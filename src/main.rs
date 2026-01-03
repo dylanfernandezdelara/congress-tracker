@@ -134,13 +134,8 @@ async fn run_votes_command(config: &Config, state: &str, date: NaiveDate, json: 
     cli::run_votes_command(config, state, date, json).await
 }
 
-async fn run_floor_command(_config: &Config, date: NaiveDate, json: bool) -> Result<()> {
-    if json {
-        println!("{{\"message\": \"floor command not yet implemented\", \"date\": \"{}\"}}", date);
-    } else {
-        println!("Floor command not yet implemented for date: {}", date);
-    }
-    Ok(())
+async fn run_floor_command(config: &Config, date: NaiveDate, json: bool) -> Result<()> {
+    cli::run_floor_command(config, date, json).await
 }
 
 async fn run_today_command(_config: &Config, state: &str, date: NaiveDate, json: bool) -> Result<()> {
