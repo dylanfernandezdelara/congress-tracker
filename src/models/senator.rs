@@ -1,0 +1,2 @@
+// Senator model definition
+
