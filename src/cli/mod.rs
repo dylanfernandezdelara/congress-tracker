@@ -6,3 +6,4 @@ pub mod votes;
 
 // Re-export command functions for easy access
 pub use senators::run_senators_command;
+pub use votes::run_votes_command;

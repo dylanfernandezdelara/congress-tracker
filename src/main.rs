@@ -130,13 +130,8 @@ async fn run_senators_command(_config: &Config, state: &str, json: bool) -> Resu
     Ok(())
 }
 
-async fn run_votes_command(_config: &Config, state: &str, date: NaiveDate, json: bool) -> Result<()> {
-    if json {
-        println!("{{\"message\": \"votes command not yet implemented\", \"state\": \"{}\", \"date\": \"{}\"}}", state, date);
-    } else {
-        println!("Votes command not yet implemented for state: {}, date: {}", state, date);
-    }
-    Ok(())
+async fn run_votes_command(config: &Config, state: &str, date: NaiveDate, json: bool) -> Result<()> {
+    cli::run_votes_command(config, state, date, json).await
 }
 
 async fn run_floor_command(_config: &Config, date: NaiveDate, json: bool) -> Result<()> {
