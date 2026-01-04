@@ -213,8 +213,8 @@ impl CongressApiClient {
     fn build_url(&self, endpoint: &str) -> String {
         let separator = if endpoint.contains('?') { '&' } else { '?' };
         format!(
-            "{}{}{}/{}{}api_key={}",
-            self.base_url, API_VERSION, endpoint, separator, "", self.api_key
+            "{}{}{}{}api_key={}",
+            self.base_url, API_VERSION, endpoint, separator, self.api_key
         )
     }
 
