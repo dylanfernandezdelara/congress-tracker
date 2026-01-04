@@ -840,6 +840,8 @@ pub fn parse_vote_list_xml(xml: &str) -> Result<Vec<VoteSummary>> {
     let mut current_vote: Option<VoteMenuFields> = None;
     let mut current_field: Option<VoteMenuField> = None;
     let mut in_votes_section = false;
+    let mut reading_congress_year = false;
+    let mut congress_year: Option<u32> = None;
 
     let mut out: Vec<VoteSummary> = Vec::new();
 
@@ -857,6 +859,10 @@ pub fn parse_vote_list_xml(xml: &str) -> Result<Vec<VoteSummary>> {
                     current_vote = Some(VoteMenuFields::default());
                     current_field = None;
                 }
+                b"congress_year" => {
+                    reading_congress_year = true;
+                    current_field = None;
+                }
                 b"vote_number" => current_field = Some(VoteMenuField::VoteNumber),
                 b"vote_date" => current_field = Some(VoteMenuField::VoteDate),
                 b"issue" => current_field = Some(VoteMenuField::Issue),
@@ -866,10 +872,19 @@ pub fn parse_vote_list_xml(xml: &str) -> Result<Vec<VoteSummary>> {
                 _ => current_field = None,
             },
             Event::Text(e) => {
-                if let (Some(vote), Some(field)) = (current_vote.as_mut(), current_field) {
-                    let text = e.unescape().context("Failed to unescape vote menu XML text")?;
-                    let text = text.trim();
-                    if !text.is_empty() {
+                let text = e.unescape().context("Failed to unescape vote menu XML text")?;
+                let text = text.trim();
+                if !text.is_empty() {
+                    // Handle congress_year
+                    if reading_congress_year {
+                        if let Ok(year) = text.parse::<u32>() {
+                            congress_year = Some(year);
+                        }
+                        reading_congress_year = false;
+                        continue;
+                    }
+                    
+                    if let (Some(vote), Some(field)) = (current_vote.as_mut(), current_field) {
                         match field {
                             VoteMenuField::VoteNumber => {
                                 vote.vote_number = text.parse().ok();
@@ -894,6 +909,9 @@ pub fn parse_vote_list_xml(xml: &str) -> Result<Vec<VoteSummary>> {
                 }
             }
             Event::End(e) => {
+                if e.name().as_ref() == b"congress_year" {
+                    reading_congress_year = false;
+                }
                 current_field = None;
 
                 match e.name().as_ref() {
@@ -902,7 +920,7 @@ pub fn parse_vote_list_xml(xml: &str) -> Result<Vec<VoteSummary>> {
                     }
                     b"vote" if in_votes_section => {
                         if let Some(vote) = current_vote.take() {
-                            if let Some(summary) = vote_menu_fields_to_summary(vote) {
+                            if let Some(summary) = vote_menu_fields_to_summary(vote, congress_year) {
                                 out.push(summary);
                             }
                         }
@@ -1190,7 +1208,7 @@ pub fn parse_vote_xml(xml: &str, config: &Config) -> Result<ParsedVoteDetails> {
     );
 
     // Parse the vote date
-    let vote_date = parse_vote_date(vote_date_str.as_deref())
+    let vote_date = parse_vote_date(vote_date_str.as_deref(), None)
         .unwrap_or_else(|| crate::util::time::today_eastern());
 
     Ok(ParsedVoteDetails {
@@ -1351,10 +1369,10 @@ impl ParsedMemberVoteBuilder {
 }
 
 /// Convert vote menu fields to a VoteSummary
-fn vote_menu_fields_to_summary(fields: VoteMenuFields) -> Option<VoteSummary> {
+fn vote_menu_fields_to_summary(fields: VoteMenuFields, congress_year: Option<u32>) -> Option<VoteSummary> {
     let vote_number = fields.vote_number?;
     let date_str = fields.vote_date?;
-    let date = parse_vote_date(Some(&date_str))?;
+    let date = parse_vote_date(Some(&date_str), congress_year)?;
 
     // Build title from available fields
     let title = build_vote_menu_title(
@@ -1435,8 +1453,8 @@ fn truncate_title(text: &str, max_len: usize) -> String {
 
 /// Parse a vote date string into NaiveDate
 ///
-/// Handles various formats like "January 15, 2024" or "2024-01-15"
-fn parse_vote_date(date_str: Option<&str>) -> Option<NaiveDate> {
+/// Handles various formats like "January 15, 2024" or "2024-01-15" or "18-Dec"
+fn parse_vote_date(date_str: Option<&str>, congress_year: Option<u32>) -> Option<NaiveDate> {
     let date_str = date_str?.trim();
     if date_str.is_empty() {
         return None;
@@ -1466,6 +1484,22 @@ fn parse_vote_date(date_str: Option<&str>) -> Option<NaiveDate> {
     // Try MM/DD/YYYY
     if let Ok(date) = NaiveDate::parse_from_str(date_str, "%m/%d/%Y") {
         return Some(date);
+    }
+
+    // Try "18-Dec" or "Dec 18" format (requires year)
+    if let Some(year) = congress_year {
+        // Try "18-Dec" format
+        if let Ok(date) = NaiveDate::parse_from_str(&format!("{} {}", date_str, year), "%d-%b %Y") {
+            return Some(date);
+        }
+        // Try "Dec 18" format
+        if let Ok(date) = NaiveDate::parse_from_str(&format!("{} {}", date_str, year), "%b %d %Y") {
+            return Some(date);
+        }
+        // Try "18-Dec" with dash separator
+        if let Ok(date) = NaiveDate::parse_from_str(&format!("{}-{}", date_str, year), "%d-%b-%Y") {
+            return Some(date);
+        }
     }
 
     None
@@ -1851,38 +1885,44 @@ mod tests {
     fn test_parse_vote_date() {
         // ISO format
         assert_eq!(
-            parse_vote_date(Some("2024-01-15")),
-            Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap())
+            parse_vote_date(Some("2025-12-18"), None),
+            Some(NaiveDate::from_ymd_opt(2025, 12, 18).unwrap())
         );
 
         // Full month name
         assert_eq!(
-            parse_vote_date(Some("January 15, 2024")),
-            Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap())
+            parse_vote_date(Some("December 18, 2025"), None),
+            Some(NaiveDate::from_ymd_opt(2025, 12, 18).unwrap())
         );
 
         // With time
         assert_eq!(
-            parse_vote_date(Some("January 15, 2024, 02:30 PM")),
-            Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap())
+            parse_vote_date(Some("December 18, 2025, 02:30 PM"), None),
+            Some(NaiveDate::from_ymd_opt(2025, 12, 18).unwrap())
         );
 
         // Short month name
         assert_eq!(
-            parse_vote_date(Some("Jan 15, 2024")),
-            Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap())
+            parse_vote_date(Some("Dec 18, 2025"), None),
+            Some(NaiveDate::from_ymd_opt(2025, 12, 18).unwrap())
         );
 
         // MM/DD/YYYY
         assert_eq!(
-            parse_vote_date(Some("01/15/2024")),
-            Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap())
+            parse_vote_date(Some("12/18/2025"), None),
+            Some(NaiveDate::from_ymd_opt(2025, 12, 18).unwrap())
+        );
+
+        // "18-Dec" format with year
+        assert_eq!(
+            parse_vote_date(Some("18-Dec"), Some(2025)),
+            Some(NaiveDate::from_ymd_opt(2025, 12, 18).unwrap())
         );
 
         // Empty/invalid
-        assert_eq!(parse_vote_date(None), None);
-        assert_eq!(parse_vote_date(Some("")), None);
-        assert_eq!(parse_vote_date(Some("invalid")), None);
+        assert_eq!(parse_vote_date(None, None), None);
+        assert_eq!(parse_vote_date(Some(""), None), None);
+        assert_eq!(parse_vote_date(Some("invalid"), None), None);
     }
 
     #[test]

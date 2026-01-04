@@ -120,14 +120,9 @@ fn format_error(err: &anyhow::Error) -> String {
     msg
 }
 
-// Placeholder command handlers - will be implemented in cli submodules
-async fn run_senators_command(_config: &Config, state: &str, json: bool) -> Result<()> {
-    if json {
-        println!("{{\"message\": \"senators command not yet implemented\", \"state\": \"{}\"}}", state);
-    } else {
-        println!("Senators command not yet implemented for state: {}", state);
-    }
-    Ok(())
+// Command handlers - delegating to cli submodules
+async fn run_senators_command(config: &Config, state: &str, json: bool) -> Result<()> {
+    cli::run_senators_command(config, state, json).await
 }
 
 async fn run_votes_command(config: &Config, state: &str, date: NaiveDate, json: bool) -> Result<()> {
@@ -138,11 +133,6 @@ async fn run_floor_command(config: &Config, date: NaiveDate, json: bool) -> Resu
     cli::run_floor_command(config, date, json).await
 }
 
-async fn run_today_command(_config: &Config, state: &str, date: NaiveDate, json: bool) -> Result<()> {
-    if json {
-        println!("{{\"message\": \"today command not yet implemented\", \"state\": \"{}\", \"date\": \"{}\"}}", state, date);
-    } else {
-        println!("Today command not yet implemented for state: {}, date: {}", state, date);
-    }
-    Ok(())
+async fn run_today_command(config: &Config, state: &str, date: NaiveDate, json: bool) -> Result<()> {
+    cli::run_today_command(config, state, Some(date), json).await
 }

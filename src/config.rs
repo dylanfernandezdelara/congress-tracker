@@ -6,9 +6,9 @@ use anyhow::{Context, Result};
 pub struct Config {
     /// Congress.gov API key loaded from environment
     pub congress_api_key: Option<String>,
-    /// Current Congress number (default: 118)
+    /// Current Congress number (default: 119)
     pub congress: u32,
-    /// Current session number (default: 2)
+    /// Current session number (default: 1)
     pub session: u32,
     /// Base URL for Senate XML endpoints
     pub senate_xml_base_url: String,
@@ -31,8 +31,8 @@ impl Config {
         
         Ok(Config {
             congress_api_key,
-            congress: 118, // Default to 118th Congress
-            session: 2,    // Default to 2nd session
+            congress: 119, // Default to 119th Congress (2025-2026)
+            session: 1,    // Default to 1st session
             senate_xml_base_url: "https://www.senate.gov/legislative/LIS/".to_string(),
             congress_api_base_url: "https://api.congress.gov/".to_string(),
         })
