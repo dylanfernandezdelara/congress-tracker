@@ -1,0 +1,16 @@
+name = "senate-data-worker"
+main = "src/index.ts"
+compatibility_date = "2026-01-04"
+
+[triggers]
+crons = ["0 10 * * *"]
+
+[vars]
+CONGRESS = "119"
+SESSION = "1"
+TARGET_STATE = "NY"
+
+[[r2_buckets]]
+binding = "DATA_BUCKET"
+bucket_name = "senate-data-bucket"
+
