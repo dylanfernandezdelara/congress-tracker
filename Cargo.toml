@@ -2,7 +2,7 @@
 name = "daily_senate_update"
 version = "0.1.0"
 edition = "2024"
-description = "CLI tool to track daily US Senate activity for your state senators"
+description = "Legacy Rust CLI used as a validation/oracle for the Cloudflare Worker output"
 
 [dependencies]
 # CLI
@@ -33,3 +33,9 @@ tokio = { version = "1.42", features = ["full"] }
 
 # Error handling
 anyhow = "1.0"
+
+[features]
+# Keep the default build focused on the Senate XML validation path.
+default = []
+# Legacy Congress.gov client (not used by the Worker ingestion pipeline).
+congress-api = []

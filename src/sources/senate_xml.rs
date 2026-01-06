@@ -304,10 +304,6 @@ struct FloorSummary {
     congress: Option<u32>,
     #[serde(default)]
     session: Option<u32>,
-    #[serde(default)]
-    date: Option<String>,
-    #[serde(default, rename = "legislative_day")]
-    legislative_day: Option<String>,
     #[serde(default, rename = "floor_actions")]
     floor_actions: Option<FloorActions>,
     #[serde(default, rename = "action")]
@@ -647,42 +643,7 @@ fn parse_floor_action_time(date: NaiveDate, time_str: Option<&str>) -> chrono::D
 
 /// Fetch and parse floor activity for a given date, returning Events
 ///
-/// This is the main public function for getting floor activity data.
-/// It handles errors gracefully - if the floor activity data is not available
-/// for the given date (e.g., weekends, recesses), it returns an empty vector
-/// rather than failing.
-pub async fn fetch_floor_activity_events(config: &Config, date: NaiveDate) -> Result<Vec<SenateEvent>> {
-    match fetch_floor_activity(config, date).await {
-        Ok(xml) => match parse_floor_activity(&xml) {
-            Ok(summary) => Ok(floor_summary_to_events(&summary, config, date)),
-            Err(e) => {
-                // Log parse error but return empty list
-                eprintln!(
-                    "Warning: Failed to parse floor activity for {}: {}",
-                    date, e
-                );
-                Ok(Vec::new())
-            }
-        },
-        Err(e) => {
-            // HTTP 404 is expected for weekends/recesses - don't log as warning
-            let error_msg = e.to_string();
-            if error_msg.contains("404") || error_msg.contains("Not Found") {
-                // This is expected, return empty list silently
-                Ok(Vec::new())
-            } else {
-                // Log other errors as warnings
-                eprintln!(
-                    "Warning: Failed to fetch floor activity for {}: {}",
-                    date, e
-                );
-                Ok(Vec::new())
-            }
-        }
-    }
-}
-
-/// Try to fetch floor activity, returning None if not available
+/// Try to fetch floor activity, returning None if not available.
 ///
 /// This is useful when you want to handle the absence of data explicitly
 /// rather than getting an empty list.
@@ -1641,8 +1602,6 @@ mod tests {
         let summary = FloorSummary {
             congress: Some(118),
             session: Some(2),
-            date: Some("2024-06-15".to_string()),
-            legislative_day: None,
             floor_actions: None,
             actions: None,
             floor_action_list: None,
@@ -1651,10 +1610,12 @@ mod tests {
         };
 
         let config = Config {
-            congress_api_key: None,
             congress: 118,
             session: 2,
             senate_xml_base_url: "https://www.senate.gov/legislative/LIS/".to_string(),
+            #[cfg(feature = "congress-api")]
+            congress_api_key: None,
+            #[cfg(feature = "congress-api")]
             congress_api_base_url: "https://api.congress.gov/".to_string(),
         };
 
@@ -1683,10 +1644,12 @@ mod tests {
         };
 
         let config = Config {
-            congress_api_key: None,
             congress: 118,
             session: 2,
             senate_xml_base_url: "https://www.senate.gov/legislative/LIS/".to_string(),
+            #[cfg(feature = "congress-api")]
+            congress_api_key: None,
+            #[cfg(feature = "congress-api")]
             congress_api_base_url: "https://api.congress.gov/".to_string(),
         };
 
@@ -1806,10 +1769,12 @@ mod tests {
         </roll_call_vote>"#;
 
         let config = Config {
-            congress_api_key: None,
             congress: 118,
             session: 2,
             senate_xml_base_url: "https://www.senate.gov/legislative/LIS/".to_string(),
+            #[cfg(feature = "congress-api")]
+            congress_api_key: None,
+            #[cfg(feature = "congress-api")]
             congress_api_base_url: "https://api.congress.gov/".to_string(),
         };
 
@@ -1857,10 +1822,12 @@ mod tests {
         };
 
         let config = Config {
-            congress_api_key: None,
             congress: 118,
             session: 2,
             senate_xml_base_url: "https://www.senate.gov/legislative/LIS/".to_string(),
+            #[cfg(feature = "congress-api")]
+            congress_api_key: None,
+            #[cfg(feature = "congress-api")]
             congress_api_base_url: "https://api.congress.gov/".to_string(),
         };
 

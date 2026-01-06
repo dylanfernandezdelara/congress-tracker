@@ -11,7 +11,7 @@ use clap::{Parser, Subcommand};
 use crate::config::Config;
 use crate::util::time::{parse_date, today_eastern};
 
-/// CLI tool to track daily US Senate activity for your state senators
+/// Legacy Rust CLI used as a validation/oracle for the Cloudflare Worker output.
 #[derive(Parser)]
 #[command(name = "daily_senate_update")]
 #[command(version, about, long_about = None)]
