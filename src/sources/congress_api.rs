@@ -1,4 +1,7 @@
-//! Congress.gov API client
+//! Congress.gov API client (legacy / optional).
+//!
+//! Post-MVP this module is **not used** by the Cloudflare Worker pipeline and is compiled only
+//! when enabling the Cargo feature `congress-api`.
 //!
 //! Phase 2D: HTTP client for Congress.gov API with member lookup and activity fetching.
 //!

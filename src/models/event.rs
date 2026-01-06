@@ -157,28 +157,6 @@ impl Event {
         }
     }
 
-    /// Create a new sponsored bill event
-    pub fn new_sponsored_bill(
-        id: String,
-        title: String,
-        timestamp: DateTime<Utc>,
-        congress: u32,
-        session: u32,
-    ) -> Self {
-        Self {
-            id,
-            event_type: EventType::SponsoredBill,
-            title,
-            description: None,
-            timestamp,
-            congress,
-            session,
-            vote_result: None,
-            senator_votes: None,
-            url: None,
-        }
-    }
-
     /// Set the description
     pub fn with_description(mut self, description: String) -> Self {
         self.description = Some(description);
