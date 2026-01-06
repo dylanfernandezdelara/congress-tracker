@@ -168,46 +168,140 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
 // Scheduled (Cron) Handler
 // ============================================================================
 
-async function handleScheduled(
-  _controller: ScheduledController,
-  env: Env
-): Promise<void> {
+/**
+ * Validates environment configuration and throws if invalid.
+ * Fails loudly so cron misconfigurations are caught immediately.
+ */
+function validateEnv(env: Env): IngestConfig {
+  const errors: string[] = [];
+
+  // Validate CONGRESS
+  if (!env.CONGRESS) {
+    errors.push("CONGRESS environment variable is missing");
+  }
+  const congress = parseInt(env.CONGRESS, 10);
+  if (isNaN(congress) || congress <= 0) {
+    errors.push(`CONGRESS must be a positive integer, got: "${env.CONGRESS}"`);
+  }
+
+  // Validate SESSION
+  if (!env.SESSION) {
+    errors.push("SESSION environment variable is missing");
+  }
+  const session = parseInt(env.SESSION, 10);
+  if (isNaN(session) || session <= 0 || session > 2) {
+    errors.push(`SESSION must be 1 or 2, got: "${env.SESSION}"`);
+  }
+
+  // Validate TARGET_STATE
+  if (!env.TARGET_STATE) {
+    errors.push("TARGET_STATE environment variable is missing");
+  }
+  const targetState = env.TARGET_STATE?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{2}$/.test(targetState)) {
+    errors.push(
+      `TARGET_STATE must be a 2-letter state code, got: "${env.TARGET_STATE}"`
+    );
+  }
+
+  // Fail loudly if any validation errors
+  if (errors.length > 0) {
+    const errorMsg = `[scheduled] CONFIGURATION ERROR:\n${errors.map((e) => `  - ${e}`).join("\n")}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  return { congress, session, targetState };
+}
+
+/**
+ * Core ingestion logic, separated for use with ctx.waitUntil.
+ */
+async function runScheduledIngestion(env: Env): Promise<void> {
+  const startTime = Date.now();
+  console.log("[scheduled] ========================================");
   console.log("[scheduled] Starting scheduled ingestion...");
+  console.log(`[scheduled] Cron trigger time: ${new Date().toISOString()}`);
 
-  const config: IngestConfig = {
-    congress: parseInt(env.CONGRESS, 10),
-    session: parseInt(env.SESSION, 10),
-    targetState: env.TARGET_STATE,
-  };
+  // Validate configuration (throws on misconfig)
+  const config = validateEnv(env);
 
+  console.log("[scheduled] Configuration validated:");
+  console.log(`[scheduled]   - Congress: ${config.congress}`);
+  console.log(`[scheduled]   - Session: ${config.session}`);
+  console.log(`[scheduled]   - Target state: ${config.targetState}`);
+
+  // Run ingestion
+  const result = await runIngestion(config);
+
+  if (!result.success) {
+    const errorMsg = `[scheduled] Ingestion failed: ${result.error}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  if (!result.snapshot || !result.meta) {
+    const errorMsg = "[scheduled] Ingestion succeeded but no data to publish";
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  // Log target date prominently before publishing
+  console.log("[scheduled] ----------------------------------------");
+  console.log(`[scheduled] TARGET VOTE DATE: ${result.targetVoteDate}`);
+  console.log(`[scheduled] Cutoff date (ET): ${result.cutoffDateEt}`);
+  console.log("[scheduled] ----------------------------------------");
+
+  // Publish to R2
+  await publishToR2(env.DATA_BUCKET, result.snapshot, result.meta);
+
+  const elapsed = Date.now() - startTime;
+  console.log("[scheduled] ========================================");
+  console.log("[scheduled] Scheduled ingestion COMPLETE");
+  console.log(`[scheduled]   - Target date: ${result.targetVoteDate}`);
+  console.log(`[scheduled]   - Votes processed: ${result.votesTotal}`);
   console.log(
-    `[scheduled] Config: congress=${config.congress}, session=${config.session}, state=${config.targetState}`
+    `[scheduled]   - Votes with ${config.targetState} members: ${result.votesWithStateMembers}`
+  );
+  console.log(`[scheduled]   - State member votes: ${result.stateMemberVotes}`);
+  console.log(`[scheduled]   - Partial data: ${result.partial}`);
+  if (result.partial && result.missingVotes.length > 0) {
+    console.log(
+      `[scheduled]   - Missing votes: ${result.missingVotes.join(", ")}`
+    );
+  }
+  console.log(`[scheduled]   - Elapsed: ${elapsed}ms`);
+  console.log("[scheduled] ========================================");
+}
+
+/**
+ * Scheduled handler for cron triggers.
+ *
+ * Uses ctx.waitUntil to ensure async work completes before the runtime
+ * terminates the worker. Fails loudly on configuration errors.
+ */
+function handleScheduled(
+  controller: ScheduledController,
+  env: Env,
+  ctx: ExecutionContext
+): void {
+  console.log(
+    `[scheduled] Cron scheduled at: ${new Date(controller.scheduledTime).toISOString()}`
   );
 
-  try {
-    const result = await runIngestion(config);
-
-    if (!result.success) {
-      console.error(`[scheduled] Ingestion failed: ${result.error}`);
-      return;
-    }
-
-    if (!result.snapshot || !result.meta) {
-      console.error("[scheduled] Ingestion succeeded but no data to publish");
-      return;
-    }
-
-    // Publish to R2
-    await publishToR2(env.DATA_BUCKET, result.snapshot, result.meta);
-
-    console.log("[scheduled] Scheduled ingestion complete");
-    console.log(`[scheduled]   - Target date: ${result.targetVoteDate}`);
-    console.log(`[scheduled]   - Votes: ${result.votesWithStateMembers}`);
-    console.log(`[scheduled]   - Partial: ${result.partial}`);
-  } catch (err) {
-    console.error("[scheduled] Unhandled error:", err);
-    throw err;
-  }
+  // Use ctx.waitUntil to ensure the async work completes
+  // This prevents the runtime from terminating the worker prematurely
+  ctx.waitUntil(
+    runScheduledIngestion(env).catch((err) => {
+      // Log and re-throw to ensure the cron run is marked as failed
+      console.error("[scheduled] FATAL: Scheduled ingestion failed");
+      console.error("[scheduled] Error:", err instanceof Error ? err.message : String(err));
+      if (err instanceof Error && err.stack) {
+        console.error("[scheduled] Stack:", err.stack);
+      }
+      throw err;
+    })
+  );
 }
 
 // ============================================================================
