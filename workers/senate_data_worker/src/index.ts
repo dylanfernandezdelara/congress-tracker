@@ -8,6 +8,13 @@
 
 import { runIngestion } from "./ingest";
 import type { IngestConfig, SnapshotJson, MetaJson } from "./types";
+import {
+  buildLatestKey,
+  buildMetaKey,
+  buildSnapshotKey,
+  publishToR2,
+  readJsonFromR2,
+} from "./storage";
 
 // ============================================================================
 // Environment Types
@@ -62,67 +69,6 @@ const notFoundResponse = (path: string) =>
 // ============================================================================
 // R2 Storage
 // ============================================================================
-
-/**
- * Write JSON to R2 bucket.
- */
-async function writeToR2(
-  bucket: R2Bucket,
-  key: string,
-  data: unknown
-): Promise<void> {
-  const json = JSON.stringify(data);
-  await bucket.put(key, json, {
-    httpMetadata: {
-      contentType: "application/json",
-    },
-  });
-  console.log(`[r2] Wrote ${key} (${json.length} bytes)`);
-}
-
-/**
- * Read JSON from R2 bucket.
- */
-async function readFromR2<T>(
-  bucket: R2Bucket,
-  key: string
-): Promise<T | null> {
-  const object = await bucket.get(key);
-  if (!object) {
-    return null;
-  }
-  const text = await object.text();
-  return JSON.parse(text) as T;
-}
-
-/**
- * Publish ingestion results to R2.
- *
- * Write order: snapshot first, then latest, then meta.
- * This ensures atomic updates from the reader's perspective.
- */
-async function publishToR2(
-  bucket: R2Bucket,
-  snapshot: SnapshotJson,
-  meta: MetaJson
-): Promise<void> {
-  const snapshotKey = meta.keys.snapshot;
-  const latestKey = meta.keys.latest;
-  const metaKey = `state/${meta.state}/_meta.json`;
-
-  console.log("[r2] Publishing to R2...");
-  console.log(`[r2]   - Snapshot: ${snapshotKey}`);
-  console.log(`[r2]   - Latest: ${latestKey}`);
-  console.log(`[r2]   - Meta: ${metaKey}`);
-
-  // Write in order: snapshot → latest → meta
-  await writeToR2(bucket, snapshotKey, snapshot);
-  await writeToR2(bucket, latestKey, snapshot);
-  await writeToR2(bucket, metaKey, meta);
-
-  console.log("[r2] Publish complete");
-}
-
 // ============================================================================
 // HTTP Handler
 // ============================================================================
@@ -164,8 +110,8 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
   const latestMatch = pathname.match(/^\/state\/([A-Z]{2})\/latest\.json$/);
   if (latestMatch) {
     const state = latestMatch[1];
-    const key = `state/${state}/latest.json`;
-    const data = await readFromR2<SnapshotJson>(env.DATA_BUCKET, key);
+    const key = buildLatestKey(state);
+    const data = await readJsonFromR2<SnapshotJson>(env.DATA_BUCKET, key);
 
     if (!data) {
       return notFoundResponse(pathname);
@@ -181,8 +127,8 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
   const metaMatch = pathname.match(/^\/state\/([A-Z]{2})\/_meta\.json$/);
   if (metaMatch) {
     const state = metaMatch[1];
-    const key = `state/${state}/_meta.json`;
-    const data = await readFromR2<MetaJson>(env.DATA_BUCKET, key);
+    const key = buildMetaKey(state);
+    const data = await readJsonFromR2<MetaJson>(env.DATA_BUCKET, key);
 
     if (!data) {
       return notFoundResponse(pathname);
@@ -201,8 +147,8 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
   if (snapshotMatch) {
     const state = snapshotMatch[1];
     const date = snapshotMatch[2];
-    const key = `state/${state}/${date}.json`;
-    const data = await readFromR2<SnapshotJson>(env.DATA_BUCKET, key);
+    const key = buildSnapshotKey(state, date);
+    const data = await readJsonFromR2<SnapshotJson>(env.DATA_BUCKET, key);
 
     if (!data) {
       return notFoundResponse(pathname);

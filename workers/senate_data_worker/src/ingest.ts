@@ -23,6 +23,7 @@ import {
   type VoteSummary,
   type VoteDetails,
 } from "./xml";
+import { buildStateKeys } from "./storage";
 import type {
   IngestConfig,
   IngestResult,
@@ -70,11 +71,12 @@ export async function runIngestion(
   fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
 ): Promise<IngestResult> {
   const { congress, session, targetState } = config;
+  const state = targetState.trim().toUpperCase();
   const cutoffDateEt = todayEastern();
   const generatedAt = new Date().toISOString();
 
   console.log(
-    `[ingest] Starting ingestion: congress=${congress}, session=${session}, state=${targetState}`
+    `[ingest] Starting ingestion: congress=${congress}, session=${session}, state=${state}`
   );
   console.log(`[ingest] Cutoff date (ET): ${cutoffDateEt}`);
 
@@ -226,7 +228,7 @@ export async function runIngestion(
   const { outputVotes, stateMemberVotes } = buildOutputVotes(
     parsedDetails,
     targetVotes,
-    targetState
+    state
   );
 
   const votesTotal = targetVotes.length;
@@ -235,7 +237,7 @@ export async function runIngestion(
 
   // Build snapshot
   const snapshot: SnapshotJson = {
-    state: targetState,
+    state,
     vote_date: targetVoteDate,
     generated_at: generatedAt,
     congress,
@@ -243,17 +245,19 @@ export async function runIngestion(
     votes: outputVotes,
   };
 
+  const keys = buildStateKeys(state, targetVoteDate);
+
   // Build meta
   const meta: MetaJson = {
-    state: targetState,
+    state,
     congress,
     session,
     generated_at: generatedAt,
     cutoff_date_et: cutoffDateEt,
     target_vote_date: targetVoteDate,
     keys: {
-      latest: `state/${targetState}/latest.json`,
-      snapshot: `state/${targetState}/${targetVoteDate}.json`,
+      latest: keys.latest,
+      snapshot: keys.snapshot,
     },
     stats: {
       votes_total: votesTotal,
