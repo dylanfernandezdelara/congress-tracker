@@ -5,12 +5,12 @@ import About from './routes/About'
 function App() {
   return (
     <BrowserRouter>
-      <div>
-        <nav style={{ marginBottom: '20px', padding: '15px', background: 'white', borderRadius: '8px' }}>
-          <Link to="/" style={{ marginRight: '20px', textDecoration: 'none', color: '#0066cc' }}>
+      <div className="appShell">
+        <nav className="appNav">
+          <Link className="appNav__link" to="/">
             Home
           </Link>
-          <Link to="/about" style={{ textDecoration: 'none', color: '#0066cc' }}>
+          <Link className="appNav__link" to="/about">
             About
           </Link>
         </nav>
