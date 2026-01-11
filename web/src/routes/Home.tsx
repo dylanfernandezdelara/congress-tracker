@@ -220,12 +220,12 @@ function Home() {
   const senatorSummary = useMemo(() => (data ? buildSenatorSummary(data) : []), [data])
 
   return (
-    <div className="page" style={{ maxWidth: '1200px', margin: '0 auto', background: 'white', borderRadius: '8px', padding: '30px' }}>
+    <div className="page">
       <header className="pageHeader">
         <h1 className="pageHeader__title">New York Senators Voting Record</h1>
         <p className="pageHeader__subtitle">Latest Senate roll-call votes for NY senators</p>
 
-        <div className="pageHeader__actions" style={{ marginTop: '12px' }}>
+        <div className="pageHeader__actions">
           <button
             type="button"
             onClick={() => setRefreshIndex((i) => i + 1)}
@@ -236,7 +236,7 @@ function Home() {
         </div>
 
         {data ? (
-          <dl className="headerMeta" style={{ marginTop: '16px' }}>
+          <dl className="headerMeta">
             <div className="headerMeta__row">
               <dt className="headerMeta__label">Vote date</dt>
               <dd className="headerMeta__value">{formatVoteDate(data.vote_date)}</dd>
@@ -253,7 +253,7 @@ function Home() {
             </div>
           </dl>
         ) : (
-          <dl className="headerMeta" style={{ marginTop: '16px' }}>
+          <dl className="headerMeta">
             <div className="headerMeta__row">
               <dt className="headerMeta__label">Resolved API base URL</dt>
               <dd className="headerMeta__value">
@@ -265,31 +265,25 @@ function Home() {
       </header>
 
       {isLoading ? (
-        <div className="state state--loading" style={{ marginTop: '20px' }}>
-          Loading latest votes…
-        </div>
+        <div className="state state--loading">Loading latest votes…</div>
       ) : null}
 
       {error ? (
-        <div className="state state--error" style={{ marginTop: '20px', color: '#b00020' }}>
+        <div className="state state--error">
           <strong>Error:</strong> {error}
         </div>
       ) : null}
 
       {data ? (
-        <main className="content" style={{ marginTop: '24px' }}>
+        <main className="content">
           <section className="senatorSummary">
             <h2 className="senatorSummary__title">Senator summary</h2>
-            <div className="senatorSummary__grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginTop: '12px' }}>
+            <div className="senatorSummary__grid">
               {senatorSummary.map((s) => (
-                <div className="senatorCard" key={s.name} style={{ border: '1px solid #eee', borderRadius: '8px', padding: '12px' }}>
-                  <div className="senatorCard__name" style={{ fontWeight: 600 }}>
-                    {s.name}
-                  </div>
-                  <div className="senatorCard__totals" style={{ marginTop: '8px', color: '#555' }}>
-                    Total: {s.total}
-                  </div>
-                  <ul className="senatorCard__breakdown" style={{ marginTop: '8px', paddingLeft: '18px' }}>
+                <div className="senatorCard" key={s.name}>
+                  <div className="senatorCard__name">{s.name}</div>
+                  <div className="senatorCard__totals">Total: {s.total}</div>
+                  <ul className="senatorCard__breakdown">
                     <li className="senatorCard__item senatorCard__item--yea">Yea: {s.yeas}</li>
                     <li className="senatorCard__item senatorCard__item--nay">Nay: {s.nays}</li>
                     <li className="senatorCard__item senatorCard__item--present">Present: {s.present}</li>
@@ -300,55 +294,47 @@ function Home() {
             </div>
           </section>
 
-          <section className="votes" style={{ marginTop: '28px' }}>
+          <section className="votes">
             <h2 className="votes__title">Votes</h2>
-            <div className="votes__list" style={{ marginTop: '12px', display: 'grid', gap: '14px' }}>
+            <div className="votes__list">
               {data.votes.map((vote) => {
                 const rk = resultKey(vote.result)
                 return (
-                  <article className="voteCard" key={vote.vote_number} style={{ border: '1px solid #eee', borderRadius: '10px', padding: '14px' }}>
+                  <article className="voteCard" key={vote.vote_number}>
                     <header className="voteCard__header">
-                      <div className="voteCard__topRow" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px' }}>
-                        <div className="voteCard__number" style={{ fontWeight: 600 }}>
-                          Roll Call {vote.vote_number}
-                        </div>
-                        <span className={`resultBadge resultBadge--${rk}`} style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '999px', border: '1px solid #ddd' }}>
+                      <div className="voteCard__topRow">
+                        <div className="voteCard__number">Roll Call {vote.vote_number}</div>
+                        <span className={`resultBadge resultBadge--${rk}`}>
                           {vote.result}
                         </span>
                       </div>
 
-                      <h3 className="voteCard__title" style={{ marginTop: '8px' }}>
-                        {vote.title}
-                      </h3>
-                      <div className="voteCard__question" style={{ marginTop: '6px', color: '#555' }}>
-                        {vote.question}
-                      </div>
+                      <h3 className="voteCard__title">{vote.title}</h3>
+                      <div className="voteCard__question">{vote.question}</div>
                       {vote.issue ? (
-                        <div className="voteCard__issue" style={{ marginTop: '6px' }}>
+                        <div className="voteCard__issue">
                           Issue: <code>{vote.issue}</code>
                         </div>
                       ) : null}
                     </header>
 
-                    <div className="voteCounts" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px', color: '#444' }}>
+                    <div className="voteCounts">
                       <span className="voteCounts__item voteCounts__item--yea">Yea: {vote.counts.yeas}</span>
                       <span className="voteCounts__item voteCounts__item--nay">Nay: {vote.counts.nays}</span>
                       <span className="voteCounts__item voteCounts__item--present">Present: {vote.counts.present}</span>
                       <span className="voteCounts__item voteCounts__item--absent">Not Voting: {vote.counts.absent}</span>
                     </div>
 
-                    <div className="memberVotes" style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                    <div className="memberVotes">
                       {vote.members.map((m) => {
                         const ck = voteCastKey(m.vote_cast)
                         return (
-                          <div className={`memberCard memberCard--${ck}`} key={m.name} style={{ border: '1px solid #f0f0f0', borderRadius: '8px', padding: '10px' }}>
-                            <div className="memberCard__name" style={{ fontWeight: 600 }}>
-                              {m.name}
-                            </div>
-                            <div className="memberCard__meta" style={{ marginTop: '2px', color: '#666', fontSize: '13px' }}>
+                          <div className={`memberCard memberCard--${ck}`} key={m.name}>
+                            <div className="memberCard__name">{m.name}</div>
+                            <div className="memberCard__meta">
                               {m.party}-{m.state}
                             </div>
-                            <div className={`memberCard__voteCast voteCast voteCast--${ck}`} style={{ marginTop: '8px' }}>
+                            <div className={`memberCard__voteCast voteCast voteCast--${ck}`}>
                               {m.vote_cast}
                             </div>
                           </div>
@@ -361,7 +347,7 @@ function Home() {
             </div>
           </section>
 
-          <div style={{ marginTop: '32px' }}>
+          <div className="settingsWrapper">
             <SettingsPanel
               apiBaseUrl={apiBaseUrl}
               onApplied={() => {
@@ -373,7 +359,7 @@ function Home() {
           </div>
         </main>
       ) : (
-        <div style={{ marginTop: '24px' }}>
+        <div className="content">
           <SettingsPanel
             apiBaseUrl={apiBaseUrl}
             onApplied={() => {
