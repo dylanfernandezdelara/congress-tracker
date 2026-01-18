@@ -1,81 +1,69 @@
 # NY Senators Voting Record - Web (React + Vite)
 
-React + Vite + TypeScript app that reads the latest NY Senate vote state from the Worker:
+React + Vite + TypeScript frontend that displays NY Senate vote data from the **Senate Data Worker API**.
 
-- **API**: `GET /state/NY/latest.json`
+## Architecture
 
-## Local development
+Two services work together:
 
-### 1) Run the Worker
+- **Worker API** (`workers/senate_data_worker/`): Backend that ingests Senate XML data, processes it, and serves JSON via HTTP API
+  - **Why needed**: Web app is frontend-only and can't fetch Senate data directly
+  - **URL**: `http://localhost:8787`
 
-In one terminal:
+- **Web App** (`web/`): Frontend UI that fetches and displays voting data
+  - **Why needed**: This is the actual website users interact with
+  - **URL**: `http://localhost:5173`
 
+**Both must run together** - the web app fetches data from the worker API.
+
+## Local Development
+
+Run both services in separate terminals:
+
+### Terminal 1: Worker API
 ```bash
 cd workers/senate_data_worker
-npm ci
-npm run dev
+npm ci          # First time only
+npm run dev     # Starts on http://localhost:8787
 ```
 
-By default this serves at `http://localhost:8787`.
+### Terminal 2: Web App
+```bash
+cd web
+npm ci          # First time only
+npm run dev     # Starts on http://localhost:5173
+```
 
-### 2) Run the web app
+Open `http://localhost:5173` in your browser.
 
-In another terminal:
+## API Configuration
+
+The web app resolves the API URL in this order:
+1. `localStorage("apiUrl")` (UI Settings panel)
+2. `VITE_API_URL` (environment variable)
+3. `http://localhost:8787` (default)
+
+**Optional**: Create `web/.env.local`:
+```bash
+VITE_API_URL=http://localhost:8787
+```
+
+## Production Build
 
 ```bash
 cd web
 npm ci
-npm run dev
+npm run build    # Output: web/dist/
+npm run preview  # Test production build locally
 ```
 
-Open the Vite dev server URL (usually `http://localhost:5173`).
+## Deployment (Cloudflare Pages)
 
-## API base URL configuration
+**Settings**:
+- Root directory: `web`
+- Build command: `npm ci && npm run build`
+- Build output: `dist`
 
-The web app resolves the API base URL in this order:
+**Environment variable**: Set `VITE_API_URL` to your deployed worker URL.
 
-1. **`localStorage("apiUrl")`** (user override)
-2. **`VITE_API_URL`** (Vite env var)
-3. **`http://localhost:8787`** (default)
-
-### Set `VITE_API_URL` (optional)
-
-Create `web/.env.local`:
-
-```bash
-VITE_API_URL=https://your-worker.example.workers.dev
-```
-
-Or set it for one command:
-
-```bash
-cd web
-VITE_API_URL=http://localhost:8787 npm run dev
-```
-
-## Build / preview
-
-```bash
-cd web
-npm ci
-npm run build
-npm run preview
-```
-
-The production build output is in `web/dist`.
-
-## Deploy to Cloudflare Pages (static)
-
-This app is a static SPA (no SSR). Deep links are handled via `web/public/_redirects`.
-
-### Pages settings
-
-- **Root directory**: `web`
-- **Build command**: `npm ci && npm run build`
-- **Build output directory**: `dist`
-
-### Runtime configuration
-
-- **Preferred**: set `VITE_API_URL` at build time (Pages → Settings → Environment variables).
-- **Fallback**: use the in-app override stored in `localStorage("apiUrl")` if you’re testing against different Worker URLs.
-
+Deep links handled via `web/public/_redirects`.
