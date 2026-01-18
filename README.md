@@ -6,8 +6,8 @@ A Cloudflare Worker that ingests Senate roll-call vote XML data, computes state-
 
 This project consists of:
 
-- **Rust CLI** (`src/`): **Legacy validation/oracle tool** (use only to sanity-check parsing/output; not deployed)
 - **Cloudflare Worker** (`workers/senate_data_worker/`): **Production** ingestion + read-only HTTP API (serves your website)
+- **Web app** (`web/`): Frontend UI that consumes the Worker API
 
 The Worker runs **once per day** via cron (10:00 UTC / 5-6 AM ET), ingests the most recent complete voting day's data, filters to NY senators, and publishes JSON to R2. Your website can then fetch precomputed JSON without making direct calls to Senate APIs.
 
@@ -374,10 +374,9 @@ votes.votes.forEach(vote => {
 
 ```
 daily_senate_update/
-├── src/                          # Rust CLI (reference implementation)
-│   ├── cli/                      # CLI commands
-│   ├── sources/                  # Senate XML parsing
-│   └── util/                     # Date/time utilities
+├── web/                          # Frontend app (Vite + React)
+│   ├── src/
+│   └── README.md
 ├── workers/
 │   └── senate_data_worker/       # Cloudflare Worker
 │       ├── src/
@@ -399,19 +398,6 @@ daily_senate_update/
 - **API Specification**: `workers/senate_data_worker/SPEC.md`
 - **Cron Schedule**: `workers/senate_data_worker/CRON.md`
 - **Validation Guide**: `workers/senate_data_worker/VALIDATION.md` (if present)
-
-## Rust CLI (validation oracle)
-
-The Rust CLI is intentionally kept as a **validation/oracle** for the Worker. It is **not** part of the Cloudflare deployment path.
-
-- **Run (example)**:
-
-```bash
-cd /Users/dylanfdl/Projects/daily_senate_update
-cargo run -- votes --state NY --date 2025-12-18 --json > rust_output.json
-```
-
-- **Compare against Worker output**: follow `workers/senate_data_worker/VALIDATION.md` (it includes `jq` snippets + an optional diff script).
 
 ## License
 

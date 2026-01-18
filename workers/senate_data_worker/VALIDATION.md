@@ -1,6 +1,6 @@
 # Validation Strategy
 
-This document describes validation steps to ensure the Worker produces correct output that matches the Rust CLI oracle.
+This document describes validation steps to ensure the Worker produces correct output.
 
 ## Overview
 
@@ -8,12 +8,11 @@ Validation occurs at multiple levels:
 1. **Local smoke tests**: Basic functionality checks using `wrangler dev`
 2. **Scheduled ingestion tests**: End-to-end ingestion using `wrangler dev --test-scheduled`
 3. **HTTP endpoint validation**: Verify JSON responses and headers
-4. **Oracle comparison**: Compare Worker output with Rust CLI output for a fixed date
+4. **Schema + regression checks**: Validate responses and (optionally) compare against saved snapshots
 
 ## Prerequisites
 
 - Node.js and npm installed
-- Rust toolchain installed (`cargo`)
 - Cloudflare R2 bucket created and bound in `wrangler.toml`
 - Worker dependencies installed: `cd workers/senate_data_worker && npm install`
 
@@ -142,22 +141,11 @@ npx wrangler r2 object list DATA_BUCKET --prefix state/NY/
 
 **Verify publish ordering:** Logs should show "write snapshot" before "write latest/meta"
 
-## 3. Rust Oracle Comparison
+## 3. Regression Validation (Worker-only)
 
-Compare Worker output with Rust CLI output for a fixed date to validate correctness.
+Validate output consistency using the Worker output alone.
 
-### 3.1 Generate Rust CLI Output
-
-Run the Rust CLI for a fixed date (e.g., 2025-12-18):
-
-```bash
-cd /Users/dylanfdl/Projects/daily_senate_update
-cargo run -- votes --state NY --date 2025-12-18 --json > rust_output.json
-```
-
-This produces a JSON array of `Event` objects filtered to NY senators.
-
-### 3.2 Generate Worker Output
+### 3.1 Generate Worker Output
 
 After running ingestion for the same date, fetch the Worker output:
 
@@ -169,62 +157,27 @@ curl http://localhost:8787/state/NY/2025-12-18.json > worker_output.json
 curl https://your-worker.your-subdomain.workers.dev/state/NY/2025-12-18.json > worker_output.json
 ```
 
-### 3.3 Compare Outputs
+### 3.2 Optional: Snapshot Baseline Comparison
 
-The Rust CLI and Worker use different output schemas, so comparison requires normalization:
-
-**Rust CLI format (`Event[]`):**
-- Array of events
-- Each event has `senator_votes: Option<Vec<SenatorVote>>`
-- Vote numbers in `id` field (e.g., `"vote-119-1-00123"`)
-
-**Worker format (`SnapshotJson`):**
-- Single object with `votes: OutputVote[]`
-- Each vote has `members: OutputMember[]` (NY senators only)
-- Vote numbers in `vote_number: number`
-
-**Key fields to compare:**
-
-1. **Vote numbers:** Should match exactly
-   ```bash
-   # Extract vote numbers from Rust output
-   jq -r '.[] | select(.event_type == "vote") | .id | match("vote-\\d+-\\d+-(\\d+)") | .captures[0].string' rust_output.json | sort -n
-   
-   # Extract vote numbers from Worker output
-   jq -r '.votes[].vote_number' worker_output.json | sort -n
-   ```
-
-2. **NY senator votes:** For each vote, compare `vote_cast` values
-   ```bash
-   # Rust: Extract senator votes per vote
-   jq '[.[] | select(.event_type == "vote") | {vote_id: .id, senators: .senator_votes[] | {name, vote_cast: .position}}]' rust_output.json
-   
-   # Worker: Extract member votes per vote
-   jq '[.votes[] | {vote_number, members: .members[] | {name, vote_cast}}]' worker_output.json
-   ```
-
-3. **Vote counts:** Compare `yeas`, `nays`, `present`, `not_voting`
-   ```bash
-   # Rust
-   jq '[.[] | select(.event_type == "vote") | {id, counts: .vote_result}]' rust_output.json
-   
-   # Worker
-   jq '[.votes[] | {vote_number, counts}]' worker_output.json
-   ```
-
-### 3.4 Use Diff Script (Optional)
-
-A helper script is provided to automate comparison (see `scripts/compare-outputs.sh`):
+If you want regression detection without external oracles, capture a known-good
+output and compare future runs against it. Example workflow:
 
 ```bash
-./scripts/compare-outputs.sh rust_output.json worker_output.json
+# Capture baseline once (commit to repo or store in a safe location)
+curl http://localhost:8787/state/NY/2025-12-18.json > baseline_output.json
+
+# Compare a new run
+curl http://localhost:8787/state/NY/2025-12-18.json > worker_output.json
+diff -u baseline_output.json worker_output.json
 ```
 
-This script:
-- Normalizes both outputs to a common format
-- Compares vote numbers
-- Compares NY senator votes per vote
-- Reports discrepancies
+If you expect ordering differences, normalize before diffing:
+
+```bash
+jq -S '.' baseline_output.json > baseline_sorted.json
+jq -S '.' worker_output.json > worker_sorted.json
+diff -u baseline_sorted.json worker_sorted.json
+```
 
 ## 4. Validation Checklist
 
@@ -250,12 +203,9 @@ Use this checklist for each validation run:
 - [ ] All endpoints have correct CORS headers
 - [ ] Cache-Control headers match spec (no `immutable`)
 
-### Oracle Comparison
-- [ ] Rust CLI runs successfully for test date (e.g., 2025-12-18)
-- [ ] Worker produces output for same date
-- [ ] Vote numbers match between Rust and Worker
-- [ ] NY senator `vote_cast` values match for each vote
-- [ ] Vote counts (`yeas`, `nays`, etc.) match
+### Regression Validation (optional)
+- [ ] Baseline snapshot captured for a fixed date
+- [ ] New output matches baseline (or diffs are explained)
 
 ### Data Quality
 - [ ] `_meta.json.target_vote_date` matches snapshot date
@@ -282,10 +232,9 @@ Use this checklist for each validation run:
 - Check R2 bucket contents: `npx wrangler r2 object list DATA_BUCKET --prefix state/NY/`
 - Verify key naming matches expected patterns
 
-### Oracle comparison shows mismatches
-- Check date normalization (both should use same date)
-- Verify state filtering (both should filter to NY)
-- Check vote number extraction logic
+### Baseline comparison shows mismatches
+- Check date normalization (same target date)
+- Verify state filtering (same `TARGET_STATE`)
 - Compare raw XML if needed to identify parsing differences
 
 ## 6. Continuous Validation
@@ -302,7 +251,7 @@ npx wrangler dev --test-scheduled
 # Validate endpoints (requires ingestion to have run)
 ./scripts/validate-endpoints.sh
 
-# Compare with Rust oracle
-./scripts/compare-outputs.sh rust_output.json worker_output.json
+# Optional regression check against a saved baseline
+diff -u baseline_sorted.json worker_sorted.json
 ```
 
