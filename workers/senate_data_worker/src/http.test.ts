@@ -104,6 +104,10 @@ function mockRequest(
   return new Request(`https://worker.example.com${path}`, { method });
 }
 
+async function readJson<T>(res: Response): Promise<T> {
+  return (await res.json()) as T;
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -170,7 +174,7 @@ describe("HTTP Read API", () => {
       const res = await handler.fetch(req, mockEnv as any);
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = await readJson<{ status: string; timestamp: string }>(res);
       expect(body.status).toBe("ok");
       expect(body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
@@ -271,7 +275,7 @@ describe("HTTP Read API", () => {
       const res = await handler.fetch(req, mockEnv as any);
 
       expect(res.status).toBe(404);
-      const body = await res.json();
+      const body = await readJson<{ error: string; path: string }>(res);
       expect(body.error).toBe("not_found");
       expect(body.path).toBe("/state/CA/_meta.json");
     });
@@ -332,7 +336,7 @@ describe("HTTP Read API", () => {
       const res = await handler.fetch(req, mockEnv as any);
 
       expect(res.status).toBe(404);
-      const body = await res.json();
+      const body = await readJson<{ error: string; path: string }>(res);
       expect(body.error).toBe("not_found");
       expect(body.path).toBe("/");
     });
