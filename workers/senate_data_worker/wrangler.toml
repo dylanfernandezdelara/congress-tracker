@@ -7,7 +7,7 @@ crons = ["0 10 * * *"]
 
 [vars]
 CONGRESS = "119"
-SESSION = "1"
+SESSION = "2"
 TARGET_STATE = "NY"
 
 [[r2_buckets]]

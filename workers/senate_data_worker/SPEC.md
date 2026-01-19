@@ -422,3 +422,129 @@ This v1 specification defines:
 
 See `CRON.md` for cron schedule specification.
 
+---
+
+# Member Activity Specification (v2)
+
+This section defines the per-member daily activity feeds (all current U.S. Senators).
+
+## JSON Schema (v2)
+
+### 1. `members/index.json`
+
+**Purpose**: List all current Senators (used to populate the web UI selector).
+
+**Structure**:
+
+```json
+{
+  "congress": 119,
+  "generated_at": "2026-01-04T16:30:00.000Z",
+  "members": [
+    {
+      "bioguide_id": "S000148",
+      "name": "Schumer, Charles E.",
+      "party": "D",
+      "state": "NY",
+      "chamber": "Senate",
+      "url": "https://www.congress.gov/member/charles-schumer/S000148"
+    }
+  ]
+}
+```
+
+### 2. `member/{bioguide}/latest.json` / `member/{bioguide}/{YYYY-MM-DD}.json`
+
+**Purpose**: Per-member daily activity for the ET window `[start_date, end_date]` covering today and the previous day.
+
+**Structure**:
+
+```json
+{
+  "member": {
+    "bioguide_id": "S000148",
+    "name": "Schumer, Charles E.",
+    "party": "D",
+    "state": "NY",
+    "chamber": "Senate",
+    "url": "https://www.congress.gov/member/charles-schumer/S000148"
+  },
+  "congress": 119,
+  "generated_at": "2026-01-04T16:30:00.000Z",
+  "window": {
+    "start_date": "2026-01-03",
+    "end_date": "2026-01-04"
+  },
+  "activities": [
+    {
+      "source": "congress",
+      "type": "legislation_action",
+      "role": "sponsor",
+      "action_date": "2026-01-03",
+      "action_text": "Referred to the Committee on Finance.",
+      "bill": {
+        "congress": 119,
+        "type": "S",
+        "number": "1234",
+        "title": "Tax Relief Act",
+        "url": "https://www.congress.gov/bill/119th-congress/senate-bill/1234"
+      }
+    }
+  ],
+  "context": {
+    "floor_schedule": [
+      {
+        "source": "senate",
+        "type": "floor_schedule",
+        "date": "2026-01-04",
+        "time": "10:00 AM",
+        "title": "Morning Business",
+        "summary": "Executive nominations and legislative business."
+      }
+    ],
+    "committee_meetings": [
+      {
+        "source": "senate",
+        "type": "committee_meeting",
+        "date": "2026-01-04",
+        "time": "02:00 PM",
+        "committee": "Judiciary",
+        "title": "Oversight hearing on DOJ operations",
+        "location": "SD-226"
+      }
+    ],
+    "daily_digest": [
+      {
+        "source": "govinfo",
+        "type": "daily_digest",
+        "date": "2026-01-03",
+        "title": "Congressional Record Daily Digest",
+        "url": "https://api.govinfo.gov/...",
+        "senate_section_url": "https://api.govinfo.gov/...",
+        "summary": "Senate considered ..."
+      }
+    ]
+  },
+  "partial": false,
+  "errors": []
+}
+```
+
+**Notes**:
+
+- `latest.json` and dated snapshots share the same schema.
+- `context` is chamber-level information shared across all members for the day (floor schedule, committee meetings, daily digest).
+- `partial` is `true` when one or more sources failed; `errors` records source failures.
+
+---
+
+## HTTP API (v2)
+
+| Method | Path                                   | Description                                  |
+|--------|----------------------------------------|----------------------------------------------|
+| GET    | `/members/index.json`                  | List all current Senators                     |
+| GET    | `/member/{bioguide}/latest.json`       | Latest activity window for a senator         |
+| GET    | `/member/{bioguide}/{YYYY-MM-DD}.json` | Dated snapshot for a senator                 |
+
+Cache and CORS headers follow the same rules as v1 (`latest` and `index` use short TTL, dated snapshots use longer TTL).
+

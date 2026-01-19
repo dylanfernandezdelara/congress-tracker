@@ -77,7 +77,8 @@ function sleep(ms: number): Promise<void> {
  */
 async function fetchWithTimeout(
   url: string,
-  timeoutMs: number
+  timeoutMs: number,
+  init?: RequestInit
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -85,10 +86,7 @@ async function fetchWithTimeout(
   try {
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: {
-        "User-Agent": "SenateDataWorker/1.0 (Cloudflare Worker)",
-        Accept: "application/xml, text/xml, */*",
-      },
+      ...init,
     });
     return response;
   } finally {
@@ -117,7 +115,12 @@ export async function fetchXmlWithRetry(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, timeoutMs);
+      const response = await fetchWithTimeout(url, timeoutMs, {
+        headers: {
+          "User-Agent": "SenateDataWorker/1.0 (Cloudflare Worker)",
+          Accept: "application/xml, text/xml, */*",
+        },
+      });
       lastStatusCode = response.status;
 
       if (response.ok) {
@@ -148,6 +151,81 @@ export async function fetchXmlWithRetry(
     }
 
     // Exponential backoff before retry
+    if (attempt < maxRetries) {
+      const delayMs = baseDelayMs * Math.pow(2, attempt);
+      await sleep(delayMs);
+    }
+  }
+
+  return {
+    success: false,
+    error: lastError ?? "Unknown error",
+    statusCode: lastStatusCode,
+  };
+}
+
+// ============================================================================
+// JSON Fetch Utilities
+// ============================================================================
+
+/**
+ * Fetch JSON content with retry and exponential backoff.
+ *
+ * @param url - The URL to fetch
+ * @param config - Fetch configuration options
+ * @param headers - Optional headers for the request
+ * @returns FetchResult with parsed JSON
+ */
+export async function fetchJsonWithRetry<T>(
+  url: string,
+  config: FetchConfig = {},
+  headers: HeadersInit = {}
+): Promise<FetchResult<T>> {
+  const { maxRetries, baseDelayMs, timeoutMs } = {
+    ...DEFAULT_CONFIG,
+    ...config,
+  };
+
+  let lastError: string | undefined;
+  let lastStatusCode: number | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, timeoutMs, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; SenateDataWorker/1.0)",
+          Accept: "application/json, */*",
+          ...headers,
+        },
+      });
+      lastStatusCode = response.status;
+
+      if (response.ok) {
+        const json = (await response.json()) as T;
+        return { success: true, data: json, statusCode: response.status };
+      }
+
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          statusCode: response.status,
+        };
+      }
+
+      lastError = `HTTP ${response.status}: ${response.statusText}`;
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.name === "AbortError") {
+          lastError = `Request timeout after ${timeoutMs}ms`;
+        } else {
+          lastError = err.message;
+        }
+      } else {
+        lastError = String(err);
+      }
+    }
+
     if (attempt < maxRetries) {
       const delayMs = baseDelayMs * Math.pow(2, attempt);
       await sleep(delayMs);

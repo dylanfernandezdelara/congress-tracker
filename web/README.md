@@ -1,16 +1,16 @@
-# NY Senators Voting Record - Web (React + Vite)
+# Senator Daily Activity - Web (React + Vite)
 
-React + Vite + TypeScript frontend that displays NY Senate vote data from the **Senate Data Worker API**.
+React + Vite + TypeScript frontend that displays per-senator daily activity from the **Senate Data Worker API**.
 
 ## Architecture
 
 Two services work together:
 
-- **Worker API** (`workers/senate_data_worker/`): Backend that ingests Senate XML data, processes it, and serves JSON via HTTP API
+- **Worker API** (`workers/senate_data_worker/`): Backend that ingests Senate activity data, processes it, and serves JSON via HTTP API
   - **Why needed**: Web app is frontend-only and can't fetch Senate data directly
   - **URL**: `http://localhost:8787`
 
-- **Web App** (`web/`): Frontend UI that fetches and displays voting data
+- **Web App** (`web/`): Frontend UI that fetches and displays member activity data
   - **Why needed**: This is the actual website users interact with
   - **URL**: `http://localhost:5173`
 

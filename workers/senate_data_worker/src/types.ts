@@ -87,6 +87,116 @@ export interface MetaJson {
 }
 
 // ============================================================================
+// Member Activity Types (Per-member daily activity)
+// ============================================================================
+
+export type ActivitySource = "congress" | "senate" | "govinfo";
+
+export type ActivityType =
+  | "legislation_action"
+  | "floor_schedule"
+  | "committee_meeting"
+  | "daily_digest";
+
+export interface MemberIndexEntry {
+  bioguide_id: string;
+  name: string;
+  party: string;
+  state: string;
+  chamber: "Senate";
+  url?: string;
+}
+
+export interface MemberIndexJson {
+  congress: number;
+  generated_at: string;
+  members: MemberIndexEntry[];
+}
+
+export interface ActivityWindow {
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+}
+
+export interface BillRef {
+  congress: number;
+  type: string; // e.g., "S", "S.RES", "PN"
+  number: string; // e.g., "123"
+  title?: string;
+  url?: string;
+}
+
+export interface LegislationActionItem {
+  source: "congress";
+  type: "legislation_action";
+  role: "sponsor" | "cosponsor";
+  action_date: string; // YYYY-MM-DD
+  action_text: string;
+  bill: BillRef;
+}
+
+export interface FloorScheduleItem {
+  source: "senate";
+  type: "floor_schedule";
+  date: string; // YYYY-MM-DD
+  time?: string;
+  title: string;
+  summary?: string;
+  location?: string;
+  url?: string;
+}
+
+export interface CommitteeMeetingItem {
+  source: "senate";
+  type: "committee_meeting";
+  date: string; // YYYY-MM-DD
+  time?: string;
+  committee: string;
+  subcommittee?: string;
+  title: string;
+  location?: string;
+  url?: string;
+}
+
+export interface DailyDigestItem {
+  source: "govinfo";
+  type: "daily_digest";
+  date: string; // YYYY-MM-DD
+  title: string;
+  url?: string;
+  senate_section_url?: string;
+  summary?: string;
+}
+
+export type ActivityItem =
+  | LegislationActionItem
+  | FloorScheduleItem
+  | CommitteeMeetingItem
+  | DailyDigestItem;
+
+export interface MemberActivityContext {
+  floor_schedule: FloorScheduleItem[];
+  committee_meetings: CommitteeMeetingItem[];
+  daily_digest: DailyDigestItem[];
+}
+
+export interface SourceError {
+  source: ActivitySource;
+  message: string;
+}
+
+export interface MemberActivityJson {
+  member: MemberIndexEntry;
+  congress: number;
+  generated_at: string;
+  window: ActivityWindow;
+  activities: ActivityItem[];
+  context: MemberActivityContext;
+  partial: boolean;
+  errors: SourceError[];
+}
+
+// ============================================================================
 // Internal Types
 // ============================================================================
 

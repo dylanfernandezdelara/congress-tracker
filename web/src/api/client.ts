@@ -5,7 +5,7 @@
  */
 
 import { getApiBaseUrl } from './config';
-import type { LatestStateResponse } from './types';
+import type { MemberActivityResponse, MemberIndexResponse } from './types';
 
 /**
  * Custom error class for API fetch failures.
@@ -26,19 +26,19 @@ export class ApiError extends Error {
 }
 
 /**
- * Fetches the latest voting data for New York senators.
+ * Fetches the list of current senators.
  *
- * Makes a request to `GET /state/NY/latest.json` and returns typed data.
+ * Makes a request to `GET /members/index.json` and returns typed data.
  *
- * @returns Promise resolving to the latest NY state voting data
+ * @returns Promise resolving to the member index
  * @throws {ApiError} When the API returns a non-OK response (with human-readable message)
  * @throws {Error} When a network error occurs
  *
  * @example
  * ```ts
  * try {
- *   const data = await fetchLatestNY();
- *   console.log(`Votes from ${data.vote_date}:`, data.votes.length);
+ *   const data = await fetchMembersIndex();
+ *   console.log(`Members:`, data.members.length);
  * } catch (error) {
  *   if (error instanceof ApiError) {
  *     console.error(`API error (${error.status}): ${error.message}`);
@@ -48,9 +48,9 @@ export class ApiError extends Error {
  * }
  * ```
  */
-export async function fetchLatestNY(): Promise<LatestStateResponse> {
+export async function fetchMembersIndex(): Promise<MemberIndexResponse> {
   const baseUrl = getApiBaseUrl();
-  const url = `${baseUrl}/state/NY/latest.json`;
+  const url = `${baseUrl}/members/index.json`;
 
   let response: Response;
   try {
@@ -72,12 +72,48 @@ export async function fetchLatestNY(): Promise<LatestStateResponse> {
 
   // Parse JSON response
   try {
-    const data: LatestStateResponse = await response.json();
+    const data: MemberIndexResponse = await response.json();
     return data;
   } catch {
     throw new Error(
       'The API returned invalid data. Please try again later.'
     );
+  }
+}
+
+/**
+ * Fetches the latest activity window for a senator.
+ *
+ * Makes a request to `GET /member/{bioguide}/latest.json` and returns typed data.
+ */
+export async function fetchMemberLatest(
+  bioguideId: string
+): Promise<MemberActivityResponse> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/member/${bioguideId}/latest.json`;
+
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    throw new Error(
+      `Failed to connect to the API. Please check your internet connection and try again.`
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      getErrorMessage(response.status, url),
+      response.status,
+      response.statusText
+    );
+  }
+
+  try {
+    const data: MemberActivityResponse = await response.json();
+    return data;
+  } catch {
+    throw new Error('The API returned invalid data. Please try again later.');
   }
 }
 
@@ -91,7 +127,7 @@ export async function fetchLatestNY(): Promise<LatestStateResponse> {
 function getErrorMessage(status: number, _url: string): string {
   switch (status) {
     case 404:
-      return 'No voting data found for New York. Data may not be available yet for today.';
+      return 'No member activity data found. Data may not be available yet.';
     case 403:
       return 'Access to voting data is forbidden. Please check your API configuration.';
     case 429:
