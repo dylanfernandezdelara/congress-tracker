@@ -4,6 +4,7 @@ import {
   todayEastern,
   compareDates,
   findMaxDateBefore,
+  subtractDays,
 } from "./date-parse";
 
 describe("parseVoteDate", () => {
@@ -327,6 +328,24 @@ describe("findMaxDateBefore", () => {
   it.each(testCases)("$description", ({ dates, cutoff, expected }) => {
     const result = findMaxDateBefore(dates, cutoff);
     expect(result).toBe(expected);
+  });
+});
+
+describe("subtractDays", () => {
+  it("subtracts a day within the same month", () => {
+    expect(subtractDays("2025-12-18", 1)).toBe("2025-12-17");
+  });
+
+  it("handles month boundaries", () => {
+    expect(subtractDays("2025-03-01", 1)).toBe("2025-02-28");
+  });
+
+  it("handles year boundaries", () => {
+    expect(subtractDays("2025-01-01", 1)).toBe("2024-12-31");
+  });
+
+  it("returns input on invalid format", () => {
+    expect(subtractDays("invalid-date", 1)).toBe("invalid-date");
   });
 });
 

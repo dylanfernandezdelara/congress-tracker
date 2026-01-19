@@ -4,8 +4,17 @@ export interface StateKeyLayout extends MetaKeys {
   meta: string;
 }
 
+export interface MemberKeyLayout {
+  latest: string;
+  snapshot: string;
+}
+
 function normalizeState(state: string): string {
   return state.trim().toUpperCase();
+}
+
+function normalizeBioguide(bioguideId: string): string {
+  return bioguideId.trim().toUpperCase();
 }
 
 export function buildLatestKey(state: string): string {
@@ -26,6 +35,28 @@ export function buildStateKeys(state: string, voteDate: string): StateKeyLayout 
     snapshot: buildSnapshotKey(state, voteDate),
     meta: buildMetaKey(state),
   };
+}
+
+export function buildMemberLatestKey(bioguideId: string): string {
+  return `member/${normalizeBioguide(bioguideId)}/latest.json`;
+}
+
+export function buildMemberSnapshotKey(bioguideId: string, date: string): string {
+  return `member/${normalizeBioguide(bioguideId)}/${date}.json`;
+}
+
+export function buildMemberKeys(
+  bioguideId: string,
+  date: string
+): MemberKeyLayout {
+  return {
+    latest: buildMemberLatestKey(bioguideId),
+    snapshot: buildMemberSnapshotKey(bioguideId, date),
+  };
+}
+
+export function buildMembersIndexKey(): string {
+  return "members/index.json";
 }
 
 export async function writeJsonToR2(

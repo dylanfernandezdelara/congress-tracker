@@ -12,10 +12,19 @@
 
 // Types
 export type {
-  LatestStateResponse,
-  Vote,
-  VoteCounts,
-  VoteMember,
+  ActivityItem,
+  ActivitySource,
+  ActivityType,
+  BillRef,
+  CommitteeMeetingItem,
+  DailyDigestItem,
+  FloorScheduleItem,
+  LegislationActionItem,
+  MemberActivityContext,
+  MemberActivityResponse,
+  MemberIndexEntry,
+  MemberIndexResponse,
+  SourceError,
 } from './types';
 
 // Config helpers
@@ -26,4 +35,4 @@ export {
 } from './config';
 
 // API client
-export { ApiError, fetchLatestNY } from './client';
+export { ApiError, fetchMemberLatest, fetchMembersIndex } from './client';

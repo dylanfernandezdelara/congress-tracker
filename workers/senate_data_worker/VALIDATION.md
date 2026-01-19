@@ -15,6 +15,9 @@ Validation occurs at multiple levels:
 - Node.js and npm installed
 - Cloudflare R2 bucket created and bound in `wrangler.toml`
 - Worker dependencies installed: `cd workers/senate_data_worker && npm install`
+- API keys configured locally via `.dev.vars`:
+  - `CONGRESS_API_KEY`
+  - `GOVINFO_API_KEY`
 
 ## 1. Local Smoke Steps
 
@@ -50,6 +53,12 @@ After running ingestion (see section 2), test the data endpoints:
 # Test latest.json endpoint
 curl -i http://localhost:8787/state/NY/latest.json
 
+# Test members index
+curl -i http://localhost:8787/members/index.json
+
+# Test member latest (replace BIOGUIDE with a real ID)
+curl -i http://localhost:8787/member/S000148/latest.json
+
 # Test _meta.json endpoint
 curl -i http://localhost:8787/state/NY/_meta.json
 
@@ -66,12 +75,15 @@ curl -i http://localhost:8787/state/NY/2020-01-01.json
 - CORS headers: `Access-Control-Allow-Origin: *`
 - Cache-Control headers:
   - `latest.json`: `s-maxage=300, stale-while-revalidate=86400`
+  - `members/index.json`: `s-maxage=300, stale-while-revalidate=86400`
   - `_meta.json`: `s-maxage=300, stale-while-revalidate=86400`
   - dated snapshots: `s-maxage=86400, stale-while-revalidate=604800`
 
 **Validate JSON structure:**
 - `latest.json` and dated snapshots should match `SnapshotJson` schema (see `src/types.ts`)
 - `_meta.json` should match `MetaJson` schema
+- `members/index.json` should match `MemberIndexJson`
+- `/member/{bioguide}/latest.json` should match `MemberActivityJson`
 - All dates should be in `YYYY-MM-DD` format
 - `generated_at` should be ISO 8601 timestamps
 
@@ -88,6 +100,7 @@ npx wrangler dev --test-scheduled
 
 This will:
 1. Trigger the `scheduled` handler
+2. Fetch member activity (Congress.gov + Senate.gov + GovInfo)
 2. Fetch vote menu XML
 3. Compute target vote date (most recent voting day before today ET)
 4. Fetch vote detail XMLs for that date
@@ -130,11 +143,16 @@ After ingestion completes, verify all three objects exist:
 ```bash
 # Using wrangler R2 commands (if available)
 npx wrangler r2 object list DATA_BUCKET --prefix state/NY/
+npx wrangler r2 object list DATA_BUCKET --prefix members/
+npx wrangler r2 object list DATA_BUCKET --prefix member/
 
 # Or verify via HTTP endpoints (see section 1.3)
 ```
 
 **Expected objects:**
+- `members/index.json`
+- `member/{BIOGUIDE}/latest.json`
+- `member/{BIOGUIDE}/{YYYY-MM-DD}.json`
 - `state/NY/latest.json`
 - `state/NY/2025-12-18.json` (or computed target date)
 - `state/NY/_meta.json`
@@ -200,6 +218,8 @@ Use this checklist for each validation run:
 - [ ] `GET /state/NY/_meta.json` returns `200` with valid `MetaJson`
 - [ ] `GET /state/NY/{DATE}.json` returns `200` for existing snapshots
 - [ ] `GET /state/NY/{DATE}.json` returns `404` for missing snapshots
+- [ ] `GET /members/index.json` returns `200` with valid `MemberIndexJson`
+- [ ] `GET /member/{BIOGUIDE}/latest.json` returns `200` with valid `MemberActivityJson`
 - [ ] All endpoints have correct CORS headers
 - [ ] Cache-Control headers match spec (no `immutable`)
 
@@ -208,6 +228,9 @@ Use this checklist for each validation run:
 - [ ] New output matches baseline (or diffs are explained)
 
 ### Data Quality
+- [ ] `members/index.json` contains 100 Senate members
+- [ ] Member activity `window.start_date` equals yesterday ET
+- [ ] Member activity `window.end_date` equals today ET
 - [ ] `_meta.json.target_vote_date` matches snapshot date
 - [ ] `_meta.json.keys.snapshot` matches actual snapshot key
 - [ ] Each vote in snapshot has exactly 2 NY senators (unless data indicates otherwise)

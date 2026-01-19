@@ -1,29 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ApiError,
-  fetchLatestNY,
+  fetchMemberLatest,
+  fetchMembersIndex,
   getApiBaseUrl,
   getApiUrlOverride,
   setApiUrlOverride,
-  type LatestStateResponse,
-  type VoteMember,
+  type ActivityItem,
+  type MemberActivityResponse,
+  type MemberIndexEntry,
 } from '../api'
 
-type VoteCast = VoteMember['vote_cast']
-
-type SenatorSummaryRow = {
-  name: string
-  total: number
-  yeas: number
-  nays: number
-  present: number
-  notVoting: number
-}
-
-function formatVoteDate(voteDate: string): string {
-  // vote_date is YYYY-MM-DD; anchor to UTC midnight for stable display.
-  const d = new Date(`${voteDate}T00:00:00Z`)
-  if (Number.isNaN(d.getTime())) return voteDate
+function formatWindowDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return dateStr
   return new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
     year: 'numeric',
@@ -45,67 +35,16 @@ function formatGeneratedAt(ts: string): string {
   }).format(d)
 }
 
-function voteCastKey(voteCast: VoteCast): 'yea' | 'nay' | 'present' | 'not-voting' | 'unknown' {
-  switch (voteCast) {
-    case 'Yea':
-      return 'yea'
-    case 'Nay':
-      return 'nay'
-    case 'Present':
-      return 'present'
-    case 'Not Voting':
-      return 'not-voting'
-    default:
-      return 'unknown'
-  }
+function formatBillLabel(item: ActivityItem): string {
+  if (item.type !== 'legislation_action') return ''
+  const number = item.bill.number ? `${item.bill.type} ${item.bill.number}` : item.bill.type
+  return item.bill.title ? `${number} — ${item.bill.title}` : number
 }
 
-function resultKey(result: string): 'passed' | 'failed' | 'neutral' {
-  const r = result.toLowerCase()
-  if (r.includes('agreed') || r.includes('passed') || r.includes('confirmed') || r.includes('invoked')) return 'passed'
-  if (r.includes('rejected') || r.includes('failed') || r.includes('not agreed') || r.includes('not invoked')) return 'failed'
-  return 'neutral'
-}
-
-function buildSenatorSummary(data: LatestStateResponse): SenatorSummaryRow[] {
-  const byName = new Map<string, SenatorSummaryRow>()
-
-  for (const vote of data.votes) {
-    for (const member of vote.members) {
-      const existing =
-        byName.get(member.name) ??
-        ({
-          name: member.name,
-          total: 0,
-          yeas: 0,
-          nays: 0,
-          present: 0,
-          notVoting: 0,
-        } satisfies SenatorSummaryRow)
-
-      existing.total += 1
-      switch (member.vote_cast) {
-        case 'Yea':
-          existing.yeas += 1
-          break
-        case 'Nay':
-          existing.nays += 1
-          break
-        case 'Present':
-          existing.present += 1
-          break
-        case 'Not Voting':
-          existing.notVoting += 1
-          break
-        default:
-          break
-      }
-
-      byName.set(member.name, existing)
-    }
-  }
-
-  return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name))
+function activitySubtitle(item: ActivityItem): string {
+  if (item.type !== 'legislation_action') return ''
+  const roleLabel = item.role === 'sponsor' ? 'Sponsored' : 'Cosponsored'
+  return `${roleLabel} • ${item.action_date}`
 }
 
 function SettingsPanel({
@@ -180,9 +119,12 @@ function SettingsPanel({
 }
 
 function Home() {
-  const [data, setData] = useState<LatestStateResponse | null>(null)
+  const [members, setMembers] = useState<MemberIndexEntry[]>([])
+  const [selectedMember, setSelectedMember] = useState<MemberIndexEntry | null>(null)
+  const [activity, setActivity] = useState<MemberActivityResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true)
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false)
   const [refreshIndex, setRefreshIndex] = useState(0)
   const [apiBaseUrl, setApiBaseUrl] = useState(() => getApiBaseUrl())
 
@@ -190,12 +132,18 @@ function Home() {
     let cancelled = false
 
     async function run() {
-      setIsLoading(true)
+      setIsLoadingMembers(true)
       setError(null)
       try {
-        const response = await fetchLatestNY()
+        const response = await fetchMembersIndex()
         if (cancelled) return
-        setData(response)
+        setMembers(response.members)
+        setSelectedMember((prev) => {
+          if (prev && response.members.some((m) => m.bioguide_id === prev.bioguide_id)) {
+            return prev
+          }
+          return response.members[0] ?? null
+        })
       } catch (e) {
         if (cancelled) return
         if (e instanceof ApiError) {
@@ -205,9 +153,9 @@ function Home() {
         } else {
           setError('Unexpected error while fetching data.')
         }
-        setData(null)
+        setMembers([])
       } finally {
-        if (!cancelled) setIsLoading(false)
+        if (!cancelled) setIsLoadingMembers(false)
       }
     }
 
@@ -217,38 +165,79 @@ function Home() {
     }
   }, [refreshIndex, apiBaseUrl])
 
-  const senatorSummary = useMemo(() => (data ? buildSenatorSummary(data) : []), [data])
+  useEffect(() => {
+    if (!selectedMember) {
+      setActivity(null)
+      return
+    }
+
+    const member = selectedMember
+    let cancelled = false
+    async function run() {
+      setIsLoadingActivity(true)
+      setError(null)
+      try {
+        const response = await fetchMemberLatest(member.bioguide_id)
+        if (cancelled) return
+        setActivity(response)
+      } catch (e) {
+        if (cancelled) return
+        if (e instanceof ApiError) {
+          setError(`${e.message} (HTTP ${e.status} ${e.statusText})`)
+        } else if (e instanceof Error) {
+          setError(e.message)
+        } else {
+          setError('Unexpected error while fetching data.')
+        }
+        setActivity(null)
+      } finally {
+        if (!cancelled) setIsLoadingActivity(false)
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedMember, apiBaseUrl, refreshIndex])
+
+  const activityItems = useMemo(() => activity?.activities ?? [], [activity])
 
   return (
     <div className="page">
       <header className="pageHeader">
-        <h1 className="pageHeader__title">New York Senators Voting Record</h1>
-        <p className="pageHeader__subtitle">Latest Senate roll-call votes for NY senators</p>
+        <h1 className="pageHeader__title">Senator Daily Activity</h1>
+        <p className="pageHeader__subtitle">
+          Today and previous day activity from Congress.gov, Senate schedules, and GovInfo
+        </p>
 
         <div className="pageHeader__actions">
           <button
             type="button"
             onClick={() => setRefreshIndex((i) => i + 1)}
-            disabled={isLoading}
+            disabled={isLoadingMembers || isLoadingActivity}
           >
-            {isLoading ? 'Refreshing…' : 'Refresh'}
+            {isLoadingMembers || isLoadingActivity ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
 
-        {data ? (
+        {activity ? (
           <dl className="headerMeta">
             <div className="headerMeta__row">
-              <dt className="headerMeta__label">Vote date</dt>
-              <dd className="headerMeta__value">{formatVoteDate(data.vote_date)}</dd>
+              <dt className="headerMeta__label">Window</dt>
+              <dd className="headerMeta__value">
+                {formatWindowDate(activity.window.start_date)} →{' '}
+                {formatWindowDate(activity.window.end_date)}
+              </dd>
             </div>
             <div className="headerMeta__row">
               <dt className="headerMeta__label">Generated at</dt>
-              <dd className="headerMeta__value">{formatGeneratedAt(data.generated_at)}</dd>
+              <dd className="headerMeta__value">{formatGeneratedAt(activity.generated_at)}</dd>
             </div>
             <div className="headerMeta__row">
-              <dt className="headerMeta__label">Congress / Session</dt>
+              <dt className="headerMeta__label">Congress</dt>
               <dd className="headerMeta__value">
-                {data.congress} / {data.session}
+                {activity.congress}
               </dd>
             </div>
           </dl>
@@ -264,8 +253,8 @@ function Home() {
         )}
       </header>
 
-      {isLoading ? (
-        <div className="state state--loading">Loading latest votes…</div>
+      {isLoadingMembers || isLoadingActivity ? (
+        <div className="state state--loading">Loading senator activity…</div>
       ) : null}
 
       {error ? (
@@ -274,78 +263,123 @@ function Home() {
         </div>
       ) : null}
 
-      {data ? (
+      {members.length > 0 ? (
         <main className="content">
-          <section className="senatorSummary">
-            <h2 className="senatorSummary__title">Senator summary</h2>
-            <div className="senatorSummary__grid">
-              {senatorSummary.map((s) => (
-                <div className="senatorCard" key={s.name}>
-                  <div className="senatorCard__name">{s.name}</div>
-                  <div className="senatorCard__totals">Total: {s.total}</div>
-                  <ul className="senatorCard__breakdown">
-                    <li className="senatorCard__item senatorCard__item--yea">Yea: {s.yeas}</li>
-                    <li className="senatorCard__item senatorCard__item--nay">Nay: {s.nays}</li>
-                    <li className="senatorCard__item senatorCard__item--present">Present: {s.present}</li>
-                    <li className="senatorCard__item senatorCard__item--not-voting">Not Voting: {s.notVoting}</li>
-                  </ul>
+          <section className="memberPicker">
+            <h2 className="memberPicker__title">Select a senator</h2>
+            <div className="memberPicker__controls">
+              <select
+                className="memberPicker__select"
+                value={selectedMember?.bioguide_id ?? ''}
+                onChange={(e) => {
+                  const next = members.find((m) => m.bioguide_id === e.target.value) ?? null
+                  setSelectedMember(next)
+                }}
+              >
+                {members.map((member) => (
+                  <option key={member.bioguide_id} value={member.bioguide_id}>
+                    {member.name} ({member.party}-{member.state})
+                  </option>
+                ))}
+              </select>
+              {selectedMember ? (
+                <span className="memberPicker__meta">
+                  {selectedMember.party}-{selectedMember.state} • {selectedMember.bioguide_id}
+                </span>
+              ) : null}
+            </div>
+          </section>
+
+          {activity ? (
+            <>
+              {activity.partial && activity.errors.length > 0 ? (
+                <div className="state state--warning">
+                  Some sources are unavailable (data may be incomplete):{' '}
+                  {activity.errors
+                    .map((e) => `${e.source.toUpperCase()}: ${e.message}`)
+                    .join(' | ')}
                 </div>
-              ))}
-            </div>
-          </section>
+              ) : null}
 
-          <section className="votes">
-            <h2 className="votes__title">Votes</h2>
-            <div className="votes__list">
-              {data.votes.map((vote) => {
-                const rk = resultKey(vote.result)
-                return (
-                  <article className="voteCard" key={vote.vote_number}>
-                    <header className="voteCard__header">
-                      <div className="voteCard__topRow">
-                        <div className="voteCard__number">Roll Call {vote.vote_number}</div>
-                        <span className={`resultBadge resultBadge--${rk}`}>
-                          {vote.result}
-                        </span>
-                      </div>
-
-                      <h3 className="voteCard__title">{vote.title}</h3>
-                      <div className="voteCard__question">{vote.question}</div>
-                      {vote.issue ? (
-                        <div className="voteCard__issue">
-                          Issue: <code>{vote.issue}</code>
+              <section className="activitySection">
+                <h2 className="activitySection__title">Legislation actions</h2>
+                {activityItems.length === 0 ? (
+                  <div className="state">No recent sponsored or cosponsored actions.</div>
+                ) : (
+                  <div className="activityList">
+                    {activityItems.map((item, idx) => (
+                      <article className="activityCard" key={`${item.type}-${idx}`}>
+                        <div className="activityCard__header">
+                          <div className="activityCard__title">{formatBillLabel(item)}</div>
+                          <div className="activityCard__subtitle">{activitySubtitle(item)}</div>
                         </div>
-                      ) : null}
-                    </header>
+                        {item.type === 'legislation_action' ? (
+                          <div className="activityCard__summary">{item.action_text}</div>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
 
-                    <div className="voteCounts">
-                      <span className="voteCounts__item voteCounts__item--yea">Yea: {vote.counts.yeas}</span>
-                      <span className="voteCounts__item voteCounts__item--nay">Nay: {vote.counts.nays}</span>
-                      <span className="voteCounts__item voteCounts__item--present">Present: {vote.counts.present}</span>
-                      <span className="voteCounts__item voteCounts__item--absent">Not Voting: {vote.counts.absent}</span>
-                    </div>
-
-                    <div className="memberVotes">
-                      {vote.members.map((m) => {
-                        const ck = voteCastKey(m.vote_cast)
-                        return (
-                          <div className={`memberCard memberCard--${ck}`} key={m.name}>
-                            <div className="memberCard__name">{m.name}</div>
-                            <div className="memberCard__meta">
-                              {m.party}-{m.state}
-                            </div>
-                            <div className={`memberCard__voteCast voteCast voteCast--${ck}`}>
-                              {m.vote_cast}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </section>
+              <section className="activitySection">
+                <h2 className="activitySection__title">Chamber context</h2>
+                <div className="contextGrid">
+                  <div className="contextCard">
+                    <h3>Floor schedule</h3>
+                    {activity.context.floor_schedule.length === 0 ? (
+                      <p>No floor schedule items found.</p>
+                    ) : (
+                      activity.context.floor_schedule.map((item, idx) => (
+                        <div className="contextItem" key={`floor-${idx}`}>
+                          <strong>{item.title}</strong>
+                          <div>{item.time ?? 'Time TBA'}</div>
+                          {item.summary ? <div>{item.summary}</div> : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="contextCard">
+                    <h3>Committee meetings</h3>
+                    {activity.context.committee_meetings.length === 0 ? (
+                      <p>No committee meetings found.</p>
+                    ) : (
+                      activity.context.committee_meetings.map((item, idx) => (
+                        <div className="contextItem" key={`committee-${idx}`}>
+                          <strong>{item.committee}</strong>
+                          <div>{item.title}</div>
+                          <div>{item.time ?? 'Time TBA'}</div>
+                          {item.location ? <div>{item.location}</div> : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="contextCard">
+                    <h3>Daily digest</h3>
+                    {activity.context.daily_digest.length === 0 ? (
+                      <p>No daily digest items found.</p>
+                    ) : (
+                      activity.context.daily_digest.map((item, idx) => (
+                        <div className="contextItem" key={`digest-${idx}`}>
+                          <strong>{item.title}</strong>
+                          <div>{item.date}</div>
+                          {item.senate_section_url ? (
+                            <a href={item.senate_section_url} target="_blank" rel="noreferrer">
+                              Senate section
+                            </a>
+                          ) : item.url ? (
+                            <a href={item.url} target="_blank" rel="noreferrer">
+                              View digest
+                            </a>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </section>
+            </>
+          ) : null}
 
           <div className="settingsWrapper">
             <SettingsPanel

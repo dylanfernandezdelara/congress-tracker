@@ -2,6 +2,15 @@
 .env
 .env.local
 .env.*.local
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Dependencies
+node_modules/
+
+# Cloudflare Wrangler
+.wrangler/
 
 # Build artifacts
 /target/
@@ -15,4 +24,3 @@
 # OS files
 .DS_Store
 Thumbs.db
-

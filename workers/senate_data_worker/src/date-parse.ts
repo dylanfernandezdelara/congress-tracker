@@ -127,7 +127,7 @@ function isValidDate(year: number, month: number, day: number): boolean {
 /**
  * Format date components as YYYY-MM-DD.
  */
-function formatDate(year: number, month: number, day: number): string {
+export function formatDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
@@ -149,6 +149,19 @@ export function todayEastern(): string {
 
   // Format returns YYYY-MM-DD in en-CA locale
   return formatter.format(now);
+}
+
+/**
+ * Subtract a number of days from a YYYY-MM-DD date string.
+ */
+export function subtractDays(dateStr: string, days: number): string {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return dateStr;
+  const [, yearStr, monthStr, dayStr] = match;
+  const date = new Date(Date.UTC(+yearStr, +monthStr - 1, +dayStr));
+  if (Number.isNaN(date.getTime())) return dateStr;
+  date.setUTCDate(date.getUTCDate() - days);
+  return formatDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
 }
 
 /**

@@ -228,9 +228,108 @@ input:focus-visible {
   background: rgba(176, 0, 32, 0.06);
 }
 
+.state--warning {
+  border-color: rgba(180, 126, 0, 0.25);
+  color: #7c4b00;
+  background: rgba(255, 201, 71, 0.12);
+}
+
 /* Content sections */
 .content {
   margin-top: 24px;
+}
+
+.memberPicker__title {
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.memberPicker__controls {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.memberPicker__select {
+  min-width: 260px;
+}
+
+.memberPicker__meta {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.activitySection {
+  margin-top: 28px;
+}
+
+.activitySection__title {
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.activityList {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.activityCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.activityCard__title {
+  font-weight: 700;
+}
+
+.activityCard__subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.activityCard__summary {
+  margin-top: 8px;
+  color: #374151;
+}
+
+.contextGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.contextCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+
+.contextCard h3 {
+  font-size: 15px;
+}
+
+.contextItem {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.contextItem:first-of-type {
+  border-top: none;
+  padding-top: 0;
 }
 
 .senatorSummary__title,

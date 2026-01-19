@@ -1,6 +1,6 @@
 # Daily Senate Update
 
-A Cloudflare Worker that ingests Senate roll-call vote XML data, computes state-specific summaries (NY for MVP), and publishes precomputed JSON to R2 for website consumption.
+A Cloudflare Worker that ingests Senate roll-call vote XML data and per-senator daily activity (Congress.gov, Senate.gov schedules, GovInfo), then publishes precomputed JSON to R2 for website consumption.
 
 ## Overview
 
@@ -9,7 +9,7 @@ This project consists of:
 - **Cloudflare Worker** (`workers/senate_data_worker/`): **Production** ingestion + read-only HTTP API (serves your website)
 - **Web app** (`web/`): Frontend UI that consumes the Worker API
 
-The Worker runs **once per day** via cron (10:00 UTC / 5-6 AM ET), ingests the most recent complete voting day's data, filters to NY senators, and publishes JSON to R2. Your website can then fetch precomputed JSON without making direct calls to Senate APIs.
+The Worker runs **once per day** via cron (10:00 UTC / 5-6 AM ET), ingests the most recent complete voting day's data plus today/previous-day member activity, and publishes JSON to R2. Your website can then fetch precomputed JSON without making direct calls to Senate APIs.
 
 ## Cloudflare Setup
 
@@ -45,7 +45,12 @@ SESSION = "1"           # Session number (1 or 2)
 TARGET_STATE = "NY"     # Two-letter state code (uppercase)
 ```
 
-**Note**: These variables are set per-environment. For production, you may want to use `wrangler secret` or environment-specific configs.
+**API keys (required)**:
+
+- `CONGRESS_API_KEY` (Congress.gov API)
+- `GOVINFO_API_KEY` (GovInfo API)
+
+For local development, set these in `workers/senate_data_worker/.dev.vars` (and keep the file out of git). For production, use `wrangler secret put CONGRESS_API_KEY` and `wrangler secret put GOVINFO_API_KEY`.
 
 ### 3. Verify R2 Binding
 
@@ -62,6 +67,15 @@ bucket_name = "senate-data-bucket"
 ```bash
 cd workers/senate_data_worker
 npm install
+```
+
+### 5. Local API Keys
+
+Create `workers/senate_data_worker/.dev.vars`:
+
+```bash
+CONGRESS_API_KEY=your_congress_api_key
+GOVINFO_API_KEY=your_govinfo_api_key
 ```
 
 ## Development
@@ -83,6 +97,12 @@ curl http://localhost:8787/health
 
 # Latest NY votes (requires data in R2)
 curl http://localhost:8787/state/NY/latest.json
+
+# Members index
+curl http://localhost:8787/members/index.json
+
+# Member activity
+curl http://localhost:8787/member/S000148/latest.json
 
 # Dated snapshot
 curl http://localhost:8787/state/NY/2025-12-18.json
@@ -240,6 +260,18 @@ All endpoints return consistent error format:
   "path": "/state/NY/2025-12-18.json"
 }
 ```
+
+### `GET /members/index.json`
+
+Returns the current list of Senators (for UI selection).
+
+### `GET /member/{bioguide}/latest.json`
+
+Returns the latest daily activity window for a senator.
+
+### `GET /member/{bioguide}/{YYYY-MM-DD}.json`
+
+Returns a dated snapshot of daily activity for a senator (window end date).
 
 ## Caching & CORS
 

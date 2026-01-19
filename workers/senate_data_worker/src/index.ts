@@ -7,14 +7,26 @@
  */
 
 import { runIngestion } from "./ingest";
-import type { IngestConfig, SnapshotJson, MetaJson } from "./types";
+import { runMemberIngestion } from "./member-ingest";
+import type {
+  IngestConfig,
+  SnapshotJson,
+  MetaJson,
+  MemberActivityJson,
+  MemberIndexJson,
+} from "./types";
 import {
   buildLatestKey,
   buildMetaKey,
   buildSnapshotKey,
+  buildMemberKeys,
+  buildMemberLatestKey,
+  buildMembersIndexKey,
   publishToR2,
   readJsonFromR2,
+  writeJsonToR2,
 } from "./storage";
+import { mapWithConcurrency } from "./concurrency";
 
 // ============================================================================
 // Environment Types
@@ -25,6 +37,8 @@ interface Env {
   CONGRESS: string;
   SESSION: string;
   TARGET_STATE: string;
+  CONGRESS_API_KEY: string;
+  GOVINFO_API_KEY: string;
 }
 
 // ============================================================================
@@ -123,6 +137,52 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     });
   }
 
+  // Match /members/index.json
+  if (pathname === "/members/index.json") {
+    const key = buildMembersIndexKey();
+    const data = await readJsonFromR2<MemberIndexJson>(env.DATA_BUCKET, key);
+    if (!data) {
+      return notFoundResponse(pathname);
+    }
+    return jsonResponse(data, {
+      status: 200,
+      headers: { "Cache-Control": cacheLatest },
+    });
+  }
+
+  // Match /member/{BIOGUIDE}/latest.json
+  const memberLatestMatch = pathname.match(/^\/member\/([A-Z]\d{6})\/latest\.json$/);
+  if (memberLatestMatch) {
+    const bioguide = memberLatestMatch[1];
+    const key = buildMemberLatestKey(bioguide);
+    const data = await readJsonFromR2<MemberActivityJson>(env.DATA_BUCKET, key);
+    if (!data) {
+      return notFoundResponse(pathname);
+    }
+    return jsonResponse(data, {
+      status: 200,
+      headers: { "Cache-Control": cacheLatest },
+    });
+  }
+
+  // Match /member/{BIOGUIDE}/{YYYY-MM-DD}.json
+  const memberSnapshotMatch = pathname.match(
+    /^\/member\/([A-Z]\d{6})\/(\d{4}-\d{2}-\d{2})\.json$/
+  );
+  if (memberSnapshotMatch) {
+    const bioguide = memberSnapshotMatch[1];
+    const date = memberSnapshotMatch[2];
+    const key = buildMemberKeys(bioguide, date).snapshot;
+    const data = await readJsonFromR2<MemberActivityJson>(env.DATA_BUCKET, key);
+    if (!data) {
+      return notFoundResponse(pathname);
+    }
+    return jsonResponse(data, {
+      status: 200,
+      headers: { "Cache-Control": cacheSnapshot },
+    });
+  }
+
   // Match /state/{STATE}/_meta.json
   const metaMatch = pathname.match(/^\/state\/([A-Z]{2})\/_meta\.json$/);
   if (metaMatch) {
@@ -204,6 +264,13 @@ function validateEnv(env: Env): IngestConfig {
     );
   }
 
+  if (!env.CONGRESS_API_KEY) {
+    errors.push("CONGRESS_API_KEY is missing");
+  }
+  if (!env.GOVINFO_API_KEY) {
+    errors.push("GOVINFO_API_KEY is missing");
+  }
+
   // Fail loudly if any validation errors
   if (errors.length > 0) {
     const errorMsg = `[scheduled] CONFIGURATION ERROR:\n${errors.map((e) => `  - ${e}`).join("\n")}`;
@@ -212,6 +279,25 @@ function validateEnv(env: Env): IngestConfig {
   }
 
   return { congress, session, targetState };
+}
+
+async function publishMemberActivity(
+  bucket: R2Bucket,
+  membersIndex: MemberIndexJson,
+  memberActivities: MemberActivityJson[],
+  windowEnd: string
+): Promise<void> {
+  console.log("[r2] Publishing member activity...");
+
+  await writeJsonToR2(bucket, buildMembersIndexKey(), membersIndex);
+
+  await mapWithConcurrency(memberActivities, 5, async (activity) => {
+    const keys = buildMemberKeys(activity.member.bioguide_id, windowEnd);
+    await writeJsonToR2(bucket, keys.snapshot, activity);
+    await writeJsonToR2(bucket, keys.latest, activity);
+  });
+
+  console.log("[r2] Member activity publish complete");
 }
 
 /**
@@ -231,7 +317,27 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   console.log(`[scheduled]   - Session: ${config.session}`);
   console.log(`[scheduled]   - Target state: ${config.targetState}`);
 
-  // Run ingestion
+  console.log("[scheduled] Running member activity ingestion...");
+  const memberResult = await runMemberIngestion({
+    congress: config.congress,
+    congressApiKey: env.CONGRESS_API_KEY,
+    govInfoApiKey: env.GOVINFO_API_KEY,
+  });
+
+  if (!memberResult.success || !memberResult.membersIndex) {
+    const errorMsg = `[scheduled] Member ingestion failed: ${memberResult.error ?? "unknown error"}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  await publishMemberActivity(
+    env.DATA_BUCKET,
+    memberResult.membersIndex,
+    memberResult.memberActivities,
+    memberResult.windowEnd
+  );
+
+  // Run legacy state ingestion (vote summaries)
   const result = await runIngestion(config);
 
   if (!result.success) {
