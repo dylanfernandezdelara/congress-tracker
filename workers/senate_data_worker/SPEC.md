@@ -64,6 +64,20 @@ This document defines the contracts for the Cloudflare Worker that ingests Senat
   - `question` (string): Vote question (e.g., "On the Motion to Table", "On Passage of the Bill")
   - `result` (string): Vote outcome (e.g., "Motion to Table Agreed to", "Bill Passed")
   - `issue` (string, optional): Bill/document reference (e.g., "H.R. 8998", "S. 1234")
+  - `issue_type` (string, optional): One of `bill`, `nomination`, `treaty`, `other`
+  - `bill` (object, optional): Enriched bill metadata when `issue_type == "bill"`
+    - `congress` (integer): Congress number
+    - `type` (string): Bill type (e.g., "S", "H.R.", "S. Res.")
+    - `number` (string): Bill number
+    - `title` (string, optional): Bill title
+    - `url` (string, optional): Congress.gov bill URL
+    - `summary` (string, optional): Official Congress.gov summary text (latest available)
+    - `summary_date` (string, optional): Date of the summary (`YYYY-MM-DD`)
+    - `policy_area` (string, optional): Policy area name
+    - `subjects` (array, optional): Legislative subjects list
+    - `committees` (array, optional): Committees of referral (name/chamber/id)
+    - `introduced_date` (string, optional): Introduced date (`YYYY-MM-DD`)
+    - `latest_action` (object, optional): Latest action text/date
   - `counts` (object): Vote tallies
     - `yeas` (integer): Yea votes
     - `nays` (integer): Nay votes
@@ -455,7 +469,7 @@ This section defines the per-member daily activity feeds (all current U.S. Senat
 
 ### 2. `member/{bioguide}/latest.json` / `member/{bioguide}/{YYYY-MM-DD}.json`
 
-**Purpose**: Per-member daily activity for the ET window `[start_date, end_date]` covering today and the previous day.
+**Purpose**: Per-member daily activity for a rolling 7-day ET window `[start_date, end_date]` covering today and the previous 6 days.
 
 **Structure**:
 
@@ -472,7 +486,7 @@ This section defines the per-member daily activity feeds (all current U.S. Senat
   "congress": 119,
   "generated_at": "2026-01-04T16:30:00.000Z",
   "window": {
-    "start_date": "2026-01-03",
+    "start_date": "2025-12-29",
     "end_date": "2026-01-04"
   },
   "activities": [
@@ -482,6 +496,7 @@ This section defines the per-member daily activity feeds (all current U.S. Senat
       "role": "sponsor",
       "action_date": "2026-01-03",
       "action_text": "Referred to the Committee on Finance.",
+      "activity_id": "S000148:congress:legislation_action:sponsor:2026-01-03:119-s-1234",
       "bill": {
         "congress": 119,
         "type": "S",
@@ -489,6 +504,24 @@ This section defines the per-member daily activity feeds (all current U.S. Senat
         "title": "Tax Relief Act",
         "url": "https://www.congress.gov/bill/119th-congress/senate-bill/1234"
       }
+    },
+    {
+      "source": "senate",
+      "type": "roll_call_vote",
+      "vote_number": 12,
+      "vote_date": "2026-01-03",
+      "title": "On the Motion to Invoke Cloture",
+      "question": "Cloture Motion",
+      "result": "Agreed to",
+      "vote_cast": "Yea",
+      "activity_id": "S000148:senate:roll_call_vote:2026-01-03:12",
+      "bill": {
+        "congress": 119,
+        "type": "S",
+        "number": "1234"
+      },
+      "url": "https://www.senate.gov/legislative/LIS/roll_call_votes/vote1191/vote_119_1_00012.xml",
+      "topics": ["Taxation", "Finance"]
     }
   ],
   "context": {
@@ -530,6 +563,13 @@ This section defines the per-member daily activity feeds (all current U.S. Senat
 }
 ```
 
+**Bill enrichment**: `activities[].bill` can include the same optional enrichment fields described in the vote schema (`summary`, `policy_area`, `subjects`, `committees`, `introduced_date`, `latest_action`).
+
+**Optional fields**:
+
+- `activities[].activity_id` is a stable identifier for the member-specific activity (useful for de-duplication).
+- `activities[].topics` is an optional list of topical tags derived from bill metadata (policy area, subjects, committees).
+
 **Notes**:
 
 - `latest.json` and dated snapshots share the same schema.
@@ -538,6 +578,32 @@ This section defines the per-member daily activity feeds (all current U.S. Senat
 
 ---
 
+### 3. `activities/index.json` (optional)
+
+**Purpose**: A compact activity ledger that lists unique activities and the Senator IDs associated with each activity. Useful for building trending/graph features without touching the frontend.
+
+**Structure**:
+
+```json
+{
+  "generated_at": "2026-01-04T16:30:00.000Z",
+  "window": {
+    "start_date": "2025-12-29",
+    "end_date": "2026-01-04"
+  },
+  "activities": [
+    {
+      "activity_id": "senate:roll_call_vote:2026-01-03:12",
+      "source": "senate",
+      "type": "roll_call_vote",
+      "date": "2026-01-03",
+      "title": "On the Motion to Invoke Cloture",
+      "members": ["S000148", "M000639"]
+    }
+  ]
+}
+```
+
 ## HTTP API (v2)
 
 | Method | Path                                   | Description                                  |
@@ -545,6 +611,6 @@ This section defines the per-member daily activity feeds (all current U.S. Senat
 | GET    | `/members/index.json`                  | List all current Senators                     |
 | GET    | `/member/{bioguide}/latest.json`       | Latest activity window for a senator         |
 | GET    | `/member/{bioguide}/{YYYY-MM-DD}.json` | Dated snapshot for a senator                 |
+| GET    | `/activities/index.json`               | Activity ledger (optional)                    |
 
 Cache and CORS headers follow the same rules as v1 (`latest` and `index` use short TTL, dated snapshots use longer TTL).
-

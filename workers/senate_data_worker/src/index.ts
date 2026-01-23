@@ -6,7 +6,7 @@
  * - HTTP API for serving precomputed JSON from R2
  */
 
-import { runIngestion } from "./ingest";
+import { runIngestion, runIngestionAllStates } from "./ingest";
 import { runMemberIngestion } from "./member-ingest";
 import type {
   IngestConfig,
@@ -14,7 +14,9 @@ import type {
   MetaJson,
   MemberActivityJson,
   MemberIndexJson,
+  ActivityIndexJson,
 } from "./types";
+import { STATE_CODES } from "./states";
 import {
   buildLatestKey,
   buildMetaKey,
@@ -22,6 +24,7 @@ import {
   buildMemberKeys,
   buildMemberLatestKey,
   buildMembersIndexKey,
+  buildActivitiesIndexKey,
   publishToR2,
   readJsonFromR2,
   writeJsonToR2,
@@ -112,6 +115,9 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       {
         status: "ok",
         timestamp: new Date().toISOString(),
+        target_state: env.TARGET_STATE,
+        congress: env.CONGRESS,
+        session: env.SESSION,
       },
       {
         status: 200,
@@ -141,6 +147,19 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
   if (pathname === "/members/index.json") {
     const key = buildMembersIndexKey();
     const data = await readJsonFromR2<MemberIndexJson>(env.DATA_BUCKET, key);
+    if (!data) {
+      return notFoundResponse(pathname);
+    }
+    return jsonResponse(data, {
+      status: 200,
+      headers: { "Cache-Control": cacheLatest },
+    });
+  }
+
+  // Match /activities/index.json
+  if (pathname === "/activities/index.json") {
+    const key = buildActivitiesIndexKey();
+    const data = await readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, key);
     if (!data) {
       return notFoundResponse(pathname);
     }
@@ -258,9 +277,9 @@ function validateEnv(env: Env): IngestConfig {
     errors.push("TARGET_STATE environment variable is missing");
   }
   const targetState = env.TARGET_STATE?.trim().toUpperCase() ?? "";
-  if (!/^[A-Z]{2}$/.test(targetState)) {
+  if (!(targetState === "ALL" || /^[A-Z]{2}$/.test(targetState))) {
     errors.push(
-      `TARGET_STATE must be a 2-letter state code, got: "${env.TARGET_STATE}"`
+      `TARGET_STATE must be a 2-letter state code or "ALL", got: "${env.TARGET_STATE}"`
     );
   }
 
@@ -278,18 +297,22 @@ function validateEnv(env: Env): IngestConfig {
     throw new Error(errorMsg);
   }
 
-  return { congress, session, targetState };
+  return { congress, session, targetState, congressApiKey: env.CONGRESS_API_KEY };
 }
 
 async function publishMemberActivity(
   bucket: R2Bucket,
   membersIndex: MemberIndexJson,
   memberActivities: MemberActivityJson[],
-  windowEnd: string
+  windowEnd: string,
+  activityIndex: ActivityIndexJson | null
 ): Promise<void> {
   console.log("[r2] Publishing member activity...");
 
   await writeJsonToR2(bucket, buildMembersIndexKey(), membersIndex);
+  if (activityIndex) {
+    await writeJsonToR2(bucket, buildActivitiesIndexKey(), activityIndex);
+  }
 
   await mapWithConcurrency(memberActivities, 5, async (activity) => {
     const keys = buildMemberKeys(activity.member.bioguide_id, windowEnd);
@@ -298,6 +321,17 @@ async function publishMemberActivity(
   });
 
   console.log("[r2] Member activity publish complete");
+}
+
+async function publishAllStatesToR2(
+  bucket: R2Bucket,
+  perState: Record<string, { snapshot: SnapshotJson; meta: MetaJson }>
+): Promise<void> {
+  const entries = Object.entries(perState);
+  await mapWithConcurrency(entries, 4, async ([state, payload]) => {
+    console.log(`[r2] Publishing ${state} vote data...`);
+    await publishToR2(bucket, payload.snapshot, payload.meta);
+  });
 }
 
 /**
@@ -320,6 +354,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   console.log("[scheduled] Running member activity ingestion...");
   const memberResult = await runMemberIngestion({
     congress: config.congress,
+    session: config.session,
     congressApiKey: env.CONGRESS_API_KEY,
     govInfoApiKey: env.GOVINFO_API_KEY,
   });
@@ -334,50 +369,82 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     env.DATA_BUCKET,
     memberResult.membersIndex,
     memberResult.memberActivities,
-    memberResult.windowEnd
+    memberResult.windowEnd,
+    memberResult.activityIndex
   );
 
-  // Run legacy state ingestion (vote summaries)
-  const result = await runIngestion(config);
+  // Run state ingestion (vote summaries)
+  if (config.targetState === "ALL") {
+    const result = await runIngestionAllStates(config, STATE_CODES);
 
-  if (!result.success) {
-    const errorMsg = `[scheduled] Ingestion failed: ${result.error}`;
-    console.error(errorMsg);
-    throw new Error(errorMsg);
-  }
+    if (!result.success) {
+      const errorMsg = `[scheduled] Ingestion failed: ${result.error}`;
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
 
-  if (!result.snapshot || !result.meta) {
-    const errorMsg = "[scheduled] Ingestion succeeded but no data to publish";
-    console.error(errorMsg);
-    throw new Error(errorMsg);
-  }
+    console.log("[scheduled] ----------------------------------------");
+    console.log(`[scheduled] TARGET VOTE DATE: ${result.targetVoteDate}`);
+    console.log(`[scheduled] Cutoff date (ET): ${result.cutoffDateEt}`);
+    console.log(`[scheduled] States processed: ${Object.keys(result.perState).length}`);
+    console.log("[scheduled] ----------------------------------------");
 
-  // Log target date prominently before publishing
-  console.log("[scheduled] ----------------------------------------");
-  console.log(`[scheduled] TARGET VOTE DATE: ${result.targetVoteDate}`);
-  console.log(`[scheduled] Cutoff date (ET): ${result.cutoffDateEt}`);
-  console.log("[scheduled] ----------------------------------------");
+    await publishAllStatesToR2(env.DATA_BUCKET, result.perState);
 
-  // Publish to R2
-  await publishToR2(env.DATA_BUCKET, result.snapshot, result.meta);
+    const elapsed = Date.now() - startTime;
+    console.log("[scheduled] ========================================");
+    console.log("[scheduled] Scheduled ingestion COMPLETE");
+    console.log(`[scheduled]   - Target date: ${result.targetVoteDate}`);
+    console.log(`[scheduled]   - Votes processed: ${result.votesTotal}`);
+    console.log(`[scheduled]   - States processed: ${Object.keys(result.perState).length}`);
+    console.log(`[scheduled]   - Partial data: ${result.partial}`);
+    if (result.partial && result.missingVotes.length > 0) {
+      console.log(
+        `[scheduled]   - Missing votes: ${result.missingVotes.join(", ")}`
+      );
+    }
+    console.log(`[scheduled]   - Elapsed: ${elapsed}ms`);
+    console.log("[scheduled] ========================================");
+  } else {
+    const result = await runIngestion(config);
 
-  const elapsed = Date.now() - startTime;
-  console.log("[scheduled] ========================================");
-  console.log("[scheduled] Scheduled ingestion COMPLETE");
-  console.log(`[scheduled]   - Target date: ${result.targetVoteDate}`);
-  console.log(`[scheduled]   - Votes processed: ${result.votesTotal}`);
-  console.log(
-    `[scheduled]   - Votes with ${config.targetState} members: ${result.votesWithStateMembers}`
-  );
-  console.log(`[scheduled]   - State member votes: ${result.stateMemberVotes}`);
-  console.log(`[scheduled]   - Partial data: ${result.partial}`);
-  if (result.partial && result.missingVotes.length > 0) {
+    if (!result.success) {
+      const errorMsg = `[scheduled] Ingestion failed: ${result.error}`;
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    if (!result.snapshot || !result.meta) {
+      const errorMsg = "[scheduled] Ingestion succeeded but no data to publish";
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    console.log("[scheduled] ----------------------------------------");
+    console.log(`[scheduled] TARGET VOTE DATE: ${result.targetVoteDate}`);
+    console.log(`[scheduled] Cutoff date (ET): ${result.cutoffDateEt}`);
+    console.log("[scheduled] ----------------------------------------");
+
+    await publishToR2(env.DATA_BUCKET, result.snapshot, result.meta);
+
+    const elapsed = Date.now() - startTime;
+    console.log("[scheduled] ========================================");
+    console.log("[scheduled] Scheduled ingestion COMPLETE");
+    console.log(`[scheduled]   - Target date: ${result.targetVoteDate}`);
+    console.log(`[scheduled]   - Votes processed: ${result.votesTotal}`);
     console.log(
-      `[scheduled]   - Missing votes: ${result.missingVotes.join(", ")}`
+      `[scheduled]   - Votes with ${config.targetState} members: ${result.votesWithStateMembers}`
     );
+    console.log(`[scheduled]   - State member votes: ${result.stateMemberVotes}`);
+    console.log(`[scheduled]   - Partial data: ${result.partial}`);
+    if (result.partial && result.missingVotes.length > 0) {
+      console.log(
+        `[scheduled]   - Missing votes: ${result.missingVotes.join(", ")}`
+      );
+    }
+    console.log(`[scheduled]   - Elapsed: ${elapsed}ms`);
+    console.log("[scheduled] ========================================");
   }
-  console.log(`[scheduled]   - Elapsed: ${elapsed}ms`);
-  console.log("[scheduled] ========================================");
 }
 
 /**
