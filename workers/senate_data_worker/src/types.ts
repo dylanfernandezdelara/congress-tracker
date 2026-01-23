@@ -37,6 +37,8 @@ export interface OutputVote {
   question: string;
   result: string;
   issue?: string;
+  issue_type?: "bill" | "nomination" | "treaty" | "other";
+  bill?: BillRef;
   counts: OutputCounts;
   members: OutputMember[];
 }
@@ -94,6 +96,7 @@ export type ActivitySource = "congress" | "senate" | "govinfo";
 
 export type ActivityType =
   | "legislation_action"
+  | "roll_call_vote"
   | "floor_schedule"
   | "committee_meeting"
   | "daily_digest";
@@ -124,6 +127,24 @@ export interface BillRef {
   number: string; // e.g., "123"
   title?: string;
   url?: string;
+  summary?: string;
+  summary_date?: string;
+  policy_area?: string;
+  subjects?: string[];
+  committees?: BillCommittee[];
+  introduced_date?: string;
+  latest_action?: BillLatestAction;
+}
+
+export interface BillLatestAction {
+  action_date?: string; // YYYY-MM-DD
+  text?: string;
+}
+
+export interface BillCommittee {
+  name: string;
+  chamber?: string;
+  committee_id?: string;
 }
 
 export interface LegislationActionItem {
@@ -133,6 +154,24 @@ export interface LegislationActionItem {
   action_date: string; // YYYY-MM-DD
   action_text: string;
   bill: BillRef;
+  is_recent?: boolean;
+  activity_id?: string;
+  topics?: string[];
+}
+
+export interface RollCallVoteItem {
+  source: "senate";
+  type: "roll_call_vote";
+  vote_number: number;
+  vote_date: string; // YYYY-MM-DD
+  title?: string;
+  question?: string;
+  result?: string;
+  vote_cast: string;
+  bill?: BillRef;
+  url?: string;
+  activity_id?: string;
+  topics?: string[];
 }
 
 export interface FloorScheduleItem {
@@ -144,6 +183,8 @@ export interface FloorScheduleItem {
   summary?: string;
   location?: string;
   url?: string;
+  activity_id?: string;
+  topics?: string[];
 }
 
 export interface CommitteeMeetingItem {
@@ -156,6 +197,8 @@ export interface CommitteeMeetingItem {
   title: string;
   location?: string;
   url?: string;
+  activity_id?: string;
+  topics?: string[];
 }
 
 export interface DailyDigestItem {
@@ -166,10 +209,13 @@ export interface DailyDigestItem {
   url?: string;
   senate_section_url?: string;
   summary?: string;
+  activity_id?: string;
+  topics?: string[];
 }
 
 export type ActivityItem =
   | LegislationActionItem
+  | RollCallVoteItem
   | FloorScheduleItem
   | CommitteeMeetingItem
   | DailyDigestItem;
@@ -196,6 +242,23 @@ export interface MemberActivityJson {
   errors: SourceError[];
 }
 
+export interface ActivityIndexEntry {
+  activity_id: string;
+  source: ActivitySource;
+  type: ActivityType;
+  date: string;
+  title?: string;
+  bill?: BillRef;
+  topics?: string[];
+  members: string[];
+}
+
+export interface ActivityIndexJson {
+  generated_at: string;
+  window: ActivityWindow;
+  activities: ActivityIndexEntry[];
+}
+
 // ============================================================================
 // Internal Types
 // ============================================================================
@@ -207,6 +270,7 @@ export interface IngestConfig {
   congress: number;
   session: number;
   targetState: string;
+  congressApiKey: string;
 }
 
 /**
@@ -235,3 +299,25 @@ export interface IngestResult {
   error?: string;
 }
 
+/**
+ * Result from multi-state ingestion.
+ */
+export interface MultiStateIngestResult {
+  success: boolean;
+  targetVoteDate: string | null;
+  cutoffDateEt: string;
+  votesTotal: number;
+  partial: boolean;
+  missingVotes: number[];
+  generatedAt: string;
+  perState: Record<
+    string,
+    {
+      snapshot: SnapshotJson;
+      meta: MetaJson;
+      votesWithStateMembers: number;
+      stateMemberVotes: number;
+    }
+  >;
+  error?: string;
+}

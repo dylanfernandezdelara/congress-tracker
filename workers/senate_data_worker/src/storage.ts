@@ -59,6 +59,10 @@ export function buildMembersIndexKey(): string {
   return "members/index.json";
 }
 
+export function buildActivitiesIndexKey(): string {
+  return "activities/index.json";
+}
+
 export async function writeJsonToR2(
   bucket: R2Bucket,
   key: string,
