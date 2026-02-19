@@ -13,6 +13,8 @@ function makeCard(overrides: Partial<ActionCardVM> = {}): ActionCardVM {
     context: '$886 billion for the Department of Defense.',
     status: 'rejected',
     voteLine: { label: 'Cloture failed', yea: 52, nay: 45, date: '2026-02-12', leadParty: { abbr: 'R', color: '#dc2626' } },
+    isCloseVote: false,
+    swingSenators: [],
     ...overrides,
   }
 }
@@ -49,5 +51,26 @@ describe('ActionCards', () => {
 
     rerender(<ActionCards cards={[makeCard({ status: 'in-progress' })]} />)
     expect(screen.getByText('In progress')).toBeTruthy()
+  })
+
+  it('renders swing footer for close-vote cards', () => {
+    const card = makeCard({
+      isCloseVote: true,
+      swingSenators: [
+        { name: 'Collins', party: 'R', state: 'ME', color: '#dc2626', voteCast: 'Yea', swingPct: 40 },
+      ],
+    })
+    const { container } = render(<ActionCards cards={[card]} />)
+    expect(container.querySelector('.actionCard__swing')).toBeTruthy()
+    expect(screen.getByText('Swing votes')).toBeTruthy()
+    expect(screen.getByText('Collins')).toBeTruthy()
+    expect(screen.getByText('(R-ME)')).toBeTruthy()
+    expect(screen.getByText('voted Yea')).toBeTruthy()
+  })
+
+  it('does not render swing footer for non-close votes', () => {
+    const card = makeCard({ isCloseVote: false, swingSenators: [] })
+    const { container } = render(<ActionCards cards={[card]} />)
+    expect(container.querySelector('.actionCard__swing')).toBeNull()
   })
 })

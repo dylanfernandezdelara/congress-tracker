@@ -10,7 +10,7 @@ import {
 } from '../api'
 import { E2E_ACTIVITIES, E2E_LEDGER, E2E_OVERVIEW } from '../e2eData'
 import ActionCards from '../components/ActionCards'
-import DecisiveVotes from '../components/DecisiveVotes'
+import SwingLeaderboard from '../components/SwingLeaderboard'
 import ComingUp from '../components/ComingUp'
 import StateDumbbell from '../components/StateDumbbell'
 import ChamberArc from '../components/ChamberArc'
@@ -18,8 +18,9 @@ import {
   buildAttendanceArcVM,
   buildBillTimelineVM,
   buildComingUpVM,
-  buildDecisiveVotesVM,
+  buildGatekeepersVM,
   buildStateDumbbellVM,
+  buildSwingFrequencyIndex,
   toActionCards,
 } from '../ui/homeViewModel'
 
@@ -134,9 +135,14 @@ export default function Home() {
     }
   }, [billTimelineVM])
 
-  const decisiveVM = useMemo(
-    () => ledger && overview ? buildDecisiveVotesVM(ledger, overview, activities) : null,
+  const swingIndex = useMemo(
+    () => ledger && overview ? buildSwingFrequencyIndex(ledger, overview, activities) : null,
     [ledger, overview, activities],
+  )
+
+  const gatekeepers = useMemo(
+    () => ledger && overview ? buildGatekeepersVM(ledger, overview) : [],
+    [ledger, overview],
   )
 
   const comingUpVM = useMemo(
@@ -155,8 +161,8 @@ export default function Home() {
   )
 
   const actionCards = useMemo(
-    () => billTimelineVM ? toActionCards(billTimelineVM) : null,
-    [billTimelineVM],
+    () => billTimelineVM && swingIndex ? toActionCards(billTimelineVM, swingIndex) : null,
+    [billTimelineVM, swingIndex],
   )
 
   return (
@@ -197,17 +203,13 @@ export default function Home() {
             </section>
           )}
 
-          {decisiveVM && (decisiveVM.decisiveVotes.length > 0 || decisiveVM.featuredSenators.length > 0) && (
-            <section className="vizSection" aria-label="Decisive votes">
-              <h2 className="vizSection__title">
-                {decisiveVM.type === 'decisive' ? 'Who made the difference' : 'Senators to watch'}
-              </h2>
+          {swingIndex && (swingIndex.profiles.size > 0 || gatekeepers.length > 0) && (
+            <section className="vizSection" aria-label="Swing voter patterns">
+              <h2 className="vizSection__title">Swing voter patterns</h2>
               <p className="vizSection__subtitle">
-                {decisiveVM.type === 'decisive'
-                  ? 'Close votes where individual senators swung the outcome.'
-                  : 'The most active and notable senators this session.'}
+                Senators who most often break party ranks on close votes, and the topics where they do it.
               </p>
-              <DecisiveVotes data={decisiveVM} />
+              <SwingLeaderboard swingIndex={swingIndex} gatekeepers={gatekeepers} />
             </section>
           )}
 

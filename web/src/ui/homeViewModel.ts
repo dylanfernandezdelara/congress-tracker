@@ -4,7 +4,6 @@ import type {
   BillAnalysis,
   BillImpactEvidence,
   BillRef,
-  FeaturedSenatorEntry,
   RecipientEvidence,
   SessionOverview,
   VoteLedger,
@@ -250,33 +249,18 @@ export function buildStateDumbbellVM(
 // ---------------------------------------------------------------------------
 
 export interface Crossover {
+  bioguideId: string
   name: string
   party: string
+  state: string
   color: string
+  voteCast: VoteCast
 }
 
 // ---------------------------------------------------------------------------
-// 5. Enriched Votes (bill summaries, policy tags, margin analysis)
+// 5. Shared helpers
 // ---------------------------------------------------------------------------
 
-export interface EnrichedVoteVM {
-  voteNumber: number
-  date: string
-  title: string
-  billTitle: string | null
-  billSummary: string | null
-  policyArea: string | null
-  result: string
-  passed: boolean
-  totalYea: number
-  totalNay: number
-  margin: number
-  isClose: boolean
-  crossovers: Crossover[]
-  isPartyLine: boolean
-}
-
-const MAX_ENRICHED = 7
 const CLOSE_MARGIN_THRESHOLD = 5
 
 function stripHtml(html: string): string {
@@ -344,117 +328,39 @@ function isPassed(result: string): boolean {
   return /agreed to|agreed|passed|confirmed|invoked|adopted|approved/.test(lc)
 }
 
-export function buildEnrichedVotesVM(
-  ledger: VoteLedger,
-  overview: SessionOverview,
-  activities: ActivityIndexResponse | null,
-): EnrichedVoteVM[] {
-  const partyMap = new Map<string, string>()
-  const nameMap = new Map<string, string>()
-  for (const s of overview.senators) {
-    partyMap.set(s.bioguide_id, s.party)
-    nameMap.set(s.bioguide_id, s.name)
-  }
-
-  const billLookup = activities ? buildBillLookup(activities) : new Map<number, BillRef>()
-  const recent = ledger.entries.slice(0, MAX_ENRICHED)
-
-  return recent.map((entry) => {
-    const bill = billLookup.get(entry.vote_number)
-    const { totalYea, totalNay } = computeVoteTallies(entry)
-    const margin = Math.abs(totalYea - totalNay)
-    const isClose = margin <= CLOSE_MARGIN_THRESHOLD
-
-    const majority = partyMajorityForVote(entry, partyMap)
-    const crossovers: Crossover[] = []
-
-    if (isClose) {
-      for (const [bio, cast] of Object.entries(entry.member_votes)) {
-        const cv = classifyVote(cast)
-        const party = partyMap.get(bio)
-        if (!party) continue
-        const partyMaj = majority.get(party)
-        if (partyMaj && (cv === 'yea' || cv === 'nay') && cv !== partyMaj) {
-          const name = nameMap.get(bio) ?? bio
-          crossovers.push({ name: name.split(',')[0], party, color: partyColor(party) })
-        }
-      }
-      crossovers.sort((a, b) => {
-        if (a.party !== b.party) return a.party.localeCompare(b.party)
-        return a.name.localeCompare(b.name)
-      })
-    }
-
-    return {
-      voteNumber: entry.vote_number,
-      date: entry.vote_date,
-      title: entry.title,
-      billTitle: bill?.title ?? null,
-      billSummary: cleanBillSummary(bill?.summary),
-      policyArea: bill?.policy_area ?? entry.policy_area ?? null,
-      result: entry.result,
-      passed: isPassed(entry.result),
-      totalYea,
-      totalNay,
-      margin,
-      isClose,
-      crossovers,
-      isPartyLine: crossovers.length === 0,
-    }
-  })
-}
-
 // ---------------------------------------------------------------------------
-// 6. Decisive Votes (close votes with swing senators)
+// 6. Swing Frequency Index (session-wide per-senator per-topic swing stats)
 // ---------------------------------------------------------------------------
 
-export interface SwingSenator {
-  name: string
-  party: string
-  state: string
-  color: string
-  voteCast: string
+export interface SwingTopicBreakdown {
+  topic: string
+  swingCount: number
+  yeaCount: number
+  nayCount: number
+  direction: 'mostly-yea' | 'mostly-nay' | 'mixed'
 }
 
-export interface DecisiveVoteVM {
-  voteNumber: number
-  date: string
-  title: string
-  billTitle: string | null
-  billSummary: string | null
-  policyArea: string | null
-  result: string
-  passed: boolean
-  totalYea: number
-  totalNay: number
-  margin: number
-  swingSenators: SwingSenator[]
-}
-
-export interface FeaturedSenatorVM {
+export interface SwingProfile {
   bioguideId: string
   name: string
   party: string
   state: string
   color: string
-  score: number
-  reasons: string[]
+  swingCount: number
+  swingPct: number
+  topicBreakdown: SwingTopicBreakdown[]
 }
 
-export interface DecisiveVotesResult {
-  type: 'decisive' | 'featured'
-  decisiveVotes: DecisiveVoteVM[]
-  featuredSenators: FeaturedSenatorVM[]
-  gatekeepers: GatekeeperVM[]
+export interface SwingFrequencyIndex {
+  totalCloseVotes: number
+  profiles: Map<string, SwingProfile>
 }
 
-const MAX_DECISIVE = 5
-
-export function buildDecisiveVotesVM(
+export function buildSwingFrequencyIndex(
   ledger: VoteLedger,
   overview: SessionOverview,
   activities: ActivityIndexResponse | null,
-): DecisiveVotesResult {
+): SwingFrequencyIndex {
   const partyMap = new Map<string, string>()
   const nameMap = new Map<string, string>()
   const stateMap = new Map<string, string>()
@@ -466,88 +372,66 @@ export function buildDecisiveVotesVM(
 
   const billLookup = activities ? buildBillLookup(activities) : new Map<number, BillRef>()
 
-  const decisiveVotes: DecisiveVoteVM[] = []
+  let totalCloseVotes = 0
+  const raw = new Map<string, { swingCount: number; topics: Map<string, { yea: number; nay: number }> }>()
 
   for (const entry of ledger.entries) {
     const { totalYea, totalNay } = computeVoteTallies(entry)
     const margin = Math.abs(totalYea - totalNay)
     if (margin > CLOSE_MARGIN_THRESHOLD) continue
 
+    totalCloseVotes++
     const majority = partyMajorityForVote(entry, partyMap)
-    const swingSenators: SwingSenator[] = []
+    const topic = billLookup.get(entry.vote_number)?.policy_area ?? entry.policy_area ?? 'Uncategorized'
 
     for (const [bio, cast] of Object.entries(entry.member_votes)) {
       const cv = classifyVote(cast)
       const party = partyMap.get(bio)
       if (!party) continue
       const partyMaj = majority.get(party)
-      if (partyMaj && (cv === 'yea' || cv === 'nay') && cv !== partyMaj) {
-        swingSenators.push({
-          name: (nameMap.get(bio) ?? bio).split(',')[0],
-          party,
-          state: stateMap.get(bio) ?? '',
-          color: partyColor(party),
-          voteCast: cv === 'yea' ? 'Yea' : 'Nay',
-        })
+      if (!partyMaj || (cv !== 'yea' && cv !== 'nay') || cv === partyMaj) continue
+
+      let profile = raw.get(bio)
+      if (!profile) {
+        profile = { swingCount: 0, topics: new Map() }
+        raw.set(bio, profile)
       }
+      profile.swingCount++
+      const topicTally = profile.topics.get(topic) ?? { yea: 0, nay: 0 }
+      if (cv === 'yea') topicTally.yea++; else topicTally.nay++
+      profile.topics.set(topic, topicTally)
     }
+  }
 
-    if (swingSenators.length === 0) continue
+  const profiles = new Map<string, SwingProfile>()
+  for (const [bio, data] of raw) {
+    const topicBreakdown: SwingTopicBreakdown[] = []
+    for (const [topic, tally] of data.topics) {
+      const direction: SwingTopicBreakdown['direction'] =
+        tally.yea > tally.nay ? 'mostly-yea' : tally.nay > tally.yea ? 'mostly-nay' : 'mixed'
+      topicBreakdown.push({
+        topic,
+        swingCount: tally.yea + tally.nay,
+        yeaCount: tally.yea,
+        nayCount: tally.nay,
+        direction,
+      })
+    }
+    topicBreakdown.sort((a, b) => b.swingCount - a.swingCount)
 
-    const bill = billLookup.get(entry.vote_number)
-    decisiveVotes.push({
-      voteNumber: entry.vote_number,
-      date: entry.vote_date,
-      title: entry.title,
-      billTitle: bill?.title ?? null,
-      billSummary: cleanBillSummary(bill?.summary),
-      policyArea: bill?.policy_area ?? entry.policy_area ?? null,
-      result: entry.result,
-      passed: isPassed(entry.result),
-      totalYea,
-      totalNay,
-      margin,
-      swingSenators,
+    profiles.set(bio, {
+      bioguideId: bio,
+      name: (nameMap.get(bio) ?? bio).split(',')[0],
+      party: partyMap.get(bio) ?? '',
+      state: stateMap.get(bio) ?? '',
+      color: partyColor(partyMap.get(bio) ?? ''),
+      swingCount: data.swingCount,
+      swingPct: totalCloseVotes > 0 ? Math.round(data.swingCount / totalCloseVotes * 100) : 0,
+      topicBreakdown,
     })
   }
 
-  decisiveVotes.splice(MAX_DECISIVE)
-
-  const gatekeepers = buildGatekeepersVM(ledger, overview)
-
-  if (decisiveVotes.length > 0) {
-    return { type: 'decisive', decisiveVotes, featuredSenators: [], gatekeepers }
-  }
-
-  const featured = buildFeaturedSenatorsFallback(activities, overview)
-  return { type: 'featured', decisiveVotes: [], featuredSenators: featured, gatekeepers }
-}
-
-function buildFeaturedSenatorsFallback(
-  activities: ActivityIndexResponse | null,
-  overview: SessionOverview,
-): FeaturedSenatorVM[] {
-  const entries = activities?.featured_senators
-  if (!entries || entries.length === 0) return []
-
-  const senatorMap = new Map<string, typeof overview.senators[number]>()
-  for (const s of overview.senators) senatorMap.set(s.bioguide_id, s)
-
-  return entries
-    .sort((a: FeaturedSenatorEntry, b: FeaturedSenatorEntry) => b.score - a.score)
-    .slice(0, 5)
-    .map((f: FeaturedSenatorEntry) => {
-      const s = senatorMap.get(f.bioguide_id)
-      return {
-        bioguideId: f.bioguide_id,
-        name: s ? s.name.split(',')[0] : f.bioguide_id,
-        party: s?.party ?? '',
-        state: s?.state ?? '',
-        color: s ? partyColor(s.party) : '#78716c',
-        score: f.score,
-        reasons: f.reasons,
-      }
-    })
+  return { totalCloseVotes, profiles }
 }
 
 // ---------------------------------------------------------------------------
@@ -967,9 +851,11 @@ export function buildBillTimelineVM(
 
   const partyMap = new Map<string, string>()
   const nameMap = new Map<string, string>()
+  const stateMap = new Map<string, string>()
   for (const s of overview.senators) {
     partyMap.set(s.bioguide_id, s.party)
     nameMap.set(s.bioguide_id, s.name)
+    stateMap.set(s.bioguide_id, s.state)
   }
 
   const billLookup = activities ? buildBillLookup(activities) : new Map<number, BillRef>()
@@ -1071,7 +957,7 @@ export function buildBillTimelineVM(
           const partyMaj = majority.get(party)
           if (partyMaj && (cv === 'yea' || cv === 'nay') && cv !== partyMaj) {
             const name = nameMap.get(bio) ?? bio
-            crossovers.push({ name: name.split(',')[0], party, color: partyColor(party) })
+            crossovers.push({ bioguideId: bio, name: name.split(',')[0], party, state: stateMap.get(bio) ?? '', color: partyColor(party), voteCast: cv })
           }
         }
         crossovers.sort((a, b) => {
@@ -1184,6 +1070,15 @@ export function buildBillTimelineVM(
 // 8b. ActionCardVM -- flat, glanceable card projection
 // ---------------------------------------------------------------------------
 
+export interface ActionCardSwingSenator {
+  name: string
+  party: string
+  state: string
+  color: string
+  voteCast: 'Yea' | 'Nay'
+  swingPct: number
+}
+
 export interface ActionCardVM {
   id: string
   category: string
@@ -1193,6 +1088,8 @@ export interface ActionCardVM {
   context: string
   status: 'passed' | 'rejected' | 'in-progress'
   voteLine: { label: string; yea: number; nay: number; date: string; leadParty: { abbr: string; color: string } | null }
+  isCloseVote: boolean
+  swingSenators: ActionCardSwingSenator[]
 }
 
 const HEDGING_CONTEXT_RE = /Official sources|limited detail|not fully specified|not specified|does not provide/i
@@ -1254,9 +1151,22 @@ function computeLeadParty(step: TimelineStep): { abbr: string; color: string } |
   return { abbr: bestParty, color: partyColor(bestParty) }
 }
 
-export function toActionCards(bills: BillTimelineVM[]): ActionCardVM[] {
+export function toActionCards(bills: BillTimelineVM[], swingIndex: SwingFrequencyIndex): ActionCardVM[] {
   return bills.map((bill) => {
     const step = pickDecisiveStep(bill.steps)
+    const swingSenators: ActionCardSwingSenator[] = step.isClose
+      ? step.crossovers.map((c) => {
+          const profile = swingIndex.profiles.get(c.bioguideId)
+          return {
+            name: c.name,
+            party: c.party,
+            state: c.state,
+            color: c.color,
+            voteCast: c.voteCast === 'yea' ? 'Yea' as const : 'Nay' as const,
+            swingPct: profile?.swingPct ?? 0,
+          }
+        })
+      : []
     return {
       id: bill.groupKey,
       category: bill.categoryLabel,
@@ -1266,6 +1176,8 @@ export function toActionCards(bills: BillTimelineVM[]): ActionCardVM[] {
       context: buildContext(bill),
       status: bill.finalStatus,
       voteLine: { label: step.label, yea: step.totalYea, nay: step.totalNay, date: step.date, leadParty: computeLeadParty(step) },
+      isCloseVote: step.isClose,
+      swingSenators,
     }
   })
 }

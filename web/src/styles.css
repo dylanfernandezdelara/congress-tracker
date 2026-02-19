@@ -459,70 +459,91 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 /* ======================================================================
-   Decisive Votes
+   Swing Leaderboard
    ====================================================================== */
 
-.decisiveVotes {
+.swingLeaderboard {
   display: grid;
   gap: var(--space-sm);
 }
 
-.decisiveVote {
+.swingProfile {
   padding: var(--space-md);
   border: 1px solid var(--line);
   border-left: 3px solid var(--defection);
   border-radius: var(--radius);
   background: var(--surface);
   display: grid;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
-.decisiveVote__header {
+.swingProfile__header {
   display: flex;
-  gap: var(--space-md);
-  align-items: flex-start;
-}
-
-.decisiveVote__info {
-  min-width: 0;
-  display: grid;
-  gap: 0.2rem;
-}
-
-.decisiveVote__title {
-  margin: 0;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.88rem;
-  font-weight: 600;
-  line-height: 1.3;
 }
 
-.decisiveVote__summary {
-  margin: 0;
+.swingProfile__rank {
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 1.4rem;
+}
+
+.swingProfile__name {
+  font-weight: 600;
+}
+
+.swingProfile__party {
   color: var(--muted);
   font-size: 0.8rem;
-  line-height: 1.4;
 }
 
-.decisiveVote__meta {
-  margin: 0;
+.swingProfile__pct {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--defection);
+}
+
+.swingProfile__topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-left: 1.7rem;
+}
+
+.swingProfile__topicTag {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
   color: var(--muted);
-  font-size: 0.76rem;
+  white-space: nowrap;
 }
 
-.decisiveVote__senators {
+/* ======================================================================
+   Action Card Swing Footer
+   ====================================================================== */
+
+.actionCard__swing {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-xs);
+  margin-top: var(--space-xs);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem 0.65rem;
 }
 
-.decisiveVote__label {
+.actionCard__swingLabel {
   font-size: 0.76rem;
   font-weight: 600;
   color: var(--defection);
 }
 
-.decisiveVote__senator {
+.actionCard__swingSenator {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -530,50 +551,24 @@ button, input, select { font: inherit; color: inherit; }
   font-weight: 500;
 }
 
-.decisiveVote__senatorName {
+.actionCard__swingName {
   font-weight: 600;
 }
 
-.decisiveVote__voteCast {
+.actionCard__swingParty {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.actionCard__swingCast {
   color: var(--muted);
   font-size: 0.72rem;
   font-style: italic;
 }
 
-/* ======================================================================
-   Featured Senators (fallback for decisive)
-   ====================================================================== */
-
-.featuredSenator {
-  padding: var(--space-md);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  display: grid;
-  gap: var(--space-xs);
-}
-
-.featuredSenator__header {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.88rem;
-}
-
-.featuredSenator__name {
-  font-weight: 600;
-}
-
-.featuredSenator__reasons {
-  margin: 0;
-  padding-left: 1.2rem;
+.actionCard__swingPct {
   color: var(--muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.featuredSenator__reasons li {
-  padding-left: 0.2rem;
+  font-size: 0.72rem;
 }
 
 /* ======================================================================
@@ -757,7 +752,7 @@ button, input, select { font: inherit; color: inherit; }
     margin-left: 0;
   }
 
-  .decisiveVote__senators {
+  .actionCard__swing {
     flex-direction: column;
     align-items: flex-start;
   }

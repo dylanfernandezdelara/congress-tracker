@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ActivityIndexResponse, SessionOverview, VoteLedger } from '../api'
-import { buildBillTimelineVM, toActionCards } from './homeViewModel'
+import { buildBillTimelineVM, buildSwingFrequencyIndex, toActionCards, type SwingFrequencyIndex } from './homeViewModel'
+
+const emptySwingIndex: SwingFrequencyIndex = { totalCloseVotes: 0, profiles: new Map() }
 
 function makeOverview(totalVotes: number, latestVoteDate: string): SessionOverview {
   return {
@@ -278,7 +280,7 @@ describe('toActionCards', () => {
     }
 
     const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), activities, { windowDays: 7, referenceDate: '2026-01-06' })
-    const cards = toActionCards(vm)
+    const cards = toActionCards(vm, emptySwingIndex)
 
     expect(cards).toHaveLength(1)
     expect(cards[0].title).not.toMatch(/was blocked|Senate vote|final vote|nomination vote/i)
@@ -306,7 +308,7 @@ describe('toActionCards', () => {
     }
 
     const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), null, { windowDays: 7, referenceDate: '2026-01-06' })
-    const cards = toActionCards(vm)
+    const cards = toActionCards(vm, emptySwingIndex)
 
     expect(cards).toHaveLength(1)
     expect(cards[0].voteLine.leadParty).not.toBeNull()
@@ -333,10 +335,73 @@ describe('toActionCards', () => {
     }
 
     const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), null, { windowDays: 7, referenceDate: '2026-01-06' })
-    const cards = toActionCards(vm)
+    const cards = toActionCards(vm, emptySwingIndex)
 
     expect(cards).toHaveLength(1)
     expect(cards[0].context).not.toMatch(/Official sources|limited detail|not specified/i)
+  })
+
+  it('populates swingSenators with correct swingPct on close votes', () => {
+    const overview = makeOverview(1, '2026-01-06')
+    const memberVotes: Record<string, string> = {}
+    for (let i = 0; i < 26; i++) memberVotes[`D${String(i).padStart(3, '0')}`] = 'Yea'
+    for (let i = 0; i < 24; i++) memberVotes[`R${String(i).padStart(3, '0')}`] = 'Nay'
+    memberVotes['A000001'] = 'Nay'
+    memberVotes['B000001'] = 'Yea'
+
+    const extendedSenators = [
+      ...overview.senators,
+      ...Array.from({ length: 26 }, (_, i) => ({
+        bioguide_id: `D${String(i).padStart(3, '0')}`,
+        name: `Dem${i}, Senator`,
+        party: 'D',
+        state: 'CA',
+        votes_cast: 1,
+        votes_missed: 0,
+        party_defections: 0,
+        alignment_pct: 100,
+      })),
+      ...Array.from({ length: 24 }, (_, i) => ({
+        bioguide_id: `R${String(i).padStart(3, '0')}`,
+        name: `Rep${i}, Senator`,
+        party: 'R',
+        state: 'TX',
+        votes_cast: 1,
+        votes_missed: 0,
+        party_defections: 0,
+        alignment_pct: 100,
+      })),
+    ]
+    const closeOverview: SessionOverview = { ...overview, senators: extendedSenators }
+
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [{
+        vote_number: 701,
+        vote_date: '2026-01-06',
+        title: 'S. 700 vote',
+        question: 'On Passage of the Bill',
+        result: 'Passed',
+        issue: 'S. 700',
+        member_votes: memberVotes,
+      }],
+    }
+
+    const swingIdx = buildSwingFrequencyIndex(ledger, closeOverview, null)
+    const vm = buildBillTimelineVM(ledger, closeOverview, null, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toActionCards(vm, swingIdx)
+
+    expect(cards).toHaveLength(1)
+    expect(cards[0].isCloseVote).toBe(true)
+    expect(cards[0].swingSenators.length).toBeGreaterThan(0)
+
+    const alphaSwing = cards[0].swingSenators.find((s) => s.name === 'Alpha')
+    expect(alphaSwing).toBeTruthy()
+    expect(alphaSwing!.voteCast).toBe('Nay')
+    expect(alphaSwing!.swingPct).toBe(100)
   })
 })
 

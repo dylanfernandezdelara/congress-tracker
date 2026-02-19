@@ -57,6 +57,20 @@ export default function ActionCards({ cards }: Props) {
             )}
             {' '}&middot; {formatDate(card.voteLine.date)}
           </p>
+          {card.isCloseVote && card.swingSenators.length > 0 && (
+            <div className="actionCard__swing">
+              <span className="actionCard__swingLabel">Swing votes</span>
+              {card.swingSenators.map((s, i) => (
+                <span key={i} className="actionCard__swingSenator">
+                  <span className="recentVoteRow__partyDot" style={{ background: s.color }} />
+                  <span className="actionCard__swingName">{s.name}</span>
+                  <span className="actionCard__swingParty">({s.party}-{s.state})</span>
+                  <span className="actionCard__swingCast">voted {s.voteCast}</span>
+                  <span className="actionCard__swingPct">&middot; swing in {s.swingPct}% of close votes</span>
+                </span>
+              ))}
+            </div>
+          )}
         </article>
       ))}
     </div>
