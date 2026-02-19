@@ -36,6 +36,14 @@ describe("congress adapter expansion", () => {
                 description: "Discussion of H.R. 12 and nominations",
               },
             ],
+            relatedItems: {
+              bills: [
+                { type: "S", number: "455", title: "Structured Bill Ref" },
+                { type: "HR", number: "12" },
+              ],
+              nominations: [{ nominationNumber: "PN145", title: "Jane Doe nomination" }],
+              treaties: [{ treatyNumber: "Treaty Doc. 119-1", title: "Maritime Treaty" }],
+            },
             videos: [{ url: "https://example.com/meeting/123" }],
           },
         });
@@ -54,6 +62,12 @@ describe("congress adapter expansion", () => {
         expect.objectContaining({ congress: 119, type: "S", number: "455" }),
         expect.objectContaining({ congress: 119, type: "HR", number: "12" }),
       ])
+    );
+    expect(result.meetings[0].related_nominations).toEqual(
+      expect.arrayContaining(["Jane Doe nomination"])
+    );
+    expect(result.meetings[0].related_treaties).toEqual(
+      expect.arrayContaining(["Maritime Treaty"])
     );
     expect(result.meetings[0].nomination_signals.length).toBeGreaterThan(0);
   });

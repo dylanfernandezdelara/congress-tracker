@@ -7,7 +7,6 @@ import type {
   FeaturedSenatorEntry,
   RecipientEvidence,
   SessionOverview,
-  UnknownReason,
   VoteLedger,
   VoteLedgerEntry,
 } from '../api'
@@ -247,85 +246,13 @@ export function buildStateDumbbellVM(
 }
 
 // ---------------------------------------------------------------------------
-// 4. Recent Votes (named crossovers)
+// 4. Shared crossover type
 // ---------------------------------------------------------------------------
 
 export interface Crossover {
   name: string
   party: string
   color: string
-}
-
-export interface RecentVoteVM {
-  voteNumber: number
-  date: string
-  title: string
-  result: string
-  passed: boolean
-  totalYea: number
-  totalNay: number
-  crossovers: Crossover[]
-  isPartyLine: boolean
-}
-
-const MAX_RECENT = 5
-
-export function buildRecentVotesVM(
-  ledger: VoteLedger,
-  overview: SessionOverview,
-): RecentVoteVM[] {
-  const partyMap = new Map<string, string>()
-  const nameMap = new Map<string, string>()
-  for (const s of overview.senators) {
-    partyMap.set(s.bioguide_id, s.party)
-    nameMap.set(s.bioguide_id, s.name)
-  }
-
-  const recent = ledger.entries.slice(0, MAX_RECENT)
-
-  return recent.map((entry) => {
-    const majority = partyMajorityForVote(entry, partyMap)
-
-    let totalYea = 0
-    let totalNay = 0
-    const crossovers: Crossover[] = []
-
-    for (const [bio, cast] of Object.entries(entry.member_votes)) {
-      const cv = classifyVote(cast)
-      if (cv === 'yea') totalYea++
-      if (cv === 'nay') totalNay++
-
-      const party = partyMap.get(bio)
-      if (!party) continue
-      const partyMaj = majority.get(party)
-      if (partyMaj && (cv === 'yea' || cv === 'nay') && cv !== partyMaj) {
-        const name = nameMap.get(bio) ?? bio
-        crossovers.push({ name: name.split(',')[0], party, color: partyColor(party) })
-      }
-    }
-
-    crossovers.sort((a, b) => {
-      if (a.party !== b.party) return a.party.localeCompare(b.party)
-      return a.name.localeCompare(b.name)
-    })
-
-    const resultLower = entry.result.toLowerCase()
-    const passed = resultLower.includes('agreed') ||
-      resultLower.includes('passed') ||
-      resultLower.includes('confirmed')
-
-    return {
-      voteNumber: entry.vote_number,
-      date: entry.vote_date,
-      title: entry.title,
-      result: entry.result,
-      passed,
-      totalYea,
-      totalNay,
-      crossovers,
-      isPartyLine: crossovers.length === 0,
-    }
-  })
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +338,10 @@ function computeVoteTallies(entry: VoteLedgerEntry): { totalYea: number; totalNa
 
 function isPassed(result: string): boolean {
   const lc = result.toLowerCase()
-  return lc.includes('agreed') || lc.includes('passed') || lc.includes('confirmed')
+  if (/failed|rejected|not agreed|not passed|disagreed|not invoked|not confirmed/.test(lc)) {
+    return false
+  }
+  return /agreed to|agreed|passed|confirmed|invoked|adopted|approved/.test(lc)
 }
 
 export function buildEnrichedVotesVM(
@@ -636,44 +566,32 @@ export interface TimelineStep {
   margin: number
   isClose: boolean
   crossovers: Crossover[]
+  partyBreakdown: Record<string, { yea: number; nay: number }>
 }
+
+type IssueType = 'bill' | 'nomination' | 'other'
+type LifecycleStage = 'senate_only' | 'cross_chamber' | 'enacted' | 'unknown'
+type ConfidenceLevel = 'high' | 'medium' | 'low'
+type FinalStatus = 'passed' | 'rejected' | 'in-progress'
+type SignificanceLevel = 'high' | 'medium' | 'low'
 
 export interface BillTimelineVM {
   groupKey: string
-  issueType: 'bill' | 'nomination' | 'other'
-  hasAnalysis: boolean
   displayCode: string | null
-  officialTitle: string | null
-  billTitle: string | null
-  billSummary: string | null
-  policyArea: string | null
   categoryLabel: string
   displayTitle: string
   meaningLine: string
-  personalImpact: string
   moneyFlows: string[]
-  structuredAmounts: AmountEvidence[]
   structuredRecipients: RecipientEvidence[]
-  stateLocalImpact: string
-  unknowns: string[]
-  unknownReasons: UnknownReason[]
-  evidence: string[]
-  richnessScore: number
-  statesMentioned: string[]
-  confidence: 'high' | 'medium' | 'low'
-  whyItMatters: string | null
   keyProvisions: string[]
-  hiddenProvisions: string | null
-  significance: 'high' | 'medium' | 'low'
-  significanceReason: string
   affectedGroups: string[]
+  significance: SignificanceLevel
   steps: TimelineStep[]
   tier: 'key' | 'secondary'
-  hasFailedProcedural: boolean
-  hasCloseVote: boolean
   latestDate: string
   whatHappensNext: string
-  finalStatus: 'passed' | 'rejected' | 'in-progress'
+  careScore: number
+  finalStatus: FinalStatus
 }
 
 function classifyQuestion(question: string): StepType {
@@ -752,21 +670,146 @@ function normalizeSignificance(value: BillAnalysis['significance'] | undefined):
   return 'medium'
 }
 
-function normalizeConfidence(value: BillAnalysis['confidence'] | undefined): 'high' | 'medium' | 'low' {
-  if (value === 'high' || value === 'medium' || value === 'low') return value
+// LifecycleStage type alias defined above BillTimelineVM
+
+function shiftIsoDate(dateStr: string, days: number): string {
+  const parsed = new Date(`${dateStr}T00:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) return dateStr
+  parsed.setUTCDate(parsed.getUTCDate() + days)
+  return parsed.toISOString().slice(0, 10)
+}
+
+function normalizeIsoDate(value: string | null | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().slice(0, 10)
+}
+
+function downgradeConfidence(
+  value: 'high' | 'medium' | 'low',
+  steps: number,
+): 'high' | 'medium' | 'low' {
+  if (steps <= 0) return value
+  if (value === 'high') return steps > 1 ? 'low' : 'medium'
+  if (value === 'medium') return 'low'
   return 'low'
 }
 
-function buildWhatHappensNext(
-  issueType: BillTimelineVM['issueType'],
-  finalStatus: BillTimelineVM['finalStatus'],
+function deriveEvidenceConfidence(
+  richnessScore: number,
+  evidenceCount: number,
+  unknownCount: number,
+): 'high' | 'medium' | 'low' {
+  let level: 'high' | 'medium' | 'low' =
+    richnessScore >= 70 ? 'high' : richnessScore >= 40 ? 'medium' : 'low'
+  if (evidenceCount === 0) level = downgradeConfidence(level, 2)
+  if (unknownCount >= 3) level = downgradeConfidence(level, 1)
+  return level
+}
+
+function inferLifecycleStage(
+  issueType: IssueType,
+  billRef: BillRef | undefined,
   lastStep: TimelineStep,
+): LifecycleStage {
+  if (issueType === 'nomination') return 'senate_only'
+  const latestActionText = billRef?.latest_action?.text?.toLowerCase() ?? ''
+  const lawNumber = billRef?.law?.number?.trim()
+  if (
+    lawNumber
+    || /became (public )?law|signed by president|signed into law|enacted/.test(latestActionText)
+  ) {
+    return 'enacted'
+  }
+  if (
+    /house|presented to president|to the president|conference|enrolling|enrolled/.test(latestActionText)
+    || (lastStep.type === 'passage' && lastStep.passed)
+  ) {
+    return 'cross_chamber'
+  }
+  if (latestActionText) return 'senate_only'
+  return 'unknown'
+}
+
+function deriveFinalStatus(
+  steps: TimelineStep[],
+  lifecycleStage: LifecycleStage,
+): FinalStatus {
+  if (lifecycleStage === 'enacted') return 'passed'
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i]
+    if (step.type === 'passage' || step.type === 'confirmation') {
+      return step.passed ? 'passed' : 'rejected'
+    }
+  }
+  const lastStep = steps[steps.length - 1]
+  if (!lastStep) return 'in-progress'
+  if (!lastStep.passed && (lastStep.type === 'proceed' || lastStep.type === 'cloture')) {
+    return 'rejected'
+  }
+  return 'in-progress'
+}
+
+function computeCareScore(input: {
+  significance: SignificanceLevel
+  finalStatus: FinalStatus
+  evidenceConfidence: ConfidenceLevel
+  hasCloseVote: boolean
+  hasMoneySignal: boolean
+  hasRecipientSignal: boolean
+  hasStateSignal: boolean
+  hasAffectedGroups: boolean
+}): number {
+  let score = input.significance === 'high' ? 40 : input.significance === 'medium' ? 25 : 10
+  if (input.finalStatus !== 'in-progress') score += 15
+  if (input.hasMoneySignal) score += 15
+  if (input.hasRecipientSignal) score += 10
+  if (input.hasStateSignal) score += 10
+  if (input.hasAffectedGroups) score += 8
+  if (input.hasCloseVote) score += 6
+  if (input.evidenceConfidence === 'low') score -= 12
+  return Math.max(0, Math.min(100, score))
+}
+
+function computePriorityScore(input: {
+  careScore: number
+  significance: SignificanceLevel
+  finalStatus: FinalStatus
+  latestDate: string
+  referenceDate: string
+}): number {
+  let score = input.careScore
+  if (input.significance === 'high') score += 12
+  else if (input.significance === 'medium') score += 6
+  if (input.finalStatus !== 'in-progress') score += 8
+  const dayDelta = Math.max(
+    0,
+    Math.round(
+      (new Date(`${input.referenceDate}T00:00:00Z`).getTime()
+        - new Date(`${input.latestDate}T00:00:00Z`).getTime()) / 86_400_000,
+    ),
+  )
+  score += Math.max(0, 10 - dayDelta)
+  return score
+}
+
+function buildWhatHappensNext(
+  issueType: IssueType,
+  finalStatus: FinalStatus,
+  lastStep: TimelineStep,
+  lifecycleStage: LifecycleStage,
 ): string {
   if (finalStatus === 'passed') {
+    if (lifecycleStage === 'enacted') {
+      return 'The measure is law; next steps are agency implementation, guidance, and oversight.'
+    }
     if (issueType === 'nomination' || lastStep.type === 'confirmation') {
       return 'Nomination is approved by the Senate and can move to appointment.'
     }
-    if (lastStep.type === 'passage') {
+    if (lifecycleStage === 'cross_chamber' || lastStep.type === 'passage') {
       return 'Measure clears the Senate and typically moves to the House or final enactment steps.'
     }
     return 'Measure advances to the next legislative step.'
@@ -783,21 +826,6 @@ function buildWhatHappensNext(
     return 'This clears a procedural hurdle; final passage or confirmation votes may come next.'
   }
   return 'Further Senate votes or negotiations are likely before a final outcome.'
-}
-
-function buildFallbackHeadline(
-  issueType: BillTimelineVM['issueType'],
-  displayCode: string | null,
-  categoryLabel: string,
-  hasFailedProcedural: boolean,
-  lastStep: TimelineStep,
-): string {
-  if (hasFailedProcedural && displayCode) return `${displayCode} was blocked`
-  if (issueType === 'nomination' && displayCode) return `${displayCode} nomination vote`
-  if (lastStep.type === 'passage' && displayCode) return `${displayCode} final vote`
-  if (displayCode) return `${displayCode} Senate vote`
-  if (issueType === 'nomination') return 'Nomination vote'
-  return `${categoryLabel} Senate vote`
 }
 
 function simplifyOfficialSummary(summary: string): string {
@@ -848,8 +876,8 @@ function formatStructuredMoneyFlows(
 }
 
 function buildMeaningLine(
-  issueType: BillTimelineVM['issueType'],
-  finalStatus: BillTimelineVM['finalStatus'],
+  issueType: IssueType,
+  finalStatus: FinalStatus,
   lastStep: TimelineStep,
   analysisSummary: string | null,
   moneyFlows: string[],
@@ -885,55 +913,6 @@ function buildMeaningLine(
   return 'This is a Senate vote related to moving or deciding a federal measure.'
 }
 
-function buildPersonalImpact(
-  issueType: BillTimelineVM['issueType'],
-  policyArea: string | null,
-  categoryLabel: string,
-  meaningLine: string,
-  analysisImpact: string | null,
-  pocketbookImpact: string[],
-): string {
-  if (pocketbookImpact.length > 0) {
-    return sanitizePrimaryNarrative(
-      pocketbookImpact[0],
-      'Official sources do not provide enough detail to estimate direct household-level impact.'
-    )
-  }
-  if (analysisImpact) {
-    return sanitizePrimaryNarrative(
-      analysisImpact,
-      'Official sources do not provide enough detail to estimate direct household-level impact.'
-    )
-  }
-  if (issueType === 'nomination') {
-    return 'Official sources describe the office being filled, but do not provide enough detail to estimate household-level impact.'
-  }
-
-  const lc = `${policyArea ?? ''} ${categoryLabel} ${meaningLine}`.toLowerCase()
-  if (lc.includes('appropriation') || lc.includes('budget') || lc.includes('funding')) {
-    return 'Official sources reference spending policy, but do not specify enough recipient and amount detail to estimate household impact.'
-  }
-  if (lc.includes('tax')) {
-    return 'Official sources reference tax policy, but do not provide enough numeric detail to estimate household impact.'
-  }
-  if (lc.includes('health')) {
-    return 'Official sources reference healthcare policy, but specific household cost impacts are not yet specified.'
-  }
-  if (lc.includes('transport') || lc.includes('transit') || lc.includes('infrastructure')) {
-    return 'Official sources reference transportation policy, but direct household cost impact is not specified.'
-  }
-  if (lc.includes('immigra') || lc.includes('border')) {
-    return 'Official sources reference border policy changes, but direct household-level effects are not specified.'
-  }
-  if (lc.includes('veteran') || lc.includes('defense') || lc.includes('armed')) {
-    return 'Official sources reference military or veterans programs, but direct household-level effects are not specified.'
-  }
-  if (lc.includes('government') || lc.includes('politic') || lc.includes('dc council')) {
-    return 'Official sources reference government rule changes, but direct household impact is not specified.'
-  }
-  return 'The official summary does not yet provide enough detail to estimate direct household impact.'
-}
-
 function deriveDisplayTitle(entries: VoteLedgerEntry[], billTitle: string | null): string {
   if (billTitle) return billTitle
   const longestTitle = entries.reduce((a, b) => a.title.length >= b.title.length ? a : b)
@@ -958,13 +937,34 @@ function extractGroupKey(entry: VoteLedgerEntry): string {
   return `standalone:${entry.vote_number}`
 }
 
-const MAX_BILL_GROUPS = 7
+const DEFAULT_TOTAL_BILL_GROUPS = 10
+const DEFAULT_KEY_BILL_GROUPS = 4
+
+export interface BillTimelineBuildOptions {
+  windowDays?: number
+  referenceDate?: string
+  totalBudget?: number
+  keyBudget?: number
+}
 
 export function buildBillTimelineVM(
   ledger: VoteLedger,
   overview: SessionOverview,
   activities: ActivityIndexResponse | null,
+  options: BillTimelineBuildOptions = {},
 ): BillTimelineVM[] {
+  const referenceDate =
+    normalizeIsoDate(options.referenceDate)
+    ?? normalizeIsoDate(overview.latest_vote_date)
+    ?? normalizeIsoDate(ledger.entries[0]?.vote_date)
+    ?? new Date().toISOString().slice(0, 10)
+  const windowDays = Math.max(1, Math.min(options.windowDays ?? 7, 30))
+  const windowStart = shiftIsoDate(referenceDate, -(windowDays - 1))
+  const eligibleEntries = ledger.entries.filter(
+    (entry) => entry.vote_date >= windowStart && entry.vote_date <= referenceDate,
+  )
+  if (eligibleEntries.length === 0) return []
+
   const partyMap = new Map<string, string>()
   const nameMap = new Map<string, string>()
   for (const s of overview.senators) {
@@ -975,7 +975,7 @@ export function buildBillTimelineVM(
   const billLookup = activities ? buildBillLookup(activities) : new Map<number, BillRef>()
 
   const groups = new Map<string, VoteLedgerEntry[]>()
-  for (const entry of ledger.entries) {
+  for (const entry of eligibleEntries) {
     const key = extractGroupKey(entry)
     const list = groups.get(key) ?? []
     list.push(entry)
@@ -999,19 +999,12 @@ export function buildBillTimelineVM(
     const policyArea = billRef?.policy_area ?? entries[0].policy_area ?? null
     const impactEvidence: BillImpactEvidence | undefined = billRef?.impact_evidence
     const analysis = billRef?.analysis
-    const hasAnalysis = Boolean(analysis)
     const officialTitle = deriveDisplayTitle(entries, billTitle)
     const categoryLabel = analysis?.category?.trim()
       || policyArea
       || (issueType === 'nomination' ? 'Nomination' : 'Senate business')
     const significance = normalizeSignificance(analysis?.significance)
     const richnessScore = analysis?.richness_score ?? impactEvidence?.richness_score ?? 0
-    const normalizedConfidence = normalizeConfidence(analysis?.confidence)
-    const confidence = normalizedConfidence === 'low' && richnessScore >= 60 ? 'medium' : normalizedConfidence
-    const rawSignificanceReason = analysis?.significance_reason?.trim() || ''
-    const significanceReason = rawSignificanceReason.toLowerCase() === 'based on available official summary details.'
-      ? ''
-      : rawSignificanceReason
     const keyProvisions = (analysis?.key_provisions ?? [])
       .map((v) => v.trim())
       .filter(Boolean)
@@ -1020,8 +1013,6 @@ export function buildBillTimelineVM(
       .map((v) => v.trim())
       .filter(Boolean)
       .slice(0, 5)
-    const hiddenProvisions = analysis?.hidden_provisions?.trim() || null
-    const whyItMatters = analysis?.why_it_matters?.trim() || null
     const structuredAmounts = (analysis?.structured_amounts ?? impactEvidence?.how_much ?? [])
       .slice(0, 6)
     const structuredRecipients = (analysis?.structured_recipients ?? impactEvidence?.who ?? [])
@@ -1034,20 +1025,11 @@ export function buildBillTimelineVM(
     const moneyFlows = (analysisMoneyFlows.length > 0 ? analysisMoneyFlows : derivedMoneyFlows)
       .filter((line) => hasConcreteSignal(line))
       .slice(0, 6)
-    const stateLocalImpact = sanitizePrimaryNarrative(
-      analysis?.state_local_impact?.trim()
-      || (
-        impactEvidence?.where.states_mentioned?.length
-          ? `State-level signals are explicitly named for: ${impactEvidence.where.states_mentioned.join(', ')}.`
-          : 'State-level allocation detail is not specified in available official sources.'
-      ),
-      'State-level allocation detail is not specified in available official sources.'
-    )
+    const unknownReasons = (analysis?.unknown_reasons ?? impactEvidence?.unknowns ?? []).slice(0, 6)
     const unknowns = (analysis?.unknowns ?? [])
       .map((v) => v.trim())
       .filter(Boolean)
       .slice(0, 6)
-    const unknownReasons = (analysis?.unknown_reasons ?? impactEvidence?.unknowns ?? []).slice(0, 6)
     const normalizedUnknowns = unknowns.length > 0
       ? unknowns
       : unknownReasons.map((reason) => reason.reason).slice(0, 6)
@@ -1058,10 +1040,6 @@ export function buildBillTimelineVM(
     const normalizedEvidence = evidence.length > 0
       ? evidence
       : (impactEvidence?.summary_evidence ?? []).slice(0, 4)
-    const pocketbookImpact = (analysis?.pocketbook_impact ?? [])
-      .map((v) => v.trim())
-      .filter(Boolean)
-      .slice(0, 6)
     const displayCode = decodeIssueLabel(entries[0].issue)
 
     const steps: TimelineStep[] = entries.map((entry) => {
@@ -1073,7 +1051,17 @@ export function buildBillTimelineVM(
       const labels = STEP_LABELS[stepType]
       const label = passed ? labels[0] : labels[1]
 
+      const partyBreakdown: Record<string, { yea: number; nay: number }> = {}
       const crossovers: Crossover[] = []
+      for (const [bio, cast] of Object.entries(entry.member_votes)) {
+        const party = partyMap.get(bio)
+        if (!party) continue
+        const cv = classifyVote(cast)
+        if (cv !== 'yea' && cv !== 'nay') continue
+        const t = partyBreakdown[party] ?? { yea: 0, nay: 0 }
+        if (cv === 'yea') t.yea++; else t.nay++
+        partyBreakdown[party] = t
+      }
       if (isClose) {
         const majority = partyMajorityForVote(entry, partyMap)
         for (const [bio, cast] of Object.entries(entry.member_votes)) {
@@ -1092,26 +1080,33 @@ export function buildBillTimelineVM(
         })
       }
 
-      return { type: stepType, label, passed, date: entry.vote_date, totalYea, totalNay, margin, isClose, crossovers }
+      return { type: stepType, label, passed, date: entry.vote_date, totalYea, totalNay, margin, isClose, crossovers, partyBreakdown }
     })
 
     const lastStep = steps[steps.length - 1]
-    const anyFailed = steps.some((s) => !s.passed)
+    if (!lastStep) continue
     const hasFailedProcedural = steps.some((s) => (s.type === 'proceed' || s.type === 'cloture') && !s.passed)
     const hasCloseVote = steps.some((s) => s.isClose)
-    const finalStatus: BillTimelineVM['finalStatus'] = anyFailed
-      ? 'rejected'
-      : (lastStep.type === 'passage' || lastStep.type === 'confirmation') ? 'passed' : 'in-progress'
-    const tier: BillTimelineVM['tier'] = (
-      significance === 'high'
-      || hasCloseVote
-      || hasFailedProcedural
-      || lastStep.type === 'passage'
-      || lastStep.type === 'confirmation'
-    ) ? 'key' : 'secondary'
-    const whatHappensNext = buildWhatHappensNext(issueType, finalStatus, lastStep)
+    const statesMentioned = analysis?.states_mentioned ?? impactEvidence?.where.states_mentioned ?? []
+    const lifecycleStage = inferLifecycleStage(issueType, billRef, lastStep)
+    const finalStatus = deriveFinalStatus(steps, lifecycleStage)
+    const evidenceConfidence = deriveEvidenceConfidence(
+      richnessScore,
+      normalizedEvidence.length,
+      Math.max(unknownReasons.length, normalizedUnknowns.length),
+    )
+    const tierScore =
+      (significance === 'high' ? 3 : significance === 'medium' ? 2 : 1)
+      + (finalStatus === 'in-progress' ? 0 : 2)
+      + (hasCloseVote ? 1 : 0)
+      + (hasFailedProcedural ? 1 : 0)
+      + (lifecycleStage === 'enacted' ? 2 : lifecycleStage === 'cross_chamber' ? 1 : 0)
+    const tier: BillTimelineVM['tier'] = tierScore >= 5 ? 'key' : 'secondary'
+    const whatHappensNext = buildWhatHappensNext(issueType, finalStatus, lastStep, lifecycleStage)
     const displayTitle = analysis?.plain_title?.trim()
-      || buildFallbackHeadline(issueType, displayCode, categoryLabel, hasFailedProcedural, lastStep)
+      || billTitle
+      || officialTitle
+      || categoryLabel
     const meaningLine = buildMeaningLine(
       issueType,
       finalStatus,
@@ -1120,59 +1115,159 @@ export function buildBillTimelineVM(
       moneyFlows,
       billSummary,
     )
-    const personalImpactRaw = buildPersonalImpact(
-      issueType,
-      policyArea,
-      categoryLabel,
-      meaningLine,
-      whyItMatters,
-      pocketbookImpact,
-    )
-    const personalImpact = confidence === 'low'
-      ? `Limited detail: ${sanitizePrimaryNarrative(personalImpactRaw, 'Official sources do not provide enough detail to estimate direct household impact.')}`
-      : sanitizePrimaryNarrative(personalImpactRaw, 'Official sources do not provide enough detail to estimate direct household impact.')
+    const careScore = computeCareScore({
+      significance,
+      finalStatus,
+      evidenceConfidence,
+      hasCloseVote,
+      hasMoneySignal: moneyFlows.length > 0 || structuredAmounts.length > 0,
+      hasRecipientSignal: structuredRecipients.length > 0,
+      hasStateSignal: statesMentioned.length > 0,
+      hasAffectedGroups: affectedGroups.length > 0,
+    })
 
     timelines.push({
       groupKey,
-      issueType,
-      hasAnalysis,
       displayCode,
-      officialTitle,
-      billTitle,
-      billSummary,
-      policyArea,
       categoryLabel,
       displayTitle,
       meaningLine,
-      personalImpact,
       moneyFlows,
-      structuredAmounts,
       structuredRecipients,
-      stateLocalImpact,
-      unknowns: normalizedUnknowns,
-      unknownReasons,
-      evidence: normalizedEvidence,
-      richnessScore,
-      statesMentioned: analysis?.states_mentioned ?? impactEvidence?.where.states_mentioned ?? [],
-      confidence,
-      whyItMatters,
       keyProvisions,
-      hiddenProvisions,
-      significance,
-      significanceReason,
       affectedGroups,
+      significance,
       steps,
       tier,
-      hasFailedProcedural,
-      hasCloseVote,
       latestDate: entries[entries.length - 1].vote_date,
       whatHappensNext,
+      careScore,
       finalStatus,
     })
   }
 
-  timelines.sort((a, b) => b.latestDate.localeCompare(a.latestDate))
-  return timelines.slice(0, MAX_BILL_GROUPS)
+  const scored = timelines.map((item) => ({
+    item,
+    priority: computePriorityScore({
+      careScore: item.careScore,
+      significance: item.significance,
+      finalStatus: item.finalStatus,
+      latestDate: item.latestDate,
+      referenceDate,
+    }),
+  }))
+  scored.sort((a, b) => b.priority - a.priority || b.item.latestDate.localeCompare(a.item.latestDate))
+
+  const totalBudget = Math.max(1, Math.min(options.totalBudget ?? DEFAULT_TOTAL_BILL_GROUPS, 20))
+  const keyBudget = Math.max(1, Math.min(options.keyBudget ?? DEFAULT_KEY_BILL_GROUPS, totalBudget))
+  const selected: Array<{ item: BillTimelineVM; priority: number }> = []
+  selected.push(...scored.filter((entry) => entry.item.tier === 'key').slice(0, keyBudget))
+  selected.push(
+    ...scored
+      .filter((entry) => entry.item.tier === 'secondary')
+      .slice(0, Math.max(0, totalBudget - selected.length)),
+  )
+  if (selected.length < totalBudget) {
+    const pickedKeys = new Set(selected.map((entry) => entry.item.groupKey))
+    for (const entry of scored) {
+      if (pickedKeys.has(entry.item.groupKey)) continue
+      selected.push(entry)
+      pickedKeys.add(entry.item.groupKey)
+      if (selected.length >= totalBudget) break
+    }
+  }
+  selected.sort((a, b) => b.priority - a.priority || b.item.latestDate.localeCompare(a.item.latestDate))
+  return selected.map((entry) => entry.item)
+}
+
+// ---------------------------------------------------------------------------
+// 8b. ActionCardVM -- flat, glanceable card projection
+// ---------------------------------------------------------------------------
+
+export interface ActionCardVM {
+  id: string
+  category: string
+  billCode: string | null
+  title: string
+  outcome: string
+  context: string
+  status: 'passed' | 'rejected' | 'in-progress'
+  voteLine: { label: string; yea: number; nay: number; date: string; leadParty: { abbr: string; color: string } | null }
+}
+
+const HEDGING_CONTEXT_RE = /Official sources|limited detail|not fully specified|not specified|does not provide/i
+const PROCEDURAL_FALLBACK_RE = /is a Senate vote related|is a procedural vote that determines|is voting on whether to approve a nominee|blocked this measure before a final|final vote on whether to pass/i
+
+function buildContext(bill: BillTimelineVM): string {
+  const parts: string[] = []
+
+  if (bill.moneyFlows.length > 0) {
+    parts.push(bill.moneyFlows.slice(0, 3).join('. '))
+  }
+
+  if (bill.keyProvisions.length > 0) {
+    const concrete = bill.keyProvisions.filter((p) => hasConcreteSignal(p))
+    if (concrete.length > 0) parts.push(concrete.slice(0, 2).join('. '))
+  }
+
+  if (parts.length === 0 && bill.structuredRecipients.length > 0) {
+    const names = bill.structuredRecipients.slice(0, 4).map((r) => r.name)
+    parts.push(`Directs funds to ${names.join(', ')}.`)
+  }
+
+  if (bill.affectedGroups.length > 0) {
+    parts.push(`Most affects: ${bill.affectedGroups.slice(0, 3).join(', ')}.`)
+  }
+
+  if (parts.length > 0) return parts.join(' ')
+
+  const ml = bill.meaningLine
+  if (ml && !HEDGING_CONTEXT_RE.test(ml) && !PROCEDURAL_FALLBACK_RE.test(ml)) {
+    return ml
+  }
+
+  const cat = bill.categoryLabel.toLowerCase()
+  if (cat.includes('nomination')) return 'A Senate vote on a federal nomination.'
+  if (cat === 'senate business') return 'A Senate procedural action.'
+  return `A Senate action on ${cat} policy.`
+}
+
+function pickDecisiveStep(steps: TimelineStep[]): TimelineStep {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].type === 'passage' || steps[i].type === 'confirmation') return steps[i]
+  }
+  return steps[steps.length - 1]
+}
+
+function computeLeadParty(step: TimelineStep): { abbr: string; color: string } | null {
+  const winningSide: 'yea' | 'nay' = step.passed ? 'yea' : 'nay'
+  let bestParty: string | null = null
+  let bestCount = 0
+  for (const [party, tally] of Object.entries(step.partyBreakdown)) {
+    const count = tally[winningSide]
+    if (count > bestCount) {
+      bestCount = count
+      bestParty = party
+    }
+  }
+  if (!bestParty) return null
+  return { abbr: bestParty, color: partyColor(bestParty) }
+}
+
+export function toActionCards(bills: BillTimelineVM[]): ActionCardVM[] {
+  return bills.map((bill) => {
+    const step = pickDecisiveStep(bill.steps)
+    return {
+      id: bill.groupKey,
+      category: bill.categoryLabel,
+      billCode: bill.displayCode,
+      title: bill.displayTitle,
+      outcome: bill.whatHappensNext,
+      context: buildContext(bill),
+      status: bill.finalStatus,
+      voteLine: { label: step.label, yea: step.totalYea, nay: step.totalNay, date: step.date, leadParty: computeLeadParty(step) },
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------

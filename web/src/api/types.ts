@@ -37,6 +37,7 @@ export interface BillRef {
   type: string
   number: string
   title?: string
+  titles?: string[]
   url?: string
   summary?: string
   summary_date?: string
@@ -45,6 +46,7 @@ export interface BillRef {
   committees?: BillCommittee[]
   introduced_date?: string
   latest_action?: BillLatestAction
+  law?: BillLawInfo
   impact_evidence?: BillImpactEvidence
   analysis?: BillAnalysis
 }
@@ -63,6 +65,18 @@ export type EvidenceEndpoint =
   | 'cosponsors'
 
 export type EvidenceSourceAvailability = Partial<Record<EvidenceEndpoint, boolean>>
+
+export interface EvidenceEndpointStatus {
+  tier: 1 | 2 | 3
+  ok: boolean
+  fetched_at: string
+  url?: string
+  attempted_urls?: string[]
+  resolved_path?: string
+  fallback_used?: boolean
+  error?: string
+  item_count?: number
+}
 
 export interface AmountEvidence {
   value_numeric: number
@@ -159,6 +173,14 @@ export interface BillLatestAction {
   text?: string
 }
 
+export interface BillLawInfo {
+  number?: string
+  type?: string
+  congress?: number
+  law_id?: string
+  url?: string
+}
+
 export interface BillCommittee {
   name: string
   chamber?: string
@@ -243,6 +265,8 @@ export interface CongressCommitteeMeetingItem {
   location?: string
   url?: string
   related_bills: BillRef[]
+  related_nominations?: string[]
+  related_treaties?: string[]
   nomination_signals: string[]
   meeting_documents: Array<{
     document_type: string

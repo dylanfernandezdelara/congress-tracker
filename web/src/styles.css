@@ -304,96 +304,8 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 /* ======================================================================
-   Recent Votes (text list)
+   Shared vote helpers (DecisiveVotes)
    ====================================================================== */
-
-.recentVotes {
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.recentVoteRow {
-  padding: var(--space-md);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.recentVoteRow__header {
-  display: flex;
-  gap: var(--space-md);
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.recentVoteRow__info {
-  min-width: 0;
-}
-
-.recentVoteRow__title {
-  margin: 0;
-  font-size: 0.88rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.recentVoteRow__sub {
-  margin: 0.15rem 0 0;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.recentVoteRow__badge {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  flex-shrink: 0;
-}
-
-.recentVoteRow__badge--passed {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.recentVoteRow__badge--rejected {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.recentVoteRow__partyLine {
-  margin: 0;
-  color: var(--faint);
-  font-size: 0.8rem;
-  font-style: italic;
-}
-
-.recentVoteRow__crossovers {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem 0.5rem;
-}
-
-.recentVoteRow__crossoverLabel {
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--defection);
-}
-
-.recentVoteRow__crossoverName {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
 
 .recentVoteRow__partyDot {
   display: inline-block;
@@ -436,35 +348,15 @@ button, input, select { font: inherit; color: inherit; }
 .policyTag--nomination { background: #f5f5f4; color: #57534e; }
 
 /* ======================================================================
-   Bill Timeline
+   Action Cards (What Just Happened)
    ====================================================================== */
 
-.billTimeline {
+.actionCards {
   display: grid;
   gap: var(--space-sm);
 }
 
-.billTimeline__secondary {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 0.35rem 0.55rem;
-}
-
-.billTimeline__secondary > summary {
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.billTimeline__secondaryList {
-  margin-top: var(--space-sm);
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.billCard {
+.actionCard {
   padding: var(--space-md);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -473,179 +365,18 @@ button, input, select { font: inherit; color: inherit; }
   gap: var(--space-sm);
 }
 
-.billCard--rejected {
+.actionCard--rejected {
   border-left: 3px solid var(--warn);
 }
 
-.billCard__header {
-  display: flex;
-  gap: var(--space-md);
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.billCard__info {
-  min-width: 0;
-  display: grid;
-  gap: 0.2rem;
-}
-
-.billCard__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.billCard__title {
-  margin: 0;
-  font-size: 0.88rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.billCard__summary {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
-.billCard__meta {
-  margin: 0;
-  color: var(--faint);
-  font-size: 0.74rem;
-  line-height: 1.35;
-}
-
-.billCard__meaning,
-.billCard__impact,
-.billCard__next,
-.billCard__hidden {
-  margin: 0;
-  font-size: 0.79rem;
-  line-height: 1.4;
-}
-
-.billCard__next--primary {
-  padding: 0.45rem 0.55rem;
-  border-radius: 10px;
-  background: #f1f5f9;
-  border: 1px solid #dbe3ea;
-  color: #0f172a;
-}
-
-.billCard__official {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.25rem 0.5rem;
-  background: #fafaf9;
-}
-
-.billCard__official > summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 600;
-}
-
-.billCard__official p {
-  margin: 0.35rem 0 0;
-  color: var(--faint);
-  font-size: 0.73rem;
-  line-height: 1.35;
-}
-
-.billCard__hidden {
-  color: var(--defection);
-}
-
-.billCard__provisions {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.35rem 0.5rem;
-  background: #fafaf9;
-}
-
-.billCard__provisions > summary {
-  cursor: pointer;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.billCard__provisions ul {
-  margin: 0.45rem 0 0 0.95rem;
-  padding: 0;
-  display: grid;
-  gap: 0.25rem;
-}
-
-.billCard__provisions li {
-  font-size: 0.76rem;
-  color: var(--muted);
-  line-height: 1.35;
-}
-
-.billCard__badge--progress {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.billCard__steps {
+.actionCard__tagRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.3rem 0.15rem;
+  gap: 0.35rem;
 }
 
-.billStep {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.billStep__chip {
-  display: inline-block;
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.billStep__chip--passed {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.billStep__chip--failed {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.billStep__tally {
-  font-size: 0.74rem;
-  color: var(--muted);
-  font-family: var(--font-mono);
-}
-
-.billStep__tally--close {
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.billStep__date {
-  font-size: 0.68rem;
-  color: var(--faint);
-}
-
-.billStep__arrow {
-  color: var(--faint);
-  font-size: 0.72rem;
-  margin: 0 0.1rem;
-}
-
-.billCodeTag {
+.actionCard__code {
   display: inline-block;
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
@@ -657,117 +388,67 @@ button, input, select { font: inherit; color: inherit; }
   white-space: nowrap;
 }
 
-.impactTag {
+.actionCard__status {
+  margin-left: auto;
   display: inline-block;
-  padding: 0.1rem 0.45rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 
-.impactTag--high {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.impactTag--medium {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.impactTag--low {
-  background: #f5f5f4;
-  color: #57534e;
-}
-
-.confidenceTag {
-  display: inline-block;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.confidenceTag--high {
+.actionCard__status--passed {
   background: #dcfce7;
   color: #166534;
 }
 
-.confidenceTag--medium {
-  background: #fef9c3;
-  color: #854d0e;
-}
-
-.confidenceTag--low {
+.actionCard__status--rejected {
   background: #fee2e2;
   color: #991b1b;
 }
 
-.billCard__stateImpact,
-.billCard__unknownCallout {
+.actionCard__status--in-progress {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.actionCard__title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.actionCard__outcome {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.actionCard__context {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.actionCard__vote {
   margin: 0;
   font-size: 0.78rem;
-  line-height: 1.38;
-}
-
-.billCard__unknownCallout {
-  color: #7c2d12;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  border-radius: 10px;
-  padding: 0.4rem 0.55rem;
-}
-
-.billCard__money,
-.billCard__unknowns,
-.billCard__evidence {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.35rem 0.5rem;
-  background: #fafaf9;
-}
-
-.billCard__money > summary,
-.billCard__unknowns > summary,
-.billCard__evidence > summary {
-  cursor: pointer;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.billCard__money ul,
-.billCard__unknowns ul,
-.billCard__evidence ul {
-  margin: 0.45rem 0 0 0.95rem;
-  padding: 0;
-  display: grid;
-  gap: 0.25rem;
-}
-
-.billCard__money li,
-.billCard__unknowns li,
-.billCard__evidence li {
-  font-size: 0.76rem;
+  font-family: var(--font-mono);
   color: var(--muted);
-  line-height: 1.35;
 }
 
-.enrichedVote__marginBadge {
+.actionCard__partyDot {
   display: inline-block;
-  margin-left: 0.3rem;
-  padding: 0.06rem 0.35rem;
-  border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  background: rgba(217, 119, 6, 0.12);
-  color: var(--defection);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  vertical-align: middle;
 }
 
 .enrichedVote__tally--close {
@@ -1066,18 +747,14 @@ button, input, select { font: inherit; color: inherit; }
     margin-top: 0.7rem;
   }
 
-  .recentVoteRow__header,
-  .billCard__header {
+  .actionCard__tagRow {
     flex-direction: column;
+    align-items: flex-start;
     gap: var(--space-xs);
   }
 
-  .billCard__steps {
-    gap: 0.4rem;
-  }
-
-  .recentVoteRow__badge {
-    align-self: flex-start;
+  .actionCard__status {
+    margin-left: 0;
   }
 
   .decisiveVote__senators {

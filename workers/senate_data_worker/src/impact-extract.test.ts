@@ -66,4 +66,23 @@ describe("extractBillImpactEvidence", () => {
     expect(trend.amount_total_nominal).toBeGreaterThan(0);
     expect(trend.snapshot_date).toBe("2026-02-18");
   });
+
+  it("detects state abbreviations and penalizes unknown-heavy evidence", () => {
+    const sparseEvidence: BillEvidenceRaw = {
+      ...rawEvidence,
+      source_text: [
+        "Authorizes pilot support for local entities in CA and TX.",
+      ],
+      source_availability: {
+        summaries: true,
+        detail: false,
+        cbo_cost_estimates: false,
+      },
+    };
+
+    const impact = extractBillImpactEvidence(bill, sparseEvidence, { session: 2 });
+    expect(impact.where.states_mentioned).toEqual(expect.arrayContaining(["CA", "TX"]));
+    expect(impact.unknowns.length).toBeGreaterThan(0);
+    expect(impact.richness_score).toBeLessThan(40);
+  });
 });

@@ -296,6 +296,78 @@ function extractSummary(
   };
 }
 
+function extractTitles(data: Record<string, unknown> | null): string[] {
+  if (!data) return [];
+  const container =
+    (data as Record<string, unknown>).titles ??
+    (data as Record<string, unknown>).title ??
+    data;
+  const list = Array.isArray(container)
+    ? container
+    : (container as Record<string, unknown>)?.titles ??
+      (container as Record<string, unknown>)?.items ??
+      (container as Record<string, unknown>)?.results ??
+      [];
+  if (!Array.isArray(list)) return [];
+  const titles = list
+    .map((item) => {
+      if (!item || typeof item !== "object") return undefined;
+      const record = item as Record<string, unknown>;
+      return getString(
+        record.title ??
+          record.titleText ??
+          record.name ??
+          record.displayText
+      );
+    })
+    .filter((value): value is string => Boolean(value));
+  return Array.from(new Set(titles)).slice(0, 8);
+}
+
+function extractLawInfo(
+  data: Record<string, unknown> | null
+): BillRef["law"] | undefined {
+  if (!data) return undefined;
+  const lawCandidate =
+    (data as Record<string, unknown>).law ??
+    (data as Record<string, unknown>).laws ??
+    (data as Record<string, unknown>).latestLaw;
+
+  const list = Array.isArray(lawCandidate)
+    ? lawCandidate
+    : lawCandidate && typeof lawCandidate === "object"
+      ? [
+          (lawCandidate as Record<string, unknown>).law ??
+            (lawCandidate as Record<string, unknown>).latestLaw ??
+            lawCandidate,
+        ]
+      : [];
+
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const number = getString(
+      record.number ??
+        record.lawNumber ??
+        record.law_number ??
+        record.publicLawNumber
+    );
+    const type = getString(record.type ?? record.lawType ?? record.law_type);
+    const lawId = getString(record.lawId ?? record.law_id ?? record.identifier);
+    const url = getString(record.url);
+    const congressValue = Number(
+      getString(record.congress ?? record.congressNumber) ?? ""
+    );
+    const congress =
+      Number.isFinite(congressValue) && congressValue > 0
+        ? congressValue
+        : undefined;
+    if (!number && !lawId && !url) continue;
+    return { number: number ?? undefined, type, law_id: lawId, congress, url };
+  }
+  return undefined;
+}
+
 function isDateInRange(date: string, start: string, end: string): boolean {
   return compareDates(date, start) >= 0 && compareDates(date, end) <= 0;
 }
@@ -571,6 +643,21 @@ export async function fetchMemberLegislationActions(
   return { actions, error: errorMessage };
 }
 
+async function fetchFirstEndpoint(
+  urls: string[],
+  config: FetchConfig
+): Promise<{ data: Record<string, unknown> | null; error?: string }> {
+  let lastError: string | undefined;
+  for (const url of urls) {
+    const result = await fetchJsonWithRetry<Record<string, unknown>>(url, config);
+    if (result.success && result.data) {
+      return { data: result.data };
+    }
+    lastError = result.error ?? `Failed fetch for ${url}`;
+  }
+  return { data: null, error: lastError };
+}
+
 export async function fetchBillDetails(
   ref: BillRef,
   apiKey: string,
@@ -587,13 +674,23 @@ export async function fetchBillDetails(
   const summaryUrl = buildCongressUrl(`${basePath}/summaries`, {}, apiKey);
   const subjectsUrl = buildCongressUrl(`${basePath}/subjects`, {}, apiKey);
   const committeesUrl = buildCongressUrl(`${basePath}/committees`, {}, apiKey);
+  const titlesUrls = [
+    buildCongressUrl(`${basePath}/titles`, {}, apiKey),
+    buildCongressUrl(`${basePath}/title`, {}, apiKey),
+  ];
+  const lawUrls = [
+    buildCongressUrl(`${basePath}/law`, {}, apiKey),
+    buildCongressUrl(`${basePath}/laws`, {}, apiKey),
+  ];
 
-  const [detailResult, summaryResult, subjectsResult, committeesResult] =
+  const [detailResult, summaryResult, subjectsResult, committeesResult, titlesResult, lawResult] =
     await Promise.all([
       fetchJsonWithRetry<Record<string, unknown>>(detailUrl, config),
       fetchJsonWithRetry<Record<string, unknown>>(summaryUrl, config),
       fetchJsonWithRetry<Record<string, unknown>>(subjectsUrl, config),
       fetchJsonWithRetry<Record<string, unknown>>(committeesUrl, config),
+      fetchFirstEndpoint(titlesUrls, config),
+      fetchFirstEndpoint(lawUrls, config),
     ]);
 
   const detailData =
@@ -632,17 +729,23 @@ export async function fetchBillDetails(
     subjectsFromEndpoint.length > 0
       ? subjectsFromEndpoint
       : extractSubjects(detailData ?? null);
+  const titles = extractTitles(titlesResult.data ?? detailData ?? null);
   const committees =
     extractCommittees(committeesResult.data ?? null) ??
     extractCommittees(detailData ?? null);
+  const law =
+    extractLawInfo(lawResult.data ?? null) ??
+    extractLawInfo(detailData ?? null);
   const summaryPayload = extractSummary(summaryResult.data ?? null);
 
   const bill: BillRef = {
     ...ref,
     title,
+    titles: titles.length > 0 ? titles : ref.titles,
     url,
     introduced_date: introducedDate ?? ref.introduced_date,
     latest_action: latestAction ?? ref.latest_action,
+    law: law ?? ref.law,
     policy_area: policyArea ?? ref.policy_area,
     subjects: subjects.length ? subjects : ref.subjects,
     committees: committees ?? ref.committees,
@@ -650,7 +753,13 @@ export async function fetchBillDetails(
     summary_date: summaryPayload.summary_date ?? ref.summary_date,
   };
 
-  const error = detailResult.error ?? summaryResult.error ?? subjectsResult.error ?? committeesResult.error;
+  const error =
+    detailResult.error ??
+    summaryResult.error ??
+    subjectsResult.error ??
+    committeesResult.error ??
+    titlesResult.error ??
+    lawResult.error;
   return { bill, error };
 }
 
@@ -728,6 +837,8 @@ export interface SenateCommitteeMeetingAdapterItem {
   location?: string;
   url?: string;
   related_bills: BillRef[];
+  related_nominations?: string[];
+  related_treaties?: string[];
   nomination_signals: string[];
   meeting_documents: CongressMeetingDocument[];
 }
@@ -806,6 +917,104 @@ function normalizeBillTypeFromLabel(value: string): string {
   if (cleaned === "HRES") return "HRES";
   if (cleaned === "SRES") return "SRES";
   return cleaned;
+}
+
+function collectRelatedLabels(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  const labels: string[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const label = getString(
+      record.title ??
+        record.name ??
+        record.nominationNumber ??
+        record.treatyNumber ??
+        record.number ??
+        record.identifier
+    );
+    if (label) labels.push(label);
+  }
+  return labels;
+}
+
+function parseBillRefFromStructuredItem(
+  item: unknown,
+  congress: number
+): BillRef | null {
+  if (!item || typeof item !== "object") return null;
+  const record = item as Record<string, unknown>;
+  const typeRaw = getString(record.type ?? record.billType ?? record.bill_type);
+  const numberRaw = getString(record.number ?? record.billNumber ?? record.bill_number);
+  const congressRaw = Number(getString(record.congress ?? record.congressNumber) ?? "");
+  const resolvedCongress =
+    Number.isFinite(congressRaw) && congressRaw > 0 ? congressRaw : congress;
+
+  if (typeRaw && numberRaw) {
+    return {
+      congress: resolvedCongress,
+      type: normalizeBillTypeFromLabel(typeRaw),
+      number: numberRaw,
+      title: getString(record.title ?? record.name),
+      url: getString(record.url),
+    };
+  }
+
+  const fallbackText = getString(record.title ?? record.name ?? record.identifier);
+  if (!fallbackText) return null;
+  const fromText = extractBillRefsFromMeetingText(fallbackText, resolvedCongress)[0];
+  if (!fromText) return null;
+  return {
+    ...fromText,
+    title: getString(record.title ?? record.name) ?? fromText.title,
+    url: getString(record.url) ?? fromText.url,
+  };
+}
+
+function extractStructuredRelatedItems(
+  rawMeeting: Record<string, unknown>,
+  congress: number
+): {
+  relatedBills: BillRef[];
+  relatedNominations: string[];
+  relatedTreaties: string[];
+} {
+  const related = rawMeeting.relatedItems;
+  if (!related || typeof related !== "object") {
+    return { relatedBills: [], relatedNominations: [], relatedTreaties: [] };
+  }
+  const relatedRecord = related as Record<string, unknown>;
+
+  const billCandidates =
+    relatedRecord.bills ??
+    relatedRecord.bill ??
+    relatedRecord.relatedBills ??
+    relatedRecord.related_bills ??
+    [];
+  const nominationCandidates =
+    relatedRecord.nominations ??
+    relatedRecord.nomination ??
+    relatedRecord.relatedNominations ??
+    [];
+  const treatyCandidates =
+    relatedRecord.treaties ??
+    relatedRecord.treaty ??
+    relatedRecord.relatedTreaties ??
+    [];
+
+  const billItems = Array.isArray(billCandidates) ? billCandidates : [];
+  const relatedBills = billItems
+    .map((item) => parseBillRefFromStructuredItem(item, congress))
+    .filter((item): item is BillRef => Boolean(item));
+
+  const relatedNominations = collectRelatedLabels(nominationCandidates);
+  const relatedTreaties = collectRelatedLabels(treatyCandidates);
+
+  return {
+    relatedBills: relatedBills.slice(0, 12),
+    relatedNominations: Array.from(new Set(relatedNominations)).slice(0, 6),
+    relatedTreaties: Array.from(new Set(relatedTreaties)).slice(0, 6),
+  };
 }
 
 function extractBillRefsFromMeetingText(
@@ -964,7 +1173,11 @@ export async function fetchSenateCommitteeMeetings(
         .filter((value): value is string => Boolean(value))
         .map((value) => value.trim());
 
+      const structuredRelated = extractStructuredRelatedItems(rawMeeting, congress);
       const relatedBillMap = new Map<string, BillRef>();
+      for (const bill of structuredRelated.relatedBills) {
+        relatedBillMap.set(buildBillKey(bill), bill);
+      }
       for (const text of sourceTexts) {
         for (const bill of extractBillRefsFromMeetingText(text, congress)) {
           relatedBillMap.set(buildBillKey(bill), bill);
@@ -972,8 +1185,11 @@ export async function fetchSenateCommitteeMeetings(
       }
       const relatedBills = Array.from(relatedBillMap.values());
 
-      const nominationSignals = sourceTexts.flatMap((text) =>
-        extractNominationSignalsFromText(text)
+      const nominationSignals = Array.from(
+        new Set([
+          ...structuredRelated.relatedNominations,
+          ...sourceTexts.flatMap((text) => extractNominationSignalsFromText(text)),
+        ])
       );
 
       const videos = Array.isArray(rawMeeting.videos)
@@ -996,6 +1212,8 @@ export async function fetchSenateCommitteeMeetings(
         location,
         url: meetingUrl,
         related_bills: relatedBills,
+        related_nominations: structuredRelated.relatedNominations,
+        related_treaties: structuredRelated.relatedTreaties,
         nomination_signals: nominationSignals.slice(0, 6),
         meeting_documents: meetingDocuments,
       } satisfies SenateCommitteeMeetingAdapterItem;

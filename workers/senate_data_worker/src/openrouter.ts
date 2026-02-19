@@ -95,6 +95,16 @@ function sanitizeConfidence(value: unknown): NonNullable<BillAnalysis["confidenc
   return "low";
 }
 
+function downgradeConfidence(
+  value: NonNullable<BillAnalysis["confidence"]>,
+  steps: number
+): NonNullable<BillAnalysis["confidence"]> {
+  if (steps <= 0) return value;
+  if (value === "high") return steps > 1 ? "low" : "medium";
+  if (value === "medium") return "low";
+  return "low";
+}
+
 function hasConcreteSignal(text: string): boolean {
   return /(\$|\d{1,3}(,\d{3})+|\b\d+\b|million|billion|department|agency|program|grant)/i.test(text);
 }
@@ -280,10 +290,14 @@ function coerceBillAnalysis(raw: unknown, ref: BillRef, impactEvidence?: BillImp
   const moneyFlowsRaw = sanitizeStringList(obj.money_flows, 6, true);
   const moneyFlows = moneyFlowsRaw.length > 0 ? moneyFlowsRaw : buildMoneyFlowsFromEvidence(impactEvidence);
   const pocketbookImpact = sanitizeStringList(obj.pocketbook_impact, 6);
+  const sanitizedUnknowns = sanitizeStringList(obj.unknowns, 6);
+  const sanitizedEvidence = sanitizeStringList(obj.evidence, 5);
 
   const richScore = impactEvidence?.richness_score ?? 0;
-  const confidenceFallback: NonNullable<BillAnalysis["confidence"]> =
+  const unknownPenalty = Math.floor((impactEvidence?.unknowns.length ?? 0) / 2);
+  const confidenceFallbackBase: NonNullable<BillAnalysis["confidence"]> =
     richScore >= 60 ? "high" : richScore >= 30 ? "medium" : "low";
+  const confidenceFallback = downgradeConfidence(confidenceFallbackBase, unknownPenalty);
 
   const plainSummary = sanitizeNarrativeText(obj.plain_summary, defaultSummary);
   const whyFallback =
@@ -320,12 +334,12 @@ function coerceBillAnalysis(raw: unknown, ref: BillRef, impactEvidence?: BillImp
       buildStateLocalImpact(impactEvidence)
     ),
     unknowns:
-      sanitizeStringList(obj.unknowns, 6).length > 0
-        ? sanitizeStringList(obj.unknowns, 6)
+      sanitizedUnknowns.length > 0
+        ? sanitizedUnknowns
         : buildUnknownStrings(impactEvidence),
     evidence:
-      sanitizeStringList(obj.evidence, 5).length > 0
-        ? sanitizeStringList(obj.evidence, 5)
+      sanitizedEvidence.length > 0
+        ? sanitizedEvidence
         : buildEvidenceLines(impactEvidence),
     confidence:
       typeof obj.confidence === "string"
@@ -674,7 +688,8 @@ export async function analyzeBillsWithCache(
           error instanceof Error ? error.message : String(error)
         }`
       );
-      return { key, analysis: null as BillAnalysis | null, skipped: true };
+      const fallback = coerceBillAnalysis({}, input.bill, input.impactEvidence);
+      return { key, analysis: fallback, skipped: true };
     }
   });
 
@@ -682,6 +697,9 @@ export async function analyzeBillsWithCache(
     if (!result.analysis) {
       skippedCount++;
       continue;
+    }
+    if (result.skipped) {
+      skippedCount++;
     }
     analyzedCount++;
     analysisByKey.set(result.key, result.analysis);

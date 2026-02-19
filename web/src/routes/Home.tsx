@@ -9,7 +9,7 @@ import {
   type VoteLedger,
 } from '../api'
 import { E2E_ACTIVITIES, E2E_LEDGER, E2E_OVERVIEW } from '../e2eData'
-import BillTimeline from '../components/BillTimeline'
+import ActionCards from '../components/ActionCards'
 import DecisiveVotes from '../components/DecisiveVotes'
 import ComingUp from '../components/ComingUp'
 import StateDumbbell from '../components/StateDumbbell'
@@ -20,6 +20,7 @@ import {
   buildComingUpVM,
   buildDecisiveVotesVM,
   buildStateDumbbellVM,
+  toActionCards,
 } from '../ui/homeViewModel'
 
 function formatToday(): string {
@@ -39,6 +40,15 @@ function formatTimestamp(value: string): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+  }).format(date)
+}
+
+function formatDateWindow(dateStr: string): string {
+  const date = new Date(`${dateStr}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return dateStr
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
   }).format(date)
 }
 
@@ -112,9 +122,17 @@ export default function Home() {
   }, [e2eMode])
 
   const billTimelineVM = useMemo(
-    () => ledger && overview ? buildBillTimelineVM(ledger, overview, activities) : null,
+    () => ledger && overview ? buildBillTimelineVM(ledger, overview, activities, { windowDays: 7 }) : null,
     [ledger, overview, activities],
   )
+  const billTimelineWindow = useMemo(() => {
+    if (!billTimelineVM || billTimelineVM.length === 0) return null
+    const sortedDates = [...billTimelineVM.map((item) => item.latestDate)].sort()
+    return {
+      start: sortedDates[0],
+      end: sortedDates[sortedDates.length - 1],
+    }
+  }, [billTimelineVM])
 
   const decisiveVM = useMemo(
     () => ledger && overview ? buildDecisiveVotesVM(ledger, overview, activities) : null,
@@ -134,6 +152,11 @@ export default function Home() {
   const arcVM = useMemo(
     () => overview ? buildAttendanceArcVM(overview) : null,
     [overview],
+  )
+
+  const actionCards = useMemo(
+    () => billTimelineVM ? toActionCards(billTimelineVM) : null,
+    [billTimelineVM],
   )
 
   return (
@@ -162,13 +185,15 @@ export default function Home() {
         <p className="loadingLine">Loading&hellip;</p>
       ) : (
         <>
-          {billTimelineVM && billTimelineVM.length > 0 && (
+          {actionCards && actionCards.length > 0 && (
             <section className="vizSection" aria-label="Recent votes">
               <h2 className="vizSection__title">What just happened</h2>
               <p className="vizSection__subtitle">
-                The most important Senate actions this week, explained in plain language.
+                {billTimelineWindow
+                  ? `Senate actions from ${formatDateWindow(billTimelineWindow.start)} to ${formatDateWindow(billTimelineWindow.end)}, explained in plain language.`
+                  : 'Recent Senate actions, explained in plain language.'}
               </p>
-              <BillTimeline bills={billTimelineVM} />
+              <ActionCards cards={actionCards} />
             </section>
           )}
 

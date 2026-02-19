@@ -365,6 +365,8 @@ function buildMemberSummary(
   const matchedUpcoming = upcomingMeetings.filter(
     (meeting) =>
       meeting.nomination_signals.length > 0 ||
+      (meeting.related_nominations?.length ?? 0) > 0 ||
+      (meeting.related_treaties?.length ?? 0) > 0 ||
       intersectsMemberBills(meeting.related_bills, memberBillKeys)
   );
 

@@ -63,6 +63,8 @@ const STATE_NAME_TO_CODE: Record<string, string> = {
   wyoming: "WY",
   "district of columbia": "DC",
 };
+const STATE_CODES = new Set(Object.values(STATE_NAME_TO_CODE));
+const AMBIGUOUS_STATE_CODES = new Set(["IN", "OR", "ME", "AS", "TO", "IT", "AT", "BY", "ON", "NO"]);
 
 function unique<T>(items: T[]): T[] {
   return Array.from(new Set(items));
@@ -73,10 +75,10 @@ function parseNumericAmount(rawNumber: string, unitWord: string | undefined): nu
   const value = Number(normalized);
   if (!Number.isFinite(value)) return null;
   const unit = (unitWord ?? "").toLowerCase();
-  if (unit.startsWith("thousand")) return value * 1_000;
-  if (unit.startsWith("million")) return value * 1_000_000;
-  if (unit.startsWith("billion")) return value * 1_000_000_000;
-  if (unit.startsWith("trillion")) return value * 1_000_000_000_000;
+  if (unit.startsWith("thousand") || unit === "k") return value * 1_000;
+  if (unit.startsWith("million") || unit === "m") return value * 1_000_000;
+  if (unit.startsWith("billion") || unit === "b") return value * 1_000_000_000;
+  if (unit.startsWith("trillion") || unit === "t") return value * 1_000_000_000_000;
   return value;
 }
 
@@ -92,31 +94,35 @@ function inferAmountType(context: string): AmountEvidence["amount_type"] {
 function extractAmounts(sourceText: string[]): AmountEvidence[] {
   const out: AmountEvidence[] = [];
   const seen = new Set<string>();
-  const amountRegex =
-    /\$ ?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*(thousand|million|billion|trillion))?/gi;
+  const amountRegexes = [
+    /\$ ?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*(thousand|million|billion|trillion|k|m|b|t))?/gi,
+    /\b(\d+(?:\.\d+)?)\s*(thousand|million|billion|trillion)\b/gi,
+  ];
 
   for (let i = 0; i < sourceText.length; i++) {
     const text = sourceText[i];
-    let match = amountRegex.exec(text);
-    while (match) {
-      const valueNumeric = parseNumericAmount(match[1], match[2]);
-      if (valueNumeric !== null) {
-        const key = `${valueNumeric}:${text}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          const fiscalYearMatch = text.match(/fiscal year\s*(20\d{2})/i);
-          out.push({
-            value_numeric: valueNumeric,
-            unit: "USD",
-            amount_type: inferAmountType(text),
-            fiscal_year: fiscalYearMatch ? Number(fiscalYearMatch[1]) : undefined,
-            source_endpoint: "summaries",
-            source_ref: `source_text:${i + 1}`,
-            raw_text: text.slice(0, 500),
-          });
+    for (const regex of amountRegexes) {
+      let match = regex.exec(text);
+      while (match) {
+        const valueNumeric = parseNumericAmount(match[1], match[2]);
+        if (valueNumeric !== null) {
+          const key = `${valueNumeric}:${i}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            const fiscalYearMatch = text.match(/fiscal year\s*(20\d{2})/i);
+            out.push({
+              value_numeric: valueNumeric,
+              unit: "USD",
+              amount_type: inferAmountType(text),
+              fiscal_year: fiscalYearMatch ? Number(fiscalYearMatch[1]) : undefined,
+              source_endpoint: "summaries",
+              source_ref: `source_text:${i + 1}`,
+              raw_text: text.slice(0, 500),
+            });
+          }
         }
+        match = regex.exec(text);
       }
-      match = amountRegex.exec(text);
     }
   }
 
@@ -143,7 +149,11 @@ function extractRecipients(sourceText: string[]): RecipientEvidence[] {
     /\b([A-Z][A-Za-z\s]+ Administration)\b/g,
     /\b([A-Z][A-Za-z\s]+ Agency)\b/g,
     /\b([A-Z][A-Za-z\s]+ Program)\b/g,
+    /\b([A-Z][A-Za-z\s]+ Department)\b/g,
+    /\b([A-Z][A-Za-z\s]+ Authority)\b/g,
+    /\b([A-Z][A-Za-z\s]+ Commission)\b/g,
     /\b(grants? to [A-Za-z0-9,\-\s]+)\b/gi,
+    /\b(funding for [A-Za-z0-9,\-\s]+)\b/gi,
   ];
 
   for (const text of sourceText) {
@@ -154,10 +164,14 @@ function extractRecipients(sourceText: string[]): RecipientEvidence[] {
         const key = raw.toLowerCase();
         if (!seen.has(key) && raw.length > 4) {
           seen.add(key);
+          const stateCode = Object.entries(STATE_NAME_TO_CODE).find(([name]) =>
+            raw.toLowerCase().includes(name)
+          )?.[1];
           out.push({
             type: classifyRecipientType(raw),
             name: raw,
-            scope: "national",
+            scope: stateCode ? "state-specific" : "national",
+            state_code: stateCode,
           });
         }
         match = regex.exec(text);
@@ -220,15 +234,39 @@ function extractStates(sourceText: string[]): string[] {
     for (const [name, code] of Object.entries(STATE_NAME_TO_CODE)) {
       if (lower.includes(name)) states.push(code);
     }
+    const upperText = text.toUpperCase();
+    for (const code of STATE_CODES) {
+      if (AMBIGUOUS_STATE_CODES.has(code)) continue;
+      const codePattern = new RegExp(
+        `(?:\\bIN\\s+|\\bFOR\\s+|\\bTO\\s+|\\bFROM\\s+|\\bAND\\s+|\\(|,\\s*|\\bSTATE OF\\s+)${code}(?:\\b|\\))`,
+        "i"
+      );
+      if (codePattern.test(upperText)) states.push(code);
+    }
   }
   return unique(states).sort();
 }
 
 function inferGeographyScope(sourceText: string[], states: string[]): GeographyScope {
+  if (states.length > 1 && sourceText.join(" ").toLowerCase().includes("local")) return "mixed";
   if (states.length > 0) return "state-named";
   const joined = sourceText.join(" ").toLowerCase();
-  if (joined.includes("formula grant") || joined.includes("states")) return "state-formula";
-  if (joined.includes("local")) return "local";
+  if (
+    joined.includes("formula grant") ||
+    joined.includes("state allocation") ||
+    joined.includes("among the states") ||
+    joined.includes("states")
+  ) {
+    return "state-formula";
+  }
+  if (
+    joined.includes("local") ||
+    joined.includes("county") ||
+    joined.includes("city") ||
+    joined.includes("municipal")
+  ) {
+    return "local";
+  }
   if (joined.trim()) return "national";
   return "unknown";
 }
@@ -300,11 +338,12 @@ function computeRichnessScore(params: {
   unknownCount: number;
 }): number {
   let score = 0;
-  if (params.amountCount > 0) score += 30;
+  if (params.amountCount > 0) score += 35;
   if (params.recipientCount > 0) score += 25;
   if (params.stateSignal) score += 20;
   if (params.dateSignal) score += 15;
-  if (params.unknownCount > 0) score += 10;
+  if (params.amountCount > 0 && params.recipientCount > 0) score += 5;
+  if (params.unknownCount > 0) score -= Math.min(30, params.unknownCount * 8);
   return Math.max(0, Math.min(100, score));
 }
 

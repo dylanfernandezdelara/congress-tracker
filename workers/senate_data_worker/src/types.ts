@@ -126,6 +126,7 @@ export interface BillRef {
   type: string; // e.g., "S", "S.RES", "PN"
   number: string; // e.g., "123"
   title?: string;
+  titles?: string[];
   url?: string;
   summary?: string;
   summary_date?: string;
@@ -134,6 +135,7 @@ export interface BillRef {
   committees?: BillCommittee[];
   introduced_date?: string;
   latest_action?: BillLatestAction;
+  law?: BillLawInfo;
   impact_evidence?: BillImpactEvidence;
   analysis?: BillAnalysis;
 }
@@ -158,6 +160,9 @@ export interface EvidenceEndpointStatus {
   ok: boolean;
   fetched_at: string; // ISO 8601
   url?: string;
+  attempted_urls?: string[];
+  resolved_path?: string;
+  fallback_used?: boolean;
   error?: string;
   item_count?: number;
 }
@@ -340,6 +345,7 @@ export interface CoverageSnapshot {
   pct_with_state_signal: number;
   pct_claims_with_evidence_refs: number;
   endpoint_success_rates: Partial<Record<EvidenceEndpoint, number>>;
+  endpoint_fallback_rates: Partial<Record<EvidenceEndpoint, number>>;
   partial: boolean;
   errors: SourceError[];
 }
@@ -347,6 +353,14 @@ export interface CoverageSnapshot {
 export interface BillLatestAction {
   action_date?: string; // YYYY-MM-DD
   text?: string;
+}
+
+export interface BillLawInfo {
+  number?: string;
+  type?: string;
+  congress?: number;
+  law_id?: string;
+  url?: string;
 }
 
 export interface BillCommittee {
@@ -442,6 +456,8 @@ export interface CongressCommitteeMeetingItem {
   location?: string;
   url?: string;
   related_bills: BillRef[];
+  related_nominations?: string[];
+  related_treaties?: string[];
   nomination_signals: string[];
   meeting_documents: Array<{
     document_type: string;

@@ -26,12 +26,15 @@ export const EVIDENCE_ENDPOINT_TIERS: Record<EvidenceEndpoint, 1 | 2 | 3> = {
 
 interface EndpointSpec {
   endpoint: EvidenceEndpoint;
-  path: string;
+  paths: string[];
 }
 
 interface EndpointFetchResult {
   endpoint: EvidenceEndpoint;
   url: string;
+  attemptedUrls: string[];
+  resolvedPath: string;
+  fallbackUsed: boolean;
   ok: boolean;
   fetchedAt: string;
   error?: string;
@@ -175,17 +178,26 @@ function collectSourceText(
 
 function buildEndpointSpecs(basePath: string): EndpointSpec[] {
   return [
-    { endpoint: "detail", path: basePath },
-    { endpoint: "summaries", path: `${basePath}/summaries` },
-    { endpoint: "subjects", path: `${basePath}/subjects` },
-    { endpoint: "committees", path: `${basePath}/committees` },
-    { endpoint: "actions", path: `${basePath}/actions` },
-    { endpoint: "text", path: `${basePath}/text` },
-    { endpoint: "amendments", path: `${basePath}/amendments` },
-    { endpoint: "cbo_cost_estimates", path: `${basePath}/cbo-cost-estimates` },
-    { endpoint: "committee_reports", path: `${basePath}/committee-reports` },
-    { endpoint: "related_bills", path: `${basePath}/related-bills` },
-    { endpoint: "cosponsors", path: `${basePath}/cosponsors` },
+    { endpoint: "detail", paths: [basePath] },
+    { endpoint: "summaries", paths: [`${basePath}/summaries`] },
+    { endpoint: "subjects", paths: [`${basePath}/subjects`] },
+    { endpoint: "committees", paths: [`${basePath}/committees`] },
+    { endpoint: "actions", paths: [`${basePath}/actions`] },
+    { endpoint: "text", paths: [`${basePath}/text`, `${basePath}/texts`] },
+    { endpoint: "amendments", paths: [`${basePath}/amendments`] },
+    {
+      endpoint: "cbo_cost_estimates",
+      paths: [`${basePath}/cbo-cost-estimates`, `${basePath}/cbocostestimates`],
+    },
+    {
+      endpoint: "committee_reports",
+      paths: [`${basePath}/committee-reports`, `${basePath}/committeereports`],
+    },
+    {
+      endpoint: "related_bills",
+      paths: [`${basePath}/relatedbills`, `${basePath}/related-bills`],
+    },
+    { endpoint: "cosponsors", paths: [`${basePath}/cosponsors`] },
   ];
 }
 
@@ -195,6 +207,9 @@ function toEndpointStatus(result: EndpointFetchResult): EvidenceEndpointStatus {
     ok: result.ok,
     fetched_at: result.fetchedAt,
     url: result.url,
+    attempted_urls: result.attemptedUrls,
+    resolved_path: result.resolvedPath,
+    fallback_used: result.fallbackUsed,
     error: result.error,
     item_count: result.itemCount,
   };
@@ -241,24 +256,51 @@ export async function harvestBillEvidence(
 
   const endpointResults = await mapWithConcurrency(specs, endpointFanout, async (spec) => {
     const fetchedAt = new Date().toISOString();
-    const url = buildCongressUrl(spec.path, {}, apiKey);
-    const result = await fetchJsonWithRetry<Record<string, unknown>>(url, fetchConfig);
-    if (!result.success || !result.data) {
+    const attemptedUrls: string[] = [];
+    const errors: string[] = [];
+    let selectedUrl = "";
+    let selectedPath = spec.paths[0] ?? "";
+    let selectedPayload: Record<string, unknown> | undefined;
+    let fallbackUsed = false;
+
+    for (let i = 0; i < spec.paths.length; i++) {
+      const path = spec.paths[i];
+      const url = buildCongressUrl(path, {}, apiKey);
+      attemptedUrls.push(url);
+      const result = await fetchJsonWithRetry<Record<string, unknown>>(url, fetchConfig);
+      if (result.success && result.data) {
+        selectedUrl = url;
+        selectedPath = path;
+        selectedPayload = result.data;
+        fallbackUsed = i > 0;
+        break;
+      }
+      errors.push(result.error ?? `Endpoint fetch failure for ${path}`);
+    }
+
+    if (!selectedPayload) {
       return {
         endpoint: spec.endpoint,
-        url,
+        url: attemptedUrls[0] ?? buildCongressUrl(selectedPath, {}, apiKey),
+        attemptedUrls,
+        resolvedPath: selectedPath,
+        fallbackUsed: false,
         ok: false,
         fetchedAt,
-        error: result.error ?? "Unknown endpoint fetch failure",
+        error: errors[errors.length - 1] ?? "Unknown endpoint fetch failure",
       } satisfies EndpointFetchResult;
     }
+
     return {
       endpoint: spec.endpoint,
-      url,
+      url: selectedUrl,
+      attemptedUrls,
+      resolvedPath: selectedPath,
+      fallbackUsed,
       ok: true,
       fetchedAt,
-      payload: result.data,
-      itemCount: estimateItemCount(spec.endpoint, result.data),
+      payload: selectedPayload,
+      itemCount: estimateItemCount(spec.endpoint, selectedPayload),
     } satisfies EndpointFetchResult;
   });
 

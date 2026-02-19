@@ -183,6 +183,7 @@ function summarizeCoverage(
   billCount: number,
   claimCoveragePct: number,
   endpointSuccessRates: Partial<Record<EvidenceEndpoint, number>>,
+  endpointFallbackRates: Partial<Record<EvidenceEndpoint, number>>,
   structuredAmountCount: number,
   recipientCount: number,
   stateSignalCount: number,
@@ -201,6 +202,7 @@ function summarizeCoverage(
     pct_with_state_signal: computePct(stateSignalCount, billCount),
     pct_claims_with_evidence_refs: claimCoveragePct,
     endpoint_success_rates: endpointSuccessRates,
+    endpoint_fallback_rates: endpointFallbackRates,
     partial,
     errors,
   };
@@ -566,6 +568,7 @@ interface BillEvidencePipelineResult {
   impactByKey: Map<string, BillImpactEvidence>;
   billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }>;
   endpointSuccessRates: Partial<Record<EvidenceEndpoint, number>>;
+  endpointFallbackRates: Partial<Record<EvidenceEndpoint, number>>;
   structuredAmountCount: number;
   recipientCount: number;
   stateSignalCount: number;
@@ -600,6 +603,19 @@ async function buildBillEvidencePipeline(
     related_bills: { ok: 0, total: 0 },
     cosponsors: { ok: 0, total: 0 },
   };
+  const endpointFallbackStats: Record<EvidenceEndpoint, { fallback: number; total: number }> = {
+    detail: { fallback: 0, total: 0 },
+    summaries: { fallback: 0, total: 0 },
+    subjects: { fallback: 0, total: 0 },
+    committees: { fallback: 0, total: 0 },
+    text: { fallback: 0, total: 0 },
+    actions: { fallback: 0, total: 0 },
+    amendments: { fallback: 0, total: 0 },
+    cbo_cost_estimates: { fallback: 0, total: 0 },
+    committee_reports: { fallback: 0, total: 0 },
+    related_bills: { fallback: 0, total: 0 },
+    cosponsors: { fallback: 0, total: 0 },
+  };
   const errors: SourceError[] = [];
   const impactByKey = new Map<string, BillImpactEvidence>();
   const billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }> = [];
@@ -627,6 +643,8 @@ async function buildBillEvidencePipeline(
       if (!status) continue;
       endpointStats[endpoint].total += 1;
       if (status.ok) endpointStats[endpoint].ok += 1;
+      endpointFallbackStats[endpoint].total += 1;
+      if (status.fallback_used) endpointFallbackStats[endpoint].fallback += 1;
     }
 
     const impact = extractBillImpactEvidence(bill, harvested.evidence, {
@@ -651,10 +669,13 @@ async function buildBillEvidencePipeline(
   });
 
   const endpointSuccessRates: Partial<Record<EvidenceEndpoint, number>> = {};
+  const endpointFallbackRates: Partial<Record<EvidenceEndpoint, number>> = {};
   for (const [endpoint, stats] of Object.entries(endpointStats) as Array<
     [EvidenceEndpoint, { ok: number; total: number }]
   >) {
     endpointSuccessRates[endpoint] = computePct(stats.ok, stats.total);
+    const fallbackStats = endpointFallbackStats[endpoint];
+    endpointFallbackRates[endpoint] = computePct(fallbackStats.fallback, fallbackStats.total);
   }
 
   let structuredAmountCount = 0;
@@ -684,6 +705,7 @@ async function buildBillEvidencePipeline(
     impactByKey,
     billInputs,
     endpointSuccessRates,
+    endpointFallbackRates,
     structuredAmountCount,
     recipientCount,
     stateSignalCount,
@@ -947,6 +969,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     evidencePipeline.processedBillCount,
     analysisResult?.claimsWithEvidenceRefPct ?? 0,
     evidencePipeline.endpointSuccessRates,
+    evidencePipeline.endpointFallbackRates,
     evidencePipeline.structuredAmountCount,
     evidencePipeline.recipientCount,
     evidencePipeline.stateSignalCount,
