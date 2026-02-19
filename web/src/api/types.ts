@@ -45,6 +45,113 @@ export interface BillRef {
   committees?: BillCommittee[]
   introduced_date?: string
   latest_action?: BillLatestAction
+  impact_evidence?: BillImpactEvidence
+  analysis?: BillAnalysis
+}
+
+export type EvidenceEndpoint =
+  | 'detail'
+  | 'summaries'
+  | 'subjects'
+  | 'committees'
+  | 'text'
+  | 'actions'
+  | 'amendments'
+  | 'cbo_cost_estimates'
+  | 'committee_reports'
+  | 'related_bills'
+  | 'cosponsors'
+
+export type EvidenceSourceAvailability = Partial<Record<EvidenceEndpoint, boolean>>
+
+export interface AmountEvidence {
+  value_numeric: number
+  unit: 'USD'
+  amount_type: 'appropriation' | 'authorization' | 'revenue' | 'deficit_impact' | 'other'
+  fiscal_year?: number
+  source_endpoint: EvidenceEndpoint | 'summary'
+  source_ref: string
+  raw_text: string
+}
+
+export interface RecipientEvidence {
+  type: 'agency' | 'program' | 'state' | 'territory' | 'local' | 'household' | 'other'
+  name: string
+  identifier?: string
+  scope: 'national' | 'state-specific' | 'mixed'
+  state_code?: string
+}
+
+export interface UnknownReason {
+  missing_field: 'amount' | 'recipient' | 'effective_date' | 'state_signal' | 'other'
+  category: 'no_source' | 'scope_gap' | 'timing_gap' | 'detail_gap'
+  reason: string
+  sources_checked: string[]
+}
+
+export interface BillImpactEvidence {
+  schema_version: 1
+  bill_key: string
+  congress: number
+  session: number
+  generated_at: string
+  source_availability: EvidenceSourceAvailability
+  who: RecipientEvidence[]
+  what: string[]
+  how_much: AmountEvidence[]
+  when: Array<{
+    date?: string
+    date_text: string
+    source_endpoint: EvidenceEndpoint | 'summary'
+    source_ref: string
+  }>
+  where: {
+    geography_scope: 'national' | 'state-formula' | 'state-named' | 'local' | 'mixed' | 'unknown'
+    states_mentioned: string[]
+  }
+  unknowns: UnknownReason[]
+  richness_score: number
+  summary_evidence: string[]
+}
+
+export interface BillAnalysisClaimRef {
+  source_endpoint: EvidenceEndpoint | 'summary'
+  source_ref: string
+  quote?: string
+}
+
+export interface BillAnalysisClaim {
+  text: string
+  kind?: 'summary' | 'impact' | 'money' | 'unknown'
+  evidence_refs: BillAnalysisClaimRef[]
+}
+
+export interface BillAnalysis {
+  plain_title: string
+  plain_summary: string
+  key_provisions: string[]
+  why_it_matters: string
+  hidden_provisions: string | null
+  significance: 'high' | 'medium' | 'low'
+  significance_reason: string
+  category: string
+  affects: string[]
+  money_flows?: string[]
+  pocketbook_impact?: string[]
+  state_local_impact?: string
+  unknowns?: string[]
+  evidence?: string[]
+  confidence?: 'high' | 'medium' | 'low'
+  analysis_version?: string
+  evidence_fingerprint?: string
+  evidence_generated_at?: string
+  richness_score?: number
+  structured_amounts?: AmountEvidence[]
+  structured_recipients?: RecipientEvidence[]
+  geography_scope?: 'national' | 'state-formula' | 'state-named' | 'local' | 'mixed' | 'unknown'
+  states_mentioned?: string[]
+  unknown_reasons?: UnknownReason[]
+  claims?: BillAnalysisClaim[]
 }
 
 export interface BillLatestAction {
@@ -329,6 +436,10 @@ export interface HealthResponse {
   target_state?: string
   congress?: string | number
   session?: string | number
+  message?: string
+  generated_at?: string
+  age_hours?: number
+  max_fresh_hours?: number
 }
 
 // ============================================================================

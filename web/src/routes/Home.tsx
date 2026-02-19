@@ -1,20 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ApiError,
+  fetchActivitiesIndex,
   fetchSessionOverview,
   fetchVoteLedger,
+  type ActivityIndexResponse,
   type SessionOverview,
   type VoteLedger,
 } from '../api'
-import { E2E_LEDGER, E2E_OVERVIEW } from '../e2eData'
-import ChamberArc from '../components/ChamberArc'
-import DefectionMatrix from '../components/DefectionMatrix'
+import { E2E_ACTIVITIES, E2E_LEDGER, E2E_OVERVIEW } from '../e2eData'
+import BillTimeline from '../components/BillTimeline'
+import DecisiveVotes from '../components/DecisiveVotes'
+import ComingUp from '../components/ComingUp'
 import StateDumbbell from '../components/StateDumbbell'
-import LatestVotes from '../components/LatestVotes'
+import ChamberArc from '../components/ChamberArc'
 import {
   buildAttendanceArcVM,
-  buildDefectionMatrixVM,
-  buildRecentVotesVM,
+  buildBillTimelineVM,
+  buildComingUpVM,
+  buildDecisiveVotesVM,
   buildStateDumbbellVM,
 } from '../ui/homeViewModel'
 
@@ -47,6 +51,7 @@ function normalizeErrorMessage(error: unknown): string {
 export default function Home() {
   const [ledger, setLedger] = useState<VoteLedger | null>(null)
   const [overview, setOverview] = useState<SessionOverview | null>(null)
+  const [activities, setActivities] = useState<ActivityIndexResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [usingDemo, setUsingDemo] = useState(false)
@@ -67,24 +72,28 @@ export default function Home() {
         if (cancelled) return
         setLedger(E2E_LEDGER)
         setOverview(E2E_OVERVIEW)
+        setActivities(E2E_ACTIVITIES)
         setUsingDemo(true)
         setIsLoading(false)
         return
       }
 
       try {
-        const [ledgerRes, overviewRes] = await Promise.all([
+        const [ledgerRes, overviewRes, activitiesRes] = await Promise.all([
           fetchVoteLedger().catch(() => null),
           fetchSessionOverview().catch(() => null),
+          fetchActivitiesIndex().catch(() => null),
         ])
         if (cancelled) return
 
         if (ledgerRes && overviewRes) {
           setLedger(ledgerRes)
           setOverview(overviewRes)
+          setActivities(activitiesRes)
         } else {
           setLedger(E2E_LEDGER)
           setOverview(E2E_OVERVIEW)
+          setActivities(E2E_ACTIVITIES)
           setUsingDemo(true)
         }
       } catch (e) {
@@ -92,6 +101,7 @@ export default function Home() {
         setError(normalizeErrorMessage(e))
         setLedger(E2E_LEDGER)
         setOverview(E2E_OVERVIEW)
+        setActivities(E2E_ACTIVITIES)
         setUsingDemo(true)
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -101,14 +111,19 @@ export default function Home() {
     return () => { cancelled = true }
   }, [e2eMode])
 
-  const arcVM = useMemo(
-    () => overview ? buildAttendanceArcVM(overview) : null,
-    [overview],
+  const billTimelineVM = useMemo(
+    () => ledger && overview ? buildBillTimelineVM(ledger, overview, activities) : null,
+    [ledger, overview, activities],
   )
 
-  const matrixVM = useMemo(
-    () => ledger && overview ? buildDefectionMatrixVM(ledger, overview) : null,
-    [ledger, overview],
+  const decisiveVM = useMemo(
+    () => ledger && overview ? buildDecisiveVotesVM(ledger, overview, activities) : null,
+    [ledger, overview, activities],
+  )
+
+  const comingUpVM = useMemo(
+    () => buildComingUpVM(activities),
+    [activities],
   )
 
   const dumbbellVM = useMemo(
@@ -116,16 +131,16 @@ export default function Home() {
     [ledger, overview],
   )
 
-  const recentVM = useMemo(
-    () => ledger && overview ? buildRecentVotesVM(ledger, overview) : null,
-    [ledger, overview],
+  const arcVM = useMemo(
+    () => overview ? buildAttendanceArcVM(overview) : null,
+    [overview],
   )
 
   return (
     <div className="page">
       <header className="dashHeader">
         <p className="dashHeader__eyebrow">Senate Pulse</p>
-        <h1 className="dashHeader__title">119th Congress at a glance</h1>
+        <h1 className="dashHeader__title">Your daily Senate briefing</h1>
         <div className="dashHeader__metaRow">
           <span>{formatToday()}</span>
           {overview && <span>Updated {formatTimestamp(overview.generated_at)}</span>}
@@ -147,11 +162,56 @@ export default function Home() {
         <p className="loadingLine">Loading&hellip;</p>
       ) : (
         <>
+          {billTimelineVM && billTimelineVM.length > 0 && (
+            <section className="vizSection" aria-label="Recent votes">
+              <h2 className="vizSection__title">What just happened</h2>
+              <p className="vizSection__subtitle">
+                The most important Senate actions this week, explained in plain language.
+              </p>
+              <BillTimeline bills={billTimelineVM} />
+            </section>
+          )}
+
+          {decisiveVM && (decisiveVM.decisiveVotes.length > 0 || decisiveVM.featuredSenators.length > 0) && (
+            <section className="vizSection" aria-label="Decisive votes">
+              <h2 className="vizSection__title">
+                {decisiveVM.type === 'decisive' ? 'Who made the difference' : 'Senators to watch'}
+              </h2>
+              <p className="vizSection__subtitle">
+                {decisiveVM.type === 'decisive'
+                  ? 'Close votes where individual senators swung the outcome.'
+                  : 'The most active and notable senators this session.'}
+              </p>
+              <DecisiveVotes data={decisiveVM} />
+            </section>
+          )}
+
+          {comingUpVM.length > 0 && (
+            <section className="vizSection" aria-label="Upcoming schedule">
+              <h2 className="vizSection__title">Coming up</h2>
+              <p className="vizSection__subtitle">
+                Floor votes and committee hearings on the schedule.
+              </p>
+              <ComingUp items={comingUpVM} />
+            </section>
+          )}
+
+          {dumbbellVM && dumbbellVM.length > 0 && (
+            <section className="vizSection" aria-label="State delegation agreement">
+              <h2 className="vizSection__title">How your senators compare</h2>
+              <p className="vizSection__subtitle">
+                How often do same-state senators vote together? Sorted by agreement.
+                Dot color = party. Line length = disagreement.
+              </p>
+              <StateDumbbell pairs={dumbbellVM} />
+            </section>
+          )}
+
           {arcVM && arcVM.length > 0 && (
             <section className="vizSection" aria-label="Chamber attendance">
-              <h2 className="vizSection__title">The chamber</h2>
+              <h2 className="vizSection__title">Who shows up</h2>
               <p className="vizSection__subtitle">
-                Who shows up? Solid = full attendance. Faded = missed votes. Dashed = absent all session.
+                Solid = full attendance. Faded = missed votes. Dashed = absent all session.
               </p>
               <ChamberArc senators={arcVM} />
               <div className="vizLegend">
@@ -168,38 +228,6 @@ export default function Home() {
                   <span className="vizLegend__swatch" style={{ background: 'transparent', border: '1.5px dashed #a8a29e' }} /> Absent
                 </span>
               </div>
-            </section>
-          )}
-
-          {matrixVM && matrixVM.rows.length > 0 && (
-            <section className="vizSection" aria-label="Defection matrix">
-              <h2 className="vizSection__title">Who breaks ranks?</h2>
-              <p className="vizSection__subtitle">
-                {matrixVM.rows.length} senators with 2+ defections across {matrixVM.columns.length} votes.
-                Amber = crossed party line. Similar patterns reveal coalitions.
-              </p>
-              <DefectionMatrix matrix={matrixVM} />
-            </section>
-          )}
-
-          {dumbbellVM && dumbbellVM.length > 0 && (
-            <section className="vizSection" aria-label="State delegation agreement">
-              <h2 className="vizSection__title">State delegations</h2>
-              <p className="vizSection__subtitle">
-                How often do same-state senators vote together? Sorted by agreement.
-                Dot color = party. Line length = disagreement.
-              </p>
-              <StateDumbbell pairs={dumbbellVM} />
-            </section>
-          )}
-
-          {recentVM && recentVM.length > 0 && (
-            <section className="vizSection" aria-label="Recent votes">
-              <h2 className="vizSection__title">Latest votes</h2>
-              <p className="vizSection__subtitle">
-                Most recent roll calls with named party-line crossovers.
-              </p>
-              <LatestVotes votes={recentVM} />
             </section>
           )}
         </>

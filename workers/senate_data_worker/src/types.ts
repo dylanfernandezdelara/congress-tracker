@@ -134,6 +134,214 @@ export interface BillRef {
   committees?: BillCommittee[];
   introduced_date?: string;
   latest_action?: BillLatestAction;
+  impact_evidence?: BillImpactEvidence;
+  analysis?: BillAnalysis;
+}
+
+export type EvidenceEndpoint =
+  | "detail"
+  | "summaries"
+  | "subjects"
+  | "committees"
+  | "text"
+  | "actions"
+  | "amendments"
+  | "cbo_cost_estimates"
+  | "committee_reports"
+  | "related_bills"
+  | "cosponsors";
+
+export type EvidenceSourceAvailability = Partial<Record<EvidenceEndpoint, boolean>>;
+
+export interface EvidenceEndpointStatus {
+  tier: 1 | 2 | 3;
+  ok: boolean;
+  fetched_at: string; // ISO 8601
+  url?: string;
+  error?: string;
+  item_count?: number;
+}
+
+export interface BillEvidenceRaw {
+  schema_version: 1;
+  bill_key: string;
+  generated_at: string; // ISO 8601
+  bill: Pick<
+    BillRef,
+    | "congress"
+    | "type"
+    | "number"
+    | "title"
+    | "summary"
+    | "policy_area"
+    | "subjects"
+    | "introduced_date"
+    | "latest_action"
+  >;
+  endpoints: Partial<Record<EvidenceEndpoint, EvidenceEndpointStatus>>;
+  source_availability: EvidenceSourceAvailability;
+  source_text: string[];
+}
+
+export type AmountType =
+  | "appropriation"
+  | "authorization"
+  | "revenue"
+  | "deficit_impact"
+  | "other";
+
+export interface AmountEvidence {
+  value_numeric: number;
+  unit: "USD";
+  amount_type: AmountType;
+  fiscal_year?: number;
+  source_endpoint: EvidenceEndpoint | "summary";
+  source_ref: string;
+  raw_text: string;
+}
+
+export type RecipientType =
+  | "agency"
+  | "program"
+  | "state"
+  | "territory"
+  | "local"
+  | "household"
+  | "other";
+
+export type RecipientScope = "national" | "state-specific" | "mixed";
+
+export interface RecipientEvidence {
+  type: RecipientType;
+  name: string;
+  identifier?: string;
+  scope: RecipientScope;
+  state_code?: string;
+}
+
+export type UnknownCategory = "no_source" | "scope_gap" | "timing_gap" | "detail_gap";
+
+export interface UnknownReason {
+  missing_field: "amount" | "recipient" | "effective_date" | "state_signal" | "other";
+  category: UnknownCategory;
+  reason: string;
+  sources_checked: string[];
+}
+
+export interface ImpactDateSignal {
+  date?: string; // YYYY-MM-DD when available
+  date_text: string;
+  source_endpoint: EvidenceEndpoint | "summary";
+  source_ref: string;
+}
+
+export type GeographyScope =
+  | "national"
+  | "state-formula"
+  | "state-named"
+  | "local"
+  | "mixed"
+  | "unknown";
+
+export interface GeographySignal {
+  geography_scope: GeographyScope;
+  states_mentioned: string[];
+}
+
+export interface BillImpactEvidence {
+  schema_version: 1;
+  bill_key: string;
+  congress: number;
+  session: number;
+  generated_at: string; // ISO 8601
+  source_availability: EvidenceSourceAvailability;
+  who: RecipientEvidence[];
+  what: string[];
+  how_much: AmountEvidence[];
+  when: ImpactDateSignal[];
+  where: GeographySignal;
+  unknowns: UnknownReason[];
+  richness_score: number; // 0-100
+  summary_evidence: string[];
+}
+
+export interface BillTrendSnapshot {
+  schema_version: 1;
+  bill_key: string;
+  congress: number;
+  session: number;
+  snapshot_date: string; // YYYY-MM-DD
+  generated_at: string; // ISO 8601
+  amount_total_nominal?: number;
+  recipient_count: number;
+  geography_scope: GeographyScope;
+  states_mentioned: string[];
+  policy_area?: string;
+  richness_score: number;
+  source_availability: EvidenceSourceAvailability;
+}
+
+export interface BillEvidenceRecord {
+  schema_version: 1;
+  generated_at: string;
+  raw: BillEvidenceRaw;
+  impact: BillImpactEvidence;
+}
+
+export interface BillAnalysisClaimRef {
+  source_endpoint: EvidenceEndpoint | "summary";
+  source_ref: string;
+  quote?: string;
+}
+
+export interface BillAnalysisClaim {
+  text: string;
+  kind?: "summary" | "impact" | "money" | "unknown";
+  evidence_refs: BillAnalysisClaimRef[];
+}
+
+export interface BillAnalysis {
+  plain_title: string;
+  plain_summary: string;
+  key_provisions: string[];
+  why_it_matters: string;
+  hidden_provisions: string | null;
+  significance: "high" | "medium" | "low";
+  significance_reason: string;
+  category: string;
+  affects: string[];
+  money_flows?: string[];
+  pocketbook_impact?: string[];
+  state_local_impact?: string;
+  unknowns?: string[];
+  evidence?: string[];
+  confidence?: "high" | "medium" | "low";
+  analysis_version?: string;
+  evidence_fingerprint?: string;
+  evidence_generated_at?: string;
+  richness_score?: number;
+  structured_amounts?: AmountEvidence[];
+  structured_recipients?: RecipientEvidence[];
+  geography_scope?: GeographyScope;
+  states_mentioned?: string[];
+  unknown_reasons?: UnknownReason[];
+  claims?: BillAnalysisClaim[];
+}
+
+export interface CoverageSnapshot {
+  generated_at: string; // ISO 8601
+  run_id: string;
+  bills_processed: number;
+  bills_with_structured_amount: number;
+  bills_with_recipient: number;
+  bills_with_state_signal: number;
+  pct_with_structured_amount: number;
+  pct_with_recipient: number;
+  pct_with_state_signal: number;
+  pct_claims_with_evidence_refs: number;
+  endpoint_success_rates: Partial<Record<EvidenceEndpoint, number>>;
+  partial: boolean;
+  errors: SourceError[];
 }
 
 export interface BillLatestAction {

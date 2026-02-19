@@ -56,6 +56,7 @@ export interface MemberIngestConfig {
   session: number;
   congressApiKey: string;
   govInfoApiKey: string;
+  lookbackDays?: number;
 }
 
 export interface MemberIngestResult {
@@ -70,7 +71,9 @@ export interface MemberIngestResult {
   error?: string;
 }
 
-const WINDOW_DAYS = 7;
+const DEFAULT_WINDOW_DAYS = 30;
+const MIN_WINDOW_DAYS = 7;
+const MAX_WINDOW_DAYS = 120;
 
 const DEFAULT_FETCH_CONFIG: FetchConfig = {
   maxRetries: 3,
@@ -764,9 +767,13 @@ export async function runMemberIngestion(
   config: MemberIngestConfig,
   fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
 ): Promise<MemberIngestResult> {
+  const lookbackDays = Math.max(
+    MIN_WINDOW_DAYS,
+    Math.min(config.lookbackDays ?? DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS)
+  );
   const generatedAt = new Date().toISOString();
   const windowEnd = todayEastern();
-  const windowStart = subtractDays(windowEnd, WINDOW_DAYS - 1);
+  const windowStart = subtractDays(windowEnd, lookbackDays - 1);
   const errors: SourceError[] = [];
 
   const floorSchedule: FloorScheduleItem[] = [];
@@ -827,7 +834,8 @@ export async function runMemberIngestion(
   const endDateUtc = new Date(`${windowEnd}T23:59:59Z`);
   const startDateUtc = new Date(`${windowStart}T00:00:00Z`);
   const upcomingEndUtc = new Date(endDateUtc.getTime() + 30 * 86_400_000);
-  const recordWindowStartUtc = new Date(endDateUtc.getTime() - 14 * 86_400_000);
+  const recordLookbackDays = Math.max(14, lookbackDays);
+  const recordWindowStartUtc = new Date(endDateUtc.getTime() - recordLookbackDays * 86_400_000);
 
   const committeeAdapterResult = await fetchSenateCommitteeMeetings(
     config.congress,

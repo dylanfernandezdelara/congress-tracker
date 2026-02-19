@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildBillEvidenceKey,
+  buildBillNarrativeKey,
+  buildBillTrendSnapshotKey,
+  buildCoverageSnapshotKey,
   buildLatestKey,
   buildMetaKey,
   buildSnapshotKey,
@@ -24,6 +28,15 @@ describe("R2 key layout helpers", () => {
       "state/NY/2025-12-18.json"
     );
     expect(buildMetaKey("ny")).toBe("state/NY/_meta.json");
+  });
+
+  it("builds bill evidence and trend keys", () => {
+    expect(buildBillEvidenceKey("119-s-210")).toBe("bills/evidence/119-s-210.json");
+    expect(buildBillNarrativeKey("119-s-210")).toBe("bills/narrative/119-s-210.json");
+    expect(buildBillTrendSnapshotKey(119, "119-s-210", "2026-02-18")).toBe(
+      "bills/trends/119/119-s-210/2026-02-18.json"
+    );
+    expect(buildCoverageSnapshotKey("2026-02-18")).toBe("stats/coverage/2026-02-18.json");
   });
 });
 

@@ -90,10 +90,16 @@ const mockEnv = {
     "state/NY/latest.json": mockSnapshot,
     "state/NY/_meta.json": mockMeta,
     "state/NY/2025-12-18.json": mockSnapshot,
+    "activities/index.json": {
+      generated_at: new Date().toISOString(),
+      window: { start_date: "2025-12-12", end_date: "2025-12-18" },
+      activities: [],
+    },
   }),
   CONGRESS: "119",
   SESSION: "1",
   TARGET_STATE: "NY",
+  DATA_FRESHNESS_MAX_HOURS: "36",
 };
 
 // Helper to create mock requests
@@ -200,6 +206,29 @@ describe("HTTP Read API", () => {
       const res = await handler.fetch(req, mockEnv as any);
 
       expect(res.headers.get("Content-Type")).toBe("application/json");
+    });
+  });
+
+  describe("GET /health/data", () => {
+    it("returns 200 when data freshness is within threshold", async () => {
+      const req = mockRequest("/health/data");
+      const res = await handler.fetch(req, mockEnv as any);
+      expect(res.status).toBe(200);
+      const body = await readJson<{ status: string; age_hours: number }>(res);
+      expect(body.status).toBe("ok");
+      expect(body.age_hours).toBeGreaterThanOrEqual(0);
+    });
+
+    it("returns 503 when activities index is missing", async () => {
+      const envMissing = {
+        ...mockEnv,
+        DATA_BUCKET: createMockBucket({}),
+      };
+      const req = mockRequest("/health/data");
+      const res = await handler.fetch(req, envMissing as any);
+      expect(res.status).toBe(503);
+      const body = await readJson<{ status: string }>(res);
+      expect(body.status).toBe("stale");
     });
   });
 

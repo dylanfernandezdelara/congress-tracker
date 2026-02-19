@@ -292,6 +292,38 @@ export async function fetchHealth(): Promise<HealthResponse> {
 }
 
 /**
+ * Fetches data freshness health from /health/data.
+ */
+export async function fetchDataHealth(): Promise<HealthResponse> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/health/data`;
+
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error(
+      `Failed to connect to the API. Please check your internet connection and try again.`
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      getErrorMessage(response.status, url),
+      response.status,
+      response.statusText
+    );
+  }
+
+  try {
+    const data: HealthResponse = await response.json();
+    return data;
+  } catch {
+    throw new Error('The API returned invalid data. Please try again later.');
+  }
+}
+
+/**
  * Fetches the chamber-wide vote ledger.
  */
 export async function fetchVoteLedger(): Promise<VoteLedger> {

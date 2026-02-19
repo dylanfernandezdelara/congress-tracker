@@ -8,6 +8,14 @@
 
 import { runIngestion, runIngestionAllStates, buildVoteLedgerUpdate } from "./ingest";
 import { runMemberIngestion } from "./member-ingest";
+import { buildBillKey } from "./congress";
+import { harvestBillEvidence, EVIDENCE_ENDPOINT_TIERS } from "./bill-evidence";
+import { buildTrendSnapshot, extractBillImpactEvidence } from "./impact-extract";
+import {
+  analyzeBillsWithCache,
+  DEFAULT_OPENROUTER_MODEL,
+  type AnalyzeBillsResult,
+} from "./openrouter";
 import type {
   IngestConfig,
   SnapshotJson,
@@ -17,6 +25,12 @@ import type {
   ActivityIndexJson,
   VoteLedger,
   SessionOverview,
+  BillRef,
+  BillImpactEvidence,
+  BillEvidenceRecord,
+  CoverageSnapshot,
+  EvidenceEndpoint,
+  SourceError,
 } from "./types";
 import { STATE_CODES } from "./states";
 import {
@@ -29,6 +43,9 @@ import {
   buildActivitiesIndexKey,
   buildVoteLedgerKey,
   buildSessionOverviewKey,
+  buildBillEvidenceKey,
+  buildBillTrendSnapshotKey,
+  buildCoverageSnapshotKey,
   publishToR2,
   readJsonFromR2,
   writeJsonToR2,
@@ -46,6 +63,16 @@ interface Env {
   TARGET_STATE: string;
   CONGRESS_API_KEY: string;
   GOVINFO_API_KEY: string;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_MODEL?: string;
+  OPENROUTER_SHADOW_MODE?: string;
+  OPENROUTER_CANARY_PERCENT?: string;
+  OPENROUTER_MAX_NEW_ANALYSES?: string;
+  DATA_FRESHNESS_MAX_HOURS?: string;
+  EVIDENCE_MAX_BILLS?: string;
+  EVIDENCE_BILL_CONCURRENCY?: string;
+  EVIDENCE_ENDPOINT_FANOUT?: string;
+  ACTIVITY_LOOKBACK_DAYS?: string;
 }
 
 // ============================================================================
@@ -87,6 +114,98 @@ const notFoundResponse = (path: string) =>
     { status: 404 }
   );
 
+function parseBool(value: string | undefined, fallback = false): boolean {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true" || normalized === "yes") return true;
+  if (normalized === "0" || normalized === "false" || normalized === "no") return false;
+  return fallback;
+}
+
+function parseIntSafe(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  return parsed;
+}
+
+function computePct(numerator: number, denominator: number): number {
+  if (denominator <= 0) return 0;
+  return Number(((numerator / denominator) * 100).toFixed(2));
+}
+
+function makeRunId(): string {
+  return `run-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function hashRunId(runId: string): number {
+  let hash = 0;
+  for (let i = 0; i < runId.length; i++) {
+    hash = (hash << 5) - hash + runId.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % 100;
+}
+
+function logEvent(event: string, payload: Record<string, unknown>): void {
+  console.log(JSON.stringify({ event, ...payload }));
+}
+
+async function runTimed<T>(
+  runId: string,
+  phase: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const started = Date.now();
+  try {
+    const result = await fn();
+    logEvent("phase_complete", {
+      run_id: runId,
+      phase,
+      duration_ms: Date.now() - started,
+      success: true,
+    });
+    return result;
+  } catch (error) {
+    logEvent("phase_complete", {
+      run_id: runId,
+      phase,
+      duration_ms: Date.now() - started,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+function summarizeCoverage(
+  runId: string,
+  billCount: number,
+  claimCoveragePct: number,
+  endpointSuccessRates: Partial<Record<EvidenceEndpoint, number>>,
+  structuredAmountCount: number,
+  recipientCount: number,
+  stateSignalCount: number,
+  partial: boolean,
+  errors: SourceError[]
+): CoverageSnapshot {
+  return {
+    generated_at: new Date().toISOString(),
+    run_id: runId,
+    bills_processed: billCount,
+    bills_with_structured_amount: structuredAmountCount,
+    bills_with_recipient: recipientCount,
+    bills_with_state_signal: stateSignalCount,
+    pct_with_structured_amount: computePct(structuredAmountCount, billCount),
+    pct_with_recipient: computePct(recipientCount, billCount),
+    pct_with_state_signal: computePct(stateSignalCount, billCount),
+    pct_claims_with_evidence_refs: claimCoveragePct,
+    endpoint_success_rates: endpointSuccessRates,
+    partial,
+    errors,
+  };
+}
+
 // ============================================================================
 // R2 Storage
 // ============================================================================
@@ -125,6 +244,43 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       },
       {
         status: 200,
+        headers: { "Cache-Control": cacheHealth },
+      }
+    );
+  }
+
+  if (pathname === "/health/data") {
+    const maxFreshHours = Math.max(1, parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, 36));
+    const activityIndex = await readJsonFromR2<ActivityIndexJson>(
+      env.DATA_BUCKET,
+      buildActivitiesIndexKey()
+    );
+    if (!activityIndex?.generated_at) {
+      return jsonResponse(
+        {
+          status: "stale",
+          message: "No activities index found in storage.",
+          max_fresh_hours: maxFreshHours,
+        },
+        {
+          status: 503,
+          headers: { "Cache-Control": cacheHealth },
+        }
+      );
+    }
+    const generatedAt = new Date(activityIndex.generated_at).getTime();
+    const now = Date.now();
+    const ageHours = Number(((now - generatedAt) / 3_600_000).toFixed(2));
+    const fresh = Number.isFinite(generatedAt) && ageHours <= maxFreshHours;
+    return jsonResponse(
+      {
+        status: fresh ? "ok" : "stale",
+        generated_at: activityIndex.generated_at,
+        age_hours: ageHours,
+        max_fresh_hours: maxFreshHours,
+      },
+      {
+        status: fresh ? 200 : 503,
         headers: { "Cache-Control": cacheHealth },
       }
     );
@@ -344,7 +500,7 @@ async function publishMemberActivity(
     await writeJsonToR2(bucket, buildActivitiesIndexKey(), activityIndex);
   }
 
-  await mapWithConcurrency(memberActivities, 5, async (activity) => {
+  await mapWithConcurrency(memberActivities, 3, async (activity) => {
     const keys = buildMemberKeys(activity.member.bioguide_id, windowEnd);
     await writeJsonToR2(bucket, keys.snapshot, activity);
     await writeJsonToR2(bucket, keys.latest, activity);
@@ -353,12 +509,242 @@ async function publishMemberActivity(
   console.log("[r2] Member activity publish complete");
 }
 
+function canBuildBillKey(bill: BillRef | undefined): bill is BillRef {
+  return Boolean(
+    bill &&
+    typeof bill.congress === "number" &&
+    typeof bill.type === "string" &&
+    bill.type.trim() &&
+    typeof bill.number === "string" &&
+    bill.number.trim()
+  );
+}
+
+function collectUniqueBills(
+  memberActivities: MemberActivityJson[],
+  activityIndex: ActivityIndexJson | null
+): Map<string, BillRef> {
+  const byKey = new Map<string, BillRef>();
+  for (const memberActivity of memberActivities) {
+    for (const item of memberActivity.activities) {
+      if ((item.type === "legislation_action" || item.type === "roll_call_vote") && item.bill) {
+        const key = buildBillKey(item.bill);
+        if (!byKey.has(key)) byKey.set(key, item.bill);
+      }
+    }
+  }
+  for (const activity of activityIndex?.activities ?? []) {
+    if (!activity.bill) continue;
+    const key = buildBillKey(activity.bill);
+    if (!byKey.has(key)) byKey.set(key, activity.bill);
+  }
+  return byKey;
+}
+
+function attachImpactEvidenceToBill(
+  bill: BillRef | undefined,
+  impactByKey: ReadonlyMap<string, BillImpactEvidence>
+): void {
+  if (!canBuildBillKey(bill)) return;
+  const key = buildBillKey(bill);
+  const impact = impactByKey.get(key);
+  if (impact) bill.impact_evidence = impact;
+}
+
+function attachAnalysisToBill(
+  bill: BillRef | undefined,
+  analysisByKey: ReadonlyMap<string, NonNullable<BillRef["analysis"]>>
+): void {
+  if (!canBuildBillKey(bill)) return;
+  const key = buildBillKey(bill);
+  const analysis = analysisByKey.get(key);
+  if (analysis) bill.analysis = analysis;
+}
+
+interface BillEvidencePipelineResult {
+  processedBillCount: number;
+  impactByKey: Map<string, BillImpactEvidence>;
+  billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }>;
+  endpointSuccessRates: Partial<Record<EvidenceEndpoint, number>>;
+  structuredAmountCount: number;
+  recipientCount: number;
+  stateSignalCount: number;
+  errors: SourceError[];
+}
+
+interface BillEvidencePipelineOptions {
+  runId: string;
+  congressApiKey: string;
+  session: number;
+  maxBills: number;
+  billConcurrency: number;
+  endpointFanout: number;
+}
+
+async function buildBillEvidencePipeline(
+  bucket: R2Bucket,
+  billsByKey: Map<string, BillRef>,
+  options: BillEvidencePipelineOptions
+): Promise<BillEvidencePipelineResult> {
+  const entries = Array.from(billsByKey.entries()).slice(0, options.maxBills);
+  const endpointStats: Record<EvidenceEndpoint, { ok: number; total: number }> = {
+    detail: { ok: 0, total: 0 },
+    summaries: { ok: 0, total: 0 },
+    subjects: { ok: 0, total: 0 },
+    committees: { ok: 0, total: 0 },
+    text: { ok: 0, total: 0 },
+    actions: { ok: 0, total: 0 },
+    amendments: { ok: 0, total: 0 },
+    cbo_cost_estimates: { ok: 0, total: 0 },
+    committee_reports: { ok: 0, total: 0 },
+    related_bills: { ok: 0, total: 0 },
+    cosponsors: { ok: 0, total: 0 },
+  };
+  const errors: SourceError[] = [];
+  const impactByKey = new Map<string, BillImpactEvidence>();
+  const billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }> = [];
+
+  const fetchConfig = {
+    maxRetries: 3,
+    baseDelayMs: 800,
+    timeoutMs: 15_000,
+    concurrency: options.endpointFanout,
+  };
+
+  await mapWithConcurrency(entries, options.billConcurrency, async ([key, bill]) => {
+    const harvested = await harvestBillEvidence(bill, options.congressApiKey, {
+      endpointFanout: options.endpointFanout,
+      fetchConfig,
+    });
+    if (harvested.error) {
+      errors.push({
+        source: "congress",
+        message: `Evidence harvest issue for ${key}: ${harvested.error}`,
+      });
+    }
+    for (const endpoint of Object.keys(EVIDENCE_ENDPOINT_TIERS) as EvidenceEndpoint[]) {
+      const status = harvested.evidence.endpoints[endpoint];
+      if (!status) continue;
+      endpointStats[endpoint].total += 1;
+      if (status.ok) endpointStats[endpoint].ok += 1;
+    }
+
+    const impact = extractBillImpactEvidence(bill, harvested.evidence, {
+      session: options.session,
+    });
+    const snapshotDate = impact.generated_at.slice(0, 10);
+    const trendSnapshot = buildTrendSnapshot(bill, impact, snapshotDate);
+    const record: BillEvidenceRecord = {
+      schema_version: 1,
+      generated_at: impact.generated_at,
+      raw: harvested.evidence,
+      impact,
+    };
+    await writeJsonToR2(bucket, buildBillEvidenceKey(key), record);
+    await writeJsonToR2(
+      bucket,
+      buildBillTrendSnapshotKey(bill.congress, key, snapshotDate),
+      trendSnapshot
+    );
+    impactByKey.set(key, impact);
+    billInputs.push({ bill, impactEvidence: impact });
+  });
+
+  const endpointSuccessRates: Partial<Record<EvidenceEndpoint, number>> = {};
+  for (const [endpoint, stats] of Object.entries(endpointStats) as Array<
+    [EvidenceEndpoint, { ok: number; total: number }]
+  >) {
+    endpointSuccessRates[endpoint] = computePct(stats.ok, stats.total);
+  }
+
+  let structuredAmountCount = 0;
+  let recipientCount = 0;
+  let stateSignalCount = 0;
+  for (const impact of impactByKey.values()) {
+    if (impact.how_much.length > 0) structuredAmountCount++;
+    if (impact.who.length > 0) recipientCount++;
+    if (
+      impact.where.states_mentioned.length > 0 ||
+      impact.where.geography_scope === "state-formula"
+    ) {
+      stateSignalCount++;
+    }
+  }
+
+  logEvent("bill_evidence_pipeline_complete", {
+    run_id: options.runId,
+    processed_bills: entries.length,
+    structured_amount_count: structuredAmountCount,
+    recipient_count: recipientCount,
+    state_signal_count: stateSignalCount,
+  });
+
+  return {
+    processedBillCount: entries.length,
+    impactByKey,
+    billInputs,
+    endpointSuccessRates,
+    structuredAmountCount,
+    recipientCount,
+    stateSignalCount,
+    errors,
+  };
+}
+
+async function enrichBillAnalyses(
+  bucket: R2Bucket,
+  billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }>,
+  memberActivities: MemberActivityJson[],
+  activityIndex: ActivityIndexJson | null,
+  apiKey: string,
+  model: string,
+  maxNewAnalyses: number,
+  shadowMode: boolean
+): Promise<AnalyzeBillsResult | null> {
+  if (billInputs.length === 0) {
+    console.log("[openrouter] No bill refs found for analysis enrichment");
+    return null;
+  }
+
+  const result = await analyzeBillsWithCache(bucket, billInputs, {
+    apiKey,
+    model,
+    maxNewAnalyses,
+    appReferer: "https://localhost",
+    appTitle: "daily_senate_update_worker",
+    timeoutMs: 30_000,
+    maxRetries: 2,
+    analysisConcurrency: 2,
+  });
+
+  console.log(
+    `[openrouter] Analysis enrichment complete: cache hits=${result.cacheHitCount}, new=${result.analyzedCount}, skipped=${result.skippedCount}, claim-coverage=${result.claimsWithEvidenceRefPct}%`
+  );
+
+  if (shadowMode) {
+    console.log("[openrouter] Shadow mode active; analysis was generated but not attached to published payloads.");
+    return result;
+  }
+
+  for (const memberActivity of memberActivities) {
+    for (const item of memberActivity.activities) {
+      if (item.type !== "legislation_action" && item.type !== "roll_call_vote") continue;
+      attachAnalysisToBill(item.bill, result.analysisByKey);
+    }
+  }
+
+  for (const activity of activityIndex?.activities ?? []) {
+    attachAnalysisToBill(activity.bill, result.analysisByKey);
+  }
+  return result;
+}
+
 async function publishAllStatesToR2(
   bucket: R2Bucket,
   perState: Record<string, { snapshot: SnapshotJson; meta: MetaJson }>
 ): Promise<void> {
   const entries = Object.entries(perState);
-  await mapWithConcurrency(entries, 4, async ([state, payload]) => {
+  await mapWithConcurrency(entries, 3, async ([state, payload]) => {
     console.log(`[r2] Publishing ${state} vote data...`);
     await publishToR2(bucket, payload.snapshot, payload.meta);
   });
@@ -368,137 +754,217 @@ async function publishAllStatesToR2(
  * Core ingestion logic, separated for use with ctx.waitUntil.
  */
 async function runScheduledIngestion(env: Env): Promise<void> {
+  const runId = makeRunId();
   const startTime = Date.now();
-  console.log("[scheduled] ========================================");
-  console.log("[scheduled] Starting scheduled ingestion...");
-  console.log(`[scheduled] Cron trigger time: ${new Date().toISOString()}`);
-
-  // Validate configuration (throws on misconfig)
-  const config = validateEnv(env);
-
-  console.log("[scheduled] Configuration validated:");
-  console.log(`[scheduled]   - Congress: ${config.congress}`);
-  console.log(`[scheduled]   - Session: ${config.session}`);
-  console.log(`[scheduled]   - Target state: ${config.targetState}`);
-
-  console.log("[scheduled] Running member activity ingestion...");
-  const memberResult = await runMemberIngestion({
-    congress: config.congress,
-    session: config.session,
-    congressApiKey: env.CONGRESS_API_KEY,
-    govInfoApiKey: env.GOVINFO_API_KEY,
+  logEvent("scheduled_ingestion_start", {
+    run_id: runId,
+    timestamp: new Date().toISOString(),
   });
 
-  if (!memberResult.success || !memberResult.membersIndex) {
-    const errorMsg = `[scheduled] Member ingestion failed: ${memberResult.error ?? "unknown error"}`;
-    console.error(errorMsg);
-    throw new Error(errorMsg);
-  }
+  const config = validateEnv(env);
+  const evidenceMaxBills = Math.max(5, parseIntSafe(env.EVIDENCE_MAX_BILLS, 30));
+  const evidenceBillConcurrency = Math.max(
+    1,
+    Math.min(parseIntSafe(env.EVIDENCE_BILL_CONCURRENCY, 2), 3)
+  );
+  const evidenceEndpointFanout = Math.max(
+    1,
+    Math.min(parseIntSafe(env.EVIDENCE_ENDPOINT_FANOUT, 3), 4)
+  );
+  const activityLookbackDays = Math.max(7, Math.min(parseIntSafe(env.ACTIVITY_LOOKBACK_DAYS, 30), 120));
 
-  await publishMemberActivity(
-    env.DATA_BUCKET,
-    memberResult.membersIndex,
-    memberResult.memberActivities,
-    memberResult.windowEnd,
-    memberResult.activityIndex
+  const memberResult = await runTimed(runId, "member_ingestion", async () =>
+    runMemberIngestion({
+      congress: config.congress,
+      session: config.session,
+      congressApiKey: env.CONGRESS_API_KEY,
+      govInfoApiKey: env.GOVINFO_API_KEY,
+      lookbackDays: activityLookbackDays,
+    })
   );
 
-  // Run state ingestion (vote summaries)
-  if (config.targetState === "ALL") {
-    const result = await runIngestionAllStates(config, STATE_CODES);
-
-    if (!result.success) {
-      const errorMsg = `[scheduled] Ingestion failed: ${result.error}`;
-      console.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    console.log("[scheduled] ----------------------------------------");
-    console.log(`[scheduled] TARGET VOTE DATE: ${result.targetVoteDate}`);
-    console.log(`[scheduled] Cutoff date (ET): ${result.cutoffDateEt}`);
-    console.log(`[scheduled] States processed: ${Object.keys(result.perState).length}`);
-    console.log("[scheduled] ----------------------------------------");
-
-    await publishAllStatesToR2(env.DATA_BUCKET, result.perState);
-
-    // Build/update vote ledger and session overview
-    console.log("[scheduled] Building vote ledger...");
-    const existingLedger = await readJsonFromR2<VoteLedger>(
-      env.DATA_BUCKET, buildVoteLedgerKey()
-    );
-    const { ledger, overview } = await buildVoteLedgerUpdate(
-      config, memberResult.membersIndex, existingLedger
-    );
-    await writeJsonToR2(env.DATA_BUCKET, buildVoteLedgerKey(), ledger);
-    await writeJsonToR2(env.DATA_BUCKET, buildSessionOverviewKey(), overview);
-    console.log(`[scheduled] Ledger: ${ledger.total_votes} votes, Overview: ${overview.total_defections} defections`);
-
-    const elapsed = Date.now() - startTime;
-    console.log("[scheduled] ========================================");
-    console.log("[scheduled] Scheduled ingestion COMPLETE");
-    console.log(`[scheduled]   - Target date: ${result.targetVoteDate}`);
-    console.log(`[scheduled]   - Votes processed: ${result.votesTotal}`);
-    console.log(`[scheduled]   - States processed: ${Object.keys(result.perState).length}`);
-    console.log(`[scheduled]   - Partial data: ${result.partial}`);
-    if (result.partial && result.missingVotes.length > 0) {
-      console.log(
-        `[scheduled]   - Missing votes: ${result.missingVotes.join(", ")}`
-      );
-    }
-    console.log(`[scheduled]   - Elapsed: ${elapsed}ms`);
-    console.log("[scheduled] ========================================");
-  } else {
-    const result = await runIngestion(config);
-
-    if (!result.success) {
-      const errorMsg = `[scheduled] Ingestion failed: ${result.error}`;
-      console.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    if (!result.snapshot || !result.meta) {
-      const errorMsg = "[scheduled] Ingestion succeeded but no data to publish";
-      console.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    console.log("[scheduled] ----------------------------------------");
-    console.log(`[scheduled] TARGET VOTE DATE: ${result.targetVoteDate}`);
-    console.log(`[scheduled] Cutoff date (ET): ${result.cutoffDateEt}`);
-    console.log("[scheduled] ----------------------------------------");
-
-    await publishToR2(env.DATA_BUCKET, result.snapshot, result.meta);
-
-    // Build/update vote ledger and session overview
-    console.log("[scheduled] Building vote ledger...");
-    const existingLedger = await readJsonFromR2<VoteLedger>(
-      env.DATA_BUCKET, buildVoteLedgerKey()
-    );
-    const { ledger, overview } = await buildVoteLedgerUpdate(
-      config, memberResult.membersIndex, existingLedger
-    );
-    await writeJsonToR2(env.DATA_BUCKET, buildVoteLedgerKey(), ledger);
-    await writeJsonToR2(env.DATA_BUCKET, buildSessionOverviewKey(), overview);
-    console.log(`[scheduled] Ledger: ${ledger.total_votes} votes, Overview: ${overview.total_defections} defections`);
-
-    const elapsed = Date.now() - startTime;
-    console.log("[scheduled] ========================================");
-    console.log("[scheduled] Scheduled ingestion COMPLETE");
-    console.log(`[scheduled]   - Target date: ${result.targetVoteDate}`);
-    console.log(`[scheduled]   - Votes processed: ${result.votesTotal}`);
-    console.log(
-      `[scheduled]   - Votes with ${config.targetState} members: ${result.votesWithStateMembers}`
-    );
-    console.log(`[scheduled]   - State member votes: ${result.stateMemberVotes}`);
-    console.log(`[scheduled]   - Partial data: ${result.partial}`);
-    if (result.partial && result.missingVotes.length > 0) {
-      console.log(
-        `[scheduled]   - Missing votes: ${result.missingVotes.join(", ")}`
-      );
-    }
-    console.log(`[scheduled]   - Elapsed: ${elapsed}ms`);
-    console.log("[scheduled] ========================================");
+  if (!memberResult.success || !memberResult.membersIndex) {
+    throw new Error(`[scheduled] Member ingestion failed: ${memberResult.error ?? "unknown error"}`);
   }
+  const membersIndex = memberResult.membersIndex;
+
+  const billsByKey = collectUniqueBills(memberResult.memberActivities, memberResult.activityIndex);
+  const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", async () =>
+    buildBillEvidencePipeline(env.DATA_BUCKET, billsByKey, {
+      runId,
+      congressApiKey: env.CONGRESS_API_KEY,
+      session: config.session,
+      maxBills: evidenceMaxBills,
+      billConcurrency: evidenceBillConcurrency,
+      endpointFanout: evidenceEndpointFanout,
+    })
+  );
+
+  for (const memberActivity of memberResult.memberActivities) {
+    for (const item of memberActivity.activities) {
+      if (item.type !== "legislation_action" && item.type !== "roll_call_vote") continue;
+      attachImpactEvidenceToBill(item.bill, evidencePipeline.impactByKey);
+    }
+  }
+  for (const activity of memberResult.activityIndex?.activities ?? []) {
+    attachImpactEvidenceToBill(activity.bill, evidencePipeline.impactByKey);
+  }
+
+  await runTimed(runId, "publish_member_activity_core", async () =>
+    publishMemberActivity(
+      env.DATA_BUCKET,
+      membersIndex,
+      memberResult.memberActivities,
+      memberResult.windowEnd,
+      memberResult.activityIndex
+    )
+  );
+
+  const shadowMode = parseBool(env.OPENROUTER_SHADOW_MODE, false);
+  const canaryPercent = Math.max(0, Math.min(parseIntSafe(env.OPENROUTER_CANARY_PERCENT, 100), 100));
+  const canaryValue = hashRunId(runId);
+  const canaryEnabled = canaryValue < canaryPercent;
+  const maxNewAnalyses = Math.max(1, parseIntSafe(env.OPENROUTER_MAX_NEW_ANALYSES, 20));
+  let analysisResult: AnalyzeBillsResult | null = null;
+  let synthesisErrors: SourceError[] = [];
+
+  if (env.OPENROUTER_API_KEY?.trim() && canaryEnabled) {
+    const model = env.OPENROUTER_MODEL?.trim() || DEFAULT_OPENROUTER_MODEL;
+    try {
+      analysisResult = await runTimed(runId, "openrouter_synthesis", async () =>
+        enrichBillAnalyses(
+          env.DATA_BUCKET,
+          evidencePipeline.billInputs,
+          memberResult.memberActivities,
+          memberResult.activityIndex,
+          env.OPENROUTER_API_KEY as string,
+          model,
+          maxNewAnalyses,
+          shadowMode
+        )
+      );
+
+      if (analysisResult && !shadowMode) {
+        try {
+          await runTimed(runId, "publish_member_activity_narrative", async () =>
+            publishMemberActivity(
+              env.DATA_BUCKET,
+              membersIndex,
+              memberResult.memberActivities,
+              memberResult.windowEnd,
+              memberResult.activityIndex
+            )
+          );
+        } catch (error) {
+          synthesisErrors.push({
+            source: "congress",
+            message: `Narrative publish failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          });
+        }
+      }
+      if (analysisResult) {
+        const analyzedTotal = analysisResult.analyzedCount + analysisResult.skippedCount;
+        const skipRate = analyzedTotal > 0 ? analysisResult.skippedCount / analyzedTotal : 0;
+        if (skipRate > 0.2) {
+          logEvent("openrouter_degradation_signal", {
+            run_id: runId,
+            skip_rate: Number((skipRate * 100).toFixed(2)),
+            analyzed_count: analysisResult.analyzedCount,
+            skipped_count: analysisResult.skippedCount,
+          });
+        }
+      }
+    } catch (error) {
+      synthesisErrors.push({
+        source: "congress",
+        message: `OpenRouter synthesis failed but core publication remains available: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      logEvent("openrouter_synthesis_failed", {
+        run_id: runId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else if (!env.OPENROUTER_API_KEY?.trim()) {
+    synthesisErrors.push({
+      source: "congress",
+      message: "OPENROUTER_API_KEY missing; synthesis skipped",
+    });
+  } else {
+    synthesisErrors.push({
+      source: "congress",
+      message: `Synthesis skipped due to canary gating (${canaryValue} >= ${canaryPercent})`,
+    });
+  }
+
+  let statePartial = false;
+  if (config.targetState === "ALL") {
+    const result = await runTimed(runId, "state_ingestion_all", async () =>
+      runIngestionAllStates(config, STATE_CODES)
+    );
+    if (!result.success) {
+      throw new Error(`[scheduled] Ingestion failed: ${result.error}`);
+    }
+    statePartial = result.partial;
+    await runTimed(runId, "publish_state_snapshots_all", async () =>
+      publishAllStatesToR2(env.DATA_BUCKET, result.perState)
+    );
+  } else {
+    const result = await runTimed(runId, "state_ingestion_single", async () => runIngestion(config));
+    if (!result.success) {
+      throw new Error(`[scheduled] Ingestion failed: ${result.error}`);
+    }
+    if (!result.snapshot || !result.meta) {
+      throw new Error("[scheduled] Ingestion succeeded but no data to publish");
+    }
+    statePartial = result.partial;
+    await runTimed(runId, "publish_state_snapshots_single", async () =>
+      publishToR2(env.DATA_BUCKET, result.snapshot as SnapshotJson, result.meta as MetaJson)
+    );
+  }
+
+  const existingLedger = await readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey());
+  const { ledger, overview } = await runTimed(runId, "build_vote_ledger", async () =>
+    buildVoteLedgerUpdate(config, membersIndex, existingLedger)
+  );
+  await runTimed(runId, "publish_vote_ledger", async () =>
+    writeJsonToR2(env.DATA_BUCKET, buildVoteLedgerKey(), ledger)
+  );
+  await runTimed(runId, "publish_session_overview", async () =>
+    writeJsonToR2(env.DATA_BUCKET, buildSessionOverviewKey(), overview)
+  );
+
+  const allErrors = [
+    ...memberResult.errors,
+    ...evidencePipeline.errors,
+    ...synthesisErrors,
+  ];
+  const coverage = summarizeCoverage(
+    runId,
+    evidencePipeline.processedBillCount,
+    analysisResult?.claimsWithEvidenceRefPct ?? 0,
+    evidencePipeline.endpointSuccessRates,
+    evidencePipeline.structuredAmountCount,
+    evidencePipeline.recipientCount,
+    evidencePipeline.stateSignalCount,
+    statePartial || allErrors.length > 0,
+    allErrors
+  );
+  await runTimed(runId, "publish_coverage_snapshot", async () =>
+    writeJsonToR2(env.DATA_BUCKET, buildCoverageSnapshotKey(memberResult.windowEnd), coverage)
+  );
+
+  logEvent("scheduled_ingestion_complete", {
+    run_id: runId,
+    duration_ms: Date.now() - startTime,
+    target_state: config.targetState,
+    bills_processed: coverage.bills_processed,
+    claims_with_evidence_pct: coverage.pct_claims_with_evidence_refs,
+    partial: coverage.partial,
+  });
 }
 
 /**

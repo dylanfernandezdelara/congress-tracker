@@ -410,6 +410,627 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 /* ======================================================================
+   Policy Tag (shared)
+   ====================================================================== */
+
+.policyTag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.policyTag--health { background: #dcfce7; color: #166534; }
+.policyTag--econ { background: #dbeafe; color: #1d4ed8; }
+.policyTag--defense { background: #f1f5f9; color: #475569; }
+.policyTag--immigration { background: #fff7ed; color: #c2410c; }
+.policyTag--gov { background: #ede9fe; color: #6d28d9; }
+.policyTag--transport { background: #e0f2fe; color: #0369a1; }
+.policyTag--energy { background: #ecfdf5; color: #047857; }
+.policyTag--social { background: #fdf2f8; color: #be185d; }
+.policyTag--nomination { background: #f5f5f4; color: #57534e; }
+
+/* ======================================================================
+   Bill Timeline
+   ====================================================================== */
+
+.billTimeline {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.billTimeline__secondary {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.35rem 0.55rem;
+}
+
+.billTimeline__secondary > summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.billTimeline__secondaryList {
+  margin-top: var(--space-sm);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.billCard {
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.billCard--rejected {
+  border-left: 3px solid var(--warn);
+}
+
+.billCard__header {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.billCard__info {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.billCard__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.billCard__title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.billCard__summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.billCard__meta {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.billCard__meaning,
+.billCard__impact,
+.billCard__next,
+.billCard__hidden {
+  margin: 0;
+  font-size: 0.79rem;
+  line-height: 1.4;
+}
+
+.billCard__next--primary {
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  background: #f1f5f9;
+  border: 1px solid #dbe3ea;
+  color: #0f172a;
+}
+
+.billCard__official {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.25rem 0.5rem;
+  background: #fafaf9;
+}
+
+.billCard__official > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.billCard__official p {
+  margin: 0.35rem 0 0;
+  color: var(--faint);
+  font-size: 0.73rem;
+  line-height: 1.35;
+}
+
+.billCard__hidden {
+  color: var(--defection);
+}
+
+.billCard__provisions {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.35rem 0.5rem;
+  background: #fafaf9;
+}
+
+.billCard__provisions > summary {
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.billCard__provisions ul {
+  margin: 0.45rem 0 0 0.95rem;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.billCard__provisions li {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.billCard__badge--progress {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.billCard__steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.15rem;
+}
+
+.billStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.billStep__chip {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.billStep__chip--passed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.billStep__chip--failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.billStep__tally {
+  font-size: 0.74rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.billStep__tally--close {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.billStep__date {
+  font-size: 0.68rem;
+  color: var(--faint);
+}
+
+.billStep__arrow {
+  color: var(--faint);
+  font-size: 0.72rem;
+  margin: 0 0.1rem;
+}
+
+.billCodeTag {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #fafaf9;
+  white-space: nowrap;
+}
+
+.impactTag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.impactTag--high {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.impactTag--medium {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.impactTag--low {
+  background: #f5f5f4;
+  color: #57534e;
+}
+
+.confidenceTag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.confidenceTag--high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.confidenceTag--medium {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.confidenceTag--low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.billCard__stateImpact,
+.billCard__unknownCallout {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.billCard__unknownCallout {
+  color: #7c2d12;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 0.4rem 0.55rem;
+}
+
+.billCard__money,
+.billCard__unknowns,
+.billCard__evidence {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.35rem 0.5rem;
+  background: #fafaf9;
+}
+
+.billCard__money > summary,
+.billCard__unknowns > summary,
+.billCard__evidence > summary {
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.billCard__money ul,
+.billCard__unknowns ul,
+.billCard__evidence ul {
+  margin: 0.45rem 0 0 0.95rem;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.billCard__money li,
+.billCard__unknowns li,
+.billCard__evidence li {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.enrichedVote__marginBadge {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0.06rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--defection);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.enrichedVote__tally--close {
+  font-weight: 700;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+/* ======================================================================
+   Decisive Votes
+   ====================================================================== */
+
+.decisiveVotes {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.decisiveVote {
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--defection);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.decisiveVote__header {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+
+.decisiveVote__info {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.decisiveVote__title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.decisiveVote__summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.decisiveVote__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.decisiveVote__senators {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.65rem;
+}
+
+.decisiveVote__label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--defection);
+}
+
+.decisiveVote__senator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.decisiveVote__senatorName {
+  font-weight: 600;
+}
+
+.decisiveVote__voteCast {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+/* ======================================================================
+   Featured Senators (fallback for decisive)
+   ====================================================================== */
+
+.featuredSenator {
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.featuredSenator__header {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+}
+
+.featuredSenator__name {
+  font-weight: 600;
+}
+
+.featuredSenator__reasons {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.featuredSenator__reasons li {
+  padding-left: 0.2rem;
+}
+
+/* ======================================================================
+   Gatekeepers
+   ====================================================================== */
+
+.gatekeeperSection {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-md);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.gatekeeperSection__heading {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.gatekeeperSection__sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.gatekeeper {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  display: grid;
+  gap: 0.2rem;
+}
+
+.gatekeeper__header {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.84rem;
+}
+
+.gatekeeper__name {
+  font-weight: 600;
+}
+
+.gatekeeper__count {
+  margin-left: 0.2rem;
+  padding: 0.06rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: var(--warn-soft);
+  color: var(--warn);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.gatekeeper__bills {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
+}
+
+/* ======================================================================
+   Coming Up
+   ====================================================================== */
+
+.comingUp {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.comingUpItem {
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: 0.3rem;
+}
+
+.comingUpItem__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.comingUpItem__type {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.comingUpItem__type--floor {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.comingUpItem__type--hearing {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.comingUpItem__date {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.comingUpItem__title {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.comingUpItem__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+
+.comingUpItem__bill {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-style: italic;
+}
+
+/* ======================================================================
    Legend (shared)
    ====================================================================== */
 
@@ -445,12 +1066,22 @@ button, input, select { font: inherit; color: inherit; }
     margin-top: 0.7rem;
   }
 
-  .recentVoteRow__header {
+  .recentVoteRow__header,
+  .billCard__header {
     flex-direction: column;
     gap: var(--space-xs);
   }
 
+  .billCard__steps {
+    gap: 0.4rem;
+  }
+
   .recentVoteRow__badge {
     align-self: flex-start;
+  }
+
+  .decisiveVote__senators {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  ActivityIndexResponse,
   HealthResponse,
   LegislationActionItem,
   MemberActivityResponse,
@@ -65,16 +66,16 @@ function buildActivity(
 
 const ACTIONS: Record<string, LegislationActionItem[]> = {
   S000148: [
-    { source: 'congress', type: 'legislation_action', role: 'sponsor', action_date: '2026-01-15', action_text: 'Introduced in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '210', title: 'Clean Transit Access Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/210', summary: 'Provides grants to modernize public transit fleets.', policy_area: 'Transportation', subjects: ['Public transit', 'Emissions'] }, is_recent: true },
+    { source: 'congress', type: 'legislation_action', role: 'sponsor', action_date: '2026-01-15', action_text: 'Introduced in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '210', title: 'Clean Transit Access Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/210', summary: 'Provides grants to modernize public transit fleets.', policy_area: 'Transportation', subjects: ['Public transit', 'Emissions'], analysis: { plain_title: 'Cleaner buses for public transit', plain_summary: 'Creates grants to help transit agencies replace old buses with cleaner vehicles.', key_provisions: ['Transit agencies can apply for federal fleet-modernization grants.', 'Funding supports cleaner buses and related infrastructure upgrades.'], why_it_matters: 'Could improve air quality and commuting reliability in cities using public transit.', hidden_provisions: null, significance: 'high', significance_reason: 'This bill affects daily transportation and local transit budgets.', category: 'Public Transit', affects: ['Transit riders', 'City transit agencies', 'Local taxpayers'] } }, is_recent: true },
   ],
   G000555: [
-    { source: 'congress', type: 'legislation_action', role: 'sponsor', action_date: '2026-01-10', action_text: 'Introduced in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '256', title: 'Family Caregiver Relief Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/256', summary: 'Creates tax credits for family caregivers.', policy_area: 'Social welfare', subjects: ['Caregiving', 'Tax credits'] }, is_recent: true },
+    { source: 'congress', type: 'legislation_action', role: 'sponsor', action_date: '2026-01-10', action_text: 'Introduced in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '256', title: 'Family Caregiver Relief Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/256', summary: 'Creates tax credits for family caregivers.', policy_area: 'Social welfare', subjects: ['Caregiving', 'Tax credits'], analysis: { plain_title: 'Tax relief for family caregivers', plain_summary: 'Offers tax credits to people who care for relatives at home.', key_provisions: ['Creates a new tax credit for eligible caregivers.', 'Targets families paying out-of-pocket caregiving costs.'], why_it_matters: 'Could reduce financial pressure for families caring for aging parents or disabled relatives.', hidden_provisions: null, significance: 'medium', significance_reason: 'Meaningful for affected families but narrower than economy-wide bills.', category: 'Family Caregiving', affects: ['Family caregivers', 'Older adults', 'Households with care expenses'] } }, is_recent: true },
   ],
   C001098: [
-    { source: 'congress', type: 'legislation_action', role: 'sponsor', action_date: '2026-01-17', action_text: 'Introduced in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '303', title: 'Border Infrastructure Modernization Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/303', summary: 'Funds upgrades to ports of entry.', policy_area: 'Immigration', subjects: ['Border security'] }, is_recent: true },
+    { source: 'congress', type: 'legislation_action', role: 'sponsor', action_date: '2026-01-17', action_text: 'Introduced in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '303', title: 'Border Infrastructure Modernization Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/303', summary: 'Funds upgrades to ports of entry.', policy_area: 'Immigration', subjects: ['Border security'], analysis: { plain_title: 'Upgrade border crossing infrastructure', plain_summary: 'Funds improvements at ports of entry to process people and goods more efficiently.', key_provisions: ['Provides federal funding for port-of-entry modernization.', 'Supports infrastructure upgrades tied to border operations.'], why_it_matters: 'Could affect border wait times, trade logistics, and federal spending priorities.', hidden_provisions: null, significance: 'high', significance_reason: 'Large federal infrastructure spending with national security implications.', category: 'Border Security', affects: ['Border communities', 'Importers and exporters', 'Travelers'] } }, is_recent: true },
   ],
   C001056: [
-    { source: 'congress', type: 'legislation_action', role: 'cosponsor', action_date: '2026-01-08', action_text: 'Cosponsored in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '244', title: 'Small Business Growth Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/244', summary: 'Expands SBA lending limits.', policy_area: 'Commerce', subjects: ['Small business'] }, is_recent: true },
+    { source: 'congress', type: 'legislation_action', role: 'cosponsor', action_date: '2026-01-08', action_text: 'Cosponsored in Senate', bill: { congress: E2E_CONGRESS, type: 'S', number: '244', title: 'Small Business Growth Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/244', summary: 'Expands SBA lending limits.', policy_area: 'Commerce', subjects: ['Small business'], analysis: { plain_title: 'Raise lending support for small businesses', plain_summary: 'Increases SBA-backed lending limits to make financing more available for small firms.', key_provisions: ['Raises limits for qualifying SBA-backed loans.', 'Aims to widen access to growth capital for small businesses.'], why_it_matters: 'Could make it easier for local businesses to borrow and expand.', hidden_provisions: null, significance: 'medium', significance_reason: 'Important to business financing but narrower than broad appropriations bills.', category: 'Small Business Finance', affects: ['Small business owners', 'Workers at small firms', 'Local lenders'] } }, is_recent: true },
   ],
 }
 
@@ -159,6 +160,70 @@ export const E2E_OVERVIEW: SessionOverview = {
   ],
 }
 
+// ---------------------------------------------------------------------------
+// Activities Index (mock)
+// ---------------------------------------------------------------------------
+
+export const E2E_ACTIVITIES: ActivityIndexResponse = {
+  generated_at: E2E_GENERATED_AT,
+  window: WINDOW,
+  activities: [
+    {
+      activity_id: 'senate:roll_call_vote:2026-01-17:14',
+      source: 'senate',
+      type: 'roll_call_vote',
+      date: '2026-01-17',
+      title: 'S. 303 — Border Infrastructure Modernization Act',
+      bill: { congress: E2E_CONGRESS, type: 'S', number: '303', title: 'Border Infrastructure Modernization Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/303', summary: 'Funds upgrades to ports of entry along the southern and northern borders.', policy_area: 'Immigration', subjects: ['Border security', 'Infrastructure'], analysis: { plain_title: 'Upgrade border crossing infrastructure', plain_summary: 'Funds major improvements at border entry points to handle travel and trade more effectively.', key_provisions: ['Pays for infrastructure upgrades at ports of entry.', 'Targets processing capacity and facility modernization.'], why_it_matters: 'Can influence border wait times, commerce flow, and federal spending priorities.', hidden_provisions: null, significance: 'high', significance_reason: 'National infrastructure and border policy impacts are broad and high-stakes.', category: 'Border Security', affects: ['Border communities', 'Travelers', 'Import/export businesses'] } },
+      topics: ['Immigration', 'Border security'],
+      members: ['C001098', 'C001056', 'S000148', 'G000555'],
+    },
+    {
+      activity_id: 'senate:roll_call_vote:2026-01-15:13',
+      source: 'senate',
+      type: 'roll_call_vote',
+      date: '2026-01-15',
+      title: 'S. 198 — Veterans Housing Stability Act',
+      bill: { congress: E2E_CONGRESS, type: 'S', number: '198', title: 'Veterans Housing Stability Act', summary: 'Expands housing assistance and rental vouchers for veterans at risk of homelessness.', policy_area: 'Armed forces and national security', subjects: ['Veterans', 'Housing'], analysis: { plain_title: 'Expand housing support for veterans', plain_summary: 'Increases housing assistance and vouchers for veterans facing housing instability.', key_provisions: ['Expands rental voucher support for eligible veterans.', 'Targets veterans at risk of homelessness.'], why_it_matters: 'Could reduce veteran homelessness and pressure on local emergency housing programs.', hidden_provisions: null, significance: 'high', significance_reason: 'Directly addresses a severe social outcome for a large vulnerable group.', category: 'Veterans Housing', affects: ['Veterans at risk of homelessness', 'Veterans families', 'Local housing programs'] } },
+      topics: ['Veterans', 'Housing'],
+      members: ['S000148', 'G000555', 'C001098', 'C001056'],
+    },
+    {
+      activity_id: 'senate:roll_call_vote:2026-01-15:12',
+      source: 'senate',
+      type: 'roll_call_vote',
+      date: '2026-01-15',
+      title: 'S. 210 — Clean Transit Access Act',
+      bill: { congress: E2E_CONGRESS, type: 'S', number: '210', title: 'Clean Transit Access Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/210', summary: 'Provides grants to modernize public transit fleets with zero-emission vehicles.', policy_area: 'Transportation', subjects: ['Public transit', 'Emissions'], analysis: { plain_title: 'Cleaner buses for public transit', plain_summary: 'Creates grants to help transit agencies replace older fleets with zero-emission vehicles.', key_provisions: ['Federal grants for fleet replacement and modernization.', 'Supports transition to cleaner transit operations.'], why_it_matters: 'Could improve local air quality and public transit service quality.', hidden_provisions: null, significance: 'high', significance_reason: 'Large local quality-of-life impact through transportation systems.', category: 'Public Transit', affects: ['Transit riders', 'Urban residents', 'Transit agencies'] } },
+      topics: ['Transportation', 'Emissions'],
+      members: ['S000148', 'G000555', 'C001098', 'C001056'],
+    },
+    {
+      activity_id: 'senate:floor_schedule:2026-01-20',
+      source: 'senate',
+      type: 'floor_schedule',
+      date: '2026-01-20',
+      title: 'Senate convenes — consideration of S. 256 Family Caregiver Relief Act',
+      bill: { congress: E2E_CONGRESS, type: 'S', number: '256', title: 'Family Caregiver Relief Act', summary: 'Creates tax credits for family caregivers.', policy_area: 'Social welfare', subjects: ['Caregiving', 'Tax credits'], analysis: { plain_title: 'Tax relief for family caregivers', plain_summary: 'Provides tax credits for households caring for family members at home.', key_provisions: ['Creates a tax credit for qualified caregiving costs.', 'Focuses on family-based care support.'], why_it_matters: 'Could lower costs for families providing unpaid or underpaid care.', hidden_provisions: null, significance: 'medium', significance_reason: 'Significant for affected households but targeted rather than economy-wide.', category: 'Family Caregiving', affects: ['Family caregivers', 'Older adults', 'Households with medical care expenses'] } },
+      topics: ['Social welfare', 'Tax credits'],
+      members: [],
+    },
+    {
+      activity_id: 'senate:committee_meeting:2026-01-21:finance',
+      source: 'senate',
+      type: 'committee_meeting',
+      date: '2026-01-21',
+      title: 'Committee on Finance — FY 2026 budget priorities hearing',
+      topics: ['Budget', 'Finance'],
+      members: [],
+    },
+  ],
+  featured_senators: [
+    { bioguide_id: 'C001056', score: 82, reasons: ['Crossed party line on 2 of 3 recent votes', 'Key swing vote on Border Infrastructure bill'], latest_activity_date: '2026-01-17' },
+    { bioguide_id: 'C001098', score: 65, reasons: ['Sponsored Border Infrastructure Modernization Act', 'Active in Immigration committee'], latest_activity_date: '2026-01-17' },
+  ],
+}
+
 export const E2E_STATE_VOTES: Record<string, StateVotesResponse> = {
   NY: {
     state: 'NY',
@@ -174,7 +239,7 @@ export const E2E_STATE_VOTES: Record<string, StateVotesResponse> = {
         result: 'Agreed to',
         issue: 'S. 210',
         issue_type: 'bill',
-        bill: { congress: E2E_CONGRESS, type: 'S', number: '210', title: 'Clean Transit Access Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/210' },
+        bill: { congress: E2E_CONGRESS, type: 'S', number: '210', title: 'Clean Transit Access Act', url: 'https://www.congress.gov/bill/119th-congress/senate-bill/210', analysis: { plain_title: 'Cleaner buses for public transit', plain_summary: 'Creates grants to modernize transit fleets with cleaner vehicles.', key_provisions: ['Supports transit fleet replacement with low-emission buses.'], why_it_matters: 'Can improve transit reliability and local air quality.', hidden_provisions: null, significance: 'high', significance_reason: 'Public transit and air quality impacts are broad and visible.', category: 'Public Transit', affects: ['Transit riders', 'Urban residents', 'Transit agencies'] } },
         counts: { yeas: 67, nays: 32, present: 1, absent: 0 },
         members: [
           { name: 'Schumer (D-NY)', state: 'NY', party: 'D', vote_cast: 'Yea' },
