@@ -11,12 +11,17 @@ import {
 } from "./fetch";
 import { compareDates, todayEastern, subtractDays } from "./date-parse";
 import {
+  fetchDailyCongressionalRecordSenateArticles,
   fetchCurrentSenators,
   fetchBillDetailsMap,
   buildBillKey,
   fetchMemberLegislationActions,
+  fetchSenateCommitteeMeetings,
 } from "./congress";
-import { fetchDailyDigest } from "./govinfo";
+import {
+  fetchDailyDigest,
+  fetchCrecSenateGranuleHighlights,
+} from "./govinfo";
 import {
   getCommitteeScheduleUrl,
   getFloorScheduleUrl,
@@ -30,13 +35,20 @@ import type {
   ActivityIndexEntry,
   ActivityItem,
   CommitteeMeetingItem,
+  CongressCommitteeMeetingItem,
   DailyDigestItem,
+  FeaturedSenatorEntry,
   FloorScheduleItem,
+  GovInfoCrecGranuleHighlightItem,
   MemberIndexEntry,
   MemberActivityJson,
+  MemberDeterministicSummary,
   MemberIndexJson,
   RollCallVoteItem,
   SourceError,
+  MemberInsight,
+  BillRef,
+  SenateRecordArticleItem,
 } from "./types";
 
 export interface MemberIngestConfig {
@@ -211,6 +223,341 @@ function extractTopicsFromBill(bill: RollCallVoteItem["bill"]): string[] {
   return Array.from(topics);
 }
 
+const FEATURED_LIMIT = 6;
+const CRITICAL_SOURCES = new Set(["congress", "senate", "govinfo"]);
+
+function normalizePartyCode(value: string | undefined): string {
+  const normalized = (value ?? "").trim().toUpperCase();
+  if (!normalized) return "";
+  if (normalized.startsWith("D")) return "D";
+  if (normalized.startsWith("R")) return "R";
+  if (normalized === "I" || normalized.startsWith("IND")) return "I";
+  return normalized;
+}
+
+function normalizeVoteCast(value: string): string {
+  const cleaned = value.trim().toLowerCase();
+  if (!cleaned) return "UNKNOWN";
+  if (cleaned.includes("yea") || cleaned.includes("aye") || cleaned === "yes") {
+    return "YEA";
+  }
+  if (cleaned.includes("nay") || cleaned === "no") {
+    return "NAY";
+  }
+  if (cleaned.includes("present")) {
+    return "PRESENT";
+  }
+  if (cleaned.includes("not voting") || cleaned.includes("absent")) {
+    return "NOT_VOTING";
+  }
+  return cleaned.toUpperCase().replace(/\s+/g, "_");
+}
+
+function computePartyMajorityByParty(memberVotes: MemberVote[]): Map<string, string> {
+  const partyCounts = new Map<string, Map<string, number>>();
+  for (const vote of memberVotes) {
+    const party = normalizePartyCode(vote.party);
+    if (!party) continue;
+    const voteCast = normalizeVoteCast(vote.vote_cast);
+    const counts = partyCounts.get(party) ?? new Map<string, number>();
+    counts.set(voteCast, (counts.get(voteCast) ?? 0) + 1);
+    partyCounts.set(party, counts);
+  }
+
+  const majorityByParty = new Map<string, string>();
+  for (const [party, counts] of partyCounts.entries()) {
+    let bestVote = "";
+    let bestCount = -1;
+    let tied = false;
+    for (const [voteCast, count] of counts.entries()) {
+      if (count > bestCount) {
+        bestVote = voteCast;
+        bestCount = count;
+        tied = false;
+      } else if (count === bestCount) {
+        tied = true;
+      }
+    }
+    if (!tied && bestVote) {
+      majorityByParty.set(party, bestVote);
+    }
+  }
+  return majorityByParty;
+}
+
+function recencyBonus(latestDate: string | undefined, referenceDate: string): number {
+  if (!latestDate) return 0;
+  const latest = new Date(`${latestDate}T00:00:00Z`).getTime();
+  const reference = new Date(`${referenceDate}T00:00:00Z`).getTime();
+  if (Number.isNaN(latest) || Number.isNaN(reference)) return 0;
+  const days = Math.max(0, Math.round((reference - latest) / 86_400_000));
+  if (days <= 0) return 5;
+  if (days === 1) return 4;
+  if (days <= 2) return 3;
+  if (days <= 4) return 2;
+  if (days <= 6) return 1;
+  return 0;
+}
+
+function formatUtcIso(date: Date): string {
+  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function getMemberBillKeySet(activities: ActivityItem[]): Set<string> {
+  const keys = new Set<string>();
+  for (const item of activities) {
+    if ((item.type === "legislation_action" || item.type === "roll_call_vote") && item.bill) {
+      keys.add(buildBillKey(item.bill));
+    }
+  }
+  return keys;
+}
+
+function intersectsMemberBills(
+  meetingBills: BillRef[],
+  memberBillKeys: Set<string>
+): boolean {
+  for (const bill of meetingBills) {
+    if (memberBillKeys.has(buildBillKey(bill))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function takeFirstEvidence<T>(items: T[], limit = 3): T[] {
+  if (items.length <= limit) return items;
+  return items.slice(0, limit);
+}
+
+function buildMemberSummary(
+  activity: MemberActivityJson
+): MemberDeterministicSummary {
+  const activities = activity.activities;
+  const memberBillKeys = getMemberBillKeySet(activities);
+  const latestActivityDate = activities[0] ? getActivityDate(activities[0]) : undefined;
+
+  const recentSponsored = activities.filter(
+    (item) =>
+      item.type === "legislation_action" &&
+      item.role === "sponsor" &&
+      item.is_recent !== false
+  );
+  const recentCosponsored = activities.filter(
+    (item) =>
+      item.type === "legislation_action" &&
+      item.role === "cosponsor" &&
+      item.is_recent !== false
+  );
+
+  const defectionVotes = activities.filter(
+    (item): item is RollCallVoteItem =>
+      item.type === "roll_call_vote" && item.against_party_majority === true
+  );
+
+  const upcomingMeetings = (activity.context.committee_meetings_congress ?? []).filter((meeting) => {
+    if (!meeting.date) return false;
+    return compareDates(meeting.date, activity.window.end_date) >= 0;
+  });
+  const matchedUpcoming = upcomingMeetings.filter(
+    (meeting) =>
+      meeting.nomination_signals.length > 0 ||
+      intersectsMemberBills(meeting.related_bills, memberBillKeys)
+  );
+
+  const senateHighlights = (activity.context.senate_granule_highlights ?? []).filter((highlight) =>
+    (highlight.member_bioguide_ids ?? []).includes(activity.member.bioguide_id)
+  );
+
+  const topicCounts = new Map<string, number>();
+  for (const item of activities) {
+    for (const topic of item.topics ?? []) {
+      if (!topic) continue;
+      topicCounts.set(topic, (topicCounts.get(topic) ?? 0) + 1);
+    }
+  }
+  const topTopics = Array.from(topicCounts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([topic]) => topic);
+
+  let score = 0;
+  const reasons: string[] = [];
+  const insights: MemberInsight[] = [];
+
+  if (defectionVotes.length > 0) {
+    const defectionScore = Math.min(defectionVotes.length, 2) * 8;
+    score += defectionScore;
+    reasons.push(
+      `Voted against party majority ${defectionVotes.length} time${defectionVotes.length === 1 ? "" : "s"}`
+    );
+    insights.push({
+      id: "party_defection",
+      kind: "party_defection",
+      title: "Party-defection signal",
+      detail:
+        defectionVotes.length === 1
+          ? "This senator voted against their party's majority position on the latest vote day."
+          : `This senator voted against their party's majority position ${defectionVotes.length} times in the current window.`,
+      score: defectionScore,
+      evidence: takeFirstEvidence(
+        defectionVotes.map((vote) => ({
+          source: vote.source,
+          label: `Roll call ${vote.vote_number}: ${vote.vote_cast} vs party majority ${vote.party_majority_vote ?? "unknown"}`,
+          date: vote.vote_date,
+          url: vote.url,
+          vote_number: vote.vote_number,
+          bill: vote.bill,
+        }))
+      ),
+    });
+  }
+
+  if (recentSponsored.length > 0) {
+    score += 6;
+    reasons.push("Recent sponsored legislation action");
+  }
+
+  if (recentCosponsored.length > 0) {
+    score += 3;
+    reasons.push("Recent cosponsored legislation action");
+  }
+
+  if (matchedUpcoming.length > 0) {
+    score += 4;
+    reasons.push("Upcoming committee item linked to bills/nominations");
+    insights.push({
+      id: "upcoming_focus",
+      kind: "upcoming_focus",
+      title: "Upcoming focus",
+      detail:
+        matchedUpcoming.length === 1
+          ? "One upcoming committee item matches this senator's active bill/nomination context."
+          : `${matchedUpcoming.length} upcoming committee items match this senator's active bill/nomination context.`,
+      score: 4,
+      evidence: takeFirstEvidence(
+        matchedUpcoming.map((meeting) => ({
+          source: meeting.source,
+          label: meeting.title,
+          date: meeting.date,
+          url: meeting.url,
+        }))
+      ),
+    });
+  }
+
+  if (senateHighlights.length > 0) {
+    score += 2;
+    reasons.push("Recent Senate floor/congressional record highlight");
+    insights.push({
+      id: "recent_session",
+      kind: "recent_session",
+      title: "Recent session highlight",
+      detail:
+        senateHighlights.length === 1
+          ? "This senator appears in one recent Senate congressional-record highlight."
+          : `This senator appears in ${senateHighlights.length} recent Senate congressional-record highlights.`,
+      score: 2,
+      evidence: takeFirstEvidence(
+        senateHighlights.map((highlight) => ({
+          source: highlight.source,
+          label: highlight.title,
+          date: highlight.date,
+          url: highlight.text_url ?? highlight.pdf_url,
+        }))
+      ),
+    });
+  }
+
+  if (topTopics.length > 0) {
+    insights.push({
+      id: "topic_focus",
+      kind: "topic_focus",
+      title: "Topic focus",
+      detail: `Top recurring topics: ${topTopics.join(", ")}.`,
+      score: 1,
+      evidence: topTopics.map((topic) => ({
+        source: "congress",
+        label: topic,
+      })),
+    });
+  }
+
+  score += recencyBonus(latestActivityDate, activity.window.end_date);
+  if (activity.partial && activity.errors.some((error) => CRITICAL_SOURCES.has(error.source))) {
+    score -= 10;
+    reasons.push("Limited source coverage (partial data)");
+  }
+
+  if (reasons.length === 0) {
+    reasons.push("Recent Senate activity context");
+  }
+
+  const latestBillActivity = activities.find(
+    (item): item is Exclude<ActivityItem, RollCallVoteItem> =>
+      item.type === "legislation_action"
+  );
+  const latestVote = activities.find(
+    (item): item is RollCallVoteItem => item.type === "roll_call_vote"
+  );
+  const deterministicPoints: string[] = [];
+  if (latestBillActivity && latestBillActivity.type === "legislation_action") {
+    deterministicPoints.push(
+      `Most recent legislation action: ${latestBillActivity.action_text}`
+    );
+  }
+  if (latestVote) {
+    deterministicPoints.push(
+      `Latest roll call participation: vote ${latestVote.vote_number} (${latestVote.vote_cast}).`
+    );
+  }
+  if (matchedUpcoming[0]) {
+    deterministicPoints.push(`Upcoming committee focus: ${matchedUpcoming[0].title}`);
+  }
+  if (deterministicPoints.length === 0 && latestActivityDate) {
+    deterministicPoints.push(`Most recent activity date: ${latestActivityDate}`);
+  }
+
+  return {
+    featured_score: score,
+    featured_reasons: reasons,
+    latest_activity_date: latestActivityDate,
+    deterministic_points: deterministicPoints,
+    insights,
+  };
+}
+
+function buildFeaturedSenators(memberActivities: MemberActivityJson[]): FeaturedSenatorEntry[] {
+  const ranked = memberActivities
+    .map((activity) => ({
+      bioguide_id: activity.member.bioguide_id,
+      score: activity.summary?.featured_score ?? 0,
+      reasons: activity.summary?.featured_reasons ?? [],
+      latest_activity_date: activity.summary?.latest_activity_date,
+      latest_vote_date:
+        activity.activities.find((item) => item.type === "roll_call_vote")?.vote_date ?? "",
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const dateA = a.latest_activity_date ?? "";
+      const dateB = b.latest_activity_date ?? "";
+      if (dateB !== dateA) return dateB.localeCompare(dateA);
+      if (b.latest_vote_date !== a.latest_vote_date) {
+        return b.latest_vote_date.localeCompare(a.latest_vote_date);
+      }
+      return a.bioguide_id.localeCompare(b.bioguide_id);
+    })
+    .slice(0, FEATURED_LIMIT)
+    .map((item) => ({
+      bioguide_id: item.bioguide_id,
+      score: item.score,
+      reasons: item.reasons,
+      latest_activity_date: item.latest_activity_date,
+    }));
+
+  return ranked;
+}
+
 function getActivityDate(activity: ActivityItem): string {
   switch (activity.type) {
     case "legislation_action":
@@ -262,7 +609,8 @@ function buildActivityIndex(
   memberActivities: MemberActivityJson[],
   windowStart: string,
   windowEnd: string,
-  generatedAt: string
+  generatedAt: string,
+  featuredSenators: FeaturedSenatorEntry[]
 ): ActivityIndexJson {
   const index = new Map<string, ActivityIndexEntry>();
 
@@ -318,6 +666,7 @@ function buildActivityIndex(
     generated_at: generatedAt,
     window: { start_date: windowStart, end_date: windowEnd },
     activities,
+    featured_senators: featuredSenators,
   };
 }
 
@@ -377,9 +726,17 @@ async function fetchVoteActivities(
 
     const bill = extractBillRefFromVote(details);
     const url = buildVoteDetailUrl(details.congress, details.session, details.vote_number);
+    const partyMajorityByParty = computePartyMajorityByParty(details.member_votes);
     for (const vote of details.member_votes) {
       const member = matchMemberForVote(vote, membersByState);
       if (!member) continue;
+      const normalizedParty = normalizePartyCode(vote.party);
+      const normalizedVoteCast = normalizeVoteCast(vote.vote_cast);
+      const partyMajorityVote = normalizedParty
+        ? partyMajorityByParty.get(normalizedParty)
+        : undefined;
+      const againstPartyMajority =
+        Boolean(partyMajorityVote) && partyMajorityVote !== normalizedVoteCast;
       const list = voteActivitiesByMember.get(member.bioguide_id) ?? [];
       list.push({
         source: "senate",
@@ -390,6 +747,9 @@ async function fetchVoteActivities(
         question: details.vote_question,
         result: details.vote_result,
         vote_cast: vote.vote_cast,
+        party: normalizedParty || undefined,
+        party_majority_vote: partyMajorityVote,
+        against_party_majority: againstPartyMajority,
         bill: bill ?? undefined,
         url,
       });
@@ -412,6 +772,9 @@ export async function runMemberIngestion(
   const floorSchedule: FloorScheduleItem[] = [];
   const committeeMeetings: CommitteeMeetingItem[] = [];
   let dailyDigest: DailyDigestItem[] = [];
+  let congressCommitteeMeetings: CongressCommitteeMeetingItem[] = [];
+  let senateRecordArticles: SenateRecordArticleItem[] = [];
+  let senateGranuleHighlights: GovInfoCrecGranuleHighlightItem[] = [];
 
   const floorResult = await fetchXmlWithRetry(getFloorScheduleUrl(), fetchConfig);
   if (floorResult.success && floorResult.data) {
@@ -461,6 +824,66 @@ export async function runMemberIngestion(
     });
   }
 
+  const endDateUtc = new Date(`${windowEnd}T23:59:59Z`);
+  const startDateUtc = new Date(`${windowStart}T00:00:00Z`);
+  const upcomingEndUtc = new Date(endDateUtc.getTime() + 30 * 86_400_000);
+  const recordWindowStartUtc = new Date(endDateUtc.getTime() - 14 * 86_400_000);
+
+  const committeeAdapterResult = await fetchSenateCommitteeMeetings(
+    config.congress,
+    config.congressApiKey,
+    fetchConfig,
+    {
+      fromDateTime: formatUtcIso(startDateUtc),
+      toDateTime: formatUtcIso(upcomingEndUtc),
+      maxMeetings: 120,
+    }
+  );
+  congressCommitteeMeetings = committeeAdapterResult.meetings;
+  if (committeeAdapterResult.error) {
+    errors.push({
+      source: "congress",
+      message: committeeAdapterResult.error,
+    });
+  }
+
+  const dailyRecordResult = await fetchDailyCongressionalRecordSenateArticles(
+    config.congressApiKey,
+    fetchConfig,
+    {
+      issueLimit: 24,
+      maxArticles: 120,
+    }
+  );
+  senateRecordArticles = dailyRecordResult.articles;
+  if (dailyRecordResult.error) {
+    errors.push({
+      source: "congress",
+      message: dailyRecordResult.error,
+    });
+  }
+
+  const granuleResult = await fetchCrecSenateGranuleHighlights(
+    formatUtcIso(recordWindowStartUtc).slice(0, 10),
+    formatUtcIso(endDateUtc).slice(0, 10),
+    config.govInfoApiKey,
+    fetchConfig,
+    {
+      maxPackages: 8,
+      maxGranulesPerPackage: 120,
+    }
+  );
+  senateGranuleHighlights = granuleResult.items.map((item) => ({
+    ...item,
+    source: "govinfo",
+  }));
+  if (granuleResult.error) {
+    errors.push({
+      source: "govinfo",
+      message: granuleResult.error,
+    });
+  }
+
   const members = await fetchCurrentSenators(
     config.congress,
     config.congressApiKey,
@@ -491,6 +914,9 @@ export async function runMemberIngestion(
     floor_schedule: floorSchedule,
     committee_meetings: committeeMeetings,
     daily_digest: dailyDigest,
+    committee_meetings_congress: congressCommitteeMeetings,
+    senate_record_articles: senateRecordArticles,
+    senate_granule_highlights: senateGranuleHighlights,
   };
 
   const voteActivitiesByMember = await fetchVoteActivities(
@@ -547,7 +973,7 @@ export async function runMemberIngestion(
         (a, b) => getActivityDate(b).localeCompare(getActivityDate(a))
       );
 
-      return {
+      const payload: MemberActivityJson = {
         member,
         congress: config.congress,
         generated_at: generatedAt,
@@ -559,7 +985,8 @@ export async function runMemberIngestion(
         context,
         partial: errors.length > 0 || memberErrors.length > 0,
         errors: [...errors, ...memberErrors],
-      } satisfies MemberActivityJson;
+      };
+      return payload;
     }
   );
 
@@ -598,13 +1025,17 @@ export async function runMemberIngestion(
     for (const item of activity.activities) {
       applyActivityMetadata(activity.member.bioguide_id, item);
     }
+    activity.summary = buildMemberSummary(activity);
   }
+
+  const featuredSenators = buildFeaturedSenators(memberActivities);
 
   const activityIndex = buildActivityIndex(
     memberActivities,
     windowStart,
     windowEnd,
-    generatedAt
+    generatedAt,
+    featuredSenators
   );
 
   return {

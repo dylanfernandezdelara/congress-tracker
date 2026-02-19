@@ -24,6 +24,24 @@ function createParser(): XMLParser {
   return new XMLParser(parserOptions);
 }
 
+function safeParseScheduleXml(xml: string, source: string): UnknownRecord | null {
+  if (!xml || !xml.trim()) {
+    console.warn(`[senate-schedule] Empty XML payload for ${source}`);
+    return null;
+  }
+  try {
+    const parser = createParser();
+    return parser.parse(xml) as UnknownRecord;
+  } catch (error) {
+    console.error(
+      `[senate-schedule] Failed to parse ${source}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
 function getText(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number") return String(value);
@@ -78,7 +96,12 @@ function collectArrays(
     }
   }
   if (node && typeof node === "object") {
-    for (const value of Object.values(node as UnknownRecord)) {
+    const record = node as UnknownRecord;
+    const hasPreferred = preferredKeys.some((key) => key in record);
+    if (hasPreferred) {
+      arrays.push([record]);
+    }
+    for (const value of Object.values(record)) {
       collectArrays(value, preferredKeys, arrays);
     }
   }
@@ -103,8 +126,8 @@ export function parseFloorScheduleXml(
   xml: string,
   fallbackDate: string
 ): FloorScheduleItem[] {
-  const parser = createParser();
-  const parsed = parser.parse(xml) as UnknownRecord;
+  const parsed = safeParseScheduleXml(xml, "floor_schedule.xml");
+  if (!parsed) return [];
   const root = (parsed as UnknownRecord).CongressSessionDayConvenings ?? parsed;
   const legislativeDays = findBestArray(root, ["LegislativeDayDate", "SessionDay"]);
 
@@ -139,6 +162,17 @@ export function parseFloorScheduleXml(
           title: "Senate convenes",
           summary: summaryParts.length ? summaryParts.join(" • ") : undefined,
         });
+
+        if (nextConvene?.date) {
+          items.push({
+            source: "senate",
+            type: "floor_schedule",
+            date: nextConvene.date,
+            time: nextConvene.time,
+            title: "Next convene",
+            summary: "Next scheduled convening time.",
+          });
+        }
       }
     }
     return items;
@@ -155,17 +189,28 @@ export function parseFloorScheduleXml(
 
   return items
     .map((item) => {
+      const rawTitle = getText(item.title ?? item.item ?? item.description ?? item.subject);
+      const rawDate = getText(item.date ?? item.meeting_date ?? item.schedule_date);
+      const rawTime = getText(item.time ?? item.meeting_time ?? item.start_time);
+      const rawLocation = getText(item.location ?? item.room);
+      const rawUrl = getText(item.url ?? item.link);
+      const hasSignal =
+        Boolean(rawTitle) ||
+        Boolean(rawDate) ||
+        Boolean(rawTime) ||
+        Boolean(rawLocation) ||
+        Boolean(rawUrl);
+      if (!hasSignal) return null;
+
       const date = normalizeDate(
-        getText(item.date ?? item.meeting_date ?? item.schedule_date),
+        rawDate,
         fallbackDate
       );
-      const time = getText(item.time ?? item.meeting_time ?? item.start_time) || undefined;
-      const title =
-        getText(item.title ?? item.item ?? item.description ?? item.subject) ||
-        "Senate floor schedule";
+      const time = rawTime || undefined;
+      const title = rawTitle || "Senate floor schedule";
       const summary = getText(item.summary ?? item.description) || undefined;
-      const location = getText(item.location ?? item.room) || undefined;
-      const url = getText(item.url ?? item.link) || undefined;
+      const location = rawLocation || undefined;
+      const url = rawUrl || undefined;
       return {
         source: "senate",
         type: "floor_schedule",
@@ -177,15 +222,15 @@ export function parseFloorScheduleXml(
         url,
       } as FloorScheduleItem;
     })
-    .filter((item) => item.title);
+    .filter((item): item is FloorScheduleItem => Boolean(item?.title));
 }
 
 export function parseCommitteeScheduleXml(
   xml: string,
   fallbackDate: string
 ): CommitteeMeetingItem[] {
-  const parser = createParser();
-  const parsed = parser.parse(xml) as UnknownRecord;
+  const parsed = safeParseScheduleXml(xml, "committee_schedule.xml");
+  if (!parsed) return [];
   const items = findBestArray(parsed, [
     "committee",
     "committee_name",

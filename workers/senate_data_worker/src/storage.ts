@@ -63,6 +63,14 @@ export function buildActivitiesIndexKey(): string {
   return "activities/index.json";
 }
 
+export function buildVoteLedgerKey(): string {
+  return "votes/ledger.json";
+}
+
+export function buildSessionOverviewKey(): string {
+  return "stats/overview.json";
+}
+
 export async function writeJsonToR2(
   bucket: R2Bucket,
   key: string,
@@ -85,8 +93,33 @@ export async function readJsonFromR2<T>(
   if (!object) {
     return null;
   }
-  const text = await object.text();
-  return JSON.parse(text) as T;
+  let text: string;
+  try {
+    text = await object.text();
+  } catch (error) {
+    console.error(
+      `[r2] Failed to read object text for ${key}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+
+  if (!text.trim()) {
+    console.warn(`[r2] Empty JSON payload for ${key}`);
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch (error) {
+    console.error(
+      `[r2] Invalid JSON payload for ${key}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
 }
 
 /**

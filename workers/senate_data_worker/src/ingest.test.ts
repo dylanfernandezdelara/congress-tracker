@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildOutputVotes, extractIssue } from "./ingest";
+import { buildOutputVotes, extractIssue, parseIssueRef } from "./ingest";
 import type { VoteDetails, VoteSummary } from "./xml";
 
 describe("extractIssue", () => {
@@ -295,3 +295,23 @@ describe("buildOutputVotes", () => {
   });
 });
 
+describe("parseIssueRef", () => {
+  it("classifies bill issues", () => {
+    const result = parseIssueRef("H.R. 1234", 119);
+    expect(result.issue_type).toBe("bill");
+    expect(result.bill?.type).toBe("H.R.");
+    expect(result.bill?.number).toBe("1234");
+  });
+
+  it("classifies nominations", () => {
+    const result = parseIssueRef("PN 42", 119);
+    expect(result.issue_type).toBe("nomination");
+    expect(result.bill).toBeUndefined();
+  });
+
+  it("classifies treaties", () => {
+    const result = parseIssueRef("Treaty Doc. 119-1", 119);
+    expect(result.issue_type).toBe("treaty");
+    expect(result.bill).toBeUndefined();
+  });
+});

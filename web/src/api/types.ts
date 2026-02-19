@@ -7,6 +7,7 @@
 export type ActivitySource = 'congress' | 'senate' | 'govinfo'
 export type ActivityType =
   | 'legislation_action'
+  | 'roll_call_vote'
   | 'floor_schedule'
   | 'committee_meeting'
   | 'daily_digest'
@@ -37,6 +38,24 @@ export interface BillRef {
   number: string
   title?: string
   url?: string
+  summary?: string
+  summary_date?: string
+  policy_area?: string
+  subjects?: string[]
+  committees?: BillCommittee[]
+  introduced_date?: string
+  latest_action?: BillLatestAction
+}
+
+export interface BillLatestAction {
+  action_date?: string
+  text?: string
+}
+
+export interface BillCommittee {
+  name: string
+  chamber?: string
+  committee_id?: string
 }
 
 export interface LegislationActionItem {
@@ -46,6 +65,24 @@ export interface LegislationActionItem {
   action_date: string
   action_text: string
   bill: BillRef
+  is_recent?: boolean
+}
+
+export interface RollCallVoteItem {
+  source: 'senate'
+  type: 'roll_call_vote'
+  vote_number: number
+  vote_date: string
+  title?: string
+  question?: string
+  result?: string
+  vote_cast: string
+  party?: string
+  party_majority_vote?: string
+  against_party_majority?: boolean
+  bill?: BillRef
+  url?: string
+  topics?: string[]
 }
 
 export interface FloorScheduleItem {
@@ -81,8 +118,104 @@ export interface DailyDigestItem {
   summary?: string
 }
 
+export interface CongressCommitteeMeetingItem {
+  source: 'congress'
+  event_id: string
+  congress: number
+  chamber: 'Senate'
+  date: string
+  time?: string
+  title: string
+  meeting_status?: string
+  meeting_type?: string
+  committees: Array<{
+    name: string
+    system_code?: string
+    url?: string
+  }>
+  location?: string
+  url?: string
+  related_bills: BillRef[]
+  nomination_signals: string[]
+  meeting_documents: Array<{
+    document_type: string
+    description?: string
+    name?: string
+    url?: string
+    format?: string
+  }>
+}
+
+export interface SenateRecordArticleItem {
+  source: 'congress'
+  issue_date: string
+  volume_number: number
+  issue_number: string
+  section_name: string
+  title: string
+  start_page?: string
+  end_page?: string
+  formatted_text_url?: string
+  pdf_url?: string
+}
+
+export interface GovInfoCrecGranuleHighlightItem {
+  source: 'govinfo'
+  package_id: string
+  granule_id: string
+  date: string
+  title: string
+  granule_class?: string
+  sub_granule_class?: string
+  member_bioguide_ids?: string[]
+  member_names?: string[]
+  committee_names?: string[]
+  text_url?: string
+  pdf_url?: string
+}
+
+export interface InsightEvidence {
+  source: ActivitySource
+  label: string
+  date?: string
+  url?: string
+  vote_number?: number
+  bill?: BillRef
+}
+
+export type MemberInsightKind =
+  | 'party_defection'
+  | 'upcoming_focus'
+  | 'recent_session'
+  | 'topic_focus'
+
+export interface MemberInsight {
+  id: string
+  kind: MemberInsightKind
+  title: string
+  detail: string
+  score: number
+  evidence: InsightEvidence[]
+}
+
+export interface MemberDeterministicSummary {
+  featured_score: number
+  featured_reasons: string[]
+  latest_activity_date?: string
+  deterministic_points: string[]
+  insights: MemberInsight[]
+}
+
+export interface FeaturedSenatorEntry {
+  bioguide_id: string
+  score: number
+  reasons: string[]
+  latest_activity_date?: string
+}
+
 export type ActivityItem =
   | LegislationActionItem
+  | RollCallVoteItem
   | FloorScheduleItem
   | CommitteeMeetingItem
   | DailyDigestItem
@@ -91,6 +224,9 @@ export interface MemberActivityContext {
   floor_schedule: FloorScheduleItem[]
   committee_meetings: CommitteeMeetingItem[]
   daily_digest: DailyDigestItem[]
+  committee_meetings_congress?: CongressCommitteeMeetingItem[]
+  senate_record_articles?: SenateRecordArticleItem[]
+  senate_granule_highlights?: GovInfoCrecGranuleHighlightItem[]
 }
 
 export interface SourceError {
@@ -105,6 +241,136 @@ export interface MemberActivityResponse {
   window: ActivityWindow
   activities: ActivityItem[]
   context: MemberActivityContext
+  summary?: MemberDeterministicSummary
   partial: boolean
   errors: SourceError[]
+}
+
+export interface ActivityIndexEntry {
+  activity_id: string
+  source: ActivitySource
+  type: ActivityType
+  date: string
+  title?: string
+  bill?: BillRef
+  topics?: string[]
+  members: string[]
+}
+
+export interface ActivityIndexResponse {
+  generated_at: string
+  window: ActivityWindow
+  activities: ActivityIndexEntry[]
+  featured_senators?: FeaturedSenatorEntry[]
+}
+
+export interface OutputMemberVote {
+  name: string
+  state: string
+  party: string
+  vote_cast: string
+}
+
+export interface OutputVoteCounts {
+  yeas: number
+  nays: number
+  present: number
+  absent: number
+}
+
+export interface OutputVote {
+  vote_number: number
+  title: string
+  question: string
+  result: string
+  issue?: string
+  issue_type?: 'bill' | 'nomination' | 'treaty' | 'other'
+  bill?: BillRef
+  counts: OutputVoteCounts
+  members: OutputMemberVote[]
+}
+
+export interface StateVotesResponse {
+  state: string
+  vote_date: string
+  generated_at: string
+  congress: number
+  session: number
+  votes: OutputVote[]
+}
+
+export interface StateMetaStats {
+  votes_total: number
+  votes_with_state_members: number
+  state_member_votes: number
+}
+
+export interface StateMetaKeys {
+  latest: string
+  snapshot: string
+}
+
+export interface StateMetaResponse {
+  state: string
+  congress: number
+  session: number
+  generated_at: string
+  cutoff_date_et: string
+  target_vote_date: string
+  keys: StateMetaKeys
+  stats: StateMetaStats
+  partial: boolean
+  missing_votes: number[]
+}
+
+export interface HealthResponse {
+  status: string
+  timestamp: string
+  target_state?: string
+  congress?: string | number
+  session?: string | number
+}
+
+// ============================================================================
+// Vote Ledger & Session Overview (chamber-wide)
+// ============================================================================
+
+export interface VoteLedgerEntry {
+  vote_number: number
+  vote_date: string
+  title: string
+  question: string
+  result: string
+  issue?: string
+  policy_area?: string
+  member_votes: Record<string, string>
+}
+
+export interface VoteLedger {
+  congress: number
+  session: number
+  generated_at: string
+  total_votes: number
+  entries: VoteLedgerEntry[]
+}
+
+export interface SenatorSessionStat {
+  bioguide_id: string
+  name: string
+  party: string
+  state: string
+  votes_cast: number
+  votes_missed: number
+  party_defections: number
+  alignment_pct: number
+}
+
+export interface SessionOverview {
+  congress: number
+  session: number
+  generated_at: string
+  total_votes: number
+  latest_vote_date: string
+  total_defections: number
+  senators: SenatorSessionStat[]
 }

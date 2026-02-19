@@ -31,9 +31,9 @@ check_endpoint() {
     echo "Checking: $description"
     echo "  GET $path"
     
-    response=$(curl -s -w "\n%{http_code}" "$BASE_URL$path" || echo -e "\n000")
-    http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | head -n-1)
+    response=$(curl -sS -w "\n%{http_code}" "$BASE_URL$path" || printf "\n000")
+    http_code="${response##*$'\n'}"
+    body="${response%$'\n'*}"
     
     if [ "$http_code" != "$expected_status" ]; then
         echo "  ❌ Expected status $expected_status, got $http_code"
@@ -42,13 +42,14 @@ check_endpoint() {
     fi
     
     # Check Content-Type header
-    content_type=$(curl -s -I "$BASE_URL$path" | grep -i "content-type:" | cut -d' ' -f2 | tr -d '\r' || echo "")
+    headers=$(curl -sS -D - -o /dev/null "$BASE_URL$path" || true)
+    content_type=$(printf "%s\n" "$headers" | awk -F': *' 'tolower($1)=="content-type"{print tolower($2); exit}' | tr -d '\r')
     if [[ ! "$content_type" =~ application/json ]]; then
         echo "  ⚠️  Content-Type is not application/json: $content_type"
     fi
     
     # Check CORS header
-    cors=$(curl -s -I "$BASE_URL$path" | grep -i "access-control-allow-origin:" | cut -d' ' -f2 | tr -d '\r' || echo "")
+    cors=$(printf "%s\n" "$headers" | awk -F': *' 'tolower($1)=="access-control-allow-origin"{print $2; exit}' | tr -d '\r')
     if [ -z "$cors" ]; then
         echo "  ⚠️  Missing CORS header"
     fi

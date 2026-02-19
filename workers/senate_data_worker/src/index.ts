@@ -6,7 +6,7 @@
  * - HTTP API for serving precomputed JSON from R2
  */
 
-import { runIngestion, runIngestionAllStates } from "./ingest";
+import { runIngestion, runIngestionAllStates, buildVoteLedgerUpdate } from "./ingest";
 import { runMemberIngestion } from "./member-ingest";
 import type {
   IngestConfig,
@@ -15,6 +15,8 @@ import type {
   MemberActivityJson,
   MemberIndexJson,
   ActivityIndexJson,
+  VoteLedger,
+  SessionOverview,
 } from "./types";
 import { STATE_CODES } from "./states";
 import {
@@ -25,6 +27,8 @@ import {
   buildMemberLatestKey,
   buildMembersIndexKey,
   buildActivitiesIndexKey,
+  buildVoteLedgerKey,
+  buildSessionOverviewKey,
   publishToR2,
   readJsonFromR2,
   writeJsonToR2,
@@ -160,6 +164,32 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
   if (pathname === "/activities/index.json") {
     const key = buildActivitiesIndexKey();
     const data = await readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, key);
+    if (!data) {
+      return notFoundResponse(pathname);
+    }
+    return jsonResponse(data, {
+      status: 200,
+      headers: { "Cache-Control": cacheLatest },
+    });
+  }
+
+  // Match /votes/ledger.json
+  if (pathname === "/votes/ledger.json") {
+    const key = buildVoteLedgerKey();
+    const data = await readJsonFromR2<VoteLedger>(env.DATA_BUCKET, key);
+    if (!data) {
+      return notFoundResponse(pathname);
+    }
+    return jsonResponse(data, {
+      status: 200,
+      headers: { "Cache-Control": cacheLatest },
+    });
+  }
+
+  // Match /stats/overview.json
+  if (pathname === "/stats/overview.json") {
+    const key = buildSessionOverviewKey();
+    const data = await readJsonFromR2<SessionOverview>(env.DATA_BUCKET, key);
     if (!data) {
       return notFoundResponse(pathname);
     }
@@ -391,6 +421,18 @@ async function runScheduledIngestion(env: Env): Promise<void> {
 
     await publishAllStatesToR2(env.DATA_BUCKET, result.perState);
 
+    // Build/update vote ledger and session overview
+    console.log("[scheduled] Building vote ledger...");
+    const existingLedger = await readJsonFromR2<VoteLedger>(
+      env.DATA_BUCKET, buildVoteLedgerKey()
+    );
+    const { ledger, overview } = await buildVoteLedgerUpdate(
+      config, memberResult.membersIndex, existingLedger
+    );
+    await writeJsonToR2(env.DATA_BUCKET, buildVoteLedgerKey(), ledger);
+    await writeJsonToR2(env.DATA_BUCKET, buildSessionOverviewKey(), overview);
+    console.log(`[scheduled] Ledger: ${ledger.total_votes} votes, Overview: ${overview.total_defections} defections`);
+
     const elapsed = Date.now() - startTime;
     console.log("[scheduled] ========================================");
     console.log("[scheduled] Scheduled ingestion COMPLETE");
@@ -426,6 +468,18 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     console.log("[scheduled] ----------------------------------------");
 
     await publishToR2(env.DATA_BUCKET, result.snapshot, result.meta);
+
+    // Build/update vote ledger and session overview
+    console.log("[scheduled] Building vote ledger...");
+    const existingLedger = await readJsonFromR2<VoteLedger>(
+      env.DATA_BUCKET, buildVoteLedgerKey()
+    );
+    const { ledger, overview } = await buildVoteLedgerUpdate(
+      config, memberResult.membersIndex, existingLedger
+    );
+    await writeJsonToR2(env.DATA_BUCKET, buildVoteLedgerKey(), ledger);
+    await writeJsonToR2(env.DATA_BUCKET, buildSessionOverviewKey(), overview);
+    console.log(`[scheduled] Ledger: ${ledger.total_votes} votes, Overview: ${overview.total_defections} defections`);
 
     const elapsed = Date.now() - startTime;
     console.log("[scheduled] ========================================");

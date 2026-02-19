@@ -49,7 +49,7 @@ describe("parseFloorScheduleXml", () => {
 
     const result = parseFloorScheduleXml(xml, "2026-01-05");
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(result[0]).toEqual(
       expect.objectContaining({
         date: "2026-01-05",
@@ -57,6 +57,18 @@ describe("parseFloorScheduleXml", () => {
         title: "Senate convenes",
       })
     );
+    expect(result[1]).toEqual(
+      expect.objectContaining({
+        date: "2026-01-06",
+        time: "10:00 AM",
+        title: "Next convene",
+      })
+    );
+  });
+
+  it("returns empty list for malformed XML", () => {
+    const result = parseFloorScheduleXml("<floor_schedule><item>", "2026-01-04");
+    expect(result).toEqual([]);
   });
 });
 
@@ -119,5 +131,10 @@ describe("parseCommitteeScheduleXml", () => {
         location: "SD-226",
       })
     );
+  });
+
+  it("returns empty list for malformed XML", () => {
+    const result = parseCommitteeScheduleXml("<committee_schedule><meeting>", "2026-01-04");
+    expect(result).toEqual([]);
   });
 });

@@ -8,9 +8,8 @@ crons = ["0 10 * * *"]
 [vars]
 CONGRESS = "119"
 SESSION = "2"
-TARGET_STATE = "NY"
+TARGET_STATE = "ALL"
 
 [[r2_buckets]]
 binding = "DATA_BUCKET"
 bucket_name = "senate-data-bucket"
-

@@ -1,411 +1,209 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ApiError,
-  fetchMemberLatest,
-  fetchMembersIndex,
-  getApiBaseUrl,
-  getApiUrlOverride,
-  setApiUrlOverride,
-  type ActivityItem,
-  type MemberActivityResponse,
-  type MemberIndexEntry,
+  fetchSessionOverview,
+  fetchVoteLedger,
+  type SessionOverview,
+  type VoteLedger,
 } from '../api'
+import { E2E_LEDGER, E2E_OVERVIEW } from '../e2eData'
+import ChamberArc from '../components/ChamberArc'
+import DefectionMatrix from '../components/DefectionMatrix'
+import StateDumbbell from '../components/StateDumbbell'
+import LatestVotes from '../components/LatestVotes'
+import {
+  buildAttendanceArcVM,
+  buildDefectionMatrixVM,
+  buildRecentVotesVM,
+  buildStateDumbbellVM,
+} from '../ui/homeViewModel'
 
-function formatWindowDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00Z`)
-  if (Number.isNaN(d.getTime())) return dateStr
+function formatToday(): string {
   return new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  }).format(d)
+  }).format(new Date())
 }
 
-function formatGeneratedAt(ts: string): string {
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return ts
+function formatTimestamp(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
-  }).format(d)
+  }).format(date)
 }
 
-function formatBillLabel(item: ActivityItem): string {
-  if (item.type !== 'legislation_action') return ''
-  const number = item.bill.number ? `${item.bill.type} ${item.bill.number}` : item.bill.type
-  return item.bill.title ? `${number} — ${item.bill.title}` : number
+function normalizeErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) return `${error.message} (HTTP ${error.status})`
+  if (error instanceof Error) return error.message
+  return 'Unexpected fetch error.'
 }
 
-function activitySubtitle(item: ActivityItem): string {
-  if (item.type !== 'legislation_action') return ''
-  const roleLabel = item.role === 'sponsor' ? 'Sponsored' : 'Cosponsored'
-  return `${roleLabel} • ${item.action_date}`
-}
-
-function SettingsPanel({
-  apiBaseUrl,
-  onApplied,
-}: {
-  apiBaseUrl: string
-  onApplied: () => void
-}) {
-  const [inputValue, setInputValue] = useState(() => getApiUrlOverride() ?? '')
-
-  function applyOverride(nextUrl: string | null) {
-    setApiUrlOverride(nextUrl)
-    onApplied()
-  }
-
-  return (
-    <section className="settings">
-      <h2 className="settings__title">Settings</h2>
-
-      <div className="settings__meta">
-        <div className="settings__metaRow">
-          <span className="settings__metaLabel">Resolved API base URL:</span>{' '}
-          <code className="settings__metaValue">{apiBaseUrl}</code>
-        </div>
-        <div className="settings__metaRow">
-          <span className="settings__metaLabel">Override (localStorage):</span>{' '}
-          <code className="settings__metaValue">{getApiUrlOverride() ?? '(none)'}</code>
-        </div>
-      </div>
-
-      <form
-        className="settings__form"
-        onSubmit={(e) => {
-          e.preventDefault()
-          const next = inputValue.trim()
-          applyOverride(next ? next : null)
-        }}
-      >
-        <label className="settings__label">
-          API URL override
-          <input
-            className="settings__input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="https://your-worker.your-subdomain.workers.dev"
-            inputMode="url"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-        </label>
-
-        <div className="settings__actions">
-          <button className="settings__button" type="submit">
-            Update
-          </button>
-          <button
-            className="settings__button settings__button--secondary"
-            type="button"
-            onClick={() => {
-              setInputValue('')
-              applyOverride(null)
-            }}
-          >
-            Clear override
-          </button>
-        </div>
-      </form>
-    </section>
-  )
-}
-
-function Home() {
-  const [members, setMembers] = useState<MemberIndexEntry[]>([])
-  const [selectedMember, setSelectedMember] = useState<MemberIndexEntry | null>(null)
-  const [activity, setActivity] = useState<MemberActivityResponse | null>(null)
+export default function Home() {
+  const [ledger, setLedger] = useState<VoteLedger | null>(null)
+  const [overview, setOverview] = useState<SessionOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isLoadingMembers, setIsLoadingMembers] = useState(true)
-  const [isLoadingActivity, setIsLoadingActivity] = useState(false)
-  const [refreshIndex, setRefreshIndex] = useState(0)
-  const [apiBaseUrl, setApiBaseUrl] = useState(() => getApiBaseUrl())
+  const [isLoading, setIsLoading] = useState(true)
+  const [usingDemo, setUsingDemo] = useState(false)
+
+  const e2eMode = useMemo(
+    () => new URLSearchParams(window.location.search).get('e2e') === '1',
+    [],
+  )
 
   useEffect(() => {
     let cancelled = false
-
     async function run() {
-      setIsLoadingMembers(true)
+      setIsLoading(true)
       setError(null)
-      try {
-        const response = await fetchMembersIndex()
+      setUsingDemo(false)
+
+      if (e2eMode) {
         if (cancelled) return
-        setMembers(response.members)
-        setSelectedMember((prev) => {
-          if (prev && response.members.some((m) => m.bioguide_id === prev.bioguide_id)) {
-            return prev
-          }
-          return response.members[0] ?? null
-        })
+        setLedger(E2E_LEDGER)
+        setOverview(E2E_OVERVIEW)
+        setUsingDemo(true)
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const [ledgerRes, overviewRes] = await Promise.all([
+          fetchVoteLedger().catch(() => null),
+          fetchSessionOverview().catch(() => null),
+        ])
+        if (cancelled) return
+
+        if (ledgerRes && overviewRes) {
+          setLedger(ledgerRes)
+          setOverview(overviewRes)
+        } else {
+          setLedger(E2E_LEDGER)
+          setOverview(E2E_OVERVIEW)
+          setUsingDemo(true)
+        }
       } catch (e) {
         if (cancelled) return
-        if (e instanceof ApiError) {
-          setError(`${e.message} (HTTP ${e.status} ${e.statusText})`)
-        } else if (e instanceof Error) {
-          setError(e.message)
-        } else {
-          setError('Unexpected error while fetching data.')
-        }
-        setMembers([])
+        setError(normalizeErrorMessage(e))
+        setLedger(E2E_LEDGER)
+        setOverview(E2E_OVERVIEW)
+        setUsingDemo(true)
       } finally {
-        if (!cancelled) setIsLoadingMembers(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
-
     run()
-    return () => {
-      cancelled = true
-    }
-  }, [refreshIndex, apiBaseUrl])
+    return () => { cancelled = true }
+  }, [e2eMode])
 
-  useEffect(() => {
-    if (!selectedMember) {
-      setActivity(null)
-      return
-    }
+  const arcVM = useMemo(
+    () => overview ? buildAttendanceArcVM(overview) : null,
+    [overview],
+  )
 
-    const member = selectedMember
-    let cancelled = false
-    async function run() {
-      setIsLoadingActivity(true)
-      setError(null)
-      try {
-        const response = await fetchMemberLatest(member.bioguide_id)
-        if (cancelled) return
-        setActivity(response)
-      } catch (e) {
-        if (cancelled) return
-        if (e instanceof ApiError) {
-          setError(`${e.message} (HTTP ${e.status} ${e.statusText})`)
-        } else if (e instanceof Error) {
-          setError(e.message)
-        } else {
-          setError('Unexpected error while fetching data.')
-        }
-        setActivity(null)
-      } finally {
-        if (!cancelled) setIsLoadingActivity(false)
-      }
-    }
+  const matrixVM = useMemo(
+    () => ledger && overview ? buildDefectionMatrixVM(ledger, overview) : null,
+    [ledger, overview],
+  )
 
-    run()
-    return () => {
-      cancelled = true
-    }
-  }, [selectedMember, apiBaseUrl, refreshIndex])
+  const dumbbellVM = useMemo(
+    () => ledger && overview ? buildStateDumbbellVM(ledger, overview) : null,
+    [ledger, overview],
+  )
 
-  const activityItems = useMemo(() => activity?.activities ?? [], [activity])
+  const recentVM = useMemo(
+    () => ledger && overview ? buildRecentVotesVM(ledger, overview) : null,
+    [ledger, overview],
+  )
 
   return (
     <div className="page">
-      <header className="pageHeader">
-        <h1 className="pageHeader__title">Senator Daily Activity</h1>
-        <p className="pageHeader__subtitle">
-          Today and previous day activity from Congress.gov, Senate schedules, and GovInfo
-        </p>
-
-        <div className="pageHeader__actions">
-          <button
-            type="button"
-            onClick={() => setRefreshIndex((i) => i + 1)}
-            disabled={isLoadingMembers || isLoadingActivity}
-          >
-            {isLoadingMembers || isLoadingActivity ? 'Refreshing…' : 'Refresh'}
-          </button>
+      <header className="dashHeader">
+        <p className="dashHeader__eyebrow">Senate Pulse</p>
+        <h1 className="dashHeader__title">119th Congress at a glance</h1>
+        <div className="dashHeader__metaRow">
+          <span>{formatToday()}</span>
+          {overview && <span>Updated {formatTimestamp(overview.generated_at)}</span>}
+          {overview && <span>Session {overview.session}</span>}
         </div>
-
-        {activity ? (
-          <dl className="headerMeta">
-            <div className="headerMeta__row">
-              <dt className="headerMeta__label">Window</dt>
-              <dd className="headerMeta__value">
-                {formatWindowDate(activity.window.start_date)} →{' '}
-                {formatWindowDate(activity.window.end_date)}
-              </dd>
-            </div>
-            <div className="headerMeta__row">
-              <dt className="headerMeta__label">Generated at</dt>
-              <dd className="headerMeta__value">{formatGeneratedAt(activity.generated_at)}</dd>
-            </div>
-            <div className="headerMeta__row">
-              <dt className="headerMeta__label">Congress</dt>
-              <dd className="headerMeta__value">
-                {activity.congress}
-              </dd>
-            </div>
-          </dl>
-        ) : (
-          <dl className="headerMeta">
-            <div className="headerMeta__row">
-              <dt className="headerMeta__label">Resolved API base URL</dt>
-              <dd className="headerMeta__value">
-                <code>{apiBaseUrl}</code>
-              </dd>
-            </div>
-          </dl>
-        )}
       </header>
 
-      {isLoadingMembers || isLoadingActivity ? (
-        <div className="state state--loading">Loading senator activity…</div>
-      ) : null}
-
-      {error ? (
-        <div className="state state--error">
-          <strong>Error:</strong> {error}
+      {usingDemo && (
+        <div className="banner banner--demo" role="status">
+          Showing demo data &mdash; run worker ingestion to see live data.
         </div>
-      ) : null}
+      )}
 
-      {members.length > 0 ? (
-        <main className="content">
-          <section className="memberPicker">
-            <h2 className="memberPicker__title">Select a senator</h2>
-            <div className="memberPicker__controls">
-              <select
-                className="memberPicker__select"
-                value={selectedMember?.bioguide_id ?? ''}
-                onChange={(e) => {
-                  const next = members.find((m) => m.bioguide_id === e.target.value) ?? null
-                  setSelectedMember(next)
-                }}
-              >
-                {members.map((member) => (
-                  <option key={member.bioguide_id} value={member.bioguide_id}>
-                    {member.name} ({member.party}-{member.state})
-                  </option>
-                ))}
-              </select>
-              {selectedMember ? (
-                <span className="memberPicker__meta">
-                  {selectedMember.party}-{selectedMember.state} • {selectedMember.bioguide_id}
-                </span>
-              ) : null}
-            </div>
-          </section>
+      {error && (
+        <div className="banner banner--error" role="status">{error}</div>
+      )}
 
-          {activity ? (
-            <>
-              {activity.partial && activity.errors.length > 0 ? (
-                <div className="state state--warning">
-                  Some sources are unavailable (data may be incomplete):{' '}
-                  {activity.errors
-                    .map((e) => `${e.source.toUpperCase()}: ${e.message}`)
-                    .join(' | ')}
-                </div>
-              ) : null}
-
-              <section className="activitySection">
-                <h2 className="activitySection__title">Legislation actions</h2>
-                {activityItems.length === 0 ? (
-                  <div className="state">No recent sponsored or cosponsored actions.</div>
-                ) : (
-                  <div className="activityList">
-                    {activityItems.map((item, idx) => (
-                      <article className="activityCard" key={`${item.type}-${idx}`}>
-                        <div className="activityCard__header">
-                          <div className="activityCard__title">{formatBillLabel(item)}</div>
-                          <div className="activityCard__subtitle">{activitySubtitle(item)}</div>
-                        </div>
-                        {item.type === 'legislation_action' ? (
-                          <div className="activityCard__summary">{item.action_text}</div>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="activitySection">
-                <h2 className="activitySection__title">Chamber context</h2>
-                <div className="contextGrid">
-                  <div className="contextCard">
-                    <h3>Floor schedule</h3>
-                    {activity.context.floor_schedule.length === 0 ? (
-                      <p>No floor schedule items found.</p>
-                    ) : (
-                      activity.context.floor_schedule.map((item, idx) => (
-                        <div className="contextItem" key={`floor-${idx}`}>
-                          <strong>{item.title}</strong>
-                          <div>{item.time ?? 'Time TBA'}</div>
-                          {item.summary ? <div>{item.summary}</div> : null}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <div className="contextCard">
-                    <h3>Committee meetings</h3>
-                    {activity.context.committee_meetings.length === 0 ? (
-                      <p>No committee meetings found.</p>
-                    ) : (
-                      activity.context.committee_meetings.map((item, idx) => (
-                        <div className="contextItem" key={`committee-${idx}`}>
-                          <strong>{item.committee}</strong>
-                          <div>{item.title}</div>
-                          <div>{item.time ?? 'Time TBA'}</div>
-                          {item.location ? <div>{item.location}</div> : null}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <div className="contextCard">
-                    <h3>Daily digest</h3>
-                    {activity.context.daily_digest.length === 0 ? (
-                      <p>No daily digest items found.</p>
-                    ) : (
-                      activity.context.daily_digest.map((item, idx) => (
-                        <div className="contextItem" key={`digest-${idx}`}>
-                          <strong>{item.title}</strong>
-                          <div>{item.date}</div>
-                          {item.senate_section_url ? (
-                            <a href={item.senate_section_url} target="_blank" rel="noreferrer">
-                              Senate section
-                            </a>
-                          ) : item.url ? (
-                            <a href={item.url} target="_blank" rel="noreferrer">
-                              View digest
-                            </a>
-                          ) : null}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </section>
-            </>
-          ) : null}
-
-          <div className="settingsWrapper">
-            <SettingsPanel
-              apiBaseUrl={apiBaseUrl}
-              onApplied={() => {
-                // Recompute base URL (localStorage/env/default), then refetch.
-                setApiBaseUrl(getApiBaseUrl())
-                setRefreshIndex((i) => i + 1)
-              }}
-            />
-          </div>
-        </main>
+      {isLoading ? (
+        <p className="loadingLine">Loading&hellip;</p>
       ) : (
-        <div className="content">
-          <SettingsPanel
-            apiBaseUrl={apiBaseUrl}
-            onApplied={() => {
-              setApiBaseUrl(getApiBaseUrl())
-              setRefreshIndex((i) => i + 1)
-            }}
-          />
-        </div>
+        <>
+          {arcVM && arcVM.length > 0 && (
+            <section className="vizSection" aria-label="Chamber attendance">
+              <h2 className="vizSection__title">The chamber</h2>
+              <p className="vizSection__subtitle">
+                Who shows up? Solid = full attendance. Faded = missed votes. Dashed = absent all session.
+              </p>
+              <ChamberArc senators={arcVM} />
+              <div className="vizLegend">
+                <span className="vizLegend__item">
+                  <span className="vizLegend__swatch" style={{ background: '#2563eb' }} /> Democrat
+                </span>
+                <span className="vizLegend__item">
+                  <span className="vizLegend__swatch" style={{ background: '#dc2626' }} /> Republican
+                </span>
+                <span className="vizLegend__item">
+                  <span className="vizLegend__swatch" style={{ background: '#7c3aed' }} /> Independent
+                </span>
+                <span className="vizLegend__item">
+                  <span className="vizLegend__swatch" style={{ background: 'transparent', border: '1.5px dashed #a8a29e' }} /> Absent
+                </span>
+              </div>
+            </section>
+          )}
+
+          {matrixVM && matrixVM.rows.length > 0 && (
+            <section className="vizSection" aria-label="Defection matrix">
+              <h2 className="vizSection__title">Who breaks ranks?</h2>
+              <p className="vizSection__subtitle">
+                {matrixVM.rows.length} senators with 2+ defections across {matrixVM.columns.length} votes.
+                Amber = crossed party line. Similar patterns reveal coalitions.
+              </p>
+              <DefectionMatrix matrix={matrixVM} />
+            </section>
+          )}
+
+          {dumbbellVM && dumbbellVM.length > 0 && (
+            <section className="vizSection" aria-label="State delegation agreement">
+              <h2 className="vizSection__title">State delegations</h2>
+              <p className="vizSection__subtitle">
+                How often do same-state senators vote together? Sorted by agreement.
+                Dot color = party. Line length = disagreement.
+              </p>
+              <StateDumbbell pairs={dumbbellVM} />
+            </section>
+          )}
+
+          {recentVM && recentVM.length > 0 && (
+            <section className="vizSection" aria-label="Recent votes">
+              <h2 className="vizSection__title">Latest votes</h2>
+              <p className="vizSection__subtitle">
+                Most recent roll calls with named party-line crossovers.
+              </p>
+              <LatestVotes votes={recentVM} />
+            </section>
+          )}
+        </>
       )}
     </div>
   )
 }
-
-export default Home
-

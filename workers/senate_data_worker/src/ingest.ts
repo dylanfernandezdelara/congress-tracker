@@ -23,15 +23,24 @@ import {
   type VoteSummary,
   type VoteDetails,
 } from "./xml";
+import { buildBillKey, fetchBillDetailsMap } from "./congress";
 import { buildStateKeys } from "./storage";
 import type {
   IngestConfig,
   IngestResult,
+  MultiStateIngestResult,
   SnapshotJson,
   MetaJson,
   OutputVote,
   OutputMember,
   OutputCounts,
+  BillRef,
+  VoteLedger,
+  VoteLedgerEntry,
+  SessionOverview,
+  SenatorSessionStat,
+  MemberIndexJson,
+  MemberIndexEntry,
 } from "./types";
 
 // ============================================================================
@@ -46,30 +55,29 @@ const DEFAULT_FETCH_CONFIG: FetchConfig = {
   concurrency: 5,
 };
 
+interface IngestionContext {
+  success: boolean;
+  error?: string;
+  targetVoteDate: string | null;
+  cutoffDateEt: string;
+  generatedAt: string;
+  votesTotal: number;
+  partial: boolean;
+  missingVotes: number[];
+  targetVotes: VoteSummary[];
+  parsedDetails: VoteDetails[];
+  congress: number;
+  session: number;
+}
+
 // ============================================================================
 // Main Ingestion Function
 // ============================================================================
 
-/**
- * Run the full ingestion process.
- *
- * 1. Determine cutoff date (today in ET)
- * 2. Fetch vote menu XML
- * 3. Parse and extract unique vote dates
- * 4. Select target date (max date < cutoff)
- * 5. Filter votes to target date
- * 6. Fetch vote details in parallel
- * 7. Parse and filter to target state
- * 8. Build output JSON structures
- *
- * @param config - Ingestion configuration
- * @param fetchConfig - Optional fetch configuration override
- * @returns IngestResult with snapshot and meta data
- */
-export async function runIngestion(
+async function buildIngestionContext(
   config: IngestConfig,
-  fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
-): Promise<IngestResult> {
+  fetchConfig: FetchConfig
+): Promise<IngestionContext> {
   const { congress, session, targetState } = config;
   const state = targetState.trim().toUpperCase();
   const cutoffDateEt = todayEastern();
@@ -92,13 +100,14 @@ export async function runIngestion(
       success: false,
       targetVoteDate: null,
       cutoffDateEt,
+      generatedAt,
       votesTotal: 0,
-      votesWithStateMembers: 0,
-      stateMemberVotes: 0,
       partial: false,
       missingVotes: [],
-      snapshot: null,
-      meta: null,
+      targetVotes: [],
+      parsedDetails: [],
+      congress,
+      session,
       error: `Failed to fetch vote menu: ${menuResult.error}`,
     };
   }
@@ -116,13 +125,14 @@ export async function runIngestion(
       success: false,
       targetVoteDate: null,
       cutoffDateEt,
+      generatedAt,
       votesTotal: 0,
-      votesWithStateMembers: 0,
-      stateMemberVotes: 0,
       partial: false,
       missingVotes: [],
-      snapshot: null,
-      meta: null,
+      targetVotes: [],
+      parsedDetails: [],
+      congress,
+      session,
       error: "No votes found in vote menu",
     };
   }
@@ -141,13 +151,14 @@ export async function runIngestion(
       success: false,
       targetVoteDate: null,
       cutoffDateEt,
+      generatedAt,
       votesTotal: 0,
-      votesWithStateMembers: 0,
-      stateMemberVotes: 0,
       partial: false,
       missingVotes: [],
-      snapshot: null,
-      meta: null,
+      targetVotes: [],
+      parsedDetails: [],
+      congress,
+      session,
       error: `No vote dates found before cutoff ${cutoffDateEt}`,
     };
   }
@@ -166,13 +177,14 @@ export async function runIngestion(
       success: false,
       targetVoteDate,
       cutoffDateEt,
+      generatedAt,
       votesTotal: 0,
-      votesWithStateMembers: 0,
-      stateMemberVotes: 0,
       partial: false,
       missingVotes: [],
-      snapshot: null,
-      meta: null,
+      targetVotes: [],
+      parsedDetails: [],
+      congress,
+      session,
       error: `No votes found on target date ${targetVoteDate}`,
     };
   }
@@ -194,9 +206,9 @@ export async function runIngestion(
   );
 
   // -------------------------------------------------------------------------
-  // Step 6: Parse vote details and filter to state
+  // Step 6: Parse vote details
   // -------------------------------------------------------------------------
-  console.log("[ingest] Parsing vote details and filtering to state...");
+  console.log("[ingest] Parsing vote details...");
   const parsedDetails: VoteDetails[] = [];
   const missingVotes: number[] = [];
 
@@ -221,40 +233,103 @@ export async function runIngestion(
     parsedDetails.push(parsed);
   }
 
-  // -------------------------------------------------------------------------
-  // Step 7: Build output JSON
-  // -------------------------------------------------------------------------
+  const partial = missingVotes.length > 0;
+
+  return {
+    success: true,
+    targetVoteDate,
+    cutoffDateEt,
+    generatedAt,
+    votesTotal: targetVotes.length,
+    partial,
+    missingVotes,
+    targetVotes,
+    parsedDetails,
+    congress,
+    session,
+  };
+}
+
+/**
+ * Run the full ingestion process.
+ *
+ * 1. Determine cutoff date (today in ET)
+ * 2. Fetch vote menu XML
+ * 3. Parse and extract unique vote dates
+ * 4. Select target date (max date < cutoff)
+ * 5. Filter votes to target date
+ * 6. Fetch vote details in parallel
+ * 7. Parse and filter to target state
+ * 8. Build output JSON structures
+ *
+ * @param config - Ingestion configuration
+ * @param fetchConfig - Optional fetch configuration override
+ * @returns IngestResult with snapshot and meta data
+ */
+export async function runIngestion(
+  config: IngestConfig,
+  fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
+): Promise<IngestResult> {
+  const state = config.targetState.trim().toUpperCase();
+  const context = await buildIngestionContext(config, fetchConfig);
+  if (!context.success) {
+    return {
+      success: false,
+      targetVoteDate: context.targetVoteDate,
+      cutoffDateEt: context.cutoffDateEt,
+      votesTotal: context.votesTotal,
+      votesWithStateMembers: 0,
+      stateMemberVotes: 0,
+      partial: context.partial,
+      missingVotes: context.missingVotes,
+      snapshot: null,
+      meta: null,
+      error: context.error,
+    };
+  }
+
+  const billRefs = collectBillRefs(context.parsedDetails);
+  const billDetailsByKey =
+    billRefs.length > 0
+      ? await fetchBillDetailsMap(
+          billRefs,
+          config.congressApiKey,
+          fetchConfig
+        )
+      : new Map();
+
   console.log("[ingest] Building output JSON...");
   const { outputVotes, stateMemberVotes } = buildOutputVotes(
-    parsedDetails,
-    targetVotes,
-    state
+    context.parsedDetails,
+    context.targetVotes,
+    state,
+    billDetailsByKey
   );
 
-  const votesTotal = targetVotes.length;
+  const votesTotal = context.votesTotal;
   const votesWithStateMembers = outputVotes.length;
-  const partial = missingVotes.length > 0;
+  const partial = context.partial;
 
   // Build snapshot
   const snapshot: SnapshotJson = {
     state,
-    vote_date: targetVoteDate,
-    generated_at: generatedAt,
-    congress,
-    session,
+    vote_date: context.targetVoteDate ?? "",
+    generated_at: context.generatedAt,
+    congress: context.congress,
+    session: context.session,
     votes: outputVotes,
   };
 
-  const keys = buildStateKeys(state, targetVoteDate);
+  const keys = buildStateKeys(state, snapshot.vote_date);
 
   // Build meta
   const meta: MetaJson = {
     state,
-    congress,
-    session,
-    generated_at: generatedAt,
-    cutoff_date_et: cutoffDateEt,
-    target_vote_date: targetVoteDate,
+    congress: context.congress,
+    session: context.session,
+    generated_at: context.generatedAt,
+    cutoff_date_et: context.cutoffDateEt,
+    target_vote_date: snapshot.vote_date,
     keys: {
       latest: keys.latest,
       snapshot: keys.snapshot,
@@ -265,30 +340,117 @@ export async function runIngestion(
       state_member_votes: stateMemberVotes,
     },
     partial,
-    missing_votes: missingVotes,
+    missing_votes: context.missingVotes,
   };
 
   console.log(`[ingest] Ingestion complete:`);
-  console.log(`  - Target vote date: ${targetVoteDate}`);
+  console.log(`  - Target vote date: ${snapshot.vote_date}`);
   console.log(`  - Votes total: ${votesTotal}`);
-  console.log(`  - Votes with ${targetState} members: ${votesWithStateMembers}`);
+  console.log(`  - Votes with ${state} members: ${votesWithStateMembers}`);
   console.log(`  - State member votes: ${stateMemberVotes}`);
   console.log(`  - Partial: ${partial}`);
   if (partial) {
-    console.log(`  - Missing votes: ${missingVotes.join(", ")}`);
+    console.log(`  - Missing votes: ${context.missingVotes.join(", ")}`);
   }
 
   return {
     success: true,
-    targetVoteDate,
-    cutoffDateEt,
+    targetVoteDate: snapshot.vote_date,
+    cutoffDateEt: context.cutoffDateEt,
     votesTotal,
     votesWithStateMembers,
     stateMemberVotes,
     partial,
-    missingVotes,
+    missingVotes: context.missingVotes,
     snapshot,
     meta,
+  };
+}
+
+export async function runIngestionAllStates(
+  config: IngestConfig,
+  states: string[],
+  fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
+): Promise<MultiStateIngestResult> {
+  const context = await buildIngestionContext(config, fetchConfig);
+  if (!context.success) {
+    return {
+      success: false,
+      targetVoteDate: context.targetVoteDate,
+      cutoffDateEt: context.cutoffDateEt,
+      votesTotal: context.votesTotal,
+      partial: context.partial,
+      missingVotes: context.missingVotes,
+      generatedAt: context.generatedAt,
+      perState: {},
+      error: context.error,
+    };
+  }
+
+  const billRefs = collectBillRefs(context.parsedDetails);
+  const billDetailsByKey =
+    billRefs.length > 0
+      ? await fetchBillDetailsMap(
+          billRefs,
+          config.congressApiKey,
+          fetchConfig
+        )
+      : new Map();
+
+  const perState: MultiStateIngestResult["perState"] = {};
+  for (const state of states) {
+    const normalized = state.trim().toUpperCase();
+    const { outputVotes, stateMemberVotes } = buildOutputVotes(
+      context.parsedDetails,
+      context.targetVotes,
+      normalized,
+      billDetailsByKey
+    );
+    const snapshot: SnapshotJson = {
+      state: normalized,
+      vote_date: context.targetVoteDate ?? "",
+      generated_at: context.generatedAt,
+      congress: context.congress,
+      session: context.session,
+      votes: outputVotes,
+    };
+    const keys = buildStateKeys(normalized, snapshot.vote_date);
+    const meta: MetaJson = {
+      state: normalized,
+      congress: context.congress,
+      session: context.session,
+      generated_at: context.generatedAt,
+      cutoff_date_et: context.cutoffDateEt,
+      target_vote_date: snapshot.vote_date,
+      keys: {
+        latest: keys.latest,
+        snapshot: keys.snapshot,
+      },
+      stats: {
+        votes_total: context.votesTotal,
+        votes_with_state_members: outputVotes.length,
+        state_member_votes: stateMemberVotes,
+      },
+      partial: context.partial,
+      missing_votes: context.missingVotes,
+    };
+    perState[normalized] = {
+      snapshot,
+      meta,
+      votesWithStateMembers: outputVotes.length,
+      stateMemberVotes,
+    };
+  }
+
+  return {
+    success: true,
+    targetVoteDate: context.targetVoteDate,
+    cutoffDateEt: context.cutoffDateEt,
+    votesTotal: context.votesTotal,
+    partial: context.partial,
+    missingVotes: context.missingVotes,
+    generatedAt: context.generatedAt,
+    perState,
   };
 }
 
@@ -307,7 +469,8 @@ export async function runIngestion(
 function buildOutputVotes(
   details: VoteDetails[],
   summaries: VoteSummary[],
-  targetState: string
+  targetState: string,
+  billDetailsByKey: Map<string, BillRef> = new Map()
 ): { outputVotes: OutputVote[]; stateMemberVotes: number } {
   const summaryMap = new Map(summaries.map((s) => [s.vote_number, s]));
   const outputVotes: OutputVote[] = [];
@@ -360,6 +523,15 @@ function buildOutputVotes(
     const issue = extractIssue(detail);
     if (issue) {
       outputVote.issue = issue;
+      const issueRef = parseIssueRef(issue, detail.congress);
+      outputVote.issue_type = issueRef.issue_type;
+      if (issueRef.bill) {
+        const billKey = buildBillKey(issueRef.bill);
+        const billDetails = billDetailsByKey.get(billKey);
+        outputVote.bill = billDetails
+          ? { ...issueRef.bill, ...billDetails }
+          : issueRef.bill;
+      }
     }
 
     outputVotes.push(outputVote);
@@ -377,7 +549,7 @@ function buildOutputVotes(
  * Looks for patterns like "S. 1234", "H.R. 5678", "PN123" in title/question.
  */
 function extractIssue(detail: VoteDetails): string | undefined {
-  const text = `${detail.vote_title} ${detail.vote_question}`;
+  const text = `${detail.vote_document ?? ""} ${detail.vote_title} ${detail.vote_question}`;
 
   // Match common bill/document patterns
   const patterns = [
@@ -404,9 +576,343 @@ function extractIssue(detail: VoteDetails): string | undefined {
   return undefined;
 }
 
+type IssueType = "bill" | "nomination" | "treaty" | "other";
+
+function parseIssueRef(issue: string, congress: number): {
+  issue_type: IssueType;
+  bill?: BillRef;
+} {
+  const trimmed = issue.trim();
+  if (!trimmed) return { issue_type: "other" };
+
+  const nominationMatch = trimmed.match(/PN\s*(\d+)/i);
+  if (nominationMatch) {
+    return { issue_type: "nomination" };
+  }
+
+  const treatyMatch = trimmed.match(/Treaty Doc\.\s*(\d+)-(\d+)/i);
+  if (treatyMatch) {
+    return { issue_type: "treaty" };
+  }
+
+  const billPatterns: Array<{ pattern: RegExp; type: string }> = [
+    { pattern: /^H\.\s*Con\.\s*Res\./i, type: "H. Con. Res." },
+    { pattern: /^S\.\s*Con\.\s*Res\./i, type: "S. Con. Res." },
+    { pattern: /^H\.\s*J\.\s*Res\./i, type: "H. J. Res." },
+    { pattern: /^S\.\s*J\.\s*Res\./i, type: "S. J. Res." },
+    { pattern: /^H\.\s*Res\./i, type: "H. Res." },
+    { pattern: /^S\.\s*Res\./i, type: "S. Res." },
+    { pattern: /^H\.R\./i, type: "H.R." },
+    { pattern: /^S\./i, type: "S." },
+  ];
+
+  for (const entry of billPatterns) {
+    if (entry.pattern.test(trimmed)) {
+      const numberMatch = trimmed.match(/(\d+)/);
+      if (!numberMatch) break;
+      const number = numberMatch[1];
+      return {
+        issue_type: "bill",
+        bill: {
+          congress,
+          type: entry.type,
+          number,
+        },
+      };
+    }
+  }
+
+  return { issue_type: "other" };
+}
+
+function collectBillRefs(details: VoteDetails[]): BillRef[] {
+  const refs: BillRef[] = [];
+  for (const detail of details) {
+    const issue = extractIssue(detail);
+    if (!issue) continue;
+    const parsed = parseIssueRef(issue, detail.congress);
+    if (parsed.bill) {
+      refs.push(parsed.bill);
+    }
+  }
+  return refs;
+}
+
+// ============================================================================
+// Vote Ledger Building
+// ============================================================================
+
+function buildMemberLookup(
+  members: MemberIndexEntry[]
+): Map<string, MemberIndexEntry[]> {
+  const byState = new Map<string, MemberIndexEntry[]>();
+  for (const m of members) {
+    const state = m.state.toUpperCase();
+    const list = byState.get(state) ?? [];
+    list.push(m);
+    byState.set(state, list);
+  }
+  return byState;
+}
+
+function extractLastName(raw: string): string {
+  const withoutParens = raw.replace(/\s*\(.*\)\s*$/, "").trim();
+  if (withoutParens.includes(",")) {
+    return withoutParens.split(",")[0].trim().toLowerCase();
+  }
+  const parts = withoutParens.split(/\s+/);
+  return (parts[parts.length - 1] ?? withoutParens).toLowerCase();
+}
+
+function extractFirstInitial(raw: string): string | undefined {
+  const withoutParens = raw.replace(/\s*\(.*\)\s*$/, "").trim();
+  if (withoutParens.includes(",")) {
+    const rest = withoutParens.split(",")[1]?.trim();
+    return rest ? rest[0]?.toLowerCase() : undefined;
+  }
+  return withoutParens.split(/\s+/)[0]?.[0]?.toLowerCase();
+}
+
+function resolveBioguideId(
+  memberFull: string,
+  state: string,
+  membersByState: Map<string, MemberIndexEntry[]>
+): string | null {
+  const candidates = membersByState.get(state.toUpperCase()) ?? [];
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0].bioguide_id;
+
+  const lastName = extractLastName(memberFull);
+  const lastMatch = candidates.filter(
+    (m) => extractLastName(m.name) === lastName
+  );
+  if (lastMatch.length === 1) return lastMatch[0].bioguide_id;
+
+  if (lastMatch.length > 1) {
+    const initial = extractFirstInitial(memberFull);
+    if (initial) {
+      const firstMatch = lastMatch.filter(
+        (m) => extractFirstInitial(m.name) === initial
+      );
+      if (firstMatch.length >= 1) return firstMatch[0].bioguide_id;
+    }
+    return lastMatch[0].bioguide_id;
+  }
+
+  return candidates[0].bioguide_id;
+}
+
+function buildLedgerEntry(
+  detail: VoteDetails,
+  summary: VoteSummary | undefined,
+  membersByState: Map<string, MemberIndexEntry[]>
+): VoteLedgerEntry {
+  const memberVotes: Record<string, string> = {};
+  for (const mv of detail.member_votes) {
+    const bioguide = resolveBioguideId(mv.member_full, mv.state, membersByState);
+    if (bioguide) {
+      memberVotes[bioguide] = mv.vote_cast;
+    }
+  }
+
+  return {
+    vote_number: detail.vote_number,
+    vote_date: detail.vote_date,
+    title: detail.vote_title || summary?.title || "Unknown Vote",
+    question: detail.vote_question || "",
+    result: detail.vote_result || summary?.result || "",
+    issue: extractIssue(detail) ?? undefined,
+    member_votes: memberVotes,
+  };
+}
+
+function computePartyMajority(
+  entry: VoteLedgerEntry,
+  partyByBioguide: Map<string, string>
+): Map<string, string> {
+  const partyTally = new Map<string, { yea: number; nay: number }>();
+  for (const [bioguide, cast] of Object.entries(entry.member_votes)) {
+    const party = partyByBioguide.get(bioguide);
+    if (!party) continue;
+    const normalized = cast.toLowerCase();
+    const isYea = normalized.includes("yea") || normalized.includes("aye") || normalized === "yes";
+    const isNay = normalized.includes("nay") || normalized === "no";
+    if (!isYea && !isNay) continue;
+    const tally = partyTally.get(party) ?? { yea: 0, nay: 0 };
+    if (isYea) tally.yea++;
+    if (isNay) tally.nay++;
+    partyTally.set(party, tally);
+  }
+  const result = new Map<string, string>();
+  for (const [party, tally] of partyTally) {
+    result.set(party, tally.yea >= tally.nay ? "Yea" : "Nay");
+  }
+  return result;
+}
+
+function computeSessionOverview(
+  ledger: VoteLedger,
+  membersIndex: MemberIndexJson
+): SessionOverview {
+  const partyByBioguide = new Map<string, string>();
+  for (const m of membersIndex.members) {
+    partyByBioguide.set(m.bioguide_id, m.party);
+  }
+
+  const stats = new Map<string, {
+    member: MemberIndexEntry;
+    cast: number;
+    missed: number;
+    defections: number;
+    withMajority: number;
+    aligned: number;
+  }>();
+  for (const m of membersIndex.members) {
+    stats.set(m.bioguide_id, {
+      member: m,
+      cast: 0, missed: 0, defections: 0, withMajority: 0, aligned: 0,
+    });
+  }
+
+  let totalDefections = 0;
+  let latestVoteDate = "";
+
+  for (const entry of ledger.entries) {
+    if (entry.vote_date > latestVoteDate) latestVoteDate = entry.vote_date;
+    const partyMajority = computePartyMajority(entry, partyByBioguide);
+
+    for (const m of membersIndex.members) {
+      const stat = stats.get(m.bioguide_id)!;
+      const voteCast = entry.member_votes[m.bioguide_id];
+      if (!voteCast || voteCast.toLowerCase().includes("not voting")) {
+        stat.missed++;
+        continue;
+      }
+      stat.cast++;
+
+      const majority = partyMajority.get(m.party);
+      if (majority) {
+        stat.withMajority++;
+        const normalizedCast = voteCast.toLowerCase();
+        const castIsYea = normalizedCast.includes("yea") || normalizedCast.includes("aye") || normalizedCast === "yes";
+        const majorityIsYea = majority === "Yea";
+        if (castIsYea === majorityIsYea) {
+          stat.aligned++;
+        } else {
+          stat.defections++;
+          totalDefections++;
+        }
+      }
+    }
+  }
+
+  const senators: SenatorSessionStat[] = [];
+  for (const [bioguide, s] of stats) {
+    senators.push({
+      bioguide_id: bioguide,
+      name: s.member.name,
+      party: s.member.party,
+      state: s.member.state,
+      votes_cast: s.cast,
+      votes_missed: s.missed,
+      party_defections: s.defections,
+      alignment_pct: s.withMajority > 0
+        ? Math.round((s.aligned / s.withMajority) * 100)
+        : 100,
+    });
+  }
+
+  return {
+    congress: ledger.congress,
+    session: ledger.session,
+    generated_at: new Date().toISOString(),
+    total_votes: ledger.total_votes,
+    latest_vote_date: latestVoteDate,
+    total_defections: totalDefections,
+    senators,
+  };
+}
+
+/**
+ * Build or update the vote ledger incrementally.
+ *
+ * Fetches vote details for any votes not already in the existing ledger,
+ * merges them in, and computes session overview stats.
+ */
+export async function buildVoteLedgerUpdate(
+  config: IngestConfig,
+  membersIndex: MemberIndexJson,
+  existingLedger: VoteLedger | null,
+  fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
+): Promise<{ ledger: VoteLedger; overview: SessionOverview }> {
+  const { congress, session } = config;
+
+  console.log("[ledger] Fetching vote menu for ledger update...");
+  const menuResult = await fetchVoteMenu(congress, session, fetchConfig);
+  if (!menuResult.success || !menuResult.data) {
+    console.warn(`[ledger] Failed to fetch vote menu: ${menuResult.error}`);
+    const empty: VoteLedger = existingLedger ?? {
+      congress, session, generated_at: new Date().toISOString(),
+      total_votes: 0, entries: [],
+    };
+    return { ledger: empty, overview: computeSessionOverview(empty, membersIndex) };
+  }
+
+  const allMenuVotes = parseVoteMenuXml(menuResult.data);
+  const cutoff = todayEastern();
+  const eligibleVotes = allMenuVotes.filter((v) => v.vote_date < cutoff);
+
+  console.log(`[ledger] Menu has ${allMenuVotes.length} votes, ${eligibleVotes.length} before cutoff`);
+
+  const existingNumbers = new Set(
+    (existingLedger?.entries ?? []).map((e) => e.vote_number)
+  );
+  const missingVotes = eligibleVotes.filter((v) => !existingNumbers.has(v.vote_number));
+
+  console.log(`[ledger] Existing ledger has ${existingNumbers.size} entries, ${missingVotes.length} new`);
+
+  let newDetails: VoteDetails[] = [];
+  if (missingVotes.length > 0) {
+    const voteNumbers = missingVotes.map((v) => v.vote_number);
+    console.log(`[ledger] Fetching ${voteNumbers.length} vote details...`);
+    const results = await fetchVoteDetailsParallel(voteNumbers, congress, session, fetchConfig);
+    console.log(`[ledger] Fetched: ${results.successCount} success, ${results.failureCount} failed`);
+
+    for (const voteNum of voteNumbers) {
+      const fr = results.results.get(voteNum);
+      if (!fr?.success || !fr.data) continue;
+      const parsed = parseVoteDetailXml(fr.data, congress, session);
+      if (parsed) newDetails.push(parsed);
+    }
+  }
+
+  const membersByState = buildMemberLookup(membersIndex.members);
+  const summaryMap = new Map(eligibleVotes.map((v) => [v.vote_number, v]));
+
+  const newEntries = newDetails.map((detail) =>
+    buildLedgerEntry(detail, summaryMap.get(detail.vote_number), membersByState)
+  );
+
+  const allEntries = [...(existingLedger?.entries ?? []), ...newEntries]
+    .sort((a, b) => b.vote_number - a.vote_number);
+
+  const ledger: VoteLedger = {
+    congress,
+    session,
+    generated_at: new Date().toISOString(),
+    total_votes: allEntries.length,
+    entries: allEntries,
+  };
+
+  const overview = computeSessionOverview(ledger, membersIndex);
+
+  console.log(`[ledger] Ledger updated: ${ledger.total_votes} total votes, ${overview.total_defections} total defections`);
+
+  return { ledger, overview };
+}
+
 // ============================================================================
 // Exports for Testing
 // ============================================================================
 
-export { buildOutputVotes, extractIssue };
-
+export { buildOutputVotes, extractIssue, parseIssueRef };

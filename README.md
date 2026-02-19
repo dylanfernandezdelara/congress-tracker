@@ -41,8 +41,8 @@ Edit `workers/senate_data_worker/wrangler.toml` to set environment variables:
 ```toml
 [vars]
 CONGRESS = "119"        # Current Congress number
-SESSION = "1"           # Session number (1 or 2)
-TARGET_STATE = "NY"     # Two-letter state code (uppercase)
+SESSION = "2"           # Session number (1 or 2)
+TARGET_STATE = "ALL"    # "ALL" or two-letter state code (uppercase)
 ```
 
 **API keys (required)**:
@@ -111,6 +111,24 @@ curl http://localhost:8787/state/NY/2025-12-18.json
 curl http://localhost:8787/state/NY/_meta.json
 ```
 
+### Local UI Automation (optional)
+
+To run the worker + web app together and generate screenshots for quick iteration:
+
+```bash
+# Terminal 1: start both services
+./scripts/dev-all.sh
+
+# Terminal 2: trigger a refresh + take a screenshot
+./scripts/loop.sh
+```
+
+Notes:
+- Screenshots are written to `web/artifacts/` by default.
+- Use deterministic UI data with `E2E=1` (default in `scripts/loop.sh`).
+- Override ports/hosts via `WEB_PORT`, `WEB_HOST`, `WORKER_PORT`, `WORKER_HOST`.
+- Take multiple screenshots with `PATHS=/,/about ./scripts/loop.sh`.
+
 **Note**: Local dev uses a local R2 emulation by default. For testing against a real R2 bucket, use:
 
 ```bash
@@ -124,6 +142,16 @@ To test the cron-triggered ingestion locally:
 ```bash
 cd workers/senate_data_worker
 npm run test-scheduled
+```
+
+Or use the helper scripts:
+
+```bash
+# Start wrangler dev and trigger scheduled ingestion (auto waits for completion)
+workers/senate_data_worker/scripts/run-ingest-local.sh
+
+# Trigger an already-running local worker
+scripts/refresh-data.sh
 ```
 
 This simulates the scheduled handler and will:
@@ -187,19 +215,15 @@ After deployment, check:
 
 ### Environment Variables (Production)
 
-If you need to override variables for production:
+Set API keys as Worker secrets, and keep non-secret runtime values in `wrangler.toml`:
 
 ```bash
-# Set secrets (if needed)
-npx wrangler secret put CONGRESS
-npx wrangler secret put SESSION
-npx wrangler secret put TARGET_STATE
-
-# Or use wrangler.toml environments:
-# [env.production.vars]
-# CONGRESS = "119"
-# ...
+# Required secrets
+npx wrangler secret put CONGRESS_API_KEY
+npx wrangler secret put GOVINFO_API_KEY
 ```
+
+`CONGRESS`, `SESSION`, and `TARGET_STATE` should be configured under `[vars]` in `wrangler.toml`.
 
 ## HTTP API Endpoints
 
@@ -264,6 +288,10 @@ All endpoints return consistent error format:
 ### `GET /members/index.json`
 
 Returns the current list of Senators (for UI selection).
+
+### `GET /activities/index.json`
+
+Returns the aggregated activity index for the current window, including deterministic featured senator ranking (`featured_senators`) used by the home dashboard.
 
 ### `GET /member/{bioguide}/latest.json`
 
@@ -434,4 +462,3 @@ daily_senate_update/
 ## License
 
 [Add your license here]
-

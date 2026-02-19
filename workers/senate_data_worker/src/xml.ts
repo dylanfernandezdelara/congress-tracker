@@ -56,6 +56,7 @@ export interface VoteDetails {
   vote_date: string; // YYYY-MM-DD
   vote_title: string;
   vote_question: string;
+  vote_document?: string;
   vote_result: string;
   counts: VoteCounts;
   member_votes: MemberVote[];
@@ -81,6 +82,24 @@ const parserOptions = {
  */
 function createParser(): XMLParser {
   return new XMLParser(parserOptions);
+}
+
+function safeParseXml<T>(xml: string, source: string): T | null {
+  if (!xml || !xml.trim()) {
+    console.warn(`[xml] Empty XML payload for ${source}`);
+    return null;
+  }
+  try {
+    const parser = createParser();
+    return parser.parse(xml) as T;
+  } catch (error) {
+    console.error(
+      `[xml] Failed to parse ${source}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
 }
 
 // ============================================================================
@@ -166,8 +185,8 @@ interface RawVoteMenu {
  * - Title fallbacks (vote_title -> title -> question + issue)
  */
 export function parseVoteMenuXml(xml: string): VoteSummary[] {
-  const parser = createParser();
-  const parsed = parser.parse(xml) as RawVoteMenu;
+  const parsed = safeParseXml<RawVoteMenu>(xml, "vote_menu.xml");
+  if (!parsed) return [];
 
   const summary = parsed.vote_summary;
   if (!summary) return [];
@@ -315,8 +334,8 @@ export function parseVoteDetailXml(
   defaultCongress: number,
   defaultSession: number
 ): VoteDetails | null {
-  const parser = createParser();
-  const parsed = parser.parse(xml) as RawVoteDetail;
+  const parsed = safeParseXml<RawVoteDetail>(xml, "vote_detail.xml");
+  if (!parsed) return null;
 
   const vote = parsed.roll_call_vote;
   if (!vote) return null;
@@ -370,6 +389,7 @@ export function parseVoteDetailXml(
     vote_date: voteDate,
     vote_title: voteTitle,
     vote_question: question,
+    vote_document: document || undefined,
     vote_result: result,
     counts,
     member_votes: memberVotes,
@@ -462,4 +482,3 @@ export function getUniqueDates(votes: VoteSummary[]): string[] {
   const dates = new Set(votes.map((v) => v.vote_date));
   return Array.from(dates).sort();
 }
-

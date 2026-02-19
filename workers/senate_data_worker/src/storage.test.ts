@@ -98,5 +98,27 @@ describe("readJsonFromR2", () => {
     const missing = await readJsonFromR2(bucket, "missing");
     expect(missing).toBeNull();
   });
+
+  it("returns null for invalid JSON payload", async () => {
+    const bucket = {
+      get: vi.fn(async () => ({
+        text: async () => "{broken-json",
+      })),
+    } as unknown as R2Bucket;
+
+    const parsed = await readJsonFromR2(bucket, "invalid");
+    expect(parsed).toBeNull();
+  });
+
+  it("returns null for empty JSON payload", async () => {
+    const bucket = {
+      get: vi.fn(async () => ({
+        text: async () => "   ",
+      })),
+    } as unknown as R2Bucket;
+
+    const parsed = await readJsonFromR2(bucket, "empty");
+    expect(parsed).toBeNull();
+  });
 });
 

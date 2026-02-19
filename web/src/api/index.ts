@@ -12,19 +12,40 @@
 
 // Types
 export type {
+  ActivityIndexEntry,
+  ActivityIndexResponse,
   ActivityItem,
   ActivitySource,
   ActivityType,
   BillRef,
   CommitteeMeetingItem,
+  CongressCommitteeMeetingItem,
   DailyDigestItem,
+  FeaturedSenatorEntry,
   FloorScheduleItem,
+  GovInfoCrecGranuleHighlightItem,
+  InsightEvidence,
   LegislationActionItem,
+  MemberDeterministicSummary,
+  MemberInsight,
+  MemberInsightKind,
   MemberActivityContext,
   MemberActivityResponse,
   MemberIndexEntry,
   MemberIndexResponse,
+  OutputMemberVote,
+  OutputVote,
+  OutputVoteCounts,
+  HealthResponse,
+  RollCallVoteItem,
+  SenateRecordArticleItem,
+  SenatorSessionStat,
+  SessionOverview,
   SourceError,
+  StateMetaResponse,
+  StateVotesResponse,
+  VoteLedger,
+  VoteLedgerEntry,
 } from './types';
 
 // Config helpers
@@ -35,4 +56,15 @@ export {
 } from './config';
 
 // API client
-export { ApiError, fetchMemberLatest, fetchMembersIndex } from './client';
+export {
+  ApiError,
+  fetchActivitiesIndex,
+  fetchMemberLatest,
+  fetchMembersIndex,
+  fetchHealth,
+  fetchSessionOverview,
+  fetchStateLatest,
+  fetchStateMeta,
+  fetchStateSnapshot,
+  fetchVoteLedger,
+} from './client';

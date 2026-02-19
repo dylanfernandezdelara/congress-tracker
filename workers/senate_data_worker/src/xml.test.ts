@@ -225,6 +225,11 @@ describe("parseVoteMenuXml", () => {
     expect(votes).toEqual([]);
   });
 
+  it("returns empty array for malformed XML", () => {
+    const votes = parseVoteMenuXml("<vote_summary><votes><vote></vote>");
+    expect(votes).toEqual([]);
+  });
+
   it("skips votes with missing vote_number", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
       <vote_summary>
@@ -624,6 +629,15 @@ describe("parseVoteDetailXml", () => {
 
     const details = parseVoteDetailXml(xml, defaultCongress, defaultSession);
 
+    expect(details).toBeNull();
+  });
+
+  it("returns null for malformed XML", () => {
+    const details = parseVoteDetailXml(
+      "<roll_call_vote><vote_number>1</vote_number>",
+      defaultCongress,
+      defaultSession
+    );
     expect(details).toBeNull();
   });
 

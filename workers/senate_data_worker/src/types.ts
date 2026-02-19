@@ -168,6 +168,9 @@ export interface RollCallVoteItem {
   question?: string;
   result?: string;
   vote_cast: string;
+  party?: string;
+  party_majority_vote?: string;
+  against_party_majority?: boolean;
   bill?: BillRef;
   url?: string;
   activity_id?: string;
@@ -213,6 +216,94 @@ export interface DailyDigestItem {
   topics?: string[];
 }
 
+export interface CongressCommitteeMeetingItem {
+  source: "congress";
+  event_id: string;
+  congress: number;
+  chamber: "Senate";
+  date: string; // YYYY-MM-DD
+  time?: string;
+  title: string;
+  meeting_status?: string;
+  meeting_type?: string;
+  committees: Array<{
+    name: string;
+    system_code?: string;
+    url?: string;
+  }>;
+  location?: string;
+  url?: string;
+  related_bills: BillRef[];
+  nomination_signals: string[];
+  meeting_documents: Array<{
+    document_type: string;
+    description?: string;
+    name?: string;
+    url?: string;
+    format?: string;
+  }>;
+}
+
+export interface SenateRecordArticleItem {
+  source: "congress";
+  issue_date: string; // YYYY-MM-DD
+  volume_number: number;
+  issue_number: string;
+  section_name: string;
+  title: string;
+  start_page?: string;
+  end_page?: string;
+  formatted_text_url?: string;
+  pdf_url?: string;
+}
+
+export interface GovInfoCrecGranuleHighlightItem {
+  source: "govinfo";
+  package_id: string;
+  granule_id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  granule_class?: string;
+  sub_granule_class?: string;
+  member_bioguide_ids?: string[];
+  member_names?: string[];
+  committee_names?: string[];
+  text_url?: string;
+  pdf_url?: string;
+}
+
+export interface InsightEvidence {
+  source: ActivitySource;
+  label: string;
+  date?: string;
+  url?: string;
+  vote_number?: number;
+  bill?: BillRef;
+}
+
+export type MemberInsightKind =
+  | "party_defection"
+  | "upcoming_focus"
+  | "recent_session"
+  | "topic_focus";
+
+export interface MemberInsight {
+  id: string;
+  kind: MemberInsightKind;
+  title: string;
+  detail: string;
+  score: number;
+  evidence: InsightEvidence[];
+}
+
+export interface MemberDeterministicSummary {
+  featured_score: number;
+  featured_reasons: string[];
+  latest_activity_date?: string;
+  deterministic_points: string[];
+  insights: MemberInsight[];
+}
+
 export type ActivityItem =
   | LegislationActionItem
   | RollCallVoteItem
@@ -224,6 +315,9 @@ export interface MemberActivityContext {
   floor_schedule: FloorScheduleItem[];
   committee_meetings: CommitteeMeetingItem[];
   daily_digest: DailyDigestItem[];
+  committee_meetings_congress?: CongressCommitteeMeetingItem[];
+  senate_record_articles?: SenateRecordArticleItem[];
+  senate_granule_highlights?: GovInfoCrecGranuleHighlightItem[];
 }
 
 export interface SourceError {
@@ -238,8 +332,16 @@ export interface MemberActivityJson {
   window: ActivityWindow;
   activities: ActivityItem[];
   context: MemberActivityContext;
+  summary?: MemberDeterministicSummary;
   partial: boolean;
   errors: SourceError[];
+}
+
+export interface FeaturedSenatorEntry {
+  bioguide_id: string;
+  score: number;
+  reasons: string[];
+  latest_activity_date?: string;
 }
 
 export interface ActivityIndexEntry {
@@ -257,6 +359,51 @@ export interface ActivityIndexJson {
   generated_at: string;
   window: ActivityWindow;
   activities: ActivityIndexEntry[];
+  featured_senators?: FeaturedSenatorEntry[];
+}
+
+// ============================================================================
+// Vote Ledger & Session Overview (chamber-wide)
+// ============================================================================
+
+export interface VoteLedgerEntry {
+  vote_number: number;
+  vote_date: string;
+  title: string;
+  question: string;
+  result: string;
+  issue?: string;
+  policy_area?: string;
+  member_votes: Record<string, string>; // bioguide_id -> "Yea"|"Nay"|"Present"|"Not Voting"
+}
+
+export interface VoteLedger {
+  congress: number;
+  session: number;
+  generated_at: string;
+  total_votes: number;
+  entries: VoteLedgerEntry[];
+}
+
+export interface SenatorSessionStat {
+  bioguide_id: string;
+  name: string;
+  party: string;
+  state: string;
+  votes_cast: number;
+  votes_missed: number;
+  party_defections: number;
+  alignment_pct: number; // 0-100
+}
+
+export interface SessionOverview {
+  congress: number;
+  session: number;
+  generated_at: string;
+  total_votes: number;
+  latest_vote_date: string;
+  total_defections: number;
+  senators: SenatorSessionStat[];
 }
 
 // ============================================================================
