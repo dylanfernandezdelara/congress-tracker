@@ -1,9 +1,12 @@
 import type {
   ActivityIndexResponse,
+  AnalysisQuality,
   AmountEvidence,
+  BenefitMapEntry,
   BillAnalysis,
   BillImpactEvidence,
   BillRef,
+  PartyPositionAnalysis,
   RecipientEvidence,
   SessionOverview,
   VoteLedger,
@@ -476,6 +479,7 @@ export interface BillTimelineVM {
   whatHappensNext: string
   careScore: number
   finalStatus: FinalStatus
+  rawAnalysis: BillAnalysis | null
 }
 
 function classifyQuestion(question: string): StepType {
@@ -1029,6 +1033,7 @@ export function buildBillTimelineVM(
       whatHappensNext,
       careScore,
       finalStatus,
+      rawAnalysis: analysis ?? null,
     })
   }
 
@@ -1087,7 +1092,7 @@ export interface ActionCardVM {
   outcome: string
   context: string
   status: 'passed' | 'rejected' | 'in-progress'
-  voteLine: { label: string; yea: number; nay: number; date: string; leadParty: { abbr: string; color: string } | null }
+  voteLine: { label: string; yea: number; nay: number; date: string; leadParty: { abbr: string; color: string; outcome: string } | null }
   isCloseVote: boolean
   swingSenators: ActionCardSwingSenator[]
 }
@@ -1136,7 +1141,7 @@ function pickDecisiveStep(steps: TimelineStep[]): TimelineStep {
   return steps[steps.length - 1]
 }
 
-function computeLeadParty(step: TimelineStep): { abbr: string; color: string } | null {
+function computeLeadParty(step: TimelineStep): { abbr: string; color: string; outcome: string } | null {
   const winningSide: 'yea' | 'nay' = step.passed ? 'yea' : 'nay'
   let bestParty: string | null = null
   let bestCount = 0
@@ -1148,7 +1153,10 @@ function computeLeadParty(step: TimelineStep): { abbr: string; color: string } |
     }
   }
   if (!bestParty) return null
-  return { abbr: bestParty, color: partyColor(bestParty) }
+  const outcome = step.passed
+    ? step.type === 'confirmation' ? 'confirmation' : 'passage'
+    : 'rejection'
+  return { abbr: bestParty, color: partyColor(bestParty), outcome }
 }
 
 export function toActionCards(bills: BillTimelineVM[], swingIndex: SwingFrequencyIndex): ActionCardVM[] {
@@ -1180,6 +1188,193 @@ export function toActionCards(bills: BillTimelineVM[], swingIndex: SwingFrequenc
       swingSenators,
     }
   })
+}
+
+// ---------------------------------------------------------------------------
+// 8c. InsightCardVM -- party insight feed projection
+// ---------------------------------------------------------------------------
+
+export interface InsightPartyPosition {
+  party: string
+  partyLabel: string
+  color: string
+  stance: 'support' | 'oppose' | 'mixed'
+  stanceLabel: string
+  evidencePoints: string[]
+  inferredRationale: string[]
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface InsightBeneficiary {
+  group: string
+  effect: 'benefit' | 'burden' | 'mixed'
+  effectLabel: string
+}
+
+export interface InsightCardVM {
+  id: string
+  category: string
+  billCode: string | null
+  title: string
+  status: 'passed' | 'rejected' | 'in-progress'
+  statusLabel: string
+  outcome: string
+  context: string
+  stepType: string
+  voteTally: { yea: number; nay: number; label: string; date: string }
+  partyPositions: InsightPartyPosition[]
+  beneficiaries: InsightBeneficiary[]
+  analysisQuality: AnalysisQuality | null
+  hasInference: boolean
+  isCloseVote: boolean
+  crossoverSenators: ActionCardSwingSenator[]
+}
+
+const STANCE_LABELS: Record<string, string> = {
+  support: 'Supported',
+  oppose: 'Opposed',
+  mixed: 'Split',
+}
+
+const EFFECT_LABELS: Record<string, string> = {
+  benefit: 'Benefits',
+  burden: 'Burdened',
+  mixed: 'Mixed impact',
+}
+
+const PARTY_LABEL_MAP: Record<string, string> = {
+  D: 'Democrats',
+  R: 'Republicans',
+  I: 'Independents',
+}
+
+function derivePartyPositionsFromVote(step: TimelineStep): InsightPartyPosition[] {
+  const positions: InsightPartyPosition[] = []
+  for (const [party, tally] of Object.entries(step.partyBreakdown)) {
+    const total = tally.yea + tally.nay
+    if (total === 0) continue
+    const yeaPct = tally.yea / total
+    let stance: 'support' | 'oppose' | 'mixed'
+    if (yeaPct >= 0.7) stance = step.passed ? 'support' : 'oppose'
+    else if (yeaPct <= 0.3) stance = step.passed ? 'oppose' : 'support'
+    else stance = 'mixed'
+    positions.push({
+      party,
+      partyLabel: PARTY_LABEL_MAP[party] ?? party,
+      color: partyColor(party),
+      stance,
+      stanceLabel: STANCE_LABELS[stance],
+      evidencePoints: [`${tally.yea} voted Yea, ${tally.nay} voted Nay`],
+      inferredRationale: [],
+      confidence: total >= 10 ? 'high' : 'medium',
+    })
+  }
+  positions.sort((a, b) => {
+    const order: Record<string, number> = { D: 0, R: 1, I: 2 }
+    return (order[a.party] ?? 3) - (order[b.party] ?? 3)
+  })
+  return positions
+}
+
+function mergeAnalysisPositions(
+  votePositions: InsightPartyPosition[],
+  analysisPositions: PartyPositionAnalysis[] | undefined,
+): InsightPartyPosition[] {
+  if (!analysisPositions || analysisPositions.length === 0) return votePositions
+  const merged = [...votePositions]
+  for (const ap of analysisPositions) {
+    const existing = merged.find((p) => p.party === ap.party)
+    if (existing) {
+      if (ap.evidence_points.length > 0) {
+        existing.evidencePoints.push(...ap.evidence_points)
+      }
+      if (ap.inferred_rationale.length > 0) {
+        existing.inferredRationale = ap.inferred_rationale
+      }
+      if (ap.confidence === 'high' && existing.confidence !== 'high') {
+        existing.confidence = ap.confidence
+      }
+    }
+  }
+  return merged
+}
+
+function deriveBeneficiaries(
+  bill: BillTimelineVM,
+  benefitMap: BenefitMapEntry[] | undefined,
+): InsightBeneficiary[] {
+  if (benefitMap && benefitMap.length > 0) {
+    return benefitMap.slice(0, 4).map((entry) => ({
+      group: entry.group,
+      effect: entry.expected_effect,
+      effectLabel: EFFECT_LABELS[entry.expected_effect] ?? 'Mixed impact',
+    }))
+  }
+  const groups: InsightBeneficiary[] = []
+  for (const r of bill.structuredRecipients.slice(0, 3)) {
+    groups.push({ group: r.name, effect: 'benefit', effectLabel: EFFECT_LABELS.benefit })
+  }
+  for (const a of bill.affectedGroups.slice(0, 2)) {
+    if (!groups.some((g) => g.group === a)) {
+      groups.push({ group: a, effect: 'mixed', effectLabel: EFFECT_LABELS.mixed })
+    }
+  }
+  return groups.slice(0, 4)
+}
+
+const STATUS_LABEL_MAP: Record<string, string> = {
+  passed: 'Passed',
+  rejected: 'Rejected',
+  'in-progress': 'In progress',
+}
+
+export function toInsightCards(bills: BillTimelineVM[], swingIndex: SwingFrequencyIndex): InsightCardVM[] {
+  return bills.map((bill) => {
+    const step = pickDecisiveStep(bill.steps)
+    const analysis = findBillAnalysis(bill)
+    const votePositions = derivePartyPositionsFromVote(step)
+    const partyPositions = mergeAnalysisPositions(votePositions, analysis?.party_positions)
+    const beneficiaries = deriveBeneficiaries(bill, analysis?.benefit_map)
+    const analysisQuality = analysis?.analysis_quality ?? null
+    const hasInference = partyPositions.some((p) => p.inferredRationale.length > 0)
+
+    const swingSenators: ActionCardSwingSenator[] = step.isClose
+      ? step.crossovers.map((c) => {
+          const profile = swingIndex.profiles.get(c.bioguideId)
+          return {
+            name: c.name,
+            party: c.party,
+            state: c.state,
+            color: c.color,
+            voteCast: c.voteCast === 'yea' ? 'Yea' as const : 'Nay' as const,
+            swingPct: profile?.swingPct ?? 0,
+          }
+        })
+      : []
+
+    return {
+      id: bill.groupKey,
+      category: bill.categoryLabel,
+      billCode: bill.displayCode,
+      title: bill.displayTitle,
+      status: bill.finalStatus,
+      statusLabel: STATUS_LABEL_MAP[bill.finalStatus] ?? bill.finalStatus,
+      outcome: bill.whatHappensNext,
+      context: buildContext(bill),
+      stepType: step.type,
+      voteTally: { yea: step.totalYea, nay: step.totalNay, label: step.label, date: step.date },
+      partyPositions,
+      beneficiaries,
+      analysisQuality,
+      hasInference,
+      isCloseVote: step.isClose,
+      crossoverSenators: swingSenators,
+    }
+  })
+}
+
+function findBillAnalysis(bill: BillTimelineVM): BillAnalysis | null {
+  return bill.rawAnalysis
 }
 
 // ---------------------------------------------------------------------------

@@ -52,7 +52,7 @@ export default function ActionCards({ cards }: Props) {
               <>
                 {' '}&middot;{' '}
                 <span className="actionCard__partyDot" style={{ backgroundColor: card.voteLine.leadParty.color }} />
-                {' '}{PARTY_NAMES[card.voteLine.leadParty.abbr] ?? card.voteLine.leadParty.abbr}-led
+                {' '}{PARTY_NAMES[card.voteLine.leadParty.abbr] ?? card.voteLine.leadParty.abbr}-led {card.voteLine.leadParty.outcome}
               </>
             )}
             {' '}&middot; {formatDate(card.voteLine.date)}

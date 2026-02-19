@@ -459,6 +459,316 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 /* ======================================================================
+   Insight Feed (Party Insight Cards)
+   ====================================================================== */
+
+.insightFeed {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.insightCard {
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.insightCard--rejected {
+  border-left: 3px solid var(--warn);
+}
+
+.insightCard--passed {
+  border-left: 3px solid #16a34a;
+}
+
+.insightCard__header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.insightCard__tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.insightCard__code {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #fafaf9;
+  white-space: nowrap;
+}
+
+.insightCard__status {
+  margin-left: auto;
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.insightCard__status--passed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.insightCard__status--rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.insightCard__status--in-progress {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.insightCard__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.insightCard__tally {
+  margin: 0;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+.insightCard__sectionTitle {
+  margin: 0 0 0.3rem 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.insightCard__partyPanel {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-xs);
+}
+
+.insightCard__partyRows {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.insightCard__partyRow {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.insightCard__partyHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.insightCard__partyDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.insightCard__partyName {
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.insightCard__stance {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+}
+
+.insightCard__stance--support {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.insightCard__stance--oppose {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.insightCard__stance--mixed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.insightCard__confidence {
+  font-size: 0.66rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.insightCard__confidence--high {
+  border-color: #16a34a;
+  color: #166534;
+}
+
+.insightCard__confidence--low {
+  border-color: var(--warn);
+  color: #991b1b;
+}
+
+.insightCard__evidenceList,
+.insightCard__inferenceList {
+  list-style: none;
+  margin: 0.15rem 0 0 0;
+  padding: 0 0 0 1rem;
+}
+
+.insightCard__evidenceItem,
+.insightCard__inferenceItem {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.insightCard__evidenceTag {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #166534;
+  background: #dcfce7;
+  padding: 0.05rem 0.25rem;
+  border-radius: 3px;
+}
+
+.insightCard__inferenceTag {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 0.05rem 0.25rem;
+  border-radius: 3px;
+}
+
+.insightCard__beneficiaryPanel {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-xs);
+}
+
+.insightCard__beneficiaryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.insightCard__beneficiaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.insightCard__effectBadge {
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 0.08rem 0.3rem;
+  border-radius: 3px;
+}
+
+.insightCard__effectBadge--benefit {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.insightCard__effectBadge--burden {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.insightCard__effectBadge--mixed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.insightCard__context {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.insightCard__outcome {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.insightCard__dissent {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-xs);
+}
+
+.insightCard__crossover {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  margin-right: 0.6rem;
+}
+
+.insightCard__crossoverName {
+  font-weight: 600;
+}
+
+.insightCard__crossoverParty {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.insightCard__crossoverCast {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.insightCard__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-xs);
+}
+
+.insightCard__qualityNote {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ======================================================================
    Swing Leaderboard
    ====================================================================== */
 

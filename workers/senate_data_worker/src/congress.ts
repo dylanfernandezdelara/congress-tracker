@@ -9,6 +9,7 @@ import type {
   BillRef,
   LegislationActionItem,
   MemberIndexEntry,
+  SponsorPartySignal,
 } from "./types";
 
 const CONGRESS_API_BASE = "https://api.congress.gov/v3";
@@ -658,6 +659,47 @@ async function fetchFirstEndpoint(
   return { data: null, error: lastError };
 }
 
+function extractSponsorPartySignals(
+  detailData: Record<string, unknown> | null,
+  cosponsorsData: Record<string, unknown> | null,
+): SponsorPartySignal[] {
+  const signals: SponsorPartySignal[] = [];
+  const seen = new Set<string>();
+
+  if (detailData) {
+    const sponsors = detailData.sponsors ?? detailData.sponsor;
+    const sponsorList = Array.isArray(sponsors) ? sponsors : sponsors ? [sponsors] : [];
+    for (const s of sponsorList) {
+      if (!s || typeof s !== "object") continue;
+      const obj = s as Record<string, unknown>;
+      const bioguide = getString(obj.bioguideId ?? obj.bioguide_id);
+      const party = getString(obj.party);
+      if (bioguide && party && !seen.has(bioguide)) {
+        seen.add(bioguide);
+        signals.push({ bioguide_id: bioguide, party, role: "sponsor" });
+      }
+    }
+  }
+
+  if (cosponsorsData) {
+    const cosponsors = cosponsorsData.cosponsors ?? cosponsorsData.co_sponsors;
+    if (Array.isArray(cosponsors)) {
+      for (const c of cosponsors) {
+        if (!c || typeof c !== "object") continue;
+        const obj = c as Record<string, unknown>;
+        const bioguide = getString(obj.bioguideId ?? obj.bioguide_id);
+        const party = getString(obj.party);
+        if (bioguide && party && !seen.has(bioguide)) {
+          seen.add(bioguide);
+          signals.push({ bioguide_id: bioguide, party, role: "cosponsor" });
+        }
+      }
+    }
+  }
+
+  return signals;
+}
+
 export async function fetchBillDetails(
   ref: BillRef,
   apiKey: string,
@@ -683,7 +725,9 @@ export async function fetchBillDetails(
     buildCongressUrl(`${basePath}/laws`, {}, apiKey),
   ];
 
-  const [detailResult, summaryResult, subjectsResult, committeesResult, titlesResult, lawResult] =
+  const cosponsorsUrl = buildCongressUrl(`${basePath}/cosponsors`, {}, apiKey);
+
+  const [detailResult, summaryResult, subjectsResult, committeesResult, titlesResult, lawResult, cosponsorsResult] =
     await Promise.all([
       fetchJsonWithRetry<Record<string, unknown>>(detailUrl, config),
       fetchJsonWithRetry<Record<string, unknown>>(summaryUrl, config),
@@ -691,6 +735,7 @@ export async function fetchBillDetails(
       fetchJsonWithRetry<Record<string, unknown>>(committeesUrl, config),
       fetchFirstEndpoint(titlesUrls, config),
       fetchFirstEndpoint(lawUrls, config),
+      fetchJsonWithRetry<Record<string, unknown>>(cosponsorsUrl, config),
     ]);
 
   const detailData =
@@ -738,6 +783,11 @@ export async function fetchBillDetails(
     extractLawInfo(detailData ?? null);
   const summaryPayload = extractSummary(summaryResult.data ?? null);
 
+  const sponsorPartySignals = extractSponsorPartySignals(
+    detailData ?? null,
+    cosponsorsResult.data ?? null,
+  );
+
   const bill: BillRef = {
     ...ref,
     title,
@@ -751,6 +801,7 @@ export async function fetchBillDetails(
     committees: committees ?? ref.committees,
     summary: summaryPayload.summary ?? ref.summary,
     summary_date: summaryPayload.summary_date ?? ref.summary_date,
+    sponsor_party_signals: sponsorPartySignals.length > 0 ? sponsorPartySignals : ref.sponsor_party_signals,
   };
 
   const error =

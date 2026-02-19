@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ActivityIndexResponse, SessionOverview, VoteLedger } from '../api'
-import { buildBillTimelineVM, buildSwingFrequencyIndex, toActionCards, type SwingFrequencyIndex } from './homeViewModel'
+import type { ActivityIndexResponse, BillAnalysis, SessionOverview, VoteLedger } from '../api'
+import { buildBillTimelineVM, buildSwingFrequencyIndex, toActionCards, toInsightCards, type SwingFrequencyIndex } from './homeViewModel'
 
 const emptySwingIndex: SwingFrequencyIndex = { totalCloseVotes: 0, profiles: new Map() }
 
@@ -402,6 +402,298 @@ describe('toActionCards', () => {
     expect(alphaSwing).toBeTruthy()
     expect(alphaSwing!.voteCast).toBe('Nay')
     expect(alphaSwing!.swingPct).toBe(100)
+  })
+})
+
+describe('toInsightCards', () => {
+  it('derives party positions from vote breakdown', () => {
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [
+        {
+          vote_number: 501,
+          vote_date: '2026-01-06',
+          title: 'S. 500 vote',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          issue: 'S. 500',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), null, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toInsightCards(vm, emptySwingIndex)
+
+    expect(cards).toHaveLength(1)
+    expect(cards[0].partyPositions.length).toBeGreaterThan(0)
+
+    const dPos = cards[0].partyPositions.find((p) => p.party === 'D')
+    expect(dPos).toBeTruthy()
+    expect(dPos!.stance).toBe('support')
+    expect(dPos!.evidencePoints.length).toBeGreaterThan(0)
+
+    const rPos = cards[0].partyPositions.find((p) => p.party === 'R')
+    expect(rPos).toBeTruthy()
+    expect(rPos!.stance).toBe('oppose')
+  })
+
+  it('merges LLM analysis positions when available', () => {
+    const analysisWithPositions: BillAnalysis = {
+      plain_title: 'Test Act',
+      plain_summary: 'A test measure',
+      key_provisions: [],
+      why_it_matters: 'testing',
+      hidden_provisions: null,
+      significance: 'medium',
+      significance_reason: 'test',
+      category: 'Testing',
+      affects: [],
+      party_positions: [
+        {
+          party: 'D',
+          stance: 'support',
+          evidence_points: ['Sponsors include senior Democrats'],
+          inferred_rationale: ['Aligns with Democratic healthcare agenda'],
+          confidence: 'medium',
+        },
+      ],
+      benefit_map: [
+        {
+          group: 'Medicare recipients',
+          expected_effect: 'benefit',
+          evidence_refs: [{ source_endpoint: 'summaries', source_ref: 'test' }],
+        },
+      ],
+      analysis_quality: {
+        evidence_coverage: 'partial',
+        inference_used: true,
+        confidence_reason: 'Some inference required.',
+      },
+    }
+
+    const activities: ActivityIndexResponse = {
+      generated_at: '2026-01-06T00:00:00Z',
+      window: { start_date: '2026-01-01', end_date: '2026-01-06' },
+      activities: [
+        {
+          activity_id: 'senate:roll_call_vote:2026-01-06:501',
+          source: 'senate',
+          type: 'roll_call_vote',
+          date: '2026-01-06',
+          members: ['A000001', 'B000001'],
+          bill: {
+            congress: 119,
+            type: 'S',
+            number: '500',
+            title: 'Test Act',
+            analysis: analysisWithPositions,
+          },
+        },
+      ],
+    }
+
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [
+        {
+          vote_number: 501,
+          vote_date: '2026-01-06',
+          title: 'S. 500 vote',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          issue: 'S. 500',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), activities, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toInsightCards(vm, emptySwingIndex)
+
+    expect(cards).toHaveLength(1)
+    const card = cards[0]
+
+    expect(card.hasInference).toBe(true)
+    const dPos = card.partyPositions.find((p) => p.party === 'D')
+    expect(dPos!.inferredRationale).toContain('Aligns with Democratic healthcare agenda')
+
+    expect(card.beneficiaries.length).toBeGreaterThan(0)
+    expect(card.beneficiaries[0].group).toBe('Medicare recipients')
+    expect(card.beneficiaries[0].effect).toBe('benefit')
+
+    expect(card.analysisQuality).toBeTruthy()
+    expect(card.analysisQuality!.inference_used).toBe(true)
+  })
+
+  it('renders fallback state when no analysis exists', () => {
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [
+        {
+          vote_number: 801,
+          vote_date: '2026-01-06',
+          title: 'S. 800 nomination',
+          question: 'On Confirmation',
+          result: 'Confirmed',
+          issue: 'PN 42',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), null, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toInsightCards(vm, emptySwingIndex)
+
+    expect(cards).toHaveLength(1)
+    expect(cards[0].hasInference).toBe(false)
+    expect(cards[0].analysisQuality).toBeNull()
+    expect(cards[0].partyPositions.length).toBeGreaterThan(0)
+    expect(cards[0].partyPositions.every((p) => p.inferredRationale.length === 0)).toBe(true)
+  })
+
+  it('marks status labels correctly', () => {
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [
+        {
+          vote_number: 901,
+          vote_date: '2026-01-06',
+          title: 'S. 900 vote',
+          question: 'On Passage of the Bill',
+          result: 'Rejected',
+          issue: 'S. 900',
+          member_votes: { A000001: 'Nay', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), null, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toInsightCards(vm, emptySwingIndex)
+
+    expect(cards).toHaveLength(1)
+    expect(cards[0].status).toBe('rejected')
+    expect(cards[0].statusLabel).toBe('Rejected')
+  })
+
+  it('labels all inference lines when present', () => {
+    const analysisWithInference: BillAnalysis = {
+      plain_title: 'Inference Test',
+      plain_summary: 'Testing inference labeling',
+      key_provisions: [],
+      why_it_matters: 'test',
+      hidden_provisions: null,
+      significance: 'medium',
+      significance_reason: 'test',
+      category: 'Testing',
+      affects: [],
+      party_positions: [
+        {
+          party: 'R',
+          stance: 'oppose',
+          evidence_points: [],
+          inferred_rationale: ['Likely opposes due to spending concerns'],
+          confidence: 'low',
+        },
+      ],
+    }
+
+    const activities: ActivityIndexResponse = {
+      generated_at: '2026-01-06T00:00:00Z',
+      window: { start_date: '2026-01-01', end_date: '2026-01-06' },
+      activities: [
+        {
+          activity_id: 'senate:roll_call_vote:2026-01-06:501',
+          source: 'senate',
+          type: 'roll_call_vote',
+          date: '2026-01-06',
+          members: ['A000001', 'B000001'],
+          bill: {
+            congress: 119,
+            type: 'S',
+            number: '500',
+            title: 'Inference Test Act',
+            analysis: analysisWithInference,
+          },
+        },
+      ],
+    }
+
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [
+        {
+          vote_number: 501,
+          vote_date: '2026-01-06',
+          title: 'S. 500 vote',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          issue: 'S. 500',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), activities, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toInsightCards(vm, emptySwingIndex)
+
+    expect(cards).toHaveLength(1)
+    expect(cards[0].hasInference).toBe(true)
+    const rPos = cards[0].partyPositions.find((p) => p.party === 'R')
+    expect(rPos!.inferredRationale.length).toBeGreaterThan(0)
+    // Vote-derived confidence ('medium' from 1 voter) is not downgraded by analysis confidence
+    expect(rPos!.confidence).toBe('medium')
+  })
+
+  it('handles tie votes with mixed stance', () => {
+    const overview = makeOverview(1, '2026-01-06')
+    const extSenators = [
+      ...overview.senators,
+      { bioguide_id: 'A000002', name: 'Alpha2, Ada2', party: 'D', state: 'CA', votes_cast: 1, votes_missed: 0, party_defections: 0, alignment_pct: 100 },
+      { bioguide_id: 'B000002', name: 'Bravo2, Ben2', party: 'R', state: 'FL', votes_cast: 1, votes_missed: 0, party_defections: 0, alignment_pct: 100 },
+    ]
+    const tiedOverview: SessionOverview = { ...overview, senators: extSenators }
+
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [
+        {
+          vote_number: 701,
+          vote_date: '2026-01-06',
+          title: 'S. 700 vote',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          issue: 'S. 700',
+          member_votes: { A000001: 'Yea', A000002: 'Nay', B000001: 'Yea', B000002: 'Nay' },
+        },
+      ],
+    }
+
+    const vm = buildBillTimelineVM(ledger, tiedOverview, null, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toInsightCards(vm, emptySwingIndex)
+
+    expect(cards).toHaveLength(1)
+    const dPos = cards[0].partyPositions.find((p) => p.party === 'D')
+    expect(dPos).toBeTruthy()
+    expect(dPos!.stance).toBe('mixed')
   })
 })
 

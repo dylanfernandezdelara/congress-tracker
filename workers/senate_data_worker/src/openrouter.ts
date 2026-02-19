@@ -2,10 +2,17 @@ import OpenAI from "openai";
 import { mapWithConcurrency } from "./concurrency";
 import { buildBillKey } from "./congress";
 import { buildBillNarrativeKey, readJsonFromR2, writeJsonToR2 } from "./storage";
-import type { BillAnalysis, BillImpactEvidence, BillRef } from "./types";
+import type {
+  AnalysisQuality,
+  BenefitMapEntry,
+  BillAnalysis,
+  BillImpactEvidence,
+  BillRef,
+  PartyPositionAnalysis,
+} from "./types";
 
 export const BILL_ANALYSIS_CACHE_KEY = "analysis/bill-analysis-cache.json";
-export const ANALYSIS_VERSION = "v3-evidence-grounded";
+export const ANALYSIS_VERSION = "v4-party-insight";
 export const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-r1-0528:free";
 
 interface LegacyAnalysisCache {
@@ -238,6 +245,100 @@ function ensureClaimsHaveRefs(analysis: BillAnalysis): boolean {
   return true;
 }
 
+function sanitizeStance(value: unknown): PartyPositionAnalysis["stance"] {
+  if (typeof value !== "string") return "mixed";
+  const lc = value.trim().toLowerCase();
+  if (lc === "support" || lc === "oppose" || lc === "mixed") return lc;
+  return "mixed";
+}
+
+function coercePartyPositions(raw: unknown): PartyPositionAnalysis[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PartyPositionAnalysis[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const party = typeof obj.party === "string" ? obj.party.trim() : "";
+    if (!party) continue;
+    const evidencePoints = sanitizeStringList(obj.evidence_points, 4);
+    const inferredRationale = sanitizeStringList(obj.inferred_rationale, 3);
+    if (evidencePoints.length === 0 && inferredRationale.length === 0) continue;
+    out.push({
+      party,
+      stance: sanitizeStance(obj.stance),
+      evidence_points: evidencePoints,
+      inferred_rationale: inferredRationale,
+      confidence: sanitizeConfidence(obj.confidence),
+    });
+  }
+  return out.slice(0, 4);
+}
+
+function coerceBenefitMap(raw: unknown): BenefitMapEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: BenefitMapEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const group = typeof obj.group === "string" ? obj.group.trim() : "";
+    if (!group) continue;
+    const effect = typeof obj.expected_effect === "string" ? obj.expected_effect.trim().toLowerCase() : "mixed";
+    const refs = Array.isArray(obj.evidence_refs)
+      ? obj.evidence_refs
+          .map((ref) => {
+            if (!ref || typeof ref !== "object") return null;
+            const r = ref as Record<string, unknown>;
+            return {
+              source_endpoint: (typeof r.source_endpoint === "string" ? r.source_endpoint : "summaries") as "summary",
+              source_ref: typeof r.source_ref === "string" ? r.source_ref.trim() : "",
+              quote: typeof r.quote === "string" ? r.quote.trim() : undefined,
+            };
+          })
+          .filter((r): r is NonNullable<typeof r> => Boolean(r?.source_ref))
+      : [];
+    out.push({
+      group,
+      expected_effect: (effect === "benefit" || effect === "burden" || effect === "mixed" ? effect : "mixed") as BenefitMapEntry["expected_effect"],
+      evidence_refs: refs,
+    });
+  }
+  return out.slice(0, 6);
+}
+
+function coerceAnalysisQuality(
+  raw: unknown,
+  partyPositions: PartyPositionAnalysis[],
+  impactEvidence?: BillImpactEvidence,
+): AnalysisQuality {
+  const richScore = impactEvidence?.richness_score ?? 0;
+  const inferenceUsed = partyPositions.some((p) => p.inferred_rationale.length > 0);
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    const coverage = typeof obj.evidence_coverage === "string" ? obj.evidence_coverage.trim().toLowerCase() : "";
+    const validCoverage = coverage === "full" || coverage === "partial" || coverage === "minimal"
+      ? coverage as AnalysisQuality["evidence_coverage"]
+      : richScore >= 60 ? "full" : richScore >= 30 ? "partial" : "minimal";
+    return {
+      evidence_coverage: validCoverage,
+      inference_used: inferenceUsed,
+      confidence_reason: typeof obj.confidence_reason === "string" ? obj.confidence_reason.trim() : buildDefaultConfidenceReason(validCoverage, inferenceUsed),
+    };
+  }
+  const coverage: AnalysisQuality["evidence_coverage"] = richScore >= 60 ? "full" : richScore >= 30 ? "partial" : "minimal";
+  return {
+    evidence_coverage: coverage,
+    inference_used: inferenceUsed,
+    confidence_reason: buildDefaultConfidenceReason(coverage, inferenceUsed),
+  };
+}
+
+function buildDefaultConfidenceReason(coverage: AnalysisQuality["evidence_coverage"], inferenceUsed: boolean): string {
+  if (coverage === "full" && !inferenceUsed) return "Based on official evidence with no inference needed.";
+  if (coverage === "full") return "Strong official evidence with supplementary inference.";
+  if (coverage === "partial") return "Partial official evidence available; some analysis is inferred.";
+  return "Limited official evidence; party positions are largely inferred from voting patterns.";
+}
+
 function coerceClaims(raw: unknown, evidence?: BillImpactEvidence): BillAnalysis["claims"] {
   if (!Array.isArray(raw)) {
     if (!evidence || evidence.summary_evidence.length === 0) return [];
@@ -355,7 +456,11 @@ function coerceBillAnalysis(raw: unknown, ref: BillRef, impactEvidence?: BillImp
     states_mentioned: impactEvidence?.where.states_mentioned ?? [],
     unknown_reasons: impactEvidence?.unknowns ?? [],
     claims: coerceClaims(obj.claims, impactEvidence),
+    party_positions: coercePartyPositions(obj.party_positions),
+    benefit_map: coerceBenefitMap(obj.benefit_map),
   };
+
+  analysis.analysis_quality = coerceAnalysisQuality(obj.analysis_quality, analysis.party_positions ?? [], impactEvidence);
 
   if ((analysis.claims?.length ?? 0) === 0 && impactEvidence?.summary_evidence?.length) {
     analysis.claims = [
@@ -377,6 +482,7 @@ function coerceBillAnalysis(raw: unknown, ref: BillRef, impactEvidence?: BillImp
 
 function isAnalysisRefreshNeeded(analysis: BillAnalysis, input: AnalyzeBillInput): boolean {
   if (!analysis.analysis_version || analysis.analysis_version !== ANALYSIS_VERSION) return true;
+  if (!analysis.analysis_quality) return true;
   if (!analysis.unknown_reasons || analysis.unknown_reasons.length === 0) return true;
   if (!analysis.claims || analysis.claims.length === 0) return true;
   if (!ensureClaimsHaveRefs(analysis)) return true;
@@ -450,6 +556,11 @@ function buildPrompt(input: AnalyzeBillInput): string {
       }
     : null;
 
+  const sponsorSignals = ref.sponsor_party_signals;
+  const sponsorContext = sponsorSignals && sponsorSignals.length > 0
+    ? `\nSPONSOR/COSPONSOR PARTY SIGNALS:\n${JSON.stringify(sponsorSignals.slice(0, 12), null, 2)}`
+    : "";
+
   return `You are a nonpartisan congressional analyst. Produce a grounded, plain-language synthesis for everyday U.S. readers.
 
 OFFICIAL BILL CONTEXT:
@@ -460,7 +571,7 @@ OFFICIAL BILL CONTEXT:
 - Latest action: ${ref.latest_action?.text ?? "N/A"}
 
 STRUCTURED EVIDENCE JSON:
-${JSON.stringify(evidencePayload, null, 2)}
+${JSON.stringify(evidencePayload, null, 2)}${sponsorContext}
 
 Return ONLY valid JSON with this structure:
 {
@@ -483,15 +594,30 @@ Return ONLY valid JSON with this structure:
     {
       "text": "string",
       "kind": "summary|impact|money|unknown",
-      "evidence_refs": [
-        {
-          "source_endpoint": "string",
-          "source_ref": "string",
-          "quote": "string"
-        }
-      ]
+      "evidence_refs": [{ "source_endpoint": "string", "source_ref": "string", "quote": "string" }]
     }
-  ]
+  ],
+  "party_positions": [
+    {
+      "party": "D|R|I",
+      "stance": "support|oppose|mixed",
+      "evidence_points": ["string - factual points from evidence"],
+      "inferred_rationale": ["string - labeled reasoning for the stance"],
+      "confidence": "high|medium|low"
+    }
+  ],
+  "benefit_map": [
+    {
+      "group": "string - who benefits or is burdened",
+      "expected_effect": "benefit|burden|mixed",
+      "evidence_refs": [{ "source_endpoint": "string", "source_ref": "string", "quote": "string" }]
+    }
+  ],
+  "analysis_quality": {
+    "evidence_coverage": "full|partial|minimal",
+    "inference_used": true,
+    "confidence_reason": "string"
+  }
 }
 
 RULES:
@@ -499,7 +625,10 @@ RULES:
 - Avoid generic phrases like "sets funding levels" unless followed by concrete details.
 - Every claim except kind="unknown" must include >=1 evidence_ref.
 - If evidence is missing, state that explicitly in unknowns.
-- Keep language neutral and concise.`;
+- Keep language neutral and concise.
+- For party_positions: evidence_points must be grounded in provided data. inferred_rationale must be clearly labeled reasoning, not presented as fact. If evidence is insufficient, set confidence to "low" and leave inferred_rationale empty.
+- For benefit_map: each entry must reference evidence. Omit entries you cannot ground.
+- If you cannot determine a party's position from the evidence, omit that party entirely rather than guessing.`;
 }
 
 function getMessageContent(message: unknown): string {
@@ -533,7 +662,7 @@ async function runModelCompletion(
       const request = client.chat.completions.create({
         model,
         temperature: 0,
-        max_tokens: 1400,
+        max_tokens: 2000,
         response_format: { type: "json_object" },
         messages: [{ role: "user", content: prompt }],
       });
@@ -549,7 +678,7 @@ async function runModelCompletion(
         const fallbackRequest = client.chat.completions.create({
           model,
           temperature: 0,
-          max_tokens: 1400,
+          max_tokens: 2000,
           messages: [{ role: "user", content: prompt }],
         });
         const timeout = new Promise<never>((_, reject) => {

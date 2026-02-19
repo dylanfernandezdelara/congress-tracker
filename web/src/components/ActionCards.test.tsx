@@ -12,7 +12,7 @@ function makeCard(overrides: Partial<ActionCardVM> = {}): ActionCardVM {
     outcome: 'The Senate blocked progress, so leadership would need to bring it back for another attempt.',
     context: '$886 billion for the Department of Defense.',
     status: 'rejected',
-    voteLine: { label: 'Cloture failed', yea: 52, nay: 45, date: '2026-02-12', leadParty: { abbr: 'R', color: '#dc2626' } },
+    voteLine: { label: 'Cloture failed', yea: 52, nay: 45, date: '2026-02-12', leadParty: { abbr: 'R', color: '#dc2626', outcome: 'rejection' } },
     isCloseVote: false,
     swingSenators: [],
     ...overrides,
@@ -39,7 +39,7 @@ describe('ActionCards', () => {
     const { container } = render(<ActionCards cards={[makeCard()]} />)
     const dot = container.querySelector('.actionCard__partyDot')
     expect(dot).toBeTruthy()
-    expect(screen.getByText(/Republican-led/)).toBeTruthy()
+    expect(screen.getByText(/Republican-led rejection/)).toBeTruthy()
   })
 
   it('displays the correct status badge text', () => {

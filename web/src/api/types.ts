@@ -49,6 +49,7 @@ export interface BillRef {
   law?: BillLawInfo
   impact_evidence?: BillImpactEvidence
   analysis?: BillAnalysis
+  sponsor_party_signals?: SponsorPartySignal[]
 }
 
 export type EvidenceEndpoint =
@@ -140,6 +141,36 @@ export interface BillAnalysisClaim {
   evidence_refs: BillAnalysisClaimRef[]
 }
 
+export type PartyStance = 'support' | 'oppose' | 'mixed'
+
+export interface PartyPositionAnalysis {
+  party: string
+  stance: PartyStance
+  evidence_points: string[]
+  inferred_rationale: string[]
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export type BenefitEffect = 'benefit' | 'burden' | 'mixed'
+
+export interface BenefitMapEntry {
+  group: string
+  expected_effect: BenefitEffect
+  evidence_refs: BillAnalysisClaimRef[]
+}
+
+export interface AnalysisQuality {
+  evidence_coverage: 'full' | 'partial' | 'minimal'
+  inference_used: boolean
+  confidence_reason: string
+}
+
+export interface SponsorPartySignal {
+  bioguide_id: string
+  party: string
+  role: 'sponsor' | 'cosponsor'
+}
+
 export interface BillAnalysis {
   plain_title: string
   plain_summary: string
@@ -166,6 +197,9 @@ export interface BillAnalysis {
   states_mentioned?: string[]
   unknown_reasons?: UnknownReason[]
   claims?: BillAnalysisClaim[]
+  party_positions?: PartyPositionAnalysis[]
+  benefit_map?: BenefitMapEntry[]
+  analysis_quality?: AnalysisQuality
 }
 
 export interface BillLatestAction {

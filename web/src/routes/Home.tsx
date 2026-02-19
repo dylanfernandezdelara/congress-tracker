@@ -10,6 +10,8 @@ import {
 } from '../api'
 import { E2E_ACTIVITIES, E2E_LEDGER, E2E_OVERVIEW } from '../e2eData'
 import ActionCards from '../components/ActionCards'
+import InsightFeed from '../components/InsightFeed'
+import InsightFeedErrorBoundary from '../components/InsightFeedErrorBoundary'
 import SwingLeaderboard from '../components/SwingLeaderboard'
 import ComingUp from '../components/ComingUp'
 import StateDumbbell from '../components/StateDumbbell'
@@ -22,7 +24,9 @@ import {
   buildStateDumbbellVM,
   buildSwingFrequencyIndex,
   toActionCards,
+  toInsightCards,
 } from '../ui/homeViewModel'
+import { getFeatureFlag } from '../utils/featureFlags'
 
 function formatToday(): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -165,6 +169,13 @@ export default function Home() {
     [billTimelineVM, swingIndex],
   )
 
+  const insightCards = useMemo(
+    () => billTimelineVM && swingIndex ? toInsightCards(billTimelineVM, swingIndex) : null,
+    [billTimelineVM, swingIndex],
+  )
+
+  const useInsightFeed = useMemo(() => getFeatureFlag('insightFeed'), [])
+
   return (
     <div className="page">
       <header className="dashHeader">
@@ -199,7 +210,15 @@ export default function Home() {
                   ? `Senate actions from ${formatDateWindow(billTimelineWindow.start)} to ${formatDateWindow(billTimelineWindow.end)}, explained in plain language.`
                   : 'Recent Senate actions, explained in plain language.'}
               </p>
-              <ActionCards cards={actionCards} />
+              {useInsightFeed && insightCards && insightCards.length > 0 ? (
+                <InsightFeedErrorBoundary
+                  fallback={<ActionCards cards={actionCards} />}
+                >
+                  <InsightFeed cards={insightCards} />
+                </InsightFeedErrorBoundary>
+              ) : (
+                <ActionCards cards={actionCards} />
+              )}
             </section>
           )}
 
