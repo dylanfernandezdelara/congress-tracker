@@ -43,7 +43,10 @@ curl -i http://localhost:8787/health
 **Expected response:**
 - Status: `200 OK`
 - Content-Type: `application/json`
-- Body: `{"status":"ok","timestamp":"..."}`
+- Body includes:
+  - `status: "ok"`
+  - `timestamp` (ISO 8601)
+  - `target_state`, `congress`, and `session`
 
 ### 1.3 Test HTTP Endpoints (After Ingestion)
 
@@ -65,6 +68,15 @@ curl -i http://localhost:8787/state/NY/_meta.json
 # Test dated snapshot endpoint (replace DATE with actual date)
 curl -i http://localhost:8787/state/NY/2025-12-18.json
 
+# Test data freshness health
+curl -i http://localhost:8787/health/data
+
+# Test vote ledger
+curl -i http://localhost:8787/votes/ledger.json
+
+# Test session overview
+curl -i http://localhost:8787/stats/overview.json
+
 # Test 404 for non-existent snapshot
 curl -i http://localhost:8787/state/NY/2020-01-01.json
 ```
@@ -84,6 +96,9 @@ curl -i http://localhost:8787/state/NY/2020-01-01.json
 - `_meta.json` should match `MetaJson` schema
 - `members/index.json` should match `MemberIndexJson`
 - `/member/{bioguide}/latest.json` should match `MemberActivityJson`
+- `/votes/ledger.json` should match `VoteLedger`
+- `/stats/overview.json` should match `SessionOverview`
+- `/health/data` should return `status`, `max_fresh_hours`, and either (`generated_at`, `age_hours`) or stale `message`
 - All dates should be in `YYYY-MM-DD` format
 - `generated_at` should be ISO 8601 timestamps
 
@@ -220,6 +235,9 @@ Use this checklist for each validation run:
 - [ ] `GET /state/NY/{DATE}.json` returns `404` for missing snapshots
 - [ ] `GET /members/index.json` returns `200` with valid `MemberIndexJson`
 - [ ] `GET /member/{BIOGUIDE}/latest.json` returns `200` with valid `MemberActivityJson`
+- [ ] `GET /health/data` returns `200` when fresh, `503` when stale/missing
+- [ ] `GET /votes/ledger.json` returns `200` with valid `VoteLedger`
+- [ ] `GET /stats/overview.json` returns `200` with valid `SessionOverview`
 - [ ] All endpoints have correct CORS headers
 - [ ] Cache-Control headers match spec (no `immutable`)
 

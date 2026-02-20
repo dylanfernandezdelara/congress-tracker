@@ -231,7 +231,7 @@ npx wrangler secret put GOVINFO_API_KEY
 `CONGRESS`, `SESSION`, and `TARGET_STATE` should be configured under `[vars]` in `wrangler.toml`.
 
 Optional runtime vars:
-- `ALLOWED_ORIGIN`: when set to a non-`*` value, responses include `Access-Control-Allow-Origin: <value>` and `Vary: Origin`.
+- `ALLOWED_ORIGIN`: set this in production to your frontend origin (for example, `https://your-site.example`) so responses do not default to wildcard CORS.
 - `OPENROUTER_APP_REFERER`: optional referer header sent to OpenRouter.
 - `OPENROUTER_APP_TITLE`: optional title header sent to OpenRouter (defaults to `daily_senate_update_worker`).
 
@@ -247,11 +247,37 @@ Health check endpoint (no R2 access required).
 ```json
 {
   "status": "ok",
-  "timestamp": "2026-01-04T16:30:00.000Z"
+  "timestamp": "2026-01-04T16:30:00.000Z",
+  "target_state": "ALL",
+  "congress": "119",
+  "session": "2"
 }
 ```
 
 **Use case**: Deployment validation, monitoring.
+
+### `GET /health/data`
+
+Data freshness health check based on the latest activities index in storage.
+
+**Response** (200 OK when fresh):
+```json
+{
+  "status": "ok",
+  "generated_at": "2026-02-20T09:58:12.000Z",
+  "age_hours": 0.42,
+  "max_fresh_hours": 36
+}
+```
+
+**Response** (503 Service Unavailable when stale/missing):
+```json
+{
+  "status": "stale",
+  "message": "No activities index found in storage.",
+  "max_fresh_hours": 36
+}
+```
 
 ### `GET /state/NY/latest.json`
 
@@ -303,6 +329,18 @@ Returns the current list of Senators (for UI selection).
 
 Returns the aggregated activity index for the current window, including deterministic featured senator ranking (`featured_senators`) used by the home dashboard.
 
+### `GET /votes/ledger.json`
+
+Returns the session vote ledger used for vote-pattern and defection analytics.
+
+**Response** (200 OK): JSON matching the `VoteLedger` schema (see `workers/senate_data_worker/src/types.ts`).
+
+### `GET /stats/overview.json`
+
+Returns an aggregate session overview used by homepage summary visualizations.
+
+**Response** (200 OK): JSON matching the `SessionOverview` schema (see `workers/senate_data_worker/src/types.ts`).
+
 ### `GET /member/{bioguide}/latest.json`
 
 Returns the latest daily activity window for a senator.
@@ -329,7 +367,7 @@ Returns a dated snapshot of daily activity for a senator (window end date).
 
 **OPTIONS preflight**: Returns `204 No Content` with CORS headers.
 
-**Note**: Set `ALLOWED_ORIGIN` in production to avoid wildcard CORS.
+**Production requirement**: set `ALLOWED_ORIGIN` to your deployed frontend origin to avoid wildcard CORS in public deployments.
 
 ### Cache-Control Strategy
 

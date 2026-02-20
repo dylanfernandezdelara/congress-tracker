@@ -107,7 +107,19 @@ Visibility note: all remote branches become visible once the repo is public.
 ## Launch-Day Governance Checklist
 
 - [ ] Enable branch protection on `main` (PR required, required checks, no force push).
-- [ ] Delete merged remote branches listed above.
-- [ ] Delete or archive each unmerged branch above.
-- [ ] Confirm `npm run public:check` still passes on the final pre-launch commit.
+- [x] Delete merged remote branches listed above.
+- [x] Delete or archive each unmerged branch above.
+- [x] Confirm `npm run public:check` still passes on the final pre-launch commit.
+- [ ] Rotate local and production API keys if real credentials are present.
+- [ ] Verify production `ALLOWED_ORIGIN` is set to deployed frontend origin.
 - [ ] Flip repository visibility to public.
+
+## Execution Notes (2026-02-20)
+
+- Branch cleanup completed:
+  - Deleted merged branches from the recommended list.
+  - Deleted all unmerged demo branches (`origin/01-02-demo_*`) as the explicit decision.
+  - Current remotes: `origin/main` only.
+- Public readiness gate re-run completed successfully (`npm run public:check`).
+- Branch protection could not be changed programmatically in this environment (`gh` branch-protection API returned HTTP 403: `Resource not accessible by integration`), so this remains a manual GitHub settings step.
+- Cloudflare secret rotation and production CORS verification remain manual because Wrangler is not authenticated in this environment.

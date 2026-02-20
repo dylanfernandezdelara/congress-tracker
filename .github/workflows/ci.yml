@@ -57,3 +57,36 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  public-readiness:
+    name: Public Readiness Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install trufflehog
+        run: |
+          python3 -m pip install --user trufflehog
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install worker dependencies
+        run: npm ci
+        working-directory: workers/senate_data_worker
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Run public readiness check
+        run: npm run public:check
