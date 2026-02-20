@@ -162,9 +162,12 @@ All endpoints return JSON with appropriate headers (see Cache & CORS section).
 | Method | Path                         | Description                                  |
 |--------|------------------------------|----------------------------------------------|
 | GET    | `/health`                    | Health check (no R2 access required)         |
+| GET    | `/health/data`               | Data freshness health check based on activities index |
 | GET    | `/state/NY/latest.json`      | Latest computed vote summary for NY          |
 | GET    | `/state/NY/YYYY-MM-DD.json`  | Dated snapshot (e.g., `/state/NY/2025-12-18.json`) |
 | GET    | `/state/NY/_meta.json`       | Metadata for NY (includes `target_vote_date`) |
+| GET    | `/votes/ledger.json`         | Session vote ledger for vote-pattern analytics |
+| GET    | `/stats/overview.json`       | Session aggregate overview used by dashboard |
 
 ### `/health`
 
@@ -173,7 +176,10 @@ All endpoints return JSON with appropriate headers (see Cache & CORS section).
 ```json
 {
   "status": "ok",
-  "timestamp": "2026-01-04T16:30:00.000Z"
+  "timestamp": "2026-01-04T16:30:00.000Z",
+  "target_state": "ALL",
+  "congress": "119",
+  "session": "2"
 }
 ```
 
@@ -181,6 +187,31 @@ All endpoints return JSON with appropriate headers (see Cache & CORS section).
 
 - Does NOT access R2; always returns 200 if the worker is running.
 - Used for deployment validation and monitoring.
+
+### `/health/data`
+
+Checks freshness of persisted data using `activities/index.json`.
+
+**Response** (200 OK when fresh):
+
+```json
+{
+  "status": "ok",
+  "generated_at": "2026-02-20T09:58:12.000Z",
+  "age_hours": 0.42,
+  "max_fresh_hours": 36
+}
+```
+
+**Response** (503 Service Unavailable when stale/missing):
+
+```json
+{
+  "status": "stale",
+  "message": "No activities index found in storage.",
+  "max_fresh_hours": 36
+}
+```
 
 ### `/state/NY/latest.json`
 
@@ -238,6 +269,40 @@ All endpoints return JSON with appropriate headers (see Cache & CORS section).
 }
 ```
 
+### `/votes/ledger.json`
+
+**Response** (200 OK):
+
+- Body: JSON matching `VoteLedger` (see `src/types.ts`)
+- Headers: `Content-Type: application/json`, CORS, short-TTL cache (see Cache & CORS section)
+
+**Error** (404 Not Found):
+
+```json
+{
+  "error": "not_found",
+  "message": "Resource not found",
+  "path": "/votes/ledger.json"
+}
+```
+
+### `/stats/overview.json`
+
+**Response** (200 OK):
+
+- Body: JSON matching `SessionOverview` (see `src/types.ts`)
+- Headers: `Content-Type: application/json`, CORS, short-TTL cache (see Cache & CORS section)
+
+**Error** (404 Not Found):
+
+```json
+{
+  "error": "not_found",
+  "message": "Resource not found",
+  "path": "/stats/overview.json"
+}
+```
+
 ---
 
 ## Cache & CORS
@@ -246,7 +311,8 @@ All endpoints return JSON with appropriate headers (see Cache & CORS section).
 
 **Strategy**:
 
-- **Default**: `Access-Control-Allow-Origin: *` (allow all origins for MVP)
+- **Default**: `Access-Control-Allow-Origin: *` (allow all origins)
+- **Production recommendation**: set `ALLOWED_ORIGIN` to your deployed frontend origin (not `*`)
 - **Optional (environment-restricted)**: If `ALLOWED_ORIGIN` environment variable is set, restrict to that origin:
   - `Access-Control-Allow-Origin: <ALLOWED_ORIGIN>`
   - Include `Vary: Origin` header when origin is not `*` (to ensure correct cache behavior)

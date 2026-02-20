@@ -4,8 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-if command -v trufflehog >/dev/null 2>&1; then
+if [[ -n "${TRUFFLEHOG_BIN:-}" && -x "${TRUFFLEHOG_BIN}" ]]; then
+  SCANNER_BIN="${TRUFFLEHOG_BIN}"
+elif command -v trufflehog >/dev/null 2>&1; then
   SCANNER_BIN="$(command -v trufflehog)"
+elif [[ -x "${HOME}/.local/bin/trufflehog" ]]; then
+  SCANNER_BIN="${HOME}/.local/bin/trufflehog"
 elif [[ -x "${HOME}/Library/Python/3.9/bin/trufflehog" ]]; then
   SCANNER_BIN="${HOME}/Library/Python/3.9/bin/trufflehog"
 else

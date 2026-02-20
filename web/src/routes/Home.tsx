@@ -94,30 +94,51 @@ export default function Home() {
       }
 
       try {
-        const [ledgerRes, overviewRes, activitiesRes] = await Promise.all([
-          fetchVoteLedger().catch(() => null),
-          fetchSessionOverview().catch(() => null),
-          fetchActivitiesIndex().catch(() => null),
+        const [ledgerResult, overviewResult, activitiesResult] = await Promise.allSettled([
+          fetchVoteLedger(),
+          fetchSessionOverview(),
+          fetchActivitiesIndex(),
         ])
         if (cancelled) return
 
-        if (ledgerRes && overviewRes) {
-          setLedger(ledgerRes)
-          setOverview(overviewRes)
-          setActivities(activitiesRes)
-        } else {
-          setLedger(E2E_LEDGER)
-          setOverview(E2E_OVERVIEW)
-          setActivities(E2E_ACTIVITIES)
-          setUsingDemo(true)
+        const ledgerRes = ledgerResult.status === 'fulfilled' ? ledgerResult.value : null
+        const overviewRes = overviewResult.status === 'fulfilled' ? overviewResult.value : null
+        const activitiesRes = activitiesResult.status === 'fulfilled' ? activitiesResult.value : null
+
+        if (!ledgerRes || !overviewRes) {
+          const loadErrors: string[] = []
+          if (ledgerResult.status === 'rejected') {
+            loadErrors.push(`vote ledger: ${normalizeErrorMessage(ledgerResult.reason)}`)
+          }
+          if (overviewResult.status === 'rejected') {
+            loadErrors.push(`session overview: ${normalizeErrorMessage(overviewResult.reason)}`)
+          }
+          setLedger(null)
+          setOverview(null)
+          setActivities(null)
+          setError(
+            loadErrors.length > 0
+              ? `Live data unavailable. ${loadErrors.join(' | ')}`
+              : 'Live data unavailable.'
+          )
+          return
+        }
+
+        setLedger(ledgerRes)
+        setOverview(overviewRes)
+        setActivities(activitiesRes)
+
+        if (activitiesResult.status === 'rejected') {
+          setError(
+            `Loaded votes and overview, but activities are unavailable: ${normalizeErrorMessage(activitiesResult.reason)}`
+          )
         }
       } catch (e) {
         if (cancelled) return
-        setError(normalizeErrorMessage(e))
-        setLedger(E2E_LEDGER)
-        setOverview(E2E_OVERVIEW)
-        setActivities(E2E_ACTIVITIES)
-        setUsingDemo(true)
+        setError(`Unexpected fetch error: ${normalizeErrorMessage(e)}`)
+        setLedger(null)
+        setOverview(null)
+        setActivities(null)
       } finally {
         if (!cancelled) setIsLoading(false)
       }
