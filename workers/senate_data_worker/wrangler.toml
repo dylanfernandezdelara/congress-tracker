@@ -12,6 +12,11 @@ cpu_ms = 300000
 CONGRESS = "119"
 SESSION = "2"
 TARGET_STATE = "ALL"
+# Optional: set to your deployed frontend origin to restrict CORS.
+# ALLOWED_ORIGIN = "https://your-site.example"
+# Optional: OpenRouter attribution headers.
+# OPENROUTER_APP_REFERER = "https://your-site.example"
+# OPENROUTER_APP_TITLE = "daily_senate_update_worker"
 
 [[r2_buckets]]
 binding = "DATA_BUCKET"

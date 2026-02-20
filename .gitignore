@@ -15,6 +15,7 @@ node_modules/
 # Build artifacts
 /target/
 web/artifacts/
+senate-*.png
 
 # IDE
 .idea/

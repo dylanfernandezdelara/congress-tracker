@@ -102,12 +102,20 @@ const mockEnv = {
   DATA_FRESHNESS_MAX_HOURS: "36",
 };
 
+function createMockEnv(overrides: Partial<typeof mockEnv> = {}): typeof mockEnv {
+  return {
+    ...mockEnv,
+    ...overrides,
+  };
+}
+
 // Helper to create mock requests
 function mockRequest(
   path: string,
-  method: string = "GET"
+  method: string = "GET",
+  headers?: HeadersInit
 ): Request {
-  return new Request(`https://worker.example.com${path}`, { method });
+  return new Request(`https://worker.example.com${path}`, { method, headers });
 }
 
 async function readJson<T>(res: Response): Promise<T> {
@@ -143,6 +151,30 @@ describe("HTTP Read API", () => {
       const res = await handler.fetch(req, mockEnv as any);
 
       expect(res.status).toBe(204);
+    });
+  });
+
+  describe("CORS origin restriction", () => {
+    it("uses ALLOWED_ORIGIN and Vary header on GET responses", async () => {
+      const env = createMockEnv({ ALLOWED_ORIGIN: "https://daily.example.com" } as any);
+      const req = mockRequest("/health");
+      const res = await handler.fetch(req, env as any);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://daily.example.com");
+      expect(res.headers.get("Vary")).toBe("Origin");
+    });
+
+    it("uses ALLOWED_ORIGIN and Vary header on OPTIONS responses", async () => {
+      const env = createMockEnv({ ALLOWED_ORIGIN: "https://daily.example.com" } as any);
+      const req = mockRequest("/state/NY/latest.json", "OPTIONS", {
+        Origin: "https://another-site.example",
+      });
+      const res = await handler.fetch(req, env as any);
+
+      expect(res.status).toBe(204);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://daily.example.com");
+      expect(res.headers.get("Vary")).toBe("Origin");
     });
   });
 

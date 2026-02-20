@@ -61,10 +61,13 @@ interface Env {
   CONGRESS: string;
   SESSION: string;
   TARGET_STATE: string;
+  ALLOWED_ORIGIN?: string;
   CONGRESS_API_KEY: string;
   GOVINFO_API_KEY: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_MODEL?: string;
+  OPENROUTER_APP_REFERER?: string;
+  OPENROUTER_APP_TITLE?: string;
   OPENROUTER_SHADOW_MODE?: string;
   OPENROUTER_CANARY_PERCENT?: string;
   OPENROUTER_MAX_NEW_ANALYSES?: string;
@@ -79,38 +82,43 @@ interface Env {
 // Headers & Helpers
 // ============================================================================
 
-const corsHeaders: HeadersInit = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-const jsonHeaders: HeadersInit = {
-  "Content-Type": "application/json",
-  ...corsHeaders,
-};
+function buildCorsHeaders(env: Env): HeadersInit {
+  const allowedOrigin = env.ALLOWED_ORIGIN?.trim();
+  const restrictedOrigin = allowedOrigin && allowedOrigin !== "*" ? allowedOrigin : null;
+  const headers: HeadersInit = {
+    "Access-Control-Allow-Origin": restrictedOrigin ?? "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+  if (restrictedOrigin) {
+    headers["Vary"] = "Origin";
+  }
+  return headers;
+}
 
 // Cache-Control values per SPEC.md
 const cacheHealth = "s-maxage=60, max-age=0, must-revalidate";
 const cacheLatest = "s-maxage=300, stale-while-revalidate=86400";
 const cacheSnapshot = "s-maxage=86400, stale-while-revalidate=604800";
 
-const jsonResponse = (body: unknown, init?: ResponseInit) =>
+const buildJsonResponse = (body: unknown, corsHeaders: HeadersInit, init?: ResponseInit) =>
   new Response(JSON.stringify(body), {
     ...init,
     headers: {
-      ...jsonHeaders,
+      "Content-Type": "application/json",
+      ...corsHeaders,
       ...(init?.headers ?? {}),
     },
   });
 
-const notFoundResponse = (path: string) =>
-  jsonResponse(
+const buildNotFoundResponse = (path: string, corsHeaders: HeadersInit) =>
+  buildJsonResponse(
     {
       error: "not_found",
       message: "Resource not found",
       path,
     },
+    corsHeaders,
     { status: 404 }
   );
 
@@ -217,6 +225,10 @@ function summarizeCoverage(
 
 async function handleFetch(request: Request, env: Env): Promise<Response> {
   const { pathname } = new URL(request.url);
+  const corsHeaders = buildCorsHeaders(env);
+  const jsonResponse = (body: unknown, init?: ResponseInit) =>
+    buildJsonResponse(body, corsHeaders, init);
+  const notFoundResponse = (path: string) => buildNotFoundResponse(path, corsHeaders);
 
   // Handle CORS preflight
   if (request.method === "OPTIONS") {
@@ -721,7 +733,9 @@ async function enrichBillAnalyses(
   apiKey: string,
   model: string,
   maxNewAnalyses: number,
-  shadowMode: boolean
+  shadowMode: boolean,
+  appReferer?: string,
+  appTitle?: string
 ): Promise<AnalyzeBillsResult | null> {
   if (billInputs.length === 0) {
     console.log("[openrouter] No bill refs found for analysis enrichment");
@@ -732,8 +746,8 @@ async function enrichBillAnalyses(
     apiKey,
     model,
     maxNewAnalyses,
-    appReferer: "https://localhost",
-    appTitle: "daily_senate_update_worker",
+    appReferer,
+    appTitle,
     timeoutMs: 30_000,
     maxRetries: 2,
     analysisConcurrency: 2,
@@ -847,6 +861,8 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   const canaryValue = hashRunId(runId);
   const canaryEnabled = canaryValue < canaryPercent;
   const maxNewAnalyses = Math.max(1, parseIntSafe(env.OPENROUTER_MAX_NEW_ANALYSES, 20));
+  const openrouterAppReferer = env.OPENROUTER_APP_REFERER?.trim();
+  const openrouterAppTitle = env.OPENROUTER_APP_TITLE?.trim() || "daily_senate_update_worker";
   let analysisResult: AnalyzeBillsResult | null = null;
   let synthesisErrors: SourceError[] = [];
 
@@ -862,7 +878,9 @@ async function runScheduledIngestion(env: Env): Promise<void> {
           env.OPENROUTER_API_KEY as string,
           model,
           maxNewAnalyses,
-          shadowMode
+          shadowMode,
+          openrouterAppReferer,
+          openrouterAppTitle
         )
       );
 
@@ -1001,20 +1019,19 @@ function handleScheduled(
   env: Env,
   ctx: ExecutionContext
 ): void {
-  console.log(
-    `[scheduled] Cron scheduled at: ${new Date(controller.scheduledTime).toISOString()}`
-  );
+  logEvent("scheduled_trigger", {
+    scheduled_for: new Date(controller.scheduledTime).toISOString(),
+  });
 
   // Use ctx.waitUntil to ensure the async work completes
   // This prevents the runtime from terminating the worker prematurely
   ctx.waitUntil(
     runScheduledIngestion(env).catch((err) => {
-      // Log and re-throw to ensure the cron run is marked as failed
-      console.error("[scheduled] FATAL: Scheduled ingestion failed");
-      console.error("[scheduled] Error:", err instanceof Error ? err.message : String(err));
-      if (err instanceof Error && err.stack) {
-        console.error("[scheduled] Stack:", err.stack);
-      }
+      // Keep failure logs structured and avoid exposing full stack traces by default.
+      logEvent("scheduled_ingestion_failed", {
+        fatal: true,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     })
   );

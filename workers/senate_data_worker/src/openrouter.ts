@@ -763,14 +763,17 @@ export async function analyzeBillsWithCache(
   const timeoutMs = Math.max(5_000, options.timeoutMs ?? 30_000);
   const maxRetries = Math.max(0, options.maxRetries ?? 2);
   const analysisConcurrency = Math.max(1, Math.min(options.analysisConcurrency ?? 2, 3));
+  const defaultHeaders: Record<string, string> = {
+    "X-Title": options.appTitle ?? "daily_senate_update_worker",
+  };
+  if (options.appReferer?.trim()) {
+    defaultHeaders["HTTP-Referer"] = options.appReferer.trim();
+  }
 
   const client = new OpenAI({
     apiKey: options.apiKey,
     baseURL: "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer": options.appReferer ?? "https://localhost",
-      "X-Title": options.appTitle ?? "daily_senate_update_worker",
-    },
+    defaultHeaders,
   });
 
   const pending: Array<{ key: string; input: AnalyzeBillInput }> = [];

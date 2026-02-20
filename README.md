@@ -43,6 +43,11 @@ Edit `workers/senate_data_worker/wrangler.toml` to set environment variables:
 CONGRESS = "119"        # Current Congress number
 SESSION = "2"           # Session number (1 or 2)
 TARGET_STATE = "ALL"    # "ALL" or two-letter state code (uppercase)
+# Optional: restrict CORS to your deployed frontend
+# ALLOWED_ORIGIN = "https://your-site.example"
+# Optional: OpenRouter attribution headers
+# OPENROUTER_APP_REFERER = "https://your-site.example"
+# OPENROUTER_APP_TITLE = "daily_senate_update_worker"
 ```
 
 **API keys (required)**:
@@ -225,6 +230,11 @@ npx wrangler secret put GOVINFO_API_KEY
 
 `CONGRESS`, `SESSION`, and `TARGET_STATE` should be configured under `[vars]` in `wrangler.toml`.
 
+Optional runtime vars:
+- `ALLOWED_ORIGIN`: when set to a non-`*` value, responses include `Access-Control-Allow-Origin: <value>` and `Vary: Origin`.
+- `OPENROUTER_APP_REFERER`: optional referer header sent to OpenRouter.
+- `OPENROUTER_APP_TITLE`: optional title header sent to OpenRouter (defaults to `daily_senate_update_worker`).
+
 ## HTTP API Endpoints
 
 All endpoints return JSON with `Content-Type: application/json` and CORS headers.
@@ -305,16 +315,21 @@ Returns a dated snapshot of daily activity for a senator (window end date).
 
 ### CORS Policy
 
-**Default**: `Access-Control-Allow-Origin: *` (allows all origins for MVP).
+**Default**: `Access-Control-Allow-Origin: *` (allows all origins).
+
+**Restricted mode**: set `ALLOWED_ORIGIN` to your deployed frontend origin to return:
+- `Access-Control-Allow-Origin: <ALLOWED_ORIGIN>`
+- `Vary: Origin`
 
 **Headers included**:
-- `Access-Control-Allow-Origin: *`
+- `Access-Control-Allow-Origin: *` (or `ALLOWED_ORIGIN` when configured)
 - `Access-Control-Allow-Methods: GET, OPTIONS`
 - `Access-Control-Allow-Headers: Content-Type`
+- `Vary: Origin` (only when `ALLOWED_ORIGIN` is configured and not `*`)
 
 **OPTIONS preflight**: Returns `204 No Content` with CORS headers.
 
-**Note**: For production, consider restricting to your website's origin via environment variable (see `SPEC.md` for details).
+**Note**: Set `ALLOWED_ORIGIN` in production to avoid wildcard CORS.
 
 ### Cache-Control Strategy
 
@@ -403,6 +418,29 @@ To manually trigger ingestion (e.g., for backfilling a missed day):
 - **Check**: Network latency to Senate XML endpoints
 - **Action**: Consider batching or increasing Worker timeout limits
 
+## Public Readiness Validation
+
+Run the repeatable public-readiness gate before changing repository visibility:
+
+```bash
+npm run public:check
+```
+
+If history scanning tooling is missing locally:
+
+```bash
+python3 -m pip install --user trufflehog
+```
+
+This runs:
+- tracked-file secret scan
+- git-history secret scan (trufflehog)
+- internal/staging URL sweep
+- worker typecheck/tests
+- web typecheck/tests
+
+See `PUBLIC_READINESS_REPORT.md` for the latest branch/history hygiene recommendations.
+
 ### Website Integration Example
 
 Fetch the latest NY votes from your website:
@@ -457,8 +495,9 @@ daily_senate_update/
 
 - **API Specification**: `workers/senate_data_worker/SPEC.md`
 - **Cron Schedule**: `workers/senate_data_worker/CRON.md`
-- **Validation Guide**: `workers/senate_data_worker/VALIDATION.md` (if present)
+- **Validation Guide**: `workers/senate_data_worker/VALIDATION.md`
+- **Security Policy**: `SECURITY.md`
 
 ## License
 
-[Add your license here]
+MIT. See `LICENSE`.

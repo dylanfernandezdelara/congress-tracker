@@ -9,61 +9,8 @@ import type {
   RecipientEvidence,
   UnknownReason,
 } from "./types";
+import { STATE_CODES_FOR_MATCHING, STATE_NAME_ENTRIES } from "./states";
 
-const STATE_NAME_TO_CODE: Record<string, string> = {
-  alabama: "AL",
-  alaska: "AK",
-  arizona: "AZ",
-  arkansas: "AR",
-  california: "CA",
-  colorado: "CO",
-  connecticut: "CT",
-  delaware: "DE",
-  florida: "FL",
-  georgia: "GA",
-  hawaii: "HI",
-  idaho: "ID",
-  illinois: "IL",
-  indiana: "IN",
-  iowa: "IA",
-  kansas: "KS",
-  kentucky: "KY",
-  louisiana: "LA",
-  maine: "ME",
-  maryland: "MD",
-  massachusetts: "MA",
-  michigan: "MI",
-  minnesota: "MN",
-  mississippi: "MS",
-  missouri: "MO",
-  montana: "MT",
-  nebraska: "NE",
-  nevada: "NV",
-  "new hampshire": "NH",
-  "new jersey": "NJ",
-  "new mexico": "NM",
-  "new york": "NY",
-  "north carolina": "NC",
-  "north dakota": "ND",
-  ohio: "OH",
-  oklahoma: "OK",
-  oregon: "OR",
-  pennsylvania: "PA",
-  "rhode island": "RI",
-  "south carolina": "SC",
-  "south dakota": "SD",
-  tennessee: "TN",
-  texas: "TX",
-  utah: "UT",
-  vermont: "VT",
-  virginia: "VA",
-  washington: "WA",
-  "west virginia": "WV",
-  wisconsin: "WI",
-  wyoming: "WY",
-  "district of columbia": "DC",
-};
-const STATE_CODES = new Set(Object.values(STATE_NAME_TO_CODE));
 const AMBIGUOUS_STATE_CODES = new Set(["IN", "OR", "ME", "AS", "TO", "IT", "AT", "BY", "ON", "NO"]);
 
 function unique<T>(items: T[]): T[] {
@@ -164,9 +111,7 @@ function extractRecipients(sourceText: string[]): RecipientEvidence[] {
         const key = raw.toLowerCase();
         if (!seen.has(key) && raw.length > 4) {
           seen.add(key);
-          const stateCode = Object.entries(STATE_NAME_TO_CODE).find(([name]) =>
-            raw.toLowerCase().includes(name)
-          )?.[1];
+          const stateCode = STATE_NAME_ENTRIES.find(([name]) => raw.toLowerCase().includes(name))?.[1];
           out.push({
             type: classifyRecipientType(raw),
             name: raw,
@@ -231,11 +176,11 @@ function extractStates(sourceText: string[]): string[] {
   const states: string[] = [];
   for (const text of sourceText) {
     const lower = text.toLowerCase();
-    for (const [name, code] of Object.entries(STATE_NAME_TO_CODE)) {
+    for (const [name, code] of STATE_NAME_ENTRIES) {
       if (lower.includes(name)) states.push(code);
     }
     const upperText = text.toUpperCase();
-    for (const code of STATE_CODES) {
+    for (const code of STATE_CODES_FOR_MATCHING) {
       if (AMBIGUOUS_STATE_CODES.has(code)) continue;
       const codePattern = new RegExp(
         `(?:\\bIN\\s+|\\bFOR\\s+|\\bTO\\s+|\\bFROM\\s+|\\bAND\\s+|\\(|,\\s*|\\bSTATE OF\\s+)${code}(?:\\b|\\))`,
