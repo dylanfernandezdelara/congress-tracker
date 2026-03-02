@@ -77,6 +77,28 @@ function createMockBucket(data: Record<string, unknown>) {
   } as unknown as R2Bucket;
 }
 
+
+function createMockD1() {
+  return {
+    prepare: vi.fn(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => null),
+        all: vi.fn(async () => ({ results: [] })),
+        run: vi.fn(async () => ({})),
+      })),
+    })),
+    exec: vi.fn(async () => {}),
+    batch: vi.fn(async () => []),
+  } as unknown as D1Database;
+}
+
+function createMockDO() {
+  return {
+    idFromName: vi.fn(() => ({ toString: () => "id" })),
+    get: vi.fn(() => ({ fetch: vi.fn(async () => new Response(JSON.stringify({ ok: true }))) })),
+  } as unknown as DurableObjectNamespace;
+}
+
 // ============================================================================
 // Import and setup handler
 // ============================================================================
@@ -100,6 +122,8 @@ const mockEnv = {
   SESSION: "1",
   TARGET_STATE: "NY",
   DATA_FRESHNESS_MAX_HOURS: "36",
+  ANALYTICS_DB: createMockD1(),
+  INGEST_LOCK: createMockDO(),
 };
 
 function createMockEnv(overrides: Partial<typeof mockEnv> = {}): typeof mockEnv {

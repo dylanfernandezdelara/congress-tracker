@@ -51,6 +51,21 @@ import {
   writeJsonToR2,
 } from "./storage";
 import { mapWithConcurrency } from "./concurrency";
+import { runMigrations } from "./db/migrations";
+import {
+  finalizeFailedRun,
+  insertRunningIngestionRun,
+  publishRun,
+} from "./db/publish";
+import {
+  queryMeta,
+  queryV2MemberActivities,
+  queryV2Members,
+  queryV2StateTimeseries,
+  queryV2Votes,
+} from "./db/queries";
+import { upsertRunScopedData } from "./db/upserts";
+import { IngestLock } from "./db/ingest-lock";
 
 // ============================================================================
 // Environment Types
@@ -76,6 +91,8 @@ interface Env {
   EVIDENCE_BILL_CONCURRENCY?: string;
   EVIDENCE_ENDPOINT_FANOUT?: string;
   ACTIVITY_LOOKBACK_DAYS?: string;
+  ANALYTICS_DB: D1Database;
+  INGEST_LOCK: DurableObjectNamespace;
 }
 
 // ============================================================================
@@ -286,18 +303,75 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     const now = Date.now();
     const ageHours = Number(((now - generatedAt) / 3_600_000).toFixed(2));
     const fresh = Number.isFinite(generatedAt) && ageHours <= maxFreshHours;
+    const dbMeta = await queryMeta(env.ANALYTICS_DB);
     return jsonResponse(
       {
         status: fresh ? "ok" : "stale",
         generated_at: activityIndex.generated_at,
         age_hours: ageHours,
         max_fresh_hours: maxFreshHours,
+        analytics: dbMeta,
       },
       {
         status: fresh ? 200 : 503,
         headers: { "Cache-Control": cacheHealth },
       }
     );
+  }
+
+  if (pathname === "/v2/meta") {
+    const data = await queryMeta(env.ANALYTICS_DB);
+    return jsonResponse(data, { status: 200, headers: { "Cache-Control": cacheLatest } });
+  }
+
+  if (pathname === "/v2/votes") {
+    const url = new URL(request.url);
+    const data = await queryV2Votes(env.ANALYTICS_DB, {
+      state: url.searchParams.get("state") ?? undefined,
+      from: url.searchParams.get("from") ?? undefined,
+      to: url.searchParams.get("to") ?? undefined,
+      party: url.searchParams.get("party") ?? undefined,
+      issue_type: url.searchParams.get("issue_type") ?? undefined,
+      limit: url.searchParams.get("limit") ? Number(url.searchParams.get("limit")) : undefined,
+      cursor: url.searchParams.get("cursor") ?? undefined,
+    });
+    return jsonResponse(data, { status: 200, headers: { "Cache-Control": cacheLatest } });
+  }
+
+  if (pathname === "/v2/members") {
+    const url = new URL(request.url);
+    const data = await queryV2Members(env.ANALYTICS_DB, {
+      state: url.searchParams.get("state") ?? undefined,
+      party: url.searchParams.get("party") ?? undefined,
+      metric_date: url.searchParams.get("metric_date") ?? undefined,
+      limit: url.searchParams.get("limit") ? Number(url.searchParams.get("limit")) : undefined,
+      cursor: url.searchParams.get("cursor") ?? undefined,
+    });
+    return jsonResponse(data, { status: 200, headers: { "Cache-Control": cacheLatest } });
+  }
+
+  const activitiesV2Match = pathname.match(/^\/v2\/members\/([A-Z]\d{6})\/activities$/);
+  if (activitiesV2Match) {
+    const url = new URL(request.url);
+    const data = await queryV2MemberActivities(env.ANALYTICS_DB, activitiesV2Match[1], {
+      from: url.searchParams.get("from") ?? undefined,
+      to: url.searchParams.get("to") ?? undefined,
+      types: url.searchParams.getAll("types"),
+      sources: url.searchParams.getAll("sources"),
+    });
+    return jsonResponse(data, { status: 200, headers: { "Cache-Control": cacheLatest } });
+  }
+
+  const timeseriesMatch = pathname.match(/^\/v2\/states\/([A-Z]{2})\/timeseries$/);
+  if (timeseriesMatch) {
+    const url = new URL(request.url);
+    const data = await queryV2StateTimeseries(
+      env.ANALYTICS_DB,
+      timeseriesMatch[1],
+      url.searchParams.get("from") ?? undefined,
+      url.searchParams.get("to") ?? undefined
+    );
+    return jsonResponse(data, { status: 200, headers: { "Cache-Control": cacheLatest } });
   }
 
   // Match /state/{STATE}/latest.json
@@ -831,10 +905,29 @@ async function runScheduledIngestion(env: Env): Promise<void> {
       congressApiKey: env.CONGRESS_API_KEY,
       session: config.session,
       maxBills: evidenceMaxBills,
-      billConcurrency: evidenceBillConcurrency,
-      endpointFanout: evidenceEndpointFanout,
-    })
-  );
+  await runMigrations(env.ANALYTICS_DB);
+  const lockId = env.INGEST_LOCK.idFromName("global");
+  const lock = env.INGEST_LOCK.get(lockId);
+  const acquired = await lock.fetch("https://lock/acquire", {
+    method: "POST",
+    body: JSON.stringify({ trigger_type: "scheduled" }),
+  });
+  if (!acquired.ok) {
+    throw new Error("Concurrent or over-budget ingestion rejected by lock");
+  }
+  try {
+    const memberResult = await runTimed(runId, "member_ingestion", async () =>
+      runMemberIngestion({
+      })
+    );
+
+    await insertRunningIngestionRun(
+      env.ANALYTICS_DB,
+      runId,
+      "scheduled",
+      memberResult.windowStart,
+      memberResult.windowEnd
+    );
 
   for (const memberActivity of memberResult.memberActivities) {
     for (const item of memberActivity.activities) {
@@ -1045,3 +1138,32 @@ export default {
   fetch: handleFetch,
   scheduled: handleScheduled,
 } satisfies ExportedHandler<Env>;
+    const upsertStats = await runTimed(runId, "d1_dual_write", async () =>
+      upsertRunScopedData(
+        env.ANALYTICS_DB,
+        runId,
+        membersIndex,
+        memberResult.memberActivities,
+        memberResult.activityIndex,
+        ledger
+      )
+    );
+
+    await publishRun(env.ANALYTICS_DB, runId, {
+      status: coverage.partial ? "partial" : "success",
+      partial: coverage.partial,
+      finishedAt: new Date().toISOString(),
+      rowWrites: upsertStats.rowWrites,
+      rowReads: 0,
+    });
+
+    logEvent("scheduled_ingestion_complete", {
+    });
+  } catch (error) {
+    await finalizeFailedRun(env.ANALYTICS_DB, runId, error);
+    throw error;
+  } finally {
+    await lock.fetch("https://lock/release", { method: "POST" });
+  }
+export { IngestLock };
+

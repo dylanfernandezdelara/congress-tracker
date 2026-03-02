@@ -21,3 +21,12 @@ TARGET_STATE = "ALL"
 [[r2_buckets]]
 binding = "DATA_BUCKET"
 bucket_name = "senate-data-bucket"
+
+[[d1_databases]]
+binding = "ANALYTICS_DB"
+database_name = "senate_analytics"
+database_id = "local-dev"
+
+[[durable_objects.bindings]]
+name = "INGEST_LOCK"
+class_name = "IngestLock"

@@ -726,3 +726,103 @@ export interface MultiStateIngestResult {
   >;
   error?: string;
 }
+
+// ============================================================================
+// V2 D1-backed API Types
+// ============================================================================
+
+export interface V2VotesQuery {
+  state?: string;
+  from?: string;
+  to?: string;
+  party?: string;
+  issue_type?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface V2VotesItem {
+  vote_id: string;
+  vote_date: string;
+  vote_number: number;
+  title: string;
+  question: string;
+  result: string;
+  issue?: string;
+  issue_type?: string;
+}
+
+export interface V2VotesResponse {
+  items: V2VotesItem[];
+  next_cursor: string | null;
+  partial: boolean;
+  run_id: string | null;
+  generated_at: string;
+}
+
+export interface V2MembersQuery {
+  state?: string;
+  party?: string;
+  metric_date?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface V2MembersItem {
+  bioguide_id: string;
+  name: string;
+  party: string;
+  state: string;
+  activity_score: number;
+  defection_count: number;
+  sponsored_count: number;
+  cosponsored_count: number;
+  vote_count: number;
+}
+
+export interface V2MembersResponse {
+  items: V2MembersItem[];
+  next_cursor: string | null;
+  partial: boolean;
+  run_id: string | null;
+}
+
+export interface V2MemberActivitiesQuery {
+  from?: string;
+  to?: string;
+  types?: string[];
+  sources?: string[];
+}
+
+export interface V2MemberActivitiesItem {
+  activity_id: string;
+  activity_date: string;
+  source: string;
+  type: string;
+  payload_json: unknown;
+}
+
+export interface V2MemberActivitiesResponse {
+  items: V2MemberActivitiesItem[];
+  partial: boolean;
+  run_id: string | null;
+}
+
+export interface V2StateTimeseriesResponse {
+  items: Array<{
+    metric_date: string;
+    votes_count: number;
+    defection_count: number;
+  }>;
+  partial: boolean;
+  run_id: string | null;
+}
+
+export interface V2MetaResponse {
+  run_id: string | null;
+  status: "running" | "success" | "partial" | "failed";
+  partial: boolean;
+  window_start: string | null;
+  window_end: string | null;
+  generated_at: string;
+}
