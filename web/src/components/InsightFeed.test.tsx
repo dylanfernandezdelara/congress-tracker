@@ -38,8 +38,9 @@ function makeInsightCard(overrides: Partial<InsightCardVM> = {}): InsightCardVM 
       },
     ],
     beneficiaries: [
-      { group: 'Department of Defense', effect: 'benefit', effectLabel: 'Benefits' },
+      { group: 'Department of Defense', effect: 'benefit', effectLabel: 'Benefits', rationale: [] },
     ],
+    likelyReasons: [],
     analysisQuality: {
       evidence_coverage: 'partial',
       inference_used: true,
@@ -99,8 +100,47 @@ describe('InsightFeed', () => {
   it('renders beneficiary panel', () => {
     render(<InsightFeed cards={[makeInsightCard()]} />)
     expect(screen.getByText('Who is affected')).toBeTruthy()
+    expect(screen.getByText('Who benefits')).toBeTruthy()
     expect(screen.getByText('Department of Defense')).toBeTruthy()
     expect(screen.getByText('Benefits')).toBeTruthy()
+  })
+
+  it('renders harms section and rationale lines when present', () => {
+    const card = makeInsightCard({
+      beneficiaries: [
+        {
+          group: 'Small businesses',
+          effect: 'burden',
+          effectLabel: 'Harms',
+          rationale: ['Source: summary_evidence:2'],
+        },
+      ],
+    })
+    render(<InsightFeed cards={[card]} />)
+    expect(screen.getByText('Who is harmed')).toBeTruthy()
+    expect(screen.getByText('Harms')).toBeTruthy()
+    expect(screen.getByText('Source: summary_evidence:2')).toBeTruthy()
+  })
+
+  it('renders likely reasons panel with inference and evidence', () => {
+    const card = makeInsightCard({
+      likelyReasons: [
+        {
+          actor: 'D',
+          actorLabel: 'Democrats',
+          category: 'Federalism',
+          reason: 'Likely concern that federal override narrows local D.C. policy control.',
+          confidence: 'medium',
+          inferenceLabel: 'Inference',
+          evidenceLines: ['The joint resolution nullifies legislation enacted by the Council of the District of Columbia.'],
+        },
+      ],
+    })
+    render(<InsightFeed cards={[card]} />)
+    expect(screen.getByText('Likely reasons behind positions')).toBeTruthy()
+    expect(screen.getByText('Federalism')).toBeTruthy()
+    expect(screen.getByText(/federal override narrows local D\.C\. policy control/i)).toBeTruthy()
+    expect(screen.getByText(/nullifies legislation enacted by the Council/i)).toBeTruthy()
   })
 
   it('renders confidence badges', () => {

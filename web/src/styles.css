@@ -670,25 +670,108 @@ button, input, select { font: inherit; color: inherit; }
   border-radius: 3px;
 }
 
+.insightCard__likelyReasonsPanel {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-xs);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.insightCard__likelyReasonRows {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.insightCard__likelyReasonRow {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.insightCard__likelyReasonHeader {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.insightCard__likelyReasonActor {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.insightCard__likelyReasonCategory {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.insightCard__likelyReasonText {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.insightCard__likelyReasonEvidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
 .insightCard__beneficiaryPanel {
   border-top: 1px solid var(--line);
   padding-top: var(--space-xs);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.insightCard__beneficiarySection {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.insightCard__beneficiarySectionTitle {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
 }
 
 .insightCard__beneficiaryList {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  display: grid;
+  gap: 0.32rem;
 }
 
 .insightCard__beneficiaryItem {
+  display: grid;
+  gap: 0.18rem;
+  font-size: 0.78rem;
+}
+
+.insightCard__beneficiaryMain {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.78rem;
+}
+
+.insightCard__beneficiaryRationaleList {
+  margin: 0;
+  padding: 0 0 0 1.2rem;
+  list-style: disc;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.insightCard__beneficiaryRationaleItem {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.3;
 }
 
 .insightCard__effectBadge {

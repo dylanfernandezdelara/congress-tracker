@@ -6,13 +6,22 @@ import type {
   AnalysisQuality,
   BenefitMapEntry,
   BillAnalysis,
+  BillAnalysisClaimRef,
   BillImpactEvidence,
   BillRef,
+  LikelyReason,
+  LikelyReasonCategory,
   PartyPositionAnalysis,
+  PolicyDelta,
+  StakeholderImpact,
 } from "./types";
+import {
+  computeConfidenceCalibrationSummary,
+  computeQuoteValidationSummary,
+} from "./analysis-validation";
 
 export const BILL_ANALYSIS_CACHE_KEY = "analysis/bill-analysis-cache.json";
-export const ANALYSIS_VERSION = "v4-party-insight";
+export const ANALYSIS_VERSION = "v6-generalized-likely-reasons";
 export const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-r1-0528:free";
 
 interface LegacyAnalysisCache {
@@ -41,6 +50,10 @@ export interface AnalyzeBillsResult {
   cacheHitCount: number;
   skippedCount: number;
   claimsWithEvidenceRefPct: number;
+  benefitMapWithEvidenceRefPct: number;
+  likelyReasonsWithEvidenceRefPct: number;
+  quoteValidityPct: number;
+  confidenceCalibrationMismatchPct: number;
 }
 
 const VAGUE_PHRASE_RE =
@@ -159,6 +172,7 @@ function buildEvidenceFingerprint(ref: BillRef, evidence?: BillImpactEvidence): 
           when: evidence.when,
           where: evidence.where,
           unknowns: evidence.unknowns,
+          policy_deltas: evidence.policy_deltas ?? [],
           richness_score: evidence.richness_score,
           summary_evidence: evidence.summary_evidence,
         }
@@ -252,6 +266,152 @@ function sanitizeStance(value: unknown): PartyPositionAnalysis["stance"] {
   return "mixed";
 }
 
+function coerceEvidenceRefs(raw: unknown): BillAnalysisClaimRef[] {
+  if (!Array.isArray(raw)) return [];
+  const refs: BillAnalysisClaimRef[] = [];
+  for (const ref of raw) {
+    if (!ref || typeof ref !== "object") continue;
+    const r = ref as Record<string, unknown>;
+    const sourceRef = typeof r.source_ref === "string" ? r.source_ref.trim() : "";
+    if (!sourceRef) continue;
+    const quote = typeof r.quote === "string" ? r.quote.trim() : "";
+    refs.push({
+      source_endpoint: (typeof r.source_endpoint === "string" ? r.source_endpoint : "summary") as BillAnalysisClaimRef["source_endpoint"],
+      source_ref: sourceRef,
+      quote: quote || undefined,
+    });
+  }
+  return refs;
+}
+
+function sanitizeEffect(value: unknown): BenefitMapEntry["expected_effect"] {
+  if (typeof value !== "string") return "mixed";
+  const effect = value.trim().toLowerCase();
+  if (effect === "benefit" || effect === "burden" || effect === "mixed") {
+    return effect;
+  }
+  return "mixed";
+}
+
+function sanitizePolicyDeltaAction(value: unknown): PolicyDelta["action"] {
+  if (typeof value !== "string") return "other";
+  const action = value.trim().toLowerCase();
+  const valid: PolicyDelta["action"][] = [
+    "nullify",
+    "reinstate",
+    "decouple",
+    "restore",
+    "expand",
+    "restrict",
+    "authorize",
+    "prohibit",
+    "modify",
+    "other",
+  ];
+  return valid.includes(action as PolicyDelta["action"]) ? (action as PolicyDelta["action"]) : "other";
+}
+
+function sanitizeLikelyReasonCategory(value: unknown): LikelyReasonCategory {
+  if (typeof value !== "string") return "other";
+  const category = value.trim().toLowerCase();
+  const valid: LikelyReasonCategory[] = [
+    "fiscal",
+    "federalism",
+    "labor",
+    "business",
+    "administrative",
+    "legal",
+    "other",
+  ];
+  return valid.includes(category as LikelyReasonCategory) ? (category as LikelyReasonCategory) : "other";
+}
+
+function coercePolicyDeltas(raw: unknown, impactEvidence?: BillImpactEvidence): PolicyDelta[] {
+  const source = Array.isArray(raw) ? raw : impactEvidence?.policy_deltas ?? [];
+  if (!Array.isArray(source)) return [];
+  const out: PolicyDelta[] = [];
+  for (const item of source) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const target = typeof obj.target === "string" ? obj.target.trim() : "";
+    if (!target) continue;
+    const refs = coerceEvidenceRefs(obj.evidence_refs);
+    if (refs.length === 0) continue;
+    out.push({
+      action: sanitizePolicyDeltaAction(obj.action),
+      target,
+      before_state: typeof obj.before_state === "string" ? obj.before_state.trim() || undefined : undefined,
+      after_state: typeof obj.after_state === "string" ? obj.after_state.trim() || undefined : undefined,
+      confidence: sanitizeConfidence(obj.confidence),
+      evidence_refs: refs,
+    });
+  }
+  return out.slice(0, 10);
+}
+
+function coerceStakeholderImpacts(raw: unknown): StakeholderImpact[] {
+  if (!Array.isArray(raw)) return [];
+  const out: StakeholderImpact[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const group = typeof obj.group === "string" ? obj.group.trim() : "";
+    const mechanism = typeof obj.mechanism === "string" ? obj.mechanism.trim() : "";
+    if (!group || !mechanism) continue;
+    const refs = coerceEvidenceRefs(obj.evidence_refs);
+    if (refs.length === 0) continue;
+    out.push({
+      group,
+      effect: sanitizeEffect(obj.effect ?? obj.expected_effect),
+      mechanism,
+      confidence: sanitizeConfidence(obj.confidence),
+      evidence_refs: refs,
+    });
+  }
+  return out.slice(0, 8);
+}
+
+function coerceLikelyReasons(raw: unknown): LikelyReason[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LikelyReason[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const actor = typeof obj.actor === "string" ? obj.actor.trim() : "";
+    const reason = typeof obj.reason === "string" ? obj.reason.trim() : "";
+    if (!actor || !reason) continue;
+    const refs = coerceEvidenceRefs(obj.evidence_refs);
+    if (refs.length === 0) continue;
+    out.push({
+      actor,
+      category: sanitizeLikelyReasonCategory(obj.category),
+      reason,
+      confidence: sanitizeConfidence(obj.confidence),
+      inference_label: "inference",
+      evidence_refs: refs,
+    });
+  }
+  return out.slice(0, 8);
+}
+
+function deriveBenefitMapFromStakeholderImpacts(stakeholderImpacts: StakeholderImpact[]): BenefitMapEntry[] {
+  return stakeholderImpacts.map((impact) => ({
+    group: impact.group,
+    expected_effect: impact.effect,
+    evidence_refs: impact.evidence_refs,
+  }));
+}
+
+function deriveStakeholderImpactsFromBenefitMap(benefitMap: BenefitMapEntry[]): StakeholderImpact[] {
+  return benefitMap.map((entry) => ({
+    group: entry.group,
+    effect: entry.expected_effect,
+    mechanism: "Effect inferred from official bill evidence and referenced policy language.",
+    confidence: "medium",
+    evidence_refs: entry.evidence_refs,
+  }));
+}
+
 function coercePartyPositions(raw: unknown): PartyPositionAnalysis[] {
   if (!Array.isArray(raw)) return [];
   const out: PartyPositionAnalysis[] = [];
@@ -282,23 +442,11 @@ function coerceBenefitMap(raw: unknown): BenefitMapEntry[] {
     const obj = item as Record<string, unknown>;
     const group = typeof obj.group === "string" ? obj.group.trim() : "";
     if (!group) continue;
-    const effect = typeof obj.expected_effect === "string" ? obj.expected_effect.trim().toLowerCase() : "mixed";
-    const refs = Array.isArray(obj.evidence_refs)
-      ? obj.evidence_refs
-          .map((ref) => {
-            if (!ref || typeof ref !== "object") return null;
-            const r = ref as Record<string, unknown>;
-            return {
-              source_endpoint: (typeof r.source_endpoint === "string" ? r.source_endpoint : "summaries") as "summary",
-              source_ref: typeof r.source_ref === "string" ? r.source_ref.trim() : "",
-              quote: typeof r.quote === "string" ? r.quote.trim() : undefined,
-            };
-          })
-          .filter((r): r is NonNullable<typeof r> => Boolean(r?.source_ref))
-      : [];
+    const refs = coerceEvidenceRefs(obj.evidence_refs);
+    if (refs.length === 0) continue;
     out.push({
       group,
-      expected_effect: (effect === "benefit" || effect === "burden" || effect === "mixed" ? effect : "mixed") as BenefitMapEntry["expected_effect"],
+      expected_effect: sanitizeEffect(obj.expected_effect),
       evidence_refs: refs,
     });
   }
@@ -308,10 +456,13 @@ function coerceBenefitMap(raw: unknown): BenefitMapEntry[] {
 function coerceAnalysisQuality(
   raw: unknown,
   partyPositions: PartyPositionAnalysis[],
+  likelyReasons: LikelyReason[],
   impactEvidence?: BillImpactEvidence,
 ): AnalysisQuality {
   const richScore = impactEvidence?.richness_score ?? 0;
-  const inferenceUsed = partyPositions.some((p) => p.inferred_rationale.length > 0);
+  const inferenceUsed =
+    partyPositions.some((p) => p.inferred_rationale.length > 0) ||
+    likelyReasons.length > 0;
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
     const coverage = typeof obj.evidence_coverage === "string" ? obj.evidence_coverage.trim().toLowerCase() : "";
@@ -361,19 +512,7 @@ function coerceClaims(raw: unknown, evidence?: BillImpactEvidence): BillAnalysis
     if (!item || typeof item !== "object") continue;
     const obj = item as Record<string, unknown>;
     if (typeof obj.text !== "string" || !obj.text.trim()) continue;
-    const refs = Array.isArray(obj.evidence_refs)
-      ? obj.evidence_refs
-          .map((ref) => {
-            if (!ref || typeof ref !== "object") return null;
-            const r = ref as Record<string, unknown>;
-            const endpoint = typeof r.source_endpoint === "string" ? r.source_endpoint : "summaries";
-            const sourceRef = typeof r.source_ref === "string" ? r.source_ref.trim() : "";
-            if (!sourceRef) return null;
-            const quote = typeof r.quote === "string" ? r.quote.trim() : undefined;
-            return { source_endpoint: endpoint as "summary", source_ref: sourceRef, quote };
-          })
-          .filter((ref): ref is NonNullable<typeof ref> => Boolean(ref))
-      : [];
+    const refs = coerceEvidenceRefs(obj.evidence_refs);
     const kind = typeof obj.kind === "string" ? obj.kind : undefined;
     out.push({
       text: obj.text.trim(),
@@ -405,6 +544,16 @@ function coerceBillAnalysis(raw: unknown, ref: BillRef, impactEvidence?: BillImp
     richScore >= 50
       ? "Official evidence indicates concrete federal policy changes with measurable implementation details."
       : "Official sources currently provide limited detail for estimating direct household-level impact.";
+  const policyDeltas = coercePolicyDeltas(obj.policy_deltas, impactEvidence);
+  let benefitMap = coerceBenefitMap(obj.benefit_map);
+  let stakeholderImpacts = coerceStakeholderImpacts(obj.stakeholder_impacts);
+  if (stakeholderImpacts.length === 0 && benefitMap.length > 0) {
+    stakeholderImpacts = deriveStakeholderImpactsFromBenefitMap(benefitMap);
+  }
+  if (benefitMap.length === 0 && stakeholderImpacts.length > 0) {
+    benefitMap = deriveBenefitMapFromStakeholderImpacts(stakeholderImpacts);
+  }
+  const likelyReasons = coerceLikelyReasons(obj.likely_reasons);
 
   const analysis: BillAnalysis = {
     plain_title: sanitizeNarrativeText(obj.plain_title, defaultPlainTitle(ref)),
@@ -455,12 +604,20 @@ function coerceBillAnalysis(raw: unknown, ref: BillRef, impactEvidence?: BillImp
     geography_scope: impactEvidence?.where.geography_scope ?? "unknown",
     states_mentioned: impactEvidence?.where.states_mentioned ?? [],
     unknown_reasons: impactEvidence?.unknowns ?? [],
+    policy_deltas: policyDeltas,
     claims: coerceClaims(obj.claims, impactEvidence),
     party_positions: coercePartyPositions(obj.party_positions),
-    benefit_map: coerceBenefitMap(obj.benefit_map),
+    benefit_map: benefitMap,
+    stakeholder_impacts: stakeholderImpacts,
+    likely_reasons: likelyReasons,
   };
 
-  analysis.analysis_quality = coerceAnalysisQuality(obj.analysis_quality, analysis.party_positions ?? [], impactEvidence);
+  analysis.analysis_quality = coerceAnalysisQuality(
+    obj.analysis_quality,
+    analysis.party_positions ?? [],
+    analysis.likely_reasons ?? [],
+    impactEvidence
+  );
 
   if ((analysis.claims?.length ?? 0) === 0 && impactEvidence?.summary_evidence?.length) {
     analysis.claims = [
@@ -486,6 +643,15 @@ function isAnalysisRefreshNeeded(analysis: BillAnalysis, input: AnalyzeBillInput
   if (!analysis.unknown_reasons || analysis.unknown_reasons.length === 0) return true;
   if (!analysis.claims || analysis.claims.length === 0) return true;
   if (!ensureClaimsHaveRefs(analysis)) return true;
+  if ((analysis.benefit_map ?? []).some((entry) => (entry.evidence_refs?.length ?? 0) === 0)) return true;
+  if ((analysis.stakeholder_impacts ?? []).some((entry) => (entry.evidence_refs?.length ?? 0) === 0)) return true;
+  if ((analysis.likely_reasons ?? []).some((entry) => (entry.evidence_refs?.length ?? 0) === 0)) return true;
+  if (
+    (input.impactEvidence?.policy_deltas?.length ?? 0) > 0 &&
+    (analysis.policy_deltas?.length ?? 0) === 0
+  ) {
+    return true;
+  }
   if (!analysis.evidence_fingerprint) return true;
   const currentFingerprint = buildEvidenceFingerprint(input.bill, input.impactEvidence);
   if (analysis.evidence_fingerprint !== currentFingerprint) return true;
@@ -552,6 +718,7 @@ function buildPrompt(input: AnalyzeBillInput): string {
         when: evidence.when.slice(0, 8),
         where: evidence.where,
         unknowns: evidence.unknowns.slice(0, 8),
+        policy_deltas: (evidence.policy_deltas ?? []).slice(0, 8),
         summary_evidence: evidence.summary_evidence.slice(0, 8),
       }
     : null;
@@ -608,8 +775,27 @@ Return ONLY valid JSON with this structure:
   ],
   "benefit_map": [
     {
-      "group": "string - who benefits or is burdened",
+      "group": "string - who benefits, is harmed, or has mixed impact",
       "expected_effect": "benefit|burden|mixed",
+      "evidence_refs": [{ "source_endpoint": "string", "source_ref": "string", "quote": "string" }]
+    }
+  ],
+  "stakeholder_impacts": [
+    {
+      "group": "string",
+      "effect": "benefit|burden|mixed",
+      "mechanism": "string - short causal mechanism grounded in bill text",
+      "confidence": "high|medium|low",
+      "evidence_refs": [{ "source_endpoint": "string", "source_ref": "string", "quote": "string" }]
+    }
+  ],
+  "likely_reasons": [
+    {
+      "actor": "D|R|I|other coalition",
+      "category": "fiscal|federalism|labor|business|administrative|legal|other",
+      "reason": "string - likely rationale explicitly framed as inference",
+      "inference_label": "inference",
+      "confidence": "high|medium|low",
       "evidence_refs": [{ "source_endpoint": "string", "source_ref": "string", "quote": "string" }]
     }
   ],
@@ -627,7 +813,10 @@ RULES:
 - If evidence is missing, state that explicitly in unknowns.
 - Keep language neutral and concise.
 - For party_positions: evidence_points must be grounded in provided data. inferred_rationale must be clearly labeled reasoning, not presented as fact. If evidence is insufficient, set confidence to "low" and leave inferred_rationale empty.
-- For benefit_map: each entry must reference evidence. Omit entries you cannot ground.
+- For benefit_map: include burden entries when evidence indicates adverse effects. If evidence supports both benefits and harms, include both.
+- For benefit_map: each entry must include >=1 evidence_ref with a concrete source_ref. Omit entries you cannot ground.
+- For stakeholder_impacts: each impact must include mechanism + confidence + >=1 evidence_ref. Omit ungrounded impacts.
+- For likely_reasons: keep reasons nonpartisan and explicitly inferential, include inference_label=\"inference\", and attach >=1 evidence_ref. Omit reasons if evidence is insufficient.
 - If you cannot determine a party's position from the evidence, omit that party entirely rather than guessing.`;
 }
 
@@ -738,6 +927,62 @@ function claimCoverage(analysisByKey: Map<string, BillAnalysis>): number {
   return Number(((withRefs / total) * 100).toFixed(2));
 }
 
+function benefitMapCoverage(analysisByKey: Map<string, BillAnalysis>): number {
+  let total = 0;
+  let withRefs = 0;
+  for (const analysis of analysisByKey.values()) {
+    for (const entry of analysis.benefit_map ?? []) {
+      total += 1;
+      if ((entry.evidence_refs?.length ?? 0) > 0) withRefs += 1;
+    }
+  }
+  if (total === 0) return 0;
+  return Number(((withRefs / total) * 100).toFixed(2));
+}
+
+function likelyReasonCoverage(analysisByKey: Map<string, BillAnalysis>): number {
+  let total = 0;
+  let withRefs = 0;
+  for (const analysis of analysisByKey.values()) {
+    for (const reason of analysis.likely_reasons ?? []) {
+      total += 1;
+      if ((reason.evidence_refs?.length ?? 0) > 0) withRefs += 1;
+    }
+  }
+  if (total === 0) return 0;
+  return Number(((withRefs / total) * 100).toFixed(2));
+}
+
+function qualityCoverage(
+  analysisByKey: Map<string, BillAnalysis>,
+  requestedByKey: Map<string, AnalyzeBillInput>
+): { quoteValidityPct: number; confidenceCalibrationMismatchPct: number } {
+  let quoteTotal = 0;
+  let quoteValid = 0;
+  let calibrationTotal = 0;
+  let calibrationMismatch = 0;
+
+  for (const [key, analysis] of analysisByKey.entries()) {
+    const input = requestedByKey.get(key);
+    const quoteSummary = computeQuoteValidationSummary(analysis, input?.impactEvidence);
+    quoteTotal += quoteSummary.totalQuotes;
+    quoteValid += quoteSummary.validQuotes;
+
+    const calibrationSummary = computeConfidenceCalibrationSummary(analysis);
+    calibrationTotal += calibrationSummary.evaluatedCount;
+    calibrationMismatch += calibrationSummary.mismatchCount;
+  }
+
+  const quoteValidityPct =
+    quoteTotal === 0 ? 100 : Number(((quoteValid / quoteTotal) * 100).toFixed(2));
+  const confidenceCalibrationMismatchPct =
+    calibrationTotal === 0
+      ? 0
+      : Number(((calibrationMismatch / calibrationTotal) * 100).toFixed(2));
+
+  return { quoteValidityPct, confidenceCalibrationMismatchPct };
+}
+
 export async function analyzeBillsWithCache(
   bucket: R2Bucket,
   inputs: AnalyzeBillInput[],
@@ -844,11 +1089,17 @@ export async function analyzeBillsWithCache(
     await writeJsonToR2(bucket, BILL_ANALYSIS_CACHE_KEY, legacyCache);
   }
 
+  const qualityMetrics = qualityCoverage(analysisByKey, requestedByKey);
+
   return {
     analysisByKey,
     analyzedCount,
     cacheHitCount,
     skippedCount,
     claimsWithEvidenceRefPct: claimCoverage(analysisByKey),
+    benefitMapWithEvidenceRefPct: benefitMapCoverage(analysisByKey),
+    likelyReasonsWithEvidenceRefPct: likelyReasonCoverage(analysisByKey),
+    quoteValidityPct: qualityMetrics.quoteValidityPct,
+    confidenceCalibrationMismatchPct: qualityMetrics.confidenceCalibrationMismatchPct,
   };
 }

@@ -104,6 +104,27 @@ export interface UnknownReason {
   sources_checked: string[]
 }
 
+export type PolicyDeltaAction =
+  | 'nullify'
+  | 'reinstate'
+  | 'decouple'
+  | 'restore'
+  | 'expand'
+  | 'restrict'
+  | 'authorize'
+  | 'prohibit'
+  | 'modify'
+  | 'other'
+
+export interface PolicyDelta {
+  action: PolicyDeltaAction
+  target: string
+  before_state?: string
+  after_state?: string
+  confidence: 'high' | 'medium' | 'low'
+  evidence_refs: BillAnalysisClaimRef[]
+}
+
 export interface BillImpactEvidence {
   schema_version: 1
   bill_key: string
@@ -125,6 +146,7 @@ export interface BillImpactEvidence {
     states_mentioned: string[]
   }
   unknowns: UnknownReason[]
+  policy_deltas?: PolicyDelta[]
   richness_score: number
   summary_evidence: string[]
 }
@@ -156,6 +178,32 @@ export type BenefitEffect = 'benefit' | 'burden' | 'mixed'
 export interface BenefitMapEntry {
   group: string
   expected_effect: BenefitEffect
+  evidence_refs: BillAnalysisClaimRef[]
+}
+
+export interface StakeholderImpact {
+  group: string
+  effect: BenefitEffect
+  mechanism: string
+  confidence: 'high' | 'medium' | 'low'
+  evidence_refs: BillAnalysisClaimRef[]
+}
+
+export type LikelyReasonCategory =
+  | 'fiscal'
+  | 'federalism'
+  | 'labor'
+  | 'business'
+  | 'administrative'
+  | 'legal'
+  | 'other'
+
+export interface LikelyReason {
+  actor: string
+  category: LikelyReasonCategory
+  reason: string
+  confidence: 'high' | 'medium' | 'low'
+  inference_label: 'inference'
   evidence_refs: BillAnalysisClaimRef[]
 }
 
@@ -196,9 +244,12 @@ export interface BillAnalysis {
   geography_scope?: 'national' | 'state-formula' | 'state-named' | 'local' | 'mixed' | 'unknown'
   states_mentioned?: string[]
   unknown_reasons?: UnknownReason[]
+  policy_deltas?: PolicyDelta[]
   claims?: BillAnalysisClaim[]
   party_positions?: PartyPositionAnalysis[]
   benefit_map?: BenefitMapEntry[]
+  stakeholder_impacts?: StakeholderImpact[]
+  likely_reasons?: LikelyReason[]
   analysis_quality?: AnalysisQuality
 }
 

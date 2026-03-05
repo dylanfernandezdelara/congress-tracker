@@ -76,6 +76,10 @@ interface Env {
   EVIDENCE_BILL_CONCURRENCY?: string;
   EVIDENCE_ENDPOINT_FANOUT?: string;
   ACTIVITY_LOOKBACK_DAYS?: string;
+  QUALITY_MIN_CLAIMS_COVERAGE?: string;
+  QUALITY_MIN_QUOTE_VALIDITY?: string;
+  QUALITY_MAX_CONFIDENCE_MISMATCH?: string;
+  QUALITY_HARD_GATES?: string;
 }
 
 // ============================================================================
@@ -137,9 +141,20 @@ function parseIntSafe(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
+function parsePct(value: string | undefined, fallback: number): number {
+  return Math.max(0, Math.min(parseIntSafe(value, fallback), 100));
+}
+
 function computePct(numerator: number, denominator: number): number {
   if (denominator <= 0) return 0;
   return Number(((numerator / denominator) * 100).toFixed(2));
+}
+
+interface QualityGateConfig {
+  minClaimsCoveragePct: number;
+  minQuoteValidityPct: number;
+  maxConfidenceMismatchPct: number;
+  hardGates: boolean;
 }
 
 function makeRunId(): string {
@@ -190,6 +205,10 @@ function summarizeCoverage(
   runId: string,
   billCount: number,
   claimCoveragePct: number,
+  benefitMapCoveragePct: number,
+  likelyReasonCoveragePct: number,
+  quoteValidityPct: number,
+  confidenceMismatchPct: number,
   endpointSuccessRates: Partial<Record<EvidenceEndpoint, number>>,
   endpointFallbackRates: Partial<Record<EvidenceEndpoint, number>>,
   structuredAmountCount: number,
@@ -209,6 +228,10 @@ function summarizeCoverage(
     pct_with_recipient: computePct(recipientCount, billCount),
     pct_with_state_signal: computePct(stateSignalCount, billCount),
     pct_claims_with_evidence_refs: claimCoveragePct,
+    pct_benefit_map_with_evidence_refs: benefitMapCoveragePct,
+    pct_likely_reasons_with_evidence_refs: likelyReasonCoveragePct,
+    pct_quote_validity: quoteValidityPct,
+    pct_confidence_calibration_mismatch: confidenceMismatchPct,
     endpoint_success_rates: endpointSuccessRates,
     endpoint_fallback_rates: endpointFallbackRates,
     partial,
@@ -596,6 +619,29 @@ interface BillEvidencePipelineOptions {
   endpointFanout: number;
 }
 
+function evaluateQualityGates(
+  result: AnalyzeBillsResult,
+  config: QualityGateConfig
+): string[] {
+  const failures: string[] = [];
+  if (result.claimsWithEvidenceRefPct < config.minClaimsCoveragePct) {
+    failures.push(
+      `claims coverage ${result.claimsWithEvidenceRefPct}% < ${config.minClaimsCoveragePct}%`
+    );
+  }
+  if (result.quoteValidityPct < config.minQuoteValidityPct) {
+    failures.push(
+      `quote validity ${result.quoteValidityPct}% < ${config.minQuoteValidityPct}%`
+    );
+  }
+  if (result.confidenceCalibrationMismatchPct > config.maxConfidenceMismatchPct) {
+    failures.push(
+      `confidence mismatch ${result.confidenceCalibrationMismatchPct}% > ${config.maxConfidenceMismatchPct}%`
+    );
+  }
+  return failures;
+}
+
 async function buildBillEvidencePipeline(
   bucket: R2Bucket,
   billsByKey: Map<string, BillRef>,
@@ -734,6 +780,7 @@ async function enrichBillAnalyses(
   model: string,
   maxNewAnalyses: number,
   shadowMode: boolean,
+  qualityGateConfig: QualityGateConfig,
   appReferer?: string,
   appTitle?: string
 ): Promise<AnalyzeBillsResult | null> {
@@ -754,8 +801,26 @@ async function enrichBillAnalyses(
   });
 
   console.log(
-    `[openrouter] Analysis enrichment complete: cache hits=${result.cacheHitCount}, new=${result.analyzedCount}, skipped=${result.skippedCount}, claim-coverage=${result.claimsWithEvidenceRefPct}%`
+    `[openrouter] Analysis enrichment complete: cache hits=${result.cacheHitCount}, new=${result.analyzedCount}, skipped=${result.skippedCount}, claim-coverage=${result.claimsWithEvidenceRefPct}%, benefit-map-coverage=${result.benefitMapWithEvidenceRefPct}%, likely-reason-coverage=${result.likelyReasonsWithEvidenceRefPct}%, quote-validity=${result.quoteValidityPct}%, confidence-mismatch=${result.confidenceCalibrationMismatchPct}%`
   );
+  if (result.skippedCount > 0) {
+    console.log(
+      `[openrouter] ${result.skippedCount} analyses deferred by maxNewAnalyses limit; refresh will continue across scheduled runs.`
+    );
+  }
+  const gateFailures = evaluateQualityGates(result, qualityGateConfig);
+  if (gateFailures.length > 0) {
+    logEvent("analysis_quality_gate_failed", {
+      failures: gateFailures,
+      hard_gates: qualityGateConfig.hardGates,
+      claims_coverage_pct: result.claimsWithEvidenceRefPct,
+      quote_validity_pct: result.quoteValidityPct,
+      confidence_mismatch_pct: result.confidenceCalibrationMismatchPct,
+    });
+    if (qualityGateConfig.hardGates) {
+      throw new Error(`Analysis quality gates failed: ${gateFailures.join("; ")}`);
+    }
+  }
 
   if (shadowMode) {
     console.log("[openrouter] Shadow mode active; analysis was generated but not attached to published payloads.");
@@ -863,6 +928,12 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   const maxNewAnalyses = Math.max(1, parseIntSafe(env.OPENROUTER_MAX_NEW_ANALYSES, 20));
   const openrouterAppReferer = env.OPENROUTER_APP_REFERER?.trim();
   const openrouterAppTitle = env.OPENROUTER_APP_TITLE?.trim() || "daily_senate_update_worker";
+  const qualityGateConfig: QualityGateConfig = {
+    minClaimsCoveragePct: parsePct(env.QUALITY_MIN_CLAIMS_COVERAGE, 70),
+    minQuoteValidityPct: parsePct(env.QUALITY_MIN_QUOTE_VALIDITY, 80),
+    maxConfidenceMismatchPct: parsePct(env.QUALITY_MAX_CONFIDENCE_MISMATCH, 35),
+    hardGates: parseBool(env.QUALITY_HARD_GATES, false),
+  };
   let analysisResult: AnalyzeBillsResult | null = null;
   let synthesisErrors: SourceError[] = [];
 
@@ -879,6 +950,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
           model,
           maxNewAnalyses,
           shadowMode,
+          qualityGateConfig,
           openrouterAppReferer,
           openrouterAppTitle
         )
@@ -986,6 +1058,10 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     runId,
     evidencePipeline.processedBillCount,
     analysisResult?.claimsWithEvidenceRefPct ?? 0,
+    analysisResult?.benefitMapWithEvidenceRefPct ?? 0,
+    analysisResult?.likelyReasonsWithEvidenceRefPct ?? 0,
+    analysisResult?.quoteValidityPct ?? 0,
+    analysisResult?.confidenceCalibrationMismatchPct ?? 0,
     evidencePipeline.endpointSuccessRates,
     evidencePipeline.endpointFallbackRates,
     evidencePipeline.structuredAmountCount,
@@ -1004,6 +1080,10 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     target_state: config.targetState,
     bills_processed: coverage.bills_processed,
     claims_with_evidence_pct: coverage.pct_claims_with_evidence_refs,
+    benefit_map_with_evidence_pct: analysisResult?.benefitMapWithEvidenceRefPct ?? 0,
+    likely_reasons_with_evidence_pct: analysisResult?.likelyReasonsWithEvidenceRefPct ?? 0,
+    quote_validity_pct: analysisResult?.quoteValidityPct ?? 0,
+    confidence_mismatch_pct: analysisResult?.confidenceCalibrationMismatchPct ?? 0,
     partial: coverage.partial,
   });
 }

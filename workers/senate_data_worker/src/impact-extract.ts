@@ -10,6 +10,7 @@ import type {
   UnknownReason,
 } from "./types";
 import { STATE_CODES_FOR_MATCHING, STATE_NAME_ENTRIES } from "./states";
+import { extractPolicyDeltas } from "./policy-delta-extract";
 
 const AMBIGUOUS_STATE_CODES = new Set(["IN", "OR", "ME", "AS", "TO", "IT", "AT", "BY", "ON", "NO"]);
 
@@ -280,6 +281,7 @@ function computeRichnessScore(params: {
   recipientCount: number;
   stateSignal: boolean;
   dateSignal: boolean;
+  policyDeltaCount: number;
   unknownCount: number;
 }): number {
   let score = 0;
@@ -287,6 +289,8 @@ function computeRichnessScore(params: {
   if (params.recipientCount > 0) score += 25;
   if (params.stateSignal) score += 20;
   if (params.dateSignal) score += 15;
+  if (params.policyDeltaCount > 0) score += 20;
+  if (params.policyDeltaCount > 2) score += 5;
   if (params.amountCount > 0 && params.recipientCount > 0) score += 5;
   if (params.unknownCount > 0) score -= Math.min(30, params.unknownCount * 8);
   return Math.max(0, Math.min(100, score));
@@ -309,6 +313,7 @@ export function extractBillImpactEvidence(
   const dateSignals = extractDateSignals(sourceText);
   const states = extractStates(sourceText);
   const geographyScope = inferGeographyScope(sourceText, states);
+  const policyDeltas = extractPolicyDeltas(sourceText);
   const unknowns = buildUnknowns(
     evidenceRaw.source_availability,
     amounts,
@@ -323,6 +328,7 @@ export function extractBillImpactEvidence(
     recipientCount: recipients.length,
     stateSignal: states.length > 0 || geographyScope === "state-formula",
     dateSignal: dateSignals.length > 0,
+    policyDeltaCount: policyDeltas.length,
     unknownCount: unknowns.length,
   });
 
@@ -342,6 +348,7 @@ export function extractBillImpactEvidence(
       states_mentioned: states,
     },
     unknowns,
+    policy_deltas: policyDeltas,
     richness_score: richnessScore,
     summary_evidence: sourceText.slice(0, 10),
   };

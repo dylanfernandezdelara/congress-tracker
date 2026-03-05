@@ -234,6 +234,27 @@ export interface UnknownReason {
   sources_checked: string[];
 }
 
+export type PolicyDeltaAction =
+  | "nullify"
+  | "reinstate"
+  | "decouple"
+  | "restore"
+  | "expand"
+  | "restrict"
+  | "authorize"
+  | "prohibit"
+  | "modify"
+  | "other";
+
+export interface PolicyDelta {
+  action: PolicyDeltaAction;
+  target: string;
+  before_state?: string;
+  after_state?: string;
+  confidence: "high" | "medium" | "low";
+  evidence_refs: BillAnalysisClaimRef[];
+}
+
 export interface ImpactDateSignal {
   date?: string; // YYYY-MM-DD when available
   date_text: string;
@@ -267,6 +288,7 @@ export interface BillImpactEvidence {
   when: ImpactDateSignal[];
   where: GeographySignal;
   unknowns: UnknownReason[];
+  policy_deltas?: PolicyDelta[];
   richness_score: number; // 0-100
   summary_evidence: string[];
 }
@@ -324,6 +346,32 @@ export interface BenefitMapEntry {
   evidence_refs: BillAnalysisClaimRef[];
 }
 
+export interface StakeholderImpact {
+  group: string;
+  effect: BenefitEffect;
+  mechanism: string;
+  confidence: "high" | "medium" | "low";
+  evidence_refs: BillAnalysisClaimRef[];
+}
+
+export type LikelyReasonCategory =
+  | "fiscal"
+  | "federalism"
+  | "labor"
+  | "business"
+  | "administrative"
+  | "legal"
+  | "other";
+
+export interface LikelyReason {
+  actor: string;
+  category: LikelyReasonCategory;
+  reason: string;
+  confidence: "high" | "medium" | "low";
+  inference_label: "inference";
+  evidence_refs: BillAnalysisClaimRef[];
+}
+
 export interface AnalysisQuality {
   evidence_coverage: "full" | "partial" | "minimal";
   inference_used: boolean;
@@ -361,9 +409,12 @@ export interface BillAnalysis {
   geography_scope?: GeographyScope;
   states_mentioned?: string[];
   unknown_reasons?: UnknownReason[];
+  policy_deltas?: PolicyDelta[];
   claims?: BillAnalysisClaim[];
   party_positions?: PartyPositionAnalysis[];
   benefit_map?: BenefitMapEntry[];
+  stakeholder_impacts?: StakeholderImpact[];
+  likely_reasons?: LikelyReason[];
   analysis_quality?: AnalysisQuality;
 }
 
@@ -378,6 +429,10 @@ export interface CoverageSnapshot {
   pct_with_recipient: number;
   pct_with_state_signal: number;
   pct_claims_with_evidence_refs: number;
+  pct_benefit_map_with_evidence_refs?: number;
+  pct_likely_reasons_with_evidence_refs?: number;
+  pct_quote_validity?: number;
+  pct_confidence_calibration_mismatch?: number;
   endpoint_success_rates: Partial<Record<EvidenceEndpoint, number>>;
   endpoint_fallback_rates: Partial<Record<EvidenceEndpoint, number>>;
   partial: boolean;
