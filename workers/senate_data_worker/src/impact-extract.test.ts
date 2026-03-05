@@ -85,4 +85,38 @@ describe("extractBillImpactEvidence", () => {
     expect(impact.unknowns.length).toBeGreaterThan(0);
     expect(impact.richness_score).toBeLessThan(40);
   });
+
+  it("captures policy deltas for governance-style text without fiscal amounts", () => {
+    const governanceBill: BillRef = {
+      congress: 119,
+      type: "H.J.RES.",
+      number: "142",
+      title: "Disapproving D.C. tax conformity action",
+      summary:
+        "This joint resolution nullifies a District of Columbia tax measure and reinstates prior tax code provisions.",
+      policy_area: "Government Operations and Politics",
+    };
+    const governanceEvidence: BillEvidenceRaw = {
+      ...rawEvidence,
+      bill_key: "119-hjres-142",
+      bill: {
+        congress: 119,
+        type: "H.J.RES.",
+        number: "142",
+        title: governanceBill.title,
+        summary: governanceBill.summary,
+        policy_area: governanceBill.policy_area,
+      },
+      source_text: [
+        "This joint resolution nullifies legislation enacted by the Council of the District of Columbia.",
+        "The nullification reinstates certain DC tax code provisions that were in place before enactment of the DC legislation.",
+      ],
+    };
+
+    const impact = extractBillImpactEvidence(governanceBill, governanceEvidence, { session: 2 });
+    expect((impact.policy_deltas ?? []).length).toBeGreaterThan(0);
+    expect((impact.policy_deltas ?? []).some((delta) => delta.action === "nullify")).toBe(true);
+    expect((impact.policy_deltas ?? []).some((delta) => delta.action === "reinstate")).toBe(true);
+    expect(impact.richness_score).toBeGreaterThan(0);
+  });
 });

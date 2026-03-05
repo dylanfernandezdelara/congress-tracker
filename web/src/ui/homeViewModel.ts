@@ -6,6 +6,7 @@ import type {
   BillAnalysis,
   BillImpactEvidence,
   BillRef,
+  LikelyReason,
   PartyPositionAnalysis,
   RecipientEvidence,
   SessionOverview,
@@ -1209,6 +1210,17 @@ export interface InsightBeneficiary {
   group: string
   effect: 'benefit' | 'burden' | 'mixed'
   effectLabel: string
+  rationale: string[]
+}
+
+export interface InsightLikelyReason {
+  actor: string
+  actorLabel: string
+  category: string
+  reason: string
+  confidence: 'high' | 'medium' | 'low'
+  inferenceLabel: 'Inference'
+  evidenceLines: string[]
 }
 
 export interface InsightCardVM {
@@ -1224,6 +1236,7 @@ export interface InsightCardVM {
   voteTally: { yea: number; nay: number; label: string; date: string }
   partyPositions: InsightPartyPosition[]
   beneficiaries: InsightBeneficiary[]
+  likelyReasons: InsightLikelyReason[]
   analysisQuality: AnalysisQuality | null
   hasInference: boolean
   isCloseVote: boolean
@@ -1238,7 +1251,7 @@ const STANCE_LABELS: Record<string, string> = {
 
 const EFFECT_LABELS: Record<string, string> = {
   benefit: 'Benefits',
-  burden: 'Burdened',
+  burden: 'Harms',
   mixed: 'Mixed impact',
 }
 
@@ -1299,6 +1312,87 @@ function mergeAnalysisPositions(
   return merged
 }
 
+const BENEFICIARY_RATIONALE_MAX_LINES = 2
+const BENEFICIARY_RATIONALE_MAX_CHARS = 180
+const LIKELY_REASON_MAX_LINES = 5
+const LIKELY_REASON_EVIDENCE_MAX_LINES = 2
+const LIKELY_REASON_TEXT_MAX_CHARS = 220
+
+function truncateReasoning(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  const sliced = text.slice(0, maxChars).trimEnd()
+  const compact = sliced.replace(/\s+\S*$/, '').trimEnd()
+  return `${compact || sliced}...`
+}
+
+function deriveBeneficiaryRationale(entry: BenefitMapEntry): string[] {
+  const rationale: string[] = []
+  const seen = new Set<string>()
+  for (const ref of entry.evidence_refs) {
+    const quote = ref.quote?.trim()
+    const sourceRef = ref.source_ref?.trim()
+    const candidate = quote && quote.length > 0
+      ? quote
+      : sourceRef && sourceRef.length > 0
+        ? `Source: ${sourceRef}`
+        : ''
+    if (!candidate) continue
+    const dedupeKey = candidate.toLowerCase().replace(/\s+/g, ' ').trim()
+    if (!dedupeKey || seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    rationale.push(truncateReasoning(candidate, BENEFICIARY_RATIONALE_MAX_CHARS))
+    if (rationale.length >= BENEFICIARY_RATIONALE_MAX_LINES) break
+  }
+  return rationale
+}
+
+function formatReasonCategory(category: LikelyReason['category']): string {
+  if (!category) return 'Other'
+  return category.charAt(0).toUpperCase() + category.slice(1)
+}
+
+function deriveLikelyReasonEvidence(refs: LikelyReason['evidence_refs']): string[] {
+  const lines: string[] = []
+  const seen = new Set<string>()
+  for (const ref of refs) {
+    const quote = ref.quote?.trim()
+    const sourceRef = ref.source_ref?.trim()
+    const candidate = quote && quote.length > 0 ? quote : sourceRef ? `Source: ${sourceRef}` : ''
+    if (!candidate) continue
+    const dedupeKey = candidate.toLowerCase().replace(/\s+/g, ' ').trim()
+    if (!dedupeKey || seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    lines.push(truncateReasoning(candidate, BENEFICIARY_RATIONALE_MAX_CHARS))
+    if (lines.length >= LIKELY_REASON_EVIDENCE_MAX_LINES) break
+  }
+  return lines
+}
+
+function deriveLikelyReasons(analysis: BillAnalysis | undefined): InsightLikelyReason[] {
+  const reasons = analysis?.likely_reasons ?? []
+  if (reasons.length === 0) return []
+  const out: InsightLikelyReason[] = []
+  const seen = new Set<string>()
+  for (const reason of reasons) {
+    const text = reason.reason.trim()
+    if (!text) continue
+    const dedupeKey = `${reason.actor}:${text}`.toLowerCase().replace(/\s+/g, ' ')
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    out.push({
+      actor: reason.actor,
+      actorLabel: PARTY_LABEL_MAP[reason.actor] ?? reason.actor,
+      category: formatReasonCategory(reason.category),
+      reason: truncateReasoning(text, LIKELY_REASON_TEXT_MAX_CHARS),
+      confidence: reason.confidence,
+      inferenceLabel: 'Inference',
+      evidenceLines: deriveLikelyReasonEvidence(reason.evidence_refs),
+    })
+    if (out.length >= LIKELY_REASON_MAX_LINES) break
+  }
+  return out
+}
+
 function deriveBeneficiaries(
   bill: BillTimelineVM,
   benefitMap: BenefitMapEntry[] | undefined,
@@ -1308,15 +1402,16 @@ function deriveBeneficiaries(
       group: entry.group,
       effect: entry.expected_effect,
       effectLabel: EFFECT_LABELS[entry.expected_effect] ?? 'Mixed impact',
+      rationale: deriveBeneficiaryRationale(entry),
     }))
   }
   const groups: InsightBeneficiary[] = []
   for (const r of bill.structuredRecipients.slice(0, 3)) {
-    groups.push({ group: r.name, effect: 'benefit', effectLabel: EFFECT_LABELS.benefit })
+    groups.push({ group: r.name, effect: 'benefit', effectLabel: EFFECT_LABELS.benefit, rationale: [] })
   }
   for (const a of bill.affectedGroups.slice(0, 2)) {
     if (!groups.some((g) => g.group === a)) {
-      groups.push({ group: a, effect: 'mixed', effectLabel: EFFECT_LABELS.mixed })
+      groups.push({ group: a, effect: 'mixed', effectLabel: EFFECT_LABELS.mixed, rationale: [] })
     }
   }
   return groups.slice(0, 4)
@@ -1335,8 +1430,11 @@ export function toInsightCards(bills: BillTimelineVM[], swingIndex: SwingFrequen
     const votePositions = derivePartyPositionsFromVote(step)
     const partyPositions = mergeAnalysisPositions(votePositions, analysis?.party_positions)
     const beneficiaries = deriveBeneficiaries(bill, analysis?.benefit_map)
+    const likelyReasons = deriveLikelyReasons(analysis ?? undefined)
     const analysisQuality = analysis?.analysis_quality ?? null
-    const hasInference = partyPositions.some((p) => p.inferredRationale.length > 0)
+    const hasInference =
+      partyPositions.some((p) => p.inferredRationale.length > 0) ||
+      likelyReasons.length > 0
 
     const swingSenators: ActionCardSwingSenator[] = step.isClose
       ? step.crossovers.map((c) => {
@@ -1365,6 +1463,7 @@ export function toInsightCards(bills: BillTimelineVM[], swingIndex: SwingFrequen
       voteTally: { yea: step.totalYea, nay: step.totalNay, label: step.label, date: step.date },
       partyPositions,
       beneficiaries,
+      likelyReasons,
       analysisQuality,
       hasInference,
       isCloseVote: step.isClose,

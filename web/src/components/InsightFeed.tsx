@@ -41,6 +41,77 @@ function ConfidenceBadge({ level }: { level: 'high' | 'medium' | 'low' }) {
   )
 }
 
+function BeneficiaryList({
+  title,
+  beneficiaries,
+}: {
+  title: string
+  beneficiaries: InsightCardVM['beneficiaries']
+}) {
+  if (beneficiaries.length === 0) return null
+  return (
+    <section className="insightCard__beneficiarySection">
+      <h5 className="insightCard__beneficiarySectionTitle">{title}</h5>
+      <ul className="insightCard__beneficiaryList">
+        {beneficiaries.map((b, i) => (
+          <li key={`${b.group}-${i}`} className="insightCard__beneficiaryItem">
+            <div className="insightCard__beneficiaryMain">
+              <span className={`insightCard__effectBadge insightCard__effectBadge--${b.effect}`}>
+                {b.effectLabel}
+              </span>
+              <span>{b.group}</span>
+            </div>
+            {b.rationale.length > 0 && (
+              <ul className="insightCard__beneficiaryRationaleList">
+                {b.rationale.map((line, idx) => (
+                  <li key={idx} className="insightCard__beneficiaryRationaleItem">
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function LikelyReasonsPanel({
+  reasons,
+}: {
+  reasons: InsightCardVM['likelyReasons']
+}) {
+  if (reasons.length === 0) return null
+  return (
+    <div className="insightCard__likelyReasonsPanel">
+      <h4 className="insightCard__sectionTitle">Likely reasons behind positions</h4>
+      <div className="insightCard__likelyReasonRows">
+        {reasons.map((reason, index) => (
+          <div key={`${reason.actor}-${index}`} className="insightCard__likelyReasonRow">
+            <div className="insightCard__likelyReasonHeader">
+              <span className="insightCard__likelyReasonActor">{reason.actorLabel}</span>
+              <span className="insightCard__likelyReasonCategory">{reason.category}</span>
+              <InferenceTag />
+              <ConfidenceBadge level={reason.confidence} />
+            </div>
+            <p className="insightCard__likelyReasonText">{reason.reason}</p>
+            {reason.evidenceLines.length > 0 && (
+              <ul className="insightCard__likelyReasonEvidence">
+                {reason.evidenceLines.map((line, i) => (
+                  <li key={i} className="insightCard__evidenceItem">
+                    <span className="insightCard__evidenceTag">Evidence</span> {line}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function InsightFeed({ cards }: Props) {
   if (cards.length === 0) return null
 
@@ -103,20 +174,24 @@ export default function InsightFeed({ cards }: Props) {
             </div>
           )}
 
+          <LikelyReasonsPanel reasons={card.likelyReasons} />
+
           {/* Who is affected panel */}
           {card.beneficiaries.length > 0 && (
             <div className="insightCard__beneficiaryPanel">
               <h4 className="insightCard__sectionTitle">Who is affected</h4>
-              <ul className="insightCard__beneficiaryList">
-                {card.beneficiaries.map((b, i) => (
-                  <li key={i} className="insightCard__beneficiaryItem">
-                    <span className={`insightCard__effectBadge insightCard__effectBadge--${b.effect}`}>
-                      {b.effectLabel}
-                    </span>
-                    {b.group}
-                  </li>
-                ))}
-              </ul>
+              <BeneficiaryList
+                title="Who benefits"
+                beneficiaries={card.beneficiaries.filter((b) => b.effect === 'benefit')}
+              />
+              <BeneficiaryList
+                title="Who is harmed"
+                beneficiaries={card.beneficiaries.filter((b) => b.effect === 'burden')}
+              />
+              <BeneficiaryList
+                title="Who has mixed impact"
+                beneficiaries={card.beneficiaries.filter((b) => b.effect === 'mixed')}
+              />
             </div>
           )}
 
