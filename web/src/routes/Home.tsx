@@ -14,12 +14,14 @@ import InsightFeed from '../components/InsightFeed'
 import InsightFeedErrorBoundary from '../components/InsightFeedErrorBoundary'
 import SwingLeaderboard from '../components/SwingLeaderboard'
 import ComingUp from '../components/ComingUp'
+import TopDevelopments from '../components/TopDevelopments'
 import StateDumbbell from '../components/StateDumbbell'
 import ChamberArc from '../components/ChamberArc'
 import {
   buildAttendanceArcVM,
   buildBillTimelineVM,
   buildComingUpVM,
+  buildHomepageSpotlightVM,
   buildGatekeepersVM,
   buildStateDumbbellVM,
   buildSwingFrequencyIndex,
@@ -151,6 +153,12 @@ export default function Home() {
     () => ledger && overview ? buildBillTimelineVM(ledger, overview, activities, { windowDays: 7 }) : null,
     [ledger, overview, activities],
   )
+
+  const homepageSpotlight = useMemo(
+    () => buildHomepageSpotlightVM(billTimelineVM, 3),
+    [billTimelineVM],
+  )
+
   const billTimelineWindow = useMemo(() => {
     if (!billTimelineVM || billTimelineVM.length === 0) return null
     const sortedDates = [...billTimelineVM.map((item) => item.latestDate)].sort()
@@ -223,12 +231,22 @@ export default function Home() {
         <p className="loadingLine">Loading&hellip;</p>
       ) : (
         <>
+          {homepageSpotlight.length > 0 && (
+            <section className="vizSection" aria-label="Top developments">
+              <h2 className="vizSection__title">Top developments</h2>
+              <p className="vizSection__subtitle">
+                Prioritized by policy relevance and recency so major Senate actions are immediately visible.
+              </p>
+              <TopDevelopments items={homepageSpotlight} />
+            </section>
+          )}
+
           {actionCards && actionCards.length > 0 && (
             <section className="vizSection" aria-label="Recent votes">
-              <h2 className="vizSection__title">What just happened</h2>
+              <h2 className="vizSection__title">Recent vote details</h2>
               <p className="vizSection__subtitle">
                 {billTimelineWindow
-                  ? `Senate actions from ${formatDateWindow(billTimelineWindow.start)} to ${formatDateWindow(billTimelineWindow.end)}, explained in plain language.`
+                  ? `From ${formatDateWindow(billTimelineWindow.start)} to ${formatDateWindow(billTimelineWindow.end)}.`
                   : 'Recent Senate actions, explained in plain language.'}
               </p>
               {useInsightFeed && insightCards && insightCards.length > 0 ? (
@@ -244,8 +262,8 @@ export default function Home() {
           )}
 
           {swingIndex && (swingIndex.profiles.size > 0 || gatekeepers.length > 0) && (
-            <section className="vizSection" aria-label="Swing voter patterns">
-              <h2 className="vizSection__title">Swing voter patterns</h2>
+            <section className="vizSection" aria-label="Swing signals">
+              <h2 className="vizSection__title">Swing signals</h2>
               <p className="vizSection__subtitle">
                 Senators who most often break party ranks on close votes, and the topics where they do it.
               </p>
@@ -255,7 +273,7 @@ export default function Home() {
 
           {comingUpVM.length > 0 && (
             <section className="vizSection" aria-label="Upcoming schedule">
-              <h2 className="vizSection__title">Coming up</h2>
+              <h2 className="vizSection__title">Upcoming schedule</h2>
               <p className="vizSection__subtitle">
                 Floor votes and committee hearings on the schedule.
               </p>
@@ -265,7 +283,7 @@ export default function Home() {
 
           {dumbbellVM && dumbbellVM.length > 0 && (
             <section className="vizSection" aria-label="State delegation agreement">
-              <h2 className="vizSection__title">How your senators compare</h2>
+              <h2 className="vizSection__title">State delegation agreement</h2>
               <p className="vizSection__subtitle">
                 How often do same-state senators vote together? Sorted by agreement.
                 Dot color = party. Line length = disagreement.
@@ -276,7 +294,7 @@ export default function Home() {
 
           {arcVM && arcVM.length > 0 && (
             <section className="vizSection" aria-label="Chamber attendance">
-              <h2 className="vizSection__title">Who shows up</h2>
+              <h2 className="vizSection__title">Attendance</h2>
               <p className="vizSection__subtitle">
                 Solid = full attendance. Faded = missed votes. Dashed = absent all session.
               </p>

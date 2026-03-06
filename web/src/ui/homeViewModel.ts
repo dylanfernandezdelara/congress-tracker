@@ -1584,3 +1584,90 @@ export function buildComingUpVM(
   upcoming.sort((a, b) => a.date.localeCompare(b.date))
   return upcoming.slice(0, MAX_UPCOMING)
 }
+
+// ---------------------------------------------------------------------------
+// 11. Homepage spotlight (prioritized, low-noise summary list)
+// ---------------------------------------------------------------------------
+
+export interface HomepageSpotlightItem {
+  id: string
+  title: string
+  billCode: string | null
+  category: string
+  status: 'passed' | 'rejected' | 'in-progress'
+  voteLabel: string
+  date: string
+  whyNow: string
+  relevanceScore: number
+}
+
+const HOMEPAGE_TOPIC_PRIORITY: Array<{ pattern: RegExp; label: string; boost: number }> = [
+  { pattern: /\biran\b|\bwar powers?\b|\bauthorization for use of military force\b/i, label: 'Iran/war powers', boost: 32 },
+  { pattern: /\bnational security\b|\bdefense\b|\barmed forces\b|\bmilitary\b|\bsanctions?\b/i, label: 'national security', boost: 22 },
+  { pattern: /\bappropriation\b|\bbudget\b|\bfunding\b|\bdebt\b|\btax\b|\bspending\b/i, label: 'federal spending', boost: 16 },
+  { pattern: /\bimmigration\b|\bborder\b|\basylum\b/i, label: 'immigration/border', boost: 16 },
+  { pattern: /\bhealth\b|\bmedicare\b|\bmedicaid\b|\bdrug\b/i, label: 'health policy', boost: 14 },
+]
+
+function pickTopPriorityTopic(text: string): { label: string; boost: number } | null {
+  for (const topic of HOMEPAGE_TOPIC_PRIORITY) {
+    if (topic.pattern.test(text)) return { label: topic.label, boost: topic.boost }
+  }
+  return null
+}
+
+export function buildHomepageSpotlightVM(
+  bills: BillTimelineVM[] | null,
+  limit = 3,
+): HomepageSpotlightItem[] {
+  if (!bills || bills.length === 0) return []
+  const normalizedLimit = Math.max(1, Math.min(limit, 6))
+  const referenceDate = [...bills]
+    .map((bill) => bill.latestDate)
+    .sort()
+    .slice(-1)[0]
+
+  const scored = bills.map((bill) => {
+    const step = pickDecisiveStep(bill.steps)
+    const targetText = `${bill.displayTitle} ${bill.categoryLabel} ${bill.meaningLine}`
+    const topic = pickTopPriorityTopic(targetText)
+    const dayDelta = Math.max(
+      0,
+      Math.round(
+        (new Date(`${referenceDate}T00:00:00Z`).getTime() - new Date(`${bill.latestDate}T00:00:00Z`).getTime()) / 86_400_000,
+      ),
+    )
+
+    let relevanceScore = Math.round(bill.careScore * 0.45)
+    relevanceScore += bill.significance === 'high' ? 20 : bill.significance === 'medium' ? 10 : 4
+    if (bill.finalStatus !== 'in-progress') relevanceScore += 8
+    if (step.isClose) relevanceScore += 12
+    relevanceScore += Math.max(0, 10 - dayDelta)
+    if (topic) relevanceScore += topic.boost
+
+    let whyNow = `${bill.categoryLabel} vote with ${step.totalYea}-${step.totalNay} tally.`
+    if (topic) {
+      whyNow = `High-priority topic: ${topic.label}. ${step.isClose ? 'Close vote that could shape next steps.' : 'Recent Senate action with broad policy relevance.'}`
+    } else if (step.isClose) {
+      whyNow = 'Close vote that may signal where future Senate coalitions are forming.'
+    } else if (bill.significance === 'high') {
+      whyNow = 'High-significance action likely to affect national policy direction.'
+    }
+
+    const voteLabel = `${step.label} · ${step.totalYea}-${step.totalNay}`
+    return {
+      id: bill.groupKey,
+      title: bill.displayTitle,
+      billCode: bill.displayCode,
+      category: bill.categoryLabel,
+      status: bill.finalStatus,
+      voteLabel,
+      date: bill.latestDate,
+      whyNow,
+      relevanceScore,
+    }
+  })
+
+  scored.sort((a, b) => b.relevanceScore - a.relevanceScore || b.date.localeCompare(a.date))
+  return scored.slice(0, normalizedLimit)
+}
