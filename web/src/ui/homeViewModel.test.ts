@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActivityIndexResponse, BillAnalysis, SessionOverview, VoteLedger } from '../api'
-import { buildBillTimelineVM, buildSwingFrequencyIndex, toActionCards, toInsightCards, type SwingFrequencyIndex } from './homeViewModel'
+import { buildBillTimelineVM, buildHomepageSpotlightVM, buildSwingFrequencyIndex, toActionCards, toInsightCards, type SwingFrequencyIndex } from './homeViewModel'
 
 const emptySwingIndex: SwingFrequencyIndex = { totalCloseVotes: 0, profiles: new Map() }
 
@@ -808,3 +808,105 @@ describe('toInsightCards', () => {
   })
 })
 
+
+
+describe('buildHomepageSpotlightVM', () => {
+  it('prioritizes war-powers/Iran relevance over less critical topics', () => {
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-20T00:00:00Z',
+      total_votes: 2,
+      entries: [
+        {
+          vote_number: 801,
+          vote_date: '2026-01-20',
+          title: 'S.J.Res. 55 vote',
+          question: 'On Passage of the Joint Resolution',
+          result: 'Passed',
+          issue: 'S.J.Res. 55',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+        {
+          vote_number: 802,
+          vote_date: '2026-01-20',
+          title: 'S. 802 vote',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          issue: 'S. 802',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const activities: ActivityIndexResponse = {
+      generated_at: '2026-01-20T00:00:00Z',
+      window: { start_date: '2026-01-15', end_date: '2026-01-20' },
+      activities: [
+        {
+          activity_id: 'senate:roll_call_vote:2026-01-20:801',
+          source: 'senate',
+          type: 'roll_call_vote',
+          date: '2026-01-20',
+          members: ['A000001', 'B000001'],
+          bill: {
+            congress: 119,
+            type: 'S.J.Res.',
+            number: '55',
+            title: 'War Powers Resolution on Iran',
+            policy_area: 'Armed forces and national security',
+            analysis: {
+              plain_title: 'War Powers Resolution on Iran',
+              plain_summary: 'Limits unauthorized military action involving Iran.',
+              key_provisions: [],
+              why_it_matters: 'test',
+              hidden_provisions: null,
+              significance: 'high',
+              significance_reason: 'test',
+              category: 'National Security',
+              affects: [],
+            },
+          },
+        },
+        {
+          activity_id: 'senate:roll_call_vote:2026-01-20:802',
+          source: 'senate',
+          type: 'roll_call_vote',
+          date: '2026-01-20',
+          members: ['A000001', 'B000001'],
+          bill: {
+            congress: 119,
+            type: 'S',
+            number: '802',
+            title: 'Post Office Naming Act',
+            policy_area: 'Government operations and politics',
+            analysis: {
+              plain_title: 'Post Office Naming Act',
+              plain_summary: 'Names a local post office building.',
+              key_provisions: [],
+              why_it_matters: 'test',
+              hidden_provisions: null,
+              significance: 'low',
+              significance_reason: 'test',
+              category: 'Government Operations',
+              affects: [],
+            },
+          },
+        },
+      ],
+    }
+
+    const bills = buildBillTimelineVM(ledger, makeOverview(2, '2026-01-20'), activities, {
+      windowDays: 7,
+      referenceDate: '2026-01-20',
+      totalBudget: 5,
+      keyBudget: 3,
+    })
+
+    const spotlight = buildHomepageSpotlightVM(bills, 2)
+
+    expect(spotlight).toHaveLength(2)
+    expect(spotlight[0].title).toMatch(/Iran|War Powers/i)
+    expect(spotlight[0].relevanceScore).toBeGreaterThan(spotlight[1].relevanceScore)
+  })
+})
