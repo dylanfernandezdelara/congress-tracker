@@ -43,6 +43,7 @@ export type {
   GovInfoCrecGranuleHighlightItem,
   InsightEvidence,
   LegislationActionItem,
+  LikelyReason,
   MemberDeterministicSummary,
   MemberInsight,
   MemberInsightKind,

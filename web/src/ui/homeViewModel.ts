@@ -6,6 +6,7 @@ import type {
   BillAnalysis,
   BillImpactEvidence,
   BillRef,
+  LikelyReason,
   PartyPositionAnalysis,
   RecipientEvidence,
   SessionOverview,
@@ -1209,6 +1210,17 @@ export interface InsightBeneficiary {
   group: string
   effect: 'benefit' | 'burden' | 'mixed'
   effectLabel: string
+  rationale: string[]
+}
+
+export interface InsightLikelyReason {
+  actor: string
+  actorLabel: string
+  category: string
+  reason: string
+  confidence: 'high' | 'medium' | 'low'
+  inferenceLabel: 'Inference'
+  evidenceLines: string[]
 }
 
 export interface InsightCardVM {
@@ -1224,6 +1236,7 @@ export interface InsightCardVM {
   voteTally: { yea: number; nay: number; label: string; date: string }
   partyPositions: InsightPartyPosition[]
   beneficiaries: InsightBeneficiary[]
+  likelyReasons: InsightLikelyReason[]
   analysisQuality: AnalysisQuality | null
   hasInference: boolean
   isCloseVote: boolean
@@ -1238,7 +1251,7 @@ const STANCE_LABELS: Record<string, string> = {
 
 const EFFECT_LABELS: Record<string, string> = {
   benefit: 'Benefits',
-  burden: 'Burdened',
+  burden: 'Harms',
   mixed: 'Mixed impact',
 }
 
@@ -1299,6 +1312,87 @@ function mergeAnalysisPositions(
   return merged
 }
 
+const BENEFICIARY_RATIONALE_MAX_LINES = 2
+const BENEFICIARY_RATIONALE_MAX_CHARS = 180
+const LIKELY_REASON_MAX_LINES = 5
+const LIKELY_REASON_EVIDENCE_MAX_LINES = 2
+const LIKELY_REASON_TEXT_MAX_CHARS = 220
+
+function truncateReasoning(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  const sliced = text.slice(0, maxChars).trimEnd()
+  const compact = sliced.replace(/\s+\S*$/, '').trimEnd()
+  return `${compact || sliced}...`
+}
+
+function deriveBeneficiaryRationale(entry: BenefitMapEntry): string[] {
+  const rationale: string[] = []
+  const seen = new Set<string>()
+  for (const ref of entry.evidence_refs) {
+    const quote = ref.quote?.trim()
+    const sourceRef = ref.source_ref?.trim()
+    const candidate = quote && quote.length > 0
+      ? quote
+      : sourceRef && sourceRef.length > 0
+        ? `Source: ${sourceRef}`
+        : ''
+    if (!candidate) continue
+    const dedupeKey = candidate.toLowerCase().replace(/\s+/g, ' ').trim()
+    if (!dedupeKey || seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    rationale.push(truncateReasoning(candidate, BENEFICIARY_RATIONALE_MAX_CHARS))
+    if (rationale.length >= BENEFICIARY_RATIONALE_MAX_LINES) break
+  }
+  return rationale
+}
+
+function formatReasonCategory(category: LikelyReason['category']): string {
+  if (!category) return 'Other'
+  return category.charAt(0).toUpperCase() + category.slice(1)
+}
+
+function deriveLikelyReasonEvidence(refs: LikelyReason['evidence_refs']): string[] {
+  const lines: string[] = []
+  const seen = new Set<string>()
+  for (const ref of refs) {
+    const quote = ref.quote?.trim()
+    const sourceRef = ref.source_ref?.trim()
+    const candidate = quote && quote.length > 0 ? quote : sourceRef ? `Source: ${sourceRef}` : ''
+    if (!candidate) continue
+    const dedupeKey = candidate.toLowerCase().replace(/\s+/g, ' ').trim()
+    if (!dedupeKey || seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    lines.push(truncateReasoning(candidate, BENEFICIARY_RATIONALE_MAX_CHARS))
+    if (lines.length >= LIKELY_REASON_EVIDENCE_MAX_LINES) break
+  }
+  return lines
+}
+
+function deriveLikelyReasons(analysis: BillAnalysis | undefined): InsightLikelyReason[] {
+  const reasons = analysis?.likely_reasons ?? []
+  if (reasons.length === 0) return []
+  const out: InsightLikelyReason[] = []
+  const seen = new Set<string>()
+  for (const reason of reasons) {
+    const text = reason.reason.trim()
+    if (!text) continue
+    const dedupeKey = `${reason.actor}:${text}`.toLowerCase().replace(/\s+/g, ' ')
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    out.push({
+      actor: reason.actor,
+      actorLabel: PARTY_LABEL_MAP[reason.actor] ?? reason.actor,
+      category: formatReasonCategory(reason.category),
+      reason: truncateReasoning(text, LIKELY_REASON_TEXT_MAX_CHARS),
+      confidence: reason.confidence,
+      inferenceLabel: 'Inference',
+      evidenceLines: deriveLikelyReasonEvidence(reason.evidence_refs),
+    })
+    if (out.length >= LIKELY_REASON_MAX_LINES) break
+  }
+  return out
+}
+
 function deriveBeneficiaries(
   bill: BillTimelineVM,
   benefitMap: BenefitMapEntry[] | undefined,
@@ -1308,15 +1402,16 @@ function deriveBeneficiaries(
       group: entry.group,
       effect: entry.expected_effect,
       effectLabel: EFFECT_LABELS[entry.expected_effect] ?? 'Mixed impact',
+      rationale: deriveBeneficiaryRationale(entry),
     }))
   }
   const groups: InsightBeneficiary[] = []
   for (const r of bill.structuredRecipients.slice(0, 3)) {
-    groups.push({ group: r.name, effect: 'benefit', effectLabel: EFFECT_LABELS.benefit })
+    groups.push({ group: r.name, effect: 'benefit', effectLabel: EFFECT_LABELS.benefit, rationale: [] })
   }
   for (const a of bill.affectedGroups.slice(0, 2)) {
     if (!groups.some((g) => g.group === a)) {
-      groups.push({ group: a, effect: 'mixed', effectLabel: EFFECT_LABELS.mixed })
+      groups.push({ group: a, effect: 'mixed', effectLabel: EFFECT_LABELS.mixed, rationale: [] })
     }
   }
   return groups.slice(0, 4)
@@ -1335,8 +1430,11 @@ export function toInsightCards(bills: BillTimelineVM[], swingIndex: SwingFrequen
     const votePositions = derivePartyPositionsFromVote(step)
     const partyPositions = mergeAnalysisPositions(votePositions, analysis?.party_positions)
     const beneficiaries = deriveBeneficiaries(bill, analysis?.benefit_map)
+    const likelyReasons = deriveLikelyReasons(analysis ?? undefined)
     const analysisQuality = analysis?.analysis_quality ?? null
-    const hasInference = partyPositions.some((p) => p.inferredRationale.length > 0)
+    const hasInference =
+      partyPositions.some((p) => p.inferredRationale.length > 0) ||
+      likelyReasons.length > 0
 
     const swingSenators: ActionCardSwingSenator[] = step.isClose
       ? step.crossovers.map((c) => {
@@ -1365,6 +1463,7 @@ export function toInsightCards(bills: BillTimelineVM[], swingIndex: SwingFrequen
       voteTally: { yea: step.totalYea, nay: step.totalNay, label: step.label, date: step.date },
       partyPositions,
       beneficiaries,
+      likelyReasons,
       analysisQuality,
       hasInference,
       isCloseVote: step.isClose,
@@ -1484,4 +1583,91 @@ export function buildComingUpVM(
 
   upcoming.sort((a, b) => a.date.localeCompare(b.date))
   return upcoming.slice(0, MAX_UPCOMING)
+}
+
+// ---------------------------------------------------------------------------
+// 11. Homepage spotlight (prioritized, low-noise summary list)
+// ---------------------------------------------------------------------------
+
+export interface HomepageSpotlightItem {
+  id: string
+  title: string
+  billCode: string | null
+  category: string
+  status: 'passed' | 'rejected' | 'in-progress'
+  voteLabel: string
+  date: string
+  whyNow: string
+  relevanceScore: number
+}
+
+const HOMEPAGE_TOPIC_PRIORITY: Array<{ pattern: RegExp; label: string; boost: number }> = [
+  { pattern: /\biran\b|\bwar powers?\b|\bauthorization for use of military force\b/i, label: 'Iran/war powers', boost: 32 },
+  { pattern: /\bnational security\b|\bdefense\b|\barmed forces\b|\bmilitary\b|\bsanctions?\b/i, label: 'national security', boost: 22 },
+  { pattern: /\bappropriation\b|\bbudget\b|\bfunding\b|\bdebt\b|\btax\b|\bspending\b/i, label: 'federal spending', boost: 16 },
+  { pattern: /\bimmigration\b|\bborder\b|\basylum\b/i, label: 'immigration/border', boost: 16 },
+  { pattern: /\bhealth\b|\bmedicare\b|\bmedicaid\b|\bdrug\b/i, label: 'health policy', boost: 14 },
+]
+
+function pickTopPriorityTopic(text: string): { label: string; boost: number } | null {
+  for (const topic of HOMEPAGE_TOPIC_PRIORITY) {
+    if (topic.pattern.test(text)) return { label: topic.label, boost: topic.boost }
+  }
+  return null
+}
+
+export function buildHomepageSpotlightVM(
+  bills: BillTimelineVM[] | null,
+  limit = 3,
+): HomepageSpotlightItem[] {
+  if (!bills || bills.length === 0) return []
+  const normalizedLimit = Math.max(1, Math.min(limit, 6))
+  const referenceDate = [...bills]
+    .map((bill) => bill.latestDate)
+    .sort()
+    .slice(-1)[0]
+
+  const scored = bills.map((bill) => {
+    const step = pickDecisiveStep(bill.steps)
+    const targetText = `${bill.displayTitle} ${bill.categoryLabel} ${bill.meaningLine}`
+    const topic = pickTopPriorityTopic(targetText)
+    const dayDelta = Math.max(
+      0,
+      Math.round(
+        (new Date(`${referenceDate}T00:00:00Z`).getTime() - new Date(`${bill.latestDate}T00:00:00Z`).getTime()) / 86_400_000,
+      ),
+    )
+
+    let relevanceScore = Math.round(bill.careScore * 0.45)
+    relevanceScore += bill.significance === 'high' ? 20 : bill.significance === 'medium' ? 10 : 4
+    if (bill.finalStatus !== 'in-progress') relevanceScore += 8
+    if (step.isClose) relevanceScore += 12
+    relevanceScore += Math.max(0, 10 - dayDelta)
+    if (topic) relevanceScore += topic.boost
+
+    let whyNow = `${bill.categoryLabel} vote with ${step.totalYea}-${step.totalNay} tally.`
+    if (topic) {
+      whyNow = `High-priority topic: ${topic.label}. ${step.isClose ? 'Close vote that could shape next steps.' : 'Recent Senate action with broad policy relevance.'}`
+    } else if (step.isClose) {
+      whyNow = 'Close vote that may signal where future Senate coalitions are forming.'
+    } else if (bill.significance === 'high') {
+      whyNow = 'High-significance action likely to affect national policy direction.'
+    }
+
+    const voteLabel = `${step.label} · ${step.totalYea}-${step.totalNay}`
+    return {
+      id: bill.groupKey,
+      title: bill.displayTitle,
+      billCode: bill.displayCode,
+      category: bill.categoryLabel,
+      status: bill.finalStatus,
+      voteLabel,
+      date: bill.latestDate,
+      whyNow,
+      relevanceScore,
+    }
+  })
+
+  scored.sort((a, b) => b.relevanceScore - a.relevanceScore || b.date.localeCompare(a.date))
+  return scored.slice(0, normalizedLimit)
 }

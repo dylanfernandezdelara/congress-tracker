@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActivityIndexResponse, BillAnalysis, SessionOverview, VoteLedger } from '../api'
-import { buildBillTimelineVM, buildSwingFrequencyIndex, toActionCards, toInsightCards, type SwingFrequencyIndex } from './homeViewModel'
+import { buildBillTimelineVM, buildHomepageSpotlightVM, buildSwingFrequencyIndex, toActionCards, toInsightCards, type SwingFrequencyIndex } from './homeViewModel'
 
 const emptySwingIndex: SwingFrequencyIndex = { totalCloseVotes: 0, profiles: new Map() }
 
@@ -465,7 +465,18 @@ describe('toInsightCards', () => {
         {
           group: 'Medicare recipients',
           expected_effect: 'benefit',
-          evidence_refs: [{ source_endpoint: 'summaries', source_ref: 'test' }],
+          evidence_refs: [
+            {
+              source_endpoint: 'summaries',
+              source_ref: 'summary_evidence:1',
+              quote: 'Coverage expands for Medicare recipients through the end of FY 2028.',
+            },
+          ],
+        },
+        {
+          group: 'Small businesses',
+          expected_effect: 'burden',
+          evidence_refs: [{ source_endpoint: 'summaries', source_ref: 'summary_evidence:2' }],
         },
       ],
       analysis_quality: {
@@ -473,6 +484,22 @@ describe('toInsightCards', () => {
         inference_used: true,
         confidence_reason: 'Some inference required.',
       },
+      likely_reasons: [
+        {
+          actor: 'D',
+          category: 'federalism',
+          reason: 'Likely concern that federal intervention overrides local D.C. tax policy decisions.',
+          confidence: 'medium',
+          inference_label: 'inference',
+          evidence_refs: [
+            {
+              source_endpoint: 'summaries',
+              source_ref: 'summary_evidence:1',
+              quote: 'This joint resolution nullifies legislation enacted by the Council of the District of Columbia.',
+            },
+          ],
+        },
+      ],
     }
 
     const activities: ActivityIndexResponse = {
@@ -527,9 +554,20 @@ describe('toInsightCards', () => {
     expect(card.beneficiaries.length).toBeGreaterThan(0)
     expect(card.beneficiaries[0].group).toBe('Medicare recipients')
     expect(card.beneficiaries[0].effect).toBe('benefit')
+    expect(card.beneficiaries[0].effectLabel).toBe('Benefits')
+    expect(card.beneficiaries[0].rationale[0]).toContain('Coverage expands for Medicare recipients')
+    const harmedGroup = card.beneficiaries.find((b) => b.effect === 'burden')
+    expect(harmedGroup).toBeTruthy()
+    expect(harmedGroup!.effectLabel).toBe('Harms')
+    expect(harmedGroup!.rationale[0]).toBe('Source: summary_evidence:2')
 
     expect(card.analysisQuality).toBeTruthy()
     expect(card.analysisQuality!.inference_used).toBe(true)
+    expect(card.likelyReasons.length).toBe(1)
+    expect(card.likelyReasons[0].actorLabel).toBe('Democrats')
+    expect(card.likelyReasons[0].category).toBe('Federalism')
+    expect(card.likelyReasons[0].inferenceLabel).toBe('Inference')
+    expect(card.likelyReasons[0].evidenceLines[0]).toContain('nullifies legislation enacted')
   })
 
   it('renders fallback state when no analysis exists', () => {
@@ -559,6 +597,79 @@ describe('toInsightCards', () => {
     expect(cards[0].analysisQuality).toBeNull()
     expect(cards[0].partyPositions.length).toBeGreaterThan(0)
     expect(cards[0].partyPositions.every((p) => p.inferredRationale.length === 0)).toBe(true)
+    expect(cards[0].beneficiaries.every((b) => b.rationale.length === 0)).toBe(true)
+  })
+
+  it('deduplicates and truncates beneficiary rationale lines', () => {
+    const longQuote = 'This bill requires covered entities to submit quarterly compliance filings and administrative certifications for every participating location nationwide before reimbursement can be issued.'
+    const analysisWithLongRationale: BillAnalysis = {
+      plain_title: 'Long Rationale Test',
+      plain_summary: 'Testing rationale formatting',
+      key_provisions: [],
+      why_it_matters: 'test',
+      hidden_provisions: null,
+      significance: 'medium',
+      significance_reason: 'test',
+      category: 'Testing',
+      affects: [],
+      benefit_map: [
+        {
+          group: 'County clinics',
+          expected_effect: 'mixed',
+          evidence_refs: [
+            { source_endpoint: 'summaries', source_ref: 'summary_evidence:1', quote: longQuote },
+            { source_endpoint: 'summaries', source_ref: 'summary_evidence:2', quote: longQuote },
+            { source_endpoint: 'summaries', source_ref: 'summary_evidence:3', quote: 'Source systems are upgraded over a 2-year transition period.' },
+          ],
+        },
+      ],
+    }
+
+    const activities: ActivityIndexResponse = {
+      generated_at: '2026-01-06T00:00:00Z',
+      window: { start_date: '2026-01-01', end_date: '2026-01-06' },
+      activities: [
+        {
+          activity_id: 'senate:roll_call_vote:2026-01-06:950',
+          source: 'senate',
+          type: 'roll_call_vote',
+          date: '2026-01-06',
+          members: ['A000001', 'B000001'],
+          bill: {
+            congress: 119,
+            type: 'S',
+            number: '950',
+            title: 'Long Rationale Test',
+            analysis: analysisWithLongRationale,
+          },
+        },
+      ],
+    }
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-06T00:00:00Z',
+      total_votes: 1,
+      entries: [
+        {
+          vote_number: 950,
+          vote_date: '2026-01-06',
+          title: 'S. 950 vote',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          issue: 'S. 950',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const vm = buildBillTimelineVM(ledger, makeOverview(1, '2026-01-06'), activities, { windowDays: 7, referenceDate: '2026-01-06' })
+    const cards = toInsightCards(vm, emptySwingIndex)
+    const rationale = cards[0].beneficiaries[0].rationale
+
+    expect(rationale.length).toBe(2)
+    expect(rationale[0].endsWith('...')).toBe(true)
+    expect(rationale[1]).toContain('Source systems are upgraded')
   })
 
   it('marks status labels correctly', () => {
@@ -697,3 +808,105 @@ describe('toInsightCards', () => {
   })
 })
 
+
+
+describe('buildHomepageSpotlightVM', () => {
+  it('prioritizes war-powers/Iran relevance over less critical topics', () => {
+    const ledger: VoteLedger = {
+      congress: 119,
+      session: 2,
+      generated_at: '2026-01-20T00:00:00Z',
+      total_votes: 2,
+      entries: [
+        {
+          vote_number: 801,
+          vote_date: '2026-01-20',
+          title: 'S.J.Res. 55 vote',
+          question: 'On Passage of the Joint Resolution',
+          result: 'Passed',
+          issue: 'S.J.Res. 55',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+        {
+          vote_number: 802,
+          vote_date: '2026-01-20',
+          title: 'S. 802 vote',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          issue: 'S. 802',
+          member_votes: { A000001: 'Yea', B000001: 'Nay' },
+        },
+      ],
+    }
+
+    const activities: ActivityIndexResponse = {
+      generated_at: '2026-01-20T00:00:00Z',
+      window: { start_date: '2026-01-15', end_date: '2026-01-20' },
+      activities: [
+        {
+          activity_id: 'senate:roll_call_vote:2026-01-20:801',
+          source: 'senate',
+          type: 'roll_call_vote',
+          date: '2026-01-20',
+          members: ['A000001', 'B000001'],
+          bill: {
+            congress: 119,
+            type: 'S.J.Res.',
+            number: '55',
+            title: 'War Powers Resolution on Iran',
+            policy_area: 'Armed forces and national security',
+            analysis: {
+              plain_title: 'War Powers Resolution on Iran',
+              plain_summary: 'Limits unauthorized military action involving Iran.',
+              key_provisions: [],
+              why_it_matters: 'test',
+              hidden_provisions: null,
+              significance: 'high',
+              significance_reason: 'test',
+              category: 'National Security',
+              affects: [],
+            },
+          },
+        },
+        {
+          activity_id: 'senate:roll_call_vote:2026-01-20:802',
+          source: 'senate',
+          type: 'roll_call_vote',
+          date: '2026-01-20',
+          members: ['A000001', 'B000001'],
+          bill: {
+            congress: 119,
+            type: 'S',
+            number: '802',
+            title: 'Post Office Naming Act',
+            policy_area: 'Government operations and politics',
+            analysis: {
+              plain_title: 'Post Office Naming Act',
+              plain_summary: 'Names a local post office building.',
+              key_provisions: [],
+              why_it_matters: 'test',
+              hidden_provisions: null,
+              significance: 'low',
+              significance_reason: 'test',
+              category: 'Government Operations',
+              affects: [],
+            },
+          },
+        },
+      ],
+    }
+
+    const bills = buildBillTimelineVM(ledger, makeOverview(2, '2026-01-20'), activities, {
+      windowDays: 7,
+      referenceDate: '2026-01-20',
+      totalBudget: 5,
+      keyBudget: 3,
+    })
+
+    const spotlight = buildHomepageSpotlightVM(bills, 2)
+
+    expect(spotlight).toHaveLength(2)
+    expect(spotlight[0].title).toMatch(/Iran|War Powers/i)
+    expect(spotlight[0].relevanceScore).toBeGreaterThan(spotlight[1].relevanceScore)
+  })
+})
