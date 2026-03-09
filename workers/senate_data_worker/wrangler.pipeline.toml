@@ -1,6 +1,9 @@
-name = "senate-data-api-worker"
-main = "src/api-index.ts"
+name = "senate-data-pipeline-worker"
+main = "src/pipeline-index.ts"
 compatibility_date = "2025-12-10"
+
+[triggers]
+crons = ["0 10 * * *"]
 
 [limits]
 cpu_ms = 300000
@@ -28,4 +31,7 @@ preview_database_id = "00000000-0000-0000-0000-000000000000"
 # Optional when the queue is created:
 # [[queues.producers]]
 # binding = "PIPELINE_QUEUE"
+# queue = "senate-platform-jobs"
+#
+# [[queues.consumers]]
 # queue = "senate-platform-jobs"

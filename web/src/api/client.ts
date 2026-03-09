@@ -7,12 +7,14 @@
 import { getApiBaseUrl } from './config';
 import type {
   ActivityIndexResponse,
+  BriefingFeedResponse,
   HealthResponse,
   MemberActivityResponse,
   MemberIndexResponse,
   SessionOverview,
   StateMetaResponse,
   StateVotesResponse,
+  VoteDetailResponse,
   VoteLedger,
 } from './types';
 
@@ -381,6 +383,68 @@ export async function fetchSessionOverview(): Promise<SessionOverview> {
 
   try {
     const data: SessionOverview = await response.json();
+    return data;
+  } catch {
+    throw new Error('The API returned invalid data. Please try again later.');
+  }
+}
+
+export async function fetchLatestBriefing(): Promise<BriefingFeedResponse> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/briefings/latest.json`;
+
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error(
+      `Failed to connect to the API. Please check your internet connection and try again.`
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      getErrorMessage(response.status, url),
+      response.status,
+      response.statusText
+    );
+  }
+
+  try {
+    const data: BriefingFeedResponse = await response.json();
+    return data;
+  } catch {
+    throw new Error('The API returned invalid data. Please try again later.');
+  }
+}
+
+export async function fetchVoteDetail(
+  congress: number | string,
+  session: number | string,
+  voteNumber: number | string
+): Promise<VoteDetailResponse> {
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/votes/${congress}/${session}/${voteNumber}.json`;
+
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error(
+      `Failed to connect to the API. Please check your internet connection and try again.`
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      getErrorMessage(response.status, url),
+      response.status,
+      response.statusText
+    );
+  }
+
+  try {
+    const data: VoteDetailResponse = await response.json();
     return data;
   } catch {
     throw new Error('The API returned invalid data. Please try again later.');

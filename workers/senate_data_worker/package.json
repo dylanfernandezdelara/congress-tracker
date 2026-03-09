@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "test-scheduled": "wrangler dev --test-scheduled",
+    "dev": "wrangler dev --config wrangler.toml",
+    "dev:api": "wrangler dev --config wrangler.toml",
+    "dev:pipeline": "wrangler dev --config wrangler.pipeline.toml",
+    "deploy": "wrangler deploy --config wrangler.toml",
+    "deploy:api": "wrangler deploy --config wrangler.toml",
+    "deploy:pipeline": "wrangler deploy --config wrangler.pipeline.toml",
+    "test-scheduled": "wrangler dev --config wrangler.pipeline.toml --test-scheduled",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

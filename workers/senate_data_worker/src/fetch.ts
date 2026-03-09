@@ -18,8 +18,10 @@ export interface FetchConfig {
   baseDelayMs?: number;
   /** Request timeout in ms (default: 10000) */
   timeoutMs?: number;
-  /** Maximum concurrent requests (default: 5) */
+  /** Maximum concurrent requests (default: 4) */
   concurrency?: number;
+  /** Maximum backoff delay in ms (default: 30000) */
+  maxDelayMs?: number;
 }
 
 export interface FetchResult<T> {
@@ -33,7 +35,8 @@ const DEFAULT_CONFIG: Required<FetchConfig> = {
   maxRetries: 3,
   baseDelayMs: 1000,
   timeoutMs: 10000,
-  concurrency: 5,
+  concurrency: 4,
+  maxDelayMs: 30000,
 };
 
 // ============================================================================
@@ -70,6 +73,30 @@ export function buildVoteDetailUrl(
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfter(value: string | null): number | null {
+  if (!value) return null;
+  const seconds = Number.parseInt(value, 10);
+  if (!Number.isNaN(seconds) && seconds >= 0) return seconds * 1000;
+  const dateMs = Date.parse(value);
+  if (!Number.isNaN(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+  return null;
+}
+
+function computeDelay(
+  attempt: number,
+  baseDelayMs: number,
+  maxDelayMs: number,
+  retryAfterMs: number | null = null
+): number {
+  const exponential = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
+  const budgeted = retryAfterMs === null ? exponential : Math.min(maxDelayMs, Math.max(exponential, retryAfterMs));
+  const jitterFloor = Math.max(0, budgeted * 0.85);
+  const jitterCeil = Math.max(jitterFloor, budgeted * 1.15);
+  return Math.round(jitterFloor + Math.random() * (jitterCeil - jitterFloor));
 }
 
 /**
@@ -109,6 +136,7 @@ export async function fetchXmlWithRetry(
     ...DEFAULT_CONFIG,
     ...config,
   };
+  const { maxDelayMs } = { ...DEFAULT_CONFIG, ...config };
 
   let lastError: string | undefined;
   let lastStatusCode: number | undefined;
@@ -117,8 +145,10 @@ export async function fetchXmlWithRetry(
     try {
       const response = await fetchWithTimeout(url, timeoutMs, {
         headers: {
-          "User-Agent": "SenateDataWorker/1.0 (Cloudflare Worker)",
+          "User-Agent": "Mozilla/5.0 (compatible; SenateDataWorker/1.0)",
           Accept: "application/xml, text/xml, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
         },
       });
       lastStatusCode = response.status;
@@ -138,6 +168,13 @@ export async function fetchXmlWithRetry(
       }
 
       lastError = `HTTP ${response.status}: ${response.statusText}`;
+      const retryAfterMs = parseRetryAfter(response.headers.get("Retry-After"));
+
+      // Exponential backoff before retry
+      if (attempt < maxRetries) {
+        await sleep(computeDelay(attempt, baseDelayMs, maxDelayMs, retryAfterMs));
+      }
+      continue;
     } catch (err) {
       if (err instanceof Error) {
         if (err.name === "AbortError") {
@@ -150,10 +187,8 @@ export async function fetchXmlWithRetry(
       }
     }
 
-    // Exponential backoff before retry
     if (attempt < maxRetries) {
-      const delayMs = baseDelayMs * Math.pow(2, attempt);
-      await sleep(delayMs);
+      await sleep(computeDelay(attempt, baseDelayMs, maxDelayMs));
     }
   }
 
@@ -185,6 +220,7 @@ export async function fetchJsonWithRetry<T>(
     ...DEFAULT_CONFIG,
     ...config,
   };
+  const { maxDelayMs } = { ...DEFAULT_CONFIG, ...config };
 
   let lastError: string | undefined;
   let lastStatusCode: number | undefined;
@@ -214,6 +250,11 @@ export async function fetchJsonWithRetry<T>(
       }
 
       lastError = `HTTP ${response.status}: ${response.statusText}`;
+      const retryAfterMs = parseRetryAfter(response.headers.get("Retry-After"));
+      if (attempt < maxRetries) {
+        await sleep(computeDelay(attempt, baseDelayMs, maxDelayMs, retryAfterMs));
+      }
+      continue;
     } catch (err) {
       if (err instanceof Error) {
         if (err.name === "AbortError") {
@@ -227,8 +268,7 @@ export async function fetchJsonWithRetry<T>(
     }
 
     if (attempt < maxRetries) {
-      const delayMs = baseDelayMs * Math.pow(2, attempt);
-      await sleep(delayMs);
+      await sleep(computeDelay(attempt, baseDelayMs, maxDelayMs));
     }
   }
 
@@ -312,4 +352,3 @@ export async function fetchVoteMenu(
   const url = buildVoteMenuUrl(congress, session);
   return fetchXmlWithRetry(url, config);
 }
-

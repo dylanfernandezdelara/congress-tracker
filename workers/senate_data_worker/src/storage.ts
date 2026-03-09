@@ -91,6 +91,38 @@ export function buildCoverageSnapshotKey(snapshotDate: string): string {
   return `stats/coverage/${snapshotDate}.json`;
 }
 
+export function buildLatestBriefingKey(): string {
+  return "briefings/latest.json";
+}
+
+export function buildLatestChamberContextKey(): string {
+  return "platform/context/chamber/latest.json";
+}
+
+export function buildChamberContextKey(snapshotDate: string): string {
+  return `platform/context/chamber/${snapshotDate}.json`;
+}
+
+export function buildVoteDetailKey(
+  congress: number,
+  session: number,
+  voteNumber: number
+): string {
+  return `votes/detail/${congress}/${session}/${voteNumber}.json`;
+}
+
+export function buildSourceArtifactKey(
+  source: string,
+  entityKey: string,
+  fetchedAt: string,
+  extension: "json" | "xml" | "txt" | "html" = "json"
+): string {
+  const safeSource = source.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const safeEntityKey = entityKey.trim().toLowerCase().replace(/[^a-z0-9/_-]+/g, "-");
+  const safeFetchedAt = fetchedAt.slice(0, 19).replace(/[:T]/g, "-");
+  return `sources/${safeSource}/${safeFetchedAt}/${safeEntityKey}.${extension}`;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -100,25 +132,25 @@ export interface R2WriteOptions {
   baseDelayMs?: number;
 }
 
-export async function writeJsonToR2(
+async function writeStringToR2(
   bucket: R2Bucket,
   key: string,
-  data: unknown,
+  data: string,
+  contentType: string,
   options: R2WriteOptions = {}
 ): Promise<void> {
-  const json = JSON.stringify(data);
   const retries = Math.max(0, options.retries ?? 2);
   const baseDelayMs = Math.max(100, options.baseDelayMs ?? 250);
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      await bucket.put(key, json, {
+      await bucket.put(key, data, {
         httpMetadata: {
-          contentType: "application/json",
+          contentType,
         },
       });
-      console.log(`[r2] Wrote ${key} (${json.length} bytes)`);
+      console.log(`[r2] Wrote ${key} (${data.length} bytes)`);
       return;
     } catch (error) {
       lastError = error;
@@ -133,6 +165,30 @@ export async function writeJsonToR2(
     `[r2] Failed to write ${key}: ${
       lastError instanceof Error ? lastError.message : String(lastError)
     }`
+  );
+}
+
+export async function writeJsonToR2(
+  bucket: R2Bucket,
+  key: string,
+  data: unknown,
+  options: R2WriteOptions = {}
+): Promise<void> {
+  await writeStringToR2(bucket, key, JSON.stringify(data), "application/json", options);
+}
+
+export async function writeTextToR2(
+  bucket: R2Bucket,
+  key: string,
+  data: string,
+  options: R2WriteOptions & { contentType?: string } = {}
+): Promise<void> {
+  await writeStringToR2(
+    bucket,
+    key,
+    data,
+    options.contentType ?? "text/plain; charset=utf-8",
+    options
   );
 }
 
@@ -173,6 +229,28 @@ export async function readJsonFromR2<T>(
   }
 }
 
+export async function readTextFromR2(
+  bucket: R2Bucket,
+  key: string
+): Promise<string | null> {
+  const object = await bucket.get(key);
+  if (!object) {
+    return null;
+  }
+
+  try {
+    const text = await object.text();
+    return text.trim() ? text : null;
+  } catch (error) {
+    console.error(
+      `[r2] Failed to read object text for ${key}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
 /**
  * Publish ingestion results to R2 in a consistent, reader-safe order.
  *
@@ -196,4 +274,3 @@ export async function publishToR2(
 
   console.log("[r2] Publish complete");
 }
-
