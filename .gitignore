@@ -15,7 +15,9 @@ node_modules/
 # Build artifacts
 /target/
 web/artifacts/
+web/output/
 senate-*.png
+.playwright-cli/
 
 # IDE
 .idea/

@@ -42,6 +42,7 @@ import type {
   GovInfoCrecGranuleHighlightItem,
   MemberIndexEntry,
   MemberActivityJson,
+  MemberActivityContext,
   MemberDeterministicSummary,
   MemberIndexJson,
   RollCallVoteItem,
@@ -67,6 +68,7 @@ export interface MemberIngestResult {
   membersIndex: MemberIndexJson | null;
   memberActivities: MemberActivityJson[];
   activityIndex: ActivityIndexJson | null;
+  context: MemberActivityContext;
   errors: SourceError[];
   error?: string;
 }
@@ -909,6 +911,14 @@ export async function runMemberIngestion(
       membersIndex: null,
       memberActivities: [],
       activityIndex: null,
+      context: {
+        floor_schedule: floorSchedule,
+        committee_meetings: committeeMeetings,
+        daily_digest: dailyDigest,
+        committee_meetings_congress: congressCommitteeMeetings,
+        senate_record_articles: senateRecordArticles,
+        senate_granule_highlights: senateGranuleHighlights,
+      },
       errors,
       error: "No current Senators returned by Congress.gov API",
     };
@@ -1056,6 +1066,7 @@ export async function runMemberIngestion(
     membersIndex,
     memberActivities,
     activityIndex,
+    context,
     errors,
   };
 }

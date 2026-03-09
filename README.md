@@ -1,541 +1,328 @@
 # Daily Senate Update
 
-A Cloudflare Worker that ingests Senate roll-call vote XML data and per-senator daily activity (Congress.gov, Senate.gov schedules, GovInfo), then publishes precomputed JSON to R2 for website consumption.
+`daily_senate_update` is a Cloudflare-native Senate vote intelligence app. It ingests official Senate and congressional data, builds a normalized read model for recent and historical voting context, and serves a ranked feed of the most relevant Senate votes plus vote-detail pages.
 
-## Overview
+## Architecture
 
-This project consists of:
+The project now has three runtime surfaces:
 
-- **Cloudflare Worker** (`workers/senate_data_worker/`): **Production** ingestion + read-only HTTP API (serves your website)
-- **Web app** (`web/`): Frontend UI that consumes the Worker API
+- `workers/senate_data_worker/wrangler.toml`
+  API Worker. Read-only HTTP endpoints for the web app.
+- `workers/senate_data_worker/wrangler.pipeline.toml`
+  Pipeline Worker. Cron-driven ingestion, queue consumption, normalization, and read-model materialization.
+- `web/`
+  Vite + React frontend for the ranked homepage and vote detail pages.
 
-The Worker runs **once per day** via cron (10:00 UTC / 5-6 AM ET), ingests the most recent complete voting day's data plus today/previous-day member activity, and publishes JSON to R2. Your website can then fetch precomputed JSON without making direct calls to Senate APIs.
+The backend keeps the Cloudflare stack but no longer treats R2 as the only query surface:
+
+- `R2`
+  Raw source payloads, evidence blobs, and cached/materialized JSON payloads.
+- `D1`
+  Normalized read model for votes, members, issue threads, historical context, argument summaries, and materialized detail payloads.
+- `Queues`
+  Retryable background work for new-vote enrichment, historical backfill chunks, excerpt extraction, thread updates, and briefing/detail regeneration.
+
+```text
+Official Sources
+  Senate.gov votes/XML
+  Congress.gov API
+  GovInfo API
+  Senate floor logs
+        |
+        v
+Pipeline Worker
+  cron -> fetch -> normalize -> enrich -> materialize
+        |               |              |
+        |               |              +--> R2 cached JSON / raw artifacts
+        |               +-----------------> D1 read model
+        +-------------------------------> Queue jobs
+                                           |
+                                           v
+API Worker
+  /briefings/latest.json
+  /votes/:congress/:session/:voteNumber.json
+  legacy R2-backed endpoints
+        |
+        v
+Web App
+  ranked feed
+  vote detail pages
+```
+
+## Data Sources
+
+The pipeline is designed around official or official-adjacent sources:
+
+- `Senate.gov`
+  Senate roll-call XML, vote archives, floor schedule, committee schedule.
+- `Congress.gov API`
+  Bill metadata, summaries, actions, related bills, committee meetings, hearing records, CRS products.
+- `GovInfo API`
+  Congressional Record text and metadata.
+- `Senate Periodical Press Gallery floor logs`
+  Same-day procedural context around proceedings and cloture activity.
+
+The interpretation layer is intentionally constrained:
+
+- Deterministic evidence assembly and ranking happen first.
+- Model-assisted summaries only operate on already-linked evidence.
+- Coverage gaps are rendered explicitly instead of being filled in heuristically.
+
+## Current Product Shape
+
+- Homepage
+  Ranked feed of recent Senate votes showing what happened, why it matters, and who crossed party lines.
+- Vote detail page
+  Vote overview, party breakdowns, crossover senators, historical thread context, and sourced argument summaries.
+- Legacy API
+  Existing R2-backed state/member/session endpoints remain available during migration.
+
+## Repository Layout
+
+```text
+daily_senate_update/
+├── web/
+│   ├── src/
+│   └── README.md
+├── workers/
+│   └── senate_data_worker/
+│       ├── migrations/
+│       ├── scripts/
+│       ├── src/
+│       │   ├── api-index.ts
+│       │   ├── pipeline-index.ts
+│       │   ├── http.ts
+│       │   ├── d1.ts
+│       │   ├── read-model.ts
+│       │   └── index.ts
+│       ├── wrangler.toml
+│       └── wrangler.pipeline.toml
+└── scripts/
+```
 
 ## Cloudflare Setup
 
-### Prerequisites
+### Required resources
 
-- Cloudflare account with Workers enabled
-- Node.js 18+ and npm installed
-- Wrangler CLI (installed via npm in the worker directory)
+Create the following resources before deploying the full split architecture:
 
-### 1. Create R2 Bucket
+1. `R2` bucket for source artifacts and cached JSON.
+2. `D1` database for the normalized read model.
+3. `Queue` for pipeline jobs.
 
-Create an R2 bucket to store the JSON artifacts:
+Example resource creation:
 
 ```bash
-# Using Cloudflare Dashboard:
-# 1. Go to R2 → Create bucket
-# 2. Name it: senate-data-bucket (or your preferred name)
-# 3. Note: No public access needed (Worker accesses via binding)
-
-# Or using Wrangler CLI:
 cd workers/senate_data_worker
+
 npx wrangler r2 bucket create senate-data-bucket
+npx wrangler d1 create senate-platform
+npx wrangler queues create senate-platform-jobs
 ```
 
-### 2. Configure Worker Variables
+After creation, update both Wrangler configs:
 
-Edit `workers/senate_data_worker/wrangler.toml` to set environment variables:
+- `workers/senate_data_worker/wrangler.toml`
+- `workers/senate_data_worker/wrangler.pipeline.toml`
+
+Uncomment and fill in:
+
+- `[[d1_databases]]`
+- `[[queues.producers]]`
+- `[[queues.consumers]]` in the pipeline config
+
+### Runtime variables and secrets
+
+Non-secret vars live in the Wrangler configs:
 
 ```toml
 [vars]
-CONGRESS = "119"        # Current Congress number
-SESSION = "2"           # Session number (1 or 2)
-TARGET_STATE = "ALL"    # "ALL" or two-letter state code (uppercase)
-# Optional: restrict CORS to your deployed frontend
+CONGRESS = "119"
+SESSION = "2"
+TARGET_STATE = "ALL"
 # ALLOWED_ORIGIN = "https://your-site.example"
-# Optional: OpenRouter attribution headers
-# OPENROUTER_APP_REFERER = "https://your-site.example"
-# OPENROUTER_APP_TITLE = "daily_senate_update_worker"
 ```
 
-**API keys (required)**:
+Required secrets:
 
-- `CONGRESS_API_KEY` (Congress.gov API)
-- `GOVINFO_API_KEY` (GovInfo API)
+- `CONGRESS_API_KEY`
+- `GOVINFO_API_KEY`
 
-For local development, set these in `workers/senate_data_worker/.dev.vars` (and keep the file out of git). For production, use `wrangler secret put CONGRESS_API_KEY` and `wrangler secret put GOVINFO_API_KEY`.
+Optional secret/runtime values:
 
-### 3. Verify R2 Binding
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
+- `OPENROUTER_APP_REFERER`
+- `OPENROUTER_APP_TITLE`
 
-Ensure `wrangler.toml` includes the R2 bucket binding:
-
-```toml
-[[r2_buckets]]
-binding = "DATA_BUCKET"
-bucket_name = "senate-data-bucket"
-```
-
-### 4. Install Dependencies
+Set local secrets in `workers/senate_data_worker/.dev.vars`.
+Set deployed secrets with Wrangler:
 
 ```bash
 cd workers/senate_data_worker
-npm install
-```
-
-### 5. Local API Keys
-
-Create `workers/senate_data_worker/.dev.vars`:
-
-```bash
-CONGRESS_API_KEY=your_congress_api_key
-GOVINFO_API_KEY=your_govinfo_api_key
-```
-
-## Development
-
-### Local Development (HTTP Endpoints)
-
-Start the Worker locally to test HTTP endpoints:
-
-```bash
-cd workers/senate_data_worker
-npm run dev
-```
-
-This starts a local server (typically `http://localhost:8787`). You can test endpoints:
-
-```bash
-# Health check
-curl http://localhost:8787/health
-
-# Latest NY votes (requires data in R2)
-curl http://localhost:8787/state/NY/latest.json
-
-# Members index
-curl http://localhost:8787/members/index.json
-
-# Member activity
-curl http://localhost:8787/member/S000148/latest.json
-
-# Dated snapshot
-curl http://localhost:8787/state/NY/2025-12-18.json
-
-# Metadata
-curl http://localhost:8787/state/NY/_meta.json
-```
-
-### Local UI Automation (optional)
-
-To run the worker + web app together and generate screenshots for quick iteration:
-
-```bash
-# Terminal 1: start both services
-./scripts/dev-all.sh
-
-# Terminal 2: trigger a refresh + take a screenshot
-./scripts/loop.sh
-```
-
-Notes:
-- Screenshots are written to `web/artifacts/` by default.
-- Use deterministic UI data with `E2E=1` (default in `scripts/loop.sh`).
-- Override ports/hosts via `WEB_PORT`, `WEB_HOST`, `WORKER_PORT`, `WORKER_HOST`.
-- Take multiple screenshots with `PATHS=/,/about ./scripts/loop.sh`.
-
-**Note**: Local dev uses a local R2 emulation by default. For testing against a real R2 bucket, use:
-
-```bash
-npm run dev -- --remote
-```
-
-### Testing Scheduled Ingestion
-
-To test the cron-triggered ingestion locally:
-
-```bash
-cd workers/senate_data_worker
-npm run test-scheduled
-```
-
-Or use the helper scripts:
-
-```bash
-# Start wrangler dev and trigger scheduled ingestion (auto waits for completion)
-workers/senate_data_worker/scripts/run-ingest-local.sh
-
-# Trigger an already-running local worker
-scripts/refresh-data.sh
-```
-
-This simulates the scheduled handler and will:
-
-1. Compute `cutoff_date_et` (today in US/Eastern)
-2. Find `target_vote_date` (most recent voting day < cutoff)
-3. Fetch and parse Senate XML for that date
-4. Filter to NY senators
-5. Publish JSON to R2 (local emulation or remote if `--remote`)
-
-**Expected output**: Logs showing `cutoff_date_et`, `target_vote_date`, vote counts, and R2 publish confirmation.
-
-### Running Tests
-
-Unit tests for parsing, date handling, and storage:
-
-```bash
-cd workers/senate_data_worker
-npm test
-```
-
-Watch mode:
-
-```bash
-npm run test:watch
-```
-
-### Type Checking
-
-```bash
-cd workers/senate_data_worker
-npm run check
-```
-
-## Deployment
-
-### Deploy to Cloudflare
-
-```bash
-cd workers/senate_data_worker
-npm run deploy
-```
-
-This publishes the Worker to Cloudflare and enables the cron trigger.
-
-### Verify Deployment
-
-After deployment, check:
-
-1. **Health endpoint**:
-   ```bash
-   curl https://senate-data-worker.<your-subdomain>.workers.dev/health
-   ```
-
-2. **Worker logs**:
-   ```bash
-   npx wrangler tail
-   ```
-
-3. **Cron execution**: Wait for the next scheduled run (10:00 UTC daily) or trigger manually via Cloudflare Dashboard → Workers → Triggers → Cron Triggers → "Run now".
-
-### Environment Variables (Production)
-
-Set API keys as Worker secrets, and keep non-secret runtime values in `wrangler.toml`:
-
-```bash
-# Required secrets
 npx wrangler secret put CONGRESS_API_KEY
 npx wrangler secret put GOVINFO_API_KEY
 ```
 
-`CONGRESS`, `SESSION`, and `TARGET_STATE` should be configured under `[vars]` in `wrangler.toml`.
+### D1 schema
 
-Optional runtime vars:
-- `ALLOWED_ORIGIN`: set this in production to your frontend origin (for example, `https://your-site.example`) so responses do not default to wildcard CORS.
-- `OPENROUTER_APP_REFERER`: optional referer header sent to OpenRouter.
-- `OPENROUTER_APP_TITLE`: optional title header sent to OpenRouter (defaults to `daily_senate_update_worker`).
+The platform read-model schema lives in:
 
-## HTTP API Endpoints
+- `workers/senate_data_worker/migrations/0001_platform_read_model.sql`
+- `workers/senate_data_worker/migrations/0002_pipeline_state.sql`
+- `workers/senate_data_worker/migrations/0003_issue_key.sql`
 
-All endpoints return JSON with `Content-Type: application/json` and CORS headers.
+The worker can also create the same schema lazily through `src/d1.ts`, but the migration file is the preferred deployment path.
 
-### `GET /health`
+## Development
 
-Health check endpoint (no R2 access required).
+### Install dependencies
 
-**Response** (200 OK):
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-01-04T16:30:00.000Z",
-  "target_state": "ALL",
-  "congress": "119",
-  "session": "2"
-}
+```bash
+npm --prefix workers/senate_data_worker install
+npm --prefix web install
 ```
 
-**Use case**: Deployment validation, monitoring.
+### Run the split stack locally
 
-### `GET /health/data`
-
-Data freshness health check based on the latest activities index in storage.
-
-**Response** (200 OK when fresh):
-```json
-{
-  "status": "ok",
-  "generated_at": "2026-02-20T09:58:12.000Z",
-  "age_hours": 0.42,
-  "max_fresh_hours": 36
-}
+```bash
+./scripts/dev-all.sh
 ```
 
-**Response** (503 Service Unavailable when stale/missing):
-```json
-{
-  "status": "stale",
-  "message": "No activities index found in storage.",
-  "max_fresh_hours": 36
-}
+This starts:
+
+- API Worker at `http://127.0.0.1:8787`
+- Pipeline Worker at `http://127.0.0.1:8788`
+- Web app at `http://127.0.0.1:5173`
+
+The repo now ships with a local `D1` binding enabled in both Wrangler configs so queue, evidence, and read-model code can run end to end during local development without provisioning a remote database first.
+
+You can also run them individually:
+
+```bash
+npm --prefix workers/senate_data_worker run dev:api
+npm --prefix workers/senate_data_worker run dev:pipeline
+npm --prefix web run dev
 ```
 
-### `GET /state/NY/latest.json`
+### Trigger pipeline ingestion locally
 
-Returns the latest computed vote summary for NY.
-
-**Response** (200 OK): JSON matching the snapshot schema (see `workers/senate_data_worker/SPEC.md`).
-
-**Error** (404 Not Found): If no data exists yet.
-
-**Use case**: Website fetches this to display the most recent voting day.
-
-### `GET /state/NY/YYYY-MM-DD.json`
-
-Returns a dated snapshot (e.g., `/state/NY/2025-12-18.json`).
-
-**Response** (200 OK): JSON matching the snapshot schema.
-
-**Error** (404 Not Found): If the requested date doesn't exist.
-
-**Use case**: Historical lookups, backfill validation.
-
-### `GET /state/NY/_meta.json`
-
-Returns metadata including `target_vote_date`, `generated_at`, and stats.
-
-**Response** (200 OK): JSON matching the `_meta.json` schema (see `workers/senate_data_worker/SPEC.md`).
-
-**Error** (404 Not Found): If no data exists yet.
-
-**Use case**: Website can check `target_vote_date` and `generated_at` without parsing the full `latest.json`.
-
-### Error Responses
-
-All endpoints return consistent error format:
-
-```json
-{
-  "error": "not_found",
-  "message": "Resource not found",
-  "path": "/state/NY/2025-12-18.json"
-}
+```bash
+./scripts/refresh-data.sh
 ```
 
-### `GET /members/index.json`
+This targets the local Pipeline Worker and triggers the scheduled ingestion path through the explicit local admin route.
 
-Returns the current list of Senators (for UI selection).
+### Seed historical backfill locally
 
-### `GET /activities/index.json`
+```bash
+./scripts/backfill-history.sh
+```
 
-Returns the aggregated activity index for the current window, including deterministic featured senator ranking (`featured_senators`) used by the home dashboard.
+Useful environment overrides:
 
-### `GET /votes/ledger.json`
+- `START_CONGRESS=119`
+- `END_CONGRESS=116`
+- `SESSION_FILTER=all`
 
-Returns the session vote ledger used for vote-pattern and defection analytics.
+The local pipeline also exposes admin endpoints for debugging:
 
-**Response** (200 OK): JSON matching the `VoteLedger` schema (see `workers/senate_data_worker/src/types.ts`).
+- `GET /__pipeline/status`
+- `GET /__pipeline/run/ingestion`
+- `GET /__pipeline/run/materialize`
+- `GET /__pipeline/run/evidence?vote=46`
+- `GET /__pipeline/run/historical-backfill?congress=116`
 
-### `GET /stats/overview.json`
+### Rate-limit aware development
 
-Returns an aggregate session overview used by homepage summary visualizations.
+The source adapters are intentionally conservative:
 
-**Response** (200 OK): JSON matching the `SessionOverview` schema (see `workers/senate_data_worker/src/types.ts`).
+- bounded concurrency
+- retry with backoff and `Retry-After` support
+- cached artifact reuse through `source_fetch_log` + R2 source artifacts
+- resumable historical backfill checkpoints in `pipeline_checkpoints`
+- fixture-driven tests preferred over repeated live API pulls
 
-### `GET /member/{bioguide}/latest.json`
+Use local fixtures and existing tests for most development work instead of repeatedly hitting Congress.gov or GovInfo.
 
-Returns the latest daily activity window for a senator.
+## Testing
 
-### `GET /member/{bioguide}/{YYYY-MM-DD}.json`
+Worker checks:
 
-Returns a dated snapshot of daily activity for a senator (window end date).
+```bash
+npm --prefix workers/senate_data_worker run check
+npm --prefix workers/senate_data_worker test
+```
 
-## Caching & CORS
+Web checks:
 
-### CORS Policy
+```bash
+npm --prefix web test
+npm --prefix web run build
+```
 
-**Default**: `Access-Control-Allow-Origin: *` (allows all origins).
+Scheduled-handler smoke test:
 
-**Restricted mode**: set `ALLOWED_ORIGIN` to your deployed frontend origin to return:
-- `Access-Control-Allow-Origin: <ALLOWED_ORIGIN>`
-- `Vary: Origin`
+```bash
+npm --prefix workers/senate_data_worker run test-scheduled
+```
 
-**Headers included**:
-- `Access-Control-Allow-Origin: *` (or `ALLOWED_ORIGIN` when configured)
-- `Access-Control-Allow-Methods: GET, OPTIONS`
-- `Access-Control-Allow-Headers: Content-Type`
-- `Vary: Origin` (only when `ALLOWED_ORIGIN` is configured and not `*`)
+## Deployment
 
-**OPTIONS preflight**: Returns `204 No Content` with CORS headers.
-
-**Production requirement**: set `ALLOWED_ORIGIN` to your deployed frontend origin to avoid wildcard CORS in public deployments.
-
-### Cache-Control Strategy
-
-Cache headers balance freshness with CDN efficiency. **Dated snapshots are NOT immutable** (they may be updated by ad-hoc backfills).
-
-| Resource Type          | Cache-Control Header                                 | Rationale                                           |
-|------------------------|------------------------------------------------------|-----------------------------------------------------|
-| `latest.json`          | `s-maxage=300, stale-while-revalidate=86400`         | Short CDN TTL (5 min), allow stale for 1 day       |
-| `_meta.json`           | `s-maxage=300, stale-while-revalidate=86400`         | Same as `latest.json` (metadata changes daily)      |
-| Dated snapshots        | `s-maxage=86400, stale-while-revalidate=604800`      | Longer CDN TTL (1 day), stale for 1 week           |
-| `/health`              | `s-maxage=60, max-age=0, must-revalidate`            | Short CDN TTL (1 min), no browser cache             |
-
-**Notes**:
-- `s-maxage` applies to CDN/shared caches (Cloudflare edge)
-- `stale-while-revalidate` allows serving stale content while fetching fresh data in the background
-- Dated snapshots get longer TTL but **NOT** `immutable` (ad-hoc backfills may update them)
-
-## Operations
-
-### Monitoring Logs
-
-Stream Worker logs in real-time:
+Deploy the API and pipeline workers independently:
 
 ```bash
 cd workers/senate_data_worker
-npx wrangler tail
+npm run deploy:api
+npm run deploy:pipeline
 ```
 
-**What to watch for**:
-- `cutoff_date_et` and `target_vote_date` (should satisfy `target_vote_date < cutoff_date_et`)
-- Vote counts (`votes_total`, `votes_with_state_members`, `state_member_votes`)
-- `partial: true` warnings (indicates some vote XMLs failed)
-- Duration (should complete in < 2 minutes typically)
+Recommended deployment order:
 
-### Cron Schedule
+1. Create R2, D1, and Queue resources.
+2. Apply the D1 schema migration.
+3. Deploy the Pipeline Worker.
+4. Deploy the API Worker.
+5. Trigger a pipeline run and verify the read model.
 
-- **Cron expression**: `0 10 * * *` (10:00 UTC daily)
-- **ET mapping**: 5 AM EST / 6 AM EDT
-- **DST handling**: Automatic (via IANA timezone conversion)
+## HTTP API
 
-See `workers/senate_data_worker/CRON.md` for details.
+Primary new endpoints:
 
-### Manual Reruns / Backfills
+- `GET /briefings/latest.json`
+  Ranked recent-vote feed for the homepage.
+- `GET /votes/:congress/:session/:voteNumber.json`
+  Vote detail payload with party breakdowns, recurrence context, crossovers, and argument summaries.
 
-To manually trigger ingestion (e.g., for backfilling a missed day):
+Operational endpoints:
 
-1. **Via Cloudflare Dashboard**:
-   - Go to Workers → `senate-data-worker` → Triggers → Cron Triggers
-   - Click "Run now" next to the cron trigger
+- `GET /health`
+- `GET /health/data`
 
-2. **Via Wrangler** (local test):
-   ```bash
-   npm run test-scheduled
-   ```
+Legacy endpoints retained during migration:
 
-3. **Backfilling a specific date** (requires code changes):
-   - Modify `ingest.ts` to accept a date override
-   - Or temporarily adjust `cutoff_date_et` logic
-   - Run `npm run test-scheduled` locally, then deploy
+- `GET /state/:state/latest.json`
+- `GET /state/:state/:date.json`
+- `GET /state/:state/_meta.json`
+- `GET /members/index.json`
+- `GET /activities/index.json`
+- `GET /votes/ledger.json`
+- `GET /stats/overview.json`
+- `GET /member/:bioguide/latest.json`
+- `GET /member/:bioguide/:date.json`
 
-**Note**: Manual reruns will overwrite `latest.json` and the corresponding dated snapshot. The Worker always computes `target_vote_date` based on `cutoff_date_et`, so backfilling older dates requires code changes.
+## Frontend
 
-### Troubleshooting
+The redesigned frontend is intentionally simpler than the original dashboard:
 
-**Issue**: `latest.json` returns 404 after deployment.
+- home is a ranked feed, not an analytics grid
+- vote cards explain why an item surfaced
+- detail pages carry the research depth
+- older dashboard modules are no longer on the landing page
 
-- **Check**: Has the cron run at least once? (Wait for 10:00 UTC or trigger manually)
-- **Check**: R2 bucket binding is correct in `wrangler.toml`
-- **Check**: Worker logs for ingestion errors (`npx wrangler tail`)
+## Notes
 
-**Issue**: `target_vote_date == cutoff_date_et` (should never happen).
-
-- **Check**: Date parsing logic (see `src/date-parse.ts`)
-- **Check**: `cutoff_date_et` computation (should use US/Eastern timezone)
-- **Action**: This indicates a logic bug; check logs and fix
-
-**Issue**: Partial ingestion (`partial: true` in `_meta.json`).
-
-- **Check**: `missing_votes` array in `_meta.json`
-- **Check**: Senate XML URLs (may be temporarily unavailable)
-- **Action**: Worker will retry on next cron run; manual rerun may help
-
-**Issue**: Worker times out (> 30 seconds).
-
-- **Check**: Number of votes on `target_vote_date` (unusually high?)
-- **Check**: Network latency to Senate XML endpoints
-- **Action**: Consider batching or increasing Worker timeout limits
-
-## Public Readiness Validation
-
-Run the repeatable public-readiness gate before changing repository visibility:
-
-```bash
-npm run public:check
-```
-
-If history scanning tooling is missing locally:
-
-```bash
-python3 -m pip install --user trufflehog
-```
-
-This runs:
-- tracked-file secret scan
-- git-history secret scan (trufflehog)
-- internal/staging URL sweep
-- worker typecheck/tests
-- web typecheck/tests
-
-See `PUBLIC_READINESS_REPORT.md` for the latest branch/history hygiene recommendations.
-
-### Website Integration Example
-
-Fetch the latest NY votes from your website:
-
-```javascript
-// Fetch metadata first to check freshness
-const metaResponse = await fetch('https://senate-data-worker.<your-subdomain>.workers.dev/state/NY/_meta.json');
-const meta = await metaResponse.json();
-
-console.log(`Last updated: ${meta.generated_at}`);
-console.log(`Vote date: ${meta.target_vote_date}`);
-
-// Fetch latest votes
-const votesResponse = await fetch('https://senate-data-worker.<your-subdomain>.workers.dev/state/NY/latest.json');
-const votes = await votesResponse.json();
-
-// Display votes
-votes.votes.forEach(vote => {
-  console.log(`Vote ${vote.vote_number}: ${vote.title}`);
-  vote.members.forEach(member => {
-    console.log(`  ${member.name}: ${member.vote_cast}`);
-  });
-});
-```
-
-**Caching note**: The browser/CDN will cache responses per `Cache-Control` headers. For real-time updates, consider fetching `_meta.json` first to check `generated_at`, then conditionally fetch `latest.json` if stale.
-
-## Project Structure
-
-```
-daily_senate_update/
-├── web/                          # Frontend app (Vite + React)
-│   ├── src/
-│   └── README.md
-├── workers/
-│   └── senate_data_worker/       # Cloudflare Worker
-│       ├── src/
-│       │   ├── index.ts          # Worker entry (fetch + scheduled handlers)
-│       │   ├── ingest.ts         # Ingestion orchestration
-│       │   ├── fetch.ts          # Senate XML fetching
-│       │   ├── xml.ts            # XML parsing utilities
-│       │   ├── date-parse.ts     # Date parsing (robust formats)
-│       │   ├── storage.ts        # R2 read/write
-│       │   └── types.ts          # TypeScript types
-│       ├── wrangler.toml         # Worker configuration
-│       ├── SPEC.md               # API specification
-│       └── CRON.md               # Cron schedule details
-└── README.md                     # This file
-```
-
-## Specifications
-
-- **API Specification**: `workers/senate_data_worker/SPEC.md`
-- **Cron Schedule**: `workers/senate_data_worker/CRON.md`
-- **Validation Guide**: `workers/senate_data_worker/VALIDATION.md`
-- **Security Policy**: `SECURITY.md`
-
-## License
-
-MIT. See `LICENSE`.
+- The current implementation ships the new read model while preserving legacy endpoints.
+- D1-backed reads are preferred when the binding exists.
+- R2 materialized JSON and derived-on-read fallbacks keep the system usable during migration.
+- Filibuster treatment in v1 stays limited to cloture/procedural context rather than a historical leaderboard.

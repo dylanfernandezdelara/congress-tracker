@@ -9,6 +9,11 @@
 import { runIngestion, runIngestionAllStates, buildVoteLedgerUpdate } from "./ingest";
 import { runMemberIngestion } from "./member-ingest";
 import { buildBillKey } from "./congress";
+import {
+  fetchVoteDetailsParallel,
+  fetchVoteMenu,
+  type FetchConfig,
+} from "./fetch";
 import { harvestBillEvidence, EVIDENCE_ENDPOINT_TIERS } from "./bill-evidence";
 import { buildTrendSnapshot, extractBillImpactEvidence } from "./impact-extract";
 import {
@@ -28,13 +33,16 @@ import type {
   BillRef,
   BillImpactEvidence,
   BillEvidenceRecord,
-  CoverageSnapshot,
-  EvidenceEndpoint,
-  SourceError,
+    CoverageSnapshot,
+    EvidenceEndpoint,
+    MemberActivityContext,
+    SourceError,
 } from "./types";
 import { STATE_CODES } from "./states";
 import {
   buildLatestKey,
+  buildLatestChamberContextKey,
+  buildLatestBriefingKey,
   buildMetaKey,
   buildSnapshotKey,
   buildMemberKeys,
@@ -42,15 +50,28 @@ import {
   buildMembersIndexKey,
   buildActivitiesIndexKey,
   buildVoteLedgerKey,
+  buildVoteDetailKey,
   buildSessionOverviewKey,
   buildBillEvidenceKey,
   buildBillTrendSnapshotKey,
   buildCoverageSnapshotKey,
+  buildChamberContextKey,
   publishToR2,
   readJsonFromR2,
   writeJsonToR2,
 } from "./storage";
 import { mapWithConcurrency } from "./concurrency";
+import { buildPipelineMaterialization, buildVoteDetailResponse } from "./read-model";
+import {
+  readPipelineCheckpoint,
+  writeHistoricalVoteBatchToD1,
+  writePipelineCheckpoint,
+  writePlatformMaterializationToD1,
+  writeVoteEvidenceToD1,
+} from "./d1";
+import type { PipelineJob, PipelineMaterialization } from "./platform-types";
+import { parseVoteDetailXml, parseVoteMenuXml } from "./xml";
+import { extractVoteEvidence } from "./vote-evidence";
 
 // ============================================================================
 // Environment Types
@@ -76,6 +97,8 @@ interface Env {
   EVIDENCE_BILL_CONCURRENCY?: string;
   EVIDENCE_ENDPOINT_FANOUT?: string;
   ACTIVITY_LOOKBACK_DAYS?: string;
+  SENATE_DB?: D1Database;
+  PIPELINE_QUEUE?: Queue<PipelineJob>;
 }
 
 // ============================================================================
@@ -216,6 +239,36 @@ function summarizeCoverage(
   };
 }
 
+const PIPELINE_FETCH_CONFIG: FetchConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  timeoutMs: 15_000,
+  concurrency: 2,
+  maxDelayMs: 30_000,
+};
+
+const HISTORICAL_BACKFILL_BATCH_SIZE = 20;
+
+function diffVoteNumbers(current: VoteLedger, previous: VoteLedger | null): number[] {
+  const previousNumbers = new Set((previous?.entries ?? []).map((entry) => entry.vote_number));
+  return current.entries
+    .map((entry) => entry.vote_number)
+    .filter((voteNumber) => !previousNumbers.has(voteNumber));
+}
+
+async function publishChamberContext(
+  bucket: R2Bucket,
+  windowEnd: string,
+  context: MemberActivityContext
+): Promise<void> {
+  await writeJsonToR2(bucket, buildChamberContextKey(windowEnd), context);
+  await writeJsonToR2(bucket, buildLatestChamberContextKey(), context);
+}
+
+async function readLatestChamberContext(bucket: R2Bucket): Promise<MemberActivityContext | null> {
+  return readJsonFromR2<MemberActivityContext>(bucket, buildLatestChamberContextKey());
+}
+
 // ============================================================================
 // R2 Storage
 // ============================================================================
@@ -297,6 +350,107 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
         status: fresh ? 200 : 503,
         headers: { "Cache-Control": cacheHealth },
       }
+    );
+  }
+
+  if (pathname === "/__pipeline/status") {
+    if (!env.SENATE_DB) {
+      return jsonResponse(
+        { status: "ok", queue_enabled: Boolean(env.PIPELINE_QUEUE), d1_enabled: false },
+        { status: 200, headers: { "Cache-Control": cacheHealth } }
+      );
+    }
+
+    const [voteStats, excerptStats, checkpointStats] = await Promise.all([
+      env.SENATE_DB.prepare(
+        "SELECT COUNT(*) AS total_votes, MIN(vote_date) AS earliest_vote_date, MAX(vote_date) AS latest_vote_date FROM votes"
+      ).all<Record<string, unknown>>(),
+      env.SENATE_DB.prepare(
+        "SELECT COUNT(*) AS excerpt_count, COUNT(DISTINCT vote_number) AS votes_with_excerpts FROM argument_excerpts"
+      ).all<Record<string, unknown>>(),
+      env.SENATE_DB.prepare(
+        "SELECT checkpoint_key, cursor_json, updated_at FROM pipeline_checkpoints ORDER BY checkpoint_key"
+      ).all<Record<string, unknown>>(),
+    ]);
+
+    return jsonResponse(
+      {
+        status: "ok",
+        queue_enabled: Boolean(env.PIPELINE_QUEUE),
+        d1_enabled: true,
+        votes: voteStats.results?.[0] ?? null,
+        excerpts: excerptStats.results?.[0] ?? null,
+        checkpoints: checkpointStats.results ?? [],
+      },
+      { status: 200, headers: { "Cache-Control": cacheHealth } }
+    );
+  }
+
+  if (pathname === "/__pipeline/run/materialize") {
+    const [ledger, overview, activityIndex] = await Promise.all([
+      readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey()),
+      readJsonFromR2<SessionOverview>(env.DATA_BUCKET, buildSessionOverviewKey()),
+      readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, buildActivitiesIndexKey()),
+    ]);
+    if (!ledger || !overview) {
+      return jsonResponse(
+        { error: "missing_prerequisites", message: "Ledger or overview data is missing from storage." },
+        { status: 503 }
+      );
+    }
+    await materializeReadModels(env, ledger, overview, activityIndex);
+    return jsonResponse({ status: "ok", action: "materialize", vote_count: ledger.entries.length }, { status: 200 });
+  }
+
+  if (pathname === "/__pipeline/run/ingestion") {
+    await runScheduledIngestion(env);
+    return jsonResponse({ status: "ok", action: "scheduled_ingestion" }, { status: 200 });
+  }
+
+  if (pathname === "/__pipeline/run/evidence") {
+    const voteNumber = Number(new URL(request.url).searchParams.get("vote"));
+    if (!Number.isInteger(voteNumber) || voteNumber <= 0) {
+      return jsonResponse(
+        { error: "invalid_vote", message: "Provide a positive integer vote query parameter." },
+        { status: 400 }
+      );
+    }
+    await processPipelineJob(
+      {
+        type: "extract_vote_evidence",
+        created_at: new Date().toISOString(),
+        congress: Number(env.CONGRESS),
+        session: Number(env.SESSION),
+        vote_number: voteNumber,
+      },
+      env
+    );
+    return jsonResponse({ status: "ok", action: "extract_vote_evidence", vote_number: voteNumber }, { status: 200 });
+  }
+
+  if (pathname === "/__pipeline/run/historical-backfill") {
+    const params = new URL(request.url).searchParams;
+    const congress = Number(params.get("congress") ?? env.CONGRESS);
+    const sessionParam = params.get("session");
+    const session = sessionParam ? Number(sessionParam) : undefined;
+    if (!Number.isInteger(congress) || congress <= 0 || (session !== undefined && (!Number.isInteger(session) || session < 1 || session > 2))) {
+      return jsonResponse(
+        { error: "invalid_backfill_target", message: "Provide a valid congress and optional session=1|2." },
+        { status: 400 }
+      );
+    }
+    await processPipelineJob(
+      {
+        type: "historical_backfill",
+        created_at: new Date().toISOString(),
+        congress,
+        session,
+      },
+      env
+    );
+    return jsonResponse(
+      { status: "ok", action: "historical_backfill", congress, session: session ?? null, inline: !env.PIPELINE_QUEUE },
+      { status: 200 }
     );
   }
 
@@ -786,6 +940,230 @@ async function publishAllStatesToR2(
   });
 }
 
+async function publishReadModelsToR2(
+  bucket: R2Bucket,
+  materialization: PipelineMaterialization
+): Promise<void> {
+  await writeJsonToR2(bucket, buildLatestBriefingKey(), materialization.briefing);
+  await mapWithConcurrency(materialization.voteDetails, 4, async (detail) => {
+    await writeJsonToR2(
+      bucket,
+      buildVoteDetailKey(detail.vote.congress, detail.vote.session, detail.vote.vote_number),
+      detail
+    );
+  });
+}
+
+async function materializeReadModels(
+  env: Env,
+  ledger: VoteLedger,
+  overview: SessionOverview,
+  activityIndex: ActivityIndexJson | null
+): Promise<void> {
+  const materialization = buildPipelineMaterialization(ledger, overview, activityIndex);
+  await publishReadModelsToR2(env.DATA_BUCKET, materialization);
+  if (env.SENATE_DB) {
+    await writePlatformMaterializationToD1(
+      env.SENATE_DB,
+      ledger,
+      overview,
+      activityIndex,
+      materialization
+    );
+  }
+}
+
+async function enqueuePipelineJob(env: Env, job: PipelineJob): Promise<boolean> {
+  if (!env.PIPELINE_QUEUE) return false;
+  try {
+    await env.PIPELINE_QUEUE.send(job);
+    return true;
+  } catch (error) {
+    logEvent("pipeline_queue_enqueue_failed", {
+      type: job.type,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
+async function processExtractVoteEvidenceJob(
+  job: Extract<PipelineJob, { type: "extract_vote_evidence" }>,
+  env: Env
+): Promise<void> {
+  if (!env.SENATE_DB) {
+    logEvent("extract_vote_evidence_skipped", {
+      reason: "missing_d1",
+      congress: job.congress,
+      session: job.session,
+      vote_number: job.vote_number,
+    });
+    return;
+  }
+
+  const [ledger, overview, activityIndex, context] = await Promise.all([
+    readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey()),
+    readJsonFromR2<SessionOverview>(env.DATA_BUCKET, buildSessionOverviewKey()),
+    readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, buildActivitiesIndexKey()),
+    readLatestChamberContext(env.DATA_BUCKET),
+  ]);
+  if (!ledger || !overview) {
+    throw new Error("Vote evidence job missing ledger or overview in storage");
+  }
+
+  const detail = buildVoteDetailResponse(ledger, overview, activityIndex, job.vote_number, "derived");
+  if (!detail) {
+    logEvent("extract_vote_evidence_skipped", {
+      reason: "vote_detail_missing",
+      congress: job.congress,
+      session: job.session,
+      vote_number: job.vote_number,
+    });
+    return;
+  }
+
+  const evidence = await extractVoteEvidence(
+    env,
+    detail,
+    overview,
+    context,
+    PIPELINE_FETCH_CONFIG
+  );
+  await writeVoteEvidenceToD1(
+    env.SENATE_DB,
+    detail.vote.congress,
+    detail.vote.session,
+    detail.vote.vote_number,
+    evidence
+  );
+
+  logEvent("extract_vote_evidence_complete", {
+    congress: job.congress,
+    session: job.session,
+    vote_number: job.vote_number,
+    excerpts: evidence.excerpts.length,
+    documents: evidence.documents.length,
+  });
+}
+
+async function processHistoricalBackfillJob(
+  job: Extract<PipelineJob, { type: "historical_backfill" }>,
+  env: Env
+): Promise<void> {
+  if (!env.SENATE_DB) {
+    logEvent("historical_backfill_skipped", {
+      reason: "missing_d1",
+      congress: job.congress,
+      session: job.session ?? null,
+    });
+    return;
+  }
+
+  const sessions = job.session ? [job.session] : [1, 2];
+  const checkpointKey = `historical_backfill:${job.congress}:${job.session ?? "all"}`;
+  const inlineMode = !env.PIPELINE_QUEUE;
+  let resumed = false;
+
+  while (true) {
+    const checkpoint = await readPipelineCheckpoint<{ session_index: number; offset: number }>(
+      env.SENATE_DB,
+      checkpointKey
+    );
+    let sessionIndex = checkpoint?.cursor.session_index ?? 0;
+    let offset = checkpoint?.cursor.offset ?? 0;
+    resumed = resumed || Boolean(checkpoint);
+
+    if (sessionIndex >= sessions.length) {
+      logEvent("historical_backfill_complete", {
+        congress: job.congress,
+        session: job.session ?? null,
+        resumed,
+      });
+      return;
+    }
+
+    const targetSession = sessions[sessionIndex];
+    const menuResult = await fetchVoteMenu(job.congress, targetSession, PIPELINE_FETCH_CONFIG);
+    if (!menuResult.success || !menuResult.data) {
+      throw new Error(menuResult.error ?? "Failed to fetch vote menu for historical backfill");
+    }
+
+    const menuVotes = parseVoteMenuXml(menuResult.data).sort((a, b) => a.vote_number - b.vote_number);
+    const batch = menuVotes.slice(offset, offset + HISTORICAL_BACKFILL_BATCH_SIZE);
+    if (batch.length === 0) {
+      sessionIndex += 1;
+      offset = 0;
+      await writePipelineCheckpoint(env.SENATE_DB, checkpointKey, {
+        session_index: sessionIndex,
+        offset,
+      });
+      if (!inlineMode && sessionIndex < sessions.length) {
+        await enqueuePipelineJob(env, {
+          type: "historical_backfill",
+          created_at: new Date().toISOString(),
+          congress: job.congress,
+          session: job.session,
+        });
+        return;
+      }
+      continue;
+    }
+
+    const detailResults = await fetchVoteDetailsParallel(
+      batch.map((entry) => entry.vote_number),
+      job.congress,
+      targetSession,
+      { ...PIPELINE_FETCH_CONFIG, concurrency: 2 }
+    );
+    const parsed = batch
+      .map((entry) => detailResults.results.get(entry.vote_number)?.data)
+      .filter((value): value is string => Boolean(value))
+      .map((xml) => parseVoteDetailXml(xml, job.congress, targetSession))
+      .filter((value): value is NonNullable<ReturnType<typeof parseVoteDetailXml>> => Boolean(value));
+
+    await writeHistoricalVoteBatchToD1(env.SENATE_DB, parsed);
+
+    const nextOffset = offset + batch.length;
+    await writePipelineCheckpoint(env.SENATE_DB, checkpointKey, {
+      session_index: sessionIndex,
+      offset: nextOffset,
+    });
+
+    logEvent("historical_backfill_batch_complete", {
+      congress: job.congress,
+      session: targetSession,
+      offset,
+      processed: parsed.length,
+      total_menu_votes: menuVotes.length,
+      inline: inlineMode,
+    });
+
+    if (nextOffset < menuVotes.length || sessionIndex < sessions.length - 1) {
+      if (!inlineMode) {
+        await enqueuePipelineJob(env, {
+          type: "historical_backfill",
+          created_at: new Date().toISOString(),
+          congress: job.congress,
+          session: job.session,
+        });
+        return;
+      }
+      continue;
+    }
+
+    await writePipelineCheckpoint(env.SENATE_DB, checkpointKey, {
+      session_index: sessions.length,
+      offset: 0,
+    });
+    logEvent("historical_backfill_complete", {
+      congress: job.congress,
+      session: job.session ?? null,
+      resumed,
+    });
+    return;
+  }
+}
+
 /**
  * Core ingestion logic, separated for use with ctx.waitUntil.
  */
@@ -823,8 +1201,23 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     throw new Error(`[scheduled] Member ingestion failed: ${memberResult.error ?? "unknown error"}`);
   }
   const membersIndex = memberResult.membersIndex;
+  const previousActivityIndex = await readJsonFromR2<ActivityIndexJson>(
+    env.DATA_BUCKET,
+    buildActivitiesIndexKey()
+  );
+  const effectiveActivityIndex =
+    (memberResult.activityIndex?.activities?.length ?? 0) > 0
+      ? memberResult.activityIndex
+      : previousActivityIndex;
+  if ((memberResult.activityIndex?.activities?.length ?? 0) === 0 && previousActivityIndex?.activities?.length) {
+    logEvent("activity_index_fallback_reused", {
+      run_id: runId,
+      previous_generated_at: previousActivityIndex.generated_at,
+      previous_count: previousActivityIndex.activities.length,
+    });
+  }
 
-  const billsByKey = collectUniqueBills(memberResult.memberActivities, memberResult.activityIndex);
+  const billsByKey = collectUniqueBills(memberResult.memberActivities, effectiveActivityIndex);
   const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", async () =>
     buildBillEvidencePipeline(env.DATA_BUCKET, billsByKey, {
       runId,
@@ -842,7 +1235,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
       attachImpactEvidenceToBill(item.bill, evidencePipeline.impactByKey);
     }
   }
-  for (const activity of memberResult.activityIndex?.activities ?? []) {
+  for (const activity of effectiveActivityIndex?.activities ?? []) {
     attachImpactEvidenceToBill(activity.bill, evidencePipeline.impactByKey);
   }
 
@@ -852,8 +1245,11 @@ async function runScheduledIngestion(env: Env): Promise<void> {
       membersIndex,
       memberResult.memberActivities,
       memberResult.windowEnd,
-      memberResult.activityIndex
+      effectiveActivityIndex
     )
+  );
+  await runTimed(runId, "publish_chamber_context", async () =>
+    publishChamberContext(env.DATA_BUCKET, memberResult.windowEnd, memberResult.context)
   );
 
   const shadowMode = parseBool(env.OPENROUTER_SHADOW_MODE, false);
@@ -874,7 +1270,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
           env.DATA_BUCKET,
           evidencePipeline.billInputs,
           memberResult.memberActivities,
-          memberResult.activityIndex,
+          effectiveActivityIndex,
           env.OPENROUTER_API_KEY as string,
           model,
           maxNewAnalyses,
@@ -892,7 +1288,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
               membersIndex,
               memberResult.memberActivities,
               memberResult.windowEnd,
-              memberResult.activityIndex
+              effectiveActivityIndex
             )
           );
         } catch (error) {
@@ -970,6 +1366,15 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   const { ledger, overview } = await runTimed(runId, "build_vote_ledger", async () =>
     buildVoteLedgerUpdate(config, membersIndex, existingLedger)
   );
+  const newVoteNumbers = diffVoteNumbers(ledger, existingLedger);
+  const evidenceTargetVoteNumbers = Array.from(
+    new Set([
+      ...newVoteNumbers,
+      ...buildPipelineMaterialization(ledger, overview, effectiveActivityIndex).briefing.items
+        .slice(0, 6)
+        .map((item) => item.vote_number),
+    ])
+  );
   await runTimed(runId, "publish_vote_ledger", async () =>
     writeJsonToR2(env.DATA_BUCKET, buildVoteLedgerKey(), ledger)
   );
@@ -997,6 +1402,45 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   await runTimed(runId, "publish_coverage_snapshot", async () =>
     writeJsonToR2(env.DATA_BUCKET, buildCoverageSnapshotKey(memberResult.windowEnd), coverage)
   );
+
+  const materializeJob: PipelineJob = {
+    type: "materialize_read_models",
+    created_at: new Date().toISOString(),
+    reason: "scheduled_ingestion_complete",
+  };
+  const queued = await runTimed(runId, "queue_materialization", async () =>
+    enqueuePipelineJob(env, materializeJob)
+  );
+  if (!queued) {
+    await runTimed(runId, "materialize_read_models_inline", async () =>
+      materializeReadModels(env, ledger, overview, effectiveActivityIndex)
+    );
+  }
+
+  if (evidenceTargetVoteNumbers.length > 0) {
+    const evidenceJobs = evidenceTargetVoteNumbers.map<PipelineJob>((voteNumber) => ({
+      type: "extract_vote_evidence",
+      created_at: new Date().toISOString(),
+      congress: ledger.congress,
+      session: ledger.session,
+      vote_number: voteNumber,
+    }));
+    const evidenceQueued = await runTimed(runId, "queue_vote_evidence", async () => {
+      let allQueued = true;
+      for (const job of evidenceJobs) {
+        const queuedJob = await enqueuePipelineJob(env, job);
+        if (!queuedJob) allQueued = false;
+      }
+      return allQueued;
+    });
+    if (!evidenceQueued) {
+      await runTimed(runId, "extract_vote_evidence_inline", async () => {
+        for (const job of evidenceJobs) {
+          await processPipelineJob(job, env);
+        }
+      });
+    }
+  }
 
   logEvent("scheduled_ingestion_complete", {
     run_id: runId,
@@ -1037,6 +1481,50 @@ function handleScheduled(
   );
 }
 
+async function processPipelineJob(job: PipelineJob, env: Env): Promise<void> {
+  if (job.type === "materialize_read_models") {
+    const [ledger, overview, activityIndex] = await Promise.all([
+      readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey()),
+      readJsonFromR2<SessionOverview>(env.DATA_BUCKET, buildSessionOverviewKey()),
+      readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, buildActivitiesIndexKey()),
+    ]);
+    if (!ledger || !overview) {
+      throw new Error("Materialization job missing ledger or overview in storage");
+    }
+    await materializeReadModels(env, ledger, overview, activityIndex);
+    return;
+  }
+
+  if (job.type === "historical_backfill") {
+    await processHistoricalBackfillJob(job, env);
+    return;
+  }
+
+  if (job.type === "extract_vote_evidence") {
+    await processExtractVoteEvidenceJob(job, env);
+  }
+}
+
+function handleQueue(
+  batch: MessageBatch<PipelineJob>,
+  env: Env,
+  ctx: ExecutionContext
+): void {
+  for (const message of batch.messages) {
+    ctx.waitUntil(
+      processPipelineJob(message.body, env)
+        .then(() => message.ack())
+        .catch((error) => {
+          logEvent("pipeline_queue_job_failed", {
+            type: message.body.type,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          message.retry();
+        })
+    );
+  }
+}
+
 // ============================================================================
 // Export Worker
 // ============================================================================
@@ -1044,4 +1532,5 @@ function handleScheduled(
 export default {
   fetch: handleFetch,
   scheduled: handleScheduled,
-} satisfies ExportedHandler<Env>;
+  queue: handleQueue,
+} satisfies ExportedHandler<Env, PipelineJob>;

@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SnapshotJson, MetaJson } from "./types";
+import type { BriefingFeedResponse, VoteDetailResponse } from "./platform-types";
 
 // ============================================================================
 // Mock Data
@@ -62,6 +63,87 @@ const mockMeta: MetaJson = {
   missing_votes: [],
 };
 
+const mockBriefing: BriefingFeedResponse = {
+  generated_at: "2026-01-04T16:30:00.000Z",
+  source: "r2",
+  items: [
+    {
+      id: "119:1:312",
+      congress: 119,
+      session: 1,
+      vote_number: 312,
+      vote_date: "2025-12-18",
+      title: "H.R. 8998",
+      summary: "A ranked briefing item for testing.",
+      outcome_label: "Passed the Senate hurdle",
+      status: "passed",
+      category: "Senate business",
+      significance: "high",
+      tally: { yea: 52, nay: 48, present: 0, absent: 0 },
+      crossed_party_lines: [],
+      ranking_reasons: [{ code: "close_vote", label: "Close vote" }],
+      source_coverage: {
+        level: "partial",
+        vote_data: true,
+        bill_context: true,
+        congressional_record: false,
+        floor_logs: false,
+        model_summary: false,
+      },
+      detail_path: "/votes/119/1/312",
+      score: 88,
+    },
+  ],
+};
+
+const mockVoteDetail: VoteDetailResponse = {
+  generated_at: "2026-01-04T16:30:00.000Z",
+  source: "r2",
+  vote: {
+    id: "119:1:312",
+    congress: 119,
+    session: 1,
+    vote_number: 312,
+    vote_date: "2025-12-18",
+    title: "H.R. 8998",
+    question: "On the Motion to Table",
+    result: "Motion to Table Agreed to",
+    issue: "H.R. 8998",
+    tally: { yea: 52, nay: 48, present: 0, absent: 0 },
+    status: "passed",
+  },
+  procedural_context: {
+    step_type: "vote",
+    question: "On the Motion to Table",
+  },
+  party_breakdown: [],
+  crossovers: [],
+  history: {
+    thread_key: "H.R. 8998",
+    measure_recurrence_count: 1,
+    issue_key: "topic-test",
+    issue_title: "H.R. 8998",
+    issue_recurrence_count: 1,
+    first_seen_vote_date: "2025-12-18",
+    related_votes: [],
+  },
+  arguments: {
+    available: false,
+    coverage_note: "No excerpts",
+    parties: [],
+    excerpts: [],
+  },
+  ranking_reasons: [{ code: "close_vote", label: "Close vote" }],
+  source_coverage: {
+    level: "partial",
+    vote_data: true,
+    bill_context: true,
+    congressional_record: false,
+    floor_logs: false,
+    model_summary: false,
+  },
+};
+
 // ============================================================================
 // Mock R2 Bucket
 // ============================================================================
@@ -83,13 +165,15 @@ function createMockBucket(data: Record<string, unknown>) {
 
 // We need to test the handleFetch function, but it's not exported
 // So we'll re-import the default export and extract the fetch handler
-import handler from "./index";
+import handler from "./api-index";
 
 const mockEnv = {
   DATA_BUCKET: createMockBucket({
     "state/NY/latest.json": mockSnapshot,
     "state/NY/_meta.json": mockMeta,
     "state/NY/2025-12-18.json": mockSnapshot,
+    "briefings/latest.json": mockBriefing,
+    "votes/detail/119/1/312.json": mockVoteDetail,
     "activities/index.json": {
       generated_at: new Date().toISOString(),
       window: { start_date: "2025-12-12", end_date: "2025-12-18" },
@@ -264,6 +348,30 @@ describe("HTTP Read API", () => {
     });
   });
 
+  describe("GET /briefings/latest.json", () => {
+    it("returns the materialized briefing payload", async () => {
+      const req = mockRequest("/briefings/latest.json");
+      const res = await handler.fetch(req, mockEnv as any);
+
+      expect(res.status).toBe(200);
+      const body = await readJson<BriefingFeedResponse>(res);
+      expect(body.items).toHaveLength(1);
+      expect(body.items[0].vote_number).toBe(312);
+    });
+  });
+
+  describe("GET /votes/:congress/:session/:voteNumber.json", () => {
+    it("returns the materialized vote detail payload", async () => {
+      const req = mockRequest("/votes/119/1/312.json");
+      const res = await handler.fetch(req, mockEnv as any);
+
+      expect(res.status).toBe(200);
+      const body = await readJson<VoteDetailResponse>(res);
+      expect(body.vote.vote_number).toBe(312);
+      expect(body.history.thread_key).toBe("H.R. 8998");
+    });
+  });
+
   describe("GET /state/{STATE}/latest.json", () => {
     it("returns snapshot data with 200", async () => {
       const req = mockRequest("/state/NY/latest.json");
@@ -432,4 +540,3 @@ describe("HTTP Read API", () => {
     });
   });
 });
-
