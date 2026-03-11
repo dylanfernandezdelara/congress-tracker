@@ -58,11 +58,8 @@ const config: Config = {
         serif: ['var(--font-serif)', 'Georgia', 'serif'],
       },
       boxShadow: {
-        glow: '0 18px 50px rgba(59, 45, 35, 0.08)',
-      },
-      backgroundImage: {
-        parchment:
-          'radial-gradient(circle at top, rgba(255,255,255,0.7), transparent 38%), linear-gradient(180deg, #f8f3eb 0%, #f3efe6 48%, #efe6d6 100%)',
+        sheet: '0 18px 42px rgba(82, 66, 38, 0.09)',
+        'sheet-sm': '0 10px 24px rgba(82, 66, 38, 0.07)',
       },
     },
   },
