@@ -180,6 +180,35 @@ interface QualityGateConfig {
   hardGates: boolean;
 }
 
+async function readPipelineStatus(db: D1Database) {
+  // Miniflare's local D1 occasionally throws internal errors when this debug
+  // endpoint fans out multiple reads at once. Keep these reads serialized so
+  // the local status inspector stays stable.
+  const voteStats =
+    (await db
+      .prepare(
+        "SELECT COUNT(*) AS total_votes, MIN(vote_date) AS earliest_vote_date, MAX(vote_date) AS latest_vote_date FROM votes"
+      )
+      .first<Record<string, unknown>>()) ?? null;
+  const excerptStats =
+    (await db
+      .prepare(
+        "SELECT COUNT(*) AS excerpt_count, COUNT(DISTINCT vote_number) AS votes_with_excerpts FROM argument_excerpts"
+      )
+      .first<Record<string, unknown>>()) ?? null;
+  const checkpointStats = await db
+    .prepare(
+      "SELECT checkpoint_key, cursor_json, updated_at FROM pipeline_checkpoints ORDER BY checkpoint_key"
+    )
+    .all<Record<string, unknown>>();
+
+  return {
+    votes: voteStats,
+    excerpts: excerptStats,
+    checkpoints: checkpointStats.results ?? [],
+  };
+}
+
 function makeRunId(): string {
   return `run-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -384,26 +413,14 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       );
     }
 
-    const [voteStats, excerptStats, checkpointStats] = await Promise.all([
-      env.SENATE_DB.prepare(
-        "SELECT COUNT(*) AS total_votes, MIN(vote_date) AS earliest_vote_date, MAX(vote_date) AS latest_vote_date FROM votes"
-      ).all<Record<string, unknown>>(),
-      env.SENATE_DB.prepare(
-        "SELECT COUNT(*) AS excerpt_count, COUNT(DISTINCT vote_number) AS votes_with_excerpts FROM argument_excerpts"
-      ).all<Record<string, unknown>>(),
-      env.SENATE_DB.prepare(
-        "SELECT checkpoint_key, cursor_json, updated_at FROM pipeline_checkpoints ORDER BY checkpoint_key"
-      ).all<Record<string, unknown>>(),
-    ]);
+    const pipelineStatus = await readPipelineStatus(env.SENATE_DB);
 
     return jsonResponse(
       {
         status: "ok",
         queue_enabled: Boolean(env.PIPELINE_QUEUE),
         d1_enabled: true,
-        votes: voteStats.results?.[0] ?? null,
-        excerpts: excerptStats.results?.[0] ?? null,
-        checkpoints: checkpointStats.results ?? [],
+        ...pipelineStatus,
       },
       { status: 200, headers: { "Cache-Control": cacheHealth } }
     );
