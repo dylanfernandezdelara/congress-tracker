@@ -14,6 +14,7 @@ import { E2E_BRIEFING } from '../e2eData'
 import { cn } from '../lib/utils'
 
 const MAX_HOME_VOTE_AGE_DAYS = 7
+const WASHINGTON_TIMEZONE = 'America/New_York'
 
 function formatCalendarDate(date: Date): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -24,14 +25,22 @@ function formatCalendarDate(date: Date): string {
   }).format(date)
 }
 
-function formatTimestamp(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+function formatWashingtonDate(date: Date): string {
   return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
+    year: 'numeric',
+    month: 'long',
     day: 'numeric',
+    timeZone: WASHINGTON_TIMEZONE,
+  }).format(date)
+}
+
+function formatWashingtonTime(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',
     minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZone: WASHINGTON_TIMEZONE,
   }).format(date)
 }
 
@@ -110,10 +119,6 @@ function crossoverSummary(item: BriefingFeedItem): string {
   return `${labels.join(', ')}${suffix}`
 }
 
-function countLabel(count: number): string {
-  return count === 1 ? '1 vote in view' : `${count} votes in view`
-}
-
 function measureLabel(item: BriefingFeedItem): string {
   return item.bill ? `${item.bill.type} ${item.bill.number}` : `Vote ${item.vote_number}`
 }
@@ -168,23 +173,6 @@ function FactBlock({
   )
 }
 
-function HeaderFactInline({
-  label,
-  value,
-  className,
-}: {
-  label: string
-  value: ReactNode
-  className?: string
-}) {
-  return (
-    <div className={cn('flex min-w-0 items-baseline gap-2', className)}>
-      <span className="document-label whitespace-nowrap">{label}</span>
-      <span className="text-sm leading-5 text-foreground">{value}</span>
-    </div>
-  )
-}
-
 function EvidencePanel({
   label,
   children,
@@ -217,18 +205,18 @@ function TallyMeter({
         <div className={cn('flex gap-4', compact ? 'text-sm' : 'text-base')}>
           <div className="text-emerald-950">
             <p className="document-label text-emerald-950/70">Yea</p>
-            <p className={cn('mt-1 font-semibold', compact ? 'text-xl' : 'text-3xl')}>
+            <p className={cn('mt-1 font-semibold tabular-nums', compact ? 'text-xl' : 'text-3xl')}>
               {item.tally.yea}
             </p>
           </div>
           <div className="text-rose-900">
             <p className="document-label text-rose-900/70">Nay</p>
-            <p className={cn('mt-1 font-semibold', compact ? 'text-xl' : 'text-3xl')}>
+            <p className={cn('mt-1 font-semibold tabular-nums', compact ? 'text-xl' : 'text-3xl')}>
               {item.tally.nay}
             </p>
           </div>
         </div>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground tabular-nums">
           {voteMargin(item)}-vote margin
         </p>
       </div>
@@ -249,7 +237,7 @@ function LeadVoteCard({
   e2eMode: boolean
 }) {
   return (
-    <Card className="draft-grid">
+    <Card className="draft-grid border-0">
       <CardContent className="grid gap-6 px-6 py-6 lg:px-8 lg:py-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <div className="max-w-4xl">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -343,11 +331,11 @@ function SecondaryVoteCard({
   e2eMode: boolean
 }) {
   return (
-    <Card>
+    <Card className="border-0">
       <CardContent className="grid gap-0 px-0 pb-0 pt-0 md:grid-cols-[72px_minmax(0,1fr)]">
         <div className="border-b border-border/70 bg-muted/30 px-4 py-4 md:border-b-0 md:border-r">
           <p className="document-label">Rank</p>
-          <p className="document-title mt-2 text-3xl font-semibold text-foreground">
+          <p className="document-title mt-2 text-3xl font-semibold text-foreground tabular-nums">
             {String(rank).padStart(2, '0')}
           </p>
         </div>
@@ -436,6 +424,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [usingDemo, setUsingDemo] = useState(false)
   const [currentDate, setCurrentDate] = useState(() => new Date())
+  const [dcNow, setDcNow] = useState(() => new Date())
 
   const e2eMode = useMemo(
     () => new URLSearchParams(window.location.search).get('e2e') === '1',
@@ -453,6 +442,16 @@ export default function Home() {
         return localIsoDate(previousDate) === localIsoDate(nextDate) ? previousDate : nextDate
       })
     }, 60_000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setDcNow(new Date())
+    }, 1000)
 
     return () => {
       window.clearInterval(intervalId)
@@ -496,6 +495,8 @@ export default function Home() {
 
   const todayDate = useMemo(() => localIsoDate(currentDate), [currentDate])
   const todayLabel = useMemo(() => formatCalendarDate(currentDate), [currentDate])
+  const dcTimeLabel = useMemo(() => formatWashingtonTime(dcNow), [dcNow])
+  const dcDateLabel = useMemo(() => formatWashingtonDate(dcNow), [dcNow])
   const freshItems = useMemo(
     () => briefing?.items.filter((item) => isFreshVoteDate(item.vote_date, todayDate)) ?? [],
     [briefing, todayDate],
@@ -509,7 +510,7 @@ export default function Home() {
   const secondaryItems = hasFreshItems ? freshItems.slice(1) : []
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {usingDemo && (
         <div className="note-panel border-primary/20 bg-primary/[0.05]">
           <p className="document-label text-primary/80">Review mode</p>
@@ -529,68 +530,17 @@ export default function Home() {
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading the latest ranked briefing...</p>
       ) : (
-        <section className="flex flex-col gap-5" aria-label="Latest Senate briefing">
-          <div className="border-b border-border/70 pb-5">
-            <p className="document-kicker">Current docket</p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              <span>{todayLabel}</span>
-              <span className="hidden text-border sm:inline">/</span>
-              <span>Official records ranked by consequence, recency, and cross-party movement</span>
-            </div>
-
-            <div className="mt-3 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <div className="max-w-3xl">
-                <h1 className="document-title text-3xl font-semibold text-foreground sm:text-4xl">
-                  {hasFreshItems ? 'Most relevant votes' : 'No fresh Senate votes right now'}
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                  {hasFreshItems
-                    ? 'The briefing puts the most consequential action first, then follows with the rest of the day’s watchlist in descending priority.'
-                    : 'The homepage only promotes recent votes. Older stored votes are not treated as the active daily briefing.'}
-                </p>
-              </div>
-
-              {briefing ? (
-                <div className="flex flex-wrap gap-x-6 gap-y-2 xl:max-w-[620px] xl:justify-end">
-                  <HeaderFactInline
-                    label="Updated"
-                    value={formatTimestamp(briefing.generated_at)}
-                  />
-                  <HeaderFactInline label="Source" value={briefing.source.toUpperCase()} />
-                  <HeaderFactInline
-                    label={hasFreshItems ? 'Votes' : 'Current votes'}
-                    value={hasFreshItems ? countLabel(freshItems.length) : '0 in freshness window'}
-                  />
-                  {!hasFreshItems && latestAvailableVoteDate && (
-                    <HeaderFactInline
-                      label="Latest vote"
-                      value={formatVoteDate(latestAvailableVoteDate)}
-                    />
-                  )}
-                  <HeaderFactInline
-                    label="Ranking"
-                    value="Consequence first, coalition movement second, recency as a tie-breaker."
-                    className="hidden xl:flex"
-                  />
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-x-6 gap-y-2 xl:max-w-[420px] xl:justify-end">
-                  <HeaderFactInline
-                    label="Status"
-                    value={isLoading ? 'Loading the latest briefing.' : 'Awaiting briefing data.'}
-                  />
-                  <HeaderFactInline
-                    label="Ranking"
-                    value="Consequence, coalition movement, and recency."
-                    className="hidden xl:flex"
-                  />
-                </div>
-              )}
-            </div>
+        <section className="flex flex-col gap-4" aria-label="Latest Senate briefing">
+          <div className="mx-auto flex items-center gap-2 text-sm leading-5 text-muted-foreground sm:text-base">
+            <span>Washington, D.C.</span>
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-foreground/70" />
+            <span className="tabular-nums">{dcTimeLabel}</span>
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-foreground/70" />
+            <span>{dcDateLabel}</span>
           </div>
 
           {!hasFreshItems && latestAvailableVoteDate && (
-            <div className="note-panel border-primary/20 bg-primary/[0.045]">
+            <div className="note-panel mt-2 border-0 bg-primary/[0.045]">
               <p className="document-label text-primary/80">No current briefing to promote</p>
               <p className="mt-2 text-sm leading-6 text-foreground">
                 The newest vote currently available in this feed is from{' '}
@@ -602,7 +552,9 @@ export default function Home() {
 
           {leadItem && (
             <>
-              <LeadVoteCard item={leadItem} e2eMode={e2eMode} />
+              <div className="mt-2">
+                <LeadVoteCard item={leadItem} e2eMode={e2eMode} />
+              </div>
 
               {secondaryItems.length > 0 && (
                 <section className="flex flex-col gap-4" aria-label="Additional votes in the briefing">

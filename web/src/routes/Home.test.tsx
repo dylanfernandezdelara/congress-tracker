@@ -109,7 +109,7 @@ describe('Home', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByText('No fresh Senate votes right now')).toBeInTheDocument()
+    expect(await screen.findByText(/Washington,\s*D\.C\./)).toBeInTheDocument()
     expect(screen.getByText('No current briefing to promote')).toBeInTheDocument()
     expect(screen.queryByText('War powers resolution')).not.toBeInTheDocument()
   })
@@ -133,7 +133,7 @@ describe('Home', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByText('Most relevant votes')).toBeInTheDocument()
+    expect(await screen.findByText(/Washington,\s*D\.C\./)).toBeInTheDocument()
     expect(screen.getByText('Rail safety package')).toBeInTheDocument()
     expect(screen.queryByText('No current briefing to promote')).not.toBeInTheDocument()
   })

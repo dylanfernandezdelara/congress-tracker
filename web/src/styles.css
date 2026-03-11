@@ -43,6 +43,7 @@
   #root {
     min-height: 100%;
     margin: 0;
+    overscroll-behavior: none;
   }
 
   html {
@@ -55,6 +56,7 @@
     background-image:
       radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 28%),
       linear-gradient(180deg, rgba(247, 243, 235, 0.98) 0%, rgba(242, 236, 226, 0.98) 100%);
+    overscroll-behavior: none;
     position: relative;
   }
 
@@ -177,5 +179,9 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
