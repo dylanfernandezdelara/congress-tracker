@@ -6,8 +6,10 @@ WEB_HOST="${WEB_HOST:-127.0.0.1}"
 WEB_PORT="${WEB_PORT:-5173}"
 WORKER_HOST="${WORKER_HOST:-127.0.0.1}"
 WORKER_PORT="${WORKER_PORT:-8787}"
+WORKER_INSPECTOR_PORT="${WORKER_INSPECTOR_PORT:-9229}"
 PIPELINE_HOST="${PIPELINE_HOST:-127.0.0.1}"
 PIPELINE_PORT="${PIPELINE_PORT:-8788}"
+PIPELINE_INSPECTOR_PORT="${PIPELINE_INSPECTOR_PORT:-9230}"
 WAIT_FOR_READY="${WAIT_FOR_READY:-1}"
 
 WORKER_URL="http://${WORKER_HOST}:${WORKER_PORT}/health"
@@ -61,13 +63,15 @@ trap cleanup EXIT INT TERM
 kill_port "${WORKER_PORT}"
 kill_port "${PIPELINE_PORT}"
 kill_port "${WEB_PORT}"
+kill_port "${WORKER_INSPECTOR_PORT}"
+kill_port "${PIPELINE_INSPECTOR_PORT}"
 
 echo "Starting API worker on ${WORKER_HOST}:${WORKER_PORT}..."
-npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:api -- --ip "${WORKER_HOST}" --port "${WORKER_PORT}" &
+npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:api -- --ip "${WORKER_HOST}" --port "${WORKER_PORT}" --inspector-port "${WORKER_INSPECTOR_PORT}" &
 WORKER_PID=$!
 
 echo "Starting pipeline worker on ${PIPELINE_HOST}:${PIPELINE_PORT}..."
-npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:pipeline -- --ip "${PIPELINE_HOST}" --port "${PIPELINE_PORT}" &
+npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:pipeline -- --ip "${PIPELINE_HOST}" --port "${PIPELINE_PORT}" --inspector-port "${PIPELINE_INSPECTOR_PORT}" &
 PIPELINE_PID=$!
 
 echo "Starting web on ${WEB_HOST}:${WEB_PORT}..."

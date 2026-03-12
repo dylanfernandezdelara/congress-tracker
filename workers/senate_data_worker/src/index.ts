@@ -18,7 +18,7 @@ import { harvestBillEvidence, EVIDENCE_ENDPOINT_TIERS } from "./bill-evidence";
 import { buildTrendSnapshot, extractBillImpactEvidence } from "./impact-extract";
 import {
   analyzeBillsWithCache,
-  DEFAULT_OPENROUTER_MODEL,
+  DEFAULT_OPENROUTER_MODELS,
   type AnalyzeBillsResult,
 } from "./openrouter";
 import type {
@@ -166,6 +166,14 @@ function parseIntSafe(value: string | undefined, fallback: number): number {
 
 function parsePct(value: string | undefined, fallback: number): number {
   return Math.max(0, Math.min(parseIntSafe(value, fallback), 100));
+}
+
+function parseCsvList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function computePct(numerator: number, denominator: number): number {
@@ -948,7 +956,7 @@ async function enrichBillAnalyses(
   memberActivities: MemberActivityJson[],
   activityIndex: ActivityIndexJson | null,
   apiKey: string,
-  model: string,
+  models: string[],
   maxNewAnalyses: number,
   shadowMode: boolean,
   qualityGateConfig: QualityGateConfig,
@@ -962,7 +970,7 @@ async function enrichBillAnalyses(
 
   const result = await analyzeBillsWithCache(bucket, billInputs, {
     apiKey,
-    model,
+    models,
     maxNewAnalyses,
     appReferer,
     appTitle,
@@ -1351,7 +1359,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   let synthesisErrors: SourceError[] = [];
 
   if (env.OPENROUTER_API_KEY?.trim() && canaryEnabled) {
-    const model = env.OPENROUTER_MODEL?.trim() || DEFAULT_OPENROUTER_MODEL;
+    const models = parseCsvList(env.OPENROUTER_MODEL);
     try {
       analysisResult = await runTimed(runId, "openrouter_synthesis", async () =>
         enrichBillAnalyses(
@@ -1360,7 +1368,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
           memberResult.memberActivities,
           effectiveActivityIndex,
           env.OPENROUTER_API_KEY as string,
-          model,
+          models.length > 0 ? models : [...DEFAULT_OPENROUTER_MODELS],
           maxNewAnalyses,
           shadowMode,
           qualityGateConfig,
