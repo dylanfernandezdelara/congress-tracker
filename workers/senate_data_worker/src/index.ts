@@ -123,7 +123,7 @@ function buildCorsHeaders(env: Env): HeadersInit {
   return headers;
 }
 
-// Cache-Control values per SPEC.md
+// Cache-Control values for the public HTTP API.
 const cacheHealth = "s-maxage=60, max-age=0, must-revalidate";
 const cacheLatest = "s-maxage=300, stale-while-revalidate=86400";
 const cacheSnapshot = "s-maxage=86400, stale-while-revalidate=604800";

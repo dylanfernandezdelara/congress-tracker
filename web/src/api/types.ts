@@ -1,7 +1,7 @@
 /**
  * TypeScript types for the Senate Data Worker API responses.
  *
- * These types mirror the output JSON schemas from the worker (per SPEC.md v2).
+ * These types mirror the JSON payloads returned by the worker.
  */
 
 export type ActivitySource = 'congress' | 'senate' | 'govinfo'

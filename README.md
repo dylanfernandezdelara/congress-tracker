@@ -82,8 +82,7 @@ The interpretation layer is intentionally constrained:
 ```text
 daily_senate_update/
 ├── web/
-│   ├── src/
-│   └── README.md
+│   └── src/
 ├── workers/
 │   └── senate_data_worker/
 │       ├── migrations/
