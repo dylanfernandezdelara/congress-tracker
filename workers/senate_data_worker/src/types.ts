@@ -1,11 +1,11 @@
 /**
  * Shared types for the Senate Data Worker.
  *
- * These types define the JSON output schemas per SPEC.md v1.
+ * These types define the worker's JSON payload shapes.
  */
 
 // ============================================================================
-// Output JSON Types (per SPEC.md)
+// Output JSON types
 // ============================================================================
 
 /**
