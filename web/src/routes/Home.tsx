@@ -531,7 +531,7 @@ export default function Home() {
         <p className="text-sm text-muted-foreground">Loading the latest ranked briefing...</p>
       ) : (
         <section className="flex flex-col gap-4" aria-label="Latest Senate briefing">
-          <div className="mx-auto flex items-center gap-2 text-sm leading-5 text-muted-foreground sm:text-base">
+          <div className="mx-auto flex w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm leading-5 text-muted-foreground sm:text-base">
             <span>Washington, D.C.</span>
             <span className="inline-flex h-1.5 w-1.5 rounded-full bg-foreground/70" />
             <span className="tabular-nums">{dcTimeLabel}</span>
@@ -560,11 +560,11 @@ export default function Home() {
                 <section className="flex flex-col gap-4" aria-label="Additional votes in the briefing">
                   <div className="section-rule">
                     <p className="document-kicker">Also in today’s briefing</p>
-                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
                       <h2 className="document-title text-2xl font-semibold text-foreground sm:text-3xl">
                         Remaining watchlist
                       </h2>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="max-w-xl text-sm text-muted-foreground sm:text-right">
                         Lower-ranked than the lead item, but still worth tracking.
                       </p>
                     </div>

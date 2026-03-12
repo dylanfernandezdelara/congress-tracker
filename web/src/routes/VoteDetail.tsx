@@ -82,7 +82,7 @@ function StatBlock({
   return (
     <div className={cn('evidence-block', className)}>
       <p className="document-label">{label}</p>
-      <div className="mt-3 text-3xl font-semibold text-foreground">{value}</div>
+      <div className="mt-3 text-3xl font-semibold leading-none tabular-nums text-foreground">{value}</div>
     </div>
   )
 }
@@ -266,7 +266,7 @@ export default function VoteDetail() {
             <div className="mt-5 space-y-3">
               {detail.party_breakdown.map((party, index) => (
                 <div key={party.party} className="note-panel">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3 sm:items-center">
                     <div>
                       <p className="font-semibold text-foreground">{prettyParty(party.party)}</p>
                       {party.majority_vote && (
@@ -275,7 +275,7 @@ export default function VoteDetail() {
                         </p>
                       )}
                     </div>
-                    <div className="text-sm font-medium text-muted-foreground">
+                    <div className="text-sm font-medium text-muted-foreground sm:text-right">
                       {party.yea} yea / {party.nay} nay
                     </div>
                   </div>
@@ -320,7 +320,7 @@ export default function VoteDetail() {
             <h2 className="document-title mt-3 text-3xl font-semibold text-foreground">
               Historical context
             </h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 [text-wrap:pretty]">
               <CaseNote label="Exact measure votes" value={detail.history.measure_recurrence_count} />
               <CaseNote label="Related issue votes" value={detail.history.issue_recurrence_count} />
               <CaseNote
