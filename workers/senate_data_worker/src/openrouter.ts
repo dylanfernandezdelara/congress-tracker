@@ -22,7 +22,12 @@ import {
 
 export const BILL_ANALYSIS_CACHE_KEY = "analysis/bill-analysis-cache.json";
 export const ANALYSIS_VERSION = "v6-generalized-likely-reasons";
-export const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-r1-0528:free";
+export const DEFAULT_OPENROUTER_MODELS = [
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "arcee-ai/trinity-large-preview:free",
+  "openrouter/free",
+] as const;
+export const DEFAULT_OPENROUTER_MODEL = DEFAULT_OPENROUTER_MODELS[0];
 
 interface LegacyAnalysisCache {
   [billKey: string]: BillAnalysis;
@@ -36,6 +41,7 @@ export interface AnalyzeBillInput {
 export interface AnalyzeBillsOptions {
   apiKey: string;
   model?: string;
+  models?: string[];
   maxNewAnalyses?: number;
   appReferer?: string;
   appTitle?: string;
@@ -243,6 +249,17 @@ function buildUnknownStrings(evidence?: BillImpactEvidence): string[] {
   if (!evidence) return ["Official source detail is limited for this item."];
   if (evidence.unknowns.length > 0) return evidence.unknowns.map((item) => item.reason).slice(0, 6);
   return [];
+}
+
+function normalizeModelList(value?: string | string[]): string[] {
+  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
+  const normalized = raw
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (normalized.length === 0) {
+    return [...DEFAULT_OPENROUTER_MODELS];
+  }
+  return Array.from(new Set(normalized));
 }
 
 function buildEvidenceLines(evidence?: BillImpactEvidence): string[] {
@@ -840,21 +857,31 @@ function getMessageContent(message: unknown): string {
 
 async function runModelCompletion(
   client: OpenAI,
-  model: string,
+  models: string[],
   prompt: string,
   timeoutMs: number,
   maxRetries: number
 ): Promise<string> {
   let lastError: unknown;
+  const [primaryModel, ...fallbackModels] = models;
+  const buildRequest = (includeResponseFormat: boolean) => {
+    const request: Record<string, unknown> = {
+      model: primaryModel,
+      temperature: 0,
+      max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }],
+    };
+    if (includeResponseFormat) {
+      request.response_format = { type: "json_object" };
+    }
+    if (fallbackModels.length > 0) {
+      request.extra_body = { models: fallbackModels };
+    }
+    return request;
+  };
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const request = client.chat.completions.create({
-        model,
-        temperature: 0,
-        max_tokens: 2000,
-        response_format: { type: "json_object" },
-        messages: [{ role: "user", content: prompt }],
-      });
+      const request = client.chat.completions.create(buildRequest(true) as never);
       const timeout = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error(`OpenRouter timeout after ${timeoutMs}ms`)), timeoutMs);
       });
@@ -864,12 +891,7 @@ async function runModelCompletion(
     } catch (error) {
       lastError = error;
       try {
-        const fallbackRequest = client.chat.completions.create({
-          model,
-          temperature: 0,
-          max_tokens: 2000,
-          messages: [{ role: "user", content: prompt }],
-        });
+        const fallbackRequest = client.chat.completions.create(buildRequest(false) as never);
         const timeout = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error(`OpenRouter timeout after ${timeoutMs}ms`)), timeoutMs);
         });
@@ -890,17 +912,17 @@ async function runModelCompletion(
 async function analyzeSingleBill(
   client: OpenAI,
   input: AnalyzeBillInput,
-  model: string,
+  models: string[],
   timeoutMs: number,
   maxRetries: number
 ): Promise<BillAnalysis> {
   const prompt = buildPrompt(input);
   const parseAttempts = 2;
 
-  const runAndCoerce = async (targetModel: string): Promise<BillAnalysis> => {
+  const runAndCoerce = async (targetModels: string[]): Promise<BillAnalysis> => {
     let last: BillAnalysis | null = null;
     for (let attempt = 0; attempt < parseAttempts; attempt++) {
-      const content = await runModelCompletion(client, targetModel, prompt, timeoutMs, maxRetries);
+      const content = await runModelCompletion(client, targetModels, prompt, timeoutMs, maxRetries);
       const parsed = parseModelJson(content);
       const analysis = coerceBillAnalysis(parsed, input.bill, input.impactEvidence);
       last = analysis;
@@ -910,7 +932,7 @@ async function analyzeSingleBill(
     throw new Error("Failed to parse grounded analysis output");
   };
 
-  return runAndCoerce(model);
+  return runAndCoerce(models);
 }
 
 function claimCoverage(analysisByKey: Map<string, BillAnalysis>): number {
@@ -1003,7 +1025,7 @@ export async function analyzeBillsWithCache(
   let skippedCount = 0;
   let legacyChanged = false;
 
-  const model = options.model || DEFAULT_OPENROUTER_MODEL;
+  const models = normalizeModelList(options.models ?? options.model);
   const maxNewAnalyses = options.maxNewAnalyses ?? 20;
   const timeoutMs = Math.max(5_000, options.timeoutMs ?? 30_000);
   const maxRetries = Math.max(0, options.maxRetries ?? 2);
@@ -1054,7 +1076,7 @@ export async function analyzeBillsWithCache(
       const analysis = await analyzeSingleBill(
         client,
         input,
-        model,
+        models,
         timeoutMs,
         maxRetries
       );

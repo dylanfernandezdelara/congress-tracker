@@ -152,6 +152,7 @@ Optional secret/runtime values:
 
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
+  Single model slug or a comma-separated fallback list in priority order.
 - `OPENROUTER_APP_REFERER`
 - `OPENROUTER_APP_TITLE`
 

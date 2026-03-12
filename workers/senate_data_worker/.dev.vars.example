@@ -1,7 +1,7 @@
 CONGRESS_API_KEY=your_congress_api_key
 GOVINFO_API_KEY=your_govinfo_api_key
 OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=deepseek/deepseek-r1-0528:free
+OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free,arcee-ai/trinity-large-preview:free,openrouter/free
 OPENROUTER_APP_REFERER=https://your-site.example
 OPENROUTER_APP_TITLE=daily_senate_update_worker
 OPENROUTER_SHADOW_MODE=false
