@@ -264,7 +264,7 @@ npm --prefix web run build
 Scheduled-handler smoke test:
 
 ```bash
-npm --prefix workers/senate_data_worker run test-scheduled
+npm --prefix workers/senate_data_worker run smoke:scheduled
 ```
 
 ## Deployment
