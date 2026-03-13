@@ -2,13 +2,13 @@
  * Ingestion orchestration for Senate vote data.
  *
  * Coordinates:
- * - Target date selection (max vote date < today ET)
+ * - Target date selection (latest vote date on or before today ET)
  * - Vote menu fetching and parsing
  * - Vote detail fetching (parallel with retry)
  * - State filtering and JSON output building
  */
 
-import { todayEastern, findMaxDateBefore } from "./date-parse";
+import { todayEastern, findMaxDateOnOrBefore } from "./date-parse";
 import {
   fetchVoteMenu,
   fetchVoteDetailsParallel,
@@ -143,10 +143,10 @@ async function buildIngestionContext(
   const uniqueDates = getUniqueDates(allVotes);
   console.log(`[ingest] Unique vote dates: ${uniqueDates.join(", ")}`);
 
-  const targetVoteDate = findMaxDateBefore(uniqueDates, cutoffDateEt);
+  const targetVoteDate = findMaxDateOnOrBefore(uniqueDates, cutoffDateEt);
 
   if (!targetVoteDate) {
-    console.warn(`[ingest] No vote dates found before cutoff ${cutoffDateEt}`);
+    console.warn(`[ingest] No vote dates found on or before cutoff ${cutoffDateEt}`);
     return {
       success: false,
       targetVoteDate: null,
@@ -159,7 +159,7 @@ async function buildIngestionContext(
       parsedDetails: [],
       congress,
       session,
-      error: `No vote dates found before cutoff ${cutoffDateEt}`,
+      error: `No vote dates found on or before cutoff ${cutoffDateEt}`,
     };
   }
 

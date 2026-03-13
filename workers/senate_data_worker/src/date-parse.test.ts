@@ -3,7 +3,7 @@ import {
   parseVoteDate,
   todayEastern,
   compareDates,
-  findMaxDateBefore,
+  findMaxDateOnOrBefore,
   subtractDays,
 } from "./date-parse";
 
@@ -290,14 +290,14 @@ describe("findMaxDateBefore", () => {
     {
       dates: ["2025-12-16", "2025-12-17", "2025-12-18"],
       cutoff: "2025-12-18",
-      expected: "2025-12-17",
-      description: "Cutoff is exclusive",
+      expected: "2025-12-18",
+      description: "Cutoff is inclusive",
     },
     {
       dates: ["2025-12-16", "2025-12-17"],
       cutoff: "2025-12-16",
-      expected: null,
-      description: "No dates before cutoff",
+      expected: "2025-12-16",
+      description: "Returns cutoff date when present",
     },
     {
       dates: [],
@@ -314,8 +314,8 @@ describe("findMaxDateBefore", () => {
     {
       dates: ["2025-12-19"],
       cutoff: "2025-12-19",
-      expected: null,
-      description: "Single date equals cutoff (exclusive)",
+      expected: "2025-12-19",
+      description: "Single date equals cutoff (inclusive)",
     },
     {
       dates: ["2025-12-20"],
@@ -326,7 +326,7 @@ describe("findMaxDateBefore", () => {
   ];
 
   it.each(testCases)("$description", ({ dates, cutoff, expected }) => {
-    const result = findMaxDateBefore(dates, cutoff);
+    const result = findMaxDateOnOrBefore(dates, cutoff);
     expect(result).toBe(expected);
   });
 });

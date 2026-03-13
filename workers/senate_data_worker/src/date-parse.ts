@@ -174,20 +174,20 @@ export function compareDates(a: string, b: string): number {
 }
 
 /**
- * Find the maximum date from an array that is strictly less than the cutoff.
+ * Find the maximum date from an array that is less than or equal to the cutoff.
  *
  * @param dates - Array of YYYY-MM-DD date strings
- * @param cutoff - The cutoff date (exclusive)
- * @returns The max date < cutoff, or null if none found
+ * @param cutoff - The cutoff date (inclusive)
+ * @returns The max date <= cutoff, or null if none found
  */
-export function findMaxDateBefore(
+export function findMaxDateOnOrBefore(
   dates: string[],
   cutoff: string
 ): string | null {
   let maxDate: string | null = null;
 
   for (const date of dates) {
-    if (compareDates(date, cutoff) < 0) {
+    if (compareDates(date, cutoff) <= 0) {
       if (maxDate === null || compareDates(date, maxDate) > 0) {
         maxDate = date;
       }
