@@ -2,6 +2,34 @@
 
 `daily_senate_update` is a Cloudflare-native Senate vote intelligence app. It ingests official Senate and congressional data, builds a normalized read model for recent and historical voting context, and serves a ranked feed of the most relevant Senate votes plus vote-detail pages.
 
+## Developer Quick Start
+
+### Runtime split (important)
+
+- API worker (`workers/senate_data_worker/wrangler.toml`): serves read-only endpoints for the frontend (for example `/briefings/latest.json`).
+- Pipeline worker (`workers/senate_data_worker/wrangler.pipeline.toml`): runs ingestion/materialization to fetch upstream data and refresh D1/R2 data used by the API worker.
+- Web app (`web/`): Vite + React frontend.
+
+### Run locally (exact commands)
+
+Run these two commands:
+
+1. Start API + Pipeline + Web:
+
+```bash
+./scripts/dev-all.sh
+```
+
+2. In a second terminal, pull/refresh latest data:
+
+```bash
+./scripts/refresh-data.sh
+```
+
+Then open `http://127.0.0.1:5173`.
+
+For one-time local setup (`npm install`, `.dev.vars`), see the `Development` section below.
+
 ## Architecture
 
 The project now has three runtime surfaces:
@@ -182,6 +210,29 @@ The worker can also create the same schema lazily through `src/d1.ts`, but the m
 
 ## Development
 
+### Local setup (first run)
+
+Create a local worker env file:
+
+```bash
+cp workers/senate_data_worker/.dev.vars.example workers/senate_data_worker/.dev.vars
+```
+
+Required local secrets in `workers/senate_data_worker/.dev.vars`:
+
+- `CONGRESS_API_KEY`
+- `GOVINFO_API_KEY`
+
+Optional local synthesis settings:
+
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
+- `OPENROUTER_APP_REFERER`
+- `OPENROUTER_APP_TITLE`
+- `OPENROUTER_SHADOW_MODE`
+- `OPENROUTER_CANARY_PERCENT`
+- `OPENROUTER_MAX_NEW_ANALYSES`
+
 ### Install dependencies
 
 ```bash
@@ -203,6 +254,8 @@ This starts:
 
 The repo now ships with a local `D1` binding enabled in both Wrangler configs so queue, evidence, and read-model code can run end to end during local development without provisioning a remote database first.
 
+Scheduled workers are not triggered automatically in local development.
+
 You can also run them individually:
 
 ```bash
@@ -218,6 +271,13 @@ npm --prefix web run dev
 ```
 
 This targets the local Pipeline Worker and triggers the scheduled ingestion path through the explicit local admin route.
+
+Typical local startup flow:
+
+1. Start the stack with `./scripts/dev-all.sh`.
+2. In a second terminal, run `./scripts/refresh-data.sh`.
+3. Verify freshness with `http://127.0.0.1:8788/__pipeline/status` and `http://127.0.0.1:8787/briefings/latest.json`.
+4. Open `http://127.0.0.1:5173`.
 
 ### Run the deterministic harness locally
 
