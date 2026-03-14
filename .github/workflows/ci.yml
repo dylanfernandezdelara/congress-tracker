@@ -33,7 +33,7 @@ jobs:
         run: npm test
 
   web:
-    name: Web Typecheck and Tests
+    name: Web Typecheck, Tests, and Build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -57,6 +57,43 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Build
+        run: npm run build
+
+  harness:
+    name: Deterministic Harness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install worker dependencies
+        run: npm ci
+        working-directory: workers/senate_data_worker
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Install Playwright browser
+        run: npm --prefix web exec -- playwright install --with-deps chromium
+
+      - name: Run deterministic harness
+        run: npm run harness:ci
+
+      - name: Upload harness artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-artifacts
+          path: target/harness
+          if-no-files-found: ignore
 
   public-readiness:
     name: Public Readiness Checks

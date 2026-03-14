@@ -21,6 +21,7 @@ import {
   DEFAULT_OPENROUTER_MODELS,
   type AnalyzeBillsResult,
 } from "./openrouter";
+import { applyHarnessEnv, getHarnessRuntime, isHarnessFixtureEnv } from "./harness";
 import type {
   IngestConfig,
   SnapshotJson,
@@ -103,6 +104,9 @@ interface Env {
   QUALITY_MIN_QUOTE_VALIDITY?: string;
   QUALITY_MAX_CONFIDENCE_MISMATCH?: string;
   QUALITY_HARD_GATES?: string;
+  HARNESS_MODE?: string;
+  HARNESS_FIXTURE_SET?: string;
+  HARNESS_NOW?: string;
 }
 
 // ============================================================================
@@ -337,6 +341,7 @@ async function readLatestChamberContext(bucket: R2Bucket): Promise<MemberActivit
 // ============================================================================
 
 async function handleFetch(request: Request, env: Env): Promise<Response> {
+  applyHarnessEnv(env);
   const { pathname } = new URL(request.url);
   const corsHeaders = buildCorsHeaders(env);
   const jsonResponse = (body: unknown, init?: ResponseInit) =>
@@ -655,6 +660,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
  */
 function validateEnv(env: Env): IngestConfig {
   const errors: string[] = [];
+  const fixtureMode = isHarnessFixtureEnv(env);
 
   // Validate CONGRESS
   if (!env.CONGRESS) {
@@ -685,10 +691,10 @@ function validateEnv(env: Env): IngestConfig {
     );
   }
 
-  if (!env.CONGRESS_API_KEY) {
+  if (!env.CONGRESS_API_KEY && !fixtureMode) {
     errors.push("CONGRESS_API_KEY is missing");
   }
-  if (!env.GOVINFO_API_KEY) {
+  if (!env.GOVINFO_API_KEY && !fixtureMode) {
     errors.push("GOVINFO_API_KEY is missing");
   }
 
@@ -699,7 +705,12 @@ function validateEnv(env: Env): IngestConfig {
     throw new Error(errorMsg);
   }
 
-  return { congress, session, targetState, congressApiKey: env.CONGRESS_API_KEY };
+  return {
+    congress,
+    session,
+    targetState,
+    congressApiKey: env.CONGRESS_API_KEY || "HARNESS_FIXTURE_KEY",
+  };
 }
 
 async function publishMemberActivity(
@@ -978,13 +989,24 @@ async function enrichBillAnalyses(
     maxRetries: 2,
     analysisConcurrency: 2,
   });
+  const modelSuccessCount = Math.max(0, result.analyzedCount - result.fallbackCount);
 
   console.log(
-    `[openrouter] Analysis enrichment complete: cache hits=${result.cacheHitCount}, new=${result.analyzedCount}, skipped=${result.skippedCount}, claim-coverage=${result.claimsWithEvidenceRefPct}%, benefit-map-coverage=${result.benefitMapWithEvidenceRefPct}%, likely-reason-coverage=${result.likelyReasonsWithEvidenceRefPct}%, quote-validity=${result.quoteValidityPct}%, confidence-mismatch=${result.confidenceCalibrationMismatchPct}%`
+    `[openrouter] Analysis enrichment complete: cache hits=${result.cacheHitCount}, saved=${result.analyzedCount}, model-success=${modelSuccessCount}, fallback=${result.fallbackCount}, deferred=${result.deferredCount}, input-skipped=${result.inputSkipCount}, claim-coverage=${result.claimsWithEvidenceRefPct}%, benefit-map-coverage=${result.benefitMapWithEvidenceRefPct}%, likely-reason-coverage=${result.likelyReasonsWithEvidenceRefPct}%, quote-validity=${result.quoteValidityPct}%, confidence-mismatch=${result.confidenceCalibrationMismatchPct}%`
   );
-  if (result.skippedCount > 0) {
+  if (result.deferredCount > 0) {
     console.log(
-      `[openrouter] ${result.skippedCount} analyses deferred by maxNewAnalyses limit; refresh will continue across scheduled runs.`
+      `[openrouter] ${result.deferredCount} analyses deferred by maxNewAnalyses limit; refresh will continue across scheduled runs.`
+    );
+  }
+  if (result.fallbackCount > 0) {
+    console.log(
+      `[openrouter] ${result.fallbackCount} analyses fell back to deterministic summaries after model output or parse failures.`
+    );
+  }
+  if (result.inputSkipCount > 0) {
+    console.log(
+      `[openrouter] ${result.inputSkipCount} analyses were skipped because the bill lacked enough title or summary text.`
     );
   }
   const gateFailures = evaluateQualityGates(result, qualityGateConfig);
@@ -1258,6 +1280,7 @@ async function processHistoricalBackfillJob(
  * Core ingestion logic, separated for use with ctx.waitUntil.
  */
 async function runScheduledIngestion(env: Env): Promise<void> {
+  applyHarnessEnv(env);
   const runId = makeRunId();
   const startTime = Date.now();
   logEvent("scheduled_ingestion_start", {
@@ -1266,6 +1289,8 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   });
 
   const config = validateEnv(env);
+  const congressApiKey = env.CONGRESS_API_KEY || config.congressApiKey;
+  const govInfoApiKey = env.GOVINFO_API_KEY || "HARNESS_FIXTURE_KEY";
   const evidenceMaxBills = Math.max(5, parseIntSafe(env.EVIDENCE_MAX_BILLS, 30));
   const evidenceBillConcurrency = Math.max(
     1,
@@ -1281,8 +1306,8 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     runMemberIngestion({
       congress: config.congress,
       session: config.session,
-      congressApiKey: env.CONGRESS_API_KEY,
-      govInfoApiKey: env.GOVINFO_API_KEY,
+      congressApiKey,
+      govInfoApiKey,
       lookbackDays: activityLookbackDays,
     })
   );
@@ -1311,7 +1336,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", async () =>
     buildBillEvidencePipeline(env.DATA_BUCKET, billsByKey, {
       runId,
-      congressApiKey: env.CONGRESS_API_KEY,
+      congressApiKey,
       session: config.session,
       maxBills: evidenceMaxBills,
       billConcurrency: evidenceBillConcurrency,
@@ -1342,7 +1367,9 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     publishChamberContext(env.DATA_BUCKET, memberResult.windowEnd, memberResult.context)
   );
 
-  const shadowMode = parseBool(env.OPENROUTER_SHADOW_MODE, false);
+  const harnessRuntime = getHarnessRuntime();
+  const fixtureMode = harnessRuntime.mode === "fixture";
+  const shadowMode = fixtureMode ? true : parseBool(env.OPENROUTER_SHADOW_MODE, false);
   const canaryPercent = Math.max(0, Math.min(parseIntSafe(env.OPENROUTER_CANARY_PERCENT, 100), 100));
   const canaryValue = hashRunId(runId);
   const canaryEnabled = canaryValue < canaryPercent;
@@ -1358,7 +1385,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   let analysisResult: AnalyzeBillsResult | null = null;
   let synthesisErrors: SourceError[] = [];
 
-  if (env.OPENROUTER_API_KEY?.trim() && canaryEnabled) {
+  if (!fixtureMode && env.OPENROUTER_API_KEY?.trim() && canaryEnabled) {
     const models = parseCsvList(env.OPENROUTER_MODEL);
     try {
       analysisResult = await runTimed(runId, "openrouter_synthesis", async () =>
@@ -1398,14 +1425,16 @@ async function runScheduledIngestion(env: Env): Promise<void> {
         }
       }
       if (analysisResult) {
-        const analyzedTotal = analysisResult.analyzedCount + analysisResult.skippedCount;
-        const skipRate = analyzedTotal > 0 ? analysisResult.skippedCount / analyzedTotal : 0;
-        if (skipRate > 0.2) {
+        const attemptedAnalyses = analysisResult.analyzedCount + analysisResult.inputSkipCount;
+        const fallbackRate =
+          attemptedAnalyses > 0 ? analysisResult.fallbackCount / attemptedAnalyses : 0;
+        if (fallbackRate > 0.2) {
           logEvent("openrouter_degradation_signal", {
             run_id: runId,
-            skip_rate: Number((skipRate * 100).toFixed(2)),
+            fallback_rate: Number((fallbackRate * 100).toFixed(2)),
             analyzed_count: analysisResult.analyzedCount,
-            skipped_count: analysisResult.skippedCount,
+            fallback_count: analysisResult.fallbackCount,
+            deferred_count: analysisResult.deferredCount,
           });
         }
       }
@@ -1421,6 +1450,11 @@ async function runScheduledIngestion(env: Env): Promise<void> {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  } else if (fixtureMode) {
+    synthesisErrors.push({
+      source: "congress",
+      message: "Harness fixture mode active; synthesis skipped",
+    });
   } else if (!env.OPENROUTER_API_KEY?.trim()) {
     synthesisErrors.push({
       source: "congress",
@@ -1568,6 +1602,7 @@ function handleScheduled(
   env: Env,
   ctx: ExecutionContext
 ): void {
+  applyHarnessEnv(env);
   logEvent("scheduled_trigger", {
     scheduled_for: new Date(controller.scheduledTime).toISOString(),
   });
@@ -1615,6 +1650,7 @@ function handleQueue(
   env: Env,
   ctx: ExecutionContext
 ): void {
+  applyHarnessEnv(env);
   for (const message of batch.messages) {
     ctx.waitUntil(
       processPipelineJob(message.body, env)

@@ -1,5 +1,6 @@
 import type { FetchConfig } from "./fetch";
 import { readSourceFetchLog, recordSourceFetchLog } from "./d1";
+import { isHarnessFixtureMode, resolveHarnessFixtureResponse } from "./harness";
 import {
   buildSourceArtifactKey,
   readTextFromR2,
@@ -74,6 +75,24 @@ async function fetchTextWithTimeout(
   timeoutMs: number,
   headers?: HeadersInit
 ): Promise<Response> {
+  const fixtureResponse = resolveHarnessFixtureResponse(url);
+  if (fixtureResponse) {
+    return new Response(fixtureResponse.body, {
+      status: fixtureResponse.status,
+      headers: {
+        "Content-Type": fixtureResponse.contentType,
+      },
+    });
+  }
+  if (isHarnessFixtureMode()) {
+    return new Response(`Missing harness fixture for ${url}`, {
+      status: 404,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    });
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {

@@ -1,3 +1,5 @@
+import { getHarnessNowDate } from "./harness";
+
 /**
  * Date parsing utilities for Senate XML data.
  *
@@ -137,7 +139,7 @@ export function formatDate(year: number, month: number, day: number): string {
  * This is the cutoff date for determining which vote day to target.
  */
 export function todayEastern(): string {
-  const now = new Date();
+  const now = getHarnessNowDate() ?? new Date();
 
   // Create formatter for Eastern time
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -196,4 +198,3 @@ export function findMaxDateOnOrBefore(
 
   return maxDate;
 }
-

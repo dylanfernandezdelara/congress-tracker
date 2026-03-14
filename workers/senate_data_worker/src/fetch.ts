@@ -7,6 +7,8 @@
  * - Parallel fetching with concurrency limits
  */
 
+import { isHarnessFixtureMode, resolveHarnessFixtureResponse } from "./harness";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -107,6 +109,24 @@ async function fetchWithTimeout(
   timeoutMs: number,
   init?: RequestInit
 ): Promise<Response> {
+  const fixtureResponse = resolveHarnessFixtureResponse(url);
+  if (fixtureResponse) {
+    return new Response(fixtureResponse.body, {
+      status: fixtureResponse.status,
+      headers: {
+        "Content-Type": fixtureResponse.contentType,
+      },
+    });
+  }
+  if (isHarnessFixtureMode()) {
+    return new Response(`Missing harness fixture for ${url}`, {
+      status: 404,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    });
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

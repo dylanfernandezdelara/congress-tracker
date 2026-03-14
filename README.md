@@ -155,6 +155,12 @@ Optional secret/runtime values:
 - `OPENROUTER_APP_REFERER`
 - `OPENROUTER_APP_TITLE`
 
+Deterministic harness runs do not require live upstream secrets. They start both workers with:
+
+- `HARNESS_MODE=fixture`
+- `HARNESS_FIXTURE_SET=canonical`
+- `HARNESS_NOW=2026-01-20T15:00:00Z`
+
 Set local secrets in `workers/senate_data_worker/.dev.vars`.
 Set deployed secrets with Wrangler:
 
@@ -213,6 +219,25 @@ npm --prefix web run dev
 
 This targets the local Pipeline Worker and triggers the scheduled ingestion path through the explicit local admin route.
 
+### Run the deterministic harness locally
+
+```bash
+npm run harness:ci
+```
+
+This boots the API worker, pipeline worker, and web app with isolated local Wrangler state, runs scheduled ingestion against the checked-in fixture corpus, verifies the materialized API outputs, and then runs Playwright against the live local app.
+
+Useful harness subcommands:
+
+```bash
+npm run harness:stack
+npm run harness:assert
+npm run harness:browser
+npm run harness:live-smoke
+```
+
+The deterministic harness writes debug artifacts, including browser failure assets, to `target/harness/`.
+
 ### Seed historical backfill locally
 
 ```bash
@@ -266,6 +291,20 @@ Scheduled-handler smoke test:
 ```bash
 npm --prefix workers/senate_data_worker run smoke:scheduled
 ```
+
+Deterministic full-stack harness:
+
+```bash
+npm run harness:ci
+```
+
+Maintainer-only fixture refresh:
+
+```bash
+npm --prefix workers/senate_data_worker run fixtures:harness:refresh
+```
+
+The refresh script captures the canonical upstream URLs and writes a generated fixture module for review; it is intended for maintainers rebasing the deterministic harness story, not for routine development.
 
 ## Deployment
 
