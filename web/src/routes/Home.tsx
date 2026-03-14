@@ -12,6 +12,7 @@ import { Card, CardContent } from '../components/ui/card'
 import { Separator } from '../components/ui/separator'
 import { E2E_BRIEFING } from '../e2eData'
 import { cn } from '../lib/utils'
+import { readHarnessNow } from '../utils/harnessNow'
 
 const MAX_HOME_VOTE_AGE_DAYS = 7
 const WASHINGTON_TIMEZONE = 'America/New_York'
@@ -419,12 +420,16 @@ function SecondaryVoteCard({
 }
 
 export default function Home() {
+  const harnessNow = useMemo(
+    () => readHarnessNow(window.location.search, window.location.hostname),
+    [],
+  )
   const [briefing, setBriefing] = useState<BriefingFeedResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [usingDemo, setUsingDemo] = useState(false)
-  const [currentDate, setCurrentDate] = useState(() => new Date())
-  const [dcNow, setDcNow] = useState(() => new Date())
+  const [currentDate, setCurrentDate] = useState(() => harnessNow ?? new Date())
+  const [dcNow, setDcNow] = useState(() => harnessNow ?? new Date())
 
   const e2eMode = useMemo(
     () => new URLSearchParams(window.location.search).get('e2e') === '1',
@@ -436,6 +441,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    if (harnessNow) return
     const intervalId = window.setInterval(() => {
       setCurrentDate((previousDate) => {
         const nextDate = new Date()
@@ -446,9 +452,10 @@ export default function Home() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [])
+  }, [harnessNow])
 
   useEffect(() => {
+    if (harnessNow) return
     const intervalId = window.setInterval(() => {
       setDcNow(new Date())
     }, 1000)
@@ -456,7 +463,7 @@ export default function Home() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [])
+  }, [harnessNow])
 
   useEffect(() => {
     let cancelled = false

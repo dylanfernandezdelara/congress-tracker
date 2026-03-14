@@ -11,6 +11,7 @@
     "deploy:pipeline": "wrangler deploy --config wrangler.pipeline.toml",
     "test-scheduled": "wrangler dev --config wrangler.pipeline.toml --test-scheduled",
     "smoke:scheduled": "bash scripts/run-ingest-local.sh",
+    "fixtures:harness:refresh": "node scripts/refresh-harness-fixtures.mjs",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

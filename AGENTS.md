@@ -15,6 +15,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`.
 - Required local secrets: `CONGRESS_API_KEY`, `GOVINFO_API_KEY`.
 - Optional local synthesis settings: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_APP_REFERER`, `OPENROUTER_APP_TITLE`, `OPENROUTER_SHADOW_MODE`, `OPENROUTER_CANARY_PERCENT`, `OPENROUTER_MAX_NEW_ANALYSES`.
+- Deterministic harness runs do not require live upstream secrets; they boot workers with `HARNESS_MODE=fixture`, `HARNESS_FIXTURE_SET=canonical`, and a fixed `HARNESS_NOW`.
 - Local D1 and R2 bindings are already configured in both Wrangler configs; do not change remote resource IDs just to make local development work.
 
 ### Local development
@@ -28,6 +29,8 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Seed historical backfill: `./scripts/backfill-history.sh`
 
 ### Verification
+- Full deterministic harness: `npm run harness:ci`
+- Harness browser checks only: `npm run harness:browser`
 - Worker typecheck: `npm --prefix workers/senate_data_worker run check`
 - Worker tests: `npm --prefix workers/senate_data_worker test`
 - Worker scheduled smoke test: `npm --prefix workers/senate_data_worker run smoke:scheduled`
@@ -36,6 +39,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 
 ## Key Rules
 - Prefer the commands above over guessing root-level npm scripts.
+- Default to `npm run harness:ci` for end-to-end verification; only fall back to manual endpoint checks when debugging the harness itself.
 - When changing ingestion, read both worker pipeline code and read-model/API surfaces.
 - For data freshness issues, check both `/briefings/latest.json` and pipeline status before changing code.
 - Use `./scripts/refresh-data.sh` or the local scheduled endpoint to repopulate the latest briefing/feed data after pipeline changes.
@@ -44,12 +48,13 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Do not commit or push directly to `main`; use a feature branch and open a PR.
 
 ## Verification By Change Type
-- Ingestion or pipeline changes: run `npm --prefix workers/senate_data_worker run check`, `npm --prefix workers/senate_data_worker test`, and `npm --prefix workers/senate_data_worker run smoke:scheduled` if scheduled flow or cron wiring changed.
-- Ingestion or materialization changes: after code changes, run `./scripts/refresh-data.sh` or trigger the local scheduled/admin endpoint, then verify pipeline status and `http://127.0.0.1:8787/briefings/latest.json`.
-- API or read-model changes: run worker typecheck and tests, then verify `http://127.0.0.1:8787/briefings/latest.json` and any touched vote/detail endpoints against the local API worker.
-- Frontend changes: run `npm --prefix web test` and `npm --prefix web run build`; manually verify the Vite app against the local API when API contracts or feed rendering changed.
+- Ingestion, pipeline, or materialization changes: run `npm run harness:ci`. Run `npm --prefix workers/senate_data_worker run smoke:scheduled` only when you also need the non-deterministic live-source smoke path.
+- API or read-model changes: run `npm run harness:ci`, then inspect `target/harness/assertions/` if the deterministic API assertions fail.
+- Frontend changes: run `npm run harness:ci`. For design-only review, `npm --prefix web run ui:snap` and `/?e2e=1` remain available but are not the CI truth path.
 
 ## Freshness And Debugging
+- Deterministic harness artifacts, including Playwright failure assets, land in `target/harness/`.
+- The canonical harness fixture corpus lives behind `HARNESS_FIXTURE_SET=canonical`; refresh it with `npm --prefix workers/senate_data_worker run fixtures:harness:refresh` when intentionally re-basing the deterministic story.
 - Worker health endpoints: `http://127.0.0.1:8787/health` and `http://127.0.0.1:8788/health`.
 - Pipeline status endpoint: `http://127.0.0.1:8788/__pipeline/status`.
 - Local ingestion trigger: `./scripts/refresh-data.sh`.
@@ -70,3 +75,4 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - The latest homepage feed is served from `/briefings/latest.json`.
 - The pipeline worker is responsible for ingestion/materialization; scheduled workers are not triggered automatically in local dev.
 - Local stack ports from the repo scripts: API `http://127.0.0.1:8787`, Pipeline `http://127.0.0.1:8788`, Web `http://127.0.0.1:5173`.
+- `web/src/e2eData.ts` is for manual review mode only; the deterministic harness exercises the live local API worker instead.

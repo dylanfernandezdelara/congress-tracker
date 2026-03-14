@@ -8,10 +8,11 @@ export default defineConfig({
     outDir: 'dist',
   },
   test: {
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     globals: true,
     css: true,
+    exclude: ['tests/harness/**', 'output/**'],
   },
 })
-

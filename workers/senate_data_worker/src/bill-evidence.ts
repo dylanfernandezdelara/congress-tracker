@@ -37,6 +37,7 @@ interface EndpointFetchResult {
   fallbackUsed: boolean;
   ok: boolean;
   fetchedAt: string;
+  statusCode?: number;
   error?: string;
   itemCount?: number;
   payload?: Record<string, unknown>;
@@ -215,6 +216,10 @@ function toEndpointStatus(result: EndpointFetchResult): EvidenceEndpointStatus {
   };
 }
 
+function isIgnorableOptionalEndpointMiss(result: EndpointFetchResult): boolean {
+  return !result.ok && result.statusCode === 404 && EVIDENCE_ENDPOINT_TIERS[result.endpoint] > 1;
+}
+
 export async function harvestBillEvidence(
   ref: BillRef,
   apiKey: string,
@@ -262,12 +267,14 @@ export async function harvestBillEvidence(
     let selectedPath = spec.paths[0] ?? "";
     let selectedPayload: Record<string, unknown> | undefined;
     let fallbackUsed = false;
+    let lastStatusCode: number | undefined;
 
     for (let i = 0; i < spec.paths.length; i++) {
       const path = spec.paths[i];
       const url = buildCongressUrl(path, {}, apiKey);
       attemptedUrls.push(url);
       const result = await fetchJsonWithRetry<Record<string, unknown>>(url, fetchConfig);
+      lastStatusCode = result.statusCode;
       if (result.success && result.data) {
         selectedUrl = url;
         selectedPath = path;
@@ -287,6 +294,7 @@ export async function harvestBillEvidence(
         fallbackUsed: false,
         ok: false,
         fetchedAt,
+        statusCode: lastStatusCode,
         error: errors[errors.length - 1] ?? "Unknown endpoint fetch failure",
       } satisfies EndpointFetchResult;
     }
@@ -299,6 +307,7 @@ export async function harvestBillEvidence(
       fallbackUsed,
       ok: true,
       fetchedAt,
+      statusCode: 200,
       payload: selectedPayload,
       itemCount: estimateItemCount(spec.endpoint, selectedPayload),
     } satisfies EndpointFetchResult;
@@ -312,7 +321,7 @@ export async function harvestBillEvidence(
   }
 
   const sourceText = collectSourceText(ref, endpointResults);
-  const firstError = endpointResults.find((r) => !r.ok)?.error;
+  const firstError = endpointResults.find((r) => !r.ok && !isIgnorableOptionalEndpointMiss(r))?.error;
 
   return {
     evidence: {

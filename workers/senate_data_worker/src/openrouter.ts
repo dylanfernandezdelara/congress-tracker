@@ -55,6 +55,9 @@ export interface AnalyzeBillsResult {
   analyzedCount: number;
   cacheHitCount: number;
   skippedCount: number;
+  deferredCount: number;
+  fallbackCount: number;
+  inputSkipCount: number;
   claimsWithEvidenceRefPct: number;
   benefitMapWithEvidenceRefPct: number;
   likelyReasonsWithEvidenceRefPct: number;
@@ -1023,6 +1026,9 @@ export async function analyzeBillsWithCache(
   let cacheHitCount = 0;
   let analyzedCount = 0;
   let skippedCount = 0;
+  let deferredCount = 0;
+  let fallbackCount = 0;
+  let inputSkipCount = 0;
   let legacyChanged = false;
 
   const models = normalizeModelList(options.models ?? options.model);
@@ -1063,6 +1069,7 @@ export async function analyzeBillsWithCache(
   }
 
   if (pending.length > maxNewAnalyses) {
+    deferredCount += pending.length - maxNewAnalyses;
     skippedCount += pending.length - maxNewAnalyses;
   }
   const work = pending.slice(0, maxNewAnalyses);
@@ -1070,7 +1077,11 @@ export async function analyzeBillsWithCache(
   const analyzed = await mapWithConcurrency(work, analysisConcurrency, async ({ key, input }) => {
     const bill = input.bill;
     if (!bill.summary && !bill.title) {
-      return { key, analysis: null as BillAnalysis | null, skipped: true };
+      return {
+        key,
+        analysis: null as BillAnalysis | null,
+        skipReason: "input" as const,
+      };
     }
     try {
       const analysis = await analyzeSingleBill(
@@ -1080,7 +1091,7 @@ export async function analyzeBillsWithCache(
         timeoutMs,
         maxRetries
       );
-      return { key, analysis, skipped: false };
+      return { key, analysis, skipReason: null };
     } catch (error) {
       console.warn(
         `[openrouter] Analysis failed for ${key}: ${
@@ -1088,17 +1099,23 @@ export async function analyzeBillsWithCache(
         }`
       );
       const fallback = coerceBillAnalysis({}, input.bill, input.impactEvidence);
-      return { key, analysis: fallback, skipped: true };
+      return {
+        key,
+        analysis: fallback,
+        skipReason: "fallback" as const,
+      };
     }
   });
 
   for (const result of analyzed) {
     if (!result.analysis) {
       skippedCount++;
+      inputSkipCount++;
       continue;
     }
-    if (result.skipped) {
+    if (result.skipReason === "fallback") {
       skippedCount++;
+      fallbackCount++;
     }
     analyzedCount++;
     analysisByKey.set(result.key, result.analysis);
@@ -1118,6 +1135,9 @@ export async function analyzeBillsWithCache(
     analyzedCount,
     cacheHitCount,
     skippedCount,
+    deferredCount,
+    fallbackCount,
+    inputSkipCount,
     claimsWithEvidenceRefPct: claimCoverage(analysisByKey),
     benefitMapWithEvidenceRefPct: benefitMapCoverage(analysisByKey),
     likelyReasonsWithEvidenceRefPct: likelyReasonCoverage(analysisByKey),
