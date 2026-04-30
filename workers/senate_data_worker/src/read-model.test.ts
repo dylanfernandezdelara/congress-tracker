@@ -114,7 +114,7 @@ const activities: ActivityIndexJson = {
 };
 
 describe("read-model builders", () => {
-  it("ranks votes into a briefing feed", () => {
+  it("orders briefing feed votes by newest roll call first", () => {
     const briefing = buildBriefingFeedResponse(ledger, overview, activities);
     expect(briefing.items).toHaveLength(2);
     expect(briefing.items[0].vote_number).toBe(14);

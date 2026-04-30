@@ -3,7 +3,7 @@ import { Card, CardContent } from '../components/ui/card'
 
 function About() {
   useEffect(() => {
-    document.title = 'About | Senate Pulse'
+    document.title = 'About | Congress Pulse'
   }, [])
 
   return (
@@ -11,13 +11,13 @@ function About() {
       <Card className="draft-grid">
         <CardContent className="grid gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:px-8 lg:py-8">
           <div className="max-w-3xl">
-            <p className="document-kicker">About Senate Pulse</p>
+            <p className="document-kicker">About Congress Pulse</p>
             <h1 className="document-title mt-4 text-4xl font-semibold text-foreground sm:text-5xl">
-              Neutral context for the Senate votes that matter most.
+              Neutral context for congressional vote summaries.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-muted-foreground">
-              Senate Pulse is a public-interest briefing that ranks recent U.S. Senate votes and
-              explains what happened, why it mattered, and who broke party lines.
+              Congress Pulse is a public-interest briefing that summarizes recent congressional
+              votes and explains what happened, the recorded tally, and who broke party lines.
             </p>
           </div>
 
@@ -26,7 +26,7 @@ function About() {
               <p className="document-label">Editorial stance</p>
               <p className="mt-3 text-sm leading-6 text-foreground">
                 The site is designed to read like a legislative briefing packet: official facts
-                first, explicit context gaps, and clear ranking logic.
+                first, explicit context gaps, and clear chronological organization.
               </p>
             </div>
             <div className="note-panel">
@@ -49,13 +49,13 @@ function About() {
             </h2>
             <p className="mt-4 text-sm leading-7 text-muted-foreground sm:text-base">
               The project combines official sources including Congress.gov, Senate.gov, and GovInfo
-              with transparent processing so readers can quickly see which votes were consequential,
-              where parties split, and when a result fits into a broader historical pattern.
+              with transparent processing so readers can quickly see recent vote outcomes, where
+              parties split, and when a result fits into a broader historical pattern.
             </p>
             <p className="mt-4 text-sm leading-7 text-muted-foreground sm:text-base">
-              It is intentionally designed as a ranked briefing rather than a dense dashboard. The
-              goal is to help you understand the most relevant Senate action first, then drill into
-              vote detail when you need more depth.
+              It is intentionally designed as a simple chronological vote summary rather than a
+              dense dashboard. The goal is to help you scan the newest materialized records first,
+              then drill into vote detail when you need more depth.
             </p>
           </CardContent>
         </Card>
@@ -66,9 +66,9 @@ function About() {
             <h2 className="document-title mt-3 text-3xl font-semibold text-foreground">What stays true</h2>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-muted-foreground">
               <li>Official-source facts first.</li>
-              <li>Explain rankings instead of hiding them.</li>
+              <li>Show newest materialized votes first.</li>
               <li>Show missing context explicitly when the record is thin.</li>
-              <li>Keep the landing page focused on the votes worth attention now.</li>
+              <li>Keep the landing page focused on vote summaries and recorded tallies.</li>
             </ul>
           </CardContent>
         </Card>

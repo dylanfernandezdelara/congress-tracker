@@ -100,10 +100,10 @@ export default function VoteDetail() {
 
   useEffect(() => {
     if (!detail) {
-      document.title = 'Senate Pulse'
+      document.title = 'Congress Pulse'
       return
     }
-    document.title = `${detail.vote.title} | Senate Pulse`
+    document.title = `${detail.vote.title} | Congress Pulse`
   }, [detail])
 
   useEffect(() => {
@@ -163,7 +163,7 @@ export default function VoteDetail() {
           </p>
         </div>
         <Button asChild variant="outline" size="sm" className="w-fit">
-          <Link to={e2eMode ? '/?e2e=1' : '/'}>Back to briefing</Link>
+          <Link to={e2eMode ? '/?e2e=1' : '/'}>Back to vote summaries</Link>
         </Button>
       </div>
     )
@@ -172,7 +172,7 @@ export default function VoteDetail() {
   return (
     <div className="flex flex-col gap-8">
       <Button asChild variant="ghost" size="sm" className="w-fit px-0 text-primary">
-        <Link to={e2eMode ? '/?e2e=1' : '/'}>&larr; Back to briefing</Link>
+        <Link to={e2eMode ? '/?e2e=1' : '/'}>&larr; Back to vote summaries</Link>
       </Button>
 
       <Card className="draft-grid">
@@ -232,9 +232,9 @@ export default function VoteDetail() {
       <section className="grid gap-4 lg:grid-cols-2">
         <Card className="h-full">
           <CardContent className="px-6 py-6">
-            <p className="document-kicker">Ranking</p>
+            <p className="document-kicker">Vote signals</p>
             <h2 className="document-title mt-3 text-3xl font-semibold text-foreground">
-              Why this vote surfaced
+              Summary signals
             </h2>
             <div className="mt-5 flex flex-wrap gap-2">
               {detail.ranking_reasons.map((reason) => (

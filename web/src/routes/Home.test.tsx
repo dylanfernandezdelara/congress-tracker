@@ -90,7 +90,7 @@ describe('Home', () => {
     vi.unstubAllGlobals()
   })
 
-  it('does not promote stale votes as the lead briefing item', async () => {
+  it('shows older materialized votes instead of hiding them behind a freshness gate', async () => {
     fetchLatestBriefing.mockResolvedValue(
       makeBriefing([
         makeItem({
@@ -110,19 +110,26 @@ describe('Home', () => {
     )
 
     expect(await screen.findByText(/Washington,\s*D\.C\./)).toBeInTheDocument()
-    expect(screen.getByText('No current briefing to promote')).toBeInTheDocument()
-    expect(screen.queryByText('War powers resolution')).not.toBeInTheDocument()
+    expect(screen.getByText('War powers resolution')).toBeInTheDocument()
+    expect(screen.getByText(/no ranking applied/i)).toBeInTheDocument()
   })
 
-  it('shows a recent vote as the lead briefing item when it falls inside the freshness window', async () => {
+  it('sorts vote summaries by newest vote date and number first', async () => {
     fetchLatestBriefing.mockResolvedValue(
       makeBriefing([
         makeItem({
-          id: 'vote-205',
-          vote_number: 205,
+          id: 'vote-203',
+          vote_number: 203,
+          vote_date: '2026-03-08',
+          title: 'Older rail safety package',
+          detail_path: '/votes/203',
+        }),
+        makeItem({
+          id: 'vote-204',
+          vote_number: 204,
           vote_date: '2026-03-09',
-          title: 'Rail safety package',
-          detail_path: '/votes/205',
+          title: 'Newer water infrastructure package',
+          detail_path: '/votes/204',
         }),
       ]),
     )
@@ -134,7 +141,11 @@ describe('Home', () => {
     )
 
     expect(await screen.findByText(/Washington,\s*D\.C\./)).toBeInTheDocument()
-    expect(screen.getByText('Rail safety package')).toBeInTheDocument()
-    expect(screen.queryByText('No current briefing to promote')).not.toBeInTheDocument()
+    const voteHeadings = screen.getAllByRole('heading', { level: 2 })
+    expect(voteHeadings.map((heading) => heading.textContent)).toEqual([
+      'Vote summaries',
+      'Newer water infrastructure package',
+      'Older rail safety package',
+    ])
   })
 })

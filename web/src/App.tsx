@@ -12,7 +12,7 @@ function App() {
             <div className="mx-auto flex w-full max-w-6xl justify-center text-center">
               <div className="max-w-2xl">
                 <Link className="inline-block" to="/">
-                  <span className="document-title text-4xl font-semibold text-foreground sm:text-[3.4rem]">Senate Pulse</span>
+                  <span className="document-title text-4xl font-semibold text-foreground sm:text-[3.4rem]">Congress Pulse</span>
                 </Link>
               </div>
             </div>

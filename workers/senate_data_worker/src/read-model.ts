@@ -667,7 +667,7 @@ export function buildBriefingFeedResponse(
   const referenceDate = overview.latest_vote_date || ledger.entries[0]?.vote_date || new Date().toISOString().slice(0, 10);
   const items = ledger.entries
     .map((entry) => buildFeedItem(ledger, overview, entry, billLookup, referenceDate))
-    .sort((a, b) => b.score - a.score || b.vote_date.localeCompare(a.vote_date))
+    .sort((a, b) => b.vote_date.localeCompare(a.vote_date) || b.vote_number - a.vote_number)
     .slice(0, 10);
 
   return {
