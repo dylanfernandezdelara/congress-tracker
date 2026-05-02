@@ -384,6 +384,36 @@ Recommended deployment order:
 4. Deploy the API Worker.
 5. Trigger a pipeline run and verify the read model.
 
+### Dev-only Cloudflare Pages deploy
+
+The frontend can be uploaded to a dev-only Cloudflare Pages project named
+`daily-senate-update-dev`:
+
+```bash
+cd web
+npm run deploy:cloudflare:dev
+```
+
+This builds the Vite app and uploads `web/dist` with Wrangler. In non-interactive
+environments, set these environment variables before running the command:
+
+```bash
+export CLOUDFLARE_ACCOUNT_ID="<your Cloudflare account ID>"
+export CLOUDFLARE_API_TOKEN="<token with Account > Cloudflare Pages > Edit>"
+```
+
+The dev site will be available at:
+
+```text
+https://daily-senate-update-dev.pages.dev
+```
+
+Set `VITE_API_URL` when you want the dev site to call a specific API Worker:
+
+```bash
+VITE_API_URL="https://your-api-worker.workers.dev" npm run deploy:cloudflare:dev
+```
+
 ## HTTP API
 
 Primary new endpoints:
