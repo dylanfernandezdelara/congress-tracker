@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "deploy:cloudflare:dev:ensure-project": "node scripts/ensure-pages-project.mjs",
+    "deploy:cloudflare:dev:create": "wrangler pages project create daily-senate-update-dev --production-branch main",
+    "deploy:cloudflare:dev": "npm run deploy:cloudflare:dev:ensure-project && npm run build && wrangler pages deploy dist --project-name daily-senate-update-dev --branch main",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -36,6 +39,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.3.3",
     "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wrangler": "^4.87.0"
   }
 }

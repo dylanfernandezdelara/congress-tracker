@@ -384,6 +384,47 @@ Recommended deployment order:
 4. Deploy the API Worker.
 5. Trigger a pipeline run and verify the read model.
 
+### Dev-only Cloudflare Pages (static web preview)
+
+The Vite frontend can be published to a **direct-upload** Pages project named
+`daily-senate-update-dev`, served at:
+
+`https://daily-senate-update-dev.pages.dev`
+
+**Local or any machine with Node 22+ (matches GitHub Actions):**
+
+```bash
+export CLOUDFLARE_ACCOUNT_ID="<account id>"
+export CLOUDFLARE_API_TOKEN="<token with Account → Cloudflare Pages → Edit>"
+# Optional: point the UI at a deployed API Worker instead of localhost
+# export VITE_API_URL="https://your-api-worker.workers.dev"
+
+cd web
+npm ci
+npm run deploy:cloudflare:dev
+```
+
+The `deploy:cloudflare:dev` script creates the Pages project via the Cloudflare
+API if it is missing, then builds and runs `wrangler pages deploy`. Wrangler
+**v4** requires **Node 22+**, which is what CI uses for the web job and Pages
+deploy workflow.
+
+**GitHub Actions:** workflow `.github/workflows/deploy-web-pages-dev.yml` runs
+on pushes to `main` that touch `web/` (and on manual dispatch). Configure:
+
+1. Repository **Secrets**: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`
+   (Pages Edit). Optionally `VITE_API_URL` for the built site’s API base.
+2. Repository **Variable**: `PAGES_DEV_DEPLOY_ENABLED` = `true` (the workflow is
+   skipped until this is set, so missing secrets do not fail unrelated work).
+
+One-time manual project creation (optional; the ensure script usually makes this
+unnecessary):
+
+```bash
+cd web
+npx wrangler pages project create daily-senate-update-dev --production-branch main
+```
+
 ## HTTP API
 
 Primary new endpoints:
