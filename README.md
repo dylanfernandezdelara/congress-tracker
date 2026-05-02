@@ -389,13 +389,24 @@ Recommended deployment order:
 The frontend can be uploaded to a dev-only Cloudflare Pages project named
 `daily-senate-update-dev`:
 
+One-time project creation:
+
+```bash
+cd web
+npx wrangler pages project create daily-senate-update-dev --production-branch main
+```
+
+This creates the stable `https://daily-senate-update-dev.pages.dev` project in
+the Cloudflare account tied to your Wrangler credentials. Then deploy updates:
+
 ```bash
 cd web
 npm run deploy:cloudflare:dev
 ```
 
-This builds the Vite app and uploads `web/dist` with Wrangler. In non-interactive
-environments, set these environment variables before running the command:
+The deploy command builds the Vite app and uploads `web/dist` to the `main`
+production branch with Wrangler. In non-interactive environments, set these
+environment variables before running the create or deploy command:
 
 ```bash
 export CLOUDFLARE_ACCOUNT_ID="<your Cloudflare account ID>"

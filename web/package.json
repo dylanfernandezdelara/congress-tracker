@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "deploy:cloudflare:dev": "npm run build && wrangler pages deploy dist --project-name daily-senate-update-dev",
+    "deploy:cloudflare:dev:create": "wrangler pages project create daily-senate-update-dev --production-branch main",
+    "deploy:cloudflare:dev": "npm run build && wrangler pages deploy dist --project-name daily-senate-update-dev --branch main",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
