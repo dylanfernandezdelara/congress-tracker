@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+---
+
+# Cloudflare-first project guidance
+
+This repository is a Cloudflare-native application. Use Cloudflare, Wrangler, Workers,
+D1, R2, Queues, and the configured Cloudflare MCP servers for hosting, deployment,
+runtime debugging, and platform documentation.
+
+- Prefer Cloudflare documentation and MCP tooling when answering platform questions.
+- Do not introduce Vercel-specific configuration or deployment workflows unless the user explicitly asks for them.
+- Keep Cloudflare account credentials, API tokens, `.dev.vars`, and Wrangler local state out of git.
+- Use the existing Wrangler configs as the source of truth:
+  - `workers/senate_data_worker/wrangler.toml`
+  - `workers/senate_data_worker/wrangler.pipeline.toml`
+- For local work, use the repository commands in `AGENTS.md` and `README.md`.
