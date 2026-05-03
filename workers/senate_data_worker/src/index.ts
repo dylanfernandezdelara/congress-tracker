@@ -59,7 +59,7 @@ import {
   buildChamberContextKey,
   publishToR2,
   readJsonFromR2,
-  writeJsonToR2,
+  writeJsonToR2IfChanged,
 } from "./storage";
 import { mapWithConcurrency } from "./concurrency";
 import { buildPipelineMaterialization, buildVoteDetailResponse } from "./read-model";
@@ -325,8 +325,8 @@ async function publishChamberContext(
   windowEnd: string,
   context: MemberActivityContext
 ): Promise<void> {
-  await writeJsonToR2(bucket, buildChamberContextKey(windowEnd), context);
-  await writeJsonToR2(bucket, buildLatestChamberContextKey(), context);
+  await writeJsonToR2IfChanged(bucket, buildChamberContextKey(windowEnd), context);
+  await writeJsonToR2IfChanged(bucket, buildLatestChamberContextKey(), context);
 }
 
 async function readLatestChamberContext(bucket: R2Bucket): Promise<MemberActivityContext | null> {
@@ -722,15 +722,15 @@ async function publishMemberActivity(
 ): Promise<void> {
   console.log("[r2] Publishing member activity...");
 
-  await writeJsonToR2(bucket, buildMembersIndexKey(), membersIndex);
+  await writeJsonToR2IfChanged(bucket, buildMembersIndexKey(), membersIndex);
   if (activityIndex) {
-    await writeJsonToR2(bucket, buildActivitiesIndexKey(), activityIndex);
+    await writeJsonToR2IfChanged(bucket, buildActivitiesIndexKey(), activityIndex);
   }
 
   await mapWithConcurrency(memberActivities, 3, async (activity) => {
     const keys = buildMemberKeys(activity.member.bioguide_id, windowEnd);
-    await writeJsonToR2(bucket, keys.snapshot, activity);
-    await writeJsonToR2(bucket, keys.latest, activity);
+    await writeJsonToR2IfChanged(bucket, keys.snapshot, activity);
+    await writeJsonToR2IfChanged(bucket, keys.latest, activity);
   });
 
   console.log("[r2] Member activity publish complete");
@@ -906,8 +906,8 @@ async function buildBillEvidencePipeline(
       raw: harvested.evidence,
       impact,
     };
-    await writeJsonToR2(bucket, buildBillEvidenceKey(key), record);
-    await writeJsonToR2(
+    await writeJsonToR2IfChanged(bucket, buildBillEvidenceKey(key), record);
+    await writeJsonToR2IfChanged(
       bucket,
       buildBillTrendSnapshotKey(bill.congress, key, snapshotDate),
       trendSnapshot
@@ -1056,9 +1056,9 @@ async function publishReadModelsToR2(
   bucket: R2Bucket,
   materialization: PipelineMaterialization
 ): Promise<void> {
-  await writeJsonToR2(bucket, buildLatestBriefingKey(), materialization.briefing);
+  await writeJsonToR2IfChanged(bucket, buildLatestBriefingKey(), materialization.briefing);
   await mapWithConcurrency(materialization.voteDetails, 4, async (detail) => {
-    await writeJsonToR2(
+    await writeJsonToR2IfChanged(
       bucket,
       buildVoteDetailKey(detail.vote.congress, detail.vote.session, detail.vote.vote_number),
       detail
@@ -1507,10 +1507,10 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     ])
   );
   await runTimed(runId, "publish_vote_ledger", async () =>
-    writeJsonToR2(env.DATA_BUCKET, buildVoteLedgerKey(), ledger)
+    writeJsonToR2IfChanged(env.DATA_BUCKET, buildVoteLedgerKey(), ledger)
   );
   await runTimed(runId, "publish_session_overview", async () =>
-    writeJsonToR2(env.DATA_BUCKET, buildSessionOverviewKey(), overview)
+    writeJsonToR2IfChanged(env.DATA_BUCKET, buildSessionOverviewKey(), overview)
   );
 
   const allErrors = [
@@ -1535,7 +1535,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     allErrors
   );
   await runTimed(runId, "publish_coverage_snapshot", async () =>
-    writeJsonToR2(env.DATA_BUCKET, buildCoverageSnapshotKey(memberResult.windowEnd), coverage)
+    writeJsonToR2IfChanged(env.DATA_BUCKET, buildCoverageSnapshotKey(memberResult.windowEnd), coverage)
   );
 
   const materializeJob: PipelineJob = {

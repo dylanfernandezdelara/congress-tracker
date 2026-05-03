@@ -130,6 +130,135 @@ function sleep(ms: number): Promise<void> {
 export interface R2WriteOptions {
   retries?: number;
   baseDelayMs?: number;
+  skipIfExists?: boolean;
+  skipIfUnchanged?: boolean;
+  jsonVolatileKeys?: string[];
+}
+
+const DEFAULT_JSON_VOLATILE_KEYS = new Set(["generated_at", "run_id"]);
+
+function normalizeJsonForComparison(
+  value: unknown,
+  volatileKeys: ReadonlySet<string>
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeJsonForComparison(item, volatileKeys));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const normalized: Record<string, unknown> = {};
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    if (volatileKeys.has(key)) continue;
+    normalized[key] = normalizeJsonForComparison(
+      (value as Record<string, unknown>)[key],
+      volatileKeys
+    );
+  }
+  return normalized;
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  if (!value || typeof value !== "object") {
+    return JSON.stringify(value) ?? "undefined";
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+  return `{${entries
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+    .join(",")}}`;
+}
+
+function equivalentJsonPayloads(
+  current: string,
+  next: string,
+  volatileKeys: ReadonlySet<string>
+): boolean {
+  try {
+    const currentNormalized = normalizeJsonForComparison(JSON.parse(current), volatileKeys);
+    const nextNormalized = normalizeJsonForComparison(JSON.parse(next), volatileKeys);
+    return stableStringify(currentNormalized) === stableStringify(nextNormalized);
+  } catch {
+    return current === next;
+  }
+}
+
+async function objectExists(bucket: R2Bucket, key: string): Promise<boolean> {
+  if (typeof bucket.head !== "function") {
+    return false;
+  }
+
+  try {
+    return Boolean(await bucket.head(key));
+  } catch (error) {
+    console.warn(
+      `[r2] Failed to check existing object ${key}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return false;
+  }
+}
+
+async function readStringForComparison(bucket: R2Bucket, key: string): Promise<string | null> {
+  if (typeof bucket.get !== "function") {
+    return null;
+  }
+
+  try {
+    const object = await bucket.get(key);
+    if (!object) {
+      return null;
+    }
+    return await object.text();
+  } catch (error) {
+    console.warn(
+      `[r2] Failed to read existing object ${key} for comparison: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
+async function shouldSkipWriteToR2(
+  bucket: R2Bucket,
+  key: string,
+  data: string,
+  contentType: string,
+  options: R2WriteOptions
+): Promise<boolean> {
+  if (options.skipIfExists && (await objectExists(bucket, key))) {
+    console.log(`[r2] Skipped existing ${key}`);
+    return true;
+  }
+
+  if (!options.skipIfUnchanged) {
+    return false;
+  }
+
+  const current = await readStringForComparison(bucket, key);
+  if (current === null) {
+    return false;
+  }
+
+  const unchanged = contentType.includes("json")
+    ? equivalentJsonPayloads(
+        current,
+        data,
+        new Set([...(options.jsonVolatileKeys ?? []), ...DEFAULT_JSON_VOLATILE_KEYS])
+      )
+    : current === data;
+  if (unchanged) {
+    console.log(`[r2] Skipped unchanged ${key}`);
+  }
+  return unchanged;
 }
 
 async function writeStringToR2(
@@ -141,6 +270,10 @@ async function writeStringToR2(
 ): Promise<void> {
   const retries = Math.max(0, options.retries ?? 2);
   const baseDelayMs = Math.max(100, options.baseDelayMs ?? 250);
+
+  if (await shouldSkipWriteToR2(bucket, key, data, contentType, options)) {
+    return;
+  }
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -177,6 +310,15 @@ export async function writeJsonToR2(
   await writeStringToR2(bucket, key, JSON.stringify(data), "application/json", options);
 }
 
+export async function writeJsonToR2IfChanged(
+  bucket: R2Bucket,
+  key: string,
+  data: unknown,
+  options: R2WriteOptions = {}
+): Promise<void> {
+  await writeJsonToR2(bucket, key, data, { ...options, skipIfUnchanged: true });
+}
+
 export async function writeTextToR2(
   bucket: R2Bucket,
   key: string,
@@ -190,6 +332,15 @@ export async function writeTextToR2(
     options.contentType ?? "text/plain; charset=utf-8",
     options
   );
+}
+
+export async function writeTextToR2IfMissing(
+  bucket: R2Bucket,
+  key: string,
+  data: string,
+  options: R2WriteOptions & { contentType?: string } = {}
+): Promise<void> {
+  await writeTextToR2(bucket, key, data, { ...options, skipIfExists: true });
 }
 
 export async function readJsonFromR2<T>(
@@ -282,9 +433,9 @@ export async function publishToR2(
   console.log(`[r2]   - Latest: ${keys.latest}`);
   console.log(`[r2]   - Meta: ${keys.meta}`);
 
-  await writeJsonToR2(bucket, keys.snapshot, snapshot);
-  await writeJsonToR2(bucket, keys.latest, snapshot);
-  await writeJsonToR2(bucket, keys.meta, meta);
+  await writeJsonToR2IfChanged(bucket, keys.snapshot, snapshot);
+  await writeJsonToR2IfChanged(bucket, keys.latest, snapshot);
+  await writeJsonToR2IfChanged(bucket, keys.meta, meta);
 
   console.log("[r2] Publish complete");
 }

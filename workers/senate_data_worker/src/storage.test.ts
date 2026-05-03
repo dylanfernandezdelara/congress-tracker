@@ -10,6 +10,8 @@ import {
   buildStateKeys,
   publishToR2,
   readJsonFromR2,
+  writeJsonToR2IfChanged,
+  writeTextToR2IfMissing,
 } from "./storage";
 import type { MetaJson, SnapshotJson } from "./types";
 
@@ -74,7 +76,7 @@ describe("publishToR2", () => {
 
   it("writes snapshot, then latest, then meta with JSON content type", async () => {
     const put = vi.fn();
-    const bucket = { put } as unknown as R2Bucket;
+    const bucket = { get: vi.fn(async () => null), put } as unknown as R2Bucket;
 
     await publishToR2(bucket, snapshot, meta);
 
@@ -89,6 +91,57 @@ describe("publishToR2", () => {
         httpMetadata: { contentType: "application/json" },
       });
     }
+  });
+
+  it("skips unchanged JSON while ignoring volatile run timestamps", async () => {
+    const put = vi.fn();
+    const bucket = {
+      get: vi.fn(async () => ({
+        text: async () =>
+          JSON.stringify({
+            generated_at: "2026-01-05T00:00:00.000Z",
+            run_id: "run-old",
+            items: [{ id: "vote-1", title: "Same vote" }],
+          }),
+      })),
+      put,
+    } as unknown as R2Bucket;
+
+    await writeJsonToR2IfChanged(bucket, "briefings/latest.json", {
+      generated_at: "2026-01-05T01:00:00.000Z",
+      run_id: "run-new",
+      items: [{ id: "vote-1", title: "Same vote" }],
+    });
+
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("writes changed JSON when stable data differs", async () => {
+    const put = vi.fn();
+    const bucket = {
+      get: vi.fn(async () => ({
+        text: async () => JSON.stringify({ items: [{ id: "vote-1" }] }),
+      })),
+      put,
+    } as unknown as R2Bucket;
+
+    await writeJsonToR2IfChanged(bucket, "briefings/latest.json", {
+      items: [{ id: "vote-2" }],
+    });
+
+    expect(put).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips source artifacts that already exist", async () => {
+    const put = vi.fn();
+    const bucket = {
+      head: vi.fn(async () => ({ key: "sources/govinfo/example.txt" })),
+      put,
+    } as unknown as R2Bucket;
+
+    await writeTextToR2IfMissing(bucket, "sources/govinfo/example.txt", "cached");
+
+    expect(put).not.toHaveBeenCalled();
   });
 });
 
