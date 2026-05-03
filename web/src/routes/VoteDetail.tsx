@@ -43,6 +43,14 @@ function coverageLabel(value: VoteDetailResponse['source_coverage']['level']): s
   return 'Minimal context'
 }
 
+function summarySourceLabel(detail: VoteDetailResponse): string {
+  const basis = detail.vote_content_profile.source_basis
+  if (basis.includes('official_bill_summary')) return 'Official Congress.gov summary'
+  if (basis.includes('analysis_summary')) return 'Generated summary fallback'
+  if (basis.includes('bill_metadata_only')) return 'Bill metadata only'
+  return 'Vote question only'
+}
+
 function prettyStepType(value: string): string {
   return value.split('_').join(' ')
 }
@@ -206,6 +214,18 @@ export default function VoteDetail() {
               {detail.vote.question}
             </p>
 
+            <div className="note-panel mt-6 max-w-3xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="document-label">Summary</p>
+                <Badge variant="outline" className="normal-case tracking-normal">
+                  {summarySourceLabel(detail)}
+                </Badge>
+              </div>
+              <p className="mt-3 text-base leading-8 text-foreground">
+                {detail.vote_content_profile.public_impact_summary}
+              </p>
+            </div>
+
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <StatBlock label="Yea" value={detail.vote.tally.yea} className="border-emerald-950/10 bg-emerald-950/[0.04]" />
               <StatBlock label="Nay" value={detail.vote.tally.nay} className="border-rose-950/10 bg-rose-950/[0.04]" />
@@ -230,33 +250,6 @@ export default function VoteDetail() {
       )}
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Card className="h-full">
-          <CardContent className="px-6 py-6">
-            <p className="document-kicker">Ranking</p>
-            <h2 className="document-title mt-3 text-3xl font-semibold text-foreground">
-              Why this vote surfaced
-            </h2>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {detail.ranking_reasons.map((reason) => (
-                <Badge key={reason.code} variant="muted" className="normal-case tracking-normal">
-                  {reason.label}
-                </Badge>
-              ))}
-            </div>
-            <div className="mt-5 space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>
-                Procedural step:{' '}
-                <strong className="text-foreground">
-                  {prettyStepType(detail.procedural_context.step_type)}
-                </strong>
-              </p>
-              <p>
-                Result: <strong className="text-foreground">{detail.vote.result}</strong>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
         <Card className="h-full">
           <CardContent className="px-6 py-6">
             <p className="document-kicker">Party record</p>

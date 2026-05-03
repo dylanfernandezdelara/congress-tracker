@@ -16,8 +16,8 @@ function About() {
               Neutral context for the Senate votes that matter most.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-muted-foreground">
-              Senate Pulse is a public-interest briefing that ranks recent U.S. Senate votes and
-              explains what happened, why it mattered, and who broke party lines.
+              Senate Pulse summarizes recent U.S. Senate votes in plain language, using official bill
+              context when it is available, and links each item to fuller vote detail including party splits.
             </p>
           </div>
 
@@ -25,8 +25,8 @@ function About() {
             <div className="note-panel">
               <p className="document-label">Editorial stance</p>
               <p className="mt-3 text-sm leading-6 text-foreground">
-                The site is designed to read like a legislative briefing packet: official facts
-                first, explicit context gaps, and clear ranking logic.
+                The site is designed to read like a legislative briefing packet: official facts first
+                with explicit gaps when summaries are unavailable.
               </p>
             </div>
             <div className="note-panel">
@@ -53,9 +53,8 @@ function About() {
               where parties split, and when a result fits into a broader historical pattern.
             </p>
             <p className="mt-4 text-sm leading-7 text-muted-foreground sm:text-base">
-              It is intentionally designed as a ranked briefing rather than a dense dashboard. The
-              goal is to help you understand the most relevant Senate action first, then drill into
-              vote detail when you need more depth.
+              The homepage lists recent votes in chronological order—newest roll calls first—with
+              short summaries derived from Congress.gov-linked material wherever possible.
             </p>
           </CardContent>
         </Card>
@@ -66,9 +65,8 @@ function About() {
             <h2 className="document-title mt-3 text-3xl font-semibold text-foreground">What stays true</h2>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-muted-foreground">
               <li>Official-source facts first.</li>
-              <li>Explain rankings instead of hiding them.</li>
               <li>Show missing context explicitly when the record is thin.</li>
-              <li>Keep the landing page focused on the votes worth attention now.</li>
+              <li>Keep the landing page readable: date, title, and summary first.</li>
             </ul>
           </CardContent>
         </Card>

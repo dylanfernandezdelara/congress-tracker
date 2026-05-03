@@ -676,6 +676,57 @@ export interface ActivityIndexJson {
 }
 
 // ============================================================================
+// Vote content profile (deterministic relevance / read-model)
+// ============================================================================
+
+export type VoteContentTargetType =
+  | "bill"
+  | "amendment"
+  | "nomination"
+  | "resolution"
+  | "procedure"
+  | "unknown";
+
+export type VoteContentStage =
+  | "final_passage"
+  | "amendment_vote"
+  | "budget_waiver"
+  | "cloture"
+  | "motion_to_proceed"
+  | "motion_to_discharge"
+  | "confirmation"
+  | "other";
+
+export type VoteContentConfidence = "high" | "medium" | "low";
+
+export type VoteSourceBasis =
+  | "official_bill_summary"
+  | "bill_metadata_only"
+  | "amendment_text"
+  | "vote_question"
+  | "congressional_record"
+  | "impact_evidence"
+  | "analysis_summary"
+  | "unknown";
+
+export interface VoteContentProfile {
+  vote_id: string;
+  congress: number;
+  session: number;
+  vote_number: number;
+  vote_date: string;
+  target_type: VoteContentTargetType;
+  stage: VoteContentStage;
+  plain_action: string;
+  official_summary: string | null;
+  public_impact_summary: string;
+  policy_topics: string[];
+  affected_groups: string[];
+  content_confidence: VoteContentConfidence;
+  source_basis: VoteSourceBasis[];
+}
+
+// ============================================================================
 // Vote Ledger & Session Overview (chamber-wide)
 // ============================================================================
 

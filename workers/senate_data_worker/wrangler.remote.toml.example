@@ -1,0 +1,37 @@
+# Copy to workers/senate_data_worker/wrangler.remote.toml (git-ignored) and fill
+# in the real production D1 database_id and R2 bucket name from the Cloudflare
+# dashboard. This config is used by `npm run dev` (DEV_MODE=live) via:
+#
+#   wrangler dev --config wrangler.remote.toml --remote
+#
+# so the local API worker reads from REAL production R2 + D1 instead of
+# Miniflare. Do NOT deploy with this config; deploys still use wrangler.toml.
+
+name = "senate-data-api-worker"
+main = "src/api-index.ts"
+compatibility_date = "2025-12-10"
+
+[limits]
+cpu_ms = 300000
+
+[vars]
+CONGRESS = "119"
+SESSION = "2"
+TARGET_STATE = "ALL"
+# Optional: if you want to hit pipeline admin endpoints locally against --remote,
+# set the same token your deployed pipeline worker has. Normally not needed here
+# since this config boots the API worker only.
+# PIPELINE_ADMIN_TOKEN = ""
+
+[[r2_buckets]]
+binding = "DATA_BUCKET"
+# Replace with the real production bucket name (matches what the deployed
+# wrangler.toml binds to in your CF account):
+bucket_name = "REPLACE_WITH_PROD_BUCKET_NAME"
+
+[[d1_databases]]
+binding = "SENATE_DB"
+# Replace with the real production database name + id from the Cloudflare
+# dashboard (D1 > your database > "database_id"):
+database_name = "REPLACE_WITH_PROD_DB_NAME"
+database_id = "REPLACE_WITH_PROD_DB_ID"

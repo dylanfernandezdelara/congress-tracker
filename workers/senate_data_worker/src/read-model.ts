@@ -1,28 +1,22 @@
-import type {
-  ActivityIndexJson,
-  BillAnalysis,
-  BillRef,
-  PartyPositionAnalysis,
-  SessionOverview,
-  VoteLedger,
-  VoteLedgerEntry,
-} from "./types";
+import type { ActivityIndexJson, BillRef, PartyPositionAnalysis, SessionOverview, VoteLedger, VoteLedgerEntry } from "./types";
 import type {
   ArgumentExcerpt,
   BriefingCrossover,
   BriefingFeedItem,
   BriefingFeedResponse,
-  BriefingRankingReason,
   BriefingVoteSummary,
   PartyArgumentSummary,
   PipelineMaterialization,
-  SignificanceLevel,
   SourceCoverage,
   VoteCast,
   VoteDetailResponse,
   VotePartyBreakdown,
   VoteStatus,
 } from "./platform-types";
+import { buildVoteContentContext, describeProcedure } from "./vote-content-profile";
+
+/** Homepage feed caps at this many votes, newest date first (no relevance ranking). */
+export const BRIEFING_FEED_ITEM_LIMIT = 15;
 
 function classifyVote(raw: string | undefined): VoteCast {
   const lc = (raw ?? "").trim().toLowerCase();
@@ -42,11 +36,6 @@ function isPassed(result: string): boolean {
 
 function toStatus(result: string): VoteStatus {
   return isPassed(result) ? "passed" : "rejected";
-}
-
-function normalizeSignificance(value: BillAnalysis["significance"] | undefined): SignificanceLevel {
-  if (value === "high" || value === "medium" || value === "low") return value;
-  return "medium";
 }
 
 function buildBillLookup(activities: ActivityIndexJson | null): Map<number, BillRef> {
@@ -71,9 +60,7 @@ function cleanSummary(bill: BillRef | undefined): string | null {
     return cleaned.replace(new RegExp(`^${escapedTitle}\\s*[:.-]*\\s*`, "i"), "").trim() || cleaned;
   };
 
-  const analysisSummary = normalizeSummary(bill?.analysis?.plain_summary);
-  if (analysisSummary) return analysisSummary;
-  return normalizeSummary(bill?.summary);
+  return normalizeSummary(bill?.summary) ?? normalizeSummary(bill?.analysis?.plain_summary);
 }
 
 function extractCategory(entry: VoteLedgerEntry, bill: BillRef | undefined): string {
@@ -85,42 +72,6 @@ function extractCategory(entry: VoteLedgerEntry, bill: BillRef | undefined): str
     (procedure ? "Floor Procedure" : undefined) ||
     (entry.issue?.startsWith("PN") ? "Nomination" : "Senate business")
   );
-}
-
-type ProcedureKind =
-  | "motion_to_discharge"
-  | "point_of_order"
-  | "motion_to_proceed"
-  | "cloture"
-  | "motion_to_table"
-  | "procedural_vote";
-
-interface ProcedureDescriptor {
-  kind: ProcedureKind;
-  label: string;
-}
-
-function describeProcedure(entry: VoteLedgerEntry): ProcedureDescriptor | null {
-  const text = `${entry.title} ${entry.question}`.toLowerCase();
-  if (text.includes("motion to discharge")) {
-    return { kind: "motion_to_discharge", label: "Motion to discharge" };
-  }
-  if (text.includes("point of order")) {
-    return { kind: "point_of_order", label: "Point of order" };
-  }
-  if (text.includes("motion to proceed")) {
-    return { kind: "motion_to_proceed", label: "Motion to proceed" };
-  }
-  if (text.includes("cloture")) {
-    return { kind: "cloture", label: "Cloture vote" };
-  }
-  if (text.includes("motion to table")) {
-    return { kind: "motion_to_table", label: "Motion to table" };
-  }
-  if (/privilege status|reconsider|appeal.*chair|discharge|table|procedural/.test(text)) {
-    return { kind: "procedural_vote", label: "Procedural vote" };
-  }
-  return null;
 }
 
 function extractConfirmationTarget(title: string): string | null {
@@ -395,91 +346,9 @@ function buildCoverage(bill: BillRef | undefined, hasRecordData = false, hasFloo
   };
 }
 
-function buildReasons(
-  entry: VoteLedgerEntry,
-  bill: BillRef | undefined,
-  tally: BriefingVoteSummary,
-  crossovers: BriefingCrossover[],
-  referenceDate: string
-): { score: number; reasons: BriefingRankingReason[]; significance: SignificanceLevel } {
-  const significance = normalizeSignificance(bill?.analysis?.significance);
-  const reasons: BriefingRankingReason[] = [];
-  let score = significance === "high" ? 55 : significance === "medium" ? 35 : 20;
-  const procedure = describeProcedure(entry);
-  const confirmationTarget = extractConfirmationTarget(entry.title);
-  const contextText = [
-    entry.title,
-    entry.question,
-    entry.issue,
-    bill?.title,
-    bill?.policy_area,
-    bill?.analysis?.category,
-    bill?.analysis?.why_it_matters,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  const isNomination = Boolean(confirmationTarget) || Boolean(entry.issue?.startsWith("PN"));
-  const hasBillContext = Boolean(cleanSummary(bill) || bill?.analysis?.why_it_matters || bill?.policy_area || entry.policy_area);
-  const isNationalSecurityVote = /war|armed|defense|military|security|foreign|border|immigration/.test(contextText);
-  const isHighImpactNomination =
-    isNomination &&
-    /federal reserve|powell|supreme court|court of appeals|circuit judge|secretary|attorney general|solicitor general|administrator|director|commissioner|chairman|chairperson|chair of the|trade representative|surgeon general|joint chiefs|treasury|commerce|secretary of state|department of state|defense|homeland security|energy|labor|education|transportation|interior|agriculture|health and human services|epa|omb|cia|fbi|sec\b|cftc|fdic/.test(
-      contextText
-    );
-  const isRoutineJudicialNomination =
-    isNomination && /district judge|district court|u\.s\. district judge|united states district judge/.test(contextText);
-
-  if (Math.abs(tally.yea - tally.nay) <= 5) {
-    score += 14;
-    reasons.push({ code: "close_vote", label: "Close vote" });
-  }
-
-  if (crossovers.length > 0) {
-    score += Math.min(12, crossovers.length * 3);
-    reasons.push({ code: "cross_party", label: "Cross-party votes" });
-  }
-
-  if (isNationalSecurityVote) {
-    score += 10;
-    reasons.push({ code: "national_security", label: "National security implications" });
-  }
-
-  if (isHighImpactNomination || (!isNomination && /federal reserve|powell|chair of the/.test(contextText))) {
-    score += 10;
-    reasons.push({ code: "institutional", label: "Institutional significance" });
-  }
-
-  if (isNomination && !isHighImpactNomination) {
-    score -= isRoutineJudicialNomination ? 12 : 6;
-  }
-
-  if (procedure && !hasBillContext) {
-    score -= 10;
-  }
-
-  if (bill?.analysis?.affects?.length) {
-    score += 6;
-    reasons.push({ code: "broad_impact", label: "Broad public impact" });
-  }
-
-  const dayDelta = Math.max(
-    0,
-    Math.round(
-      (new Date(`${referenceDate}T00:00:00Z`).getTime() - new Date(`${entry.vote_date}T00:00:00Z`).getTime()) /
-        86_400_000
-    )
-  );
-  score += Math.max(0, 8 - dayDelta);
-  if (dayDelta <= 1) reasons.push({ code: "recent", label: "Very recent vote" });
-
-  if (reasons.length === 0) reasons.push({ code: "recent_activity", label: "Recent Senate activity" });
-  return { score, reasons, significance };
-}
-
 function buildSummary(entry: VoteLedgerEntry, bill: BillRef | undefined, tally: BriefingVoteSummary): string {
-  const analysisSummary = cleanSummary(bill);
-  if (analysisSummary) return analysisSummary;
+  const summary = cleanSummary(bill);
+  if (summary) return summary;
 
   const confirmationTarget = extractConfirmationTarget(entry.title);
   if (confirmationTarget) {
@@ -493,39 +362,39 @@ function buildSummary(entry: VoteLedgerEntry, bill: BillRef | undefined, tally: 
   const procedure = describeProcedure(entry);
   const issueLabel = buildIssueLabel(entry, bill);
   if (procedure?.kind === "motion_to_discharge") {
-    return `The Senate voted ${tally.yea}-${tally.nay} on whether to pull ${issueLabel} out of committee for floor consideration. This was a procedural step, not final passage.`;
+    return `The Senate voted ${tally.yea}-${tally.nay} on whether to pull ${issueLabel} out of committee for floor consideration. No official bill summary is available in the current feed.`;
   }
   if (procedure?.kind === "point_of_order") {
-    return `The Senate voted ${tally.yea}-${tally.nay} on a parliamentary ruling tied to ${issueLabel} and whether it qualified for privileged floor consideration. This was not the final policy vote.`;
+    return `The Senate voted ${tally.yea}-${tally.nay} on a parliamentary ruling tied to ${issueLabel}. No official bill summary is available in the current feed.`;
   }
   if (procedure?.kind === "motion_to_proceed") {
-    return `The Senate voted ${tally.yea}-${tally.nay} on whether to open floor debate on ${issueLabel}. This was a gateway vote rather than final passage.`;
+    return `The Senate voted ${tally.yea}-${tally.nay} on whether to open floor debate on ${issueLabel}. No official bill summary is available in the current feed.`;
   }
   if (procedure?.kind === "cloture") {
-    return `The Senate voted ${tally.yea}-${tally.nay} on whether to limit debate and move ${issueLabel} toward a final vote. This was a procedural vote on floor timing, not the underlying measure itself.`;
+    return `The Senate voted ${tally.yea}-${tally.nay} on whether to limit debate and move ${issueLabel} toward a final vote. No official bill summary is available in the current feed.`;
   }
   if (procedure) {
-    return `The Senate voted ${tally.yea}-${tally.nay} on a floor procedure related to ${issueLabel}. The current data does not yet include enough bill-level context to explain the underlying policy dispute.`;
+    return `The Senate voted ${tally.yea}-${tally.nay} on a floor procedure related to ${issueLabel}. No official bill summary is available in the current feed.`;
   }
 
   if (Math.abs(tally.yea - tally.nay) <= 5) {
-    return `The Senate voted ${tally.yea}-${tally.nay} on this measure, but the current data does not yet include enough bill-level context to explain its policy effects.`;
+    return `The Senate voted ${tally.yea}-${tally.nay} on this measure. No official bill summary is available in the current feed.`;
   }
 
-  return `The Senate recorded a ${tally.yea}-${tally.nay} vote, but the current data does not yet include enough bill-level context to explain the measure.`;
+  return `The Senate recorded a ${tally.yea}-${tally.nay} vote. No official bill summary is available in the current feed.`;
 }
 
 function buildFeedItem(
   ledger: VoteLedger,
   overview: SessionOverview,
   entry: VoteLedgerEntry,
-  billLookup: Map<number, BillRef>,
-  referenceDate: string
+  billLookup: Map<number, BillRef>
 ): BriefingFeedItem {
   const bill = billLookup.get(entry.vote_number);
   const tally = computeTallies(entry, overview);
   const crossovers = computeCrossovers(entry, overview);
-  const { score, reasons, significance } = buildReasons(entry, bill, tally, crossovers, referenceDate);
+  const procedure = describeProcedure(entry);
+  const { profile, significance } = buildVoteContentContext(ledger, entry, bill, procedure);
   const summary = buildSummary(entry, bill, tally);
   const category = extractCategory(entry, bill);
   const status = toStatus(entry.result);
@@ -545,10 +414,12 @@ function buildFeedItem(
     bill,
     tally,
     crossed_party_lines: crossovers,
-    ranking_reasons: reasons,
     source_coverage: buildCoverage(bill),
     detail_path: `/votes/${ledger.congress}/${ledger.session}/${entry.vote_number}`,
-    score,
+    plain_action: profile.plain_action,
+    public_impact_summary: profile.public_impact_summary,
+    content_confidence: profile.content_confidence,
+    source_basis: profile.source_basis,
   };
 }
 
@@ -657,18 +528,27 @@ function detectStepType(entry: VoteLedgerEntry): string {
   return "vote";
 }
 
+/** All ledger votes as feed items, newest vote date first (tie-break: higher roll call number first). */
+export function buildBriefingFeedItemsSortedByDate(
+  ledger: VoteLedger,
+  overview: SessionOverview,
+  activities: ActivityIndexJson | null
+): { sorted: BriefingFeedItem[]; billLookup: Map<number, BillRef> } {
+  const billLookup = buildBillLookup(activities);
+  const sorted = ledger.entries
+    .map((entry) => buildFeedItem(ledger, overview, entry, billLookup))
+    .sort((a, b) => b.vote_date.localeCompare(a.vote_date) || b.vote_number - a.vote_number);
+  return { sorted, billLookup };
+}
+
 export function buildBriefingFeedResponse(
   ledger: VoteLedger,
   overview: SessionOverview,
   activities: ActivityIndexJson | null,
   source: BriefingFeedResponse["source"] = "derived"
 ): BriefingFeedResponse {
-  const billLookup = buildBillLookup(activities);
-  const referenceDate = overview.latest_vote_date || ledger.entries[0]?.vote_date || new Date().toISOString().slice(0, 10);
-  const items = ledger.entries
-    .map((entry) => buildFeedItem(ledger, overview, entry, billLookup, referenceDate))
-    .sort((a, b) => b.score - a.score || b.vote_date.localeCompare(a.vote_date))
-    .slice(0, 10);
+  const { sorted } = buildBriefingFeedItemsSortedByDate(ledger, overview, activities);
+  const items = sorted.slice(0, BRIEFING_FEED_ITEM_LIMIT);
 
   return {
     generated_at: new Date().toISOString(),
@@ -695,7 +575,8 @@ export function buildVoteDetailResponse(
   const tally = computeTallies(entry, overview);
   const crossovers = computeCrossovers(entry, overview);
   const partyBreakdown = computePartyBreakdown(entry, overview);
-  const feedItem = buildFeedItem(ledger, overview, entry, billLookup, overview.latest_vote_date || entry.vote_date);
+  const feedItem = buildFeedItem(ledger, overview, entry, billLookup);
+  const voteContentProfile = buildVoteContentContext(ledger, entry, bill, describeProcedure(entry)).profile;
   const threadKey = buildThreadKey(entry, bill);
   const issueKey = buildIssueKey(entry, bill);
   const issueTitle = buildIssueTitle(entry, bill);
@@ -732,6 +613,7 @@ export function buildVoteDetailResponse(
   return {
     generated_at: new Date().toISOString(),
     source,
+    vote_content_profile: voteContentProfile,
     vote: {
       id: feedItem.id,
       congress: ledger.congress,
@@ -763,7 +645,6 @@ export function buildVoteDetailResponse(
       related_votes: relatedVotes,
     },
     arguments: buildArguments(bill, partyBreakdown, feedItem.status),
-    ranking_reasons: feedItem.ranking_reasons,
     source_coverage: buildCoverage(bill),
   };
 }

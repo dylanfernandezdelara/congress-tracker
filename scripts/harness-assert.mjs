@@ -8,6 +8,8 @@ const pipelineUrl = process.env.HARNESS_PIPELINE_URL ?? 'http://127.0.0.1:8788'
 const expectedVoteId = process.env.HARNESS_EXPECTED_VOTE_ID ?? '119:2:14'
 const expectedVoteNumber = process.env.HARNESS_EXPECTED_VOTE_NUMBER ?? '14'
 const expectedVoteTitle = process.env.HARNESS_EXPECTED_VOTE_TITLE ?? 'Border Infrastructure Modernization Act'
+/** When "1", skip GET pipeline /__pipeline/status (used after sequential harness ingest stops the pipeline worker). */
+const skipPipelineStatus = process.env.HARNESS_ASSERT_SKIP_PIPELINE_STATUS === '1'
 
 async function fetchJson(url) {
   const response = await fetch(url)
@@ -39,10 +41,12 @@ async function main() {
   assert(health.response.ok, `API health failed (${health.response.status})`)
   assert(health.json?.status === 'ok', 'API health payload did not report ok')
 
-  const pipelineStatus = await fetchJson(`${pipelineUrl}/__pipeline/status`)
-  await writeArtifact('pipeline-status.json', pipelineStatus.json ?? pipelineStatus.text)
-  assert(pipelineStatus.response.ok, `Pipeline status failed (${pipelineStatus.response.status})`)
-  assert(pipelineStatus.json?.status === 'ok', 'Pipeline status payload did not report ok')
+  if (!skipPipelineStatus) {
+    const pipelineStatus = await fetchJson(`${pipelineUrl}/__pipeline/status`)
+    await writeArtifact('pipeline-status.json', pipelineStatus.json ?? pipelineStatus.text)
+    assert(pipelineStatus.response.ok, `Pipeline status failed (${pipelineStatus.response.status})`)
+    assert(pipelineStatus.json?.status === 'ok', 'Pipeline status payload did not report ok')
+  }
 
   const briefing = await fetchJson(`${apiUrl}/briefings/latest.json`)
   await writeArtifact('briefing-latest.json', briefing.json ?? briefing.text)

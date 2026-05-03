@@ -22,6 +22,22 @@ function createBucket() {
 const detail: VoteDetailResponse = {
   generated_at: "2026-03-08T12:00:00.000Z",
   source: "derived",
+  vote_content_profile: {
+    vote_id: "119:2:14",
+    congress: 119,
+    session: 2,
+    vote_number: 14,
+    vote_date: "2026-03-07",
+    target_type: "bill",
+    stage: "final_passage",
+    plain_action: "The Senate passed S. 303.",
+    official_summary: "Modernizes inspection and screening infrastructure at ports of entry.",
+    public_impact_summary: "Modernizes inspection and screening infrastructure at ports of entry.",
+    policy_topics: ["immigration"],
+    affected_groups: [],
+    content_confidence: "high",
+    source_basis: ["official_bill_summary", "vote_question"],
+  },
   vote: {
     id: "119:2:14",
     congress: 119,
@@ -67,7 +83,6 @@ const detail: VoteDetailResponse = {
     parties: [],
     excerpts: [],
   },
-  ranking_reasons: [],
   source_coverage: {
     level: "partial",
     vote_data: true,

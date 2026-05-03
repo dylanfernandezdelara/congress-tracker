@@ -14,10 +14,13 @@
     "fixtures:harness:refresh": "node scripts/refresh-harness-fixtures.mjs",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "briefing:feed": "tsx scripts/print-briefing-feed.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260103.0",
+    "@types/node": "^22.19.17",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16",
     "wrangler": "^4.54.0"

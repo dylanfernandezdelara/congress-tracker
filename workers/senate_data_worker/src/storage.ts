@@ -196,34 +196,41 @@ export async function readJsonFromR2<T>(
   bucket: R2Bucket,
   key: string
 ): Promise<T | null> {
-  const object = await bucket.get(key);
-  if (!object) {
-    return null;
-  }
-  let text: string;
   try {
-    text = await object.text();
+    const object = await bucket.get(key);
+    if (!object) {
+      return null;
+    }
+    let text: string;
+    try {
+      text = await object.text();
+    } catch (error) {
+      console.error(
+        `[r2] Failed to read object text for ${key}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return null;
+    }
+
+    if (!text.trim()) {
+      console.warn(`[r2] Empty JSON payload for ${key}`);
+      return null;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch (error) {
+      console.error(
+        `[r2] Invalid JSON payload for ${key}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return null;
+    }
   } catch (error) {
     console.error(
-      `[r2] Failed to read object text for ${key}: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-    return null;
-  }
-
-  if (!text.trim()) {
-    console.warn(`[r2] Empty JSON payload for ${key}`);
-    return null;
-  }
-
-  try {
-    return JSON.parse(text) as T;
-  } catch (error) {
-    console.error(
-      `[r2] Invalid JSON payload for ${key}: ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      `[r2] Failed to read object ${key}: ${error instanceof Error ? error.message : String(error)}`
     );
     return null;
   }
@@ -233,19 +240,26 @@ export async function readTextFromR2(
   bucket: R2Bucket,
   key: string
 ): Promise<string | null> {
-  const object = await bucket.get(key);
-  if (!object) {
-    return null;
-  }
-
   try {
-    const text = await object.text();
-    return text.trim() ? text : null;
+    const object = await bucket.get(key);
+    if (!object) {
+      return null;
+    }
+
+    try {
+      const text = await object.text();
+      return text.trim() ? text : null;
+    } catch (error) {
+      console.error(
+        `[r2] Failed to read object text for ${key}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return null;
+    }
   } catch (error) {
     console.error(
-      `[r2] Failed to read object text for ${key}: ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      `[r2] Failed to read object ${key}: ${error instanceof Error ? error.message : String(error)}`
     );
     return null;
   }

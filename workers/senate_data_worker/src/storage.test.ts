@@ -133,5 +133,16 @@ describe("readJsonFromR2", () => {
     const parsed = await readJsonFromR2(bucket, "empty");
     expect(parsed).toBeNull();
   });
+
+  it("returns null when bucket.get throws (resilient to R2 runtime flakes)", async () => {
+    const bucket = {
+      get: vi.fn(async () => {
+        throw new Error("internal error; reference = test");
+      }),
+    } as unknown as R2Bucket;
+
+    const parsed = await readJsonFromR2(bucket, "any-key");
+    expect(parsed).toBeNull();
+  });
 });
 

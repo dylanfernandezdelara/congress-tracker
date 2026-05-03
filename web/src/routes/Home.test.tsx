@@ -37,10 +37,6 @@ function makeItem(overrides: Partial<BriefingFeedItem> = {}): BriefingFeedItem {
       absent: 0,
     },
     crossed_party_lines: [],
-    ranking_reasons: [
-      { code: 'impact', label: 'Broad national impact' },
-      { code: 'coalition', label: 'Cross-party movement' },
-    ],
     source_coverage: {
       level: 'full',
       vote_data: true,
@@ -50,7 +46,10 @@ function makeItem(overrides: Partial<BriefingFeedItem> = {}): BriefingFeedItem {
       model_summary: true,
     },
     detail_path: '/votes/201',
-    score: 98,
+    plain_action: 'The Senate passed the measure.',
+    public_impact_summary: 'Provides emergency supplemental funding for a federal response program.',
+    content_confidence: 'high',
+    source_basis: ['official_bill_summary', 'vote_question'],
     ...overrides,
   }
 }
@@ -90,7 +89,7 @@ describe('Home', () => {
     vi.unstubAllGlobals()
   })
 
-  it('does not promote stale votes as the lead briefing item', async () => {
+  it('falls back to older ledger votes when none fall inside the freshness window', async () => {
     fetchLatestBriefing.mockResolvedValue(
       makeBriefing([
         makeItem({
@@ -110,8 +109,8 @@ describe('Home', () => {
     )
 
     expect(await screen.findByText(/Washington,\s*D\.C\./)).toBeInTheDocument()
-    expect(screen.getByText('No current briefing to promote')).toBeInTheDocument()
-    expect(screen.queryByText('War powers resolution')).not.toBeInTheDocument()
+    expect(screen.getByText('Older votes in the ledger')).toBeInTheDocument()
+    expect(screen.getByText('War powers resolution')).toBeInTheDocument()
   })
 
   it('shows a recent vote as the lead briefing item when it falls inside the freshness window', async () => {
@@ -135,6 +134,6 @@ describe('Home', () => {
 
     expect(await screen.findByText(/Washington,\s*D\.C\./)).toBeInTheDocument()
     expect(screen.getByText('Rail safety package')).toBeInTheDocument()
-    expect(screen.queryByText('No current briefing to promote')).not.toBeInTheDocument()
+    expect(screen.queryByText('Older votes in the ledger')).not.toBeInTheDocument()
   })
 })

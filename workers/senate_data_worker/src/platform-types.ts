@@ -1,4 +1,4 @@
-import type { BillRef, PartyPositionAnalysis } from "./types";
+import type { BillRef, PartyPositionAnalysis, VoteContentConfidence, VoteContentProfile, VoteSourceBasis } from "./types";
 
 export type VoteCast = "yea" | "nay" | "present" | "notVoting";
 export type VoteStatus = "passed" | "rejected" | "in-progress";
@@ -19,11 +19,6 @@ export interface SourceCoverage {
   floor_logs: boolean;
   model_summary: boolean;
   note?: string;
-}
-
-export interface BriefingRankingReason {
-  code: string;
-  label: string;
 }
 
 export interface BriefingCrossover {
@@ -56,10 +51,12 @@ export interface BriefingFeedItem {
   bill?: BillRef;
   tally: BriefingVoteSummary;
   crossed_party_lines: BriefingCrossover[];
-  ranking_reasons: BriefingRankingReason[];
   source_coverage: SourceCoverage;
   detail_path: string;
-  score: number;
+  plain_action: string;
+  public_impact_summary: string;
+  content_confidence: VoteContentConfidence;
+  source_basis: VoteSourceBasis[];
 }
 
 export interface BriefingFeedResponse {
@@ -111,6 +108,7 @@ export interface PartyArgumentSummary {
 export interface VoteDetailResponse {
   generated_at: string;
   source: "d1" | "r2" | "derived";
+  vote_content_profile: VoteContentProfile;
   vote: {
     id: string;
     congress: number;
@@ -147,7 +145,6 @@ export interface VoteDetailResponse {
     parties: PartyArgumentSummary[];
     excerpts: ArgumentExcerpt[];
   };
-  ranking_reasons: BriefingRankingReason[];
   source_coverage: SourceCoverage;
 }
 
