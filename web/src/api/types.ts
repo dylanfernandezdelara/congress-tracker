@@ -613,11 +613,6 @@ export interface SourceCoverage {
   note?: string
 }
 
-export interface BriefingRankingReason {
-  code: string
-  label: string
-}
-
 export interface BriefingCrossover {
   bioguide_id: string
   name: string
@@ -631,6 +626,35 @@ export interface BriefingVoteSummary {
   nay: number
   present: number
   absent: number
+}
+
+export type VoteContentConfidence = 'high' | 'medium' | 'low'
+
+export type VoteSourceBasis =
+  | 'official_bill_summary'
+  | 'bill_metadata_only'
+  | 'amendment_text'
+  | 'vote_question'
+  | 'congressional_record'
+  | 'impact_evidence'
+  | 'analysis_summary'
+  | 'unknown'
+
+export interface VoteContentProfile {
+  vote_id: string
+  congress: number
+  session: number
+  vote_number: number
+  vote_date: string
+  target_type: string
+  stage: string
+  plain_action: string
+  official_summary: string | null
+  public_impact_summary: string
+  policy_topics: string[]
+  affected_groups: string[]
+  content_confidence: VoteContentConfidence
+  source_basis: VoteSourceBasis[]
 }
 
 export interface BriefingFeedItem {
@@ -648,10 +672,12 @@ export interface BriefingFeedItem {
   bill?: BillRef
   tally: BriefingVoteSummary
   crossed_party_lines: BriefingCrossover[]
-  ranking_reasons: BriefingRankingReason[]
   source_coverage: SourceCoverage
   detail_path: string
-  score: number
+  plain_action: string
+  public_impact_summary: string
+  content_confidence: VoteContentConfidence
+  source_basis: VoteSourceBasis[]
 }
 
 export interface BriefingFeedResponse {
@@ -710,6 +736,7 @@ export interface PartyArgumentSummaryView {
 export interface VoteDetailResponse {
   generated_at: string
   source: 'd1' | 'r2' | 'derived'
+  vote_content_profile: VoteContentProfile
   vote: {
     id: string
     congress: number
@@ -746,6 +773,5 @@ export interface VoteDetailResponse {
     parties: PartyArgumentSummaryView[]
     excerpts: ArgumentExcerpt[]
   }
-  ranking_reasons: BriefingRankingReason[]
   source_coverage: SourceCoverage
 }

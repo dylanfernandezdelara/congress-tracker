@@ -4,7 +4,7 @@ import { isHarnessFixtureMode, resolveHarnessFixtureResponse } from "./harness";
 import {
   buildSourceArtifactKey,
   readTextFromR2,
-  writeTextToR2,
+  writeTextToR2IfMissing,
 } from "./storage";
 
 export interface SourceCacheEnv {
@@ -216,7 +216,7 @@ export async function fetchSourceArtifactText(
   if (networkResult.text) {
     const extension = inferExtension(request.extension, request.requestUrl, networkResult.contentType);
     const artifactKey = buildSourceArtifactKey(request.source, request.entityKey, fetchedAt, extension);
-    await writeTextToR2(env.DATA_BUCKET, artifactKey, networkResult.text, {
+    await writeTextToR2IfMissing(env.DATA_BUCKET, artifactKey, networkResult.text, {
       contentType: networkResult.contentType,
     });
 

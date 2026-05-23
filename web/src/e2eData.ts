@@ -8,6 +8,7 @@ import type {
   MemberIndexEntry,
   SessionOverview,
   StateVotesResponse,
+  VoteContentProfile,
   VoteDetailResponse,
   VoteLedger,
 } from './api'
@@ -15,6 +16,23 @@ import type {
 const E2E_GENERATED_AT = '2026-01-19T18:00:00Z'
 const E2E_CONGRESS = 119
 const E2E_SESSION = 2
+
+function e2eVoteContentProfile(
+  base: Pick<VoteContentProfile, 'vote_id' | 'vote_number' | 'vote_date' | 'plain_action' | 'public_impact_summary'>
+): VoteContentProfile {
+  return {
+    congress: E2E_CONGRESS,
+    session: E2E_SESSION,
+    target_type: 'bill',
+    stage: 'final_passage',
+    official_summary: null,
+    policy_topics: [],
+    affected_groups: [],
+    content_confidence: 'medium',
+    source_basis: ['vote_question'],
+    ...base,
+  }
+}
 
 const WINDOW = {
   start_date: '2025-12-20',
@@ -272,10 +290,6 @@ export const E2E_BRIEFING: BriefingFeedResponse = {
       bill: E2E_ACTIVITIES.activities[0].bill,
       tally: { yea: 2, nay: 2, present: 0, absent: 0 },
       crossed_party_lines: [],
-      ranking_reasons: [
-        { code: 'close_vote', label: 'Close vote' },
-        { code: 'national_security', label: 'National security implications' },
-      ],
       source_coverage: {
         level: 'partial',
         vote_data: true,
@@ -286,7 +300,11 @@ export const E2E_BRIEFING: BriefingFeedResponse = {
         note: 'Vote and bill context are available, but excerpt-level official sources are limited in demo mode.',
       },
       detail_path: '/votes/119/2/14',
-      score: 87,
+      plain_action: 'The Senate passed Border Infrastructure Modernization Act.',
+      public_impact_summary:
+        'Funds major improvements at border entry points to handle travel and trade more effectively.',
+      content_confidence: 'high',
+      source_basis: ['official_bill_summary', 'vote_question'],
     },
     {
       id: '119:2:12',
@@ -311,10 +329,6 @@ export const E2E_BRIEFING: BriefingFeedResponse = {
           vote_cast: 'yea',
         },
       ],
-      ranking_reasons: [
-        { code: 'cross_party', label: 'Cross-party votes' },
-        { code: 'broad_impact', label: 'Broad public impact' },
-      ],
       source_coverage: {
         level: 'partial',
         vote_data: true,
@@ -324,7 +338,11 @@ export const E2E_BRIEFING: BriefingFeedResponse = {
         model_summary: true,
       },
       detail_path: '/votes/119/2/12',
-      score: 74,
+      plain_action: 'The Senate passed Clean Transit Access Act.',
+      public_impact_summary:
+        'Creates grants to help transit agencies replace older fleets with zero-emission vehicles.',
+      content_confidence: 'high',
+      source_basis: ['official_bill_summary', 'vote_question'],
     },
   ],
 }
@@ -333,6 +351,13 @@ export const E2E_VOTE_DETAILS: Record<string, VoteDetailResponse> = {
   '119:2:14': {
     generated_at: E2E_GENERATED_AT,
     source: 'derived',
+    vote_content_profile: e2eVoteContentProfile({
+      vote_id: '119:2:14',
+      vote_number: 14,
+      vote_date: '2026-01-17',
+      plain_action: 'The Senate passed the Border Infrastructure bill (demo).',
+      public_impact_summary: 'Demo: border infrastructure modernization.',
+    }),
     vote: {
       id: '119:2:14',
       congress: E2E_CONGRESS,
@@ -390,10 +415,6 @@ export const E2E_VOTE_DETAILS: Record<string, VoteDetailResponse> = {
       ],
       excerpts: [],
     },
-    ranking_reasons: [
-      { code: 'close_vote', label: 'Close vote' },
-      { code: 'national_security', label: 'National security implications' },
-    ],
     source_coverage: {
       level: 'partial',
       vote_data: true,
@@ -407,6 +428,13 @@ export const E2E_VOTE_DETAILS: Record<string, VoteDetailResponse> = {
   '119:2:12': {
     generated_at: E2E_GENERATED_AT,
     source: 'derived',
+    vote_content_profile: e2eVoteContentProfile({
+      vote_id: '119:2:12',
+      vote_number: 12,
+      vote_date: '2026-01-15',
+      plain_action: 'The Senate passed the Clean Transit bill (demo).',
+      public_impact_summary: 'Demo: clean transit fleet modernization.',
+    }),
     vote: {
       id: '119:2:12',
       congress: E2E_CONGRESS,
@@ -470,10 +498,6 @@ export const E2E_VOTE_DETAILS: Record<string, VoteDetailResponse> = {
       ],
       excerpts: [],
     },
-    ranking_reasons: [
-      { code: 'cross_party', label: 'Cross-party votes' },
-      { code: 'broad_impact', label: 'Broad public impact' },
-    ],
     source_coverage: {
       level: 'partial',
       vote_data: true,

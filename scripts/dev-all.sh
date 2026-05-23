@@ -11,6 +11,7 @@ PIPELINE_HOST="${PIPELINE_HOST:-127.0.0.1}"
 PIPELINE_PORT="${PIPELINE_PORT:-8788}"
 PIPELINE_INSPECTOR_PORT="${PIPELINE_INSPECTOR_PORT:-9230}"
 WAIT_FOR_READY="${WAIT_FOR_READY:-1}"
+AUTO_REFRESH_LOCAL_DATA="${AUTO_REFRESH_LOCAL_DATA:-1}"
 
 WORKER_URL="http://${WORKER_HOST}:${WORKER_PORT}/health"
 PIPELINE_URL="http://${PIPELINE_HOST}:${PIPELINE_PORT}/health"
@@ -82,6 +83,17 @@ if [[ "$WAIT_FOR_READY" == "1" ]]; then
   wait_for_url "$WORKER_URL" "api worker"
   wait_for_url "$PIPELINE_URL" "pipeline worker"
   wait_for_url "$WEB_URL" "web"
+fi
+
+if [[ "$AUTO_REFRESH_LOCAL_DATA" == "1" ]]; then
+  echo "Checking whether local vote data needs ingestion…"
+  export API_URL="${API_URL:-http://${WORKER_HOST}:${WORKER_PORT}}"
+  export PIPELINE_URL="${PIPELINE_URL:-http://${PIPELINE_HOST}:${PIPELINE_PORT}}"
+  if node "${ROOT_DIR}/scripts/ensure-fresh-local-data.mjs"; then
+    echo "✅ Local data ready for the web app"
+  else
+    echo "⚠️  Auto-ingestion did not produce a briefing yet; check API keys in workers/senate_data_worker/.dev.vars and run ./scripts/refresh-data.sh" >&2
+  fi
 fi
 
 wait "$WORKER_PID" "$PIPELINE_PID" "$WEB_PID"

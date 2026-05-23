@@ -435,7 +435,7 @@ export async function writePlatformMaterializationToD1(
         buildIssueKey(sourceEntry, bill),
         detail.vote.status,
         item?.significance ?? bill?.analysis?.significance ?? "low",
-        item ? Math.round(item.score) : 0,
+        0,
         item?.summary ?? `Senate vote on ${detail.vote.title}.`,
         now
       )
@@ -452,8 +452,8 @@ export async function writePlatformMaterializationToD1(
           item.congress,
           item.session,
           item.vote_number,
-          Math.round(item.score),
-          JSON.stringify(item.ranking_reasons),
+          0,
+          "[]",
           materialization.briefing.generated_at
         )
         .run();

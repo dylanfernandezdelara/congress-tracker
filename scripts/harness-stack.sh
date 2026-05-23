@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# NOTE: This starts API + pipeline with the same --persist-to. Miniflare can throw R2/D1
+# "internal error" under concurrent access. Use `npm run harness:ci` for a reliable CI run
+# (pipeline first, then API). This script remains useful for interactive debugging when flakiness is acceptable.
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
 source "${ROOT_DIR}/scripts/harness-env.sh"
