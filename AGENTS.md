@@ -37,6 +37,15 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Web tests: `npm --prefix web test`
 - Web build: `npm --prefix web run build`
 
+### Frontend fixture review mode (fake briefing data)
+- For manual UI testing, design review, or static preview deploys, use the baked-in fixture briefing in `web/src/e2eData.ts` instead of live API data.
+- Local toggle: open the app with `/?e2e=1` (vote detail links preserve the query param).
+- Build-time toggle: set `VITE_FORCE_E2E=1` when running `npm --prefix web run build` so fixture mode is baked into the bundle without a URL param.
+- Shared detection lives in `web/src/utils/e2eMode.ts` (`isE2eMode()`).
+- Cloudflare Pages preview deploys use `.github/workflows/cloudflare-pages-preview.yml`, which builds with `VITE_FORCE_E2E=1` and deploys via `web/wrangler.toml` (`daily-senate-update-dev`).
+- Preview API worker config for fixture-backed deploys: `workers/senate_data_worker/wrangler.dev.toml`.
+- This fixture path is for frontend review and preview smoke checks only. CI truth for end-to-end behavior remains `npm run harness:ci`, which exercises the local API worker and deterministic harness fixtures.
+
 ## Key Rules
 - Prefer the commands above over guessing root-level npm scripts.
 - Default to `npm run harness:ci` for end-to-end verification; only fall back to manual endpoint checks when debugging the harness itself.
@@ -50,7 +59,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 ## Verification By Change Type
 - Ingestion, pipeline, or materialization changes: run `npm run harness:ci`. Run `npm --prefix workers/senate_data_worker run smoke:scheduled` only when you also need the non-deterministic live-source smoke path.
 - API or read-model changes: run `npm run harness:ci`, then inspect `target/harness/assertions/` if the deterministic API assertions fail.
-- Frontend changes: run `npm run harness:ci`. For design-only review, `npm --prefix web run ui:snap` and `/?e2e=1` remain available but are not the CI truth path.
+- Frontend changes: run `npm run harness:ci`. For design-only review or quick UI checks without the worker stack, use fake briefing data via `/?e2e=1` or `VITE_FORCE_E2E=1 npm --prefix web run build`; `npm --prefix web run ui:snap` also appends `e2e=1`. These paths are not the CI truth path.
 
 ## Freshness And Debugging
 - Deterministic harness artifacts, including Playwright failure assets, land in `target/harness/`.
@@ -75,4 +84,4 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - The latest homepage feed is served from `/briefings/latest.json`.
 - The pipeline worker is responsible for ingestion/materialization; scheduled workers are not triggered automatically in local dev.
 - Local stack ports from the repo scripts: API `http://127.0.0.1:8787`, Pipeline `http://127.0.0.1:8788`, Web `http://127.0.0.1:5173`.
-- `web/src/e2eData.ts` is for manual review mode only; the deterministic harness exercises the live local API worker instead.
+- `web/src/e2eData.ts` supplies fake briefing and vote detail data for fixture review mode (`/?e2e=1` or `VITE_FORCE_E2E=1`). The deterministic harness exercises the live local API worker instead.

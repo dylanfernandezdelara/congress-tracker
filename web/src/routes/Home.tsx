@@ -4,6 +4,7 @@ import { ApiError, fetchLatestBriefing, type BriefingFeedItem, type BriefingFeed
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { E2E_BRIEFING } from '../e2eData'
+import { isE2eMode } from '../utils/e2eMode'
 import { readHarnessNow } from '../utils/harnessNow'
 
 const MAX_HOME_VOTE_AGE_DAYS = 7
@@ -112,7 +113,7 @@ export default function Home() {
   const [dcNow, setDcNow] = useState(() => harnessNow ?? new Date())
 
   const e2eMode = useMemo(
-    () => new URLSearchParams(window.location.search).get('e2e') === '1',
+    () => isE2eMode(window.location.search),
     [],
   )
 

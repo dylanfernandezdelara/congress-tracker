@@ -7,6 +7,7 @@ import { Card, CardContent } from '../components/ui/card'
 import { Separator } from '../components/ui/separator'
 import { E2E_VOTE_DETAILS } from '../e2eData'
 import { cn } from '../lib/utils'
+import { isE2eMode } from '../utils/e2eMode'
 
 function formatVoteDate(value: string): string {
   const date = new Date(`${value}T12:00:00`)
@@ -102,7 +103,7 @@ export default function VoteDetail() {
   const [isLoading, setIsLoading] = useState(true)
 
   const e2eMode = useMemo(
-    () => new URLSearchParams(window.location.search).get('e2e') === '1',
+    () => isE2eMode(window.location.search),
     [],
   )
 

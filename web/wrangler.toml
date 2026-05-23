@@ -1,0 +1,6 @@
+# Cloudflare Pages preview config for the Vite frontend.
+# Production deploys are intentionally not wired from this file.
+
+name = "daily-senate-update-dev"
+pages_build_output_dir = "./dist"
+compatibility_date = "2025-12-10"
