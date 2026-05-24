@@ -92,7 +92,7 @@ if [[ "$AUTO_REFRESH_LOCAL_DATA" == "1" ]]; then
   if node "${ROOT_DIR}/scripts/ensure-fresh-local-data.mjs"; then
     echo "✅ Local data ready for the web app"
   else
-    echo "⚠️  Auto-ingestion did not produce a briefing yet; check API keys in workers/senate_data_worker/.dev.vars and run ./scripts/refresh-data.sh" >&2
+    echo "⚠️  Auto-ingestion did not produce a briefing yet; check API keys in workers/senate_data_worker/.dev.vars and trigger ${PIPELINE_URL%/}/__pipeline/run/ingestion" >&2
   fi
 fi
 

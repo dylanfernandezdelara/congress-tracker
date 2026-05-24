@@ -69,7 +69,7 @@ async function waitForBriefing(start) {
   console.warn(
     `[ensure-data] Timed out after ${MAX_WAIT_MS}ms waiting for /briefings/latest.json to return items.`,
   )
-  console.warn('[ensure-data] You can run ./scripts/refresh-data.sh manually once workers are stable.')
+  console.warn(`[ensure-data] You can trigger ${PIPELINE}/__pipeline/run/ingestion manually once workers are stable.`)
   return false
 }
 

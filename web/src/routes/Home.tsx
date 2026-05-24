@@ -270,8 +270,8 @@ export default function Home() {
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
                   The briefing feed has not materialized any vote summaries yet. If you are running the stack locally,
                   start with <code className="rounded bg-muted px-1.5 py-0.5 text-xs">./scripts/dev-all.sh</code> (it
-                  ingests when data is missing or stale) or run{' '}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">./scripts/refresh-data.sh</code>.
+                  ingests when data is missing or stale) or trigger{' '}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/__pipeline/run/ingestion</code>.
                 </p>
               </CardContent>
             </Card>

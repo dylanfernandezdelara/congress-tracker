@@ -25,7 +25,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Web only: `npm --prefix web run dev`
 
 ### Data refresh
-- Trigger local ingestion: `./scripts/refresh-data.sh`
+- Trigger local ingestion: `curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion`
 - Seed historical backfill: `./scripts/backfill-history.sh`
 
 ### Verification
@@ -51,10 +51,10 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Default to `npm run harness:ci` for end-to-end verification; only fall back to manual endpoint checks when debugging the harness itself.
 - When changing ingestion, read both worker pipeline code and read-model/API surfaces.
 - For data freshness issues, check both `/briefings/latest.json` and pipeline status before changing code.
-- Use `./scripts/refresh-data.sh` or the local scheduled endpoint to repopulate the latest briefing/feed data after pipeline changes.
+- Use the local pipeline endpoint to repopulate the latest briefing/feed data after pipeline changes.
 - Prefer fixtures, cached artifacts, and existing tests over repeated live pulls from Congress.gov or GovInfo during development.
 - Never commit secrets from `.dev.vars` or local Wrangler state.
-- Do not commit or push directly to `main`; use a feature branch and open a PR.
+- Commit and push directly to `main` when explicitly requested and validation is green; create a feature branch and PR when explicitly requested.
 
 ## Verification By Change Type
 - Ingestion, pipeline, or materialization changes: run `npm run harness:ci`. Run `npm --prefix workers/senate_data_worker run smoke:scheduled` only when you also need the non-deterministic live-source smoke path.
@@ -66,7 +66,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - The canonical harness fixture corpus lives behind `HARNESS_FIXTURE_SET=canonical`; refresh it with `npm --prefix workers/senate_data_worker run fixtures:harness:refresh` when intentionally re-basing the deterministic story.
 - Worker health endpoints: `http://127.0.0.1:8787/health` and `http://127.0.0.1:8788/health`.
 - Pipeline status endpoint: `http://127.0.0.1:8788/__pipeline/status`.
-- Local ingestion trigger: `./scripts/refresh-data.sh`.
+- Local ingestion trigger: `curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion`.
 - Useful direct pipeline routes: `http://127.0.0.1:8788/__pipeline/run/ingestion`, `http://127.0.0.1:8788/__pipeline/run/materialize`, and `http://127.0.0.1:8788/cdn-cgi/handler/scheduled`.
 - Latest homepage feed source: `http://127.0.0.1:8787/briefings/latest.json`.
 - Scheduled workers are not triggered automatically in local development; do not assume cron has run.

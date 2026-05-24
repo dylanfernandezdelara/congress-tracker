@@ -12,18 +12,10 @@
 
 ### Run locally (exact commands)
 
-Run these two commands:
-
-1. Start API + Pipeline + Web:
+Start the local stack:
 
 ```bash
 ./scripts/dev-all.sh
-```
-
-2. In a second terminal, pull/refresh latest data:
-
-```bash
-./scripts/refresh-data.sh
 ```
 
 Then open `http://127.0.0.1:5173`.
@@ -267,15 +259,15 @@ npm --prefix web run dev
 ### Trigger pipeline ingestion locally
 
 ```bash
-./scripts/refresh-data.sh
+curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion
 ```
 
-This targets the local Pipeline Worker and triggers the scheduled ingestion path through the explicit local admin route.
+This targets the local Pipeline Worker and triggers the same backend-owned ingestion path used by cron. The Worker checks D1/R2 ingestion state first, then fetches only missing vote details.
 
 Typical local startup flow:
 
 1. Start the stack with `./scripts/dev-all.sh`.
-2. In a second terminal, run `./scripts/refresh-data.sh`.
+2. In a second terminal, trigger `/__pipeline/run/ingestion` if you need fresh data immediately.
 3. Verify freshness with `http://127.0.0.1:8788/__pipeline/status` and `http://127.0.0.1:8787/briefings/latest.json`.
 4. Open `http://127.0.0.1:5173`.
 
@@ -290,10 +282,8 @@ This boots the API worker, pipeline worker, and web app with isolated local Wran
 Useful harness subcommands:
 
 ```bash
-npm run harness:stack
 npm run harness:assert
 npm run harness:browser
-npm run harness:live-smoke
 ```
 
 The deterministic harness writes debug artifacts, including browser failure assets, to `target/harness/`.

@@ -24,6 +24,11 @@ import {
   type VoteDetails,
 } from "./xml";
 import { buildBillKey, fetchBillDetailsMap } from "./congress";
+import {
+  readIngestedVoteDetailsFromD1,
+  readKnownVoteNumbersFromD1,
+  writeIngestedVoteDetailsToD1,
+} from "./d1";
 import { buildStateKeys } from "./storage";
 import type {
   IngestConfig,
@@ -68,6 +73,19 @@ interface IngestionContext {
   parsedDetails: VoteDetails[];
   congress: number;
   session: number;
+}
+
+export interface VoteLedgerDiscovery {
+  eligibleVotes: VoteSummary[];
+  existingVoteNumbers: Set<number>;
+  missingVoteNumbers: number[];
+  cutoffDateEt: string;
+  latestEligibleVoteDate: string | null;
+}
+
+export interface VoteLedgerUpdateOptions {
+  db?: D1Database;
+  discovery?: VoteLedgerDiscovery;
 }
 
 // ============================================================================
@@ -833,29 +851,30 @@ function computeSessionOverview(
   };
 }
 
-/**
- * Build or update the vote ledger incrementally.
- *
- * Fetches vote details for any votes not already in the existing ledger,
- * merges them in, and computes session overview stats.
- */
-export async function buildVoteLedgerUpdate(
+export async function discoverVoteLedgerUpdates(
   config: IngestConfig,
-  membersIndex: MemberIndexJson,
   existingLedger: VoteLedger | null,
-  fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
-): Promise<{ ledger: VoteLedger; overview: SessionOverview }> {
+  options: { db?: D1Database; fetchConfig?: FetchConfig } = {}
+): Promise<VoteLedgerDiscovery> {
   const { congress, session } = config;
 
-  console.log("[ledger] Fetching vote menu for ledger update...");
-  const menuResult = await fetchVoteMenu(congress, session, fetchConfig);
+  console.log("[ledger] Fetching vote menu for ledger discovery...");
+  const menuResult = await fetchVoteMenu(congress, session, options.fetchConfig ?? DEFAULT_FETCH_CONFIG);
   if (!menuResult.success || !menuResult.data) {
     console.warn(`[ledger] Failed to fetch vote menu: ${menuResult.error}`);
-    const empty: VoteLedger = existingLedger ?? {
-      congress, session, generated_at: new Date().toISOString(),
-      total_votes: 0, entries: [],
+    const existingVoteNumbers = new Set((existingLedger?.entries ?? []).map((e) => e.vote_number));
+    if (options.db) {
+      for (const voteNumber of await readKnownVoteNumbersFromD1(options.db, congress, session)) {
+        existingVoteNumbers.add(voteNumber);
+      }
+    }
+    return {
+      eligibleVotes: [],
+      existingVoteNumbers,
+      missingVoteNumbers: [],
+      cutoffDateEt: todayEastern(),
+      latestEligibleVoteDate: null,
     };
-    return { ledger: empty, overview: computeSessionOverview(empty, membersIndex) };
   }
 
   const allMenuVotes = parseVoteMenuXml(menuResult.data);
@@ -864,12 +883,70 @@ export async function buildVoteLedgerUpdate(
 
   console.log(`[ledger] Menu has ${allMenuVotes.length} votes, ${eligibleVotes.length} before cutoff`);
 
-  const existingNumbers = new Set(
+  const existingVoteNumbers = new Set(
     (existingLedger?.entries ?? []).map((e) => e.vote_number)
   );
-  const missingVotes = eligibleVotes.filter((v) => !existingNumbers.has(v.vote_number));
+  if (options.db) {
+    for (const voteNumber of await readKnownVoteNumbersFromD1(options.db, congress, session)) {
+      existingVoteNumbers.add(voteNumber);
+    }
+  }
+  const missingVoteNumbers = eligibleVotes
+    .filter((v) => !existingVoteNumbers.has(v.vote_number))
+    .map((v) => v.vote_number);
 
-  console.log(`[ledger] Existing ledger has ${existingNumbers.size} entries, ${missingVotes.length} new`);
+  console.log(`[ledger] Known ingestion state has ${existingVoteNumbers.size} entries, ${missingVoteNumbers.length} new`);
+
+  return {
+    eligibleVotes,
+    existingVoteNumbers,
+    missingVoteNumbers,
+    cutoffDateEt: cutoff,
+    latestEligibleVoteDate: findMaxDateOnOrBefore(eligibleVotes.map((v) => v.vote_date), cutoff),
+  };
+}
+
+/**
+ * Build or update the vote ledger incrementally.
+ *
+ * Fetches vote details for any votes not already in D1/R2 ingestion state,
+ * merges them in, and computes session overview stats.
+ */
+export async function buildVoteLedgerUpdate(
+  config: IngestConfig,
+  membersIndex: MemberIndexJson,
+  existingLedger: VoteLedger | null,
+  fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG,
+  options: VoteLedgerUpdateOptions = {}
+): Promise<{ ledger: VoteLedger; overview: SessionOverview }> {
+  const { congress, session } = config;
+  const discovery =
+    options.discovery ??
+    (await discoverVoteLedgerUpdates(config, existingLedger, {
+      db: options.db,
+      fetchConfig,
+    }));
+  const eligibleVotes = discovery.eligibleVotes;
+
+  if (eligibleVotes.length === 0) {
+    const empty: VoteLedger = existingLedger ?? {
+      congress, session, generated_at: new Date().toISOString(),
+      total_votes: 0, entries: [],
+    };
+    return { ledger: empty, overview: computeSessionOverview(empty, membersIndex) };
+  }
+
+  const existingLedgerNumbers = new Set((existingLedger?.entries ?? []).map((e) => e.vote_number));
+  const candidateCachedVoteNumbers = eligibleVotes
+    .map((v) => v.vote_number)
+    .filter((voteNumber) => !existingLedgerNumbers.has(voteNumber));
+  const cachedDetailsByNumber = options.db
+    ? await readIngestedVoteDetailsFromD1(options.db, congress, session, candidateCachedVoteNumbers)
+    : new Map<number, VoteDetails>();
+  const cachedVoteNumbers = new Set(cachedDetailsByNumber.keys());
+  const missingVotes = eligibleVotes.filter(
+    (v) => !existingLedgerNumbers.has(v.vote_number) && !cachedVoteNumbers.has(v.vote_number)
+  );
 
   let newDetails: VoteDetails[] = [];
   if (missingVotes.length > 0) {
@@ -884,12 +961,16 @@ export async function buildVoteLedgerUpdate(
       const parsed = parseVoteDetailXml(fr.data, congress, session);
       if (parsed) newDetails.push(parsed);
     }
+    if (options.db && newDetails.length > 0) {
+      await writeIngestedVoteDetailsToD1(options.db, newDetails);
+    }
   }
 
   const membersByState = buildMemberLookup(membersIndex.members);
   const summaryMap = new Map(eligibleVotes.map((v) => [v.vote_number, v]));
 
-  const newEntries = newDetails.map((detail) =>
+  const cachedDetails = Array.from(cachedDetailsByNumber.values());
+  const newEntries = [...cachedDetails, ...newDetails].map((detail) =>
     buildLedgerEntry(detail, summaryMap.get(detail.vote_number), membersByState)
   );
 

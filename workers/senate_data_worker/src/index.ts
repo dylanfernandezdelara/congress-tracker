@@ -6,7 +6,7 @@
  * - HTTP API for serving precomputed JSON from R2
  */
 
-import { runIngestion, runIngestionAllStates, buildVoteLedgerUpdate } from "./ingest";
+import { runIngestion, runIngestionAllStates, buildVoteLedgerUpdate, discoverVoteLedgerUpdates } from "./ingest";
 import { runMemberIngestion } from "./member-ingest";
 import { buildBillKey } from "./congress";
 import {
@@ -331,6 +331,15 @@ async function publishChamberContext(
 
 async function readLatestChamberContext(bucket: R2Bucket): Promise<MemberActivityContext | null> {
   return readJsonFromR2<MemberActivityContext>(bucket, buildLatestChamberContextKey());
+}
+
+async function hasPublishedReadModels(bucket: R2Bucket): Promise<boolean> {
+  const [ledger, overview, briefing] = await Promise.all([
+    readJsonFromR2<VoteLedger>(bucket, buildVoteLedgerKey()),
+    readJsonFromR2<SessionOverview>(bucket, buildSessionOverviewKey()),
+    readJsonFromR2<unknown>(bucket, buildLatestBriefingKey()),
+  ]);
+  return Boolean(ledger && overview && briefing);
 }
 
 // ============================================================================
@@ -1302,6 +1311,27 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   );
   const activityLookbackDays = Math.max(7, Math.min(parseIntSafe(env.ACTIVITY_LOOKBACK_DAYS, 30), 120));
 
+  const existingLedger = await readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey());
+  const discovery = await runTimed(runId, "discover_vote_updates", async () =>
+    discoverVoteLedgerUpdates(config, existingLedger, {
+      db: env.SENATE_DB,
+      fetchConfig: PIPELINE_FETCH_CONFIG,
+    })
+  );
+  if (discovery.missingVoteNumbers.length === 0 && (await hasPublishedReadModels(env.DATA_BUCKET))) {
+    logEvent("scheduled_ingestion_noop", {
+      run_id: runId,
+      duration_ms: Date.now() - startTime,
+      congress: config.congress,
+      session: config.session,
+      known_vote_count: discovery.existingVoteNumbers.size,
+      eligible_vote_count: discovery.eligibleVotes.length,
+      latest_eligible_vote_date: discovery.latestEligibleVoteDate,
+      new_vote_count: 0,
+    });
+    return;
+  }
+
   const memberResult = await runTimed(runId, "member_ingestion", async () =>
     runMemberIngestion({
       congress: config.congress,
@@ -1493,9 +1523,11 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     );
   }
 
-  const existingLedger = await readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey());
   const { ledger, overview } = await runTimed(runId, "build_vote_ledger", async () =>
-    buildVoteLedgerUpdate(config, membersIndex, existingLedger)
+    buildVoteLedgerUpdate(config, membersIndex, existingLedger, PIPELINE_FETCH_CONFIG, {
+      db: env.SENATE_DB,
+      discovery,
+    })
   );
   const newVoteNumbers = diffVoteNumbers(ledger, existingLedger);
   const evidenceTargetVoteNumbers = Array.from(
@@ -1581,6 +1613,8 @@ async function runScheduledIngestion(env: Env): Promise<void> {
     run_id: runId,
     duration_ms: Date.now() - startTime,
     target_state: config.targetState,
+    new_vote_count: newVoteNumbers.length,
+    new_vote_numbers: newVoteNumbers,
     bills_processed: coverage.bills_processed,
     claims_with_evidence_pct: coverage.pct_claims_with_evidence_refs,
     benefit_map_with_evidence_pct: analysisResult?.benefitMapWithEvidenceRefPct ?? 0,
