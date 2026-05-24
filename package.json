@@ -1,4 +1,5 @@
 {
+  "name": "congress-tracker",
   "scripts": {
     "harness:stack": "./scripts/harness-stack.sh",
     "harness:assert": "node ./scripts/harness-assert.mjs",

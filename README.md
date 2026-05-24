@@ -1,6 +1,6 @@
-# Daily Senate Update
+# Congress Tracker
 
-`daily_senate_update` is a Cloudflare-native Senate vote intelligence app. It ingests official Senate and congressional data, builds a normalized read model for recent and historical voting context, and serves a ranked feed of the most relevant Senate votes plus vote-detail pages.
+`congress-tracker` is a Cloudflare-native Senate vote intelligence app. It ingests official Senate and congressional data, builds a normalized read model for recent and historical voting context, and serves a ranked feed of the most relevant Senate votes plus vote-detail pages.
 
 ## Developer Quick Start
 
@@ -108,7 +108,7 @@ The interpretation layer is intentionally constrained:
 ## Repository Layout
 
 ```text
-daily_senate_update/
+congress-tracker/
 ├── web/
 │   └── src/
 ├── workers/

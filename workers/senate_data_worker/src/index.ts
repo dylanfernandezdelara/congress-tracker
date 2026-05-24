@@ -1375,7 +1375,7 @@ async function runScheduledIngestion(env: Env): Promise<void> {
   const canaryEnabled = canaryValue < canaryPercent;
   const maxNewAnalyses = Math.max(1, parseIntSafe(env.OPENROUTER_MAX_NEW_ANALYSES, 20));
   const openrouterAppReferer = env.OPENROUTER_APP_REFERER?.trim();
-  const openrouterAppTitle = env.OPENROUTER_APP_TITLE?.trim() || "daily_senate_update_worker";
+  const openrouterAppTitle = env.OPENROUTER_APP_TITLE?.trim() || "congress_tracker_worker";
   const qualityGateConfig: QualityGateConfig = {
     minClaimsCoveragePct: parsePct(env.QUALITY_MIN_CLAIMS_COVERAGE, 70),
     minQuoteValidityPct: parsePct(env.QUALITY_MIN_QUOTE_VALIDITY, 80),

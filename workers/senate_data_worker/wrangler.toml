@@ -13,7 +13,7 @@ TARGET_STATE = "ALL"
 # ALLOWED_ORIGIN = "https://your-site.example"
 # Optional: OpenRouter attribution headers.
 # OPENROUTER_APP_REFERER = "https://your-site.example"
-# OPENROUTER_APP_TITLE = "daily_senate_update_worker"
+# OPENROUTER_APP_TITLE = "congress_tracker_worker"
 
 [[r2_buckets]]
 binding = "DATA_BUCKET"
