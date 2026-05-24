@@ -10,7 +10,10 @@ import type {
   SourceCoverage,
   VoteDetailResponse,
 } from "../platform-types";
-import { buildIssueKey, buildThreadKey, buildVoteDetailResponse } from "../read-model";
+import { buildIssueKey, buildThreadKey } from "../domain/issue-keys";
+import { normalizeHistoricalBillType } from "../domain/bill-ref";
+import { normalizeVoteStatus } from "../domain/vote-status";
+import { buildVoteDetailResponse } from "../read-model";
 import type { VoteDetails } from "../xml";
 import { ensurePlatformSchema } from "./schema";
 
@@ -47,29 +50,6 @@ function canBuildBillKey(bill: BillRef | undefined): bill is BillRef {
       typeof bill.number === "string" &&
       bill.number.trim()
   );
-}
-
-function normalizeVoteStatus(result: string): VoteDetailResponse["vote"]["status"] {
-  const normalized = result.toLowerCase();
-  if (/failed|rejected|not agreed|not passed|disagreed|not invoked|not confirmed/.test(normalized)) {
-    return "rejected";
-  }
-  return /agreed to|agreed|passed|confirmed|invoked|adopted|approved/.test(normalized)
-    ? "passed"
-    : "rejected";
-}
-
-function normalizeHistoricalBillType(rawType: string): string {
-  const normalized = rawType.toUpperCase().replace(/[^A-Z]/g, "");
-  if (normalized === "HR") return "H.R.";
-  if (normalized === "S") return "S";
-  if (normalized === "HJRES") return "H.J.RES.";
-  if (normalized === "SJRES") return "S.J.RES.";
-  if (normalized === "HCONRES") return "H.CON.RES.";
-  if (normalized === "SCONRES") return "S.CON.RES.";
-  if (normalized === "HRES") return "H.RES.";
-  if (normalized === "SRES") return "S.RES.";
-  return rawType.toUpperCase();
 }
 
 function extractHistoricalThreadKey(detail: VoteDetails): string {

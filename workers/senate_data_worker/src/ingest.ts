@@ -24,6 +24,7 @@ import {
   type VoteDetails,
 } from "./xml";
 import { buildBillKey, fetchBillDetailsMap } from "./congress";
+import { computePartyMajorityLabels } from "./domain/party-majority";
 import {
   readIngestedVoteDetailsFromD1,
   readKnownVoteNumbersFromD1,
@@ -744,30 +745,6 @@ function buildLedgerEntry(
   };
 }
 
-function computePartyMajority(
-  entry: VoteLedgerEntry,
-  partyByBioguide: Map<string, string>
-): Map<string, string> {
-  const partyTally = new Map<string, { yea: number; nay: number }>();
-  for (const [bioguide, cast] of Object.entries(entry.member_votes)) {
-    const party = partyByBioguide.get(bioguide);
-    if (!party) continue;
-    const normalized = cast.toLowerCase();
-    const isYea = normalized.includes("yea") || normalized.includes("aye") || normalized === "yes";
-    const isNay = normalized.includes("nay") || normalized === "no";
-    if (!isYea && !isNay) continue;
-    const tally = partyTally.get(party) ?? { yea: 0, nay: 0 };
-    if (isYea) tally.yea++;
-    if (isNay) tally.nay++;
-    partyTally.set(party, tally);
-  }
-  const result = new Map<string, string>();
-  for (const [party, tally] of partyTally) {
-    result.set(party, tally.yea >= tally.nay ? "Yea" : "Nay");
-  }
-  return result;
-}
-
 function computeSessionOverview(
   ledger: VoteLedger,
   membersIndex: MemberIndexJson
@@ -797,7 +774,7 @@ function computeSessionOverview(
 
   for (const entry of ledger.entries) {
     if (entry.vote_date > latestVoteDate) latestVoteDate = entry.vote_date;
-    const partyMajority = computePartyMajority(entry, partyByBioguide);
+    const partyMajority = computePartyMajorityLabels(entry, partyByBioguide);
 
     for (const m of membersIndex.members) {
       const stat = stats.get(m.bioguide_id)!;

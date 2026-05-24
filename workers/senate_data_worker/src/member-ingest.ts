@@ -18,6 +18,7 @@ import {
   fetchMemberLegislationActions,
   fetchSenateCommitteeMeetings,
 } from "./congress";
+import { normalizePartyCode } from "./domain/party-majority";
 import {
   fetchDailyDigest,
   fetchCrecSenateGranuleHighlights,
@@ -230,15 +231,6 @@ function extractTopicsFromBill(bill: RollCallVoteItem["bill"]): string[] {
 
 const FEATURED_LIMIT = 6;
 const CRITICAL_SOURCES = new Set(["congress", "senate", "govinfo"]);
-
-function normalizePartyCode(value: string | undefined): string {
-  const normalized = (value ?? "").trim().toUpperCase();
-  if (!normalized) return "";
-  if (normalized.startsWith("D")) return "D";
-  if (normalized.startsWith("R")) return "R";
-  if (normalized === "I" || normalized.startsWith("IND")) return "I";
-  return normalized;
-}
 
 function normalizeVoteCast(value: string): string {
   const cleaned = value.trim().toLowerCase();

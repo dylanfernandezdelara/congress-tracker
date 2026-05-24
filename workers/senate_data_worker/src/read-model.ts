@@ -8,35 +8,20 @@ import type {
   PartyArgumentSummary,
   PipelineMaterialization,
   SourceCoverage,
-  VoteCast,
   VoteDetailResponse,
   VotePartyBreakdown,
   VoteStatus,
 } from "./platform-types";
+import { buildIssueKey, buildThreadKey, extractNominationOffice } from "./domain/issue-keys";
+import { computePartyMajority } from "./domain/party-majority";
+import { classifyVote } from "./domain/vote-cast";
+import { toStatus } from "./domain/vote-status";
 import { buildVoteContentContext, describeProcedure } from "./vote-content-profile";
+
+export { buildIssueKey, buildThreadKey } from "./domain/issue-keys";
 
 /** Homepage feed caps at this many votes, newest date first (no relevance ranking). */
 export const BRIEFING_FEED_ITEM_LIMIT = 15;
-
-function classifyVote(raw: string | undefined): VoteCast {
-  const lc = (raw ?? "").trim().toLowerCase();
-  if (lc.includes("yea") || lc.includes("aye") || lc === "yes") return "yea";
-  if (lc.includes("nay") || lc === "no") return "nay";
-  if (lc.includes("present")) return "present";
-  return "notVoting";
-}
-
-function isPassed(result: string): boolean {
-  const lc = result.toLowerCase();
-  if (/failed|rejected|not agreed|not passed|disagreed|not invoked|not confirmed/.test(lc)) {
-    return false;
-  }
-  return /agreed to|agreed|passed|confirmed|invoked|adopted|approved/.test(lc);
-}
-
-function toStatus(result: string): VoteStatus {
-  return isPassed(result) ? "passed" : "rejected";
-}
 
 function buildBillLookup(activities: ActivityIndexJson | null): Map<number, BillRef> {
   const map = new Map<number, BillRef>();
@@ -85,130 +70,8 @@ function buildIssueLabel(entry: VoteLedgerEntry, bill: BillRef | undefined): str
   return "the measure";
 }
 
-const ISSUE_KEY_STOPWORDS = new Set([
-  "about",
-  "after",
-  "against",
-  "agreement",
-  "agreed",
-  "allowing",
-  "amendment",
-  "authorization",
-  "authorizations",
-  "bill",
-  "committee",
-  "congress",
-  "confirmation",
-  "confirmed",
-  "consideration",
-  "debate",
-  "direct",
-  "discharge",
-  "floor",
-  "forces",
-  "hostilities",
-  "measure",
-  "motion",
-  "nomination",
-  "order",
-  "passage",
-  "point",
-  "privilege",
-  "proceed",
-  "question",
-  "recorded",
-  "rejected",
-  "resolution",
-  "senate",
-  "states",
-  "table",
-  "vote",
-  "votes",
-  "whether",
-  "within",
-]);
-
-function stripHtml(value: string): string {
-  return value.replace(/<[^>]+>/g, " ");
-}
-
-function buildSlug(tokens: string[]): string {
-  return tokens.join("-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-function normalizeIssueText(value: string): string {
-  return stripHtml(value)
-    .toLowerCase()
-    .replace(/\b(on|the|a|an)\b/g, " ")
-    .replace(
-      /\b(s\.?\s*j\.?\s*res\.?|s\.?\s*con\.?\s*res\.?|s\.?\s*res\.?|s\.?|h\.?\s*j\.?\s*res\.?|h\.?\s*con\.?\s*res\.?|h\.?\s*res\.?|h\.?\s*r\.?|pn)\s*\.?\s*\d+\b/gi,
-      " "
-    )
-    .replace(/\b(motion to discharge|motion to proceed|motion to invoke cloture|motion to table|point of order|privilege status|cloture|confirmation)\b/g, " ")
-    .replace(/\b(united states armed forces)\b/g, " armed forces ")
-    .replace(/\b(hostilities within or against)\b/g, " hostilities against ")
-    .replace(/[^a-z0-9\s-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function buildGenericIssueKey(text: string, fallback: string): string {
-  const normalized = normalizeIssueText(text);
-  if (!normalized) return fallback;
-
-  if (/(war powers|armed forces|hostilities|authorized)/.test(normalized) && /iran|yemen|iraq|syria/.test(normalized)) {
-    return "topic:war-powers";
-  }
-
-  if (/federal reserve|board of governors|jerome powell/.test(normalized)) {
-    return "topic:federal-reserve-chair";
-  }
-
-  const tokens = normalized
-    .split(/\s+/)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 4 && !ISSUE_KEY_STOPWORDS.has(token));
-  if (tokens.length < 3) return fallback;
-
-  return `topic:${buildSlug(tokens.slice(0, 6))}`;
-}
-
-function extractNominationOffice(title: string): string | null {
-  const cleaned = title.trim();
-  const officeMatch = cleaned.match(/\bto be (.+)$/i);
-  if (officeMatch?.[1]) return officeMatch[1].trim();
-  return null;
-}
-
 function buildIssueTitle(entry: VoteLedgerEntry, bill: BillRef | undefined): string {
   return extractNominationOffice(entry.title) ?? bill?.title ?? entry.title;
-}
-
-export function buildThreadKey(entry: VoteLedgerEntry, bill: BillRef | undefined): string {
-  if (bill?.congress && bill.type && bill.number) {
-    return `${bill.congress}:${bill.type}:${bill.number}`;
-  }
-  if (entry.issue?.trim()) return entry.issue.trim().toUpperCase();
-  return `vote:${entry.vote_number}`;
-}
-
-export function buildIssueKey(entry: VoteLedgerEntry, bill: BillRef | undefined): string {
-  const threadKey = buildThreadKey(entry, bill);
-  const nominationOffice = extractNominationOffice(entry.title);
-  if (nominationOffice) {
-    const slug = buildSlug(
-      normalizeIssueText(nominationOffice)
-        .split(/\s+/)
-        .filter((token) => token.length >= 4)
-        .slice(0, 6)
-    );
-    if (slug) return `nomination:${slug}`;
-  }
-
-  const preferredText = [bill?.title, bill?.summary, entry.title, entry.question, entry.issue]
-    .filter(Boolean)
-    .join(" ");
-  return buildGenericIssueKey(preferredText, threadKey);
 }
 
 function computeTallies(entry: VoteLedgerEntry, overview: SessionOverview): BriefingVoteSummary {
@@ -244,26 +107,6 @@ function buildPartyMaps(overview: SessionOverview): {
     stateById.set(senator.bioguide_id, senator.state);
   }
   return { partyById, nameById, stateById };
-}
-
-function computePartyMajority(entry: VoteLedgerEntry, partyById: Map<string, string>): Map<string, VoteCast> {
-  const tallies = new Map<string, { yea: number; nay: number }>();
-  for (const [bioguideId, rawCast] of Object.entries(entry.member_votes)) {
-    const party = partyById.get(bioguideId);
-    if (!party) continue;
-    const cast = classifyVote(rawCast);
-    if (cast !== "yea" && cast !== "nay") continue;
-    const tally = tallies.get(party) ?? { yea: 0, nay: 0 };
-    if (cast === "yea") tally.yea += 1;
-    else tally.nay += 1;
-    tallies.set(party, tally);
-  }
-
-  const majority = new Map<string, VoteCast>();
-  for (const [party, tally] of tallies.entries()) {
-    majority.set(party, tally.yea >= tally.nay ? "yea" : "nay");
-  }
-  return majority;
 }
 
 function computeCrossovers(entry: VoteLedgerEntry, overview: SessionOverview): BriefingCrossover[] {
