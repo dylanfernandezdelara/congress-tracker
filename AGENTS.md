@@ -85,3 +85,26 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - The pipeline worker is responsible for ingestion/materialization; scheduled workers are not triggered automatically in local dev.
 - Local stack ports from the repo scripts: API `http://127.0.0.1:8787`, Pipeline `http://127.0.0.1:8788`, Web `http://127.0.0.1:5173`.
 - `web/src/e2eData.ts` supplies fake briefing and vote detail data for fixture review mode (`/?e2e=1` or `VITE_FORCE_E2E=1`). The deterministic harness exercises the live local API worker instead.
+
+## Cursor Cloud specific instructions
+
+### CORS gotcha for local development and harness
+The `.dev.vars.example` ships with `ALLOWED_ORIGIN=https://your-site.example`. After copying it to `.dev.vars`, change that value to `*` (or remove the line) so the Vite dev server at `:5173` can successfully fetch from the API worker at `:8787`. The deterministic harness (`npm run harness:ci`) passes `--var` overrides for harness-specific settings but does NOT override `ALLOWED_ORIGIN`; a restrictive value in `.dev.vars` will cause the Playwright browser test to fail with "Briefing unavailable."
+
+### Running without live API keys
+Deterministic harness runs (`npm run harness:ci`) and the frontend fixture mode (`/?e2e=1` or `VITE_FORCE_E2E=1`) do **not** require `CONGRESS_API_KEY` or `GOVINFO_API_KEY`. Dummy placeholder values in `.dev.vars` are sufficient for development unless testing live ingestion.
+
+### Quick verification commands
+- `npm --prefix workers/senate_data_worker run check` — TypeScript typecheck
+- `npm --prefix workers/senate_data_worker test` — unit tests (vitest, 248 tests)
+- `npm --prefix web test` — frontend unit tests (vitest, 38 tests)
+- `npm --prefix web run build` — production build (includes tsc)
+- `npm run harness:ci` — full deterministic end-to-end harness (pipeline ingestion + API assertions + Playwright browser)
+
+### Service startup
+- Full stack: `./scripts/dev-all.sh` (starts API worker :8787, pipeline worker :8788, web :5173)
+- Frontend-only with fixture data: `VITE_FORCE_E2E=1 npm --prefix web run dev`
+- See `AGENTS.md` "Commands" section above for all individual service commands.
+
+### Node.js
+The environment uses Node.js 22. No `.nvmrc` or `.node-version` file exists; the system Node is correct.
