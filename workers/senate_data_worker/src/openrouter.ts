@@ -1037,7 +1037,7 @@ export async function analyzeBillsWithCache(
   const maxRetries = Math.max(0, options.maxRetries ?? 2);
   const analysisConcurrency = Math.max(1, Math.min(options.analysisConcurrency ?? 2, 3));
   const defaultHeaders: Record<string, string> = {
-    "X-Title": options.appTitle ?? "daily_senate_update_worker",
+    "X-Title": options.appTitle ?? "congress_tracker_worker",
   };
   if (options.appReferer?.trim()) {
     defaultHeaders["HTTP-Referer"] = options.appReferer.trim();

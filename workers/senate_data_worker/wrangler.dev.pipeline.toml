@@ -1,7 +1,7 @@
 # Preview-only pipeline Worker config.
 # Do not use this file for production deploys.
 
-name = "daily-senate-update-pipeline-dev"
+name = "congress-tracker-pipeline-dev"
 main = "src/pipeline-index.ts"
 compatibility_date = "2025-12-10"
 
@@ -17,4 +17,4 @@ HARNESS_NOW = "2026-01-20T15:00:00Z"
 
 [[r2_buckets]]
 binding = "DATA_BUCKET"
-bucket_name = "daily-senate-update-dev-data"
+bucket_name = "congress-tracker-dev-data"

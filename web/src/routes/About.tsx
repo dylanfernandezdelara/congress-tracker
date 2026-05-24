@@ -3,7 +3,7 @@ import { Card, CardContent } from '../components/ui/card'
 
 function About() {
   useEffect(() => {
-    document.title = 'About | Senate Pulse'
+    document.title = 'About | Congress Tracker'
   }, [])
 
   return (
@@ -11,12 +11,12 @@ function About() {
       <Card className="draft-grid">
         <CardContent className="grid gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:px-8 lg:py-8">
           <div className="max-w-3xl">
-            <p className="document-kicker">About Senate Pulse</p>
+            <p className="document-kicker">About Congress Tracker</p>
             <h1 className="document-title mt-4 text-4xl font-semibold text-foreground sm:text-5xl">
               Neutral context for the Senate votes that matter most.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-muted-foreground">
-              Senate Pulse summarizes recent U.S. Senate votes in plain language, using official bill
+              Congress Tracker summarizes recent U.S. Senate votes in plain language, using official bill
               context when it is available, and links each item to fuller vote detail including party splits.
             </p>
           </div>

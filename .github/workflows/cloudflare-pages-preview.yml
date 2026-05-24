@@ -38,7 +38,7 @@ jobs:
         run: |
           BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           npx wrangler pages deploy dist \
-            --project-name daily-senate-update-dev \
+            --project-name congress-tracker-dev \
             --branch "$BRANCH" \
             --commit-hash "$GITHUB_SHA" \
             --commit-message "$GITHUB_REF_NAME preview"

@@ -109,10 +109,10 @@ export default function VoteDetail() {
 
   useEffect(() => {
     if (!detail) {
-      document.title = 'Senate Pulse'
+      document.title = 'Congress Tracker'
       return
     }
-    document.title = `${detail.vote.title} | Senate Pulse`
+    document.title = `${detail.vote.title} | Congress Tracker`
   }, [detail])
 
   useEffect(() => {
