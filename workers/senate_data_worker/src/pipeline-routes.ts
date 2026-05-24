@@ -7,7 +7,7 @@ import {
 } from "./storage";
 import type { PipelineEnv } from "./pipeline-env";
 import type { ActivityIndexJson, SessionOverview, VoteLedger } from "./types";
-import { authorizePipelineRun, buildCorsHeaders } from "./pipeline-auth";
+import { authorizePipelineAdmin, buildCorsHeaders } from "./pipeline-auth";
 import { buildJsonResponse, cacheHealth } from "./pipeline-logging";
 import { parseIntSafe } from "./pipeline-runtime-config";
 import { readPipelineStatus } from "./pipeline-status";
@@ -26,8 +26,20 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // Only allow GET requests
-  if (request.method !== "GET") {
+  const isPipelineAdminPath =
+    pathname === "/__pipeline/status" || pathname.startsWith("/__pipeline/run/");
+
+  if (isPipelineAdminPath) {
+    if (request.method !== "GET" && request.method !== "POST") {
+      return jsonResponse(
+        {
+          error: "method_not_allowed",
+          message: "Pipeline admin routes allow GET or POST only",
+        },
+        { status: 405 }
+      );
+    }
+  } else if (request.method !== "GET") {
     return jsonResponse(
       {
         error: "method_not_allowed",
@@ -35,6 +47,11 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
       },
       { status: 405 }
     );
+  }
+
+  if (isPipelineAdminPath) {
+    const unauthorized = await authorizePipelineAdmin(request, env, jsonResponse);
+    if (unauthorized) return unauthorized;
   }
 
   // Health check (no R2 access)
@@ -110,11 +127,6 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
       },
       { status: 200, headers: { "Cache-Control": cacheHealth } }
     );
-  }
-
-  if (pathname.startsWith("/__pipeline/run/")) {
-    const unauthorized = await authorizePipelineRun(request, env, jsonResponse);
-    if (unauthorized) return unauthorized;
   }
 
   if (pathname === "/__pipeline/run/materialize") {

@@ -144,6 +144,7 @@ npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:api -- \
   --var "CONGRESS_API_KEY:HARNESS_FIXTURE_KEY" \
   --var "GOVINFO_API_KEY:HARNESS_FIXTURE_KEY" \
   --var "OPENROUTER_CANARY_PERCENT:0" \
+  --var "ALLOWED_ORIGIN:*" \
   >"${API_LOG}" 2>&1 &
 API_PID=$!
 

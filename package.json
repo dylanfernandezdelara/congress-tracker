@@ -1,6 +1,7 @@
 {
   "name": "congress-tracker",
   "scripts": {
+    "refresh:remote": "./scripts/refresh-remote.sh",
     "harness:assert": "node ./scripts/harness-assert.mjs",
     "harness:browser": "npm --prefix web exec -- playwright test --config ./web/playwright.harness.config.ts",
     "harness:ci": "./scripts/harness-ci.sh",

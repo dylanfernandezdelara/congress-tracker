@@ -66,8 +66,21 @@ function computeDelay(
   return Math.round(jitterFloor + Math.random() * (jitterCeil - jitterFloor));
 }
 
+/** Strip credential query params before persisting URLs in D1 or cache keys. */
+export function sanitizeRequestUrlForStorage(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.delete("api_key");
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return url.replace(/([?&])api_key=[^&]*/gi, "$1").replace(/[?&]$/, "");
+  }
+}
+
 function buildCacheKey(source: string, entityKey: string, requestUrl: string): string {
-  return `${source.trim().toLowerCase()}|${entityKey.trim().toLowerCase()}|${requestUrl.trim()}`;
+  const normalizedUrl = sanitizeRequestUrlForStorage(requestUrl);
+  return `${source.trim().toLowerCase()}|${entityKey.trim().toLowerCase()}|${normalizedUrl}`;
 }
 
 async function fetchTextWithTimeout(
@@ -225,7 +238,7 @@ export async function fetchSourceArtifactText(
         cacheKey,
         source: request.source,
         entityKey: request.entityKey,
-        requestUrl: request.requestUrl,
+        requestUrl: sanitizeRequestUrlForStorage(request.requestUrl),
         statusCode: networkResult.statusCode,
         contentType: networkResult.contentType,
         artifactKey,
@@ -245,7 +258,7 @@ export async function fetchSourceArtifactText(
       cacheKey,
       source: request.source,
       entityKey: request.entityKey,
-      requestUrl: request.requestUrl,
+      requestUrl: sanitizeRequestUrlForStorage(request.requestUrl),
       statusCode: networkResult.statusCode,
       contentType: networkResult.contentType,
       fetchedAt,

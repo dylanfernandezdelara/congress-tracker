@@ -26,6 +26,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 
 ### Data refresh
 - Trigger local ingestion: `curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion`
+- Trigger deployed ingestion (requires `.env.remote` with `DEPLOYED_PIPELINE_URL` and `PIPELINE_ADMIN_TOKEN`): `npm run refresh:remote`
 - Seed historical backfill: `./scripts/backfill-history.sh`
 
 ### Verification

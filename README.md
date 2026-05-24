@@ -304,15 +304,17 @@ Useful environment overrides:
 The local pipeline also exposes admin endpoints for debugging:
 
 - `GET /__pipeline/status`
-- `GET /__pipeline/run/ingestion`
-- `GET /__pipeline/run/materialize`
+- `GET` or `POST /__pipeline/run/ingestion`
+- `GET` or `POST /__pipeline/run/materialize`
 - `GET /__pipeline/run/evidence?vote=46`
 - `GET /__pipeline/run/historical-backfill?congress=116`
 
-On deployed pipeline workers, `/__pipeline/run/*` endpoints require
-`Authorization: Bearer $PIPELINE_ADMIN_TOKEN`. Set that secret with Wrangler
-before exposing the pipeline worker publicly. Localhost and deterministic
-harness runs are allowed without the token for development.
+On deployed pipeline workers, `/__pipeline/status` and `/__pipeline/run/*`
+require `Authorization: Bearer $PIPELINE_ADMIN_TOKEN`. Prefer `POST` for
+`/__pipeline/run/*` on production (`npm run refresh:remote` does this).
+Set the secret with Wrangler before exposing the pipeline worker publicly.
+Localhost and deterministic harness runs are allowed without the token for
+development.
 
 ### Rate-limit aware development
 

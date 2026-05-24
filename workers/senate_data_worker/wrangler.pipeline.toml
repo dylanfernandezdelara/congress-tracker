@@ -17,6 +17,8 @@ TARGET_STATE = "ALL"
 # Optional: OpenRouter attribution headers.
 # OPENROUTER_APP_REFERER = "https://your-site.example"
 # OPENROUTER_APP_TITLE = "congress_tracker_worker"
+# Required before exposing manual pipeline routes on a public deployment:
+#   wrangler secret put PIPELINE_ADMIN_TOKEN --config wrangler.pipeline.toml
 
 [[r2_buckets]]
 binding = "DATA_BUCKET"

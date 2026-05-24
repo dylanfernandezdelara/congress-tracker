@@ -87,7 +87,7 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
 
 describe("pipeline debug routes", () => {
   it("returns pipeline status without overlapping local D1 reads", async () => {
-    const request = new Request("https://worker.example.com/__pipeline/status");
+    const request = new Request("http://127.0.0.1:8788/__pipeline/status");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json();
 
@@ -113,6 +113,46 @@ describe("pipeline debug routes", () => {
         },
       ],
     });
+  });
+
+  it("requires an admin token for non-local pipeline status", async () => {
+    const request = new Request("https://worker.example.com/__pipeline/status");
+    const response = await handler.fetch(request, createMockEnv() as any);
+    const body = await response.json() as { error: string };
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe("pipeline_admin_token_required");
+  });
+
+  it("returns pipeline status for non-local callers with a valid admin token", async () => {
+    const request = new Request("https://worker.example.com/__pipeline/status", {
+      headers: { Authorization: "Bearer correct-token" },
+    });
+    const response = await handler.fetch(
+      request,
+      createMockEnv({ PIPELINE_ADMIN_TOKEN: "correct-token" }) as any
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ status: "ok", d1_enabled: true });
+  });
+
+  it("accepts POST for non-local manual run routes with a valid admin token", async () => {
+    const runSpy = vi.spyOn(scheduledIngestion, "runScheduledIngestion").mockResolvedValue();
+    const request = new Request("https://worker.example.com/__pipeline/run/ingestion", {
+      method: "POST",
+      headers: { Authorization: "Bearer correct-token" },
+    });
+    const response = await handler.fetch(
+      request,
+      createMockEnv({ PIPELINE_ADMIN_TOKEN: "correct-token" }) as any
+    );
+    const body = await response.json() as { status: string; action: string };
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ status: "ok", action: "scheduled_ingestion" });
+    expect(runSpy).toHaveBeenCalledOnce();
+    runSpy.mockRestore();
   });
 
   it("requires an admin token for non-local manual run routes", async () => {

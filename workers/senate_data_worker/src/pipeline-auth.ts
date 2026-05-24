@@ -10,7 +10,7 @@ export function buildCorsHeaders(env: PipelineEnv): HeadersInit {
   const restrictedOrigin = allowedOrigin && allowedOrigin !== "*" ? allowedOrigin : null;
   const headers: HeadersInit = {
     "Access-Control-Allow-Origin": restrictedOrigin ?? "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Pipeline-Admin-Token",
   };
   if (restrictedOrigin) {
@@ -49,7 +49,7 @@ export async function tokenMatches(provided: string, expected: string): Promise<
   return diff === 0;
 }
 
-export async function authorizePipelineRun(
+export async function authorizePipelineAdmin(
   request: Request,
   env: PipelineEnv,
   jsonResponse: JsonResponseBuilder
