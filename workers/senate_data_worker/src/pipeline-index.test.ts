@@ -110,4 +110,50 @@ describe("pipeline debug routes", () => {
       ],
     });
   });
+
+  it("requires an admin token for non-local manual run routes", async () => {
+    const request = new Request("https://worker.example.com/__pipeline/run/evidence?vote=abc");
+    const response = await handler.fetch(request, createMockEnv() as any);
+    const body = await response.json() as { error: string };
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe("pipeline_admin_token_required");
+  });
+
+  it("rejects invalid admin tokens for manual run routes", async () => {
+    const request = new Request("https://worker.example.com/__pipeline/run/evidence?vote=abc", {
+      headers: { Authorization: "Bearer wrong-token" },
+    });
+    const response = await handler.fetch(
+      request,
+      createMockEnv({ PIPELINE_ADMIN_TOKEN: "correct-token" }) as any
+    );
+    const body = await response.json() as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("unauthorized");
+  });
+
+  it("allows valid admin tokens before validating manual route input", async () => {
+    const request = new Request("https://worker.example.com/__pipeline/run/evidence?vote=abc", {
+      headers: { Authorization: "Bearer correct-token" },
+    });
+    const response = await handler.fetch(
+      request,
+      createMockEnv({ PIPELINE_ADMIN_TOKEN: "correct-token" }) as any
+    );
+    const body = await response.json() as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("invalid_vote");
+  });
+
+  it("allows local manual run routes without an admin token", async () => {
+    const request = new Request("http://127.0.0.1:8788/__pipeline/run/evidence?vote=abc");
+    const response = await handler.fetch(request, createMockEnv() as any);
+    const body = await response.json() as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("invalid_vote");
+  });
 });

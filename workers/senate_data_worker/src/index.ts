@@ -41,13 +41,9 @@ import type {
 } from "./types";
 import { STATE_CODES } from "./states";
 import {
-  buildLatestKey,
   buildLatestChamberContextKey,
   buildLatestBriefingKey,
-  buildMetaKey,
-  buildSnapshotKey,
   buildMemberKeys,
-  buildMemberLatestKey,
   buildMembersIndexKey,
   buildActivitiesIndexKey,
   buildVoteLedgerKey,
@@ -73,6 +69,7 @@ import {
 import type { PipelineJob, PipelineMaterialization } from "./platform-types";
 import { parseVoteDetailXml, parseVoteMenuXml } from "./xml";
 import { extractVoteEvidence } from "./vote-evidence";
+import { handleApiFetch } from "./http";
 
 // ============================================================================
 // Environment Types
@@ -94,6 +91,7 @@ interface Env {
   OPENROUTER_CANARY_PERCENT?: string;
   OPENROUTER_MAX_NEW_ANALYSES?: string;
   DATA_FRESHNESS_MAX_HOURS?: string;
+  PIPELINE_ADMIN_TOKEN?: string;
   EVIDENCE_MAX_BILLS?: string;
   EVIDENCE_BILL_CONCURRENCY?: string;
   EVIDENCE_ENDPOINT_FANOUT?: string;
@@ -119,7 +117,7 @@ function buildCorsHeaders(env: Env): HeadersInit {
   const headers: HeadersInit = {
     "Access-Control-Allow-Origin": restrictedOrigin ?? "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Pipeline-Admin-Token",
   };
   if (restrictedOrigin) {
     headers["Vary"] = "Origin";
@@ -129,9 +127,6 @@ function buildCorsHeaders(env: Env): HeadersInit {
 
 // Cache-Control values for the public HTTP API.
 const cacheHealth = "s-maxage=60, max-age=0, must-revalidate";
-const cacheLatest = "s-maxage=300, stale-while-revalidate=86400";
-const cacheSnapshot = "s-maxage=86400, stale-while-revalidate=604800";
-
 const buildJsonResponse = (body: unknown, corsHeaders: HeadersInit, init?: ResponseInit) =>
   new Response(JSON.stringify(body), {
     ...init,
@@ -141,17 +136,6 @@ const buildJsonResponse = (body: unknown, corsHeaders: HeadersInit, init?: Respo
       ...(init?.headers ?? {}),
     },
   });
-
-const buildNotFoundResponse = (path: string, corsHeaders: HeadersInit) =>
-  buildJsonResponse(
-    {
-      error: "not_found",
-      message: "Resource not found",
-      path,
-    },
-    corsHeaders,
-    { status: 404 }
-  );
 
 function parseBool(value: string | undefined, fallback = false): boolean {
   if (!value) return fallback;
@@ -183,6 +167,73 @@ function parseCsvList(value: string | undefined): string[] {
 function computePct(numerator: number, denominator: number): number {
   if (denominator <= 0) return 0;
   return Number(((numerator / denominator) * 100).toFixed(2));
+}
+
+type JsonResponseBuilder = (body: unknown, init?: ResponseInit) => Response;
+
+const LOCAL_PIPELINE_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const TOKEN_ENCODER = new TextEncoder();
+
+function isLocalRequest(request: Request): boolean {
+  return LOCAL_PIPELINE_HOSTS.has(new URL(request.url).hostname);
+}
+
+function readPipelineAdminToken(request: Request): string {
+  const authorization = request.headers.get("Authorization")?.trim() ?? "";
+  const bearerMatch = authorization.match(/^Bearer\s+(.+)$/i);
+  if (bearerMatch?.[1]?.trim()) return bearerMatch[1].trim();
+  return request.headers.get("X-Pipeline-Admin-Token")?.trim() ?? "";
+}
+
+async function tokenMatches(provided: string, expected: string): Promise<boolean> {
+  const [providedHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", TOKEN_ENCODER.encode(provided)),
+    crypto.subtle.digest("SHA-256", TOKEN_ENCODER.encode(expected)),
+  ]);
+  const timingSafeEqual = (crypto.subtle as SubtleCrypto & {
+    timingSafeEqual?: (left: ArrayBuffer, right: ArrayBuffer) => boolean;
+  }).timingSafeEqual;
+  if (timingSafeEqual) return timingSafeEqual(providedHash, expectedHash);
+
+  const providedBytes = new Uint8Array(providedHash);
+  const expectedBytes = new Uint8Array(expectedHash);
+  let diff = providedBytes.length ^ expectedBytes.length;
+  for (let i = 0; i < Math.max(providedBytes.length, expectedBytes.length); i += 1) {
+    diff |= (providedBytes[i] ?? 0) ^ (expectedBytes[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+async function authorizePipelineRun(
+  request: Request,
+  env: Env,
+  jsonResponse: JsonResponseBuilder
+): Promise<Response | null> {
+  if (isLocalRequest(request) || isHarnessFixtureEnv(env)) return null;
+
+  const expectedToken = env.PIPELINE_ADMIN_TOKEN?.trim();
+  if (!expectedToken) {
+    return jsonResponse(
+      {
+        error: "pipeline_admin_token_required",
+        message: "Set PIPELINE_ADMIN_TOKEN before exposing manual pipeline run endpoints.",
+      },
+      { status: 503 }
+    );
+  }
+
+  const providedToken = readPipelineAdminToken(request);
+  if (!providedToken || !(await tokenMatches(providedToken, expectedToken))) {
+    return jsonResponse(
+      {
+        error: "unauthorized",
+        message: "Provide a valid pipeline admin token.",
+      },
+      { status: 401, headers: { "WWW-Authenticate": "Bearer" } }
+    );
+  }
+
+  return null;
 }
 
 interface QualityGateConfig {
@@ -355,7 +406,6 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
   const corsHeaders = buildCorsHeaders(env);
   const jsonResponse = (body: unknown, init?: ResponseInit) =>
     buildJsonResponse(body, corsHeaders, init);
-  const notFoundResponse = (path: string) => buildNotFoundResponse(path, corsHeaders);
 
   // Handle CORS preflight
   if (request.method === "OPTIONS") {
@@ -448,6 +498,11 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     );
   }
 
+  if (pathname.startsWith("/__pipeline/run/")) {
+    const unauthorized = await authorizePipelineRun(request, env, jsonResponse);
+    if (unauthorized) return unauthorized;
+  }
+
   if (pathname === "/__pipeline/run/materialize") {
     const [ledger, overview, activityIndex] = await Promise.all([
       readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey()),
@@ -516,147 +571,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     );
   }
 
-  // Match /state/{STATE}/latest.json
-  const latestMatch = pathname.match(/^\/state\/([A-Z]{2})\/latest\.json$/);
-  if (latestMatch) {
-    const state = latestMatch[1];
-    const key = buildLatestKey(state);
-    const data = await readJsonFromR2<SnapshotJson>(env.DATA_BUCKET, key);
-
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheLatest },
-    });
-  }
-
-  // Match /members/index.json
-  if (pathname === "/members/index.json") {
-    const key = buildMembersIndexKey();
-    const data = await readJsonFromR2<MemberIndexJson>(env.DATA_BUCKET, key);
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheLatest },
-    });
-  }
-
-  // Match /activities/index.json
-  if (pathname === "/activities/index.json") {
-    const key = buildActivitiesIndexKey();
-    const data = await readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, key);
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheLatest },
-    });
-  }
-
-  // Match /votes/ledger.json
-  if (pathname === "/votes/ledger.json") {
-    const key = buildVoteLedgerKey();
-    const data = await readJsonFromR2<VoteLedger>(env.DATA_BUCKET, key);
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheLatest },
-    });
-  }
-
-  // Match /stats/overview.json
-  if (pathname === "/stats/overview.json") {
-    const key = buildSessionOverviewKey();
-    const data = await readJsonFromR2<SessionOverview>(env.DATA_BUCKET, key);
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheLatest },
-    });
-  }
-
-  // Match /member/{BIOGUIDE}/latest.json
-  const memberLatestMatch = pathname.match(/^\/member\/([A-Z]\d{6})\/latest\.json$/);
-  if (memberLatestMatch) {
-    const bioguide = memberLatestMatch[1];
-    const key = buildMemberLatestKey(bioguide);
-    const data = await readJsonFromR2<MemberActivityJson>(env.DATA_BUCKET, key);
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheLatest },
-    });
-  }
-
-  // Match /member/{BIOGUIDE}/{YYYY-MM-DD}.json
-  const memberSnapshotMatch = pathname.match(
-    /^\/member\/([A-Z]\d{6})\/(\d{4}-\d{2}-\d{2})\.json$/
-  );
-  if (memberSnapshotMatch) {
-    const bioguide = memberSnapshotMatch[1];
-    const date = memberSnapshotMatch[2];
-    const key = buildMemberKeys(bioguide, date).snapshot;
-    const data = await readJsonFromR2<MemberActivityJson>(env.DATA_BUCKET, key);
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheSnapshot },
-    });
-  }
-
-  // Match /state/{STATE}/_meta.json
-  const metaMatch = pathname.match(/^\/state\/([A-Z]{2})\/_meta\.json$/);
-  if (metaMatch) {
-    const state = metaMatch[1];
-    const key = buildMetaKey(state);
-    const data = await readJsonFromR2<MetaJson>(env.DATA_BUCKET, key);
-
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheLatest },
-    });
-  }
-
-  // Match /state/{STATE}/{YYYY-MM-DD}.json (dated snapshot)
-  const snapshotMatch = pathname.match(
-    /^\/state\/([A-Z]{2})\/(\d{4}-\d{2}-\d{2})\.json$/
-  );
-  if (snapshotMatch) {
-    const state = snapshotMatch[1];
-    const date = snapshotMatch[2];
-    const key = buildSnapshotKey(state, date);
-    const data = await readJsonFromR2<SnapshotJson>(env.DATA_BUCKET, key);
-
-    if (!data) {
-      return notFoundResponse(pathname);
-    }
-
-    return jsonResponse(data, {
-      status: 200,
-      headers: { "Cache-Control": cacheSnapshot },
-    });
-  }
-
-  // No route matched
-  return notFoundResponse(pathname);
+  return handleApiFetch(request, env);
 }
 
 // ============================================================================

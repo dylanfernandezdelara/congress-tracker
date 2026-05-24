@@ -1,6 +1,7 @@
 # Environment files
 .env
 .env.local
+.env.remote
 .env.*.local
 .dev.vars
 .dev.vars.*
@@ -11,6 +12,7 @@ node_modules/
 
 # Cloudflare Wrangler
 .wrangler/
+workers/senate_data_worker/wrangler.remote.toml
 
 # Build artifacts
 /target/

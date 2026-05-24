@@ -308,6 +308,11 @@ The local pipeline also exposes admin endpoints for debugging:
 - `GET /__pipeline/run/evidence?vote=46`
 - `GET /__pipeline/run/historical-backfill?congress=116`
 
+On deployed pipeline workers, `/__pipeline/run/*` endpoints require
+`Authorization: Bearer $PIPELINE_ADMIN_TOKEN`. Set that secret with Wrangler
+before exposing the pipeline worker publicly. Localhost and deterministic
+harness runs are allowed without the token for development.
+
 ### Rate-limit aware development
 
 The source adapters are intentionally conservative:
