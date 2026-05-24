@@ -1,48 +1,20 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ApiError, fetchVoteDetail, type VoteDetailResponse } from '../api'
+import type { VoteDetailResponse } from '../api'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Separator } from '../components/ui/separator'
-import { E2E_VOTE_DETAILS } from '../e2eData'
+import { useE2eLink } from '../hooks/useE2eLink'
+import { useVoteDetail } from '../hooks/useVoteDetail'
 import { cn } from '../lib/utils'
-import { isE2eMode } from '../utils/e2eMode'
-
-function formatVoteDate(value: string): string {
-  const date = new Date(`${value}T12:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date)
-}
-
-function normalizeErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return `${error.message} (HTTP ${error.status})`
-  if (error instanceof Error) return error.message
-  return 'Unexpected fetch error.'
-}
-
-function prettyParty(value: string): string {
-  if (value === 'D') return 'Democrats'
-  if (value === 'R') return 'Republicans'
-  if (value === 'I') return 'Independents'
-  return value
-}
-
-function statusLabel(value: 'passed' | 'rejected' | 'in-progress'): string {
-  if (value === 'passed') return 'Passed'
-  if (value === 'rejected') return 'Rejected'
-  return 'In progress'
-}
-
-function coverageLabel(value: VoteDetailResponse['source_coverage']['level']): string {
-  if (value === 'full') return 'Full context'
-  if (value === 'partial') return 'Partial context'
-  return 'Minimal context'
-}
+import {
+  confidenceVariant,
+  coverageLabel,
+  formatVoteDate,
+  prettyParty,
+  statusLabel,
+} from '../utils/voteLabels'
 
 function summarySourceLabel(detail: VoteDetailResponse): string {
   const basis = detail.vote_content_profile.source_basis
@@ -54,12 +26,6 @@ function summarySourceLabel(detail: VoteDetailResponse): string {
 
 function prettyStepType(value: string): string {
   return value.split('_').join(' ')
-}
-
-function confidenceVariant(value: 'high' | 'medium' | 'low'): 'success' | 'secondary' | 'destructive' {
-  if (value === 'high') return 'success'
-  if (value === 'medium') return 'secondary'
-  return 'destructive'
 }
 
 function CaseNote({
@@ -98,14 +64,8 @@ function StatBlock({
 
 export default function VoteDetail() {
   const params = useParams()
-  const [detail, setDetail] = useState<VoteDetailResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  const e2eMode = useMemo(
-    () => isE2eMode(window.location.search),
-    [],
-  )
+  const toE2ePath = useE2eLink()
+  const { detail, error, isLoading } = useVoteDetail(params.congress, params.session, params.voteNumber)
 
   useEffect(() => {
     if (!detail) {
@@ -114,49 +74,6 @@ export default function VoteDetail() {
     }
     document.title = `${detail.vote.title} | Congress Tracker`
   }, [detail])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function run() {
-      setIsLoading(true)
-      setError(null)
-
-      const { congress, session, voteNumber } = params
-      if (!congress || !session || !voteNumber) {
-        setError('Missing vote identifier.')
-        setIsLoading(false)
-        return
-      }
-
-      if (e2eMode) {
-        const fixture = E2E_VOTE_DETAILS[`${congress}:${session}:${voteNumber}`]
-        if (!cancelled) {
-          setDetail(fixture ?? null)
-          setError(fixture ? null : 'No fixture detail exists for this vote.')
-          setIsLoading(false)
-        }
-        return
-      }
-
-      try {
-        const result = await fetchVoteDetail(congress, session, voteNumber)
-        if (cancelled) return
-        setDetail(result)
-      } catch (err) {
-        if (cancelled) return
-        setDetail(null)
-        setError(`Vote detail unavailable. ${normalizeErrorMessage(err)}`)
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-
-    run()
-    return () => {
-      cancelled = true
-    }
-  }, [e2eMode, params])
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading vote detail...</p>
@@ -172,7 +89,7 @@ export default function VoteDetail() {
           </p>
         </div>
         <Button asChild variant="outline" size="sm" className="w-fit">
-          <Link to={e2eMode ? '/?e2e=1' : '/'}>Back to briefing</Link>
+          <Link to={toE2ePath('/')}>Back to briefing</Link>
         </Button>
       </div>
     )
@@ -181,7 +98,7 @@ export default function VoteDetail() {
   return (
     <div className="flex flex-col gap-8">
       <Button asChild variant="ghost" size="sm" className="w-fit px-0 text-primary">
-        <Link to={e2eMode ? '/?e2e=1' : '/'}>&larr; Back to briefing</Link>
+        <Link to={toE2ePath('/')}>&larr; Back to briefing</Link>
       </Button>
 
       <Card className="draft-grid">

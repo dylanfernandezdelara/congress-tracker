@@ -113,6 +113,19 @@ describe('Home', () => {
     expect(screen.getByText('War powers resolution')).toBeInTheDocument()
   })
 
+  it('loads fixture briefing without calling fetchLatestBriefing when ?e2e=1', async () => {
+    window.history.pushState({}, '', '/?e2e=1')
+
+    render(
+      <MemoryRouter initialEntries={['/?e2e=1']}>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Review mode')).toBeInTheDocument()
+    expect(fetchLatestBriefing).not.toHaveBeenCalled()
+  })
+
   it('shows a recent vote as the lead briefing item when it falls inside the freshness window', async () => {
     fetchLatestBriefing.mockResolvedValue(
       makeBriefing([

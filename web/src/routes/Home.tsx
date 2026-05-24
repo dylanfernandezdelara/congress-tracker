@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, fetchLatestBriefing, type BriefingFeedItem, type BriefingFeedResponse } from '../api'
+import type { BriefingFeedItem } from '../api'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
-import { E2E_BRIEFING } from '../e2eData'
-import { isE2eMode } from '../utils/e2eMode'
+import { useBriefingFeed } from '../hooks/useBriefingFeed'
+import { useE2eLink } from '../hooks/useE2eLink'
+import { useE2eMode } from '../hooks/useE2eMode'
+import { formatBriefingVoteDate } from '../utils/voteLabels'
 import { readHarnessNow } from '../utils/harnessNow'
 
 const MAX_HOME_VOTE_AGE_DAYS = 7
@@ -38,22 +40,6 @@ function formatWashingtonTime(date: Date): string {
   }).format(date)
 }
 
-function formatVoteDate(value: string): string {
-  const date = new Date(`${value}T12:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date)
-}
-
-function normalizeErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return `${error.message} (HTTP ${error.status})`
-  if (error instanceof Error) return error.message
-  return 'Unexpected fetch error.'
-}
-
 function trimSummary(summary: string, maxLength = 360): string {
   if (summary.length <= maxLength) return summary
   return `${summary.slice(0, maxLength).trimEnd()}…`
@@ -77,23 +63,23 @@ function isFreshVoteDate(voteDate: string, todayDate: string): boolean {
   return ageDays >= 0 && ageDays <= MAX_HOME_VOTE_AGE_DAYS
 }
 
-function VoteSummaryRow({ item, e2eMode }: { item: BriefingFeedItem; e2eMode: boolean }) {
-  const to = e2eMode ? `${item.detail_path}?e2e=1` : item.detail_path
+function VoteSummaryRow({ item }: { item: BriefingFeedItem }) {
+  const toE2ePath = useE2eLink()
 
   return (
     <Card className="border-0 shadow-sm">
       <CardContent className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="min-w-0 flex-1">
-          <p className="document-label text-muted-foreground">{formatVoteDate(item.vote_date)}</p>
+          <p className="document-label text-muted-foreground">{formatBriefingVoteDate(item.vote_date)}</p>
           <h2 className="document-title mt-2 text-xl font-semibold leading-snug text-foreground sm:text-2xl">
-            <Link className="transition-colors hover:text-primary" to={to}>
+            <Link className="transition-colors hover:text-primary" to={toE2ePath(item.detail_path)}>
               {item.title}
             </Link>
           </h2>
           <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">{trimSummary(item.summary)}</p>
         </div>
         <Button asChild size="sm" variant="outline" className="shrink-0 self-start">
-          <Link to={to}>Full detail</Link>
+          <Link to={toE2ePath(item.detail_path)}>Full detail</Link>
         </Button>
       </CardContent>
     </Card>
@@ -105,17 +91,10 @@ export default function Home() {
     () => readHarnessNow(window.location.search, window.location.hostname),
     [],
   )
-  const [briefing, setBriefing] = useState<BriefingFeedResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [usingDemo, setUsingDemo] = useState(false)
+  const { briefing, error, isLoading, usingDemo } = useBriefingFeed()
   const [currentDate, setCurrentDate] = useState(() => harnessNow ?? new Date())
   const [dcNow, setDcNow] = useState(() => harnessNow ?? new Date())
-
-  const e2eMode = useMemo(
-    () => isE2eMode(window.location.search),
-    [],
-  )
+  const e2eMode = useE2eMode()
 
   useEffect(() => {
     document.title = 'Congress Tracker'
@@ -146,41 +125,6 @@ export default function Home() {
     }
   }, [harnessNow])
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function run() {
-      setIsLoading(true)
-      setError(null)
-      setUsingDemo(false)
-
-      if (e2eMode) {
-        if (cancelled) return
-        setBriefing(E2E_BRIEFING)
-        setUsingDemo(true)
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        const result = await fetchLatestBriefing()
-        if (cancelled) return
-        setBriefing(result)
-      } catch (err) {
-        if (cancelled) return
-        setBriefing(null)
-        setError(`Live briefing unavailable. ${normalizeErrorMessage(err)}`)
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-
-    run()
-    return () => {
-      cancelled = true
-    }
-  }, [e2eMode])
-
   const todayDate = useMemo(() => localIsoDate(currentDate), [currentDate])
   const todayLabel = useMemo(() => formatCalendarDate(currentDate), [currentDate])
   const dcTimeLabel = useMemo(() => formatWashingtonTime(dcNow), [dcNow])
@@ -190,19 +134,17 @@ export default function Home() {
     [briefing, todayDate],
   )
 
-  /** If nothing falls in the rolling freshness window (common when local ledger dates lag the clock), still show feeds. */
   const displayedItems = useMemo(() => {
     if (freshItems.length > 0) return freshItems
     return briefing?.items ?? []
   }, [freshItems, briefing?.items])
 
   const showingOlderVotes = freshItems.length === 0 && (briefing?.items.length ?? 0) > 0
-
   const hasDisplayed = displayedItems.length > 0
 
   return (
     <div className="flex flex-col gap-4">
-      {usingDemo && (
+      {(usingDemo || e2eMode) && (
         <div className="note-panel border-primary/20 bg-primary/[0.05]">
           <p className="document-label text-primary/80">Review mode</p>
           <p className="mt-2 text-sm leading-6 text-foreground">
@@ -256,7 +198,7 @@ export default function Home() {
 
               <div className="flex flex-col gap-3">
                 {displayedItems.map((item) => (
-                  <VoteSummaryRow key={item.id} item={item} e2eMode={e2eMode} />
+                  <VoteSummaryRow key={item.id} item={item} />
                 ))}
               </div>
             </>
