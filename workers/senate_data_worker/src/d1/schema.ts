@@ -1,3 +1,5 @@
+// Production applies workers/senate_data_worker/migrations/*.sql via Wrangler.
+// ensurePlatformSchema() is a local/test safety net for lazy schema alignment.
 export const PLATFORM_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS votes (
   congress INTEGER NOT NULL,

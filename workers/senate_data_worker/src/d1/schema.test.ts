@@ -27,5 +27,14 @@ describe("ensurePlatformSchema", () => {
       expect(db.tables.has(table), `missing table ${table}`).toBe(true);
     }
     expect(db.indexes.has("idx_ingested_vote_details_date")).toBe(true);
+    expect(db.tables.has("ingested_vote_details")).toBe(true);
+  });
+
+  it("is safe on an already-initialized schema", async () => {
+    const db = createSchemaTrackingDb();
+    await ensurePlatformSchema(db);
+    db.tables.add("ingested_vote_details");
+    db.indexes.add("idx_ingested_vote_details_date");
+    await expect(ensurePlatformSchema(db)).resolves.toBeUndefined();
   });
 });
