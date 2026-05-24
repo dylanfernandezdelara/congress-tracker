@@ -16,7 +16,7 @@ import type {
   RecordDocumentWrite,
   VoteArgumentExcerptWrite,
   VoteEvidenceWrite,
-} from "./d1";
+} from "./d1/materialization";
 
 interface EvidenceCandidate {
   documentId: string;

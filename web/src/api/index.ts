@@ -88,19 +88,19 @@ export {
   setApiUrlOverride,
 } from './config';
 
-// API client
+// API client (current product surface)
+export { ApiError, fetchLatestBriefing, fetchVoteDetail } from './client';
+
+// Legacy R2/ledger endpoints (scripts, older tooling)
 export {
-  ApiError,
   fetchActivitiesIndex,
   fetchDataHealth,
-  fetchLatestBriefing,
+  fetchHealth,
   fetchMemberLatest,
   fetchMembersIndex,
-  fetchHealth,
   fetchSessionOverview,
   fetchStateLatest,
   fetchStateMeta,
   fetchStateSnapshot,
-  fetchVoteDetail,
   fetchVoteLedger,
-} from './client';
+} from './legacy';

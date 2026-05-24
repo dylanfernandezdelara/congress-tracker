@@ -77,7 +77,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - `workers/senate_data_worker/src/index.ts` — pipeline orchestration, scheduled handler, queue processing
 - `workers/senate_data_worker/src/http.ts` — API endpoints
 - `workers/senate_data_worker/src/read-model.ts` — briefing/detail materialization
-- `workers/senate_data_worker/src/d1.ts` — D1 read/write helpers
+- `workers/senate_data_worker/src/d1/` — D1 schema and repository modules
 - `web/src/` — frontend app and API client
 
 ## Notes

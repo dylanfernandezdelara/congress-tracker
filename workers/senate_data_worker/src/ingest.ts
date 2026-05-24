@@ -29,7 +29,7 @@ import {
   readIngestedVoteDetailsFromD1,
   readKnownVoteNumbersFromD1,
   writeIngestedVoteDetailsToD1,
-} from "./d1";
+} from "./d1/ingested-votes";
 import { buildStateKeys } from "./storage";
 import type {
   IngestConfig,

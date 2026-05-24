@@ -7,7 +7,7 @@ import {
 } from "./openrouter";
 import { mapWithConcurrency } from "./concurrency";
 import { buildPipelineMaterialization, buildVoteDetailResponse } from "./read-model";
-import { writePlatformMaterializationToD1 } from "./d1";
+import { writePlatformMaterializationToD1 } from "./d1/materialization";
 import type { PipelineMaterialization } from "./platform-types";
 import {
   buildLatestChamberContextKey,

@@ -111,7 +111,8 @@ congress-tracker/
 │       │   ├── api-index.ts
 │       │   ├── pipeline-index.ts
 │       │   ├── http.ts
-│       │   ├── d1.ts
+│       │   ├── d1/
+│       │   ├── worker-env.ts
 │       │   ├── read-model.ts
 │       │   └── index.ts
 │       ├── wrangler.toml
@@ -198,7 +199,7 @@ The platform read-model schema lives in:
 - `workers/senate_data_worker/migrations/0002_pipeline_state.sql`
 - `workers/senate_data_worker/migrations/0003_issue_key.sql`
 
-The worker can also create the same schema lazily through `src/d1.ts`, but the migration file is the preferred deployment path.
+The worker can also create the same schema lazily through `src/d1/schema.ts`, but the migration file is the preferred deployment path.
 
 ## Development
 

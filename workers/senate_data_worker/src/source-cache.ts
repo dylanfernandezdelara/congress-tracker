@@ -1,5 +1,5 @@
 import type { FetchConfig } from "./fetch";
-import { readSourceFetchLog, recordSourceFetchLog } from "./d1";
+import { readSourceFetchLog, recordSourceFetchLog } from "./d1/source-log";
 import { isHarnessFixtureMode, resolveHarnessFixtureResponse } from "./harness";
 import {
   buildSourceArtifactKey,

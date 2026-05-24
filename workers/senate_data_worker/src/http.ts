@@ -8,7 +8,7 @@ import type {
   VoteLedger,
 } from "./types";
 import type { BriefingFeedResponse, VoteDetailResponse } from "./platform-types";
-import { readLatestBriefingFromD1, readVoteDetailFromD1 } from "./d1";
+import { readLatestBriefingFromD1, readVoteDetailFromD1 } from "./d1/materialization";
 import { buildBriefingFeedResponse, buildVoteDetailResponse } from "./read-model";
 import {
   buildActivitiesIndexKey,
@@ -26,15 +26,8 @@ import {
   readJsonFromR2,
 } from "./storage";
 
-export interface ApiEnv {
-  DATA_BUCKET: R2Bucket;
-  CONGRESS: string;
-  SESSION: string;
-  TARGET_STATE: string;
-  ALLOWED_ORIGIN?: string;
-  DATA_FRESHNESS_MAX_HOURS?: string;
-  SENATE_DB?: D1Database;
-}
+export type { ApiEnv } from "./worker-env";
+import type { ApiEnv } from "./worker-env";
 
 const cacheHealth = "s-maxage=60, max-age=0, must-revalidate";
 const cacheLatest = "s-maxage=300, stale-while-revalidate=86400";

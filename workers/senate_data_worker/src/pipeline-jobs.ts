@@ -2,12 +2,8 @@ import {
   fetchVoteDetailsParallel,
   fetchVoteMenu,
 } from "./fetch";
-import {
-  readPipelineCheckpoint,
-  writeHistoricalVoteBatchToD1,
-  writePipelineCheckpoint,
-  writeVoteEvidenceToD1,
-} from "./d1";
+import { readPipelineCheckpoint, writePipelineCheckpoint } from "./d1/checkpoints";
+import { writeHistoricalVoteBatchToD1, writeVoteEvidenceToD1 } from "./d1/materialization";
 import type { PipelineJob } from "./platform-types";
 import { parseVoteDetailXml, parseVoteMenuXml } from "./xml";
 import { extractVoteEvidence } from "./vote-evidence";

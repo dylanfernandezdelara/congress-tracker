@@ -5,7 +5,6 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { useBriefingFeed } from '../hooks/useBriefingFeed'
 import { useE2eLink } from '../hooks/useE2eLink'
-import { useE2eMode } from '../hooks/useE2eMode'
 import { formatBriefingVoteDate } from '../utils/voteLabels'
 import { readHarnessNow } from '../utils/harnessNow'
 
@@ -94,8 +93,6 @@ export default function Home() {
   const { briefing, error, isLoading, usingDemo } = useBriefingFeed()
   const [currentDate, setCurrentDate] = useState(() => harnessNow ?? new Date())
   const [dcNow, setDcNow] = useState(() => harnessNow ?? new Date())
-  const e2eMode = useE2eMode()
-
   useEffect(() => {
     document.title = 'Congress Tracker'
   }, [])
@@ -144,7 +141,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-4">
-      {(usingDemo || e2eMode) && (
+      {usingDemo && (
         <div className="note-panel border-primary/20 bg-primary/[0.05]">
           <p className="document-label text-primary/80">Review mode</p>
           <p className="mt-2 text-sm leading-6 text-foreground">
