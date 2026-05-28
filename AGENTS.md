@@ -43,7 +43,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Local toggle: open the app with `/?e2e=1` (vote detail links preserve the query param).
 - Build-time toggle: set `VITE_FORCE_E2E=1` when running `npm --prefix web run build` so fixture mode is baked into the bundle without a URL param.
 - Shared detection lives in `web/src/utils/e2eMode.ts` (`isE2eMode()`).
-- Cloudflare Pages preview deploys use `.github/workflows/cloudflare-pages-preview.yml`, which builds with `VITE_FORCE_E2E=1` and deploys via `web/wrangler.toml` (`congress-tracker-dev`).
+- Cloudflare Pages preview deploys use `.github/workflows/cloudflare-pages-preview.yml`, which builds with `VITE_FORCE_E2E=1`, deploys via `web/wrangler.toml` (`congress-tracker-dev`), and posts/updates a sticky PR comment with the branch preview URL (requires `CLOUDFLARE_API_TOKEN` in repo secrets).
 - Preview API worker config for fixture-backed deploys: `workers/senate_data_worker/wrangler.dev.toml`.
 - This fixture path is for frontend review and preview smoke checks only. CI truth for end-to-end behavior remains `npm run harness:ci`, which exercises the local API worker and deterministic harness fixtures.
 

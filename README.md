@@ -201,6 +201,20 @@ The platform read-model schema lives in:
 
 The worker can also create the same schema lazily through `src/d1/schema.ts`, but the migration file is the preferred deployment path.
 
+### Pull request web previews
+
+Every pull request from this repository triggers `.github/workflows/cloudflare-pages-preview.yml`, which:
+
+1. Builds the Vite frontend with `VITE_FORCE_E2E=1` (fixture briefing data for review).
+2. Deploys to the Cloudflare Pages project `congress-tracker-dev` (`web/wrangler.toml`).
+3. Posts or updates a sticky PR comment with the branch preview URL (for example `https://my-branch.congress-tracker-dev.pages.dev`).
+
+Required GitHub Actions secret:
+
+- `CLOUDFLARE_API_TOKEN` — API token with Cloudflare Pages edit permission for the account that owns `congress-tracker-dev`.
+
+Fork PRs are skipped because the workflow cannot use repository secrets on untrusted forks.
+
 ## Development
 
 ### Local setup (first run)
