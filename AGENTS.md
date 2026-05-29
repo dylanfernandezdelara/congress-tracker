@@ -12,8 +12,8 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Web deps: `npm --prefix web install`
 
 ### Local setup
-- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`.
-- Required local secrets: `CONGRESS_API_KEY`, `GOVINFO_API_KEY`.
+- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or run `./scripts/cursor-cloud-setup.sh` (copies the example when missing). The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the API worker at `:8787`; `harness:ci`, `./scripts/dev-all.sh`, and `harness:browser` all read `.dev.vars` for CORS. Use a specific origin in production deploy secrets, not in the committed example.
+- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** against Congress.gov/GovInfo; placeholder values from the example file are enough for harness runs, `./scripts/dev-all.sh` with fixture data, and fixture UI mode.
 - Optional local synthesis settings: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_APP_REFERER`, `OPENROUTER_APP_TITLE`, `OPENROUTER_SHADOW_MODE`, `OPENROUTER_CANARY_PERCENT`, `OPENROUTER_MAX_NEW_ANALYSES`.
 - Deterministic harness runs do not require live upstream secrets; they boot workers with `HARNESS_MODE=fixture`, `HARNESS_FIXTURE_SET=canonical`, and a fixed `HARNESS_NOW`.
 - Local D1 and R2 bindings are already configured in both Wrangler configs; do not change remote resource IDs just to make local development work.
@@ -23,6 +23,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - API worker only: `npm --prefix workers/senate_data_worker run dev:api`
 - Pipeline worker only: `npm --prefix workers/senate_data_worker run dev:pipeline`
 - Web only: `npm --prefix web run dev`
+- Web only with fixture briefing (no workers): `VITE_FORCE_E2E=1 npm --prefix web run dev`
 
 ### Data refresh
 - Trigger local ingestion: `curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion`
@@ -86,3 +87,11 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - The pipeline worker is responsible for ingestion/materialization; scheduled workers are not triggered automatically in local dev.
 - Local stack ports from the repo scripts: API `http://127.0.0.1:8787`, Pipeline `http://127.0.0.1:8788`, Web `http://127.0.0.1:5173`.
 - `web/src/e2eData.ts` supplies fake briefing and vote detail data for fixture review mode (`/?e2e=1` or `VITE_FORCE_E2E=1`). The deterministic harness exercises the live local API worker instead.
+
+## Cursor Cloud
+
+Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh` (`npm ci` in `workers/senate_data_worker` and `web`, Playwright Chromium, creates `.dev.vars` from `.dev.vars.example` when missing). Optional **terminals** start `./scripts/dev-all.sh` or fixture-mode Vite — see **Local development** and **Frontend fixture review mode** above.
+
+- Default end-to-end check: `npm run harness:ci` (see **Verification** under **Commands** for typecheck, unit tests, and build).
+- Store real `CONGRESS_API_KEY` / `GOVINFO_API_KEY` in Cursor **Secrets**, not in committed files, when testing live ingestion.
+- CI uses Node.js 20 (`.github/workflows/ci.yml`); there is no `.nvmrc` — Node 20+ is sufficient.
