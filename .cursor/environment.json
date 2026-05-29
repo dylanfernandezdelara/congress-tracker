@@ -1,0 +1,16 @@
+{
+  "name": "Congress Tracker",
+  "install": "./scripts/cursor-cloud-setup.sh",
+  "terminals": [
+    {
+      "name": "Full stack",
+      "command": "./scripts/dev-all.sh",
+      "description": "API worker :8787, pipeline :8788, Vite :5173 (uses workers/senate_data_worker/.dev.vars)"
+    },
+    {
+      "name": "Web (fixture mode)",
+      "command": "VITE_FORCE_E2E=1 npm --prefix web run dev -- --host 127.0.0.1 --port 5173",
+      "description": "Frontend only with baked-in e2e briefing data; no API worker required"
+    }
+  ]
+}
