@@ -22,19 +22,4 @@ if [[ ! -f "${DEV_VARS}" ]]; then
   cp "${DEV_VARS_EXAMPLE}" "${DEV_VARS}"
 fi
 
-# Local Vite (:5173) must reach the API worker (:8787). harness-ci.sh also passes
-# --var ALLOWED_ORIGIN:*, but dev-all.sh reads .dev.vars directly.
-ensure_allowed_origin() {
-  local file="$1"
-  awk '
-    BEGIN { replaced = 0 }
-    /^ALLOWED_ORIGIN=/ { print "ALLOWED_ORIGIN=*"; replaced = 1; next }
-    { print }
-    END { if (!replaced) print "ALLOWED_ORIGIN=*" }
-  ' "${file}" > "${file}.tmp"
-  mv "${file}.tmp" "${file}"
-}
-
-ensure_allowed_origin "${DEV_VARS}"
-
 echo "Cursor Cloud setup complete."

@@ -12,9 +12,8 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Web deps: `npm --prefix web install`
 
 ### Local setup
-- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars` (or run `./scripts/cursor-cloud-setup.sh`, which creates it with `ALLOWED_ORIGIN=*`).
+- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or run `./scripts/cursor-cloud-setup.sh` (copies the example when missing). The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the API worker at `:8787`; `harness:ci`, `./scripts/dev-all.sh`, and `harness:browser` all read `.dev.vars` for CORS. Use a specific origin in production deploy secrets, not in the committed example.
 - `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** against Congress.gov/GovInfo; placeholder values from the example file are enough for harness runs, `./scripts/dev-all.sh` with fixture data, and fixture UI mode.
-- Keep `ALLOWED_ORIGIN=*` in `.dev.vars` for local full-stack dev so the Vite app at `:5173` can call the API worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
 - Optional local synthesis settings: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_APP_REFERER`, `OPENROUTER_APP_TITLE`, `OPENROUTER_SHADOW_MODE`, `OPENROUTER_CANARY_PERCENT`, `OPENROUTER_MAX_NEW_ANALYSES`.
 - Deterministic harness runs do not require live upstream secrets; they boot workers with `HARNESS_MODE=fixture`, `HARNESS_FIXTURE_SET=canonical`, and a fixed `HARNESS_NOW`.
 - Local D1 and R2 bindings are already configured in both Wrangler configs; do not change remote resource IDs just to make local development work.
@@ -90,20 +89,8 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 
 ## Cursor Cloud
 
-Repo-level agent VMs are configured in `.cursor/environment.json`. On each VM start, Cursor runs `./scripts/cursor-cloud-setup.sh`, which:
+Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh` (`npm ci` in `workers/senate_data_worker` and `web`, Playwright Chromium, creates `.dev.vars` from `.dev.vars.example` when missing). Optional **terminals** start `./scripts/dev-all.sh` or fixture-mode Vite — see **Local development** and **Frontend fixture review mode** above.
 
-- Runs `npm ci` in `workers/senate_data_worker` and `web`
-- Installs Playwright Chromium for browser harness tests
-- Creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing and ensures `ALLOWED_ORIGIN=*`
-
-Optional **terminals** in `environment.json` start `./scripts/dev-all.sh` (full stack) or fixture-mode Vite (`VITE_FORCE_E2E=1`). Agents can also start services manually using **Commands** above.
-
-### Verification in Cloud
-- Default end-to-end check: `npm run harness:ci` (fixtures + API assertions + Playwright; does not need live API keys).
-- `harness:ci` forces `ALLOWED_ORIGIN:*` on the API worker via `scripts/harness-ci.sh`; restrictive `.dev.vars` values still break `./scripts/dev-all.sh` and any manual `harness:browser` run against a locally started API without that override.
-- For UI-only work without workers: `VITE_FORCE_E2E=1 npm --prefix web run dev` or open `/?e2e=1`.
-- See **Verification** under **Commands** for typecheck, unit tests, and build commands.
-
-### Runtime notes
-- CI uses Node.js 20 (`.github/workflows/ci.yml`). There is no `.nvmrc`; Node 20+ is sufficient.
+- Default end-to-end check: `npm run harness:ci` (see **Verification** under **Commands** for typecheck, unit tests, and build).
 - Store real `CONGRESS_API_KEY` / `GOVINFO_API_KEY` in Cursor **Secrets**, not in committed files, when testing live ingestion.
+- CI uses Node.js 20 (`.github/workflows/ci.yml`); there is no `.nvmrc` — Node 20+ is sufficient.
