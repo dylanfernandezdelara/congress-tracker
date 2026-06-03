@@ -103,7 +103,7 @@ kill_port "${HARNESS_API_INSPECTOR_PORT}"
 kill_port "${HARNESS_PIPELINE_INSPECTOR_PORT}"
 
 # Two concurrent `wrangler dev` processes must not share the same --persist-to path:
-# Miniflare's R2/D1 SQLite backend corrupts or throws "internal error" under concurrent access.
+# Miniflare's D1 SQLite backend corrupts or throws "internal error" under concurrent access.
 # Run pipeline alone for ingestion, then API + web for assertions and browser tests.
 
 echo "Phase 1: pipeline worker (exclusive Miniflare persistence)"

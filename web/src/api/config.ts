@@ -26,7 +26,7 @@ const LOCAL_STORAGE_KEY = 'apiUrl';
  * @example
  * ```ts
  * const baseUrl = getApiBaseUrl();
- * const response = await fetch(`${baseUrl}/state/NY/latest.json`);
+ * const response = await fetch(`${baseUrl}/briefings/latest.json`);
  * ```
  */
 export function getApiBaseUrl(): string {

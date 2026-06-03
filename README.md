@@ -7,7 +7,7 @@
 ### Runtime split (important)
 
 - API worker (`workers/senate_data_worker/wrangler.toml`): serves read-only endpoints for the frontend (for example `/briefings/latest.json`).
-- Pipeline worker (`workers/senate_data_worker/wrangler.pipeline.toml`): runs ingestion/materialization to fetch upstream data and refresh D1/R2 data used by the API worker.
+- Pipeline worker (`workers/senate_data_worker/wrangler.pipeline.toml`): runs ingestion/materialization to fetch upstream data and refresh D1 (normalized tables + `kv_documents` JSON) used by the API worker.
 - Web app (`web/`): Vite + React frontend.
 
 ### Run locally (exact commands)
@@ -33,14 +33,11 @@ The project now has three runtime surfaces:
 - `web/`
   Vite + React frontend for the ranked homepage and vote detail pages.
 
-The backend keeps the Cloudflare stack but no longer treats R2 as the only query surface:
+Storage is D1-only:
 
-- `R2`
-  Raw source payloads, evidence blobs, and cached/materialized JSON payloads.
-- `D1`
-  Normalized read model for votes, members, issue threads, historical context, argument summaries, and materialized detail payloads.
-- `Queues`
-  Retryable background work for new-vote enrichment, historical backfill chunks, excerpt extraction, thread updates, and briefing/detail regeneration.
+- **Normalized tables** — votes, members, issue threads, ingested vote details, pipeline checkpoints, and related read-model rows.
+- **`kv_documents`** — JSON blobs keyed like the former object store (`votes/ledger.json`, `activities/index.json`, bill evidence/trends, OpenRouter caches, chamber context, and similar).
+- **Queues** (optional) — retryable background work for historical backfill chunks and read-model materialization.
 
 ```text
 Official Sources
@@ -52,16 +49,15 @@ Official Sources
         v
 Pipeline Worker
   cron -> fetch -> normalize -> enrich -> materialize
-        |               |              |
-        |               |              +--> R2 cached JSON / raw artifacts
-        |               +-----------------> D1 read model
-        +-------------------------------> Queue jobs
-                                           |
-                                           v
+        |
+        +--> D1 (tables + kv_documents)
+        +--> Queue jobs (when configured)
+                |
+                v
 API Worker
-  /briefings/latest.json
-  /votes/:congress/:session/:voteNumber.json
-  legacy R2-backed endpoints
+  GET /briefings/latest.json
+  GET /votes/:congress/:session/:voteNumber.json
+  GET /health, GET /health/data
         |
         v
 Web App
@@ -93,9 +89,7 @@ The interpretation layer is intentionally constrained:
 - Homepage
   Ranked feed of recent Senate votes showing what happened, why it matters, and who crossed party lines.
 - Vote detail page
-  Vote overview, party breakdowns, crossover senators, historical thread context, and sourced argument summaries.
-- Legacy API
-  Existing R2-backed state/member/session endpoints remain available during migration.
+  Vote overview, party breakdowns, crossover senators, historical thread context, and argument summaries from bill context plus tally-derived party positions when excerpt-level record text is unavailable.
 
 ## Repository Layout
 
@@ -124,18 +118,16 @@ congress-tracker/
 
 ### Required resources
 
-Create the following resources before deploying the full split architecture:
+Create the following resources before deploying the split architecture:
 
-1. `R2` bucket for source artifacts and cached JSON.
-2. `D1` database for the normalized read model.
-3. `Queue` for pipeline jobs.
+1. `D1` database for normalized tables, `kv_documents`, and materialized briefing/vote payloads.
+2. `Queue` for pipeline jobs (optional until you enable queue producers/consumers).
 
 Example resource creation:
 
 ```bash
 cd workers/senate_data_worker
 
-npx wrangler r2 bucket create senate-data-bucket
 npx wrangler d1 create senate-platform
 npx wrangler queues create senate-platform-jobs
 ```
@@ -198,8 +190,10 @@ The platform read-model schema lives in:
 - `workers/senate_data_worker/migrations/0001_platform_read_model.sql`
 - `workers/senate_data_worker/migrations/0002_pipeline_state.sql`
 - `workers/senate_data_worker/migrations/0003_issue_key.sql`
+- `workers/senate_data_worker/migrations/0004_ingested_vote_details.sql`
+- `workers/senate_data_worker/migrations/0005_kv_documents.sql`
 
-The worker can also create the same schema lazily through `src/d1/schema.ts`, but the migration file is the preferred deployment path.
+The worker can also align schema lazily through `src/d1/schema.ts`, but the migration files are the preferred deployment path.
 
 ### Pull request web previews
 
@@ -277,7 +271,7 @@ npm --prefix web run dev
 curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion
 ```
 
-This targets the local Pipeline Worker and triggers the same backend-owned ingestion path used by cron. The Worker checks D1/R2 ingestion state first, then fetches only missing vote details.
+This targets the local Pipeline Worker and triggers the same backend-owned ingestion path used by cron. The worker checks D1 ingestion state first, then fetches only missing vote details.
 
 Typical local startup flow:
 
@@ -320,7 +314,6 @@ The local pipeline also exposes admin endpoints for debugging:
 - `GET /__pipeline/status`
 - `GET` or `POST /__pipeline/run/ingestion`
 - `GET` or `POST /__pipeline/run/materialize`
-- `GET /__pipeline/run/evidence?vote=46`
 - `GET /__pipeline/run/historical-backfill?congress=116`
 
 On deployed pipeline workers, `/__pipeline/status` and `/__pipeline/run/*`
@@ -336,7 +329,7 @@ The source adapters are intentionally conservative:
 
 - bounded concurrency
 - retry with backoff and `Retry-After` support
-- cached artifact reuse through `source_fetch_log` + R2 source artifacts
+- cached upstream reuse through `source_fetch_log` and D1 `kv_documents` where applicable
 - resumable historical backfill checkpoints in `pipeline_checkpoints`
 - fixture-driven tests preferred over repeated live API pulls
 
@@ -390,7 +383,7 @@ npm run deploy:pipeline
 
 Recommended deployment order:
 
-1. Create R2, D1, and Queue resources.
+1. Create D1 (and Queue, if used) resources.
 2. Apply the D1 schema migration.
 3. Deploy the Pipeline Worker.
 4. Deploy the API Worker.
@@ -398,29 +391,24 @@ Recommended deployment order:
 
 ## HTTP API
 
-Primary new endpoints:
+Product endpoints (served from D1 read models):
 
-- `GET /briefings/latest.json`
-  Ranked recent-vote feed for the homepage.
-- `GET /votes/:congress/:session/:voteNumber.json`
-  Vote detail payload with party breakdowns, recurrence context, crossovers, and argument summaries.
+- `GET /briefings/latest.json` — ranked recent-vote feed for the homepage.
+- `GET /votes/:congress/:session/:voteNumber.json` — vote detail with party breakdowns, recurrence context, crossovers, and argument summaries.
 
 Operational endpoints:
 
-- `GET /health`
-- `GET /health/data`
+- `GET /health` — worker liveness.
+- `GET /health/data` — briefing freshness from `daily_briefings` (503 when stale or missing).
 
-Legacy endpoints retained during migration:
+Pipeline-only admin routes (on the pipeline worker, not the public API worker):
 
-- `GET /state/:state/latest.json`
-- `GET /state/:state/:date.json`
-- `GET /state/:state/_meta.json`
-- `GET /members/index.json`
-- `GET /activities/index.json`
-- `GET /votes/ledger.json`
-- `GET /stats/overview.json`
-- `GET /member/:bioguide/latest.json`
-- `GET /member/:bioguide/:date.json`
+- `GET /__pipeline/status`
+- `GET` or `POST /__pipeline/run/ingestion`
+- `GET` or `POST /__pipeline/run/materialize`
+- `GET` or `POST /__pipeline/run/historical-backfill?congress=…&session=…`
+
+Ledger, activities index, session overview, and bill evidence remain internal `kv_documents` keys written by the pipeline; they are not exposed on the API worker.
 
 ## Frontend
 
@@ -433,7 +421,6 @@ The redesigned frontend is intentionally simpler than the original dashboard:
 
 ## Notes
 
-- The current implementation ships the new read model while preserving legacy endpoints.
-- D1-backed reads are preferred when the binding exists.
-- R2 materialized JSON and derived-on-read fallbacks keep the system usable during migration.
+- The API worker serves materialized briefing and vote-detail JSON from D1 only; missing materialization returns 404 until the pipeline runs.
+- Verbatim Congressional Record floor-quote extraction is not part of the current pipeline; vote pages use bill summaries and tally-derived party summaries when excerpt tables are empty.
 - Filibuster treatment in v1 stays limited to cloture/procedural context rather than a historical leaderboard.

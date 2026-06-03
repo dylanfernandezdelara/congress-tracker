@@ -79,10 +79,12 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - `workers/senate_data_worker/src/index.ts` — pipeline orchestration, scheduled handler, queue processing
 - `workers/senate_data_worker/src/http.ts` — API endpoints
 - `workers/senate_data_worker/src/read-model.ts` — briefing/detail materialization
-- `workers/senate_data_worker/src/d1/` — D1 schema and repository modules
+- `workers/senate_data_worker/src/d1/` — D1 schema, `kv_documents` JSON store (`documents.ts`), and repository modules
 - `web/src/` — frontend app and API client
 
 ## Notes
+- Storage is D1-only: normalized tables plus `kv_documents` for pipeline JSON (ledger, activities, bill evidence, caches). There is no R2 binding.
+- The API worker exposes only `/briefings/latest.json`, `/votes/:c/:s/:n.json`, `/health`, and `/health/data`.
 - The latest homepage feed is served from `/briefings/latest.json`.
 - The pipeline worker is responsible for ingestion/materialization; scheduled workers are not triggered automatically in local dev.
 - Local stack ports from the repo scripts: API `http://127.0.0.1:8787`, Pipeline `http://127.0.0.1:8788`, Web `http://127.0.0.1:5173`.
