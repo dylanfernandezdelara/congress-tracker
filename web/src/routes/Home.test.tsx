@@ -57,7 +57,7 @@ function makeItem(overrides: Partial<BriefingFeedItem> = {}): BriefingFeedItem {
 function makeBriefing(items: BriefingFeedItem[]): BriefingFeedResponse {
   return {
     generated_at: '2026-03-10T14:30:00Z',
-    source: 'derived',
+    source: 'd1',
     items,
   }
 }

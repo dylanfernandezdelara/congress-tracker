@@ -4,14 +4,7 @@ import handler from "./pipeline-index";
 import * as pipelineJobs from "./pipeline-jobs";
 import * as pipelineMaterialize from "./pipeline-materialize";
 import * as scheduledIngestion from "./scheduled-ingestion";
-import * as storage from "./storage";
-
-function createMockBucket() {
-  return {
-    get: vi.fn(),
-    put: vi.fn(),
-  } as unknown as R2Bucket;
-}
+import * as documents from "./d1/documents";
 
 function createSequentialOnlyDb(): D1Database {
   let activeQueries = 0;
@@ -28,10 +21,20 @@ function createSequentialOnlyDb(): D1Database {
   };
 
   return {
+    async batch(statements: D1PreparedStatement[]) {
+      await Promise.all(statements.map((statement) => statement.run()));
+      return statements.map(() => ({ success: true, meta: { duration: 0 } }));
+    },
     prepare(sql: string) {
       const normalizedSql = sql.replace(/\s+/g, " ").trim();
 
       return {
+        bind() {
+          return this;
+        },
+        async run() {
+          return { success: true, meta: { duration: 0 } };
+        },
         async first<T>() {
           if (normalizedSql.includes("FROM votes")) {
             return runQuery({
@@ -74,7 +77,6 @@ function createSequentialOnlyDb(): D1Database {
 
 function createMockEnv(overrides: Record<string, unknown> = {}) {
   return {
-    DATA_BUCKET: createMockBucket(),
     CONGRESS: "119",
     SESSION: "2",
     TARGET_STATE: "ALL",
@@ -156,7 +158,7 @@ describe("pipeline debug routes", () => {
   });
 
   it("requires an admin token for non-local manual run routes", async () => {
-    const request = new Request("https://worker.example.com/__pipeline/run/evidence?vote=abc");
+    const request = new Request("https://worker.example.com/__pipeline/run/ingestion");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json() as { error: string };
 
@@ -165,7 +167,7 @@ describe("pipeline debug routes", () => {
   });
 
   it("rejects invalid admin tokens for manual run routes", async () => {
-    const request = new Request("https://worker.example.com/__pipeline/run/evidence?vote=abc", {
+    const request = new Request("https://worker.example.com/__pipeline/run/ingestion", {
       headers: { Authorization: "Bearer wrong-token" },
     });
     const response = await handler.fetch(
@@ -179,9 +181,12 @@ describe("pipeline debug routes", () => {
   });
 
   it("allows valid admin tokens before validating manual route input", async () => {
-    const request = new Request("https://worker.example.com/__pipeline/run/evidence?vote=abc", {
-      headers: { Authorization: "Bearer correct-token" },
-    });
+    const request = new Request(
+      "https://worker.example.com/__pipeline/run/historical-backfill?congress=0",
+      {
+        headers: { Authorization: "Bearer correct-token" },
+      }
+    );
     const response = await handler.fetch(
       request,
       createMockEnv({ PIPELINE_ADMIN_TOKEN: "correct-token" }) as any
@@ -189,16 +194,16 @@ describe("pipeline debug routes", () => {
     const body = await response.json() as { error: string };
 
     expect(response.status).toBe(400);
-    expect(body.error).toBe("invalid_vote");
+    expect(body.error).toBe("invalid_backfill_target");
   });
 
   it("allows local manual run routes without an admin token", async () => {
-    const request = new Request("http://127.0.0.1:8788/__pipeline/run/evidence?vote=abc");
+    const request = new Request("http://127.0.0.1:8788/__pipeline/run/historical-backfill?congress=0");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json() as { error: string };
 
     expect(response.status).toBe(400);
-    expect(body.error).toBe("invalid_vote");
+    expect(body.error).toBe("invalid_backfill_target");
   });
 
   it("runs scheduled ingestion on local /__pipeline/run/ingestion", async () => {
@@ -214,6 +219,7 @@ describe("pipeline debug routes", () => {
   });
 
   it("returns 503 for materialize when ledger or overview is missing", async () => {
+    vi.spyOn(documents, "readDocumentJson").mockResolvedValue(null);
     const request = new Request("http://127.0.0.1:8788/__pipeline/run/materialize");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json() as { error: string };
@@ -238,9 +244,11 @@ describe("pipeline debug routes", () => {
   });
 
   it("defers scheduled ingestion work through ctx.waitUntil", () => {
+    const runSpy = vi.spyOn(scheduledIngestion, "runScheduledIngestion").mockResolvedValue();
     const waitUntil = vi.fn();
     const ctx = { waitUntil } as unknown as ExecutionContext;
     handler.scheduled({ scheduledTime: Date.now() } as ScheduledController, createMockEnv() as any, ctx);
+    runSpy.mockRestore();
     expect(waitUntil).toHaveBeenCalledOnce();
     expect(waitUntil.mock.calls[0]?.[0]).toBeInstanceOf(Promise);
   });
@@ -263,9 +271,9 @@ describe("pipeline debug routes", () => {
       total_defections: 0,
       senators: [],
     };
-    vi.spyOn(storage, "readJsonFromR2").mockImplementation(async (_bucket, key) => {
-      if (key === storage.buildVoteLedgerKey()) return ledger;
-      if (key === storage.buildSessionOverviewKey()) return overview;
+    vi.spyOn(documents, "readDocumentJson").mockImplementation(async (_db, key) => {
+      if (key === "votes/ledger.json") return ledger;
+      if (key === "stats/overview.json") return overview;
       return null;
     });
 
@@ -311,9 +319,9 @@ describe("pipeline debug routes", () => {
       total_defections: 0,
       senators: [],
     };
-    vi.spyOn(storage, "readJsonFromR2").mockImplementation(async (_bucket, key) => {
-      if (key === storage.buildVoteLedgerKey()) return ledger;
-      if (key === storage.buildSessionOverviewKey()) return overview;
+    vi.spyOn(documents, "readDocumentJson").mockImplementation(async (_db, key) => {
+      if (key === "votes/ledger.json") return ledger;
+      if (key === "stats/overview.json") return overview;
       return null;
     });
 

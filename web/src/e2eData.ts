@@ -272,7 +272,7 @@ export const E2E_STATE_VOTES: Record<string, StateVotesResponse> = {
 
 export const E2E_BRIEFING: BriefingFeedResponse = {
   generated_at: E2E_GENERATED_AT,
-  source: 'derived',
+  source: 'd1',
   coverage_note: 'Demo data uses vote and bill context with limited excerpt-level evidence.',
   items: [
     {
@@ -350,7 +350,7 @@ export const E2E_BRIEFING: BriefingFeedResponse = {
 export const E2E_VOTE_DETAILS: Record<string, VoteDetailResponse> = {
   '119:2:14': {
     generated_at: E2E_GENERATED_AT,
-    source: 'derived',
+    source: 'd1',
     vote_content_profile: e2eVoteContentProfile({
       vote_id: '119:2:14',
       vote_number: 14,
@@ -427,7 +427,7 @@ export const E2E_VOTE_DETAILS: Record<string, VoteDetailResponse> = {
   },
   '119:2:12': {
     generated_at: E2E_GENERATED_AT,
-    source: 'derived',
+    source: 'd1',
     vote_content_profile: e2eVoteContentProfile({
       vote_id: '119:2:12',
       vote_number: 12,

@@ -16,7 +16,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** against Congress.gov/GovInfo; placeholder values from the example file are enough for harness runs, `./scripts/dev-all.sh` with fixture data, and fixture UI mode.
 - Optional local synthesis settings: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_APP_REFERER`, `OPENROUTER_APP_TITLE`, `OPENROUTER_SHADOW_MODE`, `OPENROUTER_CANARY_PERCENT`, `OPENROUTER_MAX_NEW_ANALYSES`.
 - Deterministic harness runs do not require live upstream secrets; they boot workers with `HARNESS_MODE=fixture`, `HARNESS_FIXTURE_SET=canonical`, and a fixed `HARNESS_NOW`.
-- Local D1 and R2 bindings are already configured in both Wrangler configs; do not change remote resource IDs just to make local development work.
+- Local D1 bindings are already configured in both Wrangler configs; do not change remote resource IDs just to make local development work.
 
 ### Local development
 - Full stack: `./scripts/dev-all.sh`

@@ -55,11 +55,10 @@ async function main() {
   assert(briefing.json.items.length > 0, 'Briefing payload was empty')
   assert(briefing.json.items[0]?.id === expectedVoteId, `Expected lead vote ${expectedVoteId}, got ${briefing.json.items[0]?.id ?? 'none'}`)
 
-  const activities = await fetchJson(`${apiUrl}/activities/index.json`)
-  await writeArtifact('activities-index.json', activities.json ?? activities.text)
-  assert(activities.response.ok, `Activities fetch failed (${activities.response.status})`)
-  assert(Array.isArray(activities.json?.activities), 'Activities payload missing activities array')
-  assert(activities.json.activities.length > 0, 'Activities payload was empty')
+  const dataHealth = await fetchJson(`${apiUrl}/health/data`)
+  await writeArtifact('health-data.json', dataHealth.json ?? dataHealth.text)
+  assert(dataHealth.response.ok, `Data health fetch failed (${dataHealth.response.status})`)
+  assert(dataHealth.json?.status === 'ok', 'Data health did not report ok')
 
   const detail = await fetchJson(`${apiUrl}/votes/119/2/${expectedVoteNumber}.json`)
   await writeArtifact(`vote-detail-${expectedVoteNumber}.json`, detail.json ?? detail.text)

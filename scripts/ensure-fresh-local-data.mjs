@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * After local workers are up: if activity/ledger data is missing or past DATA_FRESHNESS_MAX_HOURS,
+ * After local workers are up: if briefing data is missing or past DATA_FRESHNESS_MAX_HOURS,
  * trigger a full pipeline ingestion and wait until the API can serve a non-empty briefing feed.
  *
  * Env:
@@ -27,12 +27,12 @@ async function fetchJson(url, init) {
   return { ok: res.ok, status: res.status, json, text }
 }
 
-function needsIngest(health, ledger) {
+function needsIngest(health, briefing) {
   const healthOk = health.ok && health.json?.status === 'ok'
-  const ledgerOk =
-    ledger.ok &&
-    Array.isArray(ledger.json?.entries) &&
-    ledger.json.entries.length > 0
+  const briefingOk =
+    briefing.ok &&
+    Array.isArray(briefing.json?.items) &&
+    briefing.json.items.length > 0
 
   if (!healthOk) {
     if (!health.ok) {
@@ -41,17 +41,17 @@ function needsIngest(health, ledger) {
       )
     } else {
       console.log(
-        `[ensure-data] Activity index is stale or missing (${health.json?.status ?? 'unknown'}) — will run ingestion.`,
+        `[ensure-data] Briefing is stale or missing (${health.json?.status ?? 'unknown'}) — will run ingestion.`,
       )
     }
     return true
   }
-  if (!ledgerOk) {
-    console.log('[ensure-data] Vote ledger missing or empty — will run ingestion.')
+  if (!briefingOk) {
+    console.log('[ensure-data] Homepage briefing missing or empty — will run ingestion.')
     return true
   }
   console.log(
-    `[ensure-data] Data looks fresh (activity ${health.json?.generated_at ?? 'n/a'}, ${ledger.json.entries.length} ledger votes).`,
+    `[ensure-data] Data looks fresh (briefing ${health.json?.generated_at ?? 'n/a'}, ${briefing.json.items.length} feed items).`,
   )
   return false
 }
@@ -75,9 +75,9 @@ async function waitForBriefing(start) {
 
 async function main() {
   const health = await fetchJson(`${API}/health/data`)
-  const ledger = await fetchJson(`${API}/votes/ledger.json`)
+  const briefing = await fetchJson(`${API}/briefings/latest.json`)
 
-  if (!needsIngest(health, ledger)) {
+  if (!needsIngest(health, briefing)) {
     return
   }
 

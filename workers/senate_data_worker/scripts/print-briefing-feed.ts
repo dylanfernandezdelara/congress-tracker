@@ -1,7 +1,7 @@
 /**
  * Print Senate votes as the materialized briefing would order them (newest date first).
  *
- * Usage (API worker must be running with current ledger):
+ * Usage (API worker must be running with current briefing):
  *   API_URL=http://127.0.0.1:8787 SINCE_DAYS=21 npx tsx scripts/print-briefing-feed.ts
  *
  * Env:
@@ -10,8 +10,7 @@
  *   TOP_N        — max rows (default full chronological list after date sort)
  */
 
-import type { ActivityIndexJson, SessionOverview, VoteLedger } from "../src/types";
-import { BRIEFING_FEED_ITEM_LIMIT, buildBriefingFeedItemsSortedByDate } from "../src/read-model";
+import type { BriefingFeedResponse } from "../src/platform-types";
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -21,16 +20,12 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-function filterLedgerBySinceDays(ledger: VoteLedger, sinceDays: number): VoteLedger {
+function filterBriefingBySinceDays(briefing: BriefingFeedResponse, sinceDays: number): BriefingFeedResponse {
   const cutoff = new Date();
   cutoff.setUTCDate(cutoff.getUTCDate() - sinceDays);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
-  const entries = ledger.entries.filter((e) => e.vote_date >= cutoffStr);
-  return {
-    ...ledger,
-    entries,
-    total_votes: entries.length,
-  };
+  const items = briefing.items.filter((item) => item.vote_date >= cutoffStr);
+  return { ...briefing, items };
 }
 
 async function main(): Promise<void> {
@@ -42,66 +37,42 @@ async function main(): Promise<void> {
       : null;
   const topN = process.env.TOP_N ? parseInt(process.env.TOP_N, 10) : undefined;
 
-  const [ledgerRaw, overview] = await Promise.all([
-    fetchJson<VoteLedger>(`${api}/votes/ledger.json`),
-    fetchJson<SessionOverview>(`${api}/stats/overview.json`),
-  ]);
+  const briefingRaw = await fetchJson<BriefingFeedResponse>(`${api}/briefings/latest.json`);
+  const briefing =
+    sinceDays !== null ? filterBriefingBySinceDays(briefingRaw, sinceDays) : briefingRaw;
 
-  let activities: ActivityIndexJson | null = null;
-  try {
-    activities = await fetchJson<ActivityIndexJson>(`${api}/activities/index.json`);
-  } catch {
-    activities = null;
-  }
-
-  const ledger =
-    sinceDays !== null ? filterLedgerBySinceDays(ledgerRaw, sinceDays) : { ...ledgerRaw, entries: [...ledgerRaw.entries] };
-  if (ledger.entries.length === 0) {
+  if (briefing.items.length === 0) {
     if (sinceDays !== null) {
-      console.error(`No votes on or after the last ${sinceDays} day(s) in the current ledger.`);
-      console.error(`Ledger has ${ledgerRaw.entries.length} total votes; omit SINCE_DAYS to use all, or widen the window.`);
+      console.error(`No votes on or after the last ${sinceDays} day(s) in the current briefing.`);
+      console.error(`Briefing has ${briefingRaw.items.length} total items; omit SINCE_DAYS to use all, or widen the window.`);
     } else {
-      console.error("Ledger has no votes.");
+      console.error("Briefing has no items.");
     }
     process.exit(1);
   }
 
-  const { sorted } = buildBriefingFeedItemsSortedByDate(ledger, overview, activities);
-  const briefingCap = sorted.slice(0, BRIEFING_FEED_ITEM_LIMIT);
-  const inBriefing = new Set(briefingCap.map((i) => i.id));
-
-  const rows = topN !== undefined && !Number.isNaN(topN) ? sorted.slice(0, topN) : sorted;
+  const rows = topN !== undefined && !Number.isNaN(topN) ? briefing.items.slice(0, topN) : briefing.items;
 
   console.log(`API: ${api}`);
   console.log(
     sinceDays !== null
-      ? `Votes in window (last ${sinceDays} days): ${ledger.entries.length}`
-      : `Votes in ledger (no date filter): ${ledger.entries.length}`
+      ? `Votes in window (last ${sinceDays} days): ${briefing.items.length}`
+      : `Votes in briefing (no date filter): ${briefing.items.length}`
   );
-  console.log(`Homepage briefing cap (${BRIEFING_FEED_ITEM_LIMIT} newest): ${briefingCap.map((h) => h.vote_number).join(", ") || "(none)"}`);
+  console.log(`Generated at: ${briefing.generated_at}`);
   console.log("");
-  console.log(
-    ["seq".padEnd(5), "vote".padEnd(6), "date".padEnd(12), "feed?".padEnd(6), "conf".padEnd(7), "summary / plain_action"].join(" ")
-  );
-  console.log("-".repeat(120));
 
-  let seq = 0;
   for (const item of rows) {
-    seq += 1;
-    const title = (item.summary || item.plain_action || item.title).replace(/\s+/g, " ").slice(0, 88);
-    const line = [
-      String(seq).padEnd(5),
-      String(item.vote_number).padEnd(6),
-      item.vote_date.padEnd(12),
-      (inBriefing.has(item.id) ? "yes" : "no").padEnd(6),
-      item.content_confidence.padEnd(7),
-      title,
-    ].join(" ");
-    console.log(line);
+    console.log(
+      `${item.vote_date}  #${item.vote_number}  ${item.status.padEnd(8)}  ${item.title}`
+    );
+    console.log(`  ${item.summary}`);
+    console.log(`  ${item.detail_path}`);
+    console.log("");
   }
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

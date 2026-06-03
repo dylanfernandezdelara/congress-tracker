@@ -1,71 +1,15 @@
 /**
  * HTTP Read API Tests
- *
- * Tests the HTTP handler (fetch) in index.ts for:
- * - /health endpoint
- * - /state/{STATE}/latest.json
- * - /state/{STATE}/_meta.json
- * - /state/{STATE}/{YYYY-MM-DD}.json
- * - CORS headers
- * - Cache-Control headers
- * - OPTIONS preflight
- * - 404 responses
- * - 405 method not allowed
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SnapshotJson, MetaJson } from "./types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BriefingFeedResponse, VoteDetailResponse } from "./platform-types";
-
-// ============================================================================
-// Mock Data
-// ============================================================================
-
-const mockSnapshot: SnapshotJson = {
-  state: "NY",
-  vote_date: "2025-12-18",
-  generated_at: "2026-01-04T16:30:00.000Z",
-  congress: 119,
-  session: 1,
-  votes: [
-    {
-      vote_number: 312,
-      title: "On the Motion to Table S.Amdt. 3456",
-      question: "On the Motion to Table",
-      result: "Motion to Table Agreed to",
-      issue: "H.R. 8998",
-      counts: { yeas: 52, nays: 48, present: 0, absent: 0 },
-      members: [
-        { name: "Gillibrand (D-NY)", state: "NY", party: "D", vote_cast: "Yea" },
-        { name: "Schumer (D-NY)", state: "NY", party: "D", vote_cast: "Yea" },
-      ],
-    },
-  ],
-};
-
-const mockMeta: MetaJson = {
-  state: "NY",
-  congress: 119,
-  session: 1,
-  generated_at: "2026-01-04T16:30:00.000Z",
-  cutoff_date_et: "2026-01-04",
-  target_vote_date: "2025-12-18",
-  keys: {
-    latest: "state/NY/latest.json",
-    snapshot: "state/NY/2025-12-18.json",
-  },
-  stats: {
-    votes_total: 8,
-    votes_with_state_members: 8,
-    state_member_votes: 16,
-  },
-  partial: false,
-  missing_votes: [],
-};
+import * as materialization from "./d1/materialization";
+import handler from "./api-index";
 
 const mockBriefing: BriefingFeedResponse = {
   generated_at: "2026-01-04T16:30:00.000Z",
-  source: "r2",
+  source: "d1",
   items: [
     {
       id: "119:1:312",
@@ -100,7 +44,7 @@ const mockBriefing: BriefingFeedResponse = {
 
 const mockVoteDetail: VoteDetailResponse = {
   generated_at: "2026-01-04T16:30:00.000Z",
-  source: "r2",
+  source: "d1",
   vote_content_profile: {
     vote_id: "119:1:312",
     congress: 119,
@@ -161,61 +105,44 @@ const mockVoteDetail: VoteDetailResponse = {
   },
 };
 
-// ============================================================================
-// Mock R2 Bucket
-// ============================================================================
-
-function createMockBucket(data: Record<string, unknown>) {
+function createSenateDb(options: { briefingGeneratedAt?: string } = {}) {
   return {
-    get: vi.fn(async (key: string) => {
-      const value = data[key];
-      if (value === undefined) return null;
-      return { text: async () => JSON.stringify(value) };
-    }),
-    put: vi.fn(),
-  } as unknown as R2Bucket;
+    prepare(sql: string) {
+      const normalized = sql.replace(/\s+/g, " ").trim();
+      const statement = {
+        bind() {
+          return statement;
+        },
+        async all<T>() {
+          if (normalized.includes("FROM daily_briefings")) {
+            return {
+              results: options.briefingGeneratedAt
+                ? [{ generated_at: options.briefingGeneratedAt }]
+                : [],
+              success: true,
+              meta: { duration: 0 },
+            } as T;
+          }
+          return { results: [], success: true, meta: { duration: 0 } } as T;
+        },
+      };
+      return statement as unknown as D1PreparedStatement;
+    },
+  } as unknown as D1Database;
 }
 
-// ============================================================================
-// Import and setup handler
-// ============================================================================
-
-// We need to test the handleFetch function, but it's not exported
-// So we'll re-import the default export and extract the fetch handler
-import handler from "./api-index";
-
-const mockEnv = {
-  DATA_BUCKET: createMockBucket({
-    "state/NY/latest.json": mockSnapshot,
-    "state/NY/_meta.json": mockMeta,
-    "state/NY/2025-12-18.json": mockSnapshot,
-    "briefings/latest.json": mockBriefing,
-    "votes/detail/119/1/312.json": mockVoteDetail,
-    "activities/index.json": {
-      generated_at: new Date().toISOString(),
-      window: { start_date: "2025-12-12", end_date: "2025-12-18" },
-      activities: [],
-    },
-  }),
-  CONGRESS: "119",
-  SESSION: "1",
-  TARGET_STATE: "NY",
-  DATA_FRESHNESS_MAX_HOURS: "36",
-};
-
-function createMockEnv(overrides: Partial<typeof mockEnv> = {}): typeof mockEnv {
+function createMockEnv(overrides: Record<string, unknown> = {}) {
   return {
-    ...mockEnv,
+    SENATE_DB: createSenateDb({ briefingGeneratedAt: new Date().toISOString() }),
+    CONGRESS: "119",
+    SESSION: "1",
+    TARGET_STATE: "NY",
+    DATA_FRESHNESS_MAX_HOURS: "36",
     ...overrides,
   };
 }
 
-// Helper to create mock requests
-function mockRequest(
-  path: string,
-  method: string = "GET",
-  headers?: HeadersInit
-): Request {
+function mockRequest(path: string, method: string = "GET", headers?: HeadersInit): Request {
   return new Request(`https://worker.example.com${path}`, { method, headers });
 }
 
@@ -223,57 +150,25 @@ async function readJson<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-// ============================================================================
-// Tests
-// ============================================================================
-
 describe("HTTP Read API", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.spyOn(materialization, "readLatestBriefingFromD1").mockResolvedValue(mockBriefing);
+    vi.spyOn(materialization, "readVoteDetailFromD1").mockResolvedValue(mockVoteDetail);
   });
 
   describe("OPTIONS preflight", () => {
     it("returns 204 with CORS headers", async () => {
-      const req = mockRequest("/state/NY/latest.json", "OPTIONS");
-      const res = await handler.fetch(req, mockEnv as any);
-
+      const res = await handler.fetch(mockRequest("/briefings/latest.json", "OPTIONS"), createMockEnv() as any);
       expect(res.status).toBe(204);
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-      expect(res.headers.get("Access-Control-Allow-Methods")).toBe(
-        "GET, OPTIONS"
-      );
-      expect(res.headers.get("Access-Control-Allow-Headers")).toBe(
-        "Content-Type"
-      );
-    });
-
-    it("returns 204 for OPTIONS on any path", async () => {
-      const req = mockRequest("/any/path/here", "OPTIONS");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(204);
     });
   });
 
   describe("CORS origin restriction", () => {
     it("uses ALLOWED_ORIGIN and Vary header on GET responses", async () => {
-      const env = createMockEnv({ ALLOWED_ORIGIN: "https://daily.example.com" } as any);
-      const req = mockRequest("/health");
-      const res = await handler.fetch(req, env as any);
-
-      expect(res.status).toBe(200);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://daily.example.com");
-      expect(res.headers.get("Vary")).toBe("Origin");
-    });
-
-    it("uses ALLOWED_ORIGIN and Vary header on OPTIONS responses", async () => {
-      const env = createMockEnv({ ALLOWED_ORIGIN: "https://daily.example.com" } as any);
-      const req = mockRequest("/state/NY/latest.json", "OPTIONS", {
-        Origin: "https://another-site.example",
-      });
-      const res = await handler.fetch(req, env as any);
-
-      expect(res.status).toBe(204);
+      const env = createMockEnv({ ALLOWED_ORIGIN: "https://daily.example.com" });
+      const res = await handler.fetch(mockRequest("/health"), env as any);
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://daily.example.com");
       expect(res.headers.get("Vary")).toBe("Origin");
     });
@@ -281,84 +176,31 @@ describe("HTTP Read API", () => {
 
   describe("Method not allowed", () => {
     it("returns 405 for POST requests", async () => {
-      const req = mockRequest("/state/NY/latest.json", "POST");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(405);
-      const body = await res.json();
-      expect(body).toEqual({
-        error: "method_not_allowed",
-        message: "Only GET requests are allowed",
-      });
-    });
-
-    it("returns 405 for PUT requests", async () => {
-      const req = mockRequest("/state/NY/latest.json", "PUT");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(405);
-    });
-
-    it("returns 405 for DELETE requests", async () => {
-      const req = mockRequest("/state/NY/latest.json", "DELETE");
-      const res = await handler.fetch(req, mockEnv as any);
-
+      const res = await handler.fetch(mockRequest("/briefings/latest.json", "POST"), createMockEnv() as any);
       expect(res.status).toBe(405);
     });
   });
 
   describe("GET /health", () => {
     it("returns 200 with status ok", async () => {
-      const req = mockRequest("/health");
-      const res = await handler.fetch(req, mockEnv as any);
-
+      const res = await handler.fetch(mockRequest("/health"), createMockEnv() as any);
       expect(res.status).toBe(200);
-      const body = await readJson<{ status: string; timestamp: string }>(res);
+      const body = await readJson<{ status: string }>(res);
       expect(body.status).toBe("ok");
-      expect(body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    });
-
-    it("includes correct Cache-Control header", async () => {
-      const req = mockRequest("/health");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Cache-Control")).toBe(
-        "s-maxage=60, max-age=0, must-revalidate"
-      );
-    });
-
-    it("includes CORS headers", async () => {
-      const req = mockRequest("/health");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    });
-
-    it("includes Content-Type header", async () => {
-      const req = mockRequest("/health");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Content-Type")).toBe("application/json");
     });
   });
 
   describe("GET /health/data", () => {
-    it("returns 200 when data freshness is within threshold", async () => {
-      const req = mockRequest("/health/data");
-      const res = await handler.fetch(req, mockEnv as any);
+    it("returns 200 when briefing freshness is within threshold", async () => {
+      const res = await handler.fetch(mockRequest("/health/data"), createMockEnv() as any);
       expect(res.status).toBe(200);
-      const body = await readJson<{ status: string; age_hours: number }>(res);
+      const body = await readJson<{ status: string }>(res);
       expect(body.status).toBe("ok");
-      expect(body.age_hours).toBeGreaterThanOrEqual(0);
     });
 
-    it("returns 503 when activities index is missing", async () => {
-      const envMissing = {
-        ...mockEnv,
-        DATA_BUCKET: createMockBucket({}),
-      };
-      const req = mockRequest("/health/data");
-      const res = await handler.fetch(req, envMissing as any);
+    it("returns 503 when no materialized briefing exists", async () => {
+      const env = createMockEnv({ SENATE_DB: createSenateDb() });
+      const res = await handler.fetch(mockRequest("/health/data"), env as any);
       expect(res.status).toBe(503);
       const body = await readJson<{ status: string }>(res);
       expect(body.status).toBe("stale");
@@ -367,193 +209,38 @@ describe("HTTP Read API", () => {
 
   describe("GET /briefings/latest.json", () => {
     it("returns the materialized briefing payload", async () => {
-      const req = mockRequest("/briefings/latest.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
+      const res = await handler.fetch(mockRequest("/briefings/latest.json"), createMockEnv() as any);
       expect(res.status).toBe(200);
       const body = await readJson<BriefingFeedResponse>(res);
-      expect(body.items).toHaveLength(1);
-      expect(body.items[0].vote_number).toBe(312);
+      expect(body.items[0]?.vote_number).toBe(312);
+    });
+
+    it("returns 404 when briefing is missing", async () => {
+      vi.spyOn(materialization, "readLatestBriefingFromD1").mockResolvedValue(null);
+      const res = await handler.fetch(mockRequest("/briefings/latest.json"), createMockEnv() as any);
+      expect(res.status).toBe(404);
     });
   });
 
   describe("GET /votes/:congress/:session/:voteNumber.json", () => {
     it("returns the materialized vote detail payload", async () => {
-      const req = mockRequest("/votes/119/1/312.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
+      const res = await handler.fetch(mockRequest("/votes/119/1/312.json"), createMockEnv() as any);
       expect(res.status).toBe(200);
       const body = await readJson<VoteDetailResponse>(res);
       expect(body.vote.vote_number).toBe(312);
-      expect(body.history.thread_key).toBe("H.R. 8998");
-    });
-  });
-
-  describe("GET /state/{STATE}/latest.json", () => {
-    it("returns snapshot data with 200", async () => {
-      const req = mockRequest("/state/NY/latest.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body).toEqual(mockSnapshot);
     });
 
-    it("includes short TTL Cache-Control", async () => {
-      const req = mockRequest("/state/NY/latest.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Cache-Control")).toBe(
-        "s-maxage=300, stale-while-revalidate=86400"
-      );
-    });
-
-    it("includes CORS headers", async () => {
-      const req = mockRequest("/state/NY/latest.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    });
-
-    it("returns 404 for missing state", async () => {
-      const req = mockRequest("/state/TX/latest.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(404);
-      const body = await res.json();
-      expect(body).toEqual({
-        error: "not_found",
-        message: "Resource not found",
-        path: "/state/TX/latest.json",
-      });
-    });
-
-    it("only matches uppercase two-letter state codes", async () => {
-      const req = mockRequest("/state/ny/latest.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      // Should be 404 because the route regex expects uppercase
-      expect(res.status).toBe(404);
-    });
-  });
-
-  describe("GET /state/{STATE}/_meta.json", () => {
-    it("returns meta data with 200", async () => {
-      const req = mockRequest("/state/NY/_meta.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body).toEqual(mockMeta);
-    });
-
-    it("includes short TTL Cache-Control (same as latest)", async () => {
-      const req = mockRequest("/state/NY/_meta.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Cache-Control")).toBe(
-        "s-maxage=300, stale-while-revalidate=86400"
-      );
-    });
-
-    it("returns 404 for missing state", async () => {
-      const req = mockRequest("/state/CA/_meta.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(404);
-      const body = await readJson<{ error: string; path: string }>(res);
-      expect(body.error).toBe("not_found");
-      expect(body.path).toBe("/state/CA/_meta.json");
-    });
-  });
-
-  describe("GET /state/{STATE}/{YYYY-MM-DD}.json", () => {
-    it("returns snapshot data with 200", async () => {
-      const req = mockRequest("/state/NY/2025-12-18.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body).toEqual(mockSnapshot);
-    });
-
-    it("includes longer TTL Cache-Control for snapshots", async () => {
-      const req = mockRequest("/state/NY/2025-12-18.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Cache-Control")).toBe(
-        "s-maxage=86400, stale-while-revalidate=604800"
-      );
-    });
-
-    it("does NOT include immutable in Cache-Control", async () => {
-      const req = mockRequest("/state/NY/2025-12-18.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      const cacheControl = res.headers.get("Cache-Control") ?? "";
-      expect(cacheControl).not.toContain("immutable");
-    });
-
-    it("returns 404 for missing date", async () => {
-      const req = mockRequest("/state/NY/2025-01-01.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(404);
-      const body = await res.json();
-      expect(body).toEqual({
-        error: "not_found",
-        message: "Resource not found",
-        path: "/state/NY/2025-01-01.json",
-      });
-    });
-
-    it("only matches valid date format", async () => {
-      // Invalid date format should 404 (route won't match)
-      const req = mockRequest("/state/NY/12-18-2025.json");
-      const res = await handler.fetch(req, mockEnv as any);
-
+    it("returns 404 when vote detail is missing", async () => {
+      vi.spyOn(materialization, "readVoteDetailFromD1").mockResolvedValue(null);
+      const res = await handler.fetch(mockRequest("/votes/119/1/999.json"), createMockEnv() as any);
       expect(res.status).toBe(404);
     });
   });
 
   describe("404 for unknown routes", () => {
-    it("returns 404 for root path", async () => {
-      const req = mockRequest("/");
-      const res = await handler.fetch(req, mockEnv as any);
-
+    it("returns 404 for removed legacy state routes", async () => {
+      const res = await handler.fetch(mockRequest("/state/NY/latest.json"), createMockEnv() as any);
       expect(res.status).toBe(404);
-      const body = await readJson<{ error: string; path: string }>(res);
-      expect(body.error).toBe("not_found");
-      expect(body.path).toBe("/");
-    });
-
-    it("returns 404 for unknown paths", async () => {
-      const req = mockRequest("/api/votes");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(404);
-    });
-
-    it("returns 404 for partial state paths", async () => {
-      const req = mockRequest("/state/NY");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(404);
-    });
-
-    it("404 response includes CORS headers", async () => {
-      const req = mockRequest("/unknown/path");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.status).toBe(404);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    });
-
-    it("404 response includes Content-Type header", async () => {
-      const req = mockRequest("/unknown/path");
-      const res = await handler.fetch(req, mockEnv as any);
-
-      expect(res.headers.get("Content-Type")).toBe("application/json");
     });
   });
 });

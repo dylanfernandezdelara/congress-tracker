@@ -18,7 +18,7 @@ vi.mock('../api', async () => {
 
 const fixtureDetail = {
   generated_at: '2026-03-10T14:30:00Z',
-  source: 'derived',
+  source: 'd1',
   vote: {
     id: '119:2:14',
     congress: 119,
