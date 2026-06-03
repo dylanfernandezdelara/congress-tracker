@@ -23,10 +23,10 @@ import {
   collectUniqueBills,
   type BillEvidencePipelineResult,
   type QualityGateConfig,
-} from "../pipeline-materialize";
+} from "./materialize";
 import { DEFAULT_OPENROUTER_MODELS, type AnalyzeBillsResult } from "../openrouter";
 import { readDocumentJson, writeDocumentJson } from "../d1/documents";
-import { hashRunId, logEvent } from "../pipeline-logging";
+import { hashRunId, logEvent } from "./logging";
 import {
   buildActivitiesIndexKey,
   buildSessionOverviewKey,

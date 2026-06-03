@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import handler from "./worker";
-import * as pipelineJobs from "./pipeline-jobs";
-import * as pipelineMaterialize from "./pipeline-materialize";
-import * as scheduledIngestion from "./scheduled-ingestion";
+import * as pipelineJobs from "./pipeline/jobs";
+import * as pipelineMaterialize from "./pipeline/materialize";
+import * as scheduledIngestion from "./pipeline/scheduled-ingestion";
 import * as documents from "./d1/documents";
 import { resetSchemaOnceForTests } from "./storage";
 

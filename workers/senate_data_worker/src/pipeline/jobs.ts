@@ -2,26 +2,26 @@ import {
   fetchVoteDetailsParallel,
   fetchVoteMenu,
   type FetchConfig,
-} from "./fetch";
-import { readDocumentJson } from "./d1/documents";
-import { readPipelineCheckpoint, writePipelineCheckpoint } from "./d1/checkpoints";
-import { writeHistoricalVoteBatchToD1 } from "./d1/materialization";
-import type { PipelineJob } from "./platform-types";
-import { parseVoteDetailXml, parseVoteMenuXml } from "./xml";
+} from "../fetch";
+import { readDocumentJson } from "../d1/documents";
+import { readPipelineCheckpoint, writePipelineCheckpoint } from "../d1/checkpoints";
+import { writeHistoricalVoteBatchToD1 } from "../d1/materialization";
+import type { PipelineJob } from "../platform-types";
+import { parseVoteDetailXml, parseVoteMenuXml } from "../xml";
 import {
   buildVoteLedgerKey,
   buildSessionOverviewKey,
   buildActivitiesIndexKey,
-} from "./storage";
+} from "../storage";
 import {
   HISTORICAL_BACKFILL_BATCH_SIZE,
   logEvent,
   PIPELINE_FETCH_CONFIG,
-} from "./pipeline-logging";
-import type { Env } from "./config";
-import { buildRuntime, type Runtime } from "./runtime";
-import type { ActivityIndexJson, SessionOverview, VoteLedger } from "./types";
-import { materializeReadModels } from "./pipeline-materialize";
+} from "./logging";
+import type { Env } from "../config";
+import { buildRuntime, type Runtime } from "../runtime";
+import type { ActivityIndexJson, SessionOverview, VoteLedger } from "../types";
+import { materializeReadModels } from "./materialize";
 
 export async function enqueuePipelineJob(env: Env, job: PipelineJob): Promise<boolean> {
   if (!env.PIPELINE_QUEUE) return false;

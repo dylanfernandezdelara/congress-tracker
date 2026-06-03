@@ -10,10 +10,10 @@ import {
 import { parseIntSafe, type Env } from "../config";
 import { buildRuntime } from "../runtime";
 import { authorizePipelineAdmin } from "../pipeline-auth";
-import { readPipelineStatus } from "../pipeline-status";
-import { materializeReadModels } from "../pipeline-materialize";
-import { processPipelineJob } from "../pipeline-jobs";
-import { runScheduledIngestion } from "../scheduled-ingestion";
+import { readPipelineStatus } from "../storage";
+import { materializeReadModels } from "../pipeline/materialize";
+import { processPipelineJob } from "../pipeline/jobs";
+import { runScheduledIngestion } from "../pipeline/scheduled-ingestion";
 import {
   buildCorsHeaders,
   buildJsonResponse,

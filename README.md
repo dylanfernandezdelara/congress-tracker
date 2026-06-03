@@ -97,9 +97,12 @@ congress-tracker/
 │       ├── scripts/
 │       ├── src/
 │       │   ├── worker.ts
-│       │   ├── http.ts
-│       │   ├── d1/
-│       │   ├── worker-env.ts
+│       │   ├── http/router.ts
+│       │   ├── pipeline/   (scheduled ingestion, jobs, materialize, stages)
+│       │   ├── storage/    (document keys, D1 read repos, schema-once)
+│       │   ├── synthesis/  (OpenRouter bill analysis)
+│       │   ├── sources/    (HTTP/XML/Congress.gov clients)
+│       │   ├── d1/         (schema, kv_documents, materialization writes)
 │       │   └── read-model.ts
 │       └── wrangler.toml
 └── scripts/

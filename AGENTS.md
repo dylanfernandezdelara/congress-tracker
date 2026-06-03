@@ -75,12 +75,17 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 ## Project Structure
 - `workers/senate_data_worker/src/worker.ts` — single Worker entry: `fetch` + `scheduled` + `queue` handlers
 - `workers/senate_data_worker/src/ingest.ts` — vote ingestion and target-date selection
-- `workers/senate_data_worker/src/scheduled-ingestion.ts` — pipeline orchestration and scheduled handler
-- `workers/senate_data_worker/src/pipeline-jobs.ts` — queue processing
-- `workers/senate_data_worker/src/http.ts` — public read API endpoints
-- `workers/senate_data_worker/src/pipeline-routes.ts` — HTTP router (public reads + `/__pipeline/*` admin)
-- `workers/senate_data_worker/src/read-model.ts` — briefing/detail materialization
-- `workers/senate_data_worker/src/d1/` — D1 schema, `kv_documents` JSON store (`documents.ts`), and repository modules
+- `workers/senate_data_worker/src/pipeline/scheduled-ingestion.ts` — pipeline orchestration and scheduled handler
+- `workers/senate_data_worker/src/pipeline/ingestion-stages.ts` — explicit ingestion stage functions
+- `workers/senate_data_worker/src/pipeline/jobs.ts` — queue processing and historical backfill
+- `workers/senate_data_worker/src/pipeline/materialize.ts` — evidence harvest, synthesis, read-model publish
+- `workers/senate_data_worker/src/pipeline/logging.ts` — pipeline run IDs, timing, coverage logging
+- `workers/senate_data_worker/src/http/router.ts` — HTTP router (public reads + `/__pipeline/*` admin)
+- `workers/senate_data_worker/src/read-model.ts` — briefing/detail materialization builders
+- `workers/senate_data_worker/src/storage/` — document key helpers and D1 read repositories (health, pipeline status)
+- `workers/senate_data_worker/src/synthesis/` — OpenRouter client, prompts, coercers, quality gates
+- `workers/senate_data_worker/src/sources/` — shared HTTP/XML/Congress.gov clients
+- `workers/senate_data_worker/src/d1/` — D1 schema, `kv_documents` JSON store (`documents.ts`), and write paths
 - `web/src/` — frontend app and API client
 
 ## Notes

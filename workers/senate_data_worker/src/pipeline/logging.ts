@@ -1,6 +1,6 @@
-import type { FetchConfig } from "./fetch";
-import { computePct } from "./config";
-import type { CoverageSnapshot, EvidenceEndpoint, SourceError, VoteLedger } from "./types";
+import type { FetchConfig } from "../fetch";
+import { computePct } from "../config";
+import type { CoverageSnapshot, EvidenceEndpoint, SourceError, VoteLedger } from "../types";
 
 export const PIPELINE_FETCH_CONFIG: FetchConfig = {
   maxRetries: 3,
