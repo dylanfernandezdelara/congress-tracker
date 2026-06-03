@@ -1,36 +1,27 @@
 import { buildBillKey } from "./congress";
 import { harvestBillEvidence, EVIDENCE_ENDPOINT_TIERS } from "./bill-evidence";
 import { buildTrendSnapshot, extractBillImpactEvidence } from "./impact-extract";
+import { readDocumentJson, writeDocumentJson } from "./d1/documents";
 import {
   analyzeBillsWithCache,
   type AnalyzeBillsResult,
 } from "./openrouter";
 import { mapWithConcurrency } from "./concurrency";
-import { buildPipelineMaterialization, buildVoteDetailResponse } from "./read-model";
+import { buildPipelineMaterialization } from "./read-model";
 import { writePlatformMaterializationToD1 } from "./d1/materialization";
 import type { PipelineMaterialization } from "./platform-types";
 import {
   buildLatestChamberContextKey,
-  buildLatestBriefingKey,
-  buildMemberKeys,
   buildMembersIndexKey,
   buildActivitiesIndexKey,
-  buildVoteLedgerKey,
-  buildVoteDetailKey,
-  buildSessionOverviewKey,
   buildBillEvidenceKey,
   buildBillTrendSnapshotKey,
-  publishToR2,
-  readJsonFromR2,
-  writeJsonToR2IfChanged,
   buildChamberContextKey,
 } from "./storage";
 import { computePct } from "./pipeline-runtime-config";
 import { logEvent } from "./pipeline-logging";
 import type { PipelineEnv } from "./pipeline-env";
 import type {
-  SnapshotJson,
-  MetaJson,
   MemberActivityJson,
   MemberIndexJson,
   ActivityIndexJson,
@@ -73,48 +64,41 @@ export interface BillEvidencePipelineOptions {
 }
 
 export async function publishChamberContext(
-  bucket: R2Bucket,
+  db: D1Database,
   windowEnd: string,
   context: MemberActivityContext
 ): Promise<void> {
-  await writeJsonToR2IfChanged(bucket, buildChamberContextKey(windowEnd), context);
-  await writeJsonToR2IfChanged(bucket, buildLatestChamberContextKey(), context);
+  await writeDocumentJson(db, buildChamberContextKey(windowEnd), context, { skipIfUnchanged: true });
+  await writeDocumentJson(db, buildLatestChamberContextKey(), context, { skipIfUnchanged: true });
 }
 
-export async function readLatestChamberContext(bucket: R2Bucket): Promise<MemberActivityContext | null> {
-  return readJsonFromR2<MemberActivityContext>(bucket, buildLatestChamberContextKey());
+export async function readLatestChamberContext(db: D1Database): Promise<MemberActivityContext | null> {
+  return readDocumentJson<MemberActivityContext>(db, buildLatestChamberContextKey());
 }
 
-export async function hasPublishedReadModels(bucket: R2Bucket): Promise<boolean> {
-  const [ledger, overview, briefing] = await Promise.all([
-    readJsonFromR2<VoteLedger>(bucket, buildVoteLedgerKey()),
-    readJsonFromR2<SessionOverview>(bucket, buildSessionOverviewKey()),
-    readJsonFromR2<unknown>(bucket, buildLatestBriefingKey()),
-  ]);
-  return Boolean(ledger && overview && briefing);
+export async function hasPublishedReadModels(db: D1Database): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT briefing_key FROM daily_briefings WHERE briefing_key = ? LIMIT 1")
+    .bind("latest")
+    .all<{ briefing_key: string }>();
+  return (row.results?.length ?? 0) > 0;
 }
 
 export async function publishMemberActivity(
-  bucket: R2Bucket,
+  db: D1Database,
   membersIndex: MemberIndexJson,
-  memberActivities: MemberActivityJson[],
-  windowEnd: string,
+  _memberActivities: MemberActivityJson[],
+  _windowEnd: string,
   activityIndex: ActivityIndexJson | null
 ): Promise<void> {
-  console.log("[r2] Publishing member activity...");
+  console.log("[d1] Publishing member activity documents...");
 
-  await writeJsonToR2IfChanged(bucket, buildMembersIndexKey(), membersIndex);
+  await writeDocumentJson(db, buildMembersIndexKey(), membersIndex, { skipIfUnchanged: true });
   if (activityIndex) {
-    await writeJsonToR2IfChanged(bucket, buildActivitiesIndexKey(), activityIndex);
+    await writeDocumentJson(db, buildActivitiesIndexKey(), activityIndex, { skipIfUnchanged: true });
   }
 
-  await mapWithConcurrency(memberActivities, 3, async (activity) => {
-    const keys = buildMemberKeys(activity.member.bioguide_id, windowEnd);
-    await writeJsonToR2IfChanged(bucket, keys.snapshot, activity);
-    await writeJsonToR2IfChanged(bucket, keys.latest, activity);
-  });
-
-  console.log("[r2] Member activity publish complete");
+  console.log("[d1] Member activity documents publish complete");
 }
 
 export function canBuildBillKey(bill: BillRef | undefined): bill is BillRef {
@@ -193,7 +177,7 @@ export function evaluateQualityGates(
 }
 
 export async function buildBillEvidencePipeline(
-  bucket: R2Bucket,
+  db: D1Database,
   billsByKey: Map<string, BillRef>,
   options: BillEvidencePipelineOptions
 ): Promise<BillEvidencePipelineResult> {
@@ -266,11 +250,12 @@ export async function buildBillEvidencePipeline(
       raw: harvested.evidence,
       impact,
     };
-    await writeJsonToR2IfChanged(bucket, buildBillEvidenceKey(key), record);
-    await writeJsonToR2IfChanged(
-      bucket,
+    await writeDocumentJson(db, buildBillEvidenceKey(key), record, { skipIfUnchanged: true });
+    await writeDocumentJson(
+      db,
       buildBillTrendSnapshotKey(bill.congress, key, snapshotDate),
-      trendSnapshot
+      trendSnapshot,
+      { skipIfUnchanged: true }
     );
     impactByKey.set(key, impact);
     billInputs.push({ bill, impactEvidence: impact });
@@ -322,7 +307,7 @@ export async function buildBillEvidencePipeline(
 }
 
 export async function enrichBillAnalyses(
-  bucket: R2Bucket,
+  db: D1Database,
   billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }>,
   memberActivities: MemberActivityJson[],
   activityIndex: ActivityIndexJson | null,
@@ -339,7 +324,7 @@ export async function enrichBillAnalyses(
     return null;
   }
 
-  const result = await analyzeBillsWithCache(bucket, billInputs, {
+  const result = await analyzeBillsWithCache(db, billInputs, {
     apiKey,
     models,
     maxNewAnalyses,
@@ -401,31 +386,6 @@ export async function enrichBillAnalyses(
   return result;
 }
 
-export async function publishAllStatesToR2(
-  bucket: R2Bucket,
-  perState: Record<string, { snapshot: SnapshotJson; meta: MetaJson }>
-): Promise<void> {
-  const entries = Object.entries(perState);
-  await mapWithConcurrency(entries, 3, async ([state, payload]) => {
-    console.log(`[r2] Publishing ${state} vote data...`);
-    await publishToR2(bucket, payload.snapshot, payload.meta);
-  });
-}
-
-export async function publishReadModelsToR2(
-  bucket: R2Bucket,
-  materialization: PipelineMaterialization
-): Promise<void> {
-  await writeJsonToR2IfChanged(bucket, buildLatestBriefingKey(), materialization.briefing);
-  await mapWithConcurrency(materialization.voteDetails, 4, async (detail) => {
-    await writeJsonToR2IfChanged(
-      bucket,
-      buildVoteDetailKey(detail.vote.congress, detail.vote.session, detail.vote.vote_number),
-      detail
-    );
-  });
-}
-
 export async function materializeReadModels(
   env: PipelineEnv,
   ledger: VoteLedger,
@@ -433,16 +393,11 @@ export async function materializeReadModels(
   activityIndex: ActivityIndexJson | null
 ): Promise<void> {
   const materialization = buildPipelineMaterialization(ledger, overview, activityIndex);
-  await publishReadModelsToR2(env.DATA_BUCKET, materialization);
-  if (env.SENATE_DB) {
-    await writePlatformMaterializationToD1(
-      env.SENATE_DB,
-      ledger,
-      overview,
-      activityIndex,
-      materialization
-    );
-  }
+  await writePlatformMaterializationToD1(
+    env.SENATE_DB,
+    ledger,
+    overview,
+    activityIndex,
+    materialization
+  );
 }
-
-export { buildVoteDetailResponse };

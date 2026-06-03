@@ -2,16 +2,15 @@ import {
   fetchVoteDetailsParallel,
   fetchVoteMenu,
 } from "./fetch";
+import { readDocumentJson } from "./d1/documents";
 import { readPipelineCheckpoint, writePipelineCheckpoint } from "./d1/checkpoints";
-import { writeHistoricalVoteBatchToD1, writeVoteEvidenceToD1 } from "./d1/materialization";
+import { writeHistoricalVoteBatchToD1 } from "./d1/materialization";
 import type { PipelineJob } from "./platform-types";
 import { parseVoteDetailXml, parseVoteMenuXml } from "./xml";
-import { extractVoteEvidence } from "./vote-evidence";
 import {
   buildVoteLedgerKey,
   buildSessionOverviewKey,
   buildActivitiesIndexKey,
-  readJsonFromR2,
 } from "./storage";
 import {
   HISTORICAL_BACKFILL_BATCH_SIZE,
@@ -20,11 +19,7 @@ import {
 } from "./pipeline-logging";
 import type { PipelineEnv } from "./pipeline-env";
 import type { ActivityIndexJson, SessionOverview, VoteLedger } from "./types";
-import {
-  buildVoteDetailResponse,
-  materializeReadModels,
-  readLatestChamberContext,
-} from "./pipeline-materialize";
+import { materializeReadModels } from "./pipeline-materialize";
 
 export async function enqueuePipelineJob(env: PipelineEnv, job: PipelineJob): Promise<boolean> {
   if (!env.PIPELINE_QUEUE) return false;
@@ -40,78 +35,10 @@ export async function enqueuePipelineJob(env: PipelineEnv, job: PipelineJob): Pr
   }
 }
 
-export async function processExtractVoteEvidenceJob(
-  job: Extract<PipelineJob, { type: "extract_vote_evidence" }>,
-  env: PipelineEnv
-): Promise<void> {
-  if (!env.SENATE_DB) {
-    logEvent("extract_vote_evidence_skipped", {
-      reason: "missing_d1",
-      congress: job.congress,
-      session: job.session,
-      vote_number: job.vote_number,
-    });
-    return;
-  }
-
-  const [ledger, overview, activityIndex, context] = await Promise.all([
-    readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey()),
-    readJsonFromR2<SessionOverview>(env.DATA_BUCKET, buildSessionOverviewKey()),
-    readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, buildActivitiesIndexKey()),
-    readLatestChamberContext(env.DATA_BUCKET),
-  ]);
-  if (!ledger || !overview) {
-    throw new Error("Vote evidence job missing ledger or overview in storage");
-  }
-
-  const detail = buildVoteDetailResponse(ledger, overview, activityIndex, job.vote_number, "derived");
-  if (!detail) {
-    logEvent("extract_vote_evidence_skipped", {
-      reason: "vote_detail_missing",
-      congress: job.congress,
-      session: job.session,
-      vote_number: job.vote_number,
-    });
-    return;
-  }
-
-  const evidence = await extractVoteEvidence(
-    env,
-    detail,
-    overview,
-    context,
-    PIPELINE_FETCH_CONFIG
-  );
-  await writeVoteEvidenceToD1(
-    env.SENATE_DB,
-    detail.vote.congress,
-    detail.vote.session,
-    detail.vote.vote_number,
-    evidence
-  );
-
-  logEvent("extract_vote_evidence_complete", {
-    congress: job.congress,
-    session: job.session,
-    vote_number: job.vote_number,
-    excerpts: evidence.excerpts.length,
-    documents: evidence.documents.length,
-  });
-}
-
 export async function processHistoricalBackfillJob(
   job: Extract<PipelineJob, { type: "historical_backfill" }>,
   env: PipelineEnv
 ): Promise<void> {
-  if (!env.SENATE_DB) {
-    logEvent("historical_backfill_skipped", {
-      reason: "missing_d1",
-      congress: job.congress,
-      session: job.session ?? null,
-    });
-    return;
-  }
-
   const sessions = job.session ? [job.session] : [1, 2];
   const checkpointKey = `historical_backfill:${job.congress}:${job.session ?? "all"}`;
   const inlineMode = !env.PIPELINE_QUEUE;
@@ -220,9 +147,9 @@ export async function processHistoricalBackfillJob(
 export async function processPipelineJob(job: PipelineJob, env: PipelineEnv): Promise<void> {
   if (job.type === "materialize_read_models") {
     const [ledger, overview, activityIndex] = await Promise.all([
-      readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey()),
-      readJsonFromR2<SessionOverview>(env.DATA_BUCKET, buildSessionOverviewKey()),
-      readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, buildActivitiesIndexKey()),
+      readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey()),
+      readDocumentJson<SessionOverview>(env.SENATE_DB, buildSessionOverviewKey()),
+      readDocumentJson<ActivityIndexJson>(env.SENATE_DB, buildActivitiesIndexKey()),
     ]);
     if (!ledger || !overview) {
       throw new Error("Materialization job missing ledger or overview in storage");
@@ -233,11 +160,6 @@ export async function processPipelineJob(job: PipelineJob, env: PipelineEnv): Pr
 
   if (job.type === "historical_backfill") {
     await processHistoricalBackfillJob(job, env);
-    return;
-  }
-
-  if (job.type === "extract_vote_evidence") {
-    await processExtractVoteEvidenceJob(job, env);
   }
 }
 

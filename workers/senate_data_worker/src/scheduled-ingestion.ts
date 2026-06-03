@@ -1,21 +1,16 @@
-import { runIngestion, runIngestionAllStates, buildVoteLedgerUpdate, discoverVoteLedgerUpdates } from "./ingest";
+import { buildVoteLedgerUpdate, discoverVoteLedgerUpdates } from "./ingest";
 import { runMemberIngestion } from "./member-ingest";
 import { getHarnessRuntime } from "./harness";
 import { DEFAULT_OPENROUTER_MODELS, type AnalyzeBillsResult } from "./openrouter";
-import { buildPipelineMaterialization } from "./read-model";
+import { readDocumentJson, writeDocumentJson } from "./d1/documents";
 import {
   buildActivitiesIndexKey,
-  buildCoverageSnapshotKey,
   buildSessionOverviewKey,
   buildVoteLedgerKey,
-  publishToR2,
-  readJsonFromR2,
-  writeJsonToR2IfChanged,
 } from "./storage";
-import { STATE_CODES } from "./states";
 import type { PipelineJob } from "./platform-types";
 import type { PipelineEnv } from "./pipeline-env";
-import type { ActivityIndexJson, MetaJson, SnapshotJson, SourceError, VoteLedger } from "./types";
+import type { ActivityIndexJson, SourceError, VoteLedger } from "./types";
 import {
   parseBool,
   parseCsvList,
@@ -38,13 +33,12 @@ import {
   enrichBillAnalyses,
   hasPublishedReadModels,
   materializeReadModels,
-  publishAllStatesToR2,
   publishChamberContext,
   publishMemberActivity,
   collectUniqueBills,
   type QualityGateConfig,
 } from "./pipeline-materialize";
-import { enqueuePipelineJob, processPipelineJob } from "./pipeline-jobs";
+import { enqueuePipelineJob } from "./pipeline-jobs";
 
 /**
  * Core ingestion logic, separated for use with ctx.waitUntil.
@@ -71,14 +65,14 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
   );
   const activityLookbackDays = Math.max(7, Math.min(parseIntSafe(env.ACTIVITY_LOOKBACK_DAYS, 30), 120));
 
-  const existingLedger = await readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey());
+  const existingLedger = await readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey());
   const discovery = await runTimed(runId, "discover_vote_updates", async () =>
     discoverVoteLedgerUpdates(config, existingLedger, {
       db: env.SENATE_DB,
       fetchConfig: PIPELINE_FETCH_CONFIG,
     })
   );
-  if (discovery.missingVoteNumbers.length === 0 && (await hasPublishedReadModels(env.DATA_BUCKET))) {
+  if (discovery.missingVoteNumbers.length === 0 && (await hasPublishedReadModels(env.SENATE_DB))) {
     logEvent("scheduled_ingestion_noop", {
       run_id: runId,
       duration_ms: Date.now() - startTime,
@@ -106,8 +100,8 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     throw new Error(`[scheduled] Member ingestion failed: ${memberResult.error ?? "unknown error"}`);
   }
   const membersIndex = memberResult.membersIndex;
-  const previousActivityIndex = await readJsonFromR2<ActivityIndexJson>(
-    env.DATA_BUCKET,
+  const previousActivityIndex = await readDocumentJson<ActivityIndexJson>(
+    env.SENATE_DB,
     buildActivitiesIndexKey()
   );
   const effectiveActivityIndex =
@@ -124,7 +118,7 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
 
   const billsByKey = collectUniqueBills(memberResult.memberActivities, effectiveActivityIndex);
   const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", async () =>
-    buildBillEvidencePipeline(env.DATA_BUCKET, billsByKey, {
+    buildBillEvidencePipeline(env.SENATE_DB, billsByKey, {
       runId,
       congressApiKey,
       session: config.session,
@@ -146,7 +140,7 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
 
   await runTimed(runId, "publish_member_activity_core", async () =>
     publishMemberActivity(
-      env.DATA_BUCKET,
+      env.SENATE_DB,
       membersIndex,
       memberResult.memberActivities,
       memberResult.windowEnd,
@@ -154,7 +148,7 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     )
   );
   await runTimed(runId, "publish_chamber_context", async () =>
-    publishChamberContext(env.DATA_BUCKET, memberResult.windowEnd, memberResult.context)
+    publishChamberContext(env.SENATE_DB, memberResult.windowEnd, memberResult.context)
   );
 
   const harnessRuntime = getHarnessRuntime();
@@ -180,7 +174,7 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     try {
       analysisResult = await runTimed(runId, "openrouter_synthesis", async () =>
         enrichBillAnalyses(
-          env.DATA_BUCKET,
+          env.SENATE_DB,
           evidencePipeline.billInputs,
           memberResult.memberActivities,
           effectiveActivityIndex,
@@ -198,7 +192,7 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
         try {
           await runTimed(runId, "publish_member_activity_narrative", async () =>
             publishMemberActivity(
-              env.DATA_BUCKET,
+              env.SENATE_DB,
               membersIndex,
               memberResult.memberActivities,
               memberResult.windowEnd,
@@ -257,32 +251,6 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     });
   }
 
-  let statePartial = false;
-  if (config.targetState === "ALL") {
-    const result = await runTimed(runId, "state_ingestion_all", async () =>
-      runIngestionAllStates(config, STATE_CODES)
-    );
-    if (!result.success) {
-      throw new Error(`[scheduled] Ingestion failed: ${result.error}`);
-    }
-    statePartial = result.partial;
-    await runTimed(runId, "publish_state_snapshots_all", async () =>
-      publishAllStatesToR2(env.DATA_BUCKET, result.perState)
-    );
-  } else {
-    const result = await runTimed(runId, "state_ingestion_single", async () => runIngestion(config));
-    if (!result.success) {
-      throw new Error(`[scheduled] Ingestion failed: ${result.error}`);
-    }
-    if (!result.snapshot || !result.meta) {
-      throw new Error("[scheduled] Ingestion succeeded but no data to publish");
-    }
-    statePartial = result.partial;
-    await runTimed(runId, "publish_state_snapshots_single", async () =>
-      publishToR2(env.DATA_BUCKET, result.snapshot as SnapshotJson, result.meta as MetaJson)
-    );
-  }
-
   const { ledger, overview } = await runTimed(runId, "build_vote_ledger", async () =>
     buildVoteLedgerUpdate(config, membersIndex, existingLedger, PIPELINE_FETCH_CONFIG, {
       db: env.SENATE_DB,
@@ -290,26 +258,15 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     })
   );
   const newVoteNumbers = diffVoteNumbers(ledger, existingLedger);
-  const evidenceTargetVoteNumbers = Array.from(
-    new Set([
-      ...newVoteNumbers,
-      ...buildPipelineMaterialization(ledger, overview, effectiveActivityIndex).briefing.items
-        .slice(0, 6)
-        .map((item) => item.vote_number),
-    ])
-  );
+
   await runTimed(runId, "publish_vote_ledger", async () =>
-    writeJsonToR2IfChanged(env.DATA_BUCKET, buildVoteLedgerKey(), ledger)
+    writeDocumentJson(env.SENATE_DB, buildVoteLedgerKey(), ledger, { skipIfUnchanged: true })
   );
   await runTimed(runId, "publish_session_overview", async () =>
-    writeJsonToR2IfChanged(env.DATA_BUCKET, buildSessionOverviewKey(), overview)
+    writeDocumentJson(env.SENATE_DB, buildSessionOverviewKey(), overview, { skipIfUnchanged: true })
   );
 
-  const allErrors = [
-    ...memberResult.errors,
-    ...evidencePipeline.errors,
-    ...synthesisErrors,
-  ];
+  const allErrors = [...memberResult.errors, ...evidencePipeline.errors, ...synthesisErrors];
   const coverage = summarizeCoverage(
     runId,
     evidencePipeline.processedBillCount,
@@ -323,11 +280,8 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     evidencePipeline.structuredAmountCount,
     evidencePipeline.recipientCount,
     evidencePipeline.stateSignalCount,
-    statePartial || allErrors.length > 0,
+    allErrors.length > 0,
     allErrors
-  );
-  await runTimed(runId, "publish_coverage_snapshot", async () =>
-    writeJsonToR2IfChanged(env.DATA_BUCKET, buildCoverageSnapshotKey(memberResult.windowEnd), coverage)
   );
 
   const materializeJob: PipelineJob = {
@@ -342,31 +296,6 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     await runTimed(runId, "materialize_read_models_inline", async () =>
       materializeReadModels(env, ledger, overview, effectiveActivityIndex)
     );
-  }
-
-  if (evidenceTargetVoteNumbers.length > 0) {
-    const evidenceJobs = evidenceTargetVoteNumbers.map<PipelineJob>((voteNumber) => ({
-      type: "extract_vote_evidence",
-      created_at: new Date().toISOString(),
-      congress: ledger.congress,
-      session: ledger.session,
-      vote_number: voteNumber,
-    }));
-    const evidenceQueued = await runTimed(runId, "queue_vote_evidence", async () => {
-      let allQueued = true;
-      for (const job of evidenceJobs) {
-        const queuedJob = await enqueuePipelineJob(env, job);
-        if (!queuedJob) allQueued = false;
-      }
-      return allQueued;
-    });
-    if (!evidenceQueued) {
-      await runTimed(runId, "extract_vote_evidence_inline", async () => {
-        for (const job of evidenceJobs) {
-          await processPipelineJob(job, env);
-        }
-      });
-    }
   }
 
   logEvent("scheduled_ingestion_complete", {
@@ -387,9 +316,6 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
 
 /**
  * Scheduled handler for cron triggers.
- *
- * Uses ctx.waitUntil to ensure async work completes before the runtime
- * terminates the worker. Fails loudly on configuration errors.
  */
 export function handleScheduled(
   controller: ScheduledController,
@@ -400,11 +326,8 @@ export function handleScheduled(
     scheduled_for: new Date(controller.scheduledTime).toISOString(),
   });
 
-  // Use ctx.waitUntil to ensure the async work completes
-  // This prevents the runtime from terminating the worker prematurely
   ctx.waitUntil(
     runScheduledIngestion(env).catch((err) => {
-      // Keep failure logs structured and avoid exposing full stack traces by default.
       logEvent("scheduled_ingestion_failed", {
         fatal: true,
         error: err instanceof Error ? err.message : String(err),

@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 import { mapWithConcurrency } from "./concurrency";
 import { buildBillKey } from "./congress";
-import { buildBillNarrativeKey, readJsonFromR2, writeJsonToR2 } from "./storage";
+import { readDocumentJson, writeDocumentJson } from "./d1/documents";
+import { buildBillNarrativeKey } from "./storage";
 import type {
   AnalysisQuality,
   BenefitMapEntry,
@@ -1009,7 +1010,7 @@ function qualityCoverage(
 }
 
 export async function analyzeBillsWithCache(
-  bucket: R2Bucket,
+  db: D1Database,
   inputs: AnalyzeBillInput[],
   options: AnalyzeBillsOptions
 ): Promise<AnalyzeBillsResult> {
@@ -1021,7 +1022,7 @@ export async function analyzeBillsWithCache(
     if (!requestedByKey.has(key)) requestedByKey.set(key, input);
   }
 
-  const legacyCache = (await readJsonFromR2<LegacyAnalysisCache>(bucket, BILL_ANALYSIS_CACHE_KEY)) ?? {};
+  const legacyCache = (await readDocumentJson<LegacyAnalysisCache>(db, BILL_ANALYSIS_CACHE_KEY)) ?? {};
   const analysisByKey = new Map<string, BillAnalysis>();
   let cacheHitCount = 0;
   let analyzedCount = 0;
@@ -1053,7 +1054,7 @@ export async function analyzeBillsWithCache(
   const entries = Array.from(requestedByKey.entries());
   const cachedChecks = await mapWithConcurrency(entries, 4, async ([key, input]) => {
     const narrativeKey = buildBillNarrativeKey(key);
-    const cachedNarrative = await readJsonFromR2<BillAnalysis>(bucket, narrativeKey);
+    const cachedNarrative = await readDocumentJson<BillAnalysis>(db, narrativeKey);
     const cached = cachedNarrative ?? legacyCache[key];
     return { key, input, cached };
   });
@@ -1121,11 +1122,11 @@ export async function analyzeBillsWithCache(
     analysisByKey.set(result.key, result.analysis);
     legacyCache[result.key] = result.analysis;
     legacyChanged = true;
-    await writeJsonToR2(bucket, buildBillNarrativeKey(result.key), result.analysis);
+    await writeDocumentJson(db, buildBillNarrativeKey(result.key), result.analysis);
   }
 
   if (legacyChanged) {
-    await writeJsonToR2(bucket, BILL_ANALYSIS_CACHE_KEY, legacyCache);
+    await writeDocumentJson(db, BILL_ANALYSIS_CACHE_KEY, legacyCache);
   }
 
   const qualityMetrics = qualityCoverage(analysisByKey, requestedByKey);

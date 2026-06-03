@@ -3,7 +3,7 @@
  *
  * Handles:
  * - Scheduled (cron) ingestion of Senate roll-call vote data
- * - HTTP API for serving precomputed JSON from R2
+ * - HTTP API for serving precomputed JSON from D1
  */
 
 import { applyHarnessEnv } from "./harness";

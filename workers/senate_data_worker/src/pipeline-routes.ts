@@ -1,9 +1,9 @@
 import { handleApiFetch } from "./http";
+import { readDocumentJson } from "./d1/documents";
 import {
   buildActivitiesIndexKey,
   buildSessionOverviewKey,
   buildVoteLedgerKey,
-  readJsonFromR2,
 } from "./storage";
 import type { PipelineEnv } from "./pipeline-env";
 import type { ActivityIndexJson, SessionOverview, VoteLedger } from "./types";
@@ -21,7 +21,6 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
   const jsonResponse = (body: unknown, init?: ResponseInit) =>
     buildJsonResponse(body, corsHeaders, init);
 
-  // Handle CORS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -54,7 +53,6 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
     if (unauthorized) return unauthorized;
   }
 
-  // Health check (no R2 access)
   if (pathname === "/health") {
     return jsonResponse(
       {
@@ -73,15 +71,17 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
 
   if (pathname === "/health/data") {
     const maxFreshHours = Math.max(1, parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, 36));
-    const activityIndex = await readJsonFromR2<ActivityIndexJson>(
-      env.DATA_BUCKET,
-      buildActivitiesIndexKey()
-    );
-    if (!activityIndex?.generated_at) {
+    const row = await env.SENATE_DB.prepare(
+      "SELECT generated_at FROM daily_briefings WHERE briefing_key = ? LIMIT 1"
+    )
+      .bind("latest")
+      .all<{ generated_at: string }>();
+    const generatedAt = row.results?.[0]?.generated_at;
+    if (!generatedAt) {
       return jsonResponse(
         {
           status: "stale",
-          message: "No activities index found in storage.",
+          message: "No materialized briefing found in D1.",
           max_fresh_hours: maxFreshHours,
         },
         {
@@ -90,14 +90,13 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
         }
       );
     }
-    const generatedAt = new Date(activityIndex.generated_at).getTime();
-    const now = Date.now();
-    const ageHours = Number(((now - generatedAt) / 3_600_000).toFixed(2));
-    const fresh = Number.isFinite(generatedAt) && ageHours <= maxFreshHours;
+    const generatedAtMs = new Date(generatedAt).getTime();
+    const ageHours = Number(((Date.now() - generatedAtMs) / 3_600_000).toFixed(2));
+    const fresh = Number.isFinite(generatedAtMs) && ageHours <= maxFreshHours;
     return jsonResponse(
       {
         status: fresh ? "ok" : "stale",
-        generated_at: activityIndex.generated_at,
+        generated_at: generatedAt,
         age_hours: ageHours,
         max_fresh_hours: maxFreshHours,
       },
@@ -109,13 +108,6 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
   }
 
   if (pathname === "/__pipeline/status") {
-    if (!env.SENATE_DB) {
-      return jsonResponse(
-        { status: "ok", queue_enabled: Boolean(env.PIPELINE_QUEUE), d1_enabled: false },
-        { status: 200, headers: { "Cache-Control": cacheHealth } }
-      );
-    }
-
     const pipelineStatus = await readPipelineStatus(env.SENATE_DB);
 
     return jsonResponse(
@@ -131,9 +123,9 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
 
   if (pathname === "/__pipeline/run/materialize") {
     const [ledger, overview, activityIndex] = await Promise.all([
-      readJsonFromR2<VoteLedger>(env.DATA_BUCKET, buildVoteLedgerKey()),
-      readJsonFromR2<SessionOverview>(env.DATA_BUCKET, buildSessionOverviewKey()),
-      readJsonFromR2<ActivityIndexJson>(env.DATA_BUCKET, buildActivitiesIndexKey()),
+      readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey()),
+      readDocumentJson<SessionOverview>(env.SENATE_DB, buildSessionOverviewKey()),
+      readDocumentJson<ActivityIndexJson>(env.SENATE_DB, buildActivitiesIndexKey()),
     ]);
     if (!ledger || !overview) {
       return jsonResponse(
@@ -148,27 +140,6 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
   if (pathname === "/__pipeline/run/ingestion") {
     await runScheduledIngestion(env);
     return jsonResponse({ status: "ok", action: "scheduled_ingestion" }, { status: 200 });
-  }
-
-  if (pathname === "/__pipeline/run/evidence") {
-    const voteNumber = Number(new URL(request.url).searchParams.get("vote"));
-    if (!Number.isInteger(voteNumber) || voteNumber <= 0) {
-      return jsonResponse(
-        { error: "invalid_vote", message: "Provide a positive integer vote query parameter." },
-        { status: 400 }
-      );
-    }
-    await processPipelineJob(
-      {
-        type: "extract_vote_evidence",
-        created_at: new Date().toISOString(),
-        congress: Number(env.CONGRESS),
-        session: Number(env.SESSION),
-        vote_number: voteNumber,
-      },
-      env
-    );
-    return jsonResponse({ status: "ok", action: "extract_vote_evidence", vote_number: voteNumber }, { status: 200 });
   }
 
   if (pathname === "/__pipeline/run/historical-backfill") {
