@@ -6,6 +6,10 @@ import {
   analyzeBillsWithCache,
   type AnalyzeBillsResult,
 } from "./openrouter";
+import {
+  evaluateQualityGates,
+  type QualityGateConfig,
+} from "./synthesis/quality";
 import { mapWithConcurrency } from "./concurrency";
 import { buildPipelineMaterialization } from "./read-model";
 import { writePlatformMaterializationToD1 } from "./d1/materialization";
@@ -36,12 +40,7 @@ import type {
   SourceError,
 } from "./types";
 
-export interface QualityGateConfig {
-  minClaimsCoveragePct: number;
-  minQuoteValidityPct: number;
-  maxConfidenceMismatchPct: number;
-  hardGates: boolean;
-}
+export type { QualityGateConfig } from "./synthesis/quality";
 
 export interface BillEvidencePipelineResult {
   processedBillCount: number;
@@ -156,28 +155,7 @@ export function attachAnalysisToBill(
   if (analysis) bill.analysis = analysis;
 }
 
-export function evaluateQualityGates(
-  result: AnalyzeBillsResult,
-  config: QualityGateConfig
-): string[] {
-  const failures: string[] = [];
-  if (result.claimsWithEvidenceRefPct < config.minClaimsCoveragePct) {
-    failures.push(
-      `claims coverage ${result.claimsWithEvidenceRefPct}% < ${config.minClaimsCoveragePct}%`
-    );
-  }
-  if (result.quoteValidityPct < config.minQuoteValidityPct) {
-    failures.push(
-      `quote validity ${result.quoteValidityPct}% < ${config.minQuoteValidityPct}%`
-    );
-  }
-  if (result.confidenceCalibrationMismatchPct > config.maxConfidenceMismatchPct) {
-    failures.push(
-      `confidence mismatch ${result.confidenceCalibrationMismatchPct}% > ${config.maxConfidenceMismatchPct}%`
-    );
-  }
-  return failures;
-}
+export { evaluateQualityGates } from "./synthesis/quality";
 
 export async function buildBillEvidencePipeline(
   db: D1Database,
