@@ -61,7 +61,7 @@ export interface BriefingFeedItem {
 
 export interface BriefingFeedResponse {
   generated_at: string;
-  source: "d1" | "r2" | "derived";
+  source: "d1";
   items: BriefingFeedItem[];
   coverage_note?: string;
 }
@@ -107,7 +107,7 @@ export interface PartyArgumentSummary {
 
 export interface VoteDetailResponse {
   generated_at: string;
-  source: "d1" | "r2" | "derived";
+  source: "d1";
   vote_content_profile: VoteContentProfile;
   vote: {
     id: string;
@@ -214,14 +214,4 @@ export interface HistoricalBackfillJob extends PipelineJobBase {
   session?: number;
 }
 
-export interface ExtractVoteEvidenceJob extends PipelineJobBase {
-  type: "extract_vote_evidence";
-  congress: number;
-  session: number;
-  vote_number: number;
-}
-
-export type PipelineJob =
-  | MaterializeReadModelsJob
-  | HistoricalBackfillJob
-  | ExtractVoteEvidenceJob;
+export type PipelineJob = MaterializeReadModelsJob | HistoricalBackfillJob;

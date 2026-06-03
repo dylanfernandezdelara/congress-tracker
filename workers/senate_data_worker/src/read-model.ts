@@ -388,7 +388,7 @@ export function buildBriefingFeedResponse(
   ledger: VoteLedger,
   overview: SessionOverview,
   activities: ActivityIndexJson | null,
-  source: BriefingFeedResponse["source"] = "derived"
+  source: BriefingFeedResponse["source"] = "d1"
 ): BriefingFeedResponse {
   const { sorted } = buildBriefingFeedItemsSortedByDate(ledger, overview, activities);
   const items = sorted.slice(0, BRIEFING_FEED_ITEM_LIMIT);
@@ -408,7 +408,7 @@ export function buildVoteDetailResponse(
   overview: SessionOverview,
   activities: ActivityIndexJson | null,
   voteNumber: number,
-  source: VoteDetailResponse["source"] = "derived"
+  source: VoteDetailResponse["source"] = "d1"
 ): VoteDetailResponse | null {
   const entry = ledger.entries.find((candidate) => candidate.vote_number === voteNumber);
   if (!entry) return null;
@@ -497,9 +497,9 @@ export function buildPipelineMaterialization(
   overview: SessionOverview,
   activities: ActivityIndexJson | null
 ): PipelineMaterialization {
-  const briefing = buildBriefingFeedResponse(ledger, overview, activities, "derived");
+  const briefing = buildBriefingFeedResponse(ledger, overview, activities, "d1");
   const voteDetails = ledger.entries
-    .map((entry) => buildVoteDetailResponse(ledger, overview, activities, entry.vote_number, "derived"))
+    .map((entry) => buildVoteDetailResponse(ledger, overview, activities, entry.vote_number, "d1"))
     .filter((item): item is VoteDetailResponse => Boolean(item));
 
   return { briefing, voteDetails };

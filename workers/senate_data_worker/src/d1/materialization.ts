@@ -17,26 +17,6 @@ import { buildVoteDetailResponse } from "../read-model";
 import type { VoteDetails } from "../xml";
 import { ensurePlatformSchema } from "./schema";
 
-export interface RecordDocumentWrite {
-  documentId: string;
-  source: string;
-  title: string;
-  documentDate?: string;
-  url?: string;
-  threadKey?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface VoteArgumentExcerptWrite extends ArgumentExcerpt {
-  sourceDocumentId?: string;
-}
-
-export interface VoteEvidenceWrite {
-  documents: RecordDocumentWrite[];
-  excerpts: VoteArgumentExcerptWrite[];
-  parties: PartyArgumentSummary[];
-}
-
 function toSqlBool(value: boolean): number {
   return value ? 1 : 0;
 }
@@ -429,96 +409,6 @@ export async function writeHistoricalVoteBatchToD1(
         latestRow.bill_key ? String(latestRow.bill_key) : null,
         total,
         String(latestRow.vote_date),
-        now
-      )
-      .run();
-  }
-}
-
-export async function writeVoteEvidenceToD1(
-  db: D1Database,
-  congress: number,
-  session: number,
-  voteNumber: number,
-  evidence: VoteEvidenceWrite
-): Promise<void> {
-  await ensurePlatformSchema(db);
-  const now = new Date().toISOString();
-
-  await db
-    .prepare("DELETE FROM party_argument_summaries WHERE congress = ? AND session = ? AND vote_number = ?")
-    .bind(congress, session, voteNumber)
-    .run();
-  await db
-    .prepare("DELETE FROM argument_excerpts WHERE congress = ? AND session = ? AND vote_number = ?")
-    .bind(congress, session, voteNumber)
-    .run();
-
-  for (const document of evidence.documents) {
-    await db
-      .prepare(
-        `INSERT OR REPLACE INTO record_documents (
-          document_id, source, title, document_date, url, thread_key, metadata_json, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        document.documentId,
-        document.source,
-        document.title,
-        document.documentDate ?? null,
-        document.url ?? null,
-        document.threadKey ?? null,
-        document.metadata ? JSON.stringify(document.metadata) : null,
-        now
-      )
-      .run();
-  }
-
-  for (const partySummary of evidence.parties) {
-    await db
-      .prepare(
-        `INSERT OR REPLACE INTO party_argument_summaries (
-          congress, session, vote_number, party, stance, summary_text, confidence, evidence_json,
-          excerpt_ids_json, coverage_note, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        congress,
-        session,
-        voteNumber,
-        partySummary.party,
-        partySummary.stance,
-        partySummary.summary,
-        partySummary.confidence,
-        JSON.stringify(partySummary.evidence_points),
-        JSON.stringify(partySummary.excerpt_ids),
-        partySummary.coverage_note ?? null,
-        now
-      )
-      .run();
-  }
-
-  for (const excerpt of evidence.excerpts) {
-    await db
-      .prepare(
-        `INSERT OR REPLACE INTO argument_excerpts (
-          excerpt_id, congress, session, vote_number, party, source_document_id, source_type,
-          source_label, source_url, excerpt_text, note, document_date, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        excerpt.id,
-        congress,
-        session,
-        voteNumber,
-        excerpt.party ?? null,
-        excerpt.sourceDocumentId ?? null,
-        excerpt.source_type,
-        excerpt.source_label,
-        excerpt.source_url ?? null,
-        excerpt.quote ?? null,
-        excerpt.note ?? null,
-        excerpt.date ?? null,
         now
       )
       .run();
