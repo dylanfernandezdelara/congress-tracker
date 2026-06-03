@@ -83,7 +83,7 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - `web/src/` — frontend app and API client
 
 ## Notes
-- Storage is D1-only: normalized tables plus `kv_documents` for pipeline JSON (ledger, activities, bill evidence, caches). There is no R2 binding.
+- Storage is D1-only: normalized tables plus `kv_documents` for pipeline JSON (ledger, activities, bill evidence, caches).
 - The API worker exposes only `/briefings/latest.json`, `/votes/:c/:s/:n.json`, `/health`, and `/health/data`.
 - The latest homepage feed is served from `/briefings/latest.json`.
 - The pipeline worker is responsible for ingestion/materialization; scheduled workers are not triggered automatically in local dev.

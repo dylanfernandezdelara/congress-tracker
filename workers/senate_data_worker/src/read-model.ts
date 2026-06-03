@@ -185,7 +185,7 @@ function buildCoverage(bill: BillRef | undefined, hasRecordData = false, hasFloo
     note:
       hasRecordData || hasFloorLogs
         ? undefined
-        : "Vote and bill metadata are available, but sourced Congressional Record excerpts are limited in the current read model.",
+        : "Vote and bill context are available; linked official record excerpts are not populated for this vote.",
   };
 }
 
@@ -313,7 +313,7 @@ function deriveVoteBasedPartySummary(
     confidence: total >= 10 ? "high" : "medium",
     evidence_points: [`${breakdown.yea} voted Yea, ${breakdown.nay} voted Nay`],
     excerpt_ids: [],
-    coverage_note: "Derived from the recorded vote when issue-specific Congressional Record excerpts are unavailable.",
+    coverage_note: "Derived from the recorded yea/nay tally.",
   };
 }
 
@@ -339,10 +339,7 @@ function buildArguments(
         confidence: analysisPosition.confidence,
         evidence_points: analysisPosition.evidence_points,
         excerpt_ids: excerpts.slice(0, 2).map((excerpt) => excerpt.id),
-        coverage_note:
-          excerpts.length > 0
-            ? undefined
-            : "Party summary is grounded in bill analysis evidence, but excerpt-level record links are limited.",
+        coverage_note: excerpts.length > 0 ? undefined : "Party summary is grounded in bill analysis without linked excerpts.",
       });
       continue;
     }
@@ -353,8 +350,8 @@ function buildArguments(
     available: parties.length > 0,
     coverage_note:
       excerpts.length > 0
-        ? "Argument summaries are paired with available official evidence excerpts."
-        : "Argument summaries fall back to vote-derived positions when excerpt-level evidence is unavailable.",
+        ? "Argument summaries are paired with available bill-analysis excerpts."
+        : "Argument summaries use bill analysis or tally-derived party positions.",
     parties,
     excerpts,
   };

@@ -339,8 +339,8 @@ export default function VoteDetail() {
                   No linked excerpts yet
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  The backend currently falls back to vote-derived or bill-analysis summaries when
-                  excerpt-level evidence is unavailable.
+                  Party summaries use bill analysis or the recorded vote tally when linked excerpts
+                  are not available for this vote.
                 </p>
               </div>
             )}

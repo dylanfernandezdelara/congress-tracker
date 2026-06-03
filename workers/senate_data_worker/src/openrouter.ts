@@ -30,7 +30,7 @@ export const DEFAULT_OPENROUTER_MODELS = [
 ] as const;
 export const DEFAULT_OPENROUTER_MODEL = DEFAULT_OPENROUTER_MODELS[0];
 
-interface LegacyAnalysisCache {
+interface BillAnalysisCacheMap {
   [billKey: string]: BillAnalysis;
 }
 
@@ -1022,7 +1022,7 @@ export async function analyzeBillsWithCache(
     if (!requestedByKey.has(key)) requestedByKey.set(key, input);
   }
 
-  const legacyCache = (await readDocumentJson<LegacyAnalysisCache>(db, BILL_ANALYSIS_CACHE_KEY)) ?? {};
+  const bundledCache = (await readDocumentJson<BillAnalysisCacheMap>(db, BILL_ANALYSIS_CACHE_KEY)) ?? {};
   const analysisByKey = new Map<string, BillAnalysis>();
   let cacheHitCount = 0;
   let analyzedCount = 0;
@@ -1030,7 +1030,7 @@ export async function analyzeBillsWithCache(
   let deferredCount = 0;
   let fallbackCount = 0;
   let inputSkipCount = 0;
-  let legacyChanged = false;
+  let bundledCacheChanged = false;
 
   const models = normalizeModelList(options.models ?? options.model);
   const maxNewAnalyses = options.maxNewAnalyses ?? 20;
@@ -1055,7 +1055,7 @@ export async function analyzeBillsWithCache(
   const cachedChecks = await mapWithConcurrency(entries, 4, async ([key, input]) => {
     const narrativeKey = buildBillNarrativeKey(key);
     const cachedNarrative = await readDocumentJson<BillAnalysis>(db, narrativeKey);
-    const cached = cachedNarrative ?? legacyCache[key];
+    const cached = cachedNarrative ?? bundledCache[key];
     return { key, input, cached };
   });
 
@@ -1120,13 +1120,13 @@ export async function analyzeBillsWithCache(
     }
     analyzedCount++;
     analysisByKey.set(result.key, result.analysis);
-    legacyCache[result.key] = result.analysis;
-    legacyChanged = true;
+    bundledCache[result.key] = result.analysis;
+    bundledCacheChanged = true;
     await writeDocumentJson(db, buildBillNarrativeKey(result.key), result.analysis);
   }
 
-  if (legacyChanged) {
-    await writeDocumentJson(db, BILL_ANALYSIS_CACHE_KEY, legacyCache);
+  if (bundledCacheChanged) {
+    await writeDocumentJson(db, BILL_ANALYSIS_CACHE_KEY, bundledCache);
   }
 
   const qualityMetrics = qualityCoverage(analysisByKey, requestedByKey);

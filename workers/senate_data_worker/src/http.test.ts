@@ -238,7 +238,7 @@ describe("HTTP Read API", () => {
   });
 
   describe("404 for unknown routes", () => {
-    it("returns 404 for removed legacy state routes", async () => {
+    it("returns 404 for unsupported paths", async () => {
       const res = await handler.fetch(mockRequest("/state/NY/latest.json"), createMockEnv() as any);
       expect(res.status).toBe(404);
     });

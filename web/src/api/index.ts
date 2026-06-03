@@ -3,20 +3,16 @@
  *
  * @example
  * ```ts
- * import { fetchLatestNY, getApiBaseUrl } from './api';
- * import type { LatestStateResponse, Vote, VoteMember } from './api';
+ * import { fetchLatestBriefing, getApiBaseUrl } from './api';
+ * import type { BriefingFeedResponse } from './api';
  *
- * const data = await fetchLatestNY();
+ * const briefing = await fetchLatestBriefing();
  * ```
  */
 
-// Types
 export type {
   ActivityIndexEntry,
   ActivityIndexResponse,
-  ActivityItem,
-  ActivitySource,
-  ActivityType,
   AnalysisQuality,
   AmountEvidence,
   BenefitEffect,
@@ -31,49 +27,17 @@ export type {
   BillImpactEvidence,
   BillLawInfo,
   BillRef,
-  CommitteeMeetingItem,
-  CongressCommitteeMeetingItem,
-  DailyDigestItem,
   EvidenceEndpoint,
   EvidenceEndpointStatus,
   EvidenceSourceAvailability,
-  FeaturedSenatorEntry,
-  FloorScheduleItem,
-  GovInfoCrecGranuleHighlightItem,
-  InsightEvidence,
-  LegislationActionItem,
-  LikelyReason,
-  MemberDeterministicSummary,
-  MemberInsight,
-  MemberInsightKind,
-  MemberActivityContext,
-  MemberActivityResponse,
-  MemberIndexEntry,
-  MemberIndexResponse,
-  OutputMemberVote,
-  OutputVote,
-  OutputVoteCounts,
   PartyPositionAnalysis,
   PartyStance,
   PartyArgumentSummaryView,
-  RecipientEvidence,
-  SponsorPartySignal,
   SourceCoverage,
-  HealthResponse,
-  RollCallVoteItem,
-  SenateRecordArticleItem,
-  SenatorSessionStat,
-  SessionOverview,
-  SourceError,
-  StateMetaResponse,
-  StateVotesResponse,
-  UnknownReason,
   VoteCast,
   VoteContentConfidence,
   VoteContentProfile,
   VoteDetailResponse,
-  VoteLedger,
-  VoteLedgerEntry,
   VotePartyBreakdown,
   VoteSourceBasis,
   VoteStatus,
@@ -81,12 +45,10 @@ export type {
   ArgumentExcerpt,
 } from './types';
 
-// Config helpers
 export {
   getApiBaseUrl,
   getApiUrlOverride,
   setApiUrlOverride,
 } from './config';
 
-// API client
 export { ApiError, fetchLatestBriefing, fetchVoteDetail } from './client';

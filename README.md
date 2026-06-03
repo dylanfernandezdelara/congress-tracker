@@ -36,7 +36,7 @@ The project now has three runtime surfaces:
 Storage is D1-only:
 
 - **Normalized tables** — votes, members, issue threads, ingested vote details, pipeline checkpoints, and related read-model rows.
-- **`kv_documents`** — JSON blobs keyed like the former object store (`votes/ledger.json`, `activities/index.json`, bill evidence/trends, OpenRouter caches, chamber context, and similar).
+- **`kv_documents`** — JSON blobs for pipeline artifacts (`votes/ledger.json`, `activities/index.json`, bill evidence/trends, OpenRouter caches, chamber context, and similar).
 - **Queues** (optional) — retryable background work for historical backfill chunks and read-model materialization.
 
 ```text

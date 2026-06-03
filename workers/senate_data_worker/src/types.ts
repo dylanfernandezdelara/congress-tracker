@@ -43,51 +43,6 @@ export interface OutputVote {
   members: OutputMember[];
 }
 
-/**
- * Main snapshot/latest.json structure.
- */
-export interface SnapshotJson {
-  state: string;
-  vote_date: string; // YYYY-MM-DD
-  generated_at: string; // ISO 8601 timestamp
-  congress: number;
-  session: number;
-  votes: OutputVote[];
-}
-
-/**
- * Stats object for _meta.json.
- */
-export interface MetaStats {
-  votes_total: number;
-  votes_with_state_members: number;
-  state_member_votes: number;
-}
-
-/**
- * Keys object for _meta.json.
- */
-export interface MetaKeys {
-  latest: string;
-  snapshot: string;
-}
-
-/**
- * _meta.json structure.
- */
-export interface MetaJson {
-  state: string;
-  congress: number;
-  session: number;
-  generated_at: string; // ISO 8601 timestamp
-  cutoff_date_et: string; // YYYY-MM-DD
-  target_vote_date: string; // YYYY-MM-DD
-  keys: MetaKeys;
-  stats: MetaStats;
-  partial: boolean;
-  missing_votes: number[];
-}
-
 // ============================================================================
 // Member Activity Types (Per-member daily activity)
 // ============================================================================
@@ -793,42 +748,3 @@ export interface VoteDetailResult {
   error?: string;
 }
 
-/**
- * Result from the full ingestion process.
- */
-export interface IngestResult {
-  success: boolean;
-  targetVoteDate: string | null;
-  cutoffDateEt: string;
-  votesTotal: number;
-  votesWithStateMembers: number;
-  stateMemberVotes: number;
-  partial: boolean;
-  missingVotes: number[];
-  snapshot: SnapshotJson | null;
-  meta: MetaJson | null;
-  error?: string;
-}
-
-/**
- * Result from multi-state ingestion.
- */
-export interface MultiStateIngestResult {
-  success: boolean;
-  targetVoteDate: string | null;
-  cutoffDateEt: string;
-  votesTotal: number;
-  partial: boolean;
-  missingVotes: number[];
-  generatedAt: string;
-  perState: Record<
-    string,
-    {
-      snapshot: SnapshotJson;
-      meta: MetaJson;
-      votesWithStateMembers: number;
-      stateMemberVotes: number;
-    }
-  >;
-  error?: string;
-}
