@@ -30,7 +30,7 @@ import {
   parseCommitteeScheduleXml,
   parseFloorScheduleXml,
 } from "./senate-schedule";
-import { parseVoteDetailXml, parseVoteMenuXml, type MemberVote } from "./xml";
+import { parseVoteDetailXml, parseVoteMenuXml, type MemberVote, type VoteSummary } from "./xml";
 import { mapWithConcurrency } from "./concurrency";
 import type {
   ActivityIndexJson,
@@ -64,6 +64,8 @@ export interface MemberIngestConfig {
   now?: Date;
   /** Harness fixture transport applied to every fetch this stage performs. */
   fixture?: FixtureHttp;
+  /** Pre-fetched + parsed vote menu, shared across the run to avoid re-fetching. */
+  menuVotes?: VoteSummary[];
 }
 
 export interface MemberIngestResult {
@@ -681,19 +683,23 @@ async function fetchVoteActivities(
   windowStart: string,
   windowEnd: string,
   fetchConfig: FetchConfig,
-  errors: SourceError[]
+  errors: SourceError[],
+  menuVotes?: VoteSummary[]
 ): Promise<VoteActivitiesByMember> {
   const voteActivitiesByMember: VoteActivitiesByMember = new Map();
-  const menuResult = await fetchVoteMenu(congress, session, fetchConfig);
-  if (!menuResult.success || !menuResult.data) {
-    errors.push({
-      source: "senate",
-      message: `Vote menu fetch failed: ${menuResult.error ?? "unknown error"}`,
-    });
-    return voteActivitiesByMember;
+  let allVotes = menuVotes;
+  if (!allVotes) {
+    const menuResult = await fetchVoteMenu(congress, session, fetchConfig);
+    if (!menuResult.success || !menuResult.data) {
+      errors.push({
+        source: "senate",
+        message: `Vote menu fetch failed: ${menuResult.error ?? "unknown error"}`,
+      });
+      return voteActivitiesByMember;
+    }
+    allVotes = parseVoteMenuXml(menuResult.data);
   }
 
-  const allVotes = parseVoteMenuXml(menuResult.data);
   const targetVotes = allVotes.filter((vote) =>
     isDateInRange(vote.vote_date, windowStart, windowEnd)
   );
@@ -947,7 +953,8 @@ export async function runMemberIngestion(
     windowStart,
     windowEnd,
     fetchConfig,
-    errors
+    errors,
+    config.menuVotes
   );
 
   const concurrency = Math.min(fetchConfig.concurrency ?? 4, 6);

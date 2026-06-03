@@ -1,20 +1,10 @@
-import { buildVoteLedgerUpdate, discoverVoteLedgerUpdates } from "./ingest";
-import { runMemberIngestion } from "./member-ingest";
-import { DEFAULT_OPENROUTER_MODELS, type AnalyzeBillsResult } from "./openrouter";
-import { readDocumentJson, writeDocumentJson } from "./d1/documents";
-import {
-  buildActivitiesIndexKey,
-  buildSessionOverviewKey,
-  buildVoteLedgerKey,
-} from "./storage";
 import type { PipelineJob } from "./platform-types";
 import type { Env } from "./config";
 import type { FetchConfig } from "./fetch";
 import { buildRuntime, type Runtime } from "./runtime";
-import type { ActivityIndexJson, SourceError, VoteLedger } from "./types";
+import type { VoteLedger } from "./types";
 import {
   diffVoteNumbers,
-  hashRunId,
   logEvent,
   makeRunId,
   PIPELINE_FETCH_CONFIG,
@@ -22,20 +12,30 @@ import {
   summarizeCoverage,
 } from "./pipeline-logging";
 import {
-  attachImpactEvidenceToBill,
-  buildBillEvidencePipeline,
-  enrichBillAnalyses,
   hasPublishedReadModels,
   materializeReadModels,
-  publishChamberContext,
-  publishMemberActivity,
-  collectUniqueBills,
   type QualityGateConfig,
 } from "./pipeline-materialize";
 import { enqueuePipelineJob } from "./pipeline-jobs";
+import { readDocumentJson } from "./d1/documents";
+import { buildVoteLedgerKey } from "./storage";
+import {
+  collectUniqueBills,
+  stageAttachEvidenceToActivities,
+  stageBuildVoteLedger,
+  stageDiscoverVoteUpdates,
+  stageFetchVoteMenu,
+  stageHarvestEvidence,
+  stageIngestMembers,
+  stagePublishMemberCore,
+  stagePublishVoteLedger,
+  stageResolveActivityIndex,
+  stageSynthesize,
+} from "./pipeline/ingestion-stages";
 
 /**
  * Core ingestion logic, separated for use with ctx.waitUntil.
+ * Sequences explicit stages; the Senate vote menu is fetched once per run.
  */
 export async function runScheduledIngestion(
   env: Env,
@@ -51,17 +51,22 @@ export async function runScheduledIngestion(
   const config = runtime.config;
   const now = runtime.clock.now();
   const fetchConfig: FetchConfig = { ...PIPELINE_FETCH_CONFIG, fixture: runtime.fixtureHttp };
-  const congressApiKey = config.congressApiKey;
-  const govInfoApiKey = config.govInfoApiKey;
 
   const existingLedger = await readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey());
-  const discovery = await runTimed(runId, "discover_vote_updates", async () =>
-    discoverVoteLedgerUpdates(config, existingLedger, {
+
+  const menuVotes = await runTimed(runId, "fetch_vote_menu", () =>
+    stageFetchVoteMenu(config.congress, config.session, fetchConfig)
+  );
+
+  const discovery = await runTimed(runId, "discover_vote_updates", () =>
+    stageDiscoverVoteUpdates(config, existingLedger, {
       db: env.SENATE_DB,
       fetchConfig,
       now,
+      menuVotes,
     })
   );
+
   if (discovery.missingVoteNumbers.length === 0 && (await hasPublishedReadModels(env.SENATE_DB))) {
     logEvent("scheduled_ingestion_noop", {
       run_id: runId,
@@ -76,15 +81,14 @@ export async function runScheduledIngestion(
     return;
   }
 
-  const memberResult = await runTimed(runId, "member_ingestion", async () =>
-    runMemberIngestion({
-      congress: config.congress,
-      session: config.session,
-      congressApiKey,
-      govInfoApiKey,
-      lookbackDays: config.activityLookbackDays,
+  const memberResult = await runTimed(runId, "member_ingestion", () =>
+    stageIngestMembers(config, {
+      congressApiKey: config.congressApiKey,
+      govInfoApiKey: config.govInfoApiKey,
       now,
       fixture: runtime.fixtureHttp,
+      menuVotes,
+      fetchConfig,
     })
   );
 
@@ -92,27 +96,24 @@ export async function runScheduledIngestion(
     throw new Error(`[scheduled] Member ingestion failed: ${memberResult.error ?? "unknown error"}`);
   }
   const membersIndex = memberResult.membersIndex;
-  const previousActivityIndex = await readDocumentJson<ActivityIndexJson>(
-    env.SENATE_DB,
-    buildActivitiesIndexKey()
-  );
-  const effectiveActivityIndex =
-    (memberResult.activityIndex?.activities?.length ?? 0) > 0
-      ? memberResult.activityIndex
-      : previousActivityIndex;
-  if ((memberResult.activityIndex?.activities?.length ?? 0) === 0 && previousActivityIndex?.activities?.length) {
+
+  const effectiveActivityIndex = await stageResolveActivityIndex(env.SENATE_DB, memberResult);
+  if (
+    (memberResult.activityIndex?.activities?.length ?? 0) === 0 &&
+    effectiveActivityIndex?.activities?.length
+  ) {
     logEvent("activity_index_fallback_reused", {
       run_id: runId,
-      previous_generated_at: previousActivityIndex.generated_at,
-      previous_count: previousActivityIndex.activities.length,
+      previous_generated_at: effectiveActivityIndex.generated_at,
+      previous_count: effectiveActivityIndex.activities.length,
     });
   }
 
   const billsByKey = collectUniqueBills(memberResult.memberActivities, effectiveActivityIndex);
-  const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", async () =>
-    buildBillEvidencePipeline(env.SENATE_DB, billsByKey, {
+  const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", () =>
+    stageHarvestEvidence(env.SENATE_DB, billsByKey, {
       runId,
-      congressApiKey,
+      congressApiKey: config.congressApiKey,
       session: config.session,
       maxBills: config.evidence.maxBills,
       billConcurrency: config.evidence.billConcurrency,
@@ -121,143 +122,61 @@ export async function runScheduledIngestion(
     })
   );
 
-  for (const memberActivity of memberResult.memberActivities) {
-    for (const item of memberActivity.activities) {
-      if (item.type !== "legislation_action" && item.type !== "roll_call_vote") continue;
-      attachImpactEvidenceToBill(item.bill, evidencePipeline.impactByKey);
-    }
-  }
-  for (const activity of effectiveActivityIndex?.activities ?? []) {
-    attachImpactEvidenceToBill(activity.bill, evidencePipeline.impactByKey);
-  }
-
-  await runTimed(runId, "publish_member_activity_core", async () =>
-    publishMemberActivity(
-      env.SENATE_DB,
-      membersIndex,
-      memberResult.memberActivities,
-      memberResult.windowEnd,
-      effectiveActivityIndex
-    )
-  );
-  await runTimed(runId, "publish_chamber_context", async () =>
-    publishChamberContext(env.SENATE_DB, memberResult.windowEnd, memberResult.context)
+  stageAttachEvidenceToActivities(
+    memberResult.memberActivities,
+    effectiveActivityIndex,
+    evidencePipeline.impactByKey
   );
 
-  const fixtureMode = config.fixtureMode;
-  const { synthesis, quality } = config;
-  const shadowMode = synthesis.shadowMode;
-  const canaryPercent = synthesis.canaryPercent;
-  const canaryValue = hashRunId(runId);
-  const canaryEnabled = canaryValue < canaryPercent;
-  const maxNewAnalyses = synthesis.maxNewAnalyses;
-  const openrouterAppReferer = synthesis.appReferer;
-  const openrouterAppTitle = synthesis.appTitle;
+  await runTimed(runId, "publish_member_activity_core", () =>
+    stagePublishMemberCore(env.SENATE_DB, membersIndex, memberResult, effectiveActivityIndex)
+  );
+
   const qualityGateConfig: QualityGateConfig = {
-    minClaimsCoveragePct: quality.minClaimsCoveragePct,
-    minQuoteValidityPct: quality.minQuoteValidityPct,
-    maxConfidenceMismatchPct: quality.maxConfidenceMismatchPct,
-    hardGates: quality.hardGates,
+    minClaimsCoveragePct: config.quality.minClaimsCoveragePct,
+    minQuoteValidityPct: config.quality.minQuoteValidityPct,
+    maxConfidenceMismatchPct: config.quality.maxConfidenceMismatchPct,
+    hardGates: config.quality.hardGates,
   };
-  let analysisResult: AnalyzeBillsResult | null = null;
-  let synthesisErrors: SourceError[] = [];
 
-  if (synthesis.enabled && canaryEnabled) {
-    const models = synthesis.models;
-    try {
-      analysisResult = await runTimed(runId, "openrouter_synthesis", async () =>
-        enrichBillAnalyses(
-          env.SENATE_DB,
-          evidencePipeline.billInputs,
-          memberResult.memberActivities,
-          effectiveActivityIndex,
-          synthesis.apiKey as string,
-          models.length > 0 ? models : [...DEFAULT_OPENROUTER_MODELS],
-          maxNewAnalyses,
-          shadowMode,
-          qualityGateConfig,
-          openrouterAppReferer,
-          openrouterAppTitle
-        )
-      );
+  const { analysisResult, errors: synthesisErrors } = await runTimed(runId, "openrouter_synthesis", () =>
+    stageSynthesize(env.SENATE_DB, {
+      config,
+      runId,
+      evidencePipeline,
+      memberResult,
+      effectiveActivityIndex,
+      membersIndex,
+      qualityGateConfig,
+    })
+  );
 
-      if (analysisResult && !shadowMode) {
-        try {
-          await runTimed(runId, "publish_member_activity_narrative", async () =>
-            publishMemberActivity(
-              env.SENATE_DB,
-              membersIndex,
-              memberResult.memberActivities,
-              memberResult.windowEnd,
-              effectiveActivityIndex
-            )
-          );
-        } catch (error) {
-          synthesisErrors.push({
-            source: "congress",
-            message: `Narrative publish failed: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          });
-        }
-      }
-      if (analysisResult) {
-        const attemptedAnalyses = analysisResult.analyzedCount + analysisResult.inputSkipCount;
-        const fallbackRate =
-          attemptedAnalyses > 0 ? analysisResult.fallbackCount / attemptedAnalyses : 0;
-        if (fallbackRate > 0.2) {
-          logEvent("openrouter_degradation_signal", {
-            run_id: runId,
-            fallback_rate: Number((fallbackRate * 100).toFixed(2)),
-            analyzed_count: analysisResult.analyzedCount,
-            fallback_count: analysisResult.fallbackCount,
-            deferred_count: analysisResult.deferredCount,
-          });
-        }
-      }
-    } catch (error) {
-      synthesisErrors.push({
-        source: "congress",
-        message: `OpenRouter synthesis failed but core publication remains available: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      });
-      logEvent("openrouter_synthesis_failed", {
+  if (analysisResult) {
+    const attemptedAnalyses = analysisResult.analyzedCount + analysisResult.inputSkipCount;
+    const fallbackRate = attemptedAnalyses > 0 ? analysisResult.fallbackCount / attemptedAnalyses : 0;
+    if (fallbackRate > 0.2) {
+      logEvent("openrouter_degradation_signal", {
         run_id: runId,
-        error: error instanceof Error ? error.message : String(error),
+        fallback_rate: Number((fallbackRate * 100).toFixed(2)),
+        analyzed_count: analysisResult.analyzedCount,
+        fallback_count: analysisResult.fallbackCount,
+        deferred_count: analysisResult.deferredCount,
       });
     }
-  } else if (fixtureMode) {
-    synthesisErrors.push({
-      source: "congress",
-      message: "Harness fixture mode active; synthesis skipped",
-    });
-  } else if (!synthesis.apiKey) {
-    synthesisErrors.push({
-      source: "congress",
-      message: "OPENROUTER_API_KEY missing; synthesis skipped",
-    });
-  } else {
-    synthesisErrors.push({
-      source: "congress",
-      message: `Synthesis skipped due to canary gating (${canaryValue} >= ${canaryPercent})`,
-    });
   }
 
-  const { ledger, overview } = await runTimed(runId, "build_vote_ledger", async () =>
-    buildVoteLedgerUpdate(config, membersIndex, existingLedger, fetchConfig, {
+  const { ledger, overview } = await runTimed(runId, "build_vote_ledger", () =>
+    stageBuildVoteLedger(config, membersIndex, existingLedger, fetchConfig, {
       db: env.SENATE_DB,
       discovery,
       now,
+      menuVotes,
     })
   );
   const newVoteNumbers = diffVoteNumbers(ledger, existingLedger);
 
-  await runTimed(runId, "publish_vote_ledger", async () =>
-    writeDocumentJson(env.SENATE_DB, buildVoteLedgerKey(), ledger, { skipIfUnchanged: true })
-  );
-  await runTimed(runId, "publish_session_overview", async () =>
-    writeDocumentJson(env.SENATE_DB, buildSessionOverviewKey(), overview, { skipIfUnchanged: true })
+  await runTimed(runId, "publish_vote_ledger", () =>
+    stagePublishVoteLedger(env.SENATE_DB, ledger, overview)
   );
 
   const allErrors = [...memberResult.errors, ...evidencePipeline.errors, ...synthesisErrors];
@@ -283,7 +202,7 @@ export async function runScheduledIngestion(
     created_at: new Date().toISOString(),
     reason: "scheduled_ingestion_complete",
   };
-  const queued = await runTimed(runId, "queue_materialization", async () =>
+  const queued = await runTimed(runId, "queue_materialization", () =>
     enqueuePipelineJob(env, materializeJob)
   );
   if (!queued) {
