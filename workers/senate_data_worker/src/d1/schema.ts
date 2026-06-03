@@ -184,6 +184,13 @@ CREATE INDEX IF NOT EXISTS idx_votes_thread_key
 
 CREATE INDEX IF NOT EXISTS idx_ingested_vote_details_date
   ON ingested_vote_details (congress, session, vote_date DESC, vote_number DESC);
+
+CREATE TABLE IF NOT EXISTS kv_documents (
+  doc_key      TEXT PRIMARY KEY,
+  content_type TEXT NOT NULL,
+  body         TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
 `;
 
 const PLATFORM_SCHEMA_STATEMENTS = PLATFORM_SCHEMA_SQL

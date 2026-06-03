@@ -15,10 +15,6 @@ TARGET_STATE = "ALL"
 # OPENROUTER_APP_REFERER = "https://your-site.example"
 # OPENROUTER_APP_TITLE = "congress_tracker_worker"
 
-[[r2_buckets]]
-binding = "DATA_BUCKET"
-bucket_name = "senate-data-bucket"
-
 [[d1_databases]]
 binding = "SENATE_DB"
 database_name = "senate-platform-local"

@@ -2,13 +2,12 @@ import type { PipelineJob } from "./platform-types";
 
 /** Bindings shared by the public API worker and the pipeline worker. */
 export interface WorkerBindings {
-  DATA_BUCKET: R2Bucket;
+  SENATE_DB: D1Database;
   CONGRESS: string;
   SESSION: string;
   TARGET_STATE: string;
   ALLOWED_ORIGIN?: string;
   DATA_FRESHNESS_MAX_HOURS?: string;
-  SENATE_DB?: D1Database;
 }
 
 /** Public read API worker (`api-index.ts`). */

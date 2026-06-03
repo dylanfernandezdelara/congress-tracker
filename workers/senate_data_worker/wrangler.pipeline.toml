@@ -20,10 +20,6 @@ TARGET_STATE = "ALL"
 # Required before exposing manual pipeline routes on a public deployment:
 #   wrangler secret put PIPELINE_ADMIN_TOKEN --config wrangler.pipeline.toml
 
-[[r2_buckets]]
-binding = "DATA_BUCKET"
-bucket_name = "senate-data-bucket"
-
 [[d1_databases]]
 binding = "SENATE_DB"
 database_name = "senate-platform-local"

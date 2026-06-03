@@ -1,12 +1,12 @@
 # Copy to workers/senate_data_worker/wrangler.remote.toml (git-ignored) and fill
-# in the real production D1 database_id and R2 bucket name from the Cloudflare
+# in the real production D1 database_id from the Cloudflare
 # dashboard. Use this manually when you want a local API worker to read remote
 # Cloudflare resources:
 #
 #   wrangler dev --config wrangler.remote.toml --remote
 #
-# so the local API worker reads from REAL production R2 + D1 instead of
-# Miniflare. Do NOT deploy with this config; deploys still use wrangler.toml.
+# so the local API worker reads from REAL production D1 instead of Miniflare.
+# Do NOT deploy with this config; deploys still use wrangler.toml.
 
 name = "senate-data-api-worker"
 main = "src/api-index.ts"
@@ -19,12 +19,6 @@ cpu_ms = 300000
 CONGRESS = "119"
 SESSION = "2"
 TARGET_STATE = "ALL"
-
-[[r2_buckets]]
-binding = "DATA_BUCKET"
-# Replace with the real production bucket name (matches what the deployed
-# wrangler.toml binds to in your CF account):
-bucket_name = "REPLACE_WITH_PROD_BUCKET_NAME"
 
 [[d1_databases]]
 binding = "SENATE_DB"
