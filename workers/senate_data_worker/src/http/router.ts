@@ -6,9 +6,9 @@ import {
   buildSessionOverviewKey,
   buildVoteLedgerKey,
 } from "../storage";
-import type { PipelineEnv } from "../pipeline-env";
+import { parseIntSafe, type Env } from "../config";
+import { buildRuntime } from "../runtime";
 import { authorizePipelineAdmin } from "../pipeline-auth";
-import { parseIntSafe } from "../pipeline-runtime-config";
 import { readPipelineStatus } from "../pipeline-status";
 import { materializeReadModels } from "../pipeline-materialize";
 import { processPipelineJob } from "../pipeline-jobs";
@@ -24,7 +24,7 @@ function isPipelineAdminPath(pathname: string): boolean {
   return pathname === "/__pipeline/status" || pathname.startsWith("/__pipeline/run/");
 }
 
-function healthResponse(env: PipelineEnv, json: (body: unknown, init?: ResponseInit) => Response): Response {
+function healthResponse(env: Env, json: (body: unknown, init?: ResponseInit) => Response): Response {
   return json(
     {
       status: "ok",
@@ -38,7 +38,7 @@ function healthResponse(env: PipelineEnv, json: (body: unknown, init?: ResponseI
 }
 
 async function healthDataResponse(
-  env: PipelineEnv,
+  env: Env,
   json: (body: unknown, init?: ResponseInit) => Response
 ): Promise<Response> {
   const maxFreshHours = Math.max(1, parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, 36));
@@ -77,7 +77,7 @@ async function healthDataResponse(
  * and /votes/:c/:s/:n.json. Used directly by the read-only remote-inspection entry
  * and shared by the full router below.
  */
-export async function handlePublicFetch(request: Request, env: PipelineEnv): Promise<Response> {
+export async function handlePublicFetch(request: Request, env: Env): Promise<Response> {
   const { pathname } = new URL(request.url);
   const corsHeaders = buildCorsHeaders(env);
   const json = (body: unknown, init?: ResponseInit) => buildJsonResponse(body, corsHeaders, init);
@@ -124,7 +124,7 @@ export async function handlePublicFetch(request: Request, env: PipelineEnv): Pro
  * token-gated /__pipeline/* admin routes (status, ingestion, materialize,
  * historical-backfill).
  */
-export async function handleFetch(request: Request, env: PipelineEnv): Promise<Response> {
+export async function handleFetch(request: Request, env: Env): Promise<Response> {
   const { pathname } = new URL(request.url);
   const corsHeaders = buildCorsHeaders(env);
   const json = (body: unknown, init?: ResponseInit) => buildJsonResponse(body, corsHeaders, init);
@@ -145,6 +145,9 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
     const unauthorized = await authorizePipelineAdmin(request, env, json);
     if (unauthorized) return unauthorized;
   }
+
+  // One runtime per admin run, mirroring worker.ts scheduled/queue handlers.
+  const adminRuntime = adminPath ? buildRuntime(env) : null;
 
   if (pathname === "/__pipeline/status") {
     const pipelineStatus = await readPipelineStatus(env.SENATE_DB);
@@ -171,7 +174,7 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
   }
 
   if (pathname === "/__pipeline/run/ingestion") {
-    await runScheduledIngestion(env);
+    await runScheduledIngestion(env, adminRuntime ?? buildRuntime(env));
     return json({ status: "ok", action: "scheduled_ingestion" }, { status: 200 });
   }
 
@@ -192,7 +195,8 @@ export async function handleFetch(request: Request, env: PipelineEnv): Promise<R
     }
     await processPipelineJob(
       { type: "historical_backfill", created_at: new Date().toISOString(), congress, session },
-      env
+      env,
+      adminRuntime ?? buildRuntime(env)
     );
     return json(
       { status: "ok", action: "historical_backfill", congress, session: session ?? null, inline: !env.PIPELINE_QUEUE },

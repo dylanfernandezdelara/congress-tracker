@@ -7,7 +7,7 @@
  * - Parallel fetching with concurrency limits
  */
 
-import { isHarnessFixtureMode, resolveHarnessFixtureResponse } from "./harness";
+import { DISABLED_FIXTURE_HTTP, type FixtureHttp } from "./harness";
 
 // ============================================================================
 // Types
@@ -24,6 +24,11 @@ export interface FetchConfig {
   concurrency?: number;
   /** Maximum backoff delay in ms (default: 30000) */
   maxDelayMs?: number;
+  /**
+   * Harness fixture transport. When enabled, recorded responses are returned
+   * instead of hitting the network. Defaults to disabled (real fetch).
+   */
+  fixture?: FixtureHttp;
 }
 
 export interface FetchResult<T> {
@@ -33,7 +38,7 @@ export interface FetchResult<T> {
   statusCode?: number;
 }
 
-const DEFAULT_CONFIG: Required<FetchConfig> = {
+const DEFAULT_CONFIG: Omit<Required<FetchConfig>, "fixture"> = {
   maxRetries: 3,
   baseDelayMs: 1000,
   timeoutMs: 10000,
@@ -107,18 +112,19 @@ function computeDelay(
 async function fetchWithTimeout(
   url: string,
   timeoutMs: number,
+  fixture: FixtureHttp,
   init?: RequestInit
 ): Promise<Response> {
-  const fixtureResponse = resolveHarnessFixtureResponse(url);
-  if (fixtureResponse) {
-    return new Response(fixtureResponse.body, {
-      status: fixtureResponse.status,
-      headers: {
-        "Content-Type": fixtureResponse.contentType,
-      },
-    });
-  }
-  if (isHarnessFixtureMode()) {
+  if (fixture.enabled) {
+    const fixtureResponse = fixture.resolve(url);
+    if (fixtureResponse) {
+      return new Response(fixtureResponse.body, {
+        status: fixtureResponse.status,
+        headers: {
+          "Content-Type": fixtureResponse.contentType,
+        },
+      });
+    }
     return new Response(`Missing harness fixture for ${url}`, {
       status: 404,
       headers: {
@@ -157,13 +163,14 @@ export async function fetchXmlWithRetry(
     ...config,
   };
   const { maxDelayMs } = { ...DEFAULT_CONFIG, ...config };
+  const fixture = config.fixture ?? DISABLED_FIXTURE_HTTP;
 
   let lastError: string | undefined;
   let lastStatusCode: number | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, timeoutMs, {
+      const response = await fetchWithTimeout(url, timeoutMs, fixture, {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; SenateDataWorker/1.0)",
           Accept: "application/xml, text/xml, */*",
@@ -241,13 +248,14 @@ export async function fetchJsonWithRetry<T>(
     ...config,
   };
   const { maxDelayMs } = { ...DEFAULT_CONFIG, ...config };
+  const fixture = config.fixture ?? DISABLED_FIXTURE_HTTP;
 
   let lastError: string | undefined;
   let lastStatusCode: number | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, timeoutMs, {
+      const response = await fetchWithTimeout(url, timeoutMs, fixture, {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; SenateDataWorker/1.0)",
           Accept: "application/json, */*",

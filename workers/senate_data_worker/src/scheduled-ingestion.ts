@@ -1,6 +1,5 @@
 import { buildVoteLedgerUpdate, discoverVoteLedgerUpdates } from "./ingest";
 import { runMemberIngestion } from "./member-ingest";
-import { getHarnessRuntime } from "./harness";
 import { DEFAULT_OPENROUTER_MODELS, type AnalyzeBillsResult } from "./openrouter";
 import { readDocumentJson, writeDocumentJson } from "./d1/documents";
 import {
@@ -9,15 +8,10 @@ import {
   buildVoteLedgerKey,
 } from "./storage";
 import type { PipelineJob } from "./platform-types";
-import type { PipelineEnv } from "./pipeline-env";
+import type { Env } from "./config";
+import type { FetchConfig } from "./fetch";
+import { buildRuntime, type Runtime } from "./runtime";
 import type { ActivityIndexJson, SourceError, VoteLedger } from "./types";
-import {
-  parseBool,
-  parseCsvList,
-  parseIntSafe,
-  parsePct,
-  validateEnv,
-} from "./pipeline-runtime-config";
 import {
   diffVoteNumbers,
   hashRunId,
@@ -43,7 +37,10 @@ import { enqueuePipelineJob } from "./pipeline-jobs";
 /**
  * Core ingestion logic, separated for use with ctx.waitUntil.
  */
-export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
+export async function runScheduledIngestion(
+  env: Env,
+  runtime: Runtime = buildRuntime(env)
+): Promise<void> {
   const runId = makeRunId();
   const startTime = Date.now();
   logEvent("scheduled_ingestion_start", {
@@ -51,25 +48,18 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     timestamp: new Date().toISOString(),
   });
 
-  const config = validateEnv(env);
-  const congressApiKey = env.CONGRESS_API_KEY || config.congressApiKey;
-  const govInfoApiKey = env.GOVINFO_API_KEY || "HARNESS_FIXTURE_KEY";
-  const evidenceMaxBills = Math.max(5, parseIntSafe(env.EVIDENCE_MAX_BILLS, 30));
-  const evidenceBillConcurrency = Math.max(
-    1,
-    Math.min(parseIntSafe(env.EVIDENCE_BILL_CONCURRENCY, 2), 3)
-  );
-  const evidenceEndpointFanout = Math.max(
-    1,
-    Math.min(parseIntSafe(env.EVIDENCE_ENDPOINT_FANOUT, 3), 4)
-  );
-  const activityLookbackDays = Math.max(7, Math.min(parseIntSafe(env.ACTIVITY_LOOKBACK_DAYS, 30), 120));
+  const config = runtime.config;
+  const now = runtime.clock.now();
+  const fetchConfig: FetchConfig = { ...PIPELINE_FETCH_CONFIG, fixture: runtime.fixtureHttp };
+  const congressApiKey = config.congressApiKey;
+  const govInfoApiKey = config.govInfoApiKey;
 
   const existingLedger = await readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey());
   const discovery = await runTimed(runId, "discover_vote_updates", async () =>
     discoverVoteLedgerUpdates(config, existingLedger, {
       db: env.SENATE_DB,
-      fetchConfig: PIPELINE_FETCH_CONFIG,
+      fetchConfig,
+      now,
     })
   );
   if (discovery.missingVoteNumbers.length === 0 && (await hasPublishedReadModels(env.SENATE_DB))) {
@@ -92,7 +82,9 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
       session: config.session,
       congressApiKey,
       govInfoApiKey,
-      lookbackDays: activityLookbackDays,
+      lookbackDays: config.activityLookbackDays,
+      now,
+      fixture: runtime.fixtureHttp,
     })
   );
 
@@ -122,9 +114,10 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
       runId,
       congressApiKey,
       session: config.session,
-      maxBills: evidenceMaxBills,
-      billConcurrency: evidenceBillConcurrency,
-      endpointFanout: evidenceEndpointFanout,
+      maxBills: config.evidence.maxBills,
+      billConcurrency: config.evidence.billConcurrency,
+      endpointFanout: config.evidence.endpointFanout,
+      fixture: runtime.fixtureHttp,
     })
   );
 
@@ -151,26 +144,26 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
     publishChamberContext(env.SENATE_DB, memberResult.windowEnd, memberResult.context)
   );
 
-  const harnessRuntime = getHarnessRuntime();
-  const fixtureMode = harnessRuntime.mode === "fixture";
-  const shadowMode = fixtureMode ? true : parseBool(env.OPENROUTER_SHADOW_MODE, false);
-  const canaryPercent = Math.max(0, Math.min(parseIntSafe(env.OPENROUTER_CANARY_PERCENT, 100), 100));
+  const fixtureMode = config.fixtureMode;
+  const { synthesis, quality } = config;
+  const shadowMode = synthesis.shadowMode;
+  const canaryPercent = synthesis.canaryPercent;
   const canaryValue = hashRunId(runId);
   const canaryEnabled = canaryValue < canaryPercent;
-  const maxNewAnalyses = Math.max(1, parseIntSafe(env.OPENROUTER_MAX_NEW_ANALYSES, 20));
-  const openrouterAppReferer = env.OPENROUTER_APP_REFERER?.trim();
-  const openrouterAppTitle = env.OPENROUTER_APP_TITLE?.trim() || "congress_tracker_worker";
+  const maxNewAnalyses = synthesis.maxNewAnalyses;
+  const openrouterAppReferer = synthesis.appReferer;
+  const openrouterAppTitle = synthesis.appTitle;
   const qualityGateConfig: QualityGateConfig = {
-    minClaimsCoveragePct: parsePct(env.QUALITY_MIN_CLAIMS_COVERAGE, 70),
-    minQuoteValidityPct: parsePct(env.QUALITY_MIN_QUOTE_VALIDITY, 80),
-    maxConfidenceMismatchPct: parsePct(env.QUALITY_MAX_CONFIDENCE_MISMATCH, 35),
-    hardGates: parseBool(env.QUALITY_HARD_GATES, false),
+    minClaimsCoveragePct: quality.minClaimsCoveragePct,
+    minQuoteValidityPct: quality.minQuoteValidityPct,
+    maxConfidenceMismatchPct: quality.maxConfidenceMismatchPct,
+    hardGates: quality.hardGates,
   };
   let analysisResult: AnalyzeBillsResult | null = null;
   let synthesisErrors: SourceError[] = [];
 
-  if (!fixtureMode && env.OPENROUTER_API_KEY?.trim() && canaryEnabled) {
-    const models = parseCsvList(env.OPENROUTER_MODEL);
+  if (synthesis.enabled && canaryEnabled) {
+    const models = synthesis.models;
     try {
       analysisResult = await runTimed(runId, "openrouter_synthesis", async () =>
         enrichBillAnalyses(
@@ -178,7 +171,7 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
           evidencePipeline.billInputs,
           memberResult.memberActivities,
           effectiveActivityIndex,
-          env.OPENROUTER_API_KEY as string,
+          synthesis.apiKey as string,
           models.length > 0 ? models : [...DEFAULT_OPENROUTER_MODELS],
           maxNewAnalyses,
           shadowMode,
@@ -239,7 +232,7 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
       source: "congress",
       message: "Harness fixture mode active; synthesis skipped",
     });
-  } else if (!env.OPENROUTER_API_KEY?.trim()) {
+  } else if (!synthesis.apiKey) {
     synthesisErrors.push({
       source: "congress",
       message: "OPENROUTER_API_KEY missing; synthesis skipped",
@@ -252,9 +245,10 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
   }
 
   const { ledger, overview } = await runTimed(runId, "build_vote_ledger", async () =>
-    buildVoteLedgerUpdate(config, membersIndex, existingLedger, PIPELINE_FETCH_CONFIG, {
+    buildVoteLedgerUpdate(config, membersIndex, existingLedger, fetchConfig, {
       db: env.SENATE_DB,
       discovery,
+      now,
     })
   );
   const newVoteNumbers = diffVoteNumbers(ledger, existingLedger);
@@ -319,15 +313,16 @@ export async function runScheduledIngestion(env: PipelineEnv): Promise<void> {
  */
 export function handleScheduled(
   controller: ScheduledController,
-  env: PipelineEnv,
-  ctx: ExecutionContext
+  env: Env,
+  ctx: ExecutionContext,
+  runtime: Runtime = buildRuntime(env)
 ): void {
   logEvent("scheduled_trigger", {
     scheduled_for: new Date(controller.scheduledTime).toISOString(),
   });
 
   ctx.waitUntil(
-    runScheduledIngestion(env).catch((err) => {
+    runScheduledIngestion(env, runtime).catch((err) => {
       logEvent("scheduled_ingestion_failed", {
         fatal: true,
         error: err instanceof Error ? err.message : String(err),

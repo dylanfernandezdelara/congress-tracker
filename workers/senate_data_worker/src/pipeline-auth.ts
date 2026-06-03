@@ -1,6 +1,5 @@
-import { isHarnessFixtureEnv } from "./harness";
 import type { JsonResponseBuilder } from "./http/responses";
-import type { PipelineEnv } from "./pipeline-env";
+import type { Env } from "./config";
 
 export const LOCAL_PIPELINE_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 export const TOKEN_ENCODER = new TextEncoder();
@@ -37,10 +36,12 @@ export async function tokenMatches(provided: string, expected: string): Promise<
 
 export async function authorizePipelineAdmin(
   request: Request,
-  env: PipelineEnv,
+  env: Env,
   jsonResponse: JsonResponseBuilder
 ): Promise<Response | null> {
-  if (isLocalRequest(request) || isHarnessFixtureEnv(env)) return null;
+  // Localhost dev/test (and the deterministic harness, which runs against
+  // 127.0.0.1) bypass the token; remote callers must present a valid token.
+  if (isLocalRequest(request)) return null;
 
   const expectedToken = env.PIPELINE_ADMIN_TOKEN?.trim();
   if (!expectedToken) {

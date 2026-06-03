@@ -227,6 +227,7 @@ describe("pipeline debug routes", () => {
     expect(body.action).toBe("historical_backfill");
     expect(jobSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: "historical_backfill", congress: 119 }),
+      expect.anything(),
       expect.anything()
     );
     jobSpy.mockRestore();

@@ -1,5 +1,5 @@
 import type { FetchConfig } from "./fetch";
-import { computePct } from "./pipeline-runtime-config";
+import { computePct } from "./config";
 import type { CoverageSnapshot, EvidenceEndpoint, SourceError, VoteLedger } from "./types";
 
 export const PIPELINE_FETCH_CONFIG: FetchConfig = {

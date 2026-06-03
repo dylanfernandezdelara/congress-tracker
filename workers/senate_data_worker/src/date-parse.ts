@@ -1,4 +1,3 @@
-import { getHarnessNowDate } from "./harness";
 
 /**
  * Date parsing utilities for Senate XML data.
@@ -134,13 +133,13 @@ export function formatDate(year: number, month: number, day: number): string {
 }
 
 /**
- * Get today's date in US Eastern timezone as YYYY-MM-DD.
+ * Get a date in US Eastern timezone as YYYY-MM-DD.
  *
- * This is the cutoff date for determining which vote day to target.
+ * This is the cutoff date for determining which vote day to target. The
+ * reference instant is injected (via `Runtime.clock`) so callers stay
+ * deterministic under the harness instead of reading a module global.
  */
-export function todayEastern(): string {
-  const now = getHarnessNowDate() ?? new Date();
-
+export function todayEastern(now: Date = new Date()): string {
   // Create formatter for Eastern time
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/New_York",

@@ -10,6 +10,7 @@ import {
   type FetchConfig,
 } from "./fetch";
 import { compareDates, todayEastern, subtractDays } from "./date-parse";
+import type { FixtureHttp } from "./harness";
 import {
   fetchDailyCongressionalRecordSenateArticles,
   fetchCurrentSenators,
@@ -59,6 +60,10 @@ export interface MemberIngestConfig {
   congressApiKey: string;
   govInfoApiKey: string;
   lookbackDays?: number;
+  /** Reference instant for the Eastern-time window end (injected via Runtime.clock). */
+  now?: Date;
+  /** Harness fixture transport applied to every fetch this stage performs. */
+  fixture?: FixtureHttp;
 }
 
 export interface MemberIngestResult {
@@ -763,12 +768,16 @@ export async function runMemberIngestion(
   config: MemberIngestConfig,
   fetchConfig: FetchConfig = DEFAULT_FETCH_CONFIG
 ): Promise<MemberIngestResult> {
+  const effectiveFetchConfig: FetchConfig = config.fixture
+    ? { ...fetchConfig, fixture: config.fixture }
+    : fetchConfig;
+  fetchConfig = effectiveFetchConfig;
   const lookbackDays = Math.max(
     MIN_WINDOW_DAYS,
     Math.min(config.lookbackDays ?? DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS)
   );
   const generatedAt = new Date().toISOString();
-  const windowEnd = todayEastern();
+  const windowEnd = todayEastern(config.now);
   const windowStart = subtractDays(windowEnd, lookbackDays - 1);
   const errors: SourceError[] = [];
 

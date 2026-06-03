@@ -1,4 +1,4 @@
-import type { PipelineEnv } from "../pipeline-env";
+import type { Env } from "../config";
 
 export type JsonResponseBuilder = (body: unknown, init?: ResponseInit) => Response;
 
@@ -11,7 +11,7 @@ export const cacheLatest = "s-maxage=300, stale-while-revalidate=86400";
  * allowed methods/headers cover both. Admin routes are protected by the token
  * check, not by CORS.
  */
-export function buildCorsHeaders(env: Pick<PipelineEnv, "ALLOWED_ORIGIN">): HeadersInit {
+export function buildCorsHeaders(env: Pick<Env, "ALLOWED_ORIGIN">): HeadersInit {
   const allowedOrigin = env.ALLOWED_ORIGIN?.trim();
   const restrictedOrigin = allowedOrigin && allowedOrigin !== "*" ? allowedOrigin : null;
   const headers: HeadersInit = {

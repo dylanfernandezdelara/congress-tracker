@@ -18,9 +18,10 @@ import {
   buildBillTrendSnapshotKey,
   buildChamberContextKey,
 } from "./storage";
-import { computePct } from "./pipeline-runtime-config";
+import { computePct, type Env } from "./config";
+import type { FetchConfig } from "./fetch";
+import type { FixtureHttp } from "./harness";
 import { logEvent } from "./pipeline-logging";
-import type { PipelineEnv } from "./pipeline-env";
 import type {
   MemberActivityJson,
   MemberIndexJson,
@@ -61,6 +62,8 @@ export interface BillEvidencePipelineOptions {
   maxBills: number;
   billConcurrency: number;
   endpointFanout: number;
+  /** Harness fixture transport applied to every evidence fetch. */
+  fixture?: FixtureHttp;
 }
 
 export async function publishChamberContext(
@@ -212,11 +215,12 @@ export async function buildBillEvidencePipeline(
   const impactByKey = new Map<string, BillImpactEvidence>();
   const billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }> = [];
 
-  const fetchConfig = {
+  const fetchConfig: FetchConfig = {
     maxRetries: 3,
     baseDelayMs: 800,
     timeoutMs: 15_000,
     concurrency: options.endpointFanout,
+    fixture: options.fixture,
   };
 
   await mapWithConcurrency(entries, options.billConcurrency, async ([key, bill]) => {
@@ -387,7 +391,7 @@ export async function enrichBillAnalyses(
 }
 
 export async function materializeReadModels(
-  env: PipelineEnv,
+  env: Env,
   ledger: VoteLedger,
   overview: SessionOverview,
   activityIndex: ActivityIndexJson | null

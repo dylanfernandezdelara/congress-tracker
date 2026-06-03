@@ -19,13 +19,22 @@ export interface HarnessFixtureResponse {
 
 const CANONICAL_FIXTURE_SET = "canonical";
 const CANONICAL_HARNESS_NOW = "2026-01-20T15:00:00Z";
-const DEFAULT_RUNTIME: HarnessRuntimeConfig = {
-  mode: "live",
-  fixtureSet: null,
-  now: null,
-};
 
-let currentRuntime: HarnessRuntimeConfig = { ...DEFAULT_RUNTIME };
+/**
+ * Harness fixture transport. When `enabled`, `resolve` returns a recorded
+ * response for a known URL (or null for an unknown URL, which the caller
+ * turns into a 404). Built once per invocation from `Env` and threaded
+ * through `FetchConfig` instead of read from module-global state.
+ */
+export interface FixtureHttp {
+  readonly enabled: boolean;
+  resolve(url: string): HarnessFixtureResponse | null;
+}
+
+export const DISABLED_FIXTURE_HTTP: FixtureHttp = {
+  enabled: false,
+  resolve: () => null,
+};
 
 function normalizeMode(value: string | undefined): HarnessMode {
   return value?.trim().toLowerCase() === "fixture" ? "fixture" : "live";
@@ -46,7 +55,8 @@ function normalizeNow(value: string | undefined, mode: HarnessMode, fixtureSet: 
   return null;
 }
 
-export function applyHarnessEnv(env: {
+/** Pure: derive the harness runtime config from env (no global mutation). */
+export function buildHarnessConfig(env: {
   HARNESS_MODE?: string;
   HARNESS_FIXTURE_SET?: string;
   HARNESS_NOW?: string;
@@ -54,25 +64,13 @@ export function applyHarnessEnv(env: {
   const mode = normalizeMode(env.HARNESS_MODE);
   const fixtureSet = normalizeFixtureSet(env.HARNESS_FIXTURE_SET, mode);
   const now = normalizeNow(env.HARNESS_NOW, mode, fixtureSet);
-  currentRuntime = { mode, fixtureSet, now };
-  return currentRuntime;
+  return { mode, fixtureSet, now };
 }
 
-export function resetHarnessRuntime(): void {
-  currentRuntime = { ...DEFAULT_RUNTIME };
-}
-
-export function getHarnessRuntime(): HarnessRuntimeConfig {
-  return currentRuntime;
-}
-
-export function isHarnessFixtureMode(): boolean {
-  return currentRuntime.mode === "fixture";
-}
-
-export function getHarnessNowDate(): Date | null {
-  if (!currentRuntime.now) return null;
-  const parsed = new Date(currentRuntime.now);
+/** Fixed "now" for fixture runs, or null in live mode. */
+export function harnessNowDate(harness: HarnessRuntimeConfig): Date | null {
+  if (!harness.now) return null;
+  const parsed = new Date(harness.now);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
@@ -104,22 +102,14 @@ function buildFixtureMap(entries: HarnessFixtureEntry[]): Map<string, HarnessFix
   return map;
 }
 
-let cachedFixtureSet: string | null = null;
-let cachedFixtureMap: Map<string, HarnessFixtureResponse> | null = null;
-
-function getFixtureMap(): Map<string, HarnessFixtureResponse> {
-  if (cachedFixtureMap && cachedFixtureSet === currentRuntime.fixtureSet) {
-    return cachedFixtureMap;
-  }
-  cachedFixtureSet = currentRuntime.fixtureSet;
-  cachedFixtureMap = buildFixtureMap(fixtureEntriesForSet(currentRuntime.fixtureSet));
-  return cachedFixtureMap;
-}
-
-export function resolveHarnessFixtureResponse(url: string): HarnessFixtureResponse | null {
-  if (!isHarnessFixtureMode()) return null;
-  const fixture = getFixtureMap().get(normalizeUrl(url));
-  return fixture ?? null;
+/** Build the fixture transport for an invocation from its harness config. */
+export function createFixtureHttp(harness: HarnessRuntimeConfig): FixtureHttp {
+  if (harness.mode !== "fixture") return DISABLED_FIXTURE_HTTP;
+  const map = buildFixtureMap(fixtureEntriesForSet(harness.fixtureSet));
+  return {
+    enabled: true,
+    resolve: (url: string) => map.get(normalizeUrl(url)) ?? null,
+  };
 }
 
 export function isHarnessFixtureEnv(env: { HARNESS_MODE?: string }): boolean {

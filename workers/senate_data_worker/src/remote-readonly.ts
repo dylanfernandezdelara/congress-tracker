@@ -1,5 +1,5 @@
 import { handlePublicFetch } from "./http/router";
-import type { PipelineEnv } from "./pipeline-env";
+import type { Env } from "./config";
 
 /**
  * Read-only entry used ONLY by `wrangler.remote.toml` (see the committed
@@ -17,4 +17,4 @@ import type { PipelineEnv } from "./pipeline-env";
  */
 export default {
   fetch: handlePublicFetch,
-} satisfies ExportedHandler<PipelineEnv>;
+} satisfies ExportedHandler<Env>;

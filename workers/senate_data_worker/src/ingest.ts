@@ -62,6 +62,8 @@ export interface VoteLedgerDiscovery {
 export interface VoteLedgerUpdateOptions {
   db?: D1Database;
   discovery?: VoteLedgerDiscovery;
+  /** Reference instant for the Eastern-time cutoff (injected via Runtime.clock). */
+  now?: Date;
 }
 
 /**
@@ -320,9 +322,10 @@ function computeSessionOverview(
 export async function discoverVoteLedgerUpdates(
   config: IngestConfig,
   existingLedger: VoteLedger | null,
-  options: { db?: D1Database; fetchConfig?: FetchConfig } = {}
+  options: { db?: D1Database; fetchConfig?: FetchConfig; now?: Date } = {}
 ): Promise<VoteLedgerDiscovery> {
   const { congress, session } = config;
+  const now = options.now ?? new Date();
 
   console.log("[ledger] Fetching vote menu for ledger discovery...");
   const menuResult = await fetchVoteMenu(congress, session, options.fetchConfig ?? DEFAULT_FETCH_CONFIG);
@@ -338,13 +341,13 @@ export async function discoverVoteLedgerUpdates(
       eligibleVotes: [],
       existingVoteNumbers,
       missingVoteNumbers: [],
-      cutoffDateEt: todayEastern(),
+      cutoffDateEt: todayEastern(now),
       latestEligibleVoteDate: null,
     };
   }
 
   const allMenuVotes = parseVoteMenuXml(menuResult.data);
-  const cutoff = todayEastern();
+  const cutoff = todayEastern(now);
   const eligibleVotes = allMenuVotes.filter((v) => v.vote_date < cutoff);
 
   console.log(`[ledger] Menu has ${allMenuVotes.length} votes, ${eligibleVotes.length} before cutoff`);
@@ -391,6 +394,7 @@ export async function buildVoteLedgerUpdate(
     (await discoverVoteLedgerUpdates(config, existingLedger, {
       db: options.db,
       fetchConfig,
+      now: options.now,
     }));
   const eligibleVotes = discovery.eligibleVotes;
 

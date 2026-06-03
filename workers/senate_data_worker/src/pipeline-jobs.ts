@@ -1,6 +1,7 @@
 import {
   fetchVoteDetailsParallel,
   fetchVoteMenu,
+  type FetchConfig,
 } from "./fetch";
 import { readDocumentJson } from "./d1/documents";
 import { readPipelineCheckpoint, writePipelineCheckpoint } from "./d1/checkpoints";
@@ -17,11 +18,12 @@ import {
   logEvent,
   PIPELINE_FETCH_CONFIG,
 } from "./pipeline-logging";
-import type { PipelineEnv } from "./pipeline-env";
+import type { Env } from "./config";
+import { buildRuntime, type Runtime } from "./runtime";
 import type { ActivityIndexJson, SessionOverview, VoteLedger } from "./types";
 import { materializeReadModels } from "./pipeline-materialize";
 
-export async function enqueuePipelineJob(env: PipelineEnv, job: PipelineJob): Promise<boolean> {
+export async function enqueuePipelineJob(env: Env, job: PipelineJob): Promise<boolean> {
   if (!env.PIPELINE_QUEUE) return false;
   try {
     await env.PIPELINE_QUEUE.send(job);
@@ -37,11 +39,13 @@ export async function enqueuePipelineJob(env: PipelineEnv, job: PipelineJob): Pr
 
 export async function processHistoricalBackfillJob(
   job: Extract<PipelineJob, { type: "historical_backfill" }>,
-  env: PipelineEnv
+  env: Env,
+  runtime: Runtime = buildRuntime(env)
 ): Promise<void> {
   const sessions = job.session ? [job.session] : [1, 2];
   const checkpointKey = `historical_backfill:${job.congress}:${job.session ?? "all"}`;
   const inlineMode = !env.PIPELINE_QUEUE;
+  const fetchConfig: FetchConfig = { ...PIPELINE_FETCH_CONFIG, fixture: runtime.fixtureHttp };
   let resumed = false;
 
   while (true) {
@@ -63,7 +67,7 @@ export async function processHistoricalBackfillJob(
     }
 
     const targetSession = sessions[sessionIndex];
-    const menuResult = await fetchVoteMenu(job.congress, targetSession, PIPELINE_FETCH_CONFIG);
+    const menuResult = await fetchVoteMenu(job.congress, targetSession, fetchConfig);
     if (!menuResult.success || !menuResult.data) {
       throw new Error(menuResult.error ?? "Failed to fetch vote menu for historical backfill");
     }
@@ -93,7 +97,7 @@ export async function processHistoricalBackfillJob(
       batch.map((entry) => entry.vote_number),
       job.congress,
       targetSession,
-      { ...PIPELINE_FETCH_CONFIG, concurrency: 2 }
+      { ...fetchConfig, concurrency: 2 }
     );
     const parsed = batch
       .map((entry) => detailResults.results.get(entry.vote_number)?.data)
@@ -144,7 +148,11 @@ export async function processHistoricalBackfillJob(
   }
 }
 
-export async function processPipelineJob(job: PipelineJob, env: PipelineEnv): Promise<void> {
+export async function processPipelineJob(
+  job: PipelineJob,
+  env: Env,
+  runtime: Runtime = buildRuntime(env)
+): Promise<void> {
   if (job.type === "materialize_read_models") {
     const [ledger, overview, activityIndex] = await Promise.all([
       readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey()),
@@ -159,18 +167,19 @@ export async function processPipelineJob(job: PipelineJob, env: PipelineEnv): Pr
   }
 
   if (job.type === "historical_backfill") {
-    await processHistoricalBackfillJob(job, env);
+    await processHistoricalBackfillJob(job, env, runtime);
   }
 }
 
 export function handleQueue(
   batch: MessageBatch<PipelineJob>,
-  env: PipelineEnv,
-  ctx: ExecutionContext
+  env: Env,
+  ctx: ExecutionContext,
+  runtime: Runtime = buildRuntime(env)
 ): void {
   for (const message of batch.messages) {
     ctx.waitUntil(
-      processPipelineJob(message.body, env)
+      processPipelineJob(message.body, env, runtime)
         .then(() => message.ack())
         .catch((error) => {
           logEvent("pipeline_queue_job_failed", {
