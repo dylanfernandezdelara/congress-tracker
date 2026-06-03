@@ -1,12 +1,12 @@
 import type { VoteDetails } from "../xml";
-import { ensurePlatformSchema } from "./schema";
+import { ensureSchemaOnce } from "../storage/schema";
 
 export async function readKnownVoteNumbersFromD1(
   db: D1Database,
   congress: number,
   session: number
 ): Promise<Set<number>> {
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   const numbers = new Set<number>();
 
   const ingested = await db
@@ -31,7 +31,7 @@ export async function readIngestedVoteDetailsFromD1(
   session: number,
   voteNumbers?: Iterable<number>
 ): Promise<Map<number, VoteDetails>> {
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   const requested = voteNumbers ? new Set(voteNumbers) : null;
   if (requested && requested.size === 0) return new Map();
 
@@ -63,7 +63,7 @@ export async function writeIngestedVoteDetailsToD1(
   details: VoteDetails[]
 ): Promise<void> {
   if (details.length === 0) return;
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   const now = new Date().toISOString();
 
   for (const detail of details) {

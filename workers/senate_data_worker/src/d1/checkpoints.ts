@@ -1,4 +1,4 @@
-import { ensurePlatformSchema } from "./schema";
+import { ensureSchemaOnce } from "../storage/schema";
 
 export interface PipelineCheckpointRecord<T = Record<string, unknown>> {
   checkpointKey: string;
@@ -11,7 +11,7 @@ export async function writePipelineCheckpoint<T>(
   checkpointKey: string,
   cursor: T
 ): Promise<void> {
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   await db
     .prepare(
       `INSERT OR REPLACE INTO pipeline_checkpoints (
@@ -26,7 +26,7 @@ export async function readPipelineCheckpoint<T>(
   db: D1Database,
   checkpointKey: string
 ): Promise<PipelineCheckpointRecord<T> | null> {
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   const result = await db
     .prepare(
       `SELECT checkpoint_key, cursor_json, updated_at

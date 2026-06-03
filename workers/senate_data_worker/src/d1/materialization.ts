@@ -11,7 +11,7 @@ import { normalizeHistoricalBillType } from "../domain/bill-ref";
 import { normalizeVoteStatus } from "../domain/vote-status";
 import { buildVoteDetailResponse } from "../read-model";
 import type { VoteDetails } from "../xml";
-import { ensurePlatformSchema } from "./schema";
+import { ensureSchemaOnce } from "../storage/schema";
 import {
   buildImportanceReasonsJson,
   significanceToScore,
@@ -83,7 +83,7 @@ export async function writePlatformMaterializationToD1(
   activities: ActivityIndexJson | null,
   materialization: PipelineMaterialization
 ): Promise<void> {
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   const now = new Date().toISOString();
   const billLookup = new Map<number, BillRef>();
   const briefingItemByVoteNumber = new Map(
@@ -316,7 +316,7 @@ export async function writeHistoricalVoteBatchToD1(
   details: VoteDetails[]
 ): Promise<void> {
   if (details.length === 0) return;
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   const now = new Date().toISOString();
   const touchedThreads = new Set<string>();
 

@@ -191,6 +191,7 @@ export function qualityCoverage(
 
   return { quoteValidityPct, confidenceCalibrationMismatchPct };
 }
+
 export function evaluateQualityGates(
   result: AnalyzeBillsResult,
   config: QualityGateConfig

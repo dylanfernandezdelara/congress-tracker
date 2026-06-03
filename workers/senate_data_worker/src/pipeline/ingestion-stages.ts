@@ -56,6 +56,7 @@ export async function stageDiscoverVoteUpdates(
     db: D1Database;
     fetchConfig: FetchConfig;
     now: Date;
+    /** `null` = upstream fetch failed; do not refetch. */
     menuVotes: VoteSummary[] | null;
   }
 ): Promise<VoteLedgerDiscovery> {
@@ -75,6 +76,7 @@ export async function stageIngestMembers(
     govInfoApiKey: string;
     now: Date;
     fixture: FixtureHttp;
+    /** `null` = upstream fetch failed; do not refetch. */
     menuVotes: VoteSummary[] | null;
     fetchConfig: FetchConfig;
   }
@@ -263,6 +265,7 @@ export async function stageBuildVoteLedger(
     db: D1Database;
     discovery: VoteLedgerDiscovery;
     now: Date;
+    /** `null` = upstream fetch failed; do not refetch. */
     menuVotes: VoteSummary[] | null;
   }
 ) {

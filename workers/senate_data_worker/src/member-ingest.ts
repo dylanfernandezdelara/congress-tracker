@@ -64,8 +64,11 @@ export interface MemberIngestConfig {
   now?: Date;
   /** Harness fixture transport applied to every fetch this stage performs. */
   fixture?: FixtureHttp;
-  /** Pre-fetched + parsed vote menu, shared across the run to avoid re-fetching. */
-  menuVotes?: VoteSummary[];
+  /**
+   * Pre-fetched vote menu: array when available, `null` when fetch was attempted and
+   * failed (do not refetch), `undefined` to fetch inside member vote activities.
+   */
+  menuVotes?: VoteSummary[] | null;
 }
 
 export interface MemberIngestResult {
@@ -684,11 +687,20 @@ async function fetchVoteActivities(
   windowEnd: string,
   fetchConfig: FetchConfig,
   errors: SourceError[],
-  menuVotes?: VoteSummary[]
+  menuVotes?: VoteSummary[] | null
 ): Promise<VoteActivitiesByMember> {
   const voteActivitiesByMember: VoteActivitiesByMember = new Map();
-  let allVotes = menuVotes;
-  if (!allVotes) {
+  let allVotes: VoteSummary[] | undefined;
+  if (menuVotes === null) {
+    errors.push({
+      source: "senate",
+      message: "Vote menu unavailable (fetch already attempted upstream)",
+    });
+    return voteActivitiesByMember;
+  }
+  if (menuVotes !== undefined) {
+    allVotes = menuVotes;
+  } else {
     const menuResult = await fetchVoteMenu(congress, session, fetchConfig);
     if (!menuResult.success || !menuResult.data) {
       errors.push({

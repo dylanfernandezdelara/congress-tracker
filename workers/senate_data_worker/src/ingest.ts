@@ -64,8 +64,11 @@ export interface VoteLedgerUpdateOptions {
   discovery?: VoteLedgerDiscovery;
   /** Reference instant for the Eastern-time cutoff (injected via Runtime.clock). */
   now?: Date;
-  /** Pre-fetched + parsed vote menu, shared across the run to avoid re-fetching. */
-  menuVotes?: VoteSummary[];
+  /**
+   * Pre-fetched vote menu: array when available, `null` when fetch was attempted and
+   * failed (do not refetch), `undefined` to fetch inside this function.
+   */
+  menuVotes?: VoteSummary[] | null;
 }
 
 /**
@@ -328,32 +331,45 @@ export async function discoverVoteLedgerUpdates(
     db?: D1Database;
     fetchConfig?: FetchConfig;
     now?: Date;
-    /** Pre-fetched + parsed vote menu, shared across the run to avoid re-fetching. */
-    menuVotes?: VoteSummary[];
+    /**
+     * Pre-fetched vote menu: array when available, `null` when fetch was attempted and
+     * failed (do not refetch), `undefined` to fetch inside this function.
+     */
+    menuVotes?: VoteSummary[] | null;
   } = {}
 ): Promise<VoteLedgerDiscovery> {
   const { congress, session } = config;
   const now = options.now ?? new Date();
 
-  let allMenuVotes = options.menuVotes;
-  if (!allMenuVotes) {
+  const emptyDiscoveryOnMenuFailure = async (): Promise<VoteLedgerDiscovery> => {
+    const existingVoteNumbers = new Set((existingLedger?.entries ?? []).map((e) => e.vote_number));
+    if (options.db) {
+      for (const voteNumber of await readKnownVoteNumbersFromD1(options.db, congress, session)) {
+        existingVoteNumbers.add(voteNumber);
+      }
+    }
+    return {
+      eligibleVotes: [],
+      existingVoteNumbers,
+      missingVoteNumbers: [],
+      cutoffDateEt: todayEastern(now),
+      latestEligibleVoteDate: null,
+    };
+  };
+
+  let allMenuVotes: VoteSummary[] | undefined;
+  if (options.menuVotes === null) {
+    console.warn("[ledger] Vote menu unavailable (fetch already attempted upstream)");
+    return emptyDiscoveryOnMenuFailure();
+  }
+  if (options.menuVotes !== undefined) {
+    allMenuVotes = options.menuVotes;
+  } else {
     console.log("[ledger] Fetching vote menu for ledger discovery...");
     const menuResult = await fetchVoteMenu(congress, session, options.fetchConfig ?? DEFAULT_FETCH_CONFIG);
     if (!menuResult.success || !menuResult.data) {
       console.warn(`[ledger] Failed to fetch vote menu: ${menuResult.error}`);
-      const existingVoteNumbers = new Set((existingLedger?.entries ?? []).map((e) => e.vote_number));
-      if (options.db) {
-        for (const voteNumber of await readKnownVoteNumbersFromD1(options.db, congress, session)) {
-          existingVoteNumbers.add(voteNumber);
-        }
-      }
-      return {
-        eligibleVotes: [],
-        existingVoteNumbers,
-        missingVoteNumbers: [],
-        cutoffDateEt: todayEastern(now),
-        latestEligibleVoteDate: null,
-      };
+      return emptyDiscoveryOnMenuFailure();
     }
     allMenuVotes = parseVoteMenuXml(menuResult.data);
   }

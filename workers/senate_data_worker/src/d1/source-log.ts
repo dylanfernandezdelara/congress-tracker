@@ -1,4 +1,4 @@
-import { ensurePlatformSchema } from "./schema";
+import { ensureSchemaOnce } from "../storage/schema";
 
 export interface SourceFetchLogRecord {
   cacheKey: string;
@@ -17,7 +17,7 @@ export async function recordSourceFetchLog(
   db: D1Database,
   record: SourceFetchLogRecord
 ): Promise<void> {
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   await db
     .prepare(
       `INSERT OR REPLACE INTO source_fetch_log (
@@ -44,7 +44,7 @@ export async function readSourceFetchLog(
   db: D1Database,
   cacheKey: string
 ): Promise<SourceFetchLogRecord | null> {
-  await ensurePlatformSchema(db);
+  await ensureSchemaOnce(db);
   const result = await db
     .prepare(
       `SELECT cache_key, source, entity_key, request_url, status_code, content_type,

@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 import { mapWithConcurrency } from "../concurrency";
 import { buildBillKey } from "../congress";
-import { readDocumentJson, writeDocumentJson } from "../d1/documents";
+import { readDocumentJson, writeDocumentJson } from "../storage/documents";
+import { migrateLegacyBillAnalysisBundle } from "./legacy-cache";
 import { buildBillNarrativeKey } from "../storage";
 import type { AnalyzeBillInput, AnalyzeBillsOptions, AnalyzeBillsResult } from "./types-shared";
 import type { BillAnalysis } from "../types";
@@ -125,6 +126,8 @@ export async function analyzeBillsWithCache(
   inputs: AnalyzeBillInput[],
   options: AnalyzeBillsOptions
 ): Promise<AnalyzeBillsResult> {
+  await migrateLegacyBillAnalysisBundle(db);
+
   const requestedByKey = new Map<string, AnalyzeBillInput>();
   for (const input of inputs) {
     const bill = input.bill;
