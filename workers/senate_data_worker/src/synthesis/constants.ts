@@ -1,4 +1,3 @@
-export const BILL_ANALYSIS_CACHE_KEY = "analysis/bill-analysis-cache.json";
 export const ANALYSIS_VERSION = "v6-generalized-likely-reasons";
 export const DEFAULT_OPENROUTER_MODELS = [
   "nvidia/nemotron-3-super-120b-a12b:free",

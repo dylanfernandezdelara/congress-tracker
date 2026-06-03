@@ -12,6 +12,11 @@ import { normalizeVoteStatus } from "../domain/vote-status";
 import { buildVoteDetailResponse } from "../read-model";
 import type { VoteDetails } from "../xml";
 import { ensurePlatformSchema } from "./schema";
+import {
+  buildImportanceReasonsJson,
+  significanceToScore,
+} from "../domain/significance-score";
+import type { SignificanceLevel } from "../platform-types";
 
 function toSqlBool(value: boolean): number {
   return value ? 1 : 0;
@@ -126,13 +131,16 @@ export async function writePlatformMaterializationToD1(
         buildIssueKey(sourceEntry, bill),
         detail.vote.status,
         item?.significance ?? bill?.analysis?.significance ?? "low",
-        0,
+        significanceToScore(
+          (item?.significance ?? bill?.analysis?.significance ?? "low") as SignificanceLevel
+        ),
         item?.summary ?? `Senate vote on ${detail.vote.title}.`,
         now
       )
       .run();
 
     if (item) {
+      const significance = item.significance;
       await db
         .prepare(
           `INSERT OR REPLACE INTO importance_scores (
@@ -143,8 +151,11 @@ export async function writePlatformMaterializationToD1(
           item.congress,
           item.session,
           item.vote_number,
-          0,
-          "[]",
+          significanceToScore(significance),
+          buildImportanceReasonsJson(
+            significance,
+            bill?.analysis?.significance_reason
+          ),
           materialization.briefing.generated_at
         )
         .run();
@@ -336,7 +347,7 @@ export async function writeHistoricalVoteBatchToD1(
         issueKey,
         normalizeVoteStatus(detail.vote_result),
         "low",
-        0,
+        significanceToScore("low"),
         `Historical Senate vote on ${detail.vote_title}.`,
         now
       )

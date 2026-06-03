@@ -5,6 +5,7 @@ import * as pipelineJobs from "./pipeline-jobs";
 import * as pipelineMaterialize from "./pipeline-materialize";
 import * as scheduledIngestion from "./scheduled-ingestion";
 import * as documents from "./d1/documents";
+import { resetSchemaOnceForTests } from "./storage";
 
 function createSequentialOnlyDb(): D1Database {
   let activeQueries = 0;
@@ -22,7 +23,9 @@ function createSequentialOnlyDb(): D1Database {
 
   return {
     async batch(statements: D1PreparedStatement[]) {
-      await Promise.all(statements.map((statement) => statement.run()));
+      for (const statement of statements) {
+        await statement.run();
+      }
       return statements.map(() => ({ success: true, meta: { duration: 0 } }));
     },
     prepare(sql: string) {
@@ -47,6 +50,13 @@ function createSequentialOnlyDb(): D1Database {
           throw new Error(`Unexpected first() query: ${normalizedSql}`);
         },
         async all<T>() {
+          if (normalizedSql.startsWith("PRAGMA table_info")) {
+            return runQuery({
+              results: [{ name: "issue_key" }],
+              success: true,
+              meta: { duration: 0 },
+            } as T);
+          }
           if (normalizedSql.includes("FROM pipeline_checkpoints")) {
             return runQuery({
               results: [
@@ -81,6 +91,10 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
 }
 
 describe("pipeline debug routes", () => {
+  beforeEach(() => {
+    resetSchemaOnceForTests();
+  });
+
   it("returns pipeline status without overlapping local D1 reads", async () => {
     const request = new Request("http://127.0.0.1:8787/__pipeline/status");
     const response = await handler.fetch(request, createMockEnv() as any);
@@ -233,11 +247,15 @@ describe("pipeline debug routes", () => {
     jobSpy.mockRestore();
   });
 
-  it("defers scheduled ingestion work through ctx.waitUntil", () => {
+  it("defers scheduled ingestion work through ctx.waitUntil", async () => {
     const runSpy = vi.spyOn(scheduledIngestion, "runScheduledIngestion").mockResolvedValue();
     const waitUntil = vi.fn();
     const ctx = { waitUntil } as unknown as ExecutionContext;
-    handler.scheduled({ scheduledTime: Date.now() } as ScheduledController, createMockEnv() as any, ctx);
+    await handler.scheduled(
+      { scheduledTime: Date.now() } as ScheduledController,
+      createMockEnv() as any,
+      ctx
+    );
     runSpy.mockRestore();
     expect(waitUntil).toHaveBeenCalledOnce();
     expect(waitUntil.mock.calls[0]?.[0]).toBeInstanceOf(Promise);
@@ -276,7 +294,7 @@ describe("pipeline debug routes", () => {
       created_at: new Date().toISOString(),
       reason: "test",
     } as const;
-    handler.queue(
+    await handler.queue(
       {
         messages: [{ body: job, ack, retry }],
       } as unknown as MessageBatch<typeof job>,

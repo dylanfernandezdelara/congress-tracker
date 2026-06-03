@@ -5,6 +5,7 @@ import {
   buildActivitiesIndexKey,
   buildSessionOverviewKey,
   buildVoteLedgerKey,
+  readLatestBriefingGeneratedAt,
 } from "../storage";
 import { parseIntSafe, type Env } from "../config";
 import { buildRuntime } from "../runtime";
@@ -42,12 +43,7 @@ async function healthDataResponse(
   json: (body: unknown, init?: ResponseInit) => Response
 ): Promise<Response> {
   const maxFreshHours = Math.max(1, parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, 36));
-  const row = await env.SENATE_DB.prepare(
-    "SELECT generated_at FROM daily_briefings WHERE briefing_key = ? LIMIT 1"
-  )
-    .bind("latest")
-    .all<{ generated_at: string }>();
-  const generatedAt = row.results?.[0]?.generated_at;
+  const generatedAt = await readLatestBriefingGeneratedAt(env.SENATE_DB);
   if (!generatedAt) {
     return json(
       {

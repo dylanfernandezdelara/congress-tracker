@@ -12,13 +12,12 @@ import {
   summarizeCoverage,
 } from "./pipeline-logging";
 import {
-  hasPublishedReadModels,
   materializeReadModels,
   type QualityGateConfig,
 } from "./pipeline-materialize";
 import { enqueuePipelineJob } from "./pipeline-jobs";
 import { readDocumentJson } from "./d1/documents";
-import { buildVoteLedgerKey } from "./storage";
+import { buildVoteLedgerKey, hasPublishedReadModels } from "./storage";
 import {
   collectUniqueBills,
   stageAttachEvidenceToActivities,

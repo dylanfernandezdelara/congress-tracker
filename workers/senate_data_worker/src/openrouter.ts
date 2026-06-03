@@ -3,7 +3,6 @@
  * `synthesis/` (client, prompt, coerce, quality).
  */
 export {
-  BILL_ANALYSIS_CACHE_KEY,
   ANALYSIS_VERSION,
   DEFAULT_OPENROUTER_MODELS,
   DEFAULT_OPENROUTER_MODEL,

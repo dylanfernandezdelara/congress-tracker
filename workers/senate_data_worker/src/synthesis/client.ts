@@ -2,9 +2,8 @@ import OpenAI from "openai";
 import { mapWithConcurrency } from "../concurrency";
 import { buildBillKey } from "../congress";
 import { readDocumentJson, writeDocumentJson } from "../d1/documents";
-import { BILL_ANALYSIS_CACHE_KEY } from "./constants";
 import { buildBillNarrativeKey } from "../storage";
-import type { AnalyzeBillInput, AnalyzeBillsOptions, AnalyzeBillsResult, BillAnalysisCacheMap } from "./types-shared";
+import type { AnalyzeBillInput, AnalyzeBillsOptions, AnalyzeBillsResult } from "./types-shared";
 import type { BillAnalysis } from "../types";
 import { coerceBillAnalysis, ensureClaimsHaveRefs, isAnalysisRefreshNeeded, normalizeModelList } from "./coerce";
 import { buildPrompt } from "./prompt";
@@ -16,7 +15,7 @@ import {
   qualityCoverage,
 } from "./quality";
 
-export { BILL_ANALYSIS_CACHE_KEY, ANALYSIS_VERSION, DEFAULT_OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODEL } from "./constants";
+export { ANALYSIS_VERSION, DEFAULT_OPENROUTER_MODELS, DEFAULT_OPENROUTER_MODEL } from "./constants";
 export type { AnalyzeBillInput, AnalyzeBillsOptions, AnalyzeBillsResult } from "./types-shared";
 
 function sleep(ms: number): Promise<void> {
@@ -134,7 +133,6 @@ export async function analyzeBillsWithCache(
     if (!requestedByKey.has(key)) requestedByKey.set(key, input);
   }
 
-  const bundledCache = (await readDocumentJson<BillAnalysisCacheMap>(db, BILL_ANALYSIS_CACHE_KEY)) ?? {};
   const analysisByKey = new Map<string, BillAnalysis>();
   let cacheHitCount = 0;
   let analyzedCount = 0;
@@ -142,7 +140,6 @@ export async function analyzeBillsWithCache(
   let deferredCount = 0;
   let fallbackCount = 0;
   let inputSkipCount = 0;
-  let bundledCacheChanged = false;
 
   const models = normalizeModelList(options.models ?? options.model);
   const maxNewAnalyses = options.maxNewAnalyses ?? 20;
@@ -167,7 +164,7 @@ export async function analyzeBillsWithCache(
   const cachedChecks = await mapWithConcurrency(entries, 4, async ([key, input]) => {
     const narrativeKey = buildBillNarrativeKey(key);
     const cachedNarrative = await readDocumentJson<BillAnalysis>(db, narrativeKey);
-    const cached = cachedNarrative ?? bundledCache[key];
+    const cached = cachedNarrative;
     return { key, input, cached };
   });
 
@@ -232,13 +229,7 @@ export async function analyzeBillsWithCache(
     }
     analyzedCount++;
     analysisByKey.set(result.key, result.analysis);
-    bundledCache[result.key] = result.analysis;
-    bundledCacheChanged = true;
     await writeDocumentJson(db, buildBillNarrativeKey(result.key), result.analysis);
-  }
-
-  if (bundledCacheChanged) {
-    await writeDocumentJson(db, BILL_ANALYSIS_CACHE_KEY, bundledCache);
   }
 
   const qualityMetrics = qualityCoverage(analysisByKey, requestedByKey);

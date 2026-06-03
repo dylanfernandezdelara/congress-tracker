@@ -1,5 +1,3 @@
-import { ensurePlatformSchema } from "./schema";
-
 export interface DocumentWriteOptions {
   skipIfUnchanged?: boolean;
   jsonVolatileKeys?: string[];
@@ -60,7 +58,6 @@ function equivalentJsonPayloads(
 }
 
 export async function readDocumentJson<T>(db: D1Database, key: string): Promise<T | null> {
-  await ensurePlatformSchema(db);
   const result = await db
     .prepare("SELECT body FROM kv_documents WHERE doc_key = ? LIMIT 1")
     .bind(key)
@@ -87,7 +84,6 @@ export async function writeDocumentJson(
   value: unknown,
   options: DocumentWriteOptions = {}
 ): Promise<void> {
-  await ensurePlatformSchema(db);
   const body = JSON.stringify(value);
   const contentType = "application/json";
   const updatedAt = new Date().toISOString();
@@ -121,6 +117,5 @@ export async function writeDocumentJson(
 }
 
 export async function deleteDocument(db: D1Database, key: string): Promise<void> {
-  await ensurePlatformSchema(db);
   await db.prepare("DELETE FROM kv_documents WHERE doc_key = ?").bind(key).run();
 }
