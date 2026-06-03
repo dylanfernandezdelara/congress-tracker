@@ -5,6 +5,12 @@
 import { fetchJsonWithRetry, type FetchConfig } from "./fetch";
 import { compareDates } from "./date-parse";
 import { mapWithConcurrency } from "./concurrency";
+import {
+  buildBillKey,
+  buildCongressUrl,
+  normalizeBillNumber,
+  normalizeBillType,
+} from "./sources/congress-client";
 import type {
   BillRef,
   LegislationActionItem,
@@ -12,7 +18,7 @@ import type {
   SponsorPartySignal,
 } from "./types";
 
-const CONGRESS_API_BASE = "https://api.congress.gov/v3";
+export { buildBillKey };
 
 interface CongressPagination {
   count?: number;
@@ -71,20 +77,6 @@ interface CongressLegislationResponse {
   pagination?: CongressPagination;
 }
 
-function buildCongressUrl(
-  path: string,
-  params: Record<string, string | number | boolean>,
-  apiKey: string
-): string {
-  const url = new URL(`${CONGRESS_API_BASE}${path}`);
-  url.searchParams.set("format", "json");
-  url.searchParams.set("api_key", apiKey);
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, String(value));
-  });
-  return url.toString();
-}
-
 function normalizeDate(dateStr: string | undefined | null): string | null {
   if (!dateStr) return null;
   const trimmed = dateStr.trim();
@@ -95,33 +87,6 @@ function normalizeDate(dateStr: string | undefined | null): string | null {
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
-}
-
-function normalizeBillType(value: string): string {
-  const cleaned = value.toLowerCase().replace(/\./g, "").replace(/\s+/g, "");
-  if (!cleaned) return "";
-  if (cleaned === "hr") return "hr";
-  if (cleaned === "s") return "s";
-  if (cleaned === "hres") return "hres";
-  if (cleaned === "sres") return "sres";
-  if (cleaned === "hjres") return "hjres";
-  if (cleaned === "sjres") return "sjres";
-  if (cleaned === "hconres") return "hconres";
-  if (cleaned === "sconres") return "sconres";
-  return cleaned;
-}
-
-function normalizeBillNumber(value: string): string {
-  const cleaned = value.trim();
-  if (!cleaned) return "";
-  const match = cleaned.match(/\d+/);
-  return match ? match[0] : cleaned;
-}
-
-export function buildBillKey(ref: BillRef): string {
-  const type = normalizeBillType(ref.type);
-  const number = normalizeBillNumber(ref.number);
-  return `${ref.congress}-${type}-${number}`;
 }
 
 function getString(value: unknown): string | undefined {

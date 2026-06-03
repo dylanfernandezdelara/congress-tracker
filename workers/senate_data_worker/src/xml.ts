@@ -8,7 +8,7 @@
  * - Count field variations (count vs counts, absent vs not_voting)
  */
 
-import { XMLParser } from "fast-xml-parser";
+import { createXmlParser } from "./sources/xml";
 import { parseVoteDate } from "./date-parse";
 
 // ============================================================================
@@ -63,26 +63,10 @@ export interface VoteDetails {
 }
 
 // ============================================================================
-// XML Parser Configuration
+// XML Parsing
 // ============================================================================
 
-const parserOptions = {
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  textNodeName: "#text",
-  // Don't transform tag names - keep original casing
-  transformTagName: undefined,
-  // Parse numbers as strings initially (we handle conversion manually)
-  parseTagValue: false,
-  trimValues: true,
-};
-
-/**
- * Create a configured XML parser instance.
- */
-function createParser(): XMLParser {
-  return new XMLParser(parserOptions);
-}
+const createParser = createXmlParser;
 
 function safeParseXml<T>(xml: string, source: string): T | null {
   if (!xml || !xml.trim()) {

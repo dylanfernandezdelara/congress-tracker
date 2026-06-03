@@ -1,5 +1,10 @@
 import { mapWithConcurrency } from "./concurrency";
-import { buildBillKey } from "./congress";
+import {
+  buildBillKey,
+  buildCongressUrl,
+  normalizeBillNumber,
+  normalizeBillType,
+} from "./sources/congress-client";
 import { fetchJsonWithRetry, type FetchConfig } from "./fetch";
 import type {
   BillEvidenceRaw,
@@ -7,8 +12,6 @@ import type {
   EvidenceEndpoint,
   EvidenceEndpointStatus,
 } from "./types";
-
-const CONGRESS_API_BASE = "https://api.congress.gov/v3";
 
 export const EVIDENCE_ENDPOINT_TIERS: Record<EvidenceEndpoint, 1 | 2 | 3> = {
   detail: 1,
@@ -51,41 +54,6 @@ export interface BillEvidenceHarvestOptions {
 export interface BillEvidenceHarvestResult {
   evidence: BillEvidenceRaw;
   error?: string;
-}
-
-function buildCongressUrl(
-  path: string,
-  params: Record<string, string | number | boolean>,
-  apiKey: string
-): string {
-  const url = new URL(`${CONGRESS_API_BASE}${path}`);
-  url.searchParams.set("format", "json");
-  url.searchParams.set("api_key", apiKey);
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, String(value));
-  });
-  return url.toString();
-}
-
-function normalizeBillType(value: string): string {
-  const cleaned = value.toLowerCase().replace(/\./g, "").replace(/\s+/g, "");
-  if (!cleaned) return "";
-  if (cleaned === "hr") return "hr";
-  if (cleaned === "s") return "s";
-  if (cleaned === "hres") return "hres";
-  if (cleaned === "sres") return "sres";
-  if (cleaned === "hjres") return "hjres";
-  if (cleaned === "sjres") return "sjres";
-  if (cleaned === "hconres") return "hconres";
-  if (cleaned === "sconres") return "sconres";
-  return cleaned;
-}
-
-function normalizeBillNumber(value: string): string {
-  const cleaned = value.trim();
-  if (!cleaned) return "";
-  const match = cleaned.match(/\d+/);
-  return match ? match[0] : cleaned;
 }
 
 function estimateItemCount(endpoint: EvidenceEndpoint, data: Record<string, unknown>): number | undefined {

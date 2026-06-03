@@ -2,7 +2,7 @@
  * Senate.gov schedule XML parsing (floor + committee hearings).
  */
 
-import { XMLParser } from "fast-xml-parser";
+import { createXmlParser } from "./sources/xml";
 import { parseVoteDate } from "./date-parse";
 import type { CommitteeMeetingItem, FloorScheduleItem } from "./types";
 
@@ -11,18 +11,7 @@ const FLOOR_SCHEDULE_URL =
 const COMMITTEE_SCHEDULE_URL =
   "https://www.senate.gov/general/committee_schedules/hearings.xml";
 
-const parserOptions = {
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  textNodeName: "#text",
-  transformTagName: undefined,
-  parseTagValue: false,
-  trimValues: true,
-};
-
-function createParser(): XMLParser {
-  return new XMLParser(parserOptions);
-}
+const createParser = createXmlParser;
 
 function safeParseScheduleXml(xml: string, source: string): UnknownRecord | null {
   if (!xml || !xml.trim()) {
