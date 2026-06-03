@@ -1,6 +1,6 @@
 import type { PipelineJob } from "./platform-types";
 
-/** Bindings shared by the public API worker and the pipeline worker. */
+/** Base bindings available to every request (public reads + pipeline). */
 export interface WorkerBindings {
   SENATE_DB: D1Database;
   CONGRESS: string;
@@ -10,10 +10,7 @@ export interface WorkerBindings {
   DATA_FRESHNESS_MAX_HOURS?: string;
 }
 
-/** Public read API worker (`api-index.ts`). */
-export type ApiEnv = WorkerBindings;
-
-/** Pipeline ingestion worker (`index.ts`). */
+/** Full environment for the unified worker (`worker.ts`): API + pipeline + queue + cron. */
 export interface PipelineEnv extends WorkerBindings {
   CONGRESS_API_KEY: string;
   GOVINFO_API_KEY: string;

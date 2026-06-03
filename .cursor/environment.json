@@ -5,7 +5,7 @@
     {
       "name": "Full stack",
       "command": "./scripts/dev-all.sh",
-      "description": "API worker :8787, pipeline :8788, Vite :5173 (uses workers/senate_data_worker/.dev.vars)"
+      "description": "Unified worker :8787 (API + pipeline + cron), Vite :5173 (uses workers/senate_data_worker/.dev.vars)"
     },
     {
       "name": "Web (fixture mode)",

@@ -1,15 +1,16 @@
 /**
- * Senate Data Worker - Cloudflare Worker for Senate vote ingestion.
+ * Senate Data Worker - single Cloudflare Worker for Senate vote ingestion + serving.
  *
  * Handles:
  * - Scheduled (cron) ingestion of Senate roll-call vote data
- * - HTTP API for serving precomputed JSON from D1
+ * - Queue jobs (materialization, historical backfill)
+ * - HTTP API for serving precomputed JSON from D1 plus pipeline admin routes
  */
 
 import { applyHarnessEnv } from "./harness";
 import type { PipelineEnv } from "./pipeline-env";
 import type { PipelineJob } from "./platform-types";
-import { handleFetch as handleFetchInner } from "./pipeline-routes";
+import { handleFetch as handleFetchInner } from "./http/router";
 import { handleScheduled as handleScheduledInner } from "./scheduled-ingestion";
 import { handleQueue as handleQueueInner } from "./pipeline-jobs";
 

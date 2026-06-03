@@ -2,20 +2,6 @@ import type { FetchConfig } from "./fetch";
 import { computePct } from "./pipeline-runtime-config";
 import type { CoverageSnapshot, EvidenceEndpoint, SourceError, VoteLedger } from "./types";
 
-export type JsonResponseBuilder = (body: unknown, init?: ResponseInit) => Response;
-
-export const cacheHealth = "s-maxage=60, max-age=0, must-revalidate";
-
-export const buildJsonResponse = (body: unknown, corsHeaders: HeadersInit, init?: ResponseInit) =>
-  new Response(JSON.stringify(body), {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...corsHeaders,
-      ...(init?.headers ?? {}),
-    },
-  });
-
 export const PIPELINE_FETCH_CONFIG: FetchConfig = {
   maxRetries: 3,
   baseDelayMs: 1000,

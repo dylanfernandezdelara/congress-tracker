@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import handler from "./pipeline-index";
+import handler from "./worker";
 import * as pipelineJobs from "./pipeline-jobs";
 import * as pipelineMaterialize from "./pipeline-materialize";
 import * as scheduledIngestion from "./scheduled-ingestion";
@@ -44,13 +44,6 @@ function createSequentialOnlyDb(): D1Database {
             } as T);
           }
 
-          if (normalizedSql.includes("FROM argument_excerpts")) {
-            return runQuery({
-              excerpt_count: 11,
-              votes_with_excerpts: 4,
-            } as T);
-          }
-
           throw new Error(`Unexpected first() query: ${normalizedSql}`);
         },
         async all<T>() {
@@ -89,7 +82,7 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
 
 describe("pipeline debug routes", () => {
   it("returns pipeline status without overlapping local D1 reads", async () => {
-    const request = new Request("http://127.0.0.1:8788/__pipeline/status");
+    const request = new Request("http://127.0.0.1:8787/__pipeline/status");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json();
 
@@ -102,10 +95,6 @@ describe("pipeline debug routes", () => {
         total_votes: 3466,
         earliest_vote_date: "2015-01-08",
         latest_vote_date: "2026-03-09",
-      },
-      excerpts: {
-        excerpt_count: 11,
-        votes_with_excerpts: 4,
       },
       checkpoints: [
         {
@@ -198,7 +187,7 @@ describe("pipeline debug routes", () => {
   });
 
   it("allows local manual run routes without an admin token", async () => {
-    const request = new Request("http://127.0.0.1:8788/__pipeline/run/historical-backfill?congress=0");
+    const request = new Request("http://127.0.0.1:8787/__pipeline/run/historical-backfill?congress=0");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json() as { error: string };
 
@@ -208,7 +197,7 @@ describe("pipeline debug routes", () => {
 
   it("runs scheduled ingestion on local /__pipeline/run/ingestion", async () => {
     const runSpy = vi.spyOn(scheduledIngestion, "runScheduledIngestion").mockResolvedValue();
-    const request = new Request("http://127.0.0.1:8788/__pipeline/run/ingestion");
+    const request = new Request("http://127.0.0.1:8787/__pipeline/run/ingestion");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json() as { status: string; action: string };
 
@@ -220,7 +209,7 @@ describe("pipeline debug routes", () => {
 
   it("returns 503 for materialize when ledger or overview is missing", async () => {
     vi.spyOn(documents, "readDocumentJson").mockResolvedValue(null);
-    const request = new Request("http://127.0.0.1:8788/__pipeline/run/materialize");
+    const request = new Request("http://127.0.0.1:8787/__pipeline/run/materialize");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json() as { error: string };
 
@@ -230,7 +219,7 @@ describe("pipeline debug routes", () => {
 
   it("dispatches historical backfill jobs through the pipeline processor", async () => {
     const jobSpy = vi.spyOn(pipelineJobs, "processPipelineJob").mockResolvedValue();
-    const request = new Request("http://127.0.0.1:8788/__pipeline/run/historical-backfill?congress=119");
+    const request = new Request("http://127.0.0.1:8787/__pipeline/run/historical-backfill?congress=119");
     const response = await handler.fetch(request, createMockEnv() as any);
     const body = await response.json() as { status: string; action: string };
 
@@ -325,7 +314,7 @@ describe("pipeline debug routes", () => {
       return null;
     });
 
-    const request = new Request("http://127.0.0.1:8788/__pipeline/run/materialize");
+    const request = new Request("http://127.0.0.1:8787/__pipeline/run/materialize");
     const response = await handler.fetch(request, createMockEnv() as any);
     expect(response.status).toBe(200);
     expect(materializeSpy).toHaveBeenCalledOnce();

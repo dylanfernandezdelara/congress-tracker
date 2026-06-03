@@ -4,12 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev --config wrangler.toml",
-    "dev:api": "wrangler dev --config wrangler.toml",
-    "dev:pipeline": "wrangler dev --config wrangler.pipeline.toml",
     "deploy": "wrangler deploy --config wrangler.toml",
-    "deploy:api": "wrangler deploy --config wrangler.toml",
-    "deploy:pipeline": "wrangler deploy --config wrangler.pipeline.toml",
-    "test-scheduled": "wrangler dev --config wrangler.pipeline.toml --test-scheduled",
+    "test-scheduled": "wrangler dev --config wrangler.toml --test-scheduled",
     "smoke:scheduled": "bash scripts/run-ingest-local.sh",
     "fixtures:harness:refresh": "node scripts/refresh-harness-fixtures.mjs",
     "check": "tsc --noEmit",

@@ -5,12 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
 source "${ROOT_DIR}/scripts/harness-env.sh"
 
-API_LOG="${HARNESS_LOG_DIR}/api.log"
-PIPELINE_LOG="${HARNESS_LOG_DIR}/pipeline.log"
+WORKER_LOG="${HARNESS_LOG_DIR}/worker.log"
 WEB_LOG="${HARNESS_LOG_DIR}/web.log"
 
-API_PID=""
-PIPELINE_PID=""
+WORKER_PID=""
 WEB_PID=""
 
 # Wrangler/Vite often ignore SIGTERM briefly or leave children alive; unbounded `wait` on EXIT
@@ -34,22 +32,10 @@ harness_stop_pid() {
 
 cleanup() {
   harness_stop_pid "${WEB_PID}"
-  harness_stop_pid "${API_PID}"
-  harness_stop_pid "${PIPELINE_PID}"
+  harness_stop_pid "${WORKER_PID}"
   kill_port "${HARNESS_WEB_PORT}"
   kill_port "${HARNESS_API_PORT}"
-  kill_port "${HARNESS_PIPELINE_PORT}"
   kill_port "${HARNESS_API_INSPECTOR_PORT}"
-  kill_port "${HARNESS_PIPELINE_INSPECTOR_PORT}"
-}
-
-harness_stop_pipeline_phase() {
-  echo "Stopping pipeline worker (release persistence lock before API starts)"
-  harness_stop_pid "${PIPELINE_PID}"
-  PIPELINE_PID=""
-  sleep 1
-  kill_port "${HARNESS_PIPELINE_PORT}"
-  kill_port "${HARNESS_PIPELINE_INSPECTOR_PORT}"
 }
 
 kill_port() {
@@ -82,7 +68,7 @@ wait_for_url() {
 }
 
 print_logs() {
-  for log_file in "${HARNESS_LOG_DIR}/api.log" "${HARNESS_LOG_DIR}/pipeline.log" "${HARNESS_LOG_DIR}/web.log"; do
+  for log_file in "${HARNESS_LOG_DIR}/worker.log" "${HARNESS_LOG_DIR}/web.log"; do
     if [[ -f "${log_file}" ]]; then
       echo "--- ${log_file}"
       tail -n 200 "${log_file}" || true
@@ -97,43 +83,13 @@ rm -rf "${HARNESS_STATE_DIR}"
 mkdir -p "${HARNESS_STATE_DIR}"
 
 kill_port "${HARNESS_API_PORT}"
-kill_port "${HARNESS_PIPELINE_PORT}"
 kill_port "${HARNESS_WEB_PORT}"
 kill_port "${HARNESS_API_INSPECTOR_PORT}"
-kill_port "${HARNESS_PIPELINE_INSPECTOR_PORT}"
 
-# Two concurrent `wrangler dev` processes must not share the same --persist-to path:
-# Miniflare's D1 SQLite backend corrupts or throws "internal error" under concurrent access.
-# Run pipeline alone for ingestion, then API + web for assertions and browser tests.
-
-echo "Phase 1: pipeline worker (exclusive Miniflare persistence)"
-npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:pipeline -- \
-  --ip "${HARNESS_HOST}" \
-  --port "${HARNESS_PIPELINE_PORT}" \
-  --inspector-port "${HARNESS_PIPELINE_INSPECTOR_PORT}" \
-  --persist-to "${HARNESS_STATE_DIR}" \
-  --var "HARNESS_MODE:fixture" \
-  --var "HARNESS_FIXTURE_SET:${HARNESS_FIXTURE_SET}" \
-  --var "HARNESS_NOW:${HARNESS_NOW}" \
-  --var "CONGRESS_API_KEY:HARNESS_FIXTURE_KEY" \
-  --var "GOVINFO_API_KEY:HARNESS_FIXTURE_KEY" \
-  --var "OPENROUTER_CANARY_PERCENT:0" \
-  >"${PIPELINE_LOG}" 2>&1 &
-PIPELINE_PID=$!
-
-wait_for_url "${HARNESS_PIPELINE_URL}/health" "Pipeline worker"
-
-echo "Triggering deterministic scheduled ingestion..."
-if ! curl -fsS --max-time "${HARNESS_INGEST_MAX_TIME}" "${HARNESS_PIPELINE_URL}/__pipeline/run/ingestion" \
-  >"${HARNESS_ASSERT_DIR}/ingestion-response.json"; then
-  print_logs
-  exit 1
-fi
-
-harness_stop_pipeline_phase
-
-echo "Phase 2: API worker + web app (same persisted state, single wrangler at a time)"
-npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:api -- \
+# Single unified worker: one `wrangler dev` over one --persist-to path. No concurrent
+# Miniflare D1 access, so the previous sequential two-phase start is no longer needed.
+echo "Starting unified worker (fetch + scheduled + queue) on ${HARNESS_HOST}:${HARNESS_API_PORT}"
+npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev -- \
   --ip "${HARNESS_HOST}" \
   --port "${HARNESS_API_PORT}" \
   --inspector-port "${HARNESS_API_INSPECTOR_PORT}" \
@@ -145,11 +101,19 @@ npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev:api -- \
   --var "GOVINFO_API_KEY:HARNESS_FIXTURE_KEY" \
   --var "OPENROUTER_CANARY_PERCENT:0" \
   --var "ALLOWED_ORIGIN:*" \
-  >"${API_LOG}" 2>&1 &
-API_PID=$!
+  >"${WORKER_LOG}" 2>&1 &
+WORKER_PID=$!
 
-wait_for_url "${HARNESS_API_URL}/health" "API worker"
+wait_for_url "${HARNESS_API_URL}/health" "Worker"
 
+echo "Triggering deterministic scheduled ingestion..."
+if ! curl -fsS --max-time "${HARNESS_INGEST_MAX_TIME}" "${HARNESS_PIPELINE_URL}/__pipeline/run/ingestion" \
+  >"${HARNESS_ASSERT_DIR}/ingestion-response.json"; then
+  print_logs
+  exit 1
+fi
+
+echo "Starting web app on ${HARNESS_HOST}:${HARNESS_WEB_PORT}"
 VITE_API_URL="${HARNESS_API_URL}" \
   npm --prefix "${ROOT_DIR}/web" run dev -- \
     --host "${HARNESS_HOST}" \
@@ -159,7 +123,6 @@ WEB_PID=$!
 
 wait_for_url "${HARNESS_WEB_URL}" "Web app"
 
-export HARNESS_ASSERT_SKIP_PIPELINE_STATUS=1
 if ! npm run harness:assert; then
   print_logs
   exit 1

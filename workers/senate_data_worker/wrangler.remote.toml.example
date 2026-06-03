@@ -1,15 +1,20 @@
 # Copy to workers/senate_data_worker/wrangler.remote.toml (git-ignored) and fill
 # in the real production D1 database_id from the Cloudflare
-# dashboard. Use this manually when you want a local API worker to read remote
+# dashboard. Use this manually when you want a local worker to read remote
 # Cloudflare resources:
 #
 #   wrangler dev --config wrangler.remote.toml --remote
 #
-# so the local API worker reads from REAL production D1 instead of Miniflare.
-# Do NOT deploy with this config; deploys still use wrangler.toml.
+# so the local worker reads from REAL production D1 instead of Miniflare.
+#
+# This config intentionally uses the READ-ONLY entry (src/remote-readonly.ts),
+# NOT src/worker.ts: the full worker's /__pipeline/* admin routes bypass auth for
+# localhost callers, which against production D1 would let a local request trigger
+# ingestion/materialization on prod. The read-only entry exposes only the public
+# read API. Do NOT deploy with this config; deploys still use wrangler.toml.
 
 name = "senate-data-api-worker"
-main = "src/api-index.ts"
+main = "src/remote-readonly.ts"
 compatibility_date = "2025-12-10"
 
 [limits]

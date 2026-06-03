@@ -5,7 +5,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BriefingFeedResponse, VoteDetailResponse } from "./platform-types";
 import * as materialization from "./d1/materialization";
-import handler from "./api-index";
+import { handlePublicFetch } from "./http/router";
+
+const handler = { fetch: handlePublicFetch };
 
 const mockBriefing: BriefingFeedResponse = {
   generated_at: "2026-01-04T16:30:00.000Z",

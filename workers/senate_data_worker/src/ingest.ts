@@ -18,12 +18,10 @@ import {
   parseVoteMenuXml,
   parseVoteDetailXml,
   filterVotesByDate,
-  filterMembersByState,
   getUniqueDates,
   type VoteSummary,
   type VoteDetails,
 } from "./xml";
-import { buildBillKey, fetchBillDetailsMap } from "./congress";
 import { computePartyMajorityLabels } from "./domain/party-majority";
 import {
   readIngestedVoteDetailsFromD1,
@@ -32,9 +30,6 @@ import {
 } from "./d1/ingested-votes";
 import type {
   IngestConfig,
-  OutputVote,
-  OutputMember,
-  OutputCounts,
   BillRef,
   VoteLedger,
   VoteLedgerEntry,
@@ -67,95 +62,6 @@ export interface VoteLedgerDiscovery {
 export interface VoteLedgerUpdateOptions {
   db?: D1Database;
   discovery?: VoteLedgerDiscovery;
-}
-
-// ============================================================================
-// Output building (retained for unit tests)
-// ============================================================================
-
-/**
- * Build output vote records with state-filtered members.
- *
- * @param details - Parsed vote details
- * @param summaries - Vote summaries (for fallback title/result)
- * @param targetState - State code to filter members
- * @returns Output votes and total state member vote count
- */
-function buildOutputVotes(
-  details: VoteDetails[],
-  summaries: VoteSummary[],
-  targetState: string,
-  billDetailsByKey: Map<string, BillRef> = new Map()
-): { outputVotes: OutputVote[]; stateMemberVotes: number } {
-  const summaryMap = new Map(summaries.map((s) => [s.vote_number, s]));
-  const outputVotes: OutputVote[] = [];
-  let stateMemberVotes = 0;
-
-  for (const detail of details) {
-    // Filter members to target state
-    const stateMembers = filterMembersByState(
-      detail.member_votes,
-      targetState
-    );
-
-    // Skip votes with no members from target state
-    if (stateMembers.length === 0) {
-      continue;
-    }
-
-    stateMemberVotes += stateMembers.length;
-
-    // Get summary for fallbacks
-    const summary = summaryMap.get(detail.vote_number);
-
-    // Build output members
-    const outputMembers: OutputMember[] = stateMembers.map((m) => ({
-      name: m.member_full,
-      state: m.state,
-      party: m.party,
-      vote_cast: m.vote_cast,
-    }));
-
-    // Build output counts (convert not_voting to absent per spec)
-    const outputCounts: OutputCounts = {
-      yeas: detail.counts.yeas,
-      nays: detail.counts.nays,
-      present: detail.counts.present,
-      absent: detail.counts.not_voting,
-    };
-
-    // Build output vote
-    const outputVote: OutputVote = {
-      vote_number: detail.vote_number,
-      title: detail.vote_title || summary?.title || "Unknown Vote",
-      question: detail.vote_question || "",
-      result: detail.vote_result || summary?.result || "",
-      counts: outputCounts,
-      members: outputMembers,
-    };
-
-    // Add issue if we can extract it from the title/question
-    const issue = extractIssue(detail);
-    if (issue) {
-      outputVote.issue = issue;
-      const issueRef = parseIssueRef(issue, detail.congress);
-      outputVote.issue_type = issueRef.issue_type;
-      if (issueRef.bill) {
-        const billKey = buildBillKey(issueRef.bill);
-        const billDetails = billDetailsByKey.get(billKey);
-        outputVote.bill = billDetails
-          ? { ...issueRef.bill, ...billDetails }
-          : issueRef.bill;
-      }
-    }
-
-    outputVotes.push(outputVote);
-  }
-
-  // Sort by vote number
-  outputVotes.sort((a, b) => a.vote_number - b.vote_number);
-
-  return { outputVotes, stateMemberVotes };
 }
 
 /**
@@ -238,19 +144,6 @@ function parseIssueRef(issue: string, congress: number): {
   }
 
   return { issue_type: "other" };
-}
-
-function collectBillRefs(details: VoteDetails[]): BillRef[] {
-  const refs: BillRef[] = [];
-  for (const detail of details) {
-    const issue = extractIssue(detail);
-    if (!issue) continue;
-    const parsed = parseIssueRef(issue, detail.congress);
-    if (parsed.bill) {
-      refs.push(parsed.bill);
-    }
-  }
-  return refs;
 }
 
 // ============================================================================
@@ -569,4 +462,4 @@ export async function buildVoteLedgerUpdate(
 // Exports for Testing
 // ============================================================================
 
-export { buildOutputVotes, extractIssue, parseIssueRef };
+export { extractIssue, parseIssueRef };

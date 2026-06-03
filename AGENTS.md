@@ -1,8 +1,7 @@
 # Congress Tracker
 
-Cloudflare-native Senate vote intelligence app with three runtime surfaces:
-- `workers/senate_data_worker/wrangler.toml` — API worker
-- `workers/senate_data_worker/wrangler.pipeline.toml` — pipeline worker
+Cloudflare-native Senate vote intelligence app with two runtime surfaces:
+- `workers/senate_data_worker/wrangler.toml` — unified worker (API + pipeline + cron + queue)
 - `web/` — Vite + React frontend
 
 ## Commands
@@ -12,21 +11,20 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Web deps: `npm --prefix web install`
 
 ### Local setup
-- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or run `./scripts/cursor-cloud-setup.sh` (copies the example when missing). The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the API worker at `:8787`; `harness:ci`, `./scripts/dev-all.sh`, and `harness:browser` all read `.dev.vars` for CORS. Use a specific origin in production deploy secrets, not in the committed example.
+- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or run `./scripts/cursor-cloud-setup.sh` (copies the example when missing). The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`; `harness:ci`, `./scripts/dev-all.sh`, and `harness:browser` all read `.dev.vars` for CORS. Use a specific origin in production deploy secrets, not in the committed example.
 - `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** against Congress.gov/GovInfo; placeholder values from the example file are enough for harness runs, `./scripts/dev-all.sh` with fixture data, and fixture UI mode.
 - Optional local synthesis settings: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_APP_REFERER`, `OPENROUTER_APP_TITLE`, `OPENROUTER_SHADOW_MODE`, `OPENROUTER_CANARY_PERCENT`, `OPENROUTER_MAX_NEW_ANALYSES`.
 - Deterministic harness runs do not require live upstream secrets; they boot workers with `HARNESS_MODE=fixture`, `HARNESS_FIXTURE_SET=canonical`, and a fixed `HARNESS_NOW`.
-- Local D1 bindings are already configured in both Wrangler configs; do not change remote resource IDs just to make local development work.
+- Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
 
 ### Local development
-- Full stack: `./scripts/dev-all.sh`
-- API worker only: `npm --prefix workers/senate_data_worker run dev:api`
-- Pipeline worker only: `npm --prefix workers/senate_data_worker run dev:pipeline`
+- Full stack: `./scripts/dev-all.sh` (or `npm run dev` from the repo root)
+- Worker only: `npm --prefix workers/senate_data_worker run dev`
 - Web only: `npm --prefix web run dev`
-- Web only with fixture briefing (no workers): `VITE_FORCE_E2E=1 npm --prefix web run dev`
+- Web only with fixture briefing (no worker): `VITE_FORCE_E2E=1 npm --prefix web run dev`
 
 ### Data refresh
-- Trigger local ingestion: `curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion`
+- Trigger local ingestion: `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion`
 - Trigger deployed ingestion (requires `.env.remote` with `DEPLOYED_PIPELINE_URL` and `PIPELINE_ADMIN_TOKEN`): `npm run refresh:remote`
 - Seed historical backfill: `./scripts/backfill-history.sh`
 
@@ -45,8 +43,8 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 - Build-time toggle: set `VITE_FORCE_E2E=1` when running `npm --prefix web run build` so fixture mode is baked into the bundle without a URL param.
 - Shared detection lives in `web/src/utils/e2eMode.ts` (`isE2eMode()`).
 - Cloudflare Pages preview deploys use `.github/workflows/cloudflare-pages-preview.yml`, which builds with `VITE_FORCE_E2E=1`, deploys via `web/wrangler.toml` (`congress-tracker-dev`), and posts/updates a sticky PR comment with the branch preview URL (requires `CLOUDFLARE_API_TOKEN` in repo secrets).
-- Preview API worker config for fixture-backed deploys: `workers/senate_data_worker/wrangler.dev.toml`.
-- This fixture path is for frontend review and preview smoke checks only. CI truth for end-to-end behavior remains `npm run harness:ci`, which exercises the local API worker and deterministic harness fixtures.
+- Preview worker config for fixture-backed deploys: `workers/senate_data_worker/wrangler.dev.toml`.
+- This fixture path is for frontend review and preview smoke checks only. CI truth for end-to-end behavior remains `npm run harness:ci`, which exercises the local worker and deterministic harness fixtures.
 
 ## Key Rules
 - Prefer the commands above over guessing root-level npm scripts.
@@ -66,29 +64,32 @@ Cloudflare-native Senate vote intelligence app with three runtime surfaces:
 ## Freshness And Debugging
 - Deterministic harness artifacts, including Playwright failure assets, land in `target/harness/`.
 - The canonical harness fixture corpus lives behind `HARNESS_FIXTURE_SET=canonical`; refresh it with `npm --prefix workers/senate_data_worker run fixtures:harness:refresh` when intentionally re-basing the deterministic story.
-- Worker health endpoints: `http://127.0.0.1:8787/health` and `http://127.0.0.1:8788/health`.
-- Pipeline status endpoint: `http://127.0.0.1:8788/__pipeline/status`.
-- Local ingestion trigger: `curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion`.
-- Useful direct pipeline routes: `http://127.0.0.1:8788/__pipeline/run/ingestion`, `http://127.0.0.1:8788/__pipeline/run/materialize`, and `http://127.0.0.1:8788/cdn-cgi/handler/scheduled`.
+- Worker health endpoint: `http://127.0.0.1:8787/health`.
+- Pipeline status endpoint: `http://127.0.0.1:8787/__pipeline/status`.
+- Local ingestion trigger: `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion`.
+- Useful direct pipeline routes: `http://127.0.0.1:8787/__pipeline/run/ingestion`, `http://127.0.0.1:8787/__pipeline/run/materialize`, and `http://127.0.0.1:8787/cdn-cgi/handler/scheduled`.
 - Latest homepage feed source: `http://127.0.0.1:8787/briefings/latest.json`.
-- Scheduled workers are not triggered automatically in local development; do not assume cron has run.
+- Scheduled (cron) ingestion is not triggered automatically in local development; do not assume cron has run.
 - If the homepage looks stale, verify pipeline status first, then trigger ingestion/materialization, then re-check `/briefings/latest.json` before changing ranking or frontend code.
 
 ## Project Structure
+- `workers/senate_data_worker/src/worker.ts` — single Worker entry: `fetch` + `scheduled` + `queue` handlers
 - `workers/senate_data_worker/src/ingest.ts` — vote ingestion and target-date selection
-- `workers/senate_data_worker/src/index.ts` — pipeline orchestration, scheduled handler, queue processing
-- `workers/senate_data_worker/src/http.ts` — API endpoints
+- `workers/senate_data_worker/src/scheduled-ingestion.ts` — pipeline orchestration and scheduled handler
+- `workers/senate_data_worker/src/pipeline-jobs.ts` — queue processing
+- `workers/senate_data_worker/src/http.ts` — public read API endpoints
+- `workers/senate_data_worker/src/pipeline-routes.ts` — HTTP router (public reads + `/__pipeline/*` admin)
 - `workers/senate_data_worker/src/read-model.ts` — briefing/detail materialization
 - `workers/senate_data_worker/src/d1/` — D1 schema, `kv_documents` JSON store (`documents.ts`), and repository modules
 - `web/src/` — frontend app and API client
 
 ## Notes
 - Storage is D1-only: normalized tables plus `kv_documents` for pipeline JSON (ledger, activities, bill evidence, caches).
-- The API worker exposes only `/briefings/latest.json`, `/votes/:c/:s/:n.json`, `/health`, and `/health/data`.
+- The public API exposes only `/briefings/latest.json`, `/votes/:c/:s/:n.json`, `/health`, and `/health/data`; `/__pipeline/*` admin routes are token-gated on deploy.
 - The latest homepage feed is served from `/briefings/latest.json`.
-- The pipeline worker is responsible for ingestion/materialization; scheduled workers are not triggered automatically in local dev.
-- Local stack ports from the repo scripts: API `http://127.0.0.1:8787`, Pipeline `http://127.0.0.1:8788`, Web `http://127.0.0.1:5173`.
-- `web/src/e2eData.ts` supplies fake briefing and vote detail data for fixture review mode (`/?e2e=1` or `VITE_FORCE_E2E=1`). The deterministic harness exercises the live local API worker instead.
+- One unified worker handles ingestion/materialization and serving; scheduled (cron) ingestion is not triggered automatically in local dev.
+- Local stack ports from the repo scripts: Worker `http://127.0.0.1:8787`, Web `http://127.0.0.1:5173`.
+- `web/src/e2eData.ts` supplies fake briefing and vote detail data for fixture review mode (`/?e2e=1` or `VITE_FORCE_E2E=1`). The deterministic harness exercises the live local worker instead.
 
 ## Cursor Cloud
 

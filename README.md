@@ -4,10 +4,9 @@
 
 ## Developer Quick Start
 
-### Runtime split (important)
+### Runtime surfaces
 
-- API worker (`workers/senate_data_worker/wrangler.toml`): serves read-only endpoints for the frontend (for example `/briefings/latest.json`).
-- Pipeline worker (`workers/senate_data_worker/wrangler.pipeline.toml`): runs ingestion/materialization to fetch upstream data and refresh D1 (normalized tables + `kv_documents` JSON) used by the API worker.
+- Worker (`workers/senate_data_worker/wrangler.toml`): a single Cloudflare Worker that serves the read-only API (for example `/briefings/latest.json`), exposes the `/__pipeline/*` admin routes, consumes queue jobs, and runs cron-driven ingestion/materialization that refreshes D1 (normalized tables + `kv_documents` JSON).
 - Web app (`web/`): Vite + React frontend.
 
 ### Run locally (exact commands)
@@ -24,12 +23,10 @@ For one-time local setup (`npm install`, `.dev.vars`), see the `Development` sec
 
 ## Architecture
 
-The project now has three runtime surfaces:
+The project has two runtime surfaces:
 
 - `workers/senate_data_worker/wrangler.toml`
-  API Worker. Read-only HTTP endpoints for the web app.
-- `workers/senate_data_worker/wrangler.pipeline.toml`
-  Pipeline Worker. Cron-driven ingestion, queue consumption, normalization, and read-model materialization.
+  Unified Worker. Read-only HTTP endpoints for the web app, plus cron-driven ingestion, queue consumption, normalization, read-model materialization, and `/__pipeline/*` admin routes.
 - `web/`
   Vite + React frontend for the ranked homepage and vote detail pages.
 
@@ -47,17 +44,14 @@ Official Sources
   Senate floor logs
         |
         v
-Pipeline Worker
-  cron -> fetch -> normalize -> enrich -> materialize
+Unified Worker
+  pipeline: cron -> fetch -> normalize -> enrich -> materialize
+        |   +--> D1 (tables + kv_documents)
+        |   +--> Queue jobs (when configured)
         |
-        +--> D1 (tables + kv_documents)
-        +--> Queue jobs (when configured)
-                |
-                v
-API Worker
-  GET /briefings/latest.json
-  GET /votes/:congress/:session/:voteNumber.json
-  GET /health, GET /health/data
+  api:  GET /briefings/latest.json
+        GET /votes/:congress/:session/:voteNumber.json
+        GET /health, GET /health/data
         |
         v
 Web App
@@ -102,15 +96,12 @@ congress-tracker/
 │       ├── migrations/
 │       ├── scripts/
 │       ├── src/
-│       │   ├── api-index.ts
-│       │   ├── pipeline-index.ts
+│       │   ├── worker.ts
 │       │   ├── http.ts
 │       │   ├── d1/
 │       │   ├── worker-env.ts
-│       │   ├── read-model.ts
-│       │   └── index.ts
-│       ├── wrangler.toml
-│       └── wrangler.pipeline.toml
+│       │   └── read-model.ts
+│       └── wrangler.toml
 └── scripts/
 ```
 
@@ -118,7 +109,7 @@ congress-tracker/
 
 ### Required resources
 
-Create the following resources before deploying the split architecture:
+Create the following resources before deploying:
 
 1. `D1` database for normalized tables, `kv_documents`, and materialized briefing/vote payloads.
 2. `Queue` for pipeline jobs (optional until you enable queue producers/consumers).
@@ -132,16 +123,14 @@ npx wrangler d1 create senate-platform
 npx wrangler queues create senate-platform-jobs
 ```
 
-After creation, update both Wrangler configs:
+After creation, update the Wrangler config:
 
 - `workers/senate_data_worker/wrangler.toml`
-- `workers/senate_data_worker/wrangler.pipeline.toml`
 
 Uncomment and fill in:
 
 - `[[d1_databases]]`
-- `[[queues.producers]]`
-- `[[queues.consumers]]` in the pipeline config
+- `[[queues.producers]]` and `[[queues.consumers]]` (the unified worker is both)
 
 ### Runtime variables and secrets
 
@@ -168,7 +157,7 @@ Optional secret/runtime values:
 - `OPENROUTER_APP_REFERER`
 - `OPENROUTER_APP_TITLE`
 
-Deterministic harness runs do not require live upstream secrets. They start both workers with:
+Deterministic harness runs do not require live upstream secrets. They start the worker with:
 
 - `HARNESS_MODE=fixture`
 - `HARNESS_FIXTURE_SET=canonical`
@@ -249,35 +238,33 @@ npm --prefix web install
 
 This starts:
 
-- API Worker at `http://127.0.0.1:8787`
-- Pipeline Worker at `http://127.0.0.1:8788`
+- Unified Worker at `http://127.0.0.1:8787`
 - Web app at `http://127.0.0.1:5173`
 
-The repo now ships with a local `D1` binding enabled in both Wrangler configs so queue, evidence, and read-model code can run end to end during local development without provisioning a remote database first.
+The repo ships with a local `D1` binding enabled in the Wrangler config so queue, evidence, and read-model code can run end to end during local development without provisioning a remote database first.
 
-Scheduled workers are not triggered automatically in local development.
+Scheduled (cron) ingestion is not triggered automatically in local development.
 
 You can also run them individually:
 
 ```bash
-npm --prefix workers/senate_data_worker run dev:api
-npm --prefix workers/senate_data_worker run dev:pipeline
+npm --prefix workers/senate_data_worker run dev
 npm --prefix web run dev
 ```
 
 ### Trigger pipeline ingestion locally
 
 ```bash
-curl -fsS http://127.0.0.1:8788/__pipeline/run/ingestion
+curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion
 ```
 
-This targets the local Pipeline Worker and triggers the same backend-owned ingestion path used by cron. The worker checks D1 ingestion state first, then fetches only missing vote details.
+This targets the local worker and triggers the same backend-owned ingestion path used by cron. The worker checks D1 ingestion state first, then fetches only missing vote details.
 
 Typical local startup flow:
 
 1. Start the stack with `./scripts/dev-all.sh`.
 2. In a second terminal, trigger `/__pipeline/run/ingestion` if you need fresh data immediately.
-3. Verify freshness with `http://127.0.0.1:8788/__pipeline/status` and `http://127.0.0.1:8787/briefings/latest.json`.
+3. Verify freshness with `http://127.0.0.1:8787/__pipeline/status` and `http://127.0.0.1:8787/briefings/latest.json`.
 4. Open `http://127.0.0.1:5173`.
 
 ### Run the deterministic harness locally
@@ -286,7 +273,7 @@ Typical local startup flow:
 npm run harness:ci
 ```
 
-This boots the API worker, pipeline worker, and web app with isolated local Wrangler state, runs scheduled ingestion against the checked-in fixture corpus, verifies the materialized API outputs, and then runs Playwright against the live local app.
+This boots the unified worker and web app with isolated local Wrangler state, runs scheduled ingestion against the checked-in fixture corpus, verifies the materialized API outputs, and then runs Playwright against the live local app.
 
 Useful harness subcommands:
 
@@ -309,17 +296,17 @@ Useful environment overrides:
 - `END_CONGRESS=116`
 - `SESSION_FILTER=all`
 
-The local pipeline also exposes admin endpoints for debugging:
+The local worker also exposes admin endpoints for debugging:
 
 - `GET /__pipeline/status`
 - `GET` or `POST /__pipeline/run/ingestion`
 - `GET` or `POST /__pipeline/run/materialize`
 - `GET /__pipeline/run/historical-backfill?congress=116`
 
-On deployed pipeline workers, `/__pipeline/status` and `/__pipeline/run/*`
+On the deployed worker, `/__pipeline/status` and `/__pipeline/run/*`
 require `Authorization: Bearer $PIPELINE_ADMIN_TOKEN`. Prefer `POST` for
 `/__pipeline/run/*` on production (`npm run refresh:remote` does this).
-Set the secret with Wrangler before exposing the pipeline worker publicly.
+Set the secret with Wrangler before exposing the worker publicly.
 Localhost and deterministic harness runs are allowed without the token for
 development.
 
@@ -373,21 +360,19 @@ The refresh script captures the canonical upstream URLs and writes a generated f
 
 ## Deployment
 
-Deploy the API and pipeline workers independently:
+Deploy the unified worker:
 
 ```bash
 cd workers/senate_data_worker
-npm run deploy:api
-npm run deploy:pipeline
+npm run deploy
 ```
 
 Recommended deployment order:
 
 1. Create D1 (and Queue, if used) resources.
 2. Apply the D1 schema migration.
-3. Deploy the Pipeline Worker.
-4. Deploy the API Worker.
-5. Trigger a pipeline run and verify the read model.
+3. Deploy the worker.
+4. Trigger a pipeline run and verify the read model.
 
 ## HTTP API
 
@@ -401,14 +386,14 @@ Operational endpoints:
 - `GET /health` — worker liveness.
 - `GET /health/data` — briefing freshness from `daily_briefings` (503 when stale or missing).
 
-Pipeline-only admin routes (on the pipeline worker, not the public API worker):
+Pipeline admin routes (token-gated on the deployed worker):
 
 - `GET /__pipeline/status`
 - `GET` or `POST /__pipeline/run/ingestion`
 - `GET` or `POST /__pipeline/run/materialize`
 - `GET` or `POST /__pipeline/run/historical-backfill?congress=…&session=…`
 
-Ledger, activities index, session overview, and bill evidence remain internal `kv_documents` keys written by the pipeline; they are not exposed on the API worker.
+Ledger, activities index, session overview, and bill evidence remain internal `kv_documents` keys written by the pipeline; they are not exposed as public API routes.
 
 ## Frontend
 
@@ -421,6 +406,6 @@ The redesigned frontend is intentionally simpler than the original dashboard:
 
 ## Notes
 
-- The API worker serves materialized briefing and vote-detail JSON from D1 only; missing materialization returns 404 until the pipeline runs.
+- The worker serves materialized briefing and vote-detail JSON from D1 only; missing materialization returns 404 until the pipeline runs.
 - Verbatim Congressional Record floor-quote extraction is not part of the current pipeline; vote pages use bill summaries and tally-derived party summaries when excerpt tables are empty.
 - Filibuster treatment in v1 stays limited to cloture/procedural context rather than a historical leaderboard.

@@ -5,13 +5,13 @@
  *
  * Env:
  *   API_URL / HARNESS_API_URL     — default http://127.0.0.1:8787
- *   PIPELINE_URL / HARNESS_PIPELINE_URL — default http://127.0.0.1:8788
+ *   PIPELINE_URL / HARNESS_PIPELINE_URL — default http://127.0.0.1:8787 (unified worker)
  *   ENSURE_DATA_MAX_WAIT_MS       — max wait after ingest (default 420000)
  *   ENSURE_DATA_POLL_MS           — poll interval (default 2500)
  */
 
 const API = (process.env.API_URL || process.env.HARNESS_API_URL || 'http://127.0.0.1:8787').replace(/\/$/, '')
-const PIPELINE = (process.env.PIPELINE_URL || process.env.HARNESS_PIPELINE_URL || 'http://127.0.0.1:8788').replace(/\/$/, '')
+const PIPELINE = (process.env.PIPELINE_URL || process.env.HARNESS_PIPELINE_URL || 'http://127.0.0.1:8787').replace(/\/$/, '')
 const MAX_WAIT_MS = Math.max(60_000, Number(process.env.ENSURE_DATA_MAX_WAIT_MS || 420_000))
 const POLL_MS = Math.max(500, Number(process.env.ENSURE_DATA_POLL_MS || 2500))
 

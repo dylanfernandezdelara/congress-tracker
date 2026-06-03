@@ -1,23 +1,9 @@
 import { isHarnessFixtureEnv } from "./harness";
-import type { JsonResponseBuilder } from "./pipeline-logging";
+import type { JsonResponseBuilder } from "./http/responses";
 import type { PipelineEnv } from "./pipeline-env";
 
 export const LOCAL_PIPELINE_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 export const TOKEN_ENCODER = new TextEncoder();
-
-export function buildCorsHeaders(env: PipelineEnv): HeadersInit {
-  const allowedOrigin = env.ALLOWED_ORIGIN?.trim();
-  const restrictedOrigin = allowedOrigin && allowedOrigin !== "*" ? allowedOrigin : null;
-  const headers: HeadersInit = {
-    "Access-Control-Allow-Origin": restrictedOrigin ?? "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Pipeline-Admin-Token",
-  };
-  if (restrictedOrigin) {
-    headers["Vary"] = "Origin";
-  }
-  return headers;
-}
 
 export function isLocalRequest(request: Request): boolean {
   return LOCAL_PIPELINE_HOSTS.has(new URL(request.url).hostname);

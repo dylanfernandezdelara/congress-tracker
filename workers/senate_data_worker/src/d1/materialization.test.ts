@@ -120,34 +120,6 @@ describe("read model payloads from D1", () => {
           },
         } as D1PreparedStatement;
       }
-      if (normalized.includes("FROM argument_excerpts")) {
-        return {
-          bind() {
-            return {
-              async run() {
-                return { success: true, meta: { duration: 0 } };
-              },
-              async all<T>() {
-                return { results: [], success: true, meta: { duration: 0 } } as T;
-              },
-            } as D1PreparedStatement;
-          },
-        } as D1PreparedStatement;
-      }
-      if (normalized.includes("FROM party_argument_summaries")) {
-        return {
-          bind() {
-            return {
-              async run() {
-                return { success: true, meta: { duration: 0 } };
-              },
-              async all<T>() {
-                return { results: [], success: true, meta: { duration: 0 } } as T;
-              },
-            } as D1PreparedStatement;
-          },
-        } as D1PreparedStatement;
-      }
       if (normalized.includes("FROM votes")) {
         return {
           bind() {

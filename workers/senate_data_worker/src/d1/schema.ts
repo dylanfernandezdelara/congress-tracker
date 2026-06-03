@@ -88,48 +88,6 @@ CREATE TABLE IF NOT EXISTS importance_scores (
   PRIMARY KEY (congress, session, vote_number)
 );
 
-CREATE TABLE IF NOT EXISTS record_documents (
-  document_id TEXT PRIMARY KEY,
-  source TEXT NOT NULL,
-  title TEXT NOT NULL,
-  document_date TEXT,
-  url TEXT,
-  thread_key TEXT,
-  metadata_json TEXT,
-  updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS argument_excerpts (
-  excerpt_id TEXT PRIMARY KEY,
-  congress INTEGER NOT NULL,
-  session INTEGER NOT NULL,
-  vote_number INTEGER NOT NULL,
-  party TEXT,
-  source_document_id TEXT,
-  source_type TEXT NOT NULL,
-  source_label TEXT NOT NULL,
-  source_url TEXT,
-  excerpt_text TEXT,
-  note TEXT,
-  document_date TEXT,
-  updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS party_argument_summaries (
-  congress INTEGER NOT NULL,
-  session INTEGER NOT NULL,
-  vote_number INTEGER NOT NULL,
-  party TEXT NOT NULL,
-  stance TEXT NOT NULL,
-  summary_text TEXT NOT NULL,
-  confidence TEXT NOT NULL,
-  evidence_json TEXT NOT NULL,
-  excerpt_ids_json TEXT NOT NULL,
-  coverage_note TEXT,
-  updated_at TEXT NOT NULL,
-  PRIMARY KEY (congress, session, vote_number, party)
-);
-
 CREATE TABLE IF NOT EXISTS historical_context (
   congress INTEGER NOT NULL,
   session INTEGER NOT NULL,
@@ -228,11 +186,6 @@ export async function ensurePlatformSchema(db: D1Database): Promise<void> {
   await db
     .prepare(
       "CREATE INDEX IF NOT EXISTS idx_issue_thread_votes_lookup ON issue_thread_votes (congress, session, vote_number, thread_key)"
-    )
-    .run();
-  await db
-    .prepare(
-      "CREATE INDEX IF NOT EXISTS idx_argument_excerpts_vote_lookup ON argument_excerpts (congress, session, vote_number, party)"
     )
     .run();
   await db

@@ -1,7 +1,3 @@
-function normalizeBioguide(bioguideId: string): string {
-  return bioguideId.trim().toUpperCase();
-}
-
 export function buildMembersIndexKey(): string {
   return "members/index.json";
 }
@@ -34,19 +30,10 @@ export function buildBillTrendSnapshotKey(
   return `bills/trends/${congress}/${billKey}/${snapshotDate}.json`;
 }
 
-export function buildLatestBriefingKey(): string {
-  return "briefings/latest.json";
-}
-
 export function buildLatestChamberContextKey(): string {
   return "platform/context/chamber/latest.json";
 }
 
 export function buildChamberContextKey(snapshotDate: string): string {
   return `platform/context/chamber/${snapshotDate}.json`;
-}
-
-/** Per-member activity snapshots (pipeline-internal kv_documents keys). */
-export function buildMemberLatestKey(bioguideId: string): string {
-  return `member/${normalizeBioguide(bioguideId)}/latest.json`;
 }

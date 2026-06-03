@@ -1,6 +1,11 @@
 name = "senate-data-api-worker"
-main = "src/api-index.ts"
+main = "src/worker.ts"
 compatibility_date = "2025-12-10"
+
+# Single unified worker: serves the public read API, the /__pipeline/* admin
+# routes, the queue consumer, and the scheduled (cron) ingestion below.
+[triggers]
+crons = ["0 10 * * *"]
 
 [limits]
 cpu_ms = 300000
@@ -14,6 +19,8 @@ TARGET_STATE = "ALL"
 # Optional: OpenRouter attribution headers.
 # OPENROUTER_APP_REFERER = "https://your-site.example"
 # OPENROUTER_APP_TITLE = "congress_tracker_worker"
+# Required before exposing manual pipeline routes on a public deployment:
+#   wrangler secret put PIPELINE_ADMIN_TOKEN --config wrangler.toml
 
 [[d1_databases]]
 binding = "SENATE_DB"
@@ -21,7 +28,10 @@ database_name = "senate-platform-local"
 database_id = "00000000-0000-0000-0000-000000000000"
 preview_database_id = "00000000-0000-0000-0000-000000000000"
 
-# Optional when the queue is created:
+# Optional when the queue is created (this worker is both producer and consumer):
 # [[queues.producers]]
 # binding = "PIPELINE_QUEUE"
+# queue = "senate-platform-jobs"
+#
+# [[queues.consumers]]
 # queue = "senate-platform-jobs"

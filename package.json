@@ -1,6 +1,12 @@
 {
   "name": "congress-tracker",
   "scripts": {
+    "dev": "./scripts/dev-all.sh",
+    "test": "npm --prefix workers/senate_data_worker test && npm --prefix web test",
+    "check": "npm --prefix workers/senate_data_worker run check && npm --prefix web exec -- tsc --noEmit",
+    "build": "npm --prefix web run build",
+    "verify": "npm run harness:ci",
+    "deploy": "npm --prefix workers/senate_data_worker run deploy",
     "refresh:remote": "./scripts/refresh-remote.sh",
     "harness:assert": "node ./scripts/harness-assert.mjs",
     "harness:browser": "npm --prefix web exec -- playwright test --config ./web/playwright.harness.config.ts",

@@ -8,12 +8,6 @@ export async function readPipelineStatus(db: D1Database) {
         "SELECT COUNT(*) AS total_votes, MIN(vote_date) AS earliest_vote_date, MAX(vote_date) AS latest_vote_date FROM votes"
       )
       .first<Record<string, unknown>>()) ?? null;
-  const excerptStats =
-    (await db
-      .prepare(
-        "SELECT COUNT(*) AS excerpt_count, COUNT(DISTINCT vote_number) AS votes_with_excerpts FROM argument_excerpts"
-      )
-      .first<Record<string, unknown>>()) ?? null;
   const checkpointStats = await db
     .prepare(
       "SELECT checkpoint_key, cursor_json, updated_at FROM pipeline_checkpoints ORDER BY checkpoint_key"
@@ -22,7 +16,6 @@ export async function readPipelineStatus(db: D1Database) {
 
   return {
     votes: voteStats,
-    excerpts: excerptStats,
     checkpoints: checkpointStats.results ?? [],
   };
 }

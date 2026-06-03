@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG_PATH="${CONFIG_PATH:-wrangler.pipeline.toml}"
-PORT="${PORT:-8788}"
+CONFIG_PATH="${CONFIG_PATH:-wrangler.toml}"
+PORT="${PORT:-8787}"
 INSPECTOR_PORT="${INSPECTOR_PORT:-9231}"
 HOST="${HOST:-127.0.0.1}"
 LOG_PATH="${LOG_PATH:-/tmp/wrangler-test-scheduled.log}"
@@ -37,7 +37,7 @@ ensure_available_port() {
   exit 1
 }
 
-PORT="$(ensure_available_port "${PORT}" "8788" "PORT" "HTTP port" 8798 8898 8988)"
+PORT="$(ensure_available_port "${PORT}" "8787" "PORT" "HTTP port" 8797 8897 8987)"
 INSPECTOR_PORT="$(ensure_available_port "${INSPECTOR_PORT}" "9231" "INSPECTOR_PORT" "Inspector port" 9241 9251 9261)"
 WORKER_URL="${WORKER_URL:-http://${HOST}:${PORT}}"
 

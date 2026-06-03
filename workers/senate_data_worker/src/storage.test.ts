@@ -4,9 +4,7 @@ import {
   buildBillEvidenceKey,
   buildBillNarrativeKey,
   buildBillTrendSnapshotKey,
-  buildLatestBriefingKey,
   buildLatestChamberContextKey,
-  buildMemberLatestKey,
   buildMembersIndexKey,
   buildSessionOverviewKey,
   buildVoteLedgerKey,
@@ -18,9 +16,7 @@ describe("kv_documents key layout helpers", () => {
     expect(buildActivitiesIndexKey()).toBe("activities/index.json");
     expect(buildVoteLedgerKey()).toBe("votes/ledger.json");
     expect(buildSessionOverviewKey()).toBe("stats/overview.json");
-    expect(buildLatestBriefingKey()).toBe("briefings/latest.json");
     expect(buildLatestChamberContextKey()).toBe("platform/context/chamber/latest.json");
-    expect(buildMemberLatestKey("a000360")).toBe("member/A000360/latest.json");
   });
 
   it("builds bill evidence and trend keys", () => {

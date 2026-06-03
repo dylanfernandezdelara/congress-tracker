@@ -4,11 +4,12 @@ import path from 'node:path'
 const rootDir = path.resolve(new URL('..', import.meta.url).pathname)
 const assertDir = process.env.HARNESS_ASSERT_DIR ?? path.join(rootDir, 'target', 'harness', 'assertions')
 const apiUrl = process.env.HARNESS_API_URL ?? 'http://127.0.0.1:8787'
-const pipelineUrl = process.env.HARNESS_PIPELINE_URL ?? 'http://127.0.0.1:8788'
+const pipelineUrl = process.env.HARNESS_PIPELINE_URL ?? 'http://127.0.0.1:8787'
 const expectedVoteId = process.env.HARNESS_EXPECTED_VOTE_ID ?? '119:2:14'
 const expectedVoteNumber = process.env.HARNESS_EXPECTED_VOTE_NUMBER ?? '14'
 const expectedVoteTitle = process.env.HARNESS_EXPECTED_VOTE_TITLE ?? 'Border Infrastructure Modernization Act'
-/** When "1", skip GET pipeline /__pipeline/status (used after sequential harness ingest stops the pipeline worker). */
+/** When "1", skip GET /__pipeline/status. The unified worker stays up for the whole
+ * harness run, so this is no longer set by harness:ci; retained as a manual escape hatch. */
 const skipPipelineStatus = process.env.HARNESS_ASSERT_SKIP_PIPELINE_STATUS === '1'
 
 async function fetchJson(url) {

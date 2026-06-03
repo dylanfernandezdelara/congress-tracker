@@ -1,13 +1,9 @@
 import { buildBillKey } from "../congress";
 import type { ActivityIndexJson, BillRef, SessionOverview, VoteLedger } from "../types";
 import type {
-  ArgumentExcerpt,
-  BriefingFeedItem,
   BriefingFeedResponse,
   HistoricalVoteReference,
-  PartyArgumentSummary,
   PipelineMaterialization,
-  SourceCoverage,
   VoteDetailResponse,
 } from "../platform-types";
 import { buildIssueKey, buildThreadKey } from "../domain/issue-keys";
@@ -57,27 +53,6 @@ function extractHistoricalIssueKey(detail: VoteDetails): string {
     member_votes: {},
   };
   return buildIssueKey(entryLike, undefined) || threadKey;
-}
-
-function mergeCoverage(
-  coverage: SourceCoverage,
-  hasRecordData: boolean,
-  hasFloorLogs: boolean
-): SourceCoverage {
-  const level: SourceCoverage["level"] =
-    coverage.bill_context && (hasRecordData || hasFloorLogs)
-      ? "full"
-      : coverage.level;
-  return {
-    ...coverage,
-    level,
-    congressional_record: coverage.congressional_record || hasRecordData,
-    floor_logs: coverage.floor_logs || hasFloorLogs,
-    note:
-      hasRecordData || hasFloorLogs
-        ? undefined
-        : coverage.note,
-  };
 }
 
 function isEarlierVote(
@@ -415,109 +390,6 @@ export async function writeHistoricalVoteBatchToD1(
   }
 }
 
-async function readVoteSourceCoverage(
-  db: D1Database,
-  item: Pick<BriefingFeedItem, "congress" | "session" | "vote_number" | "source_coverage">
-): Promise<SourceCoverage> {
-  const result = await db
-    .prepare(
-      `SELECT source_type, COUNT(*) AS total
-      FROM argument_excerpts
-      WHERE congress = ? AND session = ? AND vote_number = ?
-      GROUP BY source_type`
-    )
-    .bind(item.congress, item.session, item.vote_number)
-    .all<Record<string, unknown>>();
-
-  let hasRecordData = false;
-  let hasFloorLogs = false;
-  for (const row of result.results ?? []) {
-    const sourceType = String(row.source_type ?? "");
-    if (sourceType === "congress_record") hasRecordData = true;
-    if (sourceType === "floor_log") hasFloorLogs = true;
-  }
-  return mergeCoverage(item.source_coverage, hasRecordData, hasFloorLogs);
-}
-
-async function readOfficialArgumentsForVote(
-  db: D1Database,
-  detail: VoteDetailResponse
-): Promise<VoteDetailResponse["arguments"] | null> {
-  const [summaryResult, excerptResult] = await Promise.all([
-    db
-      .prepare(
-        `SELECT party, stance, summary_text, confidence, evidence_json, excerpt_ids_json, coverage_note
-        FROM party_argument_summaries
-        WHERE congress = ? AND session = ? AND vote_number = ?`
-      )
-      .bind(detail.vote.congress, detail.vote.session, detail.vote.vote_number)
-      .all<Record<string, unknown>>(),
-    db
-      .prepare(
-        `SELECT excerpt_id, party, source_type, source_label, source_url, excerpt_text, note, document_date
-        FROM argument_excerpts
-        WHERE congress = ? AND session = ? AND vote_number = ?
-        ORDER BY COALESCE(document_date, '') DESC, excerpt_id`
-      )
-      .bind(detail.vote.congress, detail.vote.session, detail.vote.vote_number)
-      .all<Record<string, unknown>>(),
-  ]);
-
-  if ((summaryResult.results?.length ?? 0) === 0 && (excerptResult.results?.length ?? 0) === 0) {
-    return null;
-  }
-
-  const summariesByParty = new Map<string, PartyArgumentSummary>();
-  for (const row of summaryResult.results ?? []) {
-    summariesByParty.set(String(row.party), {
-      party: String(row.party),
-      stance: String(row.stance) as PartyArgumentSummary["stance"],
-      summary: String(row.summary_text),
-      confidence: String(row.confidence) as PartyArgumentSummary["confidence"],
-      evidence_points: JSON.parse(String(row.evidence_json)) as string[],
-      excerpt_ids: JSON.parse(String(row.excerpt_ids_json)) as string[],
-      coverage_note: row.coverage_note ? String(row.coverage_note) : undefined,
-    });
-  }
-
-  const excerpts: ArgumentExcerpt[] = (excerptResult.results ?? []).map((row) => ({
-    id: String(row.excerpt_id),
-    party: row.party ? String(row.party) : undefined,
-    source_type: String(row.source_type) as ArgumentExcerpt["source_type"],
-    source_label: String(row.source_label),
-    source_url: row.source_url ? String(row.source_url) : undefined,
-    quote: row.excerpt_text ? String(row.excerpt_text) : undefined,
-    note: row.note ? String(row.note) : undefined,
-    date: row.document_date ? String(row.document_date) : undefined,
-  }));
-
-  const parties = detail.party_breakdown.map((partyBreakdown) => {
-    return (
-      summariesByParty.get(partyBreakdown.party) ?? {
-        party: partyBreakdown.party,
-        stance: "mixed" as const,
-        summary:
-          "Insufficient sourced evidence in the current official-record window to summarize a party-specific rationale.",
-        confidence: "low" as const,
-        evidence_points: [],
-        excerpt_ids: [],
-        coverage_note: "No linked official excerpts were captured for this party in the current evidence window.",
-      }
-    );
-  });
-
-  const partiesWithEvidence = parties.filter((party) => party.excerpt_ids.length > 0).length;
-  return {
-    available: excerpts.length > 0 || partiesWithEvidence > 0,
-    coverage_note:
-      partiesWithEvidence === parties.length
-        ? "Argument summaries are grounded in linked official excerpts."
-        : "Official excerpts are available for part of the chamber; parties without linked evidence are marked explicitly.",
-    parties,
-    excerpts,
-  };
-}
-
 async function readHistoricalContextForVote(
   db: D1Database,
   detail: VoteDetailResponse
@@ -606,20 +478,10 @@ export async function readLatestBriefingFromD1(db: D1Database): Promise<Briefing
     .all<Record<string, unknown>>();
   const payload = await readJsonPayload<BriefingFeedResponse>(result);
   if (!payload) return null;
-  const items = await Promise.all(
-    payload.items.map(async (item) => ({
-      ...item,
-      source_coverage: await readVoteSourceCoverage(db, item),
-    }))
-  );
-  return {
-    ...payload,
-    source: "d1",
-    items,
-    coverage_note: items.some((item) => item.source_coverage.level !== "full")
-      ? "Some votes currently have full vote data but partial contextual or excerpt coverage."
-      : undefined,
-  };
+  // The materialized payload (built by buildBriefingFeedResponse) already carries
+  // each item's source_coverage and the aggregate coverage_note, so it is the
+  // single source of truth on read.
+  return { ...payload, source: "d1" };
 }
 
 export async function readVoteDetailFromD1(
@@ -636,21 +498,9 @@ export async function readVoteDetailFromD1(
     .all<Record<string, unknown>>();
   const payload = await readJsonPayload<VoteDetailResponse>(result);
   if (!payload) return null;
-  const [argumentsOverride, history, coverage] = await Promise.all([
-    readOfficialArgumentsForVote(db, payload),
-    readHistoricalContextForVote(db, payload),
-    readVoteSourceCoverage(db, {
-      congress: payload.vote.congress,
-      session: payload.vote.session,
-      vote_number: payload.vote.vote_number,
-      source_coverage: payload.source_coverage,
-    }),
-  ]);
-  return {
-    ...payload,
-    source: "d1",
-    arguments: argumentsOverride ?? payload.arguments,
-    history,
-    source_coverage: coverage,
-  };
+  // arguments and source_coverage come straight from the materialized payload.
+  // Only history is recomputed, since it aggregates cross-session votes that
+  // historical backfill populates in the `votes` table after materialization.
+  const history = await readHistoricalContextForVote(db, payload);
+  return { ...payload, source: "d1", history };
 }
