@@ -1,0 +1,28 @@
+---
+description: Default to worker replay fixtures for local UI work and screenshots unless the user requests live ingestion.
+alwaysApply: true
+---
+
+# Replay mock data (default)
+
+For frontend/UI work, local dev, and screenshots, use **worker replay fixtures** — not live Congress.gov / GovInfo.
+
+## Required local worker env (`workers/senate_data_worker/.dev.vars`)
+
+- `DATA_SOURCE=replay`
+- `REPLAY_FIXTURE_SET=canonical`
+- `CLOCK=2026-01-20T15:00:00Z`
+
+`./scripts/cursor-cloud-setup.sh` runs `scripts/ensure-replay-dev-vars.sh` to apply these on every agent VM bootstrap (unless `DATA_SOURCE=live` is set explicitly).
+
+## Standard UI stack
+
+1. `npm run dev:worker`
+2. `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`
+3. `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` when the briefing feed is empty
+
+There is no separate frontend mock JSON; the web app calls the real API backed by fixtures in `workers/senate_data_worker/src/harness-fixtures.ts`.
+
+## When to use live data
+
+Only when the user explicitly asks for live ingestion, production API keys, or real upstream freshness checks. Then set `DATA_SOURCE=live` in `.dev.vars` and provide real `CONGRESS_API_KEY` / `GOVINFO_API_KEY`.

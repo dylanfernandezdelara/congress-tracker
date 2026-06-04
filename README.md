@@ -196,6 +196,8 @@ Or set up manually:
 
 ```bash
 cp workers/senate_data_worker/.dev.vars.example workers/senate_data_worker/.dev.vars
+# or re-apply replay defaults on an existing file:
+./scripts/ensure-replay-dev-vars.sh
 npm --prefix workers/senate_data_worker install
 npm --prefix web install
 npm --prefix web exec -- playwright install --with-deps chromium

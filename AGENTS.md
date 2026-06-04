@@ -7,11 +7,11 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 ## Commands
 
 ### Install and setup
-- Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing).
+- Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, ensures `workers/senate_data_worker/.dev.vars` uses replay fixtures via `scripts/ensure-replay-dev-vars.sh`).
 - Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test` and `npm run snapshot`).
 
 ### Local setup
-- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example defaults to replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) and sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
+- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh` / `./scripts/ensure-replay-dev-vars.sh`. Local defaults are replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, `CLOCK=2026-01-20T15:00:00Z`) with `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Setup re-applies replay keys on every Cursor Cloud bootstrap unless `.dev.vars` sets `DATA_SOURCE=live`. Use a specific origin in production deploy secrets, not in the committed example.
 - `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live` (or remove `DATA_SOURCE=replay`).
 - Deterministic test runs boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
 - Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
@@ -88,7 +88,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 
 Solo-contributor workflow: push fixes directly to `main` (no PRs or `cursor/*` branches) unless the user asks otherwise.
 
-Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh`. Start `npm run dev:worker` and `npm run dev:web` in separate terminals when you need the local stack.
+Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh`, which enables replay mock data in `.dev.vars` unless live mode was set explicitly. **Default to replay for all UI work and screenshots**; switch to live only when the user asks. Start `npm run dev:worker` and `npm run dev:web` in separate terminals when you need the local stack.
 
 - End-to-end check: `npm test`.
 - Store real `CONGRESS_API_KEY` / `GOVINFO_API_KEY` in Cursor **Secrets**, not in committed files, when testing live ingestion.
