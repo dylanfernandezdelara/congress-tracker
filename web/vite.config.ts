@@ -11,7 +11,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@contract': path.join(repoRoot, '../workers/senate_data_worker/src/contract.ts'),
-      '@contract/': path.join(repoRoot, '../workers/senate_data_worker/src/'),
     },
   },
   build: {

@@ -22,8 +22,7 @@
 
     "baseUrl": ".",
     "paths": {
-      "@contract": ["../workers/senate_data_worker/src/contract.ts"],
-      "@contract/*": ["../workers/senate_data_worker/src/*"]
+      "@contract": ["../workers/senate_data_worker/src/contract.ts"]
     }
   },
   "include": ["src"],

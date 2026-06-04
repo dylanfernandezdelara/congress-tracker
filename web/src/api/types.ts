@@ -13,6 +13,7 @@ export type {
   AmountEvidence,
   AnalysisQuality,
   ArgumentExcerpt,
+  ArgumentSourceType,
   BenefitEffect,
   BenefitMapEntry,
   BillAnalysis,
@@ -52,10 +53,13 @@ export type {
   VoteStatus,
 } from '@contract';
 
-import type { ActivityIndexJson, PartyArgumentSummary } from '@contract';
+import type { ActivityIndexJson, PartyArgumentSummary, SourceCoverageLevel } from '@contract';
 
 /** Homepage activity index payload (worker: `ActivityIndexJson`). */
 export type ActivityIndexResponse = ActivityIndexJson;
 
 /** Vote detail party argument row (worker: `PartyArgumentSummary`). */
 export type PartyArgumentSummaryView = PartyArgumentSummary;
+
+/** Source coverage level on briefing/vote payloads (worker: `SourceCoverageLevel`). */
+export type CoverageLevel = SourceCoverageLevel;
