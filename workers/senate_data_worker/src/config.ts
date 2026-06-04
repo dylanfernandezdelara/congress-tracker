@@ -1,11 +1,11 @@
-import { isHarnessFixtureEnv } from "./harness";
+import { isReplayDataSource } from "./harness";
 import type { PipelineJob } from "./platform-types";
 import type { IngestConfig } from "./types";
 
 /**
  * Single environment-binding type for the unified worker (`worker.ts`):
  * D1, public-API vars, ingestion/source keys, synthesis + quality knobs,
- * the optional queue, and the harness fixture switches.
+ * the optional queue, and the HTTP replay fixture switches.
  */
 export interface Env {
   SENATE_DB: D1Database;
@@ -33,9 +33,9 @@ export interface Env {
   QUALITY_MIN_QUOTE_VALIDITY?: string;
   QUALITY_MAX_CONFIDENCE_MISMATCH?: string;
   QUALITY_HARD_GATES?: string;
-  HARNESS_MODE?: string;
-  HARNESS_FIXTURE_SET?: string;
-  HARNESS_NOW?: string;
+  DATA_SOURCE?: string;
+  REPLAY_FIXTURE_SET?: string;
+  CLOCK?: string;
 }
 
 // ============================================================================
@@ -80,7 +80,7 @@ export function computePct(numerator: number, denominator: number): number {
  */
 export function validateEnv(env: Env): IngestConfig {
   const errors: string[] = [];
-  const fixtureMode = isHarnessFixtureEnv(env);
+  const replayMode = isReplayDataSource(env);
 
   if (!env.CONGRESS) {
     errors.push("CONGRESS environment variable is missing");
@@ -106,10 +106,10 @@ export function validateEnv(env: Env): IngestConfig {
     errors.push(`TARGET_STATE must be a 2-letter state code or "ALL", got: "${env.TARGET_STATE}"`);
   }
 
-  if (!env.CONGRESS_API_KEY && !fixtureMode) {
+  if (!env.CONGRESS_API_KEY && !replayMode) {
     errors.push("CONGRESS_API_KEY is missing");
   }
-  if (!env.GOVINFO_API_KEY && !fixtureMode) {
+  if (!env.GOVINFO_API_KEY && !replayMode) {
     errors.push("GOVINFO_API_KEY is missing");
   }
 
@@ -161,7 +161,7 @@ export interface Config {
   targetState: string;
   congressApiKey: string;
   govInfoApiKey: string;
-  fixtureMode: boolean;
+  replayMode: boolean;
   dataFreshnessMaxHours: number;
   activityLookbackDays: number;
   evidence: EvidenceConfig;
@@ -175,7 +175,7 @@ export interface Config {
  */
 export function parseConfig(env: Env): Config {
   const ingest = validateEnv(env);
-  const fixtureMode = isHarnessFixtureEnv(env);
+  const replayMode = isReplayDataSource(env);
   const apiKey = env.OPENROUTER_API_KEY?.trim() || undefined;
 
   return {
@@ -184,7 +184,7 @@ export function parseConfig(env: Env): Config {
     targetState: ingest.targetState,
     congressApiKey: env.CONGRESS_API_KEY || ingest.congressApiKey,
     govInfoApiKey: env.GOVINFO_API_KEY || "HARNESS_FIXTURE_KEY",
-    fixtureMode,
+    replayMode,
     dataFreshnessMaxHours: Math.max(1, parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, 36)),
     activityLookbackDays: Math.max(7, Math.min(parseIntSafe(env.ACTIVITY_LOOKBACK_DAYS, 30), 120)),
     evidence: {
@@ -199,8 +199,8 @@ export function parseConfig(env: Env): Config {
       hardGates: parseBool(env.QUALITY_HARD_GATES, false),
     },
     synthesis: {
-      enabled: !fixtureMode && Boolean(apiKey),
-      shadowMode: fixtureMode ? true : parseBool(env.OPENROUTER_SHADOW_MODE, false),
+      enabled: !replayMode && Boolean(apiKey),
+      shadowMode: replayMode ? true : parseBool(env.OPENROUTER_SHADOW_MODE, false),
       canaryPercent: Math.max(0, Math.min(parseIntSafe(env.OPENROUTER_CANARY_PERCENT, 100), 100)),
       maxNewAnalyses: Math.max(1, parseIntSafe(env.OPENROUTER_MAX_NEW_ANALYSES, 20)),
       appReferer: env.OPENROUTER_APP_REFERER?.trim() || undefined,

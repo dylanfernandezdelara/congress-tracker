@@ -8,8 +8,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ui:snap": "E2E=1 node scripts/snapshot.mjs",
-    "ui:snap:all": "E2E=1 PATHS=/,/about,/votes/119/2/14 node scripts/snapshot.mjs"
+    "ui:snap": "node scripts/snapshot.mjs",
+    "ui:snap:all": "PATHS=/,/about,/votes/119/2/14 node scripts/snapshot.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

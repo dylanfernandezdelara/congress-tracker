@@ -5,7 +5,6 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Separator } from '../components/ui/separator'
-import { useE2eLink } from '../hooks/useE2eLink'
 import { useVoteDetail } from '../hooks/useVoteDetail'
 import { cn } from '../lib/utils'
 import {
@@ -64,7 +63,6 @@ function StatBlock({
 
 export default function VoteDetail() {
   const params = useParams()
-  const toE2ePath = useE2eLink()
   const { detail, error, isLoading } = useVoteDetail(params.congress, params.session, params.voteNumber)
 
   useEffect(() => {
@@ -89,7 +87,7 @@ export default function VoteDetail() {
           </p>
         </div>
         <Button asChild variant="outline" size="sm" className="w-fit">
-          <Link to={toE2ePath('/')}>Back to briefing</Link>
+          <Link to="/">Back to briefing</Link>
         </Button>
       </div>
     )
@@ -98,7 +96,7 @@ export default function VoteDetail() {
   return (
     <div className="flex flex-col gap-8">
       <Button asChild variant="ghost" size="sm" className="w-fit px-0 text-primary">
-        <Link to={toE2ePath('/')}>&larr; Back to briefing</Link>
+        <Link to="/">&larr; Back to briefing</Link>
       </Button>
 
       <Card className="draft-grid">

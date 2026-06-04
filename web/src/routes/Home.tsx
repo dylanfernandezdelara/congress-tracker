@@ -4,7 +4,6 @@ import type { BriefingFeedItem } from '../api'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { useBriefingFeed } from '../hooks/useBriefingFeed'
-import { useE2eLink } from '../hooks/useE2eLink'
 import { formatBriefingVoteDate } from '../utils/voteLabels'
 import { readHarnessNow } from '../utils/harnessNow'
 
@@ -63,22 +62,20 @@ function isFreshVoteDate(voteDate: string, todayDate: string): boolean {
 }
 
 function VoteSummaryRow({ item }: { item: BriefingFeedItem }) {
-  const toE2ePath = useE2eLink()
-
   return (
     <Card className="border-0 shadow-sm">
       <CardContent className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="min-w-0 flex-1">
           <p className="document-label text-muted-foreground">{formatBriefingVoteDate(item.vote_date)}</p>
           <h2 className="document-title mt-2 text-xl font-semibold leading-snug text-foreground sm:text-2xl">
-            <Link className="transition-colors hover:text-primary" to={toE2ePath(item.detail_path)}>
+            <Link className="transition-colors hover:text-primary" to={item.detail_path}>
               {item.title}
             </Link>
           </h2>
           <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">{trimSummary(item.summary)}</p>
         </div>
         <Button asChild size="sm" variant="outline" className="shrink-0 self-start">
-          <Link to={toE2ePath(item.detail_path)}>Full detail</Link>
+          <Link to={item.detail_path}>Full detail</Link>
         </Button>
       </CardContent>
     </Card>
@@ -90,7 +87,7 @@ export default function Home() {
     () => readHarnessNow(window.location.search, window.location.hostname),
     [],
   )
-  const { briefing, error, isLoading, usingDemo } = useBriefingFeed()
+  const { briefing, error, isLoading } = useBriefingFeed()
   const [currentDate, setCurrentDate] = useState(() => harnessNow ?? new Date())
   const [dcNow, setDcNow] = useState(() => harnessNow ?? new Date())
   useEffect(() => {
@@ -141,15 +138,6 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-4">
-      {usingDemo && (
-        <div className="note-panel border-primary/20 bg-primary/[0.05]">
-          <p className="document-label text-primary/80">Review mode</p>
-          <p className="mt-2 text-sm leading-6 text-foreground">
-            Showing fixture data so the briefing can be reviewed without live ingestion.
-          </p>
-        </div>
-      )}
-
       {error && (
         <div className="note-panel border-destructive/20 bg-destructive/[0.06]">
           <p className="document-label text-destructive/80">Briefing unavailable</p>

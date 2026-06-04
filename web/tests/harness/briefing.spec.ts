@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const harnessNow = process.env.HARNESS_NOW ?? '2026-01-20T15:00:00Z'
+const harnessNow = process.env.CLOCK ?? '2026-01-20T15:00:00Z'
 const expectedTitle =
   process.env.HARNESS_EXPECTED_VOTE_TITLE ?? 'Border Infrastructure Modernization Act'
 

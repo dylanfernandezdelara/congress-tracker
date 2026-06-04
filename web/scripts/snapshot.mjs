@@ -6,7 +6,6 @@ const baseUrl = process.env.URL ?? 'http://127.0.0.1:5173'
 const browserName = (process.env.BROWSER ?? 'webkit').toLowerCase()
 const outDir = process.env.OUT_DIR ?? 'artifacts'
 const selector = process.env.SELECTOR ?? 'body'
-const e2e = process.env.E2E === '1'
 const rawPaths = process.env.PATHS ?? '/'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -46,13 +45,6 @@ const normalizePath = (value) => {
   return `${baseUrl}/${value}`
 }
 
-const applyE2E = (url) => {
-  if (!e2e) return url
-  const hasQuery = url.includes('?')
-  if (url.includes('e2e=1')) return url
-  return `${url}${hasQuery ? '&' : '?'}e2e=1`
-}
-
 const safeName = (value) =>
   value
     .replace(/^https?:\/\//, '')
@@ -66,7 +58,6 @@ const paths = rawPaths
   .map((p) => p.trim())
   .filter(Boolean)
   .map(normalizePath)
-  .map(applyE2E)
 
 const main = async () => {
   await fs.mkdir(outDir, { recursive: true })

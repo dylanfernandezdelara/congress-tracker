@@ -80,29 +80,6 @@ describe('VoteDetail', () => {
     vi.unstubAllGlobals()
   })
 
-  it('loads fixture vote detail without calling fetchVoteDetail when ?e2e=1', async () => {
-    renderVoteDetail('/votes/119/2/14?e2e=1')
-
-    expect(
-      await screen.findByRole('heading', { name: 'Border Infrastructure Modernization Act' }),
-    ).toBeInTheDocument()
-    expect(fetchVoteDetail).not.toHaveBeenCalled()
-  })
-
-  it('shows an error when fixture vote detail is missing in e2e mode', async () => {
-    renderVoteDetail('/votes/119/2/99?e2e=1')
-
-    expect(await screen.findByText(/No fixture detail exists/i)).toBeInTheDocument()
-    expect(fetchVoteDetail).not.toHaveBeenCalled()
-  })
-
-  it('preserves ?e2e=1 on the back link', async () => {
-    renderVoteDetail('/votes/119/2/14?e2e=1')
-
-    const backLink = await screen.findByRole('link', { name: /Back to briefing/i })
-    expect(backLink.getAttribute('href')).toContain('e2e=1')
-  })
-
   it('calls the API client in live mode', async () => {
     fetchVoteDetail.mockResolvedValue({
       ...fixtureDetailTyped,

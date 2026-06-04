@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchVoteDetail, type VoteDetailResponse } from '../api'
-import { E2E_VOTE_DETAILS } from '../e2eData'
 import { normalizeErrorMessage } from '../utils/errors'
-import { useE2eMode } from './useE2eMode'
 
 export function useVoteDetail(
   congress: string | undefined,
@@ -13,7 +11,6 @@ export function useVoteDetail(
   error: string | null
   isLoading: boolean
 } {
-  const e2eMode = useE2eMode()
   const [detail, setDetail] = useState<VoteDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -28,16 +25,6 @@ export function useVoteDetail(
       if (!congress || !session || !voteNumber) {
         setError('Missing vote identifier.')
         setIsLoading(false)
-        return
-      }
-
-      if (e2eMode) {
-        const fixture = E2E_VOTE_DETAILS[`${congress}:${session}:${voteNumber}`]
-        if (!cancelled) {
-          setDetail(fixture ?? null)
-          setError(fixture ? null : 'No fixture detail exists for this vote.')
-          setIsLoading(false)
-        }
         return
       }
 
@@ -58,7 +45,7 @@ export function useVoteDetail(
     return () => {
       cancelled = true
     }
-  }, [congress, e2eMode, session, voteNumber])
+  }, [congress, session, voteNumber])
 
   return { detail, error, isLoading }
 }

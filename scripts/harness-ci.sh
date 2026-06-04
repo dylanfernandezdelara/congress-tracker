@@ -94,9 +94,9 @@ npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev -- \
   --port "${HARNESS_API_PORT}" \
   --inspector-port "${HARNESS_API_INSPECTOR_PORT}" \
   --persist-to "${HARNESS_STATE_DIR}" \
-  --var "HARNESS_MODE:fixture" \
-  --var "HARNESS_FIXTURE_SET:${HARNESS_FIXTURE_SET}" \
-  --var "HARNESS_NOW:${HARNESS_NOW}" \
+  --var "DATA_SOURCE:replay" \
+  --var "REPLAY_FIXTURE_SET:${REPLAY_FIXTURE_SET}" \
+  --var "CLOCK:${CLOCK}" \
   --var "CONGRESS_API_KEY:HARNESS_FIXTURE_KEY" \
   --var "GOVINFO_API_KEY:HARNESS_FIXTURE_KEY" \
   --var "OPENROUTER_CANARY_PERCENT:0" \

@@ -3,12 +3,12 @@ import {
   type HarnessFixtureEntry,
 } from "./harness-fixtures";
 
-export type HarnessMode = "live" | "fixture";
+export type DataSource = "live" | "replay";
 
 export interface HarnessRuntimeConfig {
-  mode: HarnessMode;
-  fixtureSet: string | null;
-  now: string | null;
+  dataSource: DataSource;
+  replayFixtureSet: string | null;
+  clock: string | null;
 }
 
 export interface HarnessFixtureResponse {
@@ -17,8 +17,8 @@ export interface HarnessFixtureResponse {
   body: string;
 }
 
-const CANONICAL_FIXTURE_SET = "canonical";
-const CANONICAL_HARNESS_NOW = "2026-01-20T15:00:00Z";
+const CANONICAL_REPLAY_FIXTURE_SET = "canonical";
+const CANONICAL_CLOCK = "2026-01-20T15:00:00Z";
 
 /**
  * Harness fixture transport. When `enabled`, `resolve` returns a recorded
@@ -36,46 +36,53 @@ export const DISABLED_FIXTURE_HTTP: FixtureHttp = {
   resolve: () => null,
 };
 
-function normalizeMode(value: string | undefined): HarnessMode {
-  return value?.trim().toLowerCase() === "fixture" ? "fixture" : "live";
+function normalizeDataSource(value: string | undefined): DataSource {
+  return value?.trim().toLowerCase() === "replay" ? "replay" : "live";
 }
 
-function normalizeFixtureSet(value: string | undefined, mode: HarnessMode): string | null {
+function normalizeReplayFixtureSet(
+  value: string | undefined,
+  dataSource: DataSource,
+): string | null {
   const trimmed = value?.trim();
   if (trimmed) return trimmed;
-  return mode === "fixture" ? CANONICAL_FIXTURE_SET : null;
+  return dataSource === "replay" ? CANONICAL_REPLAY_FIXTURE_SET : null;
 }
 
-function normalizeNow(value: string | undefined, mode: HarnessMode, fixtureSet: string | null): string | null {
+function normalizeClock(
+  value: string | undefined,
+  dataSource: DataSource,
+  replayFixtureSet: string | null,
+): string | null {
   const trimmed = value?.trim();
   if (trimmed) return trimmed;
-  if (mode === "fixture" && fixtureSet === CANONICAL_FIXTURE_SET) {
-    return CANONICAL_HARNESS_NOW;
+  if (dataSource === "replay" && replayFixtureSet === CANONICAL_REPLAY_FIXTURE_SET) {
+    return CANONICAL_CLOCK;
   }
   return null;
 }
 
 /** Pure: derive the harness runtime config from env (no global mutation). */
 export function buildHarnessConfig(env: {
-  HARNESS_MODE?: string;
-  HARNESS_FIXTURE_SET?: string;
-  HARNESS_NOW?: string;
+  DATA_SOURCE?: string;
+  REPLAY_FIXTURE_SET?: string;
+  CLOCK?: string;
 }): HarnessRuntimeConfig {
-  const mode = normalizeMode(env.HARNESS_MODE);
-  const fixtureSet = normalizeFixtureSet(env.HARNESS_FIXTURE_SET, mode);
-  const now = normalizeNow(env.HARNESS_NOW, mode, fixtureSet);
-  return { mode, fixtureSet, now };
+  const dataSource = normalizeDataSource(env.DATA_SOURCE);
+  const replayFixtureSet = normalizeReplayFixtureSet(env.REPLAY_FIXTURE_SET, dataSource);
+  const clock = normalizeClock(env.CLOCK, dataSource, replayFixtureSet);
+  return { dataSource, replayFixtureSet, clock };
 }
 
-/** Fixed "now" for fixture runs, or null in live mode. */
+/** Fixed "now" for replay runs, or null in live mode. */
 export function harnessNowDate(harness: HarnessRuntimeConfig): Date | null {
-  if (!harness.now) return null;
-  const parsed = new Date(harness.now);
+  if (!harness.clock) return null;
+  const parsed = new Date(harness.clock);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function fixtureEntriesForSet(fixtureSet: string | null): HarnessFixtureEntry[] {
-  if (fixtureSet === CANONICAL_FIXTURE_SET) {
+function fixtureEntriesForSet(replayFixtureSet: string | null): HarnessFixtureEntry[] {
+  if (replayFixtureSet === CANONICAL_REPLAY_FIXTURE_SET) {
     return canonicalHarnessFixtures;
   }
   return [];
@@ -104,19 +111,19 @@ function buildFixtureMap(entries: HarnessFixtureEntry[]): Map<string, HarnessFix
 
 /** Build the fixture transport for an invocation from its harness config. */
 export function createFixtureHttp(harness: HarnessRuntimeConfig): FixtureHttp {
-  if (harness.mode !== "fixture") return DISABLED_FIXTURE_HTTP;
-  const map = buildFixtureMap(fixtureEntriesForSet(harness.fixtureSet));
+  if (harness.dataSource !== "replay") return DISABLED_FIXTURE_HTTP;
+  const map = buildFixtureMap(fixtureEntriesForSet(harness.replayFixtureSet));
   return {
     enabled: true,
     resolve: (url: string) => map.get(normalizeUrl(url)) ?? null,
   };
 }
 
-export function isHarnessFixtureEnv(env: { HARNESS_MODE?: string }): boolean {
-  return normalizeMode(env.HARNESS_MODE) === "fixture";
+export function isReplayDataSource(env: { DATA_SOURCE?: string }): boolean {
+  return normalizeDataSource(env.DATA_SOURCE) === "replay";
 }
 
-export const HARNESS_DEFAULTS = {
-  fixtureSet: CANONICAL_FIXTURE_SET,
-  now: CANONICAL_HARNESS_NOW,
+export const REPLAY_DEFAULTS = {
+  replayFixtureSet: CANONICAL_REPLAY_FIXTURE_SET,
+  clock: CANONICAL_CLOCK,
 };

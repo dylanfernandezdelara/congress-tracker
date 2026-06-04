@@ -187,7 +187,7 @@ export async function stageSynthesize(
   const qualityGateConfig = options.qualityGateConfig;
 
   if (!synthesis.enabled || !canaryEnabled) {
-    if (config.fixtureMode) {
+    if (config.replayMode) {
       errors.push({
         source: "congress",
         message: "Harness fixture mode active; synthesis skipped",
