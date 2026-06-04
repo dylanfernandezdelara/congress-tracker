@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "wrangler dev --config wrangler.toml",
     "deploy": "wrangler deploy --config wrangler.toml",
-    "test-scheduled": "wrangler dev --config wrangler.toml --test-scheduled",
     "smoke:scheduled": "bash scripts/run-ingest-local.sh",
     "fixtures:harness:refresh": "node scripts/refresh-harness-fixtures.mjs",
     "check": "tsc --noEmit",

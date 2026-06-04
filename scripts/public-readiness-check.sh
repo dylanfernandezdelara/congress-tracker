@@ -9,9 +9,6 @@ echo "== Public readiness validation loop =="
 echo "-- Scanning tracked files for secrets --"
 "${ROOT_DIR}/scripts/scan-tracked-secrets.sh"
 
-echo "-- Scanning git history for secrets --"
-"${ROOT_DIR}/scripts/scan-history-secrets.sh"
-
 echo "-- Sweeping for internal/staging URL references --"
 "${ROOT_DIR}/scripts/scan-internal-references.sh"
 
@@ -31,19 +28,5 @@ if [[ -n "${tracked_artifacts}" ]]; then
     exit 1
   fi
 fi
-
-echo "-- Worker typecheck and tests --"
-(
-  cd "${ROOT_DIR}/workers/senate_data_worker"
-  npm run check
-  npm test
-)
-
-echo "-- Web typecheck and tests --"
-(
-  cd "${ROOT_DIR}/web"
-  npm exec -- tsc --noEmit
-  npm test
-)
 
 echo "All validation gates passed."

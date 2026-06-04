@@ -8,13 +8,8 @@ source "${ROOT_DIR}/scripts/harness-env.sh"
 source "${ROOT_DIR}/scripts/lib/proc.sh"
 
 WORKER_LOG="${HARNESS_LOG_DIR}/worker.log"
-WEB_LOG="${HARNESS_LOG_DIR}/web.log"
-
 WORKER_PID=""
-WEB_PID=""
 
-# Wrangler/Vite often ignore SIGTERM briefly or leave children alive; unbounded `wait` on EXIT
-# makes harness:ci look "stuck" after tests pass. Use bounded teardown + port cleanup.
 harness_stop_pid() {
   local pid="$1"
   [[ -z "${pid}" ]] && return 0
@@ -32,21 +27,17 @@ harness_stop_pid() {
   fi
 }
 
-cleanup() {
-  harness_stop_pid "${WEB_PID}"
-  harness_stop_pid "${WORKER_PID}"
-  kill_port "${HARNESS_WEB_PORT}"
-  kill_port "${HARNESS_API_PORT}"
-  kill_port "${HARNESS_API_INSPECTOR_PORT}"
+print_worker_log_tail() {
+  if [[ -f "${WORKER_LOG}" ]]; then
+    echo "--- ${WORKER_LOG}"
+    tail -n 200 "${WORKER_LOG}" || true
+  fi
 }
 
-print_logs() {
-  for log_file in "${HARNESS_LOG_DIR}/worker.log" "${HARNESS_LOG_DIR}/web.log"; do
-    if [[ -f "${log_file}" ]]; then
-      echo "--- ${log_file}"
-      tail -n 200 "${log_file}" || true
-    fi
-  done
+cleanup() {
+  harness_stop_pid "${WORKER_PID}"
+  kill_port "${HARNESS_API_PORT}"
+  kill_port "${HARNESS_API_INSPECTOR_PORT}"
 }
 
 trap cleanup EXIT INT TERM
@@ -56,12 +47,9 @@ rm -rf "${HARNESS_STATE_DIR}"
 mkdir -p "${HARNESS_STATE_DIR}"
 
 kill_port "${HARNESS_API_PORT}"
-kill_port "${HARNESS_WEB_PORT}"
 kill_port "${HARNESS_API_INSPECTOR_PORT}"
 
-# Single unified worker: one `wrangler dev` over one --persist-to path. No concurrent
-# Miniflare D1 access, so the previous sequential two-phase start is no longer needed.
-echo "Starting unified worker (fetch + scheduled + queue) on ${HARNESS_HOST}:${HARNESS_API_PORT}"
+echo "Starting unified worker (replay) on ${HARNESS_HOST}:${HARNESS_API_PORT}"
 npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev -- \
   --ip "${HARNESS_HOST}" \
   --port "${HARNESS_API_PORT}" \
@@ -77,33 +65,21 @@ npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev -- \
   >"${WORKER_LOG}" 2>&1 &
 WORKER_PID=$!
 
-wait_for_url "${HARNESS_API_URL}/health" "Worker"
+if ! wait_for_url "${HARNESS_API_URL}/health" "Worker"; then
+  print_worker_log_tail
+  exit 1
+fi
 
 echo "Triggering deterministic scheduled ingestion..."
 if ! curl -fsS --max-time "${HARNESS_INGEST_MAX_TIME}" "${HARNESS_PIPELINE_URL}/__pipeline/run/ingestion" \
   >"${HARNESS_ASSERT_DIR}/ingestion-response.json"; then
-  print_logs
+  print_worker_log_tail
   exit 1
 fi
-
-echo "Starting web app on ${HARNESS_HOST}:${HARNESS_WEB_PORT}"
-VITE_API_URL="${HARNESS_API_URL}" \
-  npm --prefix "${ROOT_DIR}/web" run dev -- \
-    --host "${HARNESS_HOST}" \
-    --port "${HARNESS_WEB_PORT}" \
-    >"${WEB_LOG}" 2>&1 &
-WEB_PID=$!
-
-wait_for_url "${HARNESS_WEB_URL}" "Web app"
 
 if ! npm run harness:assert; then
-  print_logs
+  print_worker_log_tail
   exit 1
 fi
 
-if ! npm run harness:browser; then
-  print_logs
-  exit 1
-fi
-
-echo "Harness CI run passed."
+echo "Harness quick run passed."

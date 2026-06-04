@@ -11,6 +11,7 @@
     "harness:assert": "node ./scripts/harness-assert.mjs",
     "harness:browser": "npm --prefix web exec -- playwright test --config ./web/playwright.harness.config.ts",
     "harness:ci": "./scripts/harness-ci.sh",
+    "harness:quick": "./scripts/harness-quick.sh",
     "public:check": "./scripts/public-readiness-check.sh",
     "public:scan:tracked-secrets": "./scripts/scan-tracked-secrets.sh",
     "public:scan:history-secrets": "./scripts/scan-history-secrets.sh",

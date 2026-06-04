@@ -29,7 +29,8 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Seed historical backfill: `./scripts/backfill-history.sh`
 
 ### Verification
-- Full deterministic harness: `npm run harness:ci`
+- Fast inner-loop harness (worker + HTTP assertions, ~1–2 min, no browser): `npm run harness:quick`
+- Full deterministic harness: `npm run harness:ci` (worker + Vite + Playwright; use for final end-to-end checks)
 - Harness browser checks only: `npm run harness:browser`
 - Worker typecheck: `npm --prefix workers/senate_data_worker run check`
 - Worker tests: `npm --prefix workers/senate_data_worker test`
