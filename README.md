@@ -234,14 +234,16 @@ Typical local startup flow:
 1. Start the worker and web (`npm run dev:worker`, `npm run dev:web`).
 2. Trigger `/__pipeline/run/ingestion` if you need fresh data immediately.
 3. Verify freshness with `http://127.0.0.1:8787/__pipeline/status` and `http://127.0.0.1:8787/briefings/latest.json`.
-4. Open `http://127.0.0.1:5173`.
+4. Open `http://localhost:5173` (Vite; use `localhost`, not `127.0.0.1`, on some Linux dev setups).
 
 ### UI screenshots
 
-With the web dev server running:
+Mobile-first by default (iPhone 13 profile). With the web dev server running:
 
 ```bash
 npm run snapshot
+# desktop: npm --prefix web run ui:snap:desktop
+# PR assets: npm run docs:snapshots  → docs/screenshots/
 ```
 
 Requires Playwright Chromium (`./scripts/cursor-cloud-setup.sh`, or `npm --prefix web exec -- playwright install --with-deps chromium` after web deps are installed).

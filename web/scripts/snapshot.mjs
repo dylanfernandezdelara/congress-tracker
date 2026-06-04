@@ -1,8 +1,13 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { chromium, devices, webkit } from '@playwright/test'
+import { chromium, webkit } from '@playwright/test'
+import {
+  buildSnapshotOutputPath,
+  isIgnorableRequestFailure,
+  resolveViewportProfile,
+} from './snapshot-viewport.mjs'
 
-const baseUrl = process.env.URL ?? 'http://127.0.0.1:5173'
+const baseUrl = process.env.URL ?? 'http://localhost:5173'
 const browserName = (process.env.BROWSER ?? 'chromium').toLowerCase()
 const outDir = process.env.OUT_DIR ?? 'artifacts'
 const selector = process.env.SELECTOR ?? 'body'
@@ -39,30 +44,6 @@ const findChromiumPath = async () => {
   } catch {
     return null
   }
-}
-
-/** Mobile-first default; set VIEWPORT=desktop for 1280×720. */
-function resolveViewportProfile() {
-  const mode = (process.env.VIEWPORT ?? 'mobile').trim().toLowerCase()
-  if (mode === 'desktop') {
-    return {
-      tag: 'desktop',
-      context: { viewport: { width: 1280, height: 720 } },
-    }
-  }
-  if (mode === 'mobile') {
-    return { tag: 'mobile', context: devices['iPhone 13'] }
-  }
-  const match = /^(\d{3,4})x(\d{3,5})$/.exec(mode)
-  if (match) {
-    const width = Number(match[1])
-    const height = Number(match[2])
-    return {
-      tag: `${width}x${height}`,
-      context: { viewport: { width, height }, deviceScaleFactor: 2, isMobile: true },
-    }
-  }
-  return { tag: 'mobile', context: devices['iPhone 13'] }
 }
 
 const normalizePath = (value) => {
@@ -110,21 +91,29 @@ const main = async () => {
     errors.push(text)
   })
   page.on('requestfailed', (req) => {
-    const text = `${req.url()} :: ${req.failure()?.errorText || 'request failed'}`
+    const failure = req.failure()?.errorText || 'request failed'
+    if (isIgnorableRequestFailure(failure)) {
+      console.log(`[requestfailed:ignored] ${req.url()} :: ${failure}`)
+      return
+    }
+    const text = `${req.url()} :: ${failure}`
     console.log(`[requestfailed] ${text}`)
     errors.push(text)
   })
 
-  console.log(`[snapshot] viewport=${viewportProfile.tag}`)
+  console.log(`[snapshot] viewport=${viewportProfile.tag} url=${baseUrl}`)
 
   for (const url of paths) {
     console.log(`[snapshot] visiting ${url}`)
     await page.goto(url, { waitUntil, timeout: 60_000 })
     await sleep(settleMs)
     const name = safeName(url)
-    const outPath = process.env.OUT
-      ? process.env.OUT
-      : path.join(outDir, `${name}_${viewportProfile.tag}.png`)
+    const outPath = buildSnapshotOutputPath({
+      outDir,
+      safeName: name,
+      viewportTag: viewportProfile.tag,
+      outOverride: process.env.OUT,
+    })
     if (selector === 'body') {
       await page.screenshot({
         path: outPath,

@@ -3,8 +3,9 @@ DATA_SOURCE=replay
 REPLAY_FIXTURE_SET=canonical
 CLOCK=2026-01-20T15:00:00Z
 
-# Live ingestion (Congress.gov / GovInfo) — set real keys and switch DATA_SOURCE to live
-# (or remove/unset DATA_SOURCE=replay) when pulling from upstream.
+# Live ingestion (Congress.gov / GovInfo) — set DATA_SOURCE=live below and real keys;
+# cloud setup will not overwrite a file that already has DATA_SOURCE=live.
+# DATA_SOURCE=live
 CONGRESS_API_KEY=your_congress_api_key
 GOVINFO_API_KEY=your_govinfo_api_key
 

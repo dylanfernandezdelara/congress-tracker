@@ -50,7 +50,7 @@ export function VoteHero({ detail }: VoteHeroProps) {
             <Badge variant="outline">{coverageLabel(detail.source_coverage.level)}</Badge>
           </div>
 
-          <h1 className="document-title mt-4 text-[1.65rem] font-semibold leading-snug text-foreground sm:mt-5 sm:text-4xl sm:leading-tight lg:text-6xl">
+          <h1 className="document-title mt-4 text-[1.65rem] font-semibold leading-snug text-foreground sm:mt-5 sm:text-5xl sm:leading-tight lg:text-6xl">
             {detail.vote.title}
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-8 text-muted-foreground">

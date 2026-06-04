@@ -11,14 +11,14 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test` and `npm run snapshot`).
 
 ### Local setup
-- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh` / `./scripts/ensure-replay-dev-vars.sh`. Local defaults are replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, `CLOCK=2026-01-20T15:00:00Z`) with `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Setup re-applies replay keys on every Cursor Cloud bootstrap unless `.dev.vars` sets `DATA_SOURCE=live`. Use a specific origin in production deploy secrets, not in the committed example.
+- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh` / `./scripts/ensure-replay-dev-vars.sh`. Local defaults are replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, `CLOCK=2026-01-20T15:00:00Z`) with `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Cloud setup fills **missing** replay keys only; it skips files with `DATA_SOURCE=live` or a non-replay `DATA_SOURCE`. Use a specific origin in production deploy secrets, not in the committed example.
 - `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live` (or remove `DATA_SOURCE=replay`).
 - Deterministic test runs boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
 - Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
 
 ### Local development
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
-- Web: `npm run dev:web` (`http://127.0.0.1:5173`)
+- Web: `npm run dev:web` (open `http://localhost:5173`; worker API stays on `http://127.0.0.1:8787`)
 - Point the web app at a non-default worker with `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web` (harness uses `scripts/harness-env.sh` for ports).
 
 ### Data refresh
@@ -31,10 +31,10 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Worker scheduled smoke (live sources only): `npm --prefix workers/senate_data_worker run smoke:scheduled`
 
 ### UI screenshots
-- With the web dev server running: `npm run snapshot` (Playwright Chromium, **mobile-first** iPhone 13 profile by default). Use `npm --prefix web run ui:snap:desktop` for 1280×720. On Linux agent VMs where Vite binds to `localhost` only, set `URL=http://localhost:5173`.
+- With the web dev server running: `npm run snapshot` (Playwright Chromium, **mobile-first** iPhone 13 profile; default `URL=http://localhost:5173`). Use `npm --prefix web run ui:snap:desktop` for 1280×720. Regenerate committed PR screenshots: `npm run docs:snapshots` (see `docs/screenshots/README.md`).
 
 ### UI and design review
-- There is no separate frontend fixture path. Replay UI review sequence: ensure `.dev.vars` has `DATA_SOURCE=replay`, run `npm run dev:worker`, run `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`, trigger `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` if the briefing is empty, then `URL=http://localhost:5173 npm run snapshot` (mobile-first).
+- There is no separate frontend fixture path. Replay UI review sequence: ensure `.dev.vars` has `DATA_SOURCE=replay`, run `npm run dev:worker`, run `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`, trigger `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` if the briefing is empty, then `npm run snapshot` (mobile-first; default `http://localhost:5173`).
 - Replay-backed preview deploys use `[env.preview]` in `workers/senate_data_worker/wrangler.toml` (`wrangler deploy --env preview`).
 
 ## Key Rules
@@ -81,7 +81,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - The public API exposes only `/briefings/latest.json`, `/votes/:c/:s/:n.json`, `/health`, and `/health/data`; `/__pipeline/*` admin routes are token-gated on deploy.
 - The latest homepage feed is served from `/briefings/latest.json`.
 - One unified worker handles ingestion/materialization and serving; scheduled (cron) ingestion is not triggered automatically in local dev.
-- Local stack ports: Worker `http://127.0.0.1:8787`, Web `http://127.0.0.1:5173`.
+- Local stack: Worker `http://127.0.0.1:8787`, Web UI `http://localhost:5173`.
 - The deterministic harness exercises the real local worker in replay mode (`DATA_SOURCE=replay`); there is no frontend fixture data file.
 
 ## Cursor Cloud

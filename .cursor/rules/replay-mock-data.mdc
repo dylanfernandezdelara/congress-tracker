@@ -1,29 +1,27 @@
 ---
-description: Default to worker replay fixtures for local UI work and screenshots unless the user requests live ingestion.
+description: Replay fixtures and mobile-first UI screenshots for local/agent development.
 alwaysApply: true
 ---
 
-# Replay mock data (default)
+# Replay mock data + mobile UI (default)
 
-For frontend/UI work, local dev, and screenshots, use **worker replay fixtures** — not live Congress.gov / GovInfo.
+Use **worker replay fixtures** for frontend/UI work unless the user requests live ingestion. See `AGENTS.md` (Install, UI screenshots) for the full command list.
 
-## Required local worker env (`workers/senate_data_worker/.dev.vars`)
+## `.dev.vars` (auto-applied by `./scripts/cursor-cloud-setup.sh`)
 
-- `DATA_SOURCE=replay`
-- `REPLAY_FIXTURE_SET=canonical`
-- `CLOCK=2026-01-20T15:00:00Z`
+- `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, `CLOCK=2026-01-20T15:00:00Z`
+- Opt out of live overwrite: set `DATA_SOURCE=live` in `.dev.vars`
+- Custom fixture set / clock: set `REPLAY_FIXTURE_SET` or `CLOCK` explicitly — bootstrap only fills **missing** keys
 
-`./scripts/cursor-cloud-setup.sh` runs `scripts/ensure-replay-dev-vars.sh` to apply these on every agent VM bootstrap (unless `DATA_SOURCE=live` is set explicitly).
-
-## Standard UI stack
+## UI stack
 
 1. `npm run dev:worker`
 2. `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`
-3. `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` when the briefing feed is empty
-4. `URL=http://localhost:5173 npm run snapshot` for **mobile-first** UI screenshots (default viewport)
+3. `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` if the feed is empty
+4. `npm run snapshot` (mobile iPhone 13, `http://localhost:5173` default)
 
-There is no separate frontend mock JSON; the web app calls the real API backed by fixtures in `workers/senate_data_worker/src/harness-fixtures.ts`.
+Regenerate PR screenshots: `npm run docs:snapshots` → `docs/screenshots/`
 
-## When to use live data
+## Live data
 
-Only when the user explicitly asks for live ingestion, production API keys, or real upstream freshness checks. Then set `DATA_SOURCE=live` in `.dev.vars` and provide real `CONGRESS_API_KEY` / `GOVINFO_API_KEY`.
+Only when the user asks: `DATA_SOURCE=live` plus real `CONGRESS_API_KEY` / `GOVINFO_API_KEY`.
