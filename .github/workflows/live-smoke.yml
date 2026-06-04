@@ -47,14 +47,10 @@ jobs:
         env:
           CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
           GOVINFO_API_KEY: ${{ secrets.GOVINFO_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
         run: |
           cat > .dev.vars <<EOF
           CONGRESS_API_KEY=${CONGRESS_API_KEY}
           GOVINFO_API_KEY=${GOVINFO_API_KEY}
-          OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-          OPENROUTER_MODEL=${OPENROUTER_MODEL}
           EOF
 
       - name: Run live smoke

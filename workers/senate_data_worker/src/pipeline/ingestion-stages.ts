@@ -17,17 +17,12 @@ import type { MemberIndexJson, VoteLedger } from "../types";
 import {
   attachImpactEvidenceToBill,
   buildBillEvidencePipeline,
-  enrichBillAnalyses,
   publishChamberContext,
   publishMemberActivity,
   collectUniqueBills,
   type BillEvidencePipelineResult,
-  type QualityGateConfig,
 } from "./materialize";
-import { DEFAULT_OPENROUTER_MODELS } from "../synthesis/client";
-import type { AnalyzeBillsResult } from "../synthesis/types-shared";
 import { readDocumentJson, writeDocumentJson } from "../storage/documents";
-import { logEvent } from "./logging";
 import {
   buildActivitiesIndexKey,
   buildSessionOverviewKey,
@@ -158,99 +153,6 @@ export async function stagePublishMemberCore(
     effectiveActivityIndex
   );
   await publishChamberContext(db, memberResult.windowEnd, memberResult.context);
-}
-
-export interface SynthesisStageResult {
-  analysisResult: AnalyzeBillsResult | null;
-  errors: import("../types").SourceError[];
-}
-
-export async function stageSynthesize(
-  db: D1Database,
-  options: {
-    config: Config;
-    runId: string;
-    evidencePipeline: BillEvidencePipelineResult;
-    memberResult: MemberIngestResult;
-    effectiveActivityIndex: ActivityIndexJson | null;
-    membersIndex: MemberIndexJson;
-    qualityGateConfig: QualityGateConfig;
-  }
-): Promise<SynthesisStageResult> {
-  const { config, runId, evidencePipeline, memberResult, effectiveActivityIndex, membersIndex } =
-    options;
-  const { synthesis } = config;
-  const errors: import("../types").SourceError[] = [];
-
-  const qualityGateConfig = options.qualityGateConfig;
-
-  if (!synthesis.enabled) {
-    if (config.replayMode) {
-      errors.push({
-        source: "congress",
-        message: "Replay mode active; synthesis skipped",
-      });
-    } else if (!synthesis.apiKey) {
-      errors.push({
-        source: "congress",
-        message: "OPENROUTER_API_KEY missing; synthesis skipped",
-      });
-    } else {
-      errors.push({
-        source: "congress",
-        message: "Synthesis disabled (SYNTHESIS!=on); synthesis skipped",
-      });
-    }
-    return { analysisResult: null, errors };
-  }
-
-  const models = synthesis.models;
-  try {
-    const analysisResult = await enrichBillAnalyses(
-      db,
-      evidencePipeline.billInputs,
-      memberResult.memberActivities,
-      effectiveActivityIndex,
-      synthesis.apiKey as string,
-      models.length > 0 ? models : [...DEFAULT_OPENROUTER_MODELS],
-      synthesis.maxNewAnalyses,
-      qualityGateConfig,
-      synthesis.appReferer,
-      synthesis.appTitle
-    );
-
-    if (analysisResult) {
-      try {
-        await publishMemberActivity(
-          db,
-          membersIndex,
-          memberResult.memberActivities,
-          memberResult.windowEnd,
-          effectiveActivityIndex
-        );
-      } catch (error) {
-        errors.push({
-          source: "congress",
-          message: `Narrative publish failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        });
-      }
-    }
-
-    return { analysisResult, errors };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    errors.push({
-      source: "congress",
-      message: `OpenRouter synthesis failed but core publication remains available: ${message}`,
-    });
-    logEvent("openrouter_synthesis_failed", {
-      run_id: runId,
-      error: message,
-    });
-    return { analysisResult: null, errors };
-  }
 }
 
 /** Build or update the vote ledger and session overview. */

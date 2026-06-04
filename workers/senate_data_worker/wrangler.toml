@@ -16,9 +16,6 @@ SESSION = "2"
 TARGET_STATE = "ALL"
 # Production: set to your deployed frontend origin (do not use "*" publicly).
 # ALLOWED_ORIGIN = "https://your-site.example"
-# Optional: OpenRouter attribution headers.
-# OPENROUTER_APP_REFERER = "https://your-site.example"
-# OPENROUTER_APP_TITLE = "congress_tracker_worker"
 # Required before exposing manual pipeline routes on a public deployment:
 #   wrangler secret put PIPELINE_ADMIN_TOKEN --config wrangler.toml
 

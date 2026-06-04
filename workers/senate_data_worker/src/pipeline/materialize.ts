@@ -2,16 +2,9 @@ import { buildBillKey } from "../congress";
 import { harvestBillEvidence, EVIDENCE_ENDPOINT_TIERS } from "../bill-evidence";
 import { buildTrendSnapshot, extractBillImpactEvidence } from "../impact-extract";
 import { readDocumentJson, writeDocumentJson } from "../storage/documents";
-import { analyzeBillsWithCache } from "../synthesis/client";
-import type { AnalyzeBillsResult } from "../synthesis/types-shared";
-import {
-  evaluateQualityGates,
-  type QualityGateConfig,
-} from "../synthesis/quality";
 import { mapWithConcurrency } from "../concurrency";
 import { buildPipelineMaterialization } from "../read-model";
 import { writePlatformMaterializationToD1 } from "../d1/materialization";
-import type { PipelineMaterialization } from "../platform-types";
 import {
   buildLatestChamberContextKey,
   buildMembersIndexKey,
@@ -37,8 +30,6 @@ import type {
   MemberActivityContext,
   SourceError,
 } from "../types";
-
-export type { QualityGateConfig } from "../synthesis/quality";
 
 export interface BillEvidencePipelineResult {
   processedBillCount: number;
@@ -134,18 +125,6 @@ export function attachImpactEvidenceToBill(
   const impact = impactByKey.get(key);
   if (impact) bill.impact_evidence = impact;
 }
-
-export function attachAnalysisToBill(
-  bill: BillRef | undefined,
-  analysisByKey: ReadonlyMap<string, NonNullable<BillRef["analysis"]>>
-): void {
-  if (!canBuildBillKey(bill)) return;
-  const key = buildBillKey(bill);
-  const analysis = analysisByKey.get(key);
-  if (analysis) bill.analysis = analysis;
-}
-
-export { evaluateQualityGates } from "../synthesis/quality";
 
 export async function buildBillEvidencePipeline(
   db: D1Database,
@@ -276,80 +255,6 @@ export async function buildBillEvidencePipeline(
     stateSignalCount,
     errors,
   };
-}
-
-export async function enrichBillAnalyses(
-  db: D1Database,
-  billInputs: Array<{ bill: BillRef; impactEvidence?: BillImpactEvidence }>,
-  memberActivities: MemberActivityJson[],
-  activityIndex: ActivityIndexJson | null,
-  apiKey: string,
-  models: string[],
-  maxNewAnalyses: number,
-  qualityGateConfig: QualityGateConfig,
-  appReferer?: string,
-  appTitle?: string
-): Promise<AnalyzeBillsResult | null> {
-  if (billInputs.length === 0) {
-    console.log("[openrouter] No bill refs found for analysis enrichment");
-    return null;
-  }
-
-  const result = await analyzeBillsWithCache(db, billInputs, {
-    apiKey,
-    models,
-    maxNewAnalyses,
-    appReferer,
-    appTitle,
-    timeoutMs: 30_000,
-    maxRetries: 2,
-    analysisConcurrency: 2,
-  });
-  const modelSuccessCount = Math.max(0, result.analyzedCount - result.fallbackCount);
-
-  console.log(
-    `[openrouter] Analysis enrichment complete: cache hits=${result.cacheHitCount}, saved=${result.analyzedCount}, model-success=${modelSuccessCount}, fallback=${result.fallbackCount}, deferred=${result.deferredCount}, input-skipped=${result.inputSkipCount}, claim-coverage=${result.claimsWithEvidenceRefPct}%, benefit-map-coverage=${result.benefitMapWithEvidenceRefPct}%, likely-reason-coverage=${result.likelyReasonsWithEvidenceRefPct}%, quote-validity=${result.quoteValidityPct}%, confidence-mismatch=${result.confidenceCalibrationMismatchPct}%`
-  );
-  if (result.deferredCount > 0) {
-    console.log(
-      `[openrouter] ${result.deferredCount} analyses deferred by maxNewAnalyses limit; refresh will continue across scheduled runs.`
-    );
-  }
-  if (result.fallbackCount > 0) {
-    console.log(
-      `[openrouter] ${result.fallbackCount} analyses fell back to deterministic summaries after model output or parse failures.`
-    );
-  }
-  if (result.inputSkipCount > 0) {
-    console.log(
-      `[openrouter] ${result.inputSkipCount} analyses were skipped because the bill lacked enough title or summary text.`
-    );
-  }
-  const gateFailures = evaluateQualityGates(result, qualityGateConfig);
-  if (gateFailures.length > 0) {
-    logEvent("analysis_quality_gate_failed", {
-      failures: gateFailures,
-      hard_gates: qualityGateConfig.hardGates,
-      claims_coverage_pct: result.claimsWithEvidenceRefPct,
-      quote_validity_pct: result.quoteValidityPct,
-      confidence_mismatch_pct: result.confidenceCalibrationMismatchPct,
-    });
-    if (qualityGateConfig.hardGates) {
-      throw new Error(`Analysis quality gates failed: ${gateFailures.join("; ")}`);
-    }
-  }
-
-  for (const memberActivity of memberActivities) {
-    for (const item of memberActivity.activities) {
-      if (item.type !== "legislation_action" && item.type !== "roll_call_vote") continue;
-      attachAnalysisToBill(item.bill, result.analysisByKey);
-    }
-  }
-
-  for (const activity of activityIndex?.activities ?? []) {
-    attachAnalysisToBill(activity.bill, result.analysisByKey);
-  }
-  return result;
 }
 
 export async function materializeReadModels(

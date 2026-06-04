@@ -11,10 +11,7 @@ import {
   runTimed,
   summarizeCoverage,
 } from "./logging";
-import {
-  materializeReadModels,
-  type QualityGateConfig,
-} from "./materialize";
+import { materializeReadModels } from "./materialize";
 import { enqueuePipelineJob } from "./jobs";
 import { readDocumentJson } from "../storage/documents";
 import { buildVoteLedgerKey, hasPublishedReadModels } from "../storage";
@@ -29,7 +26,6 @@ import {
   stagePublishMemberCore,
   stagePublishVoteLedger,
   stageResolveActivityIndex,
-  stageSynthesize,
 } from "./ingestion-stages";
 
 /**
@@ -131,39 +127,6 @@ export async function runScheduledIngestion(
     stagePublishMemberCore(env.SENATE_DB, membersIndex, memberResult, effectiveActivityIndex)
   );
 
-  const qualityGateConfig: QualityGateConfig = {
-    minClaimsCoveragePct: config.quality.minClaimsCoveragePct,
-    minQuoteValidityPct: config.quality.minQuoteValidityPct,
-    maxConfidenceMismatchPct: config.quality.maxConfidenceMismatchPct,
-    hardGates: config.quality.hardGates,
-  };
-
-  const { analysisResult, errors: synthesisErrors } = await runTimed(runId, "openrouter_synthesis", () =>
-    stageSynthesize(env.SENATE_DB, {
-      config,
-      runId,
-      evidencePipeline,
-      memberResult,
-      effectiveActivityIndex,
-      membersIndex,
-      qualityGateConfig,
-    })
-  );
-
-  if (analysisResult) {
-    const attemptedAnalyses = analysisResult.analyzedCount + analysisResult.inputSkipCount;
-    const fallbackRate = attemptedAnalyses > 0 ? analysisResult.fallbackCount / attemptedAnalyses : 0;
-    if (fallbackRate > 0.2) {
-      logEvent("openrouter_degradation_signal", {
-        run_id: runId,
-        fallback_rate: Number((fallbackRate * 100).toFixed(2)),
-        analyzed_count: analysisResult.analyzedCount,
-        fallback_count: analysisResult.fallbackCount,
-        deferred_count: analysisResult.deferredCount,
-      });
-    }
-  }
-
   const { ledger, overview } = await runTimed(runId, "build_vote_ledger", () =>
     stageBuildVoteLedger(config, membersIndex, existingLedger, fetchConfig, {
       db: env.SENATE_DB,
@@ -178,15 +141,10 @@ export async function runScheduledIngestion(
     stagePublishVoteLedger(env.SENATE_DB, ledger, overview)
   );
 
-  const allErrors = [...memberResult.errors, ...evidencePipeline.errors, ...synthesisErrors];
+  const allErrors = [...memberResult.errors, ...evidencePipeline.errors];
   const coverage = summarizeCoverage(
     runId,
     evidencePipeline.processedBillCount,
-    analysisResult?.claimsWithEvidenceRefPct ?? 0,
-    analysisResult?.benefitMapWithEvidenceRefPct ?? 0,
-    analysisResult?.likelyReasonsWithEvidenceRefPct ?? 0,
-    analysisResult?.quoteValidityPct ?? 0,
-    analysisResult?.confidenceCalibrationMismatchPct ?? 0,
     evidencePipeline.endpointSuccessRates,
     evidencePipeline.endpointFallbackRates,
     evidencePipeline.structuredAmountCount,
@@ -217,11 +175,6 @@ export async function runScheduledIngestion(
     new_vote_count: newVoteNumbers.length,
     new_vote_numbers: newVoteNumbers,
     bills_processed: coverage.bills_processed,
-    claims_with_evidence_pct: coverage.pct_claims_with_evidence_refs,
-    benefit_map_with_evidence_pct: analysisResult?.benefitMapWithEvidenceRefPct ?? 0,
-    likely_reasons_with_evidence_pct: analysisResult?.likelyReasonsWithEvidenceRefPct ?? 0,
-    quote_validity_pct: analysisResult?.quoteValidityPct ?? 0,
-    confidence_mismatch_pct: analysisResult?.confidenceCalibrationMismatchPct ?? 0,
     partial: coverage.partial,
   });
 }

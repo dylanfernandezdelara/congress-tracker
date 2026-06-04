@@ -33,7 +33,7 @@ The project has two runtime surfaces:
 Storage is D1-only:
 
 - **Normalized tables** — votes, members, issue threads, ingested vote details, pipeline checkpoints, and related read-model rows.
-- **`kv_documents`** — JSON blobs for pipeline artifacts (`votes/ledger.json`, `activities/index.json`, bill evidence/trends, OpenRouter caches, chamber context, and similar).
+- **`kv_documents`** — JSON blobs for pipeline artifacts (`votes/ledger.json`, `activities/index.json`, bill evidence/trends, chamber context, and similar).
 - **Queues** (optional) — retryable background work for historical backfill chunks and read-model materialization.
 
 ```text
@@ -75,7 +75,6 @@ The pipeline is designed around official or official-adjacent sources:
 The interpretation layer is intentionally constrained:
 
 - Deterministic evidence assembly and ranking happen first.
-- Model-assisted summaries only operate on already-linked evidence.
 - Coverage gaps are rendered explicitly instead of being filled in heuristically.
 
 ## Current Product Shape
@@ -100,7 +99,6 @@ congress-tracker/
 │       │   ├── http/router.ts
 │       │   ├── pipeline/   (scheduled ingestion, jobs, materialize, stages)
 │       │   ├── storage/    (document keys, D1 read repos, schema-once)
-│       │   ├── synthesis/  (OpenRouter bill analysis)
 │       │   ├── sources/    (HTTP/XML/Congress.gov clients)
 │       │   ├── congress/   (Congress.gov client modules)
 │       │   ├── member-ingest/ (member activity ingestion)
@@ -155,15 +153,6 @@ Required secrets:
 - `CONGRESS_API_KEY`
 - `GOVINFO_API_KEY`
 
-Optional secret/runtime values:
-
-- `SYNTHESIS=on|off` (off by default; set `SYNTHESIS=on` plus a key/model to enable LLM synthesis)
-- `OPENROUTER_API_KEY`
-- `OPENROUTER_MODEL`
-  Single model slug or a comma-separated fallback list in priority order.
-- `OPENROUTER_APP_REFERER`
-- `OPENROUTER_APP_TITLE`
-
 Deterministic harness runs do not require live upstream secrets. They start the worker with:
 
 - `DATA_SOURCE=replay`
@@ -207,16 +196,7 @@ Required local secrets in `workers/senate_data_worker/.dev.vars`:
 - `CONGRESS_API_KEY`
 - `GOVINFO_API_KEY`
 
-Optional local synthesis settings:
-
-- `SYNTHESIS=on|off` (off by default; set `SYNTHESIS=on` plus a key/model to enable)
-- `OPENROUTER_API_KEY`
-- `OPENROUTER_MODEL`
-- `OPENROUTER_APP_REFERER`
-- `OPENROUTER_APP_TITLE`
-
-Quality/evidence thresholds (`QUALITY_*`, `EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
-
+Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 ### Install dependencies
 
 ```bash

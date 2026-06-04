@@ -5,10 +5,5 @@ GOVINFO_API_KEY=your_govinfo_api_key
 # CORS: use * for local dev (Vite :5173 -> API :8787); set a specific origin in prod
 ALLOWED_ORIGIN=*
 
-# Optional LLM synthesis (off by default). Set SYNTHESIS=on plus a key/model to enable.
-SYNTHESIS=off
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free,arcee-ai/trinity-large-preview:free,openrouter/free
-
-# Quality/evidence thresholds use code defaults; override via QUALITY_* / EVIDENCE_* /
+# Evidence thresholds use code defaults; override via EVIDENCE_* /
 # ACTIVITY_LOOKBACK_DAYS / DATA_FRESHNESS_MAX_HOURS env vars when actively tuning.

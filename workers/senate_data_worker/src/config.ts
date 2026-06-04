@@ -4,7 +4,7 @@ import type { IngestConfig } from "./types";
 
 /**
  * Single environment-binding type for the unified worker (`worker.ts`):
- * D1, public-API vars, ingestion/source keys, synthesis + quality knobs,
+ * D1, public-API vars, ingestion/source keys, evidence knobs,
  * the optional queue, and the HTTP replay fixture switches.
  */
 export interface Env {
@@ -16,21 +16,12 @@ export interface Env {
   DATA_FRESHNESS_MAX_HOURS?: string;
   CONGRESS_API_KEY: string;
   GOVINFO_API_KEY: string;
-  OPENROUTER_API_KEY?: string;
-  OPENROUTER_MODEL?: string;
-  OPENROUTER_APP_REFERER?: string;
-  OPENROUTER_APP_TITLE?: string;
-  SYNTHESIS?: string;
   PIPELINE_ADMIN_TOKEN?: string;
   EVIDENCE_MAX_BILLS?: string;
   EVIDENCE_BILL_CONCURRENCY?: string;
   EVIDENCE_ENDPOINT_FANOUT?: string;
   ACTIVITY_LOOKBACK_DAYS?: string;
   PIPELINE_QUEUE?: Queue<PipelineJob>;
-  QUALITY_MIN_CLAIMS_COVERAGE?: string;
-  QUALITY_MIN_QUOTE_VALIDITY?: string;
-  QUALITY_MAX_CONFIDENCE_MISMATCH?: string;
-  QUALITY_HARD_GATES?: string;
   DATA_SOURCE?: string;
   REPLAY_FIXTURE_SET?: string;
   CLOCK?: string;
@@ -61,14 +52,6 @@ export function parseIntSafe(value: string | undefined, fallback: number): numbe
 
 export function parsePct(value: string | undefined, fallback: number): number {
   return Math.max(0, Math.min(parseIntSafe(value, fallback), 100));
-}
-
-export function parseCsvList(value: string | undefined): string[] {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 export function computePct(numerator: number, denominator: number): number {
@@ -133,36 +116,16 @@ export function validateEnv(env: Env): IngestConfig {
 // Parsed pipeline configuration (parsed once, passed to stages)
 // ============================================================================
 
-const DEFAULT_MAX_NEW_ANALYSES = 20;
 const DEFAULT_DATA_FRESHNESS_MAX_HOURS = 36;
 const DEFAULT_ACTIVITY_LOOKBACK_DAYS = 30;
 const DEFAULT_EVIDENCE_MAX_BILLS = 30;
 const DEFAULT_EVIDENCE_BILL_CONCURRENCY = 2;
 const DEFAULT_EVIDENCE_ENDPOINT_FANOUT = 3;
-const DEFAULT_QUALITY_MIN_CLAIMS_COVERAGE = 70;
-const DEFAULT_QUALITY_MIN_QUOTE_VALIDITY = 80;
-const DEFAULT_QUALITY_MAX_CONFIDENCE_MISMATCH = 35;
 
 export interface EvidenceConfig {
   maxBills: number;
   billConcurrency: number;
   endpointFanout: number;
-}
-
-export interface QualityConfig {
-  minClaimsCoveragePct: number;
-  minQuoteValidityPct: number;
-  maxConfidenceMismatchPct: number;
-  hardGates: boolean;
-}
-
-export interface SynthesisConfig {
-  enabled: boolean;
-  maxNewAnalyses: number;
-  appReferer?: string;
-  appTitle: string;
-  models: string[];
-  apiKey?: string;
 }
 
 export interface Config {
@@ -175,8 +138,6 @@ export interface Config {
   dataFreshnessMaxHours: number;
   activityLookbackDays: number;
   evidence: EvidenceConfig;
-  quality: QualityConfig;
-  synthesis: SynthesisConfig;
 }
 
 /**
@@ -186,7 +147,6 @@ export interface Config {
 export function parseConfig(env: Env): Config {
   const ingest = validateEnv(env);
   const replayMode = isReplayDataSource(env);
-  const apiKey = env.OPENROUTER_API_KEY?.trim() || undefined;
 
   return {
     congress: ingest.congress,
@@ -213,26 +173,6 @@ export function parseConfig(env: Env): Config {
         1,
         Math.min(parseIntSafe(env.EVIDENCE_ENDPOINT_FANOUT, DEFAULT_EVIDENCE_ENDPOINT_FANOUT), 4)
       ),
-    },
-    quality: {
-      minClaimsCoveragePct: parsePct(
-        env.QUALITY_MIN_CLAIMS_COVERAGE,
-        DEFAULT_QUALITY_MIN_CLAIMS_COVERAGE
-      ),
-      minQuoteValidityPct: parsePct(env.QUALITY_MIN_QUOTE_VALIDITY, DEFAULT_QUALITY_MIN_QUOTE_VALIDITY),
-      maxConfidenceMismatchPct: parsePct(
-        env.QUALITY_MAX_CONFIDENCE_MISMATCH,
-        DEFAULT_QUALITY_MAX_CONFIDENCE_MISMATCH
-      ),
-      hardGates: parseBool(env.QUALITY_HARD_GATES, false),
-    },
-    synthesis: {
-      enabled: parseBool(env.SYNTHESIS, false) && !replayMode && Boolean(apiKey),
-      maxNewAnalyses: DEFAULT_MAX_NEW_ANALYSES,
-      appReferer: env.OPENROUTER_APP_REFERER?.trim() || undefined,
-      appTitle: env.OPENROUTER_APP_TITLE?.trim() || "congress_tracker_worker",
-      models: parseCsvList(env.OPENROUTER_MODEL),
-      apiKey,
     },
   };
 }

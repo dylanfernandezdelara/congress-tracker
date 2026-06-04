@@ -23,42 +23,21 @@ describe("parseBool", () => {
   });
 });
 
-describe("parseConfig synthesis", () => {
-  it("enables synthesis when SYNTHESIS=on, api key present, and not replay", () => {
-    const config = parseConfig(
-      baseEnv({
-        SYNTHESIS: "on",
-        OPENROUTER_API_KEY: "test-openrouter-key",
-      })
-    );
-    expect(config.synthesis.enabled).toBe(true);
-    expect(config.synthesis.maxNewAnalyses).toBe(20);
-    expect(config.synthesis.apiKey).toBe("test-openrouter-key");
+describe("parseConfig", () => {
+  it("parses evidence limits with defaults", () => {
+    const config = parseConfig(baseEnv());
+    expect(config.evidence.maxBills).toBe(30);
+    expect(config.evidence.billConcurrency).toBe(2);
+    expect(config.evidence.endpointFanout).toBe(3);
   });
 
-  it("keeps synthesis disabled when SYNTHESIS is unset or off", () => {
-    expect(parseConfig(baseEnv()).synthesis.enabled).toBe(false);
-    expect(parseConfig(baseEnv({ SYNTHESIS: "off" })).synthesis.enabled).toBe(false);
-    expect(
-      parseConfig(
-        baseEnv({
-          SYNTHESIS: "off",
-          OPENROUTER_API_KEY: "test-openrouter-key",
-        })
-      ).synthesis.enabled
-    ).toBe(false);
-  });
-
-  it("forces synthesis off in replay mode even with SYNTHESIS=on and api key", () => {
+  it("marks replay mode from harness env", () => {
     const config = parseConfig(
       baseEnv({
         DATA_SOURCE: "replay",
         REPLAY_FIXTURE_SET: "canonical",
-        SYNTHESIS: "on",
-        OPENROUTER_API_KEY: "test-openrouter-key",
       })
     );
     expect(config.replayMode).toBe(true);
-    expect(config.synthesis.enabled).toBe(false);
   });
 });

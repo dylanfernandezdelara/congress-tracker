@@ -383,11 +383,6 @@ export interface CoverageSnapshot {
   pct_with_structured_amount: number;
   pct_with_recipient: number;
   pct_with_state_signal: number;
-  pct_claims_with_evidence_refs: number;
-  pct_benefit_map_with_evidence_refs?: number;
-  pct_likely_reasons_with_evidence_refs?: number;
-  pct_quote_validity?: number;
-  pct_confidence_calibration_mismatch?: number;
   endpoint_success_rates: Partial<Record<EvidenceEndpoint, number>>;
   endpoint_fallback_rates: Partial<Record<EvidenceEndpoint, number>>;
   partial: boolean;
