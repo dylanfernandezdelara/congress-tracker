@@ -121,7 +121,8 @@ export default function Home() {
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
                   The briefing feed has not materialized any vote summaries yet. For local development, run{' '}
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npm run dev:worker</code> and{' '}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npm run dev:web</code>, then trigger{' '}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npm run dev:web</code> (replay mode is the
+                  default in <code className="rounded bg-muted px-1.5 py-0.5 text-xs">.dev.vars</code>), then trigger{' '}
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/__pipeline/run/ingestion</code> if data is
                   missing.
                 </p>

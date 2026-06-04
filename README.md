@@ -18,7 +18,7 @@ npm run dev:worker
 npm run dev:web
 ```
 
-Then open `http://127.0.0.1:5173`. If the briefing feed is empty, trigger ingestion on the worker (see **Development** below).
+Then open `http://127.0.0.1:5173`. The copied `.dev.vars` from `.dev.vars.example` uses replay fixtures by default (no live API keys). If the briefing feed is empty, trigger ingestion on the worker (see **Development** below). Live ingestion requires real `CONGRESS_API_KEY` / `GOVINFO_API_KEY` and switching `DATA_SOURCE` away from `replay`.
 
 For one-time local setup (dependencies, Playwright Chromium, `.dev.vars`), see the **Development** section below.
 
@@ -201,7 +201,7 @@ npm --prefix web install
 npm --prefix web exec -- playwright install --with-deps chromium
 ```
 
-`CONGRESS_API_KEY` and `GOVINFO_API_KEY` in `workers/senate_data_worker/.dev.vars` are required only for **live ingestion** against Congress.gov and GovInfo. Placeholder values from the example file are enough for `npm test`, which boots the worker in replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, fixed `CLOCK`). For local development without live keys, set `DATA_SOURCE=replay` in `.dev.vars`.
+`.dev.vars.example` defaults to replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) so first-run local dev works without live API keys. `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live` (or remove `DATA_SOURCE=replay`). `npm test` also boots the worker in replay with a fixed `CLOCK`.
 
 Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 

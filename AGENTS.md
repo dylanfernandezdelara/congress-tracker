@@ -11,8 +11,8 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test` and `npm run snapshot`).
 
 ### Local setup
-- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
-- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** against Congress.gov/GovInfo; placeholder values from the example file are enough for deterministic test runs. For local dev without live keys, set `DATA_SOURCE=replay` in `.dev.vars`.
+- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example defaults to replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) and sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
+- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live` (or remove `DATA_SOURCE=replay`).
 - Deterministic test runs boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
 - Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
 
@@ -34,7 +34,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - With the web dev server running: `npm run snapshot` (Playwright Chromium screenshots).
 
 ### UI and design review
-- There is no separate frontend fixture path. Run the real worker in replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, optional `CLOCK`) and point the web app at it with `VITE_API_URL`.
+- There is no separate frontend fixture path. Replay UI review sequence: ensure `.dev.vars` has `DATA_SOURCE=replay`, run `npm run dev:worker`, run `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`, trigger `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` if the briefing is empty, then `npm run snapshot`.
 - Replay-backed preview deploys use `[env.preview]` in `workers/senate_data_worker/wrangler.toml` (`wrangler deploy --env preview`).
 
 ## Key Rules
