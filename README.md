@@ -102,6 +102,9 @@ congress-tracker/
 │       │   ├── storage/    (document keys, D1 read repos, schema-once)
 │       │   ├── synthesis/  (OpenRouter bill analysis)
 │       │   ├── sources/    (HTTP/XML/Congress.gov clients)
+│       │   ├── congress/   (Congress.gov client modules)
+│       │   ├── member-ingest/ (member activity ingestion)
+│       │   ├── contract.ts (shared API payload types for web)
 │       │   ├── d1/         (schema, kv_documents, materialization writes)
 │       │   └── read-model.ts
 │       └── wrangler.toml
@@ -154,6 +157,7 @@ Required secrets:
 
 Optional secret/runtime values:
 
+- `SYNTHESIS=on|off` (off by default; set `SYNTHESIS=on` plus a key/model to enable LLM synthesis)
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
   Single model slug or a comma-separated fallback list in priority order.
@@ -162,9 +166,9 @@ Optional secret/runtime values:
 
 Deterministic harness runs do not require live upstream secrets. They start the worker with:
 
-- `HARNESS_MODE=fixture`
-- `HARNESS_FIXTURE_SET=canonical`
-- `HARNESS_NOW=2026-01-20T15:00:00Z`
+- `DATA_SOURCE=replay`
+- `REPLAY_FIXTURE_SET=canonical`
+- `CLOCK=2026-01-20T15:00:00Z`
 
 Set local secrets in `workers/senate_data_worker/.dev.vars`.
 Set deployed secrets with Wrangler:
@@ -184,8 +188,9 @@ The platform read-model schema lives in:
 - `workers/senate_data_worker/migrations/0003_issue_key.sql`
 - `workers/senate_data_worker/migrations/0004_ingested_vote_details.sql`
 - `workers/senate_data_worker/migrations/0005_kv_documents.sql`
+- `workers/senate_data_worker/migrations/0006_drop_ghost_tables.sql`
 
-The worker can also align schema lazily through `src/d1/schema.ts`, but the migration files are the preferred deployment path.
+`PLATFORM_SCHEMA_SQL` in `workers/senate_data_worker/src/d1/schema.ts` is the canonical current-state schema. `migrations/*.sql` is append-only deploy history (Wrangler); `src/d1/schema-drift.test.ts` guards that migrations' net effect matches the canonical schema.
 
 ## Development
 
@@ -204,13 +209,13 @@ Required local secrets in `workers/senate_data_worker/.dev.vars`:
 
 Optional local synthesis settings:
 
+- `SYNTHESIS=on|off` (off by default; set `SYNTHESIS=on` plus a key/model to enable)
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
 - `OPENROUTER_APP_REFERER`
 - `OPENROUTER_APP_TITLE`
-- `OPENROUTER_SHADOW_MODE`
-- `OPENROUTER_CANARY_PERCENT`
-- `OPENROUTER_MAX_NEW_ANALYSES`
+
+Quality/evidence thresholds (`QUALITY_*`, `EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 
 ### Install dependencies
 
@@ -258,11 +263,19 @@ Typical local startup flow:
 
 ### Run the deterministic harness locally
 
+Fast inner loop (worker + HTTP assertions, no browser):
+
+```bash
+npm run harness:quick
+```
+
+Full end-to-end gate:
+
 ```bash
 npm run harness:ci
 ```
 
-This boots the unified worker and web app with isolated local Wrangler state, runs scheduled ingestion against the checked-in fixture corpus, verifies the materialized API outputs, and then runs Playwright against the live local app.
+`harness:ci` boots the unified worker and web app with isolated local Wrangler state, runs scheduled ingestion against the checked-in replay fixture corpus (`DATA_SOURCE=replay`), verifies the materialized API outputs, and then runs Playwright against the live local app (Vite pointed at the harness worker via `VITE_API_URL`).
 
 Useful harness subcommands:
 
@@ -307,9 +320,9 @@ The source adapters are intentionally conservative:
 - retry with backoff and `Retry-After` support
 - cached upstream reuse through `source_fetch_log` and D1 `kv_documents` where applicable
 - resumable historical backfill checkpoints in `pipeline_checkpoints`
-- fixture-driven tests preferred over repeated live API pulls
+- replay-driven tests preferred over repeated live API pulls
 
-Use local fixtures and existing tests for most development work instead of repeatedly hitting Congress.gov or GovInfo.
+Use replay mode and existing tests for most development work instead of repeatedly hitting Congress.gov or GovInfo.
 
 ## Testing
 
@@ -333,6 +346,12 @@ Scheduled-handler smoke test:
 npm --prefix workers/senate_data_worker run smoke:scheduled
 ```
 
+Fast harness (worker + HTTP assertions):
+
+```bash
+npm run harness:quick
+```
+
 Deterministic full-stack harness:
 
 ```bash
@@ -354,6 +373,13 @@ Deploy the unified worker:
 ```bash
 cd workers/senate_data_worker
 npm run deploy
+```
+
+Replay-backed preview environment (`[env.preview]` in `wrangler.toml`):
+
+```bash
+cd workers/senate_data_worker
+npx wrangler deploy --env preview
 ```
 
 Recommended deployment order:
