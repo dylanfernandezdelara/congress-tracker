@@ -13,7 +13,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 ### Local setup
 - Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or run `./scripts/cursor-cloud-setup.sh` (copies the example when missing). The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`; `harness:ci`, `./scripts/dev-all.sh`, and `harness:browser` all read `.dev.vars` for CORS. Use a specific origin in production deploy secrets, not in the committed example.
 - `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** against Congress.gov/GovInfo; placeholder values from the example file are enough for deterministic harness runs. For `./scripts/dev-all.sh` without live keys, set `DATA_SOURCE=replay` in `.dev.vars`.
-- Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
+- Optional local synthesis: `SYNTHESIS=on|off` (off by default). When on, set `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and optionally `OPENROUTER_APP_REFERER`, `OPENROUTER_APP_TITLE`. Quality/evidence thresholds (`QUALITY_*`, `EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 - Deterministic harness runs do not require live upstream secrets; they boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
 - Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
 
@@ -77,11 +77,12 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - `workers/senate_data_worker/src/pipeline/scheduled-ingestion.ts` — pipeline orchestration and scheduled handler
 - `workers/senate_data_worker/src/pipeline/ingestion-stages.ts` — explicit ingestion stage functions
 - `workers/senate_data_worker/src/pipeline/jobs.ts` — queue processing and historical backfill
-- `workers/senate_data_worker/src/pipeline/materialize.ts` — evidence harvest and read-model publish
+- `workers/senate_data_worker/src/pipeline/materialize.ts` — evidence harvest, synthesis, read-model publish
 - `workers/senate_data_worker/src/pipeline/logging.ts` — pipeline run IDs, timing, coverage logging
 - `workers/senate_data_worker/src/http/router.ts` — HTTP router (public reads + `/__pipeline/*` admin)
 - `workers/senate_data_worker/src/read-model.ts` — briefing/detail materialization builders
 - `workers/senate_data_worker/src/storage/` — document key helpers and D1 read repositories (health, pipeline status)
+- `workers/senate_data_worker/src/synthesis/` — OpenRouter client, prompts, coercers, quality gates
 - `workers/senate_data_worker/src/sources/` — shared HTTP/XML/Congress.gov clients
 - `workers/senate_data_worker/src/d1/` — D1 schema (`schema.ts` / `PLATFORM_SCHEMA_SQL`), `schema-drift.test.ts`, `kv_documents` JSON store (`documents.ts`), and write paths
 - `web/src/` — frontend app and API client
@@ -95,6 +96,8 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - The deterministic harness exercises the real local worker in replay mode (`DATA_SOURCE=replay`); there is no frontend fixture data file.
 
 ## Cursor Cloud
+
+Solo-contributor workflow: push fixes directly to `main` (no PRs or `cursor/*` branches) unless the user asks otherwise.
 
 Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh` (`npm ci` in `workers/senate_data_worker` and `web`, Playwright Chromium, creates `.dev.vars` from `.dev.vars.example` when missing). An optional **terminal** starts `./scripts/dev-all.sh` — see **Local development** above.
 
