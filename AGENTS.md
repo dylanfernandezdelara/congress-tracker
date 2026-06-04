@@ -31,10 +31,10 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Worker scheduled smoke (live sources only): `npm --prefix workers/senate_data_worker run smoke:scheduled`
 
 ### UI screenshots
-- With the web dev server running: `npm run snapshot` (Playwright Chromium screenshots).
+- With the web dev server running: `npm run snapshot` (Playwright Chromium, **mobile-first** iPhone 13 profile by default). Use `npm --prefix web run ui:snap:desktop` for 1280×720. On Linux agent VMs where Vite binds to `localhost` only, set `URL=http://localhost:5173`.
 
 ### UI and design review
-- There is no separate frontend fixture path. Replay UI review sequence: ensure `.dev.vars` has `DATA_SOURCE=replay`, run `npm run dev:worker`, run `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`, trigger `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` if the briefing is empty, then `npm run snapshot`.
+- There is no separate frontend fixture path. Replay UI review sequence: ensure `.dev.vars` has `DATA_SOURCE=replay`, run `npm run dev:worker`, run `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`, trigger `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` if the briefing is empty, then `URL=http://localhost:5173 npm run snapshot` (mobile-first).
 - Replay-backed preview deploys use `[env.preview]` in `workers/senate_data_worker/wrangler.toml` (`wrangler deploy --env preview`).
 
 ## Key Rules

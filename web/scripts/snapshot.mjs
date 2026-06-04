@@ -1,12 +1,14 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { chromium, webkit } from '@playwright/test'
+import { chromium, devices, webkit } from '@playwright/test'
 
 const baseUrl = process.env.URL ?? 'http://127.0.0.1:5173'
 const browserName = (process.env.BROWSER ?? 'chromium').toLowerCase()
 const outDir = process.env.OUT_DIR ?? 'artifacts'
 const selector = process.env.SELECTOR ?? 'body'
 const rawPaths = process.env.PATHS ?? '/'
+const waitUntil = process.env.WAIT_UNTIL ?? 'domcontentloaded'
+const settleMs = Number(process.env.SETTLE_MS ?? '500')
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const homeDir = process.env.HOME || ''
@@ -39,6 +41,30 @@ const findChromiumPath = async () => {
   }
 }
 
+/** Mobile-first default; set VIEWPORT=desktop for 1280×720. */
+function resolveViewportProfile() {
+  const mode = (process.env.VIEWPORT ?? 'mobile').trim().toLowerCase()
+  if (mode === 'desktop') {
+    return {
+      tag: 'desktop',
+      context: { viewport: { width: 1280, height: 720 } },
+    }
+  }
+  if (mode === 'mobile') {
+    return { tag: 'mobile', context: devices['iPhone 13'] }
+  }
+  const match = /^(\d{3,4})x(\d{3,5})$/.exec(mode)
+  if (match) {
+    const width = Number(match[1])
+    const height = Number(match[2])
+    return {
+      tag: `${width}x${height}`,
+      context: { viewport: { width, height }, deviceScaleFactor: 2, isMobile: true },
+    }
+  }
+  return { tag: 'mobile', context: devices['iPhone 13'] }
+}
+
 const normalizePath = (value) => {
   if (value.startsWith('http://') || value.startsWith('https://')) return value
   if (value.startsWith('/')) return `${baseUrl}${value}`
@@ -59,6 +85,8 @@ const paths = rawPaths
   .filter(Boolean)
   .map(normalizePath)
 
+const viewportProfile = resolveViewportProfile()
+
 const main = async () => {
   await fs.mkdir(outDir, { recursive: true })
   const errors = []
@@ -68,7 +96,7 @@ const main = async () => {
   const browser = await browserType.launch({
     executablePath: chromiumPath || undefined,
   })
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
+  const page = await browser.newPage(viewportProfile.context)
 
   page.on('console', (msg) => {
     const type = msg.type()
@@ -87,16 +115,25 @@ const main = async () => {
     errors.push(text)
   })
 
+  console.log(`[snapshot] viewport=${viewportProfile.tag}`)
+
   for (const url of paths) {
     console.log(`[snapshot] visiting ${url}`)
-    await page.goto(url, { waitUntil: 'networkidle' })
-    await sleep(500)
-    const loc = page.locator(selector)
+    await page.goto(url, { waitUntil, timeout: 60_000 })
+    await sleep(settleMs)
     const name = safeName(url)
     const outPath = process.env.OUT
       ? process.env.OUT
-      : path.join(outDir, `${name}.png`)
-    await loc.screenshot({ path: outPath })
+      : path.join(outDir, `${name}_${viewportProfile.tag}.png`)
+    if (selector === 'body') {
+      await page.screenshot({
+        path: outPath,
+        fullPage: process.env.FULL_PAGE === '1',
+        animations: 'disabled',
+      })
+    } else {
+      await page.locator(selector).screenshot({ path: outPath, animations: 'disabled' })
+    }
     const html = await page.content()
     console.log(`[snapshot] saved ${outPath} (${html.length} chars html)`)
   }

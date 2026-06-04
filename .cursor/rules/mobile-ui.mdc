@@ -1,0 +1,25 @@
+---
+description: Mobile-first UI iteration — default screenshots and layout review at phone width.
+alwaysApply: true
+---
+
+# Mobile-first UI
+
+When editing frontend layout, typography, or spacing, **design and verify at mobile width first**, then check `sm:` / `lg:` breakpoints.
+
+## Screenshots (required for UI PRs)
+
+- Default: `npm run snapshot` uses **iPhone 13** profile (`VIEWPORT=mobile`, 390×664 logical px).
+- Local Vite in this environment: `URL=http://localhost:5173 npm run snapshot`
+- Multiple routes: `npm run ui:snap:all` (home, about, sample vote detail).
+- Desktop only when needed: `npm run ui:snap:desktop` or `VIEWPORT=desktop`.
+
+Outputs land in `web/artifacts/*_mobile.png` unless `OUT` / `OUT_DIR` is set.
+
+## Replay data
+
+Use worker replay fixtures (`DATA_SOURCE=replay`) — see `replay-mock-data` rule. Trigger ingestion before screenshots if the feed is empty.
+
+## Stack
+
+`npm run dev:worker` + `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`

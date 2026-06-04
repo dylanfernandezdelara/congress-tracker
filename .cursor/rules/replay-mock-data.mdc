@@ -20,6 +20,7 @@ For frontend/UI work, local dev, and screenshots, use **worker replay fixtures**
 1. `npm run dev:worker`
 2. `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`
 3. `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` when the briefing feed is empty
+4. `URL=http://localhost:5173 npm run snapshot` for **mobile-first** UI screenshots (default viewport)
 
 There is no separate frontend mock JSON; the web app calls the real API backed by fixtures in `workers/senate_data_worker/src/harness-fixtures.ts`.
 

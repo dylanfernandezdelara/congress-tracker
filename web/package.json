@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ui:snap": "node scripts/snapshot.mjs",
+    "ui:snap:desktop": "VIEWPORT=desktop node scripts/snapshot.mjs",
     "ui:snap:all": "PATHS=/,/about,/votes/119/2/14 node scripts/snapshot.mjs"
   },
   "dependencies": {

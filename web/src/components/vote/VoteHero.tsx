@@ -27,7 +27,7 @@ type VoteHeroProps = {
 export function VoteHero({ detail }: VoteHeroProps) {
   return (
     <Card className="draft-grid">
-      <CardContent className="grid gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(300px,0.82fr)] lg:px-8 lg:py-8">
+      <CardContent className="grid gap-6 px-4 py-5 sm:gap-8 sm:px-6 sm:py-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(300px,0.82fr)] lg:px-8 lg:py-8">
         <div className="max-w-4xl">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">
@@ -50,7 +50,7 @@ export function VoteHero({ detail }: VoteHeroProps) {
             <Badge variant="outline">{coverageLabel(detail.source_coverage.level)}</Badge>
           </div>
 
-          <h1 className="document-title mt-5 text-4xl font-semibold text-foreground sm:text-5xl lg:text-6xl">
+          <h1 className="document-title mt-4 text-[1.65rem] font-semibold leading-snug text-foreground sm:mt-5 sm:text-4xl sm:leading-tight lg:text-6xl">
             {detail.vote.title}
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-8 text-muted-foreground">

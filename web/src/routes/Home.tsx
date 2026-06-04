@@ -27,7 +27,7 @@ function VoteSummaryRow({ item }: { item: BriefingFeedItem }) {
           </h2>
           <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">{trimSummary(item.summary)}</p>
         </div>
-        <Button asChild size="sm" variant="outline" className="shrink-0 self-start">
+        <Button asChild size="sm" variant="outline" className="w-full shrink-0 sm:w-auto sm:self-start">
           <Link to={item.detail_path}>Full detail</Link>
         </Button>
       </CardContent>
