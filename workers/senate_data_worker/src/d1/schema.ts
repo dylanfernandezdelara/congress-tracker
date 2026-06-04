@@ -1,5 +1,6 @@
-// Production applies workers/senate_data_worker/migrations/*.sql via Wrangler.
-// ensurePlatformSchema() is a local/test safety net for lazy schema alignment.
+// PLATFORM_SCHEMA_SQL is the canonical current-state schema.
+// migrations/*.sql is append-only deploy history (Wrangler); do not rewrite it.
+// schema-drift.test.ts asserts migrations' net effect matches this file + ensurePlatformSchema().
 export const PLATFORM_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS votes (
   congress INTEGER NOT NULL,
