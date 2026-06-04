@@ -22,6 +22,7 @@ import {
   type VoteSummary,
   type VoteDetails,
 } from "./xml";
+import { extractIssue } from "./domain/issue-ref";
 import { computePartyMajorityLabels } from "./domain/party-majority";
 import {
   readIngestedVoteDetailsFromD1,
@@ -30,7 +31,6 @@ import {
 } from "./d1/ingested-votes";
 import type {
   IngestConfig,
-  BillRef,
   VoteLedger,
   VoteLedgerEntry,
   SessionOverview,
@@ -69,88 +69,6 @@ export interface VoteLedgerUpdateOptions {
    * failed (do not refetch), `undefined` to fetch inside this function.
    */
   menuVotes?: VoteSummary[] | null;
-}
-
-/**
- * Extract issue/bill reference from vote details.
- *
- * Looks for patterns like "S. 1234", "H.R. 5678", "PN123" in title/question.
- */
-function extractIssue(detail: VoteDetails): string | undefined {
-  const text = `${detail.vote_document ?? ""} ${detail.vote_title} ${detail.vote_question}`;
-
-  // Match common bill/document patterns
-  const patterns = [
-    /\b(S\.\s*\d+)\b/i, // S. 1234
-    /\b(H\.R\.\s*\d+)\b/i, // H.R. 5678
-    /\b(H\.\s*Res\.\s*\d+)\b/i, // H. Res. 123
-    /\b(S\.\s*Res\.\s*\d+)\b/i, // S. Res. 123
-    /\b(H\.\s*J\.\s*Res\.\s*\d+)\b/i, // H. J. Res. 123
-    /\b(S\.\s*J\.\s*Res\.\s*\d+)\b/i, // S. J. Res. 123
-    /\b(H\.\s*Con\.\s*Res\.\s*\d+)\b/i, // H. Con. Res. 123
-    /\b(S\.\s*Con\.\s*Res\.\s*\d+)\b/i, // S. Con. Res. 123
-    /\b(PN\s*\d+)\b/i, // PN123 (Presidential Nomination)
-    /\b(Treaty Doc\.\s*\d+-\d+)\b/i, // Treaty Doc. 119-1
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      // Normalize whitespace
-      return match[1].replace(/\s+/g, " ");
-    }
-  }
-
-  return undefined;
-}
-
-type IssueType = "bill" | "nomination" | "treaty" | "other";
-
-function parseIssueRef(issue: string, congress: number): {
-  issue_type: IssueType;
-  bill?: BillRef;
-} {
-  const trimmed = issue.trim();
-  if (!trimmed) return { issue_type: "other" };
-
-  const nominationMatch = trimmed.match(/PN\s*(\d+)/i);
-  if (nominationMatch) {
-    return { issue_type: "nomination" };
-  }
-
-  const treatyMatch = trimmed.match(/Treaty Doc\.\s*(\d+)-(\d+)/i);
-  if (treatyMatch) {
-    return { issue_type: "treaty" };
-  }
-
-  const billPatterns: Array<{ pattern: RegExp; type: string }> = [
-    { pattern: /^H\.\s*Con\.\s*Res\./i, type: "H. Con. Res." },
-    { pattern: /^S\.\s*Con\.\s*Res\./i, type: "S. Con. Res." },
-    { pattern: /^H\.\s*J\.\s*Res\./i, type: "H. J. Res." },
-    { pattern: /^S\.\s*J\.\s*Res\./i, type: "S. J. Res." },
-    { pattern: /^H\.\s*Res\./i, type: "H. Res." },
-    { pattern: /^S\.\s*Res\./i, type: "S. Res." },
-    { pattern: /^H\.R\./i, type: "H.R." },
-    { pattern: /^S\./i, type: "S." },
-  ];
-
-  for (const entry of billPatterns) {
-    if (entry.pattern.test(trimmed)) {
-      const numberMatch = trimmed.match(/(\d+)/);
-      if (!numberMatch) break;
-      const number = numberMatch[1];
-      return {
-        issue_type: "bill",
-        bill: {
-          congress,
-          type: entry.type,
-          number,
-        },
-      };
-    }
-  }
-
-  return { issue_type: "other" };
 }
 
 // ============================================================================
@@ -494,4 +412,4 @@ export async function buildVoteLedgerUpdate(
 // Exports for Testing
 // ============================================================================
 
-export { extractIssue, parseIssueRef };
+export { extractIssue, parseIssueRef } from "./domain/issue-ref";

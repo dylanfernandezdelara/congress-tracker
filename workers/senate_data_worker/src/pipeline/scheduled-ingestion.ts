@@ -4,6 +4,25 @@ import type { FetchConfig } from "../fetch";
 import { buildRuntime, type Runtime } from "../runtime";
 import type { VoteLedger } from "../types";
 import {
+  buildVoteLedgerUpdate,
+  discoverVoteLedgerUpdates,
+} from "../ingest";
+import { runMemberIngestion } from "../member-ingest";
+import { readDocumentJson, writeDocumentJson } from "../storage/documents";
+import { buildVoteLedgerKey, buildSessionOverviewKey, hasPublishedReadModels } from "../storage";
+import {
+  collectUniqueBills,
+  buildBillEvidencePipeline,
+  materializeReadModels,
+  publishChamberContext,
+  publishMemberActivity,
+} from "./materialize";
+import {
+  attachEvidenceToActivities,
+  fetchAndParseVoteMenu,
+  resolveActivityIndex,
+} from "./ingestion-helpers";
+import {
   diffVoteNumbers,
   logEvent,
   makeRunId,
@@ -11,26 +30,12 @@ import {
   runTimed,
   summarizeCoverage,
 } from "./logging";
-import { materializeReadModels } from "./materialize";
 import { enqueuePipelineJob } from "./jobs";
-import { readDocumentJson } from "../storage/documents";
-import { buildVoteLedgerKey, hasPublishedReadModels } from "../storage";
-import {
-  collectUniqueBills,
-  stageAttachEvidenceToActivities,
-  stageBuildVoteLedger,
-  stageDiscoverVoteUpdates,
-  stageFetchVoteMenu,
-  stageHarvestEvidence,
-  stageIngestMembers,
-  stagePublishMemberCore,
-  stagePublishVoteLedger,
-  stageResolveActivityIndex,
-} from "./ingestion-stages";
 
 /**
  * Core ingestion logic, separated for use with ctx.waitUntil.
- * Sequences explicit stages; the Senate vote menu is fetched once per run.
+ * Orchestrates member ingestion, bill evidence, vote-ledger updates, and read-model
+ * materialization; the Senate vote menu is fetched once per run.
  */
 export async function runScheduledIngestion(
   env: Env,
@@ -50,15 +55,15 @@ export async function runScheduledIngestion(
   const existingLedger = await readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey());
 
   const menuVotes = await runTimed(runId, "fetch_vote_menu", () =>
-    stageFetchVoteMenu(config.congress, config.session, fetchConfig)
+    fetchAndParseVoteMenu(config.congress, config.session, fetchConfig)
   );
 
   const discovery = await runTimed(runId, "discover_vote_updates", () =>
-    stageDiscoverVoteUpdates(config, existingLedger, {
+    discoverVoteLedgerUpdates(config, existingLedger, {
       db: env.SENATE_DB,
       fetchConfig,
       now,
-      menuVotes,
+      menuVotes: menuVotes ?? undefined,
     })
   );
 
@@ -77,14 +82,19 @@ export async function runScheduledIngestion(
   }
 
   const memberResult = await runTimed(runId, "member_ingestion", () =>
-    stageIngestMembers(config, {
-      congressApiKey: config.congressApiKey,
-      govInfoApiKey: config.govInfoApiKey,
-      now,
-      fixture: runtime.fixtureHttp,
-      menuVotes,
-      fetchConfig,
-    })
+    runMemberIngestion(
+      {
+        congress: config.congress,
+        session: config.session,
+        congressApiKey: config.congressApiKey,
+        govInfoApiKey: config.govInfoApiKey,
+        lookbackDays: config.activityLookbackDays,
+        now,
+        fixture: runtime.fixtureHttp,
+        menuVotes: menuVotes ?? undefined,
+      },
+      fetchConfig
+    )
   );
 
   if (!memberResult.success || !memberResult.membersIndex) {
@@ -92,7 +102,7 @@ export async function runScheduledIngestion(
   }
   const membersIndex = memberResult.membersIndex;
 
-  const effectiveActivityIndex = await stageResolveActivityIndex(env.SENATE_DB, memberResult);
+  const effectiveActivityIndex = await resolveActivityIndex(env.SENATE_DB, memberResult);
   if (
     (memberResult.activityIndex?.activities?.length ?? 0) === 0 &&
     effectiveActivityIndex?.activities?.length
@@ -106,7 +116,7 @@ export async function runScheduledIngestion(
 
   const billsByKey = collectUniqueBills(memberResult.memberActivities, effectiveActivityIndex);
   const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", () =>
-    stageHarvestEvidence(env.SENATE_DB, billsByKey, {
+    buildBillEvidencePipeline(env.SENATE_DB, billsByKey, {
       runId,
       congressApiKey: config.congressApiKey,
       session: config.session,
@@ -117,29 +127,39 @@ export async function runScheduledIngestion(
     })
   );
 
-  stageAttachEvidenceToActivities(
+  attachEvidenceToActivities(
     memberResult.memberActivities,
     effectiveActivityIndex,
     evidencePipeline.impactByKey
   );
 
-  await runTimed(runId, "publish_member_activity_core", () =>
-    stagePublishMemberCore(env.SENATE_DB, membersIndex, memberResult, effectiveActivityIndex)
-  );
+  await runTimed(runId, "publish_member_activity_core", async () => {
+    await publishMemberActivity(
+      env.SENATE_DB,
+      membersIndex,
+      memberResult.memberActivities,
+      memberResult.windowEnd,
+      effectiveActivityIndex
+    );
+    await publishChamberContext(env.SENATE_DB, memberResult.windowEnd, memberResult.context);
+  });
 
   const { ledger, overview } = await runTimed(runId, "build_vote_ledger", () =>
-    stageBuildVoteLedger(config, membersIndex, existingLedger, fetchConfig, {
+    buildVoteLedgerUpdate(config, membersIndex, existingLedger, fetchConfig, {
       db: env.SENATE_DB,
       discovery,
       now,
-      menuVotes,
+      menuVotes: menuVotes ?? undefined,
     })
   );
   const newVoteNumbers = diffVoteNumbers(ledger, existingLedger);
 
-  await runTimed(runId, "publish_vote_ledger", () =>
-    stagePublishVoteLedger(env.SENATE_DB, ledger, overview)
-  );
+  await runTimed(runId, "publish_vote_ledger", async () => {
+    await writeDocumentJson(env.SENATE_DB, buildVoteLedgerKey(), ledger, { skipIfUnchanged: true });
+    await writeDocumentJson(env.SENATE_DB, buildSessionOverviewKey(), overview, {
+      skipIfUnchanged: true,
+    });
+  });
 
   const allErrors = [...memberResult.errors, ...evidencePipeline.errors];
   const coverage = summarizeCoverage(

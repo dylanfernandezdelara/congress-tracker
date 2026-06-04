@@ -74,7 +74,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - `workers/senate_data_worker/src/member-ingest/` — member activity ingestion and summary helpers
 - `workers/senate_data_worker/src/contract.ts` — shared API payload types (imported by web via `@contract`)
 - `workers/senate_data_worker/src/pipeline/scheduled-ingestion.ts` — pipeline orchestration and scheduled handler
-- `workers/senate_data_worker/src/pipeline/ingestion-stages.ts` — explicit ingestion stage functions
+- `workers/senate_data_worker/src/pipeline/ingestion-helpers.ts` — ingestion helpers (vote menu fetch, activity-index fallback, evidence attach)
 - `workers/senate_data_worker/src/pipeline/jobs.ts` — queue processing and historical backfill
 - `workers/senate_data_worker/src/pipeline/materialize.ts` — evidence harvest and read-model publish
 - `workers/senate_data_worker/src/pipeline/logging.ts` — pipeline run IDs, timing, coverage logging
