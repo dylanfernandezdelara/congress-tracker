@@ -1,64 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import type { BriefingFeedItem } from '../api'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { useBriefingFeed } from '../hooks/useBriefingFeed'
+import { useWashingtonClock } from '../hooks/useWashingtonClock'
+import { MAX_HOME_VOTE_AGE_DAYS, isFreshVoteDate } from '../utils/homeClock'
 import { formatBriefingVoteDate } from '../utils/voteLabels'
 import { readHarnessNow } from '../utils/harnessNow'
-
-const MAX_HOME_VOTE_AGE_DAYS = 7
-const WASHINGTON_TIMEZONE = 'America/New_York'
-
-function formatCalendarDate(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(date)
-}
-
-function formatWashingtonDate(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: WASHINGTON_TIMEZONE,
-  }).format(date)
-}
-
-function formatWashingtonTime(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-    timeZone: WASHINGTON_TIMEZONE,
-  }).format(date)
-}
 
 function trimSummary(summary: string, maxLength = 360): string {
   if (summary.length <= maxLength) return summary
   return `${summary.slice(0, maxLength).trimEnd()}…`
-}
-
-function localIsoDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function dayDistance(fromDate: string, toDate: string): number {
-  const from = new Date(`${fromDate}T12:00:00`)
-  const to = new Date(`${toDate}T12:00:00`)
-  return Math.round((from.getTime() - to.getTime()) / 86_400_000)
-}
-
-function isFreshVoteDate(voteDate: string, todayDate: string): boolean {
-  const ageDays = dayDistance(todayDate, voteDate)
-  return ageDays >= 0 && ageDays <= MAX_HOME_VOTE_AGE_DAYS
 }
 
 function VoteSummaryRow({ item }: { item: BriefingFeedItem }) {
@@ -88,41 +41,12 @@ export default function Home() {
     [],
   )
   const { briefing, error, isLoading } = useBriefingFeed()
-  const [currentDate, setCurrentDate] = useState(() => harnessNow ?? new Date())
-  const [dcNow, setDcNow] = useState(() => harnessNow ?? new Date())
+  const { todayDate, todayLabel, dcTimeLabel, dcDateLabel } = useWashingtonClock(harnessNow)
+
   useEffect(() => {
     document.title = 'Congress Tracker'
   }, [])
 
-  useEffect(() => {
-    if (harnessNow) return
-    const intervalId = window.setInterval(() => {
-      setCurrentDate((previousDate) => {
-        const nextDate = new Date()
-        return localIsoDate(previousDate) === localIsoDate(nextDate) ? previousDate : nextDate
-      })
-    }, 60_000)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [harnessNow])
-
-  useEffect(() => {
-    if (harnessNow) return
-    const intervalId = window.setInterval(() => {
-      setDcNow(new Date())
-    }, 1000)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [harnessNow])
-
-  const todayDate = useMemo(() => localIsoDate(currentDate), [currentDate])
-  const todayLabel = useMemo(() => formatCalendarDate(currentDate), [currentDate])
-  const dcTimeLabel = useMemo(() => formatWashingtonTime(dcNow), [dcNow])
-  const dcDateLabel = useMemo(() => formatWashingtonDate(dcNow), [dcNow])
   const freshItems = useMemo(
     () => briefing?.items.filter((item) => isFreshVoteDate(item.vote_date, todayDate)) ?? [],
     [briefing, todayDate],

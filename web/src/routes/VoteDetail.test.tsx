@@ -41,7 +41,24 @@ const fixtureDetail = {
     issue_key: '119:S:100',
     issue_title: 'Rail safety package',
     issue_recurrence_count: 1,
-    related_votes: [],
+    last_comparable_vote: {
+      congress: 119,
+      session: 2,
+      vote_number: 11,
+      vote_date: '2026-02-28',
+      title: 'Prior rail cloture vote',
+      result: 'Agreed to',
+    },
+    related_votes: [
+      {
+        congress: 119,
+        session: 2,
+        vote_number: 12,
+        vote_date: '2026-03-01',
+        title: 'Earlier rail vote',
+        result: 'Agreed to',
+      },
+    ],
   },
   source_coverage: {
     level: 'partial',
@@ -89,5 +106,19 @@ describe('VoteDetail', () => {
 
     expect(await screen.findByRole('heading', { name: 'Live API Vote Title' })).toBeInTheDocument()
     expect(fetchVoteDetail).toHaveBeenCalledWith('119', '2', '14')
+    expect(screen.getByRole('link', { name: 'Vote 12: Earlier rail vote' })).toHaveAttribute(
+      'href',
+      '/votes/119/2/12',
+    )
+  })
+
+  it('links last comparable vote in historical context', async () => {
+    fetchVoteDetail.mockResolvedValue(fixtureDetailTyped)
+    renderVoteDetail('/votes/119/2/14')
+
+    const lastComparableLink = await screen.findByRole('link', {
+      name: 'Last comparable vote 11: Prior rail cloture vote',
+    })
+    expect(lastComparableLink).toHaveAttribute('href', '/votes/119/2/11')
   })
 })

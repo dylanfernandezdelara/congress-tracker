@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
 import { fetchVoteDetail, type VoteDetailResponse } from '../api'
 import { normalizeErrorMessage } from '../utils/errors'
+import { useAsyncData } from './useAsyncData'
 
 export function useVoteDetail(
   congress: string | undefined,
@@ -11,41 +11,17 @@ export function useVoteDetail(
   error: string | null
   isLoading: boolean
 } {
-  const [detail, setDetail] = useState<VoteDetailResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function run() {
-      setIsLoading(true)
-      setError(null)
-
+  const { data, error, isLoading } = useAsyncData({
+    deps: [congress, session, voteNumber],
+    validate: () => {
       if (!congress || !session || !voteNumber) {
-        setError('Missing vote identifier.')
-        setIsLoading(false)
-        return
+        return 'Missing vote identifier.'
       }
+      return null
+    },
+    load: () => fetchVoteDetail(congress!, session!, voteNumber!),
+    mapError: (err) => `Vote detail unavailable. ${normalizeErrorMessage(err)}`,
+  })
 
-      try {
-        const result = await fetchVoteDetail(congress, session, voteNumber)
-        if (cancelled) return
-        setDetail(result)
-      } catch (err) {
-        if (cancelled) return
-        setDetail(null)
-        setError(`Vote detail unavailable. ${normalizeErrorMessage(err)}`)
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [congress, session, voteNumber])
-
-  return { detail, error, isLoading }
+  return { detail: data, error, isLoading }
 }
