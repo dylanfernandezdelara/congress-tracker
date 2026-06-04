@@ -72,7 +72,6 @@ npm --prefix "${ROOT_DIR}/workers/senate_data_worker" run dev -- \
   --var "CLOCK:${CLOCK}" \
   --var "CONGRESS_API_KEY:HARNESS_FIXTURE_KEY" \
   --var "GOVINFO_API_KEY:HARNESS_FIXTURE_KEY" \
-  --var "OPENROUTER_CANARY_PERCENT:0" \
   --var "ALLOWED_ORIGIN:*" \
   >"${WORKER_LOG}" 2>&1 &
 WORKER_PID=$!

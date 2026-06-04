@@ -16,15 +16,6 @@ export function makeRunId(): string {
   return `run-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function hashRunId(runId: string): number {
-  let hash = 0;
-  for (let i = 0; i < runId.length; i++) {
-    hash = (hash << 5) - hash + runId.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash) % 100;
-}
-
 export function logEvent(event: string, payload: Record<string, unknown>): void {
   console.log(JSON.stringify({ event, ...payload }));
 }

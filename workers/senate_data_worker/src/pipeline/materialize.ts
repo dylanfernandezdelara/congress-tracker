@@ -286,7 +286,6 @@ export async function enrichBillAnalyses(
   apiKey: string,
   models: string[],
   maxNewAnalyses: number,
-  shadowMode: boolean,
   qualityGateConfig: QualityGateConfig,
   appReferer?: string,
   appTitle?: string
@@ -338,11 +337,6 @@ export async function enrichBillAnalyses(
     if (qualityGateConfig.hardGates) {
       throw new Error(`Analysis quality gates failed: ${gateFailures.join("; ")}`);
     }
-  }
-
-  if (shadowMode) {
-    console.log("[openrouter] Shadow mode active; analysis was generated but not attached to published payloads.");
-    return result;
   }
 
   for (const memberActivity of memberActivities) {

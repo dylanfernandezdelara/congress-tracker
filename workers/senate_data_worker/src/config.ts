@@ -20,9 +20,7 @@ export interface Env {
   OPENROUTER_MODEL?: string;
   OPENROUTER_APP_REFERER?: string;
   OPENROUTER_APP_TITLE?: string;
-  OPENROUTER_SHADOW_MODE?: string;
-  OPENROUTER_CANARY_PERCENT?: string;
-  OPENROUTER_MAX_NEW_ANALYSES?: string;
+  SYNTHESIS?: string;
   PIPELINE_ADMIN_TOKEN?: string;
   EVIDENCE_MAX_BILLS?: string;
   EVIDENCE_BILL_CONCURRENCY?: string;
@@ -45,8 +43,12 @@ export interface Env {
 export function parseBool(value: string | undefined, fallback = false): boolean {
   if (!value) return fallback;
   const normalized = value.trim().toLowerCase();
-  if (normalized === "1" || normalized === "true" || normalized === "yes") return true;
-  if (normalized === "0" || normalized === "false" || normalized === "no") return false;
+  if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") {
+    return false;
+  }
   return fallback;
 }
 
@@ -131,6 +133,16 @@ export function validateEnv(env: Env): IngestConfig {
 // Parsed pipeline configuration (parsed once, passed to stages)
 // ============================================================================
 
+const DEFAULT_MAX_NEW_ANALYSES = 20;
+const DEFAULT_DATA_FRESHNESS_MAX_HOURS = 36;
+const DEFAULT_ACTIVITY_LOOKBACK_DAYS = 30;
+const DEFAULT_EVIDENCE_MAX_BILLS = 30;
+const DEFAULT_EVIDENCE_BILL_CONCURRENCY = 2;
+const DEFAULT_EVIDENCE_ENDPOINT_FANOUT = 3;
+const DEFAULT_QUALITY_MIN_CLAIMS_COVERAGE = 70;
+const DEFAULT_QUALITY_MIN_QUOTE_VALIDITY = 80;
+const DEFAULT_QUALITY_MAX_CONFIDENCE_MISMATCH = 35;
+
 export interface EvidenceConfig {
   maxBills: number;
   billConcurrency: number;
@@ -146,8 +158,6 @@ export interface QualityConfig {
 
 export interface SynthesisConfig {
   enabled: boolean;
-  shadowMode: boolean;
-  canaryPercent: number;
   maxNewAnalyses: number;
   appReferer?: string;
   appTitle: string;
@@ -185,24 +195,40 @@ export function parseConfig(env: Env): Config {
     congressApiKey: env.CONGRESS_API_KEY || ingest.congressApiKey,
     govInfoApiKey: env.GOVINFO_API_KEY || "HARNESS_FIXTURE_KEY",
     replayMode,
-    dataFreshnessMaxHours: Math.max(1, parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, 36)),
-    activityLookbackDays: Math.max(7, Math.min(parseIntSafe(env.ACTIVITY_LOOKBACK_DAYS, 30), 120)),
+    dataFreshnessMaxHours: Math.max(
+      1,
+      parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, DEFAULT_DATA_FRESHNESS_MAX_HOURS)
+    ),
+    activityLookbackDays: Math.max(
+      7,
+      Math.min(parseIntSafe(env.ACTIVITY_LOOKBACK_DAYS, DEFAULT_ACTIVITY_LOOKBACK_DAYS), 120)
+    ),
     evidence: {
-      maxBills: Math.max(5, parseIntSafe(env.EVIDENCE_MAX_BILLS, 30)),
-      billConcurrency: Math.max(1, Math.min(parseIntSafe(env.EVIDENCE_BILL_CONCURRENCY, 2), 3)),
-      endpointFanout: Math.max(1, Math.min(parseIntSafe(env.EVIDENCE_ENDPOINT_FANOUT, 3), 4)),
+      maxBills: Math.max(5, parseIntSafe(env.EVIDENCE_MAX_BILLS, DEFAULT_EVIDENCE_MAX_BILLS)),
+      billConcurrency: Math.max(
+        1,
+        Math.min(parseIntSafe(env.EVIDENCE_BILL_CONCURRENCY, DEFAULT_EVIDENCE_BILL_CONCURRENCY), 3)
+      ),
+      endpointFanout: Math.max(
+        1,
+        Math.min(parseIntSafe(env.EVIDENCE_ENDPOINT_FANOUT, DEFAULT_EVIDENCE_ENDPOINT_FANOUT), 4)
+      ),
     },
     quality: {
-      minClaimsCoveragePct: parsePct(env.QUALITY_MIN_CLAIMS_COVERAGE, 70),
-      minQuoteValidityPct: parsePct(env.QUALITY_MIN_QUOTE_VALIDITY, 80),
-      maxConfidenceMismatchPct: parsePct(env.QUALITY_MAX_CONFIDENCE_MISMATCH, 35),
+      minClaimsCoveragePct: parsePct(
+        env.QUALITY_MIN_CLAIMS_COVERAGE,
+        DEFAULT_QUALITY_MIN_CLAIMS_COVERAGE
+      ),
+      minQuoteValidityPct: parsePct(env.QUALITY_MIN_QUOTE_VALIDITY, DEFAULT_QUALITY_MIN_QUOTE_VALIDITY),
+      maxConfidenceMismatchPct: parsePct(
+        env.QUALITY_MAX_CONFIDENCE_MISMATCH,
+        DEFAULT_QUALITY_MAX_CONFIDENCE_MISMATCH
+      ),
       hardGates: parseBool(env.QUALITY_HARD_GATES, false),
     },
     synthesis: {
-      enabled: !replayMode && Boolean(apiKey),
-      shadowMode: replayMode ? true : parseBool(env.OPENROUTER_SHADOW_MODE, false),
-      canaryPercent: Math.max(0, Math.min(parseIntSafe(env.OPENROUTER_CANARY_PERCENT, 100), 100)),
-      maxNewAnalyses: Math.max(1, parseIntSafe(env.OPENROUTER_MAX_NEW_ANALYSES, 20)),
+      enabled: parseBool(env.SYNTHESIS, false) && !replayMode && Boolean(apiKey),
+      maxNewAnalyses: DEFAULT_MAX_NEW_ANALYSES,
       appReferer: env.OPENROUTER_APP_REFERER?.trim() || undefined,
       appTitle: env.OPENROUTER_APP_TITLE?.trim() || "congress_tracker_worker",
       models: parseCsvList(env.OPENROUTER_MODEL),

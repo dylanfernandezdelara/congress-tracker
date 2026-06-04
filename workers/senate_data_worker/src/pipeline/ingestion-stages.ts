@@ -27,7 +27,7 @@ import {
 import { DEFAULT_OPENROUTER_MODELS } from "../synthesis/client";
 import type { AnalyzeBillsResult } from "../synthesis/types-shared";
 import { readDocumentJson, writeDocumentJson } from "../storage/documents";
-import { hashRunId, logEvent } from "./logging";
+import { logEvent } from "./logging";
 import {
   buildActivitiesIndexKey,
   buildSessionOverviewKey,
@@ -181,16 +181,14 @@ export async function stageSynthesize(
     options;
   const { synthesis } = config;
   const errors: import("../types").SourceError[] = [];
-  const canaryValue = hashRunId(runId);
-  const canaryEnabled = canaryValue < synthesis.canaryPercent;
 
   const qualityGateConfig = options.qualityGateConfig;
 
-  if (!synthesis.enabled || !canaryEnabled) {
+  if (!synthesis.enabled) {
     if (config.replayMode) {
       errors.push({
         source: "congress",
-        message: "Harness fixture mode active; synthesis skipped",
+        message: "Replay mode active; synthesis skipped",
       });
     } else if (!synthesis.apiKey) {
       errors.push({
@@ -200,7 +198,7 @@ export async function stageSynthesize(
     } else {
       errors.push({
         source: "congress",
-        message: `Synthesis skipped due to canary gating (${canaryValue} >= ${synthesis.canaryPercent})`,
+        message: "Synthesis disabled (SYNTHESIS!=on); synthesis skipped",
       });
     }
     return { analysisResult: null, errors };
@@ -216,13 +214,12 @@ export async function stageSynthesize(
       synthesis.apiKey as string,
       models.length > 0 ? models : [...DEFAULT_OPENROUTER_MODELS],
       synthesis.maxNewAnalyses,
-      synthesis.shadowMode,
       qualityGateConfig,
       synthesis.appReferer,
       synthesis.appTitle
     );
 
-    if (analysisResult && !synthesis.shadowMode) {
+    if (analysisResult) {
       try {
         await publishMemberActivity(
           db,
