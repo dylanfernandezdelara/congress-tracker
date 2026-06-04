@@ -1,11 +1,9 @@
 import { buildBillKey } from "../congress";
 import { harvestBillEvidence, EVIDENCE_ENDPOINT_TIERS } from "../bill-evidence";
 import { buildTrendSnapshot, extractBillImpactEvidence } from "../impact-extract";
-import { readDocumentJson, writeDocumentJson } from "../d1/documents";
-import {
-  analyzeBillsWithCache,
-  type AnalyzeBillsResult,
-} from "../openrouter";
+import { readDocumentJson, writeDocumentJson } from "../storage/documents";
+import { analyzeBillsWithCache } from "../synthesis/client";
+import type { AnalyzeBillsResult } from "../synthesis/types-shared";
 import {
   evaluateQualityGates,
   type QualityGateConfig,

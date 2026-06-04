@@ -16,7 +16,7 @@ import {
   type QualityGateConfig,
 } from "./materialize";
 import { enqueuePipelineJob } from "./jobs";
-import { readDocumentJson } from "../d1/documents";
+import { readDocumentJson } from "../storage/documents";
 import { buildVoteLedgerKey, hasPublishedReadModels } from "../storage";
 import {
   collectUniqueBills,

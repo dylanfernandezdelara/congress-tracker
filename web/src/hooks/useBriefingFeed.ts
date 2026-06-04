@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ApiError, fetchLatestBriefing, type BriefingFeedResponse } from '../api'
+import { fetchLatestBriefing, type BriefingFeedResponse } from '../api'
 import { E2E_BRIEFING } from '../e2eData'
+import { normalizeErrorMessage } from '../utils/errors'
 import { useE2eMode } from './useE2eMode'
-
-function normalizeErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return `${error.message} (HTTP ${error.status})`
-  if (error instanceof Error) return error.message
-  return 'Unexpected fetch error.'
-}
 
 export function useBriefingFeed(): {
   briefing: BriefingFeedResponse | null

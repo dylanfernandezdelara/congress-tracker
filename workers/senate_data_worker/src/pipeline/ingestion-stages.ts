@@ -24,8 +24,9 @@ import {
   type BillEvidencePipelineResult,
   type QualityGateConfig,
 } from "./materialize";
-import { DEFAULT_OPENROUTER_MODELS, type AnalyzeBillsResult } from "../openrouter";
-import { readDocumentJson, writeDocumentJson } from "../d1/documents";
+import { DEFAULT_OPENROUTER_MODELS } from "../synthesis/client";
+import type { AnalyzeBillsResult } from "../synthesis/types-shared";
+import { readDocumentJson, writeDocumentJson } from "../storage/documents";
 import { hashRunId, logEvent } from "./logging";
 import {
   buildActivitiesIndexKey,

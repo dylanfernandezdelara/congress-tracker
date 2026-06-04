@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readDocumentJson, writeDocumentJson } from "./documents";
+import { readDocumentJson, writeDocumentJson } from "../storage/documents";
 
 type KvDocumentsTestDb = D1Database & { insertCount: number };
 

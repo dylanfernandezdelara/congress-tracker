@@ -45,10 +45,6 @@ export type {
   ArgumentExcerpt,
 } from './types';
 
-export {
-  getApiBaseUrl,
-  getApiUrlOverride,
-  setApiUrlOverride,
-} from './config';
+export { getApiBaseUrl } from './config';
 
 export { ApiError, fetchLatestBriefing, fetchVoteDetail } from './client';

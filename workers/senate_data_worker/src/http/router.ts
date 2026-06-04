@@ -1,5 +1,5 @@
 import type { ActivityIndexJson, SessionOverview, VoteLedger } from "../types";
-import { readDocumentJson } from "../d1/documents";
+import { readDocumentJson } from "../storage/documents";
 import { readLatestBriefingFromD1, readVoteDetailFromD1 } from "../d1/materialization";
 import {
   buildActivitiesIndexKey,

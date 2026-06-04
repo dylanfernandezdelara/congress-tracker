@@ -3,7 +3,7 @@ import {
   fetchVoteMenu,
   type FetchConfig,
 } from "../fetch";
-import { readDocumentJson } from "../d1/documents";
+import { readDocumentJson } from "../storage/documents";
 import { readPipelineCheckpoint, writePipelineCheckpoint } from "../d1/checkpoints";
 import { writeHistoricalVoteBatchToD1 } from "../d1/materialization";
 import type { PipelineJob } from "../platform-types";

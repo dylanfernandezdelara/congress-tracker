@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeConfidenceCalibrationSummary,
   computeQuoteValidationSummary,
-} from "./analysis-validation";
+} from "./synthesis/quality";
 import type { BillAnalysis, BillImpactEvidence } from "./types";
 
 describe("analysis-validation", () => {

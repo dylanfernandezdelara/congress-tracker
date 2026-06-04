@@ -4,7 +4,7 @@ import handler from "./worker";
 import * as pipelineJobs from "./pipeline/jobs";
 import * as pipelineMaterialize from "./pipeline/materialize";
 import * as scheduledIngestion from "./pipeline/scheduled-ingestion";
-import * as documents from "./d1/documents";
+import * as documents from "./storage/documents";
 import { resetSchemaOnceForTests } from "./storage";
 
 function createSequentialOnlyDb(): D1Database {
