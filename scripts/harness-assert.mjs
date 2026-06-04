@@ -6,8 +6,20 @@ const assertDir = process.env.HARNESS_ASSERT_DIR ?? path.join(rootDir, 'target',
 const apiUrl = process.env.HARNESS_API_URL ?? 'http://127.0.0.1:8787'
 const pipelineUrl = process.env.HARNESS_PIPELINE_URL ?? 'http://127.0.0.1:8787'
 const expectedVoteId = process.env.HARNESS_EXPECTED_VOTE_ID ?? '119:2:14'
-const expectedVoteNumber = process.env.HARNESS_EXPECTED_VOTE_NUMBER ?? '14'
 const expectedVoteTitle = process.env.HARNESS_EXPECTED_VOTE_TITLE ?? 'Border Infrastructure Modernization Act'
+
+function voteDetailApiPath(voteId) {
+  const parts = voteId.split(':')
+  if (parts.length !== 3 || parts.some((part) => !part)) {
+    throw new Error(`HARNESS_EXPECTED_VOTE_ID must be congress:session:number, got "${voteId}"`)
+  }
+  const [congress, session, number] = parts
+  return `/votes/${congress}/${session}/${number}.json`
+}
+
+const voteDetailPath =
+  process.env.HARNESS_EXPECTED_VOTE_DETAIL_API_PATH ?? voteDetailApiPath(expectedVoteId)
+const expectedVoteNumber = voteDetailPath.match(/\/(\d+)\.json$/)?.[1] ?? ''
 /** When "1", skip GET /__pipeline/status. The unified worker stays up for the whole
  * harness run, so this is no longer set by npm test; retained as a manual escape hatch. */
 const skipPipelineStatus = process.env.HARNESS_ASSERT_SKIP_PIPELINE_STATUS === '1'
@@ -61,7 +73,7 @@ async function main() {
   assert(dataHealth.response.ok, `Data health fetch failed (${dataHealth.response.status})`)
   assert(dataHealth.json?.status === 'ok', 'Data health did not report ok')
 
-  const detail = await fetchJson(`${apiUrl}/votes/119/2/${expectedVoteNumber}.json`)
+  const detail = await fetchJson(`${apiUrl}${voteDetailPath}`)
   await writeArtifact(`vote-detail-${expectedVoteNumber}.json`, detail.json ?? detail.text)
   assert(detail.response.ok, `Vote detail fetch failed (${detail.response.status})`)
   assert(detail.json?.vote?.id === expectedVoteId, `Expected vote detail id ${expectedVoteId}, got ${detail.json?.vote?.id ?? 'none'}`)

@@ -3,8 +3,10 @@
   "scripts": {
     "dev:worker": "npm --prefix workers/senate_data_worker run dev",
     "dev:web": "npm --prefix web run dev",
-    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && ./scripts/harness-ci.sh",
+    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/screenshot-replay-contract.test.mjs && ./scripts/harness-ci.sh",
     "snapshot": "npm --prefix web run ui:snap",
+    "screenshot:replay": "./scripts/screenshot-replay.sh",
+    "docs:snapshots": "./scripts/docs-snapshots.sh",
     "deploy": "npm --prefix workers/senate_data_worker run deploy",
     "refresh:remote": "./scripts/refresh-remote.sh",
     "public:check": "./scripts/public-readiness-check.sh",

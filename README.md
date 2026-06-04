@@ -201,7 +201,7 @@ npm --prefix web install
 npm --prefix web exec -- playwright install --with-deps chromium
 ```
 
-`.dev.vars.example` defaults to replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) so first-run local dev works without live API keys. `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live` (or remove `DATA_SOURCE=replay`). `npm test` also boots the worker in replay with a fixed `CLOCK`.
+`.dev.vars.example` defaults to replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) so first-run local dev works without live API keys. `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live`. `npm test` and `npm run screenshot:replay` boot the worker with explicit replay vars and a fixed `CLOCK`.
 
 Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 
@@ -236,13 +236,27 @@ Typical local startup flow:
 
 ### UI screenshots
 
-With the web dev server running:
+For agent/UI review with deterministic replay data:
+
+```bash
+npm run screenshot:replay
+```
+
+This starts the real Worker with explicit replay vars, triggers ingestion, asserts replay API data, starts Vite against that Worker, and writes mobile PNGs under `target/screenshots/`.
+
+To refresh committed docs reference images:
+
+```bash
+npm run docs:snapshots
+```
+
+For ad-hoc screenshots with the web dev server already running:
 
 ```bash
 npm run snapshot
 ```
 
-Requires Playwright Chromium (`./scripts/cursor-cloud-setup.sh`, or `npm --prefix web exec -- playwright install --with-deps chromium` after web deps are installed).
+Set `FULL_PAGE=1` for a full-page PNG, or `VIEWPORT_WIDTH` / `VIEWPORT_HEIGHT` for a custom viewport. Requires Playwright Chromium (`./scripts/cursor-cloud-setup.sh`, or `npm --prefix web exec -- playwright install --with-deps chromium` after web deps are installed).
 
 ### Seed historical backfill locally
 

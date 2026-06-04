@@ -103,3 +103,66 @@ harness_trigger_ingestion() {
   curl -fsS --max-time "${HARNESS_INGEST_MAX_TIME}" "${HARNESS_PIPELINE_URL}/__pipeline/run/ingestion" \
     >"${HARNESS_ASSERT_DIR}/ingestion-response.json"
 }
+
+harness_assert_replay_api() {
+  node "${ROOT_DIR}/scripts/harness-assert.mjs"
+}
+
+harness_start_web() {
+  echo "Starting web app on ${HARNESS_HOST}:${HARNESS_WEB_PORT}"
+  VITE_API_URL="${HARNESS_API_URL}" \
+    npm --prefix "${ROOT_DIR}/web" run dev -- \
+      --host "${HARNESS_HOST}" \
+      --port "${HARNESS_WEB_PORT}" \
+      >"${HARNESS_WEB_LOG}" 2>&1 &
+  HARNESS_STARTED_WEB_PID=$!
+}
+
+harness_wait_for_web() {
+  wait_for_url "${HARNESS_WEB_URL}" "Web app"
+}
+
+# Bootstraps replay worker + optional web for harness-ci / screenshot-replay.
+# Args: worker_start_message api_assert_timing start_web
+#   api_assert_timing: none | before-web | after-web
+#   start_web: 0 | 1
+# Sets HARNESS_STARTED_WORKER_PID and, when start_web=1, HARNESS_STARTED_WEB_PID.
+harness_bootstrap_replay_stack() {
+  local worker_start_message="$1"
+  local api_assert_timing="${2:-none}"
+  local start_web="${3:-0}"
+
+  harness_prepare_dirs
+  harness_kill_api_ports
+  harness_kill_web_port
+
+  harness_start_worker "${worker_start_message}"
+  if ! harness_wait_for_worker 0; then
+    return 1
+  fi
+
+  if ! harness_trigger_ingestion; then
+    return 1
+  fi
+
+  if [[ "${api_assert_timing}" == "before-web" ]]; then
+    if ! harness_assert_replay_api; then
+      return 1
+    fi
+  fi
+
+  if [[ "${start_web}" == "1" ]]; then
+    harness_start_web
+    if ! harness_wait_for_web; then
+      return 1
+    fi
+  fi
+
+  if [[ "${api_assert_timing}" == "after-web" ]]; then
+    if ! harness_assert_replay_api; then
+      return 1
+    fi
+  fi
+
+  return 0
+}

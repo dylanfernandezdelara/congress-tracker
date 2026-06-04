@@ -7,9 +7,24 @@ const browserName = (process.env.BROWSER ?? 'chromium').toLowerCase()
 const outDir = process.env.OUT_DIR ?? 'artifacts'
 const selector = process.env.SELECTOR ?? 'body'
 const rawPaths = process.env.PATHS ?? '/'
+const waitUntil = process.env.WAIT_UNTIL ?? 'networkidle'
+const assertText = process.env.ASSERT_TEXT?.trim() || ''
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const homeDir = process.env.HOME || ''
+
+const parsePositiveInt = (name, fallback) => {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const parsed = Number.parseInt(raw, 10)
+  if (Number.isFinite(parsed) && parsed > 0) return parsed
+  console.warn(`[snapshot] ignoring invalid ${name}=${raw}; using ${fallback}`)
+  return fallback
+}
+
+const viewportWidth = parsePositiveInt('VIEWPORT_WIDTH', 1280)
+const viewportHeight = parsePositiveInt('VIEWPORT_HEIGHT', 720)
+const settleMs = parsePositiveInt('SETTLE_MS', 500)
 
 const findChromiumPath = async () => {
   if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH
@@ -68,7 +83,9 @@ const main = async () => {
   const browser = await browserType.launch({
     executablePath: chromiumPath || undefined,
   })
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
+  const page = await browser.newPage({
+    viewport: { width: viewportWidth, height: viewportHeight },
+  })
 
   page.on('console', (msg) => {
     const type = msg.type()
@@ -89,14 +106,27 @@ const main = async () => {
 
   for (const url of paths) {
     console.log(`[snapshot] visiting ${url}`)
-    await page.goto(url, { waitUntil: 'networkidle' })
-    await sleep(500)
-    const loc = page.locator(selector)
+    await page.goto(url, { waitUntil })
+    if (assertText) {
+      await page.getByText(assertText, { exact: false }).first().waitFor({
+        state: 'visible',
+        timeout: 30_000,
+      })
+    }
+    await sleep(settleMs)
     const name = safeName(url)
     const outPath = process.env.OUT
       ? process.env.OUT
       : path.join(outDir, `${name}.png`)
-    await loc.screenshot({ path: outPath })
+    if (selector === 'body') {
+      await page.screenshot({
+        path: outPath,
+        fullPage: process.env.FULL_PAGE === '1',
+        animations: 'disabled',
+      })
+    } else {
+      await page.locator(selector).screenshot({ path: outPath, animations: 'disabled' })
+    }
     const html = await page.content()
     console.log(`[snapshot] saved ${outPath} (${html.length} chars html)`)
   }
