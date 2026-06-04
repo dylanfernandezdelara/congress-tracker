@@ -20,7 +20,7 @@ npm run dev:web
 
 Then open `http://127.0.0.1:5173`. If the briefing feed is empty, trigger ingestion on the worker (see **Development** below).
 
-For one-time local setup (`npm install`, `.dev.vars`), see the **Development** section below.
+For one-time local setup (dependencies, Playwright Chromium, `.dev.vars`), see the **Development** section below.
 
 ## Architecture
 
@@ -186,24 +186,24 @@ The platform read-model schema lives in:
 
 ### Local setup (first run)
 
-Create a local worker env file:
+One-shot bootstrap (worker and web `npm ci`, Playwright Chromium, `.dev.vars` from the example when missing):
+
+```bash
+./scripts/cursor-cloud-setup.sh
+```
+
+Or set up manually:
 
 ```bash
 cp workers/senate_data_worker/.dev.vars.example workers/senate_data_worker/.dev.vars
-```
-
-Required local secrets in `workers/senate_data_worker/.dev.vars`:
-
-- `CONGRESS_API_KEY`
-- `GOVINFO_API_KEY`
-
-Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
-### Install dependencies
-
-```bash
 npm --prefix workers/senate_data_worker install
 npm --prefix web install
+npm --prefix web exec -- playwright install --with-deps chromium
 ```
+
+`CONGRESS_API_KEY` and `GOVINFO_API_KEY` in `workers/senate_data_worker/.dev.vars` are required only for **live ingestion** against Congress.gov and GovInfo. Placeholder values from the example file are enough for `npm test`, which boots the worker in replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, fixed `CLOCK`). For local development without live keys, set `DATA_SOURCE=replay` in `.dev.vars`.
+
+Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 
 ### Run the split stack locally
 
@@ -241,6 +241,8 @@ With the web dev server running:
 ```bash
 npm run snapshot
 ```
+
+Requires Playwright Chromium (`./scripts/cursor-cloud-setup.sh`, or `npm --prefix web exec -- playwright install --with-deps chromium` after web deps are installed).
 
 ### Seed historical backfill locally
 
@@ -287,6 +289,8 @@ From the repo root (worker typecheck and tests, web tests and build, determinist
 ```bash
 npm test
 ```
+
+Requires Playwright Chromium (installed by `./scripts/cursor-cloud-setup.sh`, or run `npm --prefix web exec -- playwright install --with-deps chromium` after web dependencies are installed). The harness uses replay fixtures and does not call Congress.gov or GovInfo.
 
 Harness debug artifacts, including browser failure assets, are written to `target/harness/`.
 

@@ -8,7 +8,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 
 ### Install and setup
 - Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing).
-- Or install manually: `npm --prefix workers/senate_data_worker install` and `npm --prefix web install`.
+- Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test` and `npm run snapshot`).
 
 ### Local setup
 - Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
@@ -27,7 +27,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Seed historical backfill: `./scripts/backfill-history.sh`
 
 ### Verification
-- From repo root: `npm test` (worker typecheck and tests, web tests and build, then deterministic harness via `scripts/harness-ci.sh` with replay fixtures and Playwright).
+- From repo root: `npm test` (worker typecheck and tests, web tests and build, then the deterministic replay harness with Playwright).
 - Worker scheduled smoke (live sources only): `npm --prefix workers/senate_data_worker run smoke:scheduled`
 
 ### UI screenshots

@@ -61,4 +61,4 @@ if ! npm --prefix "${ROOT_DIR}/web" exec -- playwright test --config "${ROOT_DIR
   exit 1
 fi
 
-echo "Harness CI run passed."
+echo "Deterministic test harness passed."
