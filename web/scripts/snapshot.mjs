@@ -3,7 +3,7 @@ import path from 'node:path'
 import { chromium, webkit } from '@playwright/test'
 
 const baseUrl = process.env.URL ?? 'http://127.0.0.1:5173'
-const browserName = (process.env.BROWSER ?? 'webkit').toLowerCase()
+const browserName = (process.env.BROWSER ?? 'chromium').toLowerCase()
 const outDir = process.env.OUT_DIR ?? 'artifacts'
 const selector = process.env.SELECTOR ?? 'body'
 const rawPaths = process.env.PATHS ?? '/'

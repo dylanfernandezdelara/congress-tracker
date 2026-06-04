@@ -51,14 +51,14 @@ WEB_PID=$!
 
 wait_for_url "${HARNESS_WEB_URL}" "Web app"
 
-if ! npm run harness:assert; then
+if ! node "${ROOT_DIR}/scripts/harness-assert.mjs"; then
   print_logs
   exit 1
 fi
 
-if ! npm run harness:browser; then
+if ! npm --prefix "${ROOT_DIR}/web" exec -- playwright test --config "${ROOT_DIR}/web/playwright.harness.config.ts"; then
   print_logs
   exit 1
 fi
 
-echo "Harness CI run passed."
+echo "Deterministic test harness passed."

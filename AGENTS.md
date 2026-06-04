@@ -6,21 +6,20 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 
 ## Commands
 
-### Install
-- Worker deps: `npm --prefix workers/senate_data_worker install`
-- Web deps: `npm --prefix web install`
+### Install and setup
+- Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing).
+- Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test` and `npm run snapshot`).
 
 ### Local setup
-- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or run `./scripts/cursor-cloud-setup.sh` (copies the example when missing). The example sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`; `harness:ci`, `./scripts/dev-all.sh`, and `harness:browser` all read `.dev.vars` for CORS. Use a specific origin in production deploy secrets, not in the committed example.
-- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** against Congress.gov/GovInfo; placeholder values from the example file are enough for deterministic harness runs. For `./scripts/dev-all.sh` without live keys, set `DATA_SOURCE=replay` in `.dev.vars`.
-- Deterministic harness runs do not require live upstream secrets; they boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
+- Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example defaults to replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) and sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
+- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live` (or remove `DATA_SOURCE=replay`).
+- Deterministic test runs boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
 - Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
 
 ### Local development
-- Full stack: `./scripts/dev-all.sh` (or `npm run dev` from the repo root)
-- Worker only: `npm --prefix workers/senate_data_worker run dev`
-- Web only: `npm --prefix web run dev`
-- UI/design review against replay data: start the worker with `DATA_SOURCE=replay` (as in `npm run harness:ci` / `harness:quick`), then run Vite with `VITE_API_URL=http://127.0.0.1:8787 npm --prefix web run dev` (or match the harness API port from `scripts/harness-env.sh`).
+- Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
+- Web: `npm run dev:web` (`http://127.0.0.1:5173`)
+- Point the web app at a non-default worker with `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web` (harness uses `scripts/harness-env.sh` for ports).
 
 ### Data refresh
 - Trigger local ingestion: `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion`
@@ -28,22 +27,19 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Seed historical backfill: `./scripts/backfill-history.sh`
 
 ### Verification
-- Fast inner-loop harness (worker + HTTP assertions, ~30s, no browser): `npm run harness:quick`
-- Full deterministic harness: `npm run harness:ci` (worker + Vite + Playwright; use for final end-to-end checks)
-- Harness browser checks only: `npm run harness:browser`
-- Worker typecheck: `npm --prefix workers/senate_data_worker run check`
-- Worker tests: `npm --prefix workers/senate_data_worker test`
-- Worker scheduled smoke test: `npm --prefix workers/senate_data_worker run smoke:scheduled`
-- Web tests: `npm --prefix web test`
-- Web build: `npm --prefix web run build`
+- From repo root: `npm test` (worker typecheck and tests, web tests and build, then the deterministic replay harness with Playwright).
+- Worker scheduled smoke (live sources only): `npm --prefix workers/senate_data_worker run smoke:scheduled`
+
+### UI screenshots
+- With the web dev server running: `npm run snapshot` (Playwright Chromium screenshots).
 
 ### UI and design review
-- There is no separate frontend fixture path. Run the real worker in replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, optional `CLOCK`) and point the web app at it with `VITE_API_URL` (the deterministic harness does this automatically).
+- There is no separate frontend fixture path. Replay UI review sequence: ensure `.dev.vars` has `DATA_SOURCE=replay`, run `npm run dev:worker`, run `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`, trigger `curl -fsS http://127.0.0.1:8787/__pipeline/run/ingestion` if the briefing is empty, then `npm run snapshot`.
 - Replay-backed preview deploys use `[env.preview]` in `workers/senate_data_worker/wrangler.toml` (`wrangler deploy --env preview`).
 
 ## Key Rules
 - Prefer the commands above over guessing root-level npm scripts.
-- Default to `npm run harness:ci` for end-to-end verification; only fall back to manual endpoint checks when debugging the harness itself.
+- Default to `npm test` for verification; inspect `target/harness/` (including `assertions/`) when the harness step fails.
 - When changing ingestion, read both worker pipeline code and read-model/API surfaces.
 - For data freshness issues, check both `/briefings/latest.json` and pipeline status before changing code.
 - Use the local pipeline endpoint to repopulate the latest briefing/feed data after pipeline changes.
@@ -51,13 +47,8 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Never commit secrets from `.dev.vars` or local Wrangler state.
 - Commit and push directly to `main` when explicitly requested and validation is green; create a feature branch and PR when explicitly requested.
 
-## Verification By Change Type
-- Ingestion, pipeline, or materialization changes: run `npm run harness:ci`. Run `npm --prefix workers/senate_data_worker run smoke:scheduled` only when you also need the non-deterministic live-source smoke path.
-- API or read-model changes: run `npm run harness:ci`, then inspect `target/harness/assertions/` if the deterministic API assertions fail.
-- Frontend changes: run `npm run harness:quick` for fast API-backed checks; run `npm run harness:ci` before merge. For manual UI review, use replay mode plus `VITE_API_URL` (see **UI and design review** above).
-
 ## Freshness And Debugging
-- Deterministic harness artifacts, including Playwright failure assets, land in `target/harness/`.
+- Harness artifacts, including Playwright failure assets, land in `target/harness/`.
 - The canonical replay fixture corpus lives behind `REPLAY_FIXTURE_SET=canonical`; refresh it with `npm --prefix workers/senate_data_worker run fixtures:harness:refresh` when intentionally re-basing the deterministic story.
 - Worker health endpoint: `http://127.0.0.1:8787/health`.
 - Pipeline status endpoint: `http://127.0.0.1:8787/__pipeline/status`.
@@ -90,15 +81,15 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - The public API exposes only `/briefings/latest.json`, `/votes/:c/:s/:n.json`, `/health`, and `/health/data`; `/__pipeline/*` admin routes are token-gated on deploy.
 - The latest homepage feed is served from `/briefings/latest.json`.
 - One unified worker handles ingestion/materialization and serving; scheduled (cron) ingestion is not triggered automatically in local dev.
-- Local stack ports from the repo scripts: Worker `http://127.0.0.1:8787`, Web `http://127.0.0.1:5173`.
+- Local stack ports: Worker `http://127.0.0.1:8787`, Web `http://127.0.0.1:5173`.
 - The deterministic harness exercises the real local worker in replay mode (`DATA_SOURCE=replay`); there is no frontend fixture data file.
 
 ## Cursor Cloud
 
 Solo-contributor workflow: push fixes directly to `main` (no PRs or `cursor/*` branches) unless the user asks otherwise.
 
-Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh` (`npm ci` in `workers/senate_data_worker` and `web`, Playwright Chromium, creates `.dev.vars` from `.dev.vars.example` when missing). An optional **terminal** starts `./scripts/dev-all.sh` — see **Local development** above.
+Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh`. Start `npm run dev:worker` and `npm run dev:web` in separate terminals when you need the local stack.
 
-- Default end-to-end check: `npm run harness:ci` (see **Verification** under **Commands** for typecheck, unit tests, and build).
+- End-to-end check: `npm test`.
 - Store real `CONGRESS_API_KEY` / `GOVINFO_API_KEY` in Cursor **Secrets**, not in committed files, when testing live ingestion.
 - CI uses Node.js 20 (`.github/workflows/ci.yml`); there is no `.nvmrc` — Node 20+ is sufficient.

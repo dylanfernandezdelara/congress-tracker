@@ -11,15 +11,16 @@
 
 ### Run locally (exact commands)
 
-Start the local stack:
+In separate terminals:
 
 ```bash
-./scripts/dev-all.sh
+npm run dev:worker
+npm run dev:web
 ```
 
-Then open `http://127.0.0.1:5173`.
+Then open `http://127.0.0.1:5173`. The copied `.dev.vars` from `.dev.vars.example` uses replay fixtures by default (no live API keys). If the briefing feed is empty, trigger ingestion on the worker (see **Development** below). Live ingestion requires real `CONGRESS_API_KEY` / `GOVINFO_API_KEY` and switching `DATA_SOURCE` away from `replay`.
 
-For one-time local setup (`npm install`, `.dev.vars`), see the `Development` section below.
+For one-time local setup (dependencies, Playwright Chromium, `.dev.vars`), see the **Development** section below.
 
 ## Architecture
 
@@ -185,32 +186,31 @@ The platform read-model schema lives in:
 
 ### Local setup (first run)
 
-Create a local worker env file:
+One-shot bootstrap (worker and web `npm ci`, Playwright Chromium, `.dev.vars` from the example when missing):
+
+```bash
+./scripts/cursor-cloud-setup.sh
+```
+
+Or set up manually:
 
 ```bash
 cp workers/senate_data_worker/.dev.vars.example workers/senate_data_worker/.dev.vars
-```
-
-Required local secrets in `workers/senate_data_worker/.dev.vars`:
-
-- `CONGRESS_API_KEY`
-- `GOVINFO_API_KEY`
-
-Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
-### Install dependencies
-
-```bash
 npm --prefix workers/senate_data_worker install
 npm --prefix web install
+npm --prefix web exec -- playwright install --with-deps chromium
 ```
+
+`.dev.vars.example` defaults to replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) so first-run local dev works without live API keys. `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live` (or remove `DATA_SOURCE=replay`). `npm test` also boots the worker in replay with a fixed `CLOCK`.
+
+Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 
 ### Run the split stack locally
 
 ```bash
-./scripts/dev-all.sh
+npm run dev:worker
+npm run dev:web
 ```
-
-This starts:
 
 - Unified Worker at `http://127.0.0.1:8787`
 - Web app at `http://127.0.0.1:5173`
@@ -218,13 +218,6 @@ This starts:
 The repo ships with a local `D1` binding enabled in the Wrangler config so queue, evidence, and read-model code can run end to end during local development without provisioning a remote database first.
 
 Scheduled (cron) ingestion is not triggered automatically in local development.
-
-You can also run them individually:
-
-```bash
-npm --prefix workers/senate_data_worker run dev
-npm --prefix web run dev
-```
 
 ### Trigger pipeline ingestion locally
 
@@ -236,35 +229,20 @@ This targets the local worker and triggers the same backend-owned ingestion path
 
 Typical local startup flow:
 
-1. Start the stack with `./scripts/dev-all.sh`.
-2. In a second terminal, trigger `/__pipeline/run/ingestion` if you need fresh data immediately.
+1. Start the worker and web (`npm run dev:worker`, `npm run dev:web`).
+2. Trigger `/__pipeline/run/ingestion` if you need fresh data immediately.
 3. Verify freshness with `http://127.0.0.1:8787/__pipeline/status` and `http://127.0.0.1:8787/briefings/latest.json`.
 4. Open `http://127.0.0.1:5173`.
 
-### Run the deterministic harness locally
+### UI screenshots
 
-Fast inner loop (worker + HTTP assertions, no browser):
-
-```bash
-npm run harness:quick
-```
-
-Full end-to-end gate:
+With the web dev server running:
 
 ```bash
-npm run harness:ci
+npm run snapshot
 ```
 
-`harness:ci` boots the unified worker and web app with isolated local Wrangler state, runs scheduled ingestion against the checked-in replay fixture corpus (`DATA_SOURCE=replay`), verifies the materialized API outputs, and then runs Playwright against the live local app (Vite pointed at the harness worker via `VITE_API_URL`).
-
-Useful harness subcommands:
-
-```bash
-npm run harness:assert
-npm run harness:browser
-```
-
-The deterministic harness writes debug artifacts, including browser failure assets, to `target/harness/`.
+Requires Playwright Chromium (`./scripts/cursor-cloud-setup.sh`, or `npm --prefix web exec -- playwright install --with-deps chromium` after web deps are installed).
 
 ### Seed historical backfill locally
 
@@ -306,36 +284,20 @@ Use replay mode and existing tests for most development work instead of repeated
 
 ## Testing
 
-Worker checks:
+From the repo root (worker typecheck and tests, web tests and build, deterministic replay harness with Playwright):
 
 ```bash
-npm --prefix workers/senate_data_worker run check
-npm --prefix workers/senate_data_worker test
+npm test
 ```
 
-Web checks:
+Requires Playwright Chromium (installed by `./scripts/cursor-cloud-setup.sh`, or run `npm --prefix web exec -- playwright install --with-deps chromium` after web dependencies are installed). The harness uses replay fixtures and does not call Congress.gov or GovInfo.
 
-```bash
-npm --prefix web test
-npm --prefix web run build
-```
+Harness debug artifacts, including browser failure assets, are written to `target/harness/`.
 
-Scheduled-handler smoke test:
+Scheduled-handler smoke test (live upstream sources):
 
 ```bash
 npm --prefix workers/senate_data_worker run smoke:scheduled
-```
-
-Fast harness (worker + HTTP assertions):
-
-```bash
-npm run harness:quick
-```
-
-Deterministic full-stack harness:
-
-```bash
-npm run harness:ci
 ```
 
 Maintainer-only fixture refresh:

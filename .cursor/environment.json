@@ -1,11 +1,4 @@
 {
   "name": "Congress Tracker",
-  "install": "./scripts/cursor-cloud-setup.sh",
-  "terminals": [
-    {
-      "name": "Full stack",
-      "command": "./scripts/dev-all.sh",
-      "description": "Unified worker :8787 (API + pipeline + cron), Vite :5173 (uses workers/senate_data_worker/.dev.vars)"
-    }
-  ]
+  "install": "./scripts/cursor-cloud-setup.sh"
 }
