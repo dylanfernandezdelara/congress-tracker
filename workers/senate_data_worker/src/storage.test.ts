@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildActivitiesIndexKey,
   buildBillEvidenceKey,
-  buildBillNarrativeKey,
   buildBillTrendSnapshotKey,
   buildLatestChamberContextKey,
   buildMembersIndexKey,
@@ -21,7 +20,6 @@ describe("kv_documents key layout helpers", () => {
 
   it("builds bill evidence and trend keys", () => {
     expect(buildBillEvidenceKey("119-s-210")).toBe("bills/evidence/119-s-210.json");
-    expect(buildBillNarrativeKey("119-s-210")).toBe("bills/narrative/119-s-210.json");
     expect(buildBillTrendSnapshotKey(119, "119-s-210", "2026-02-18")).toBe(
       "bills/trends/119/119-s-210/2026-02-18.json"
     );

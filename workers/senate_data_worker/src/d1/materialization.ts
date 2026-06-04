@@ -7,7 +7,7 @@ import type {
   VoteDetailResponse,
 } from "../platform-types";
 import { buildIssueKey, buildThreadKey } from "../domain/issue-keys";
-import { normalizeHistoricalBillType } from "../domain/bill-ref";
+import { canBuildBillKey, normalizeHistoricalBillType } from "../domain/bill-ref";
 import { normalizeVoteStatus } from "../domain/vote-status";
 import { buildVoteDetailResponse } from "../read-model";
 import type { VoteDetails } from "../xml";
@@ -20,17 +20,6 @@ import type { SignificanceLevel } from "../platform-types";
 
 function toSqlBool(value: boolean): number {
   return value ? 1 : 0;
-}
-
-function canBuildBillKey(bill: BillRef | undefined): bill is BillRef {
-  return Boolean(
-    bill &&
-      typeof bill.congress === "number" &&
-      typeof bill.type === "string" &&
-      bill.type.trim() &&
-      typeof bill.number === "string" &&
-      bill.number.trim()
-  );
 }
 
 function extractHistoricalThreadKey(detail: VoteDetails): string {

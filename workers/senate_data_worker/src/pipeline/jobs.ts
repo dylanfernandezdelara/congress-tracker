@@ -3,16 +3,10 @@ import {
   fetchVoteMenu,
   type FetchConfig,
 } from "../fetch";
-import { readDocumentJson } from "../storage/documents";
 import { readPipelineCheckpoint, writePipelineCheckpoint } from "../d1/checkpoints";
 import { writeHistoricalVoteBatchToD1 } from "../d1/materialization";
 import type { PipelineJob } from "../platform-types";
 import { parseVoteDetailXml, parseVoteMenuXml } from "../xml";
-import {
-  buildVoteLedgerKey,
-  buildSessionOverviewKey,
-  buildActivitiesIndexKey,
-} from "../storage";
 import {
   HISTORICAL_BACKFILL_BATCH_SIZE,
   logEvent,
@@ -20,8 +14,7 @@ import {
 } from "./logging";
 import type { Env } from "../config";
 import { buildRuntime, type Runtime } from "../runtime";
-import type { ActivityIndexJson, SessionOverview, VoteLedger } from "../types";
-import { materializeReadModels } from "./materialize";
+import { materializeReadModelsFromStorage } from "./materialize";
 
 export async function enqueuePipelineJob(env: Env, job: PipelineJob): Promise<boolean> {
   if (!env.PIPELINE_QUEUE) return false;
@@ -154,15 +147,7 @@ export async function processPipelineJob(
   runtime: Runtime = buildRuntime(env)
 ): Promise<void> {
   if (job.type === "materialize_read_models") {
-    const [ledger, overview, activityIndex] = await Promise.all([
-      readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey()),
-      readDocumentJson<SessionOverview>(env.SENATE_DB, buildSessionOverviewKey()),
-      readDocumentJson<ActivityIndexJson>(env.SENATE_DB, buildActivitiesIndexKey()),
-    ]);
-    if (!ledger || !overview) {
-      throw new Error("Materialization job missing ledger or overview in storage");
-    }
-    await materializeReadModels(env, ledger, overview, activityIndex);
+    await materializeReadModelsFromStorage(env);
     return;
   }
 

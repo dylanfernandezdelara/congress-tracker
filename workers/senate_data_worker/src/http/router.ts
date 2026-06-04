@@ -1,17 +1,14 @@
-import type { ActivityIndexJson, SessionOverview, VoteLedger } from "../types";
-import { readDocumentJson } from "../storage/documents";
 import { readLatestBriefingFromD1, readVoteDetailFromD1 } from "../d1/materialization";
-import {
-  buildActivitiesIndexKey,
-  buildSessionOverviewKey,
-  buildVoteLedgerKey,
-  readLatestBriefingGeneratedAt,
-} from "../storage";
+import { readLatestBriefingGeneratedAt } from "../storage";
 import { parseIntSafe, type Env } from "../config";
 import { buildRuntime } from "../runtime";
 import { authorizePipelineAdmin } from "../pipeline-auth";
 import { readPipelineStatus } from "../storage";
-import { materializeReadModels } from "../pipeline/materialize";
+import {
+  hasMaterializationPrerequisites,
+  materializeReadModels,
+  readMaterializationPrerequisites,
+} from "../pipeline/materialize";
 import { processPipelineJob } from "../pipeline/jobs";
 import { runScheduledIngestion } from "../pipeline/scheduled-ingestion";
 import {
@@ -154,19 +151,23 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
   }
 
   if (pathname === "/__pipeline/run/materialize") {
-    const [ledger, overview, activityIndex] = await Promise.all([
-      readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey()),
-      readDocumentJson<SessionOverview>(env.SENATE_DB, buildSessionOverviewKey()),
-      readDocumentJson<ActivityIndexJson>(env.SENATE_DB, buildActivitiesIndexKey()),
-    ]);
-    if (!ledger || !overview) {
+    const prereqs = await readMaterializationPrerequisites(env.SENATE_DB);
+    if (!hasMaterializationPrerequisites(prereqs)) {
       return json(
         { error: "missing_prerequisites", message: "Ledger or overview data is missing from storage." },
         { status: 503 }
       );
     }
-    await materializeReadModels(env, ledger, overview, activityIndex);
-    return json({ status: "ok", action: "materialize", vote_count: ledger.entries.length }, { status: 200 });
+    await materializeReadModels(
+      env,
+      prereqs.ledger,
+      prereqs.overview,
+      prereqs.activityIndex
+    );
+    return json(
+      { status: "ok", action: "materialize", vote_count: prereqs.ledger.entries.length },
+      { status: 200 }
+    );
   }
 
   if (pathname === "/__pipeline/run/ingestion") {

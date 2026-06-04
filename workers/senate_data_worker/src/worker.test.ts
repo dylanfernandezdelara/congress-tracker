@@ -261,29 +261,35 @@ describe("pipeline debug routes", () => {
     expect(waitUntil.mock.calls[0]?.[0]).toBeInstanceOf(Promise);
   });
 
+  it("retries materialize queue jobs when ledger or overview is missing from storage", async () => {
+    vi.spyOn(documents, "readDocumentJson").mockResolvedValue(null);
+
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const waitUntil = vi.fn((promise: Promise<unknown>) => promise);
+    const ctx = { waitUntil } as unknown as ExecutionContext;
+    const job = {
+      type: "materialize_read_models",
+      created_at: new Date().toISOString(),
+      reason: "test",
+    } as const;
+    await handler.queue(
+      {
+        messages: [{ body: job, ack, retry }],
+      } as unknown as MessageBatch<typeof job>,
+      createMockEnv() as any,
+      ctx
+    );
+    await waitUntil.mock.calls[0]?.[0];
+    expect(retry).toHaveBeenCalledOnce();
+    expect(ack).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
   it("acks queue messages after successful job dispatch", async () => {
-    const materializeSpy = vi.spyOn(pipelineMaterialize, "materializeReadModels").mockResolvedValue();
-    const ledger = {
-      congress: 119,
-      session: 2,
-      generated_at: "2026-01-20T12:00:00Z",
-      total_votes: 0,
-      entries: [],
-    };
-    const overview = {
-      congress: 119,
-      session: 2,
-      generated_at: "2026-01-20T12:00:00Z",
-      total_votes: 0,
-      latest_vote_date: "2026-01-17",
-      total_defections: 0,
-      senators: [],
-    };
-    vi.spyOn(documents, "readDocumentJson").mockImplementation(async (_db, key) => {
-      if (key === "votes/ledger.json") return ledger;
-      if (key === "stats/overview.json") return overview;
-      return null;
-    });
+    const materializeSpy = vi
+      .spyOn(pipelineMaterialize, "materializeReadModelsFromStorage")
+      .mockResolvedValue();
 
     const ack = vi.fn();
     const retry = vi.fn();

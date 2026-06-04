@@ -18,11 +18,6 @@ export function buildBillEvidenceKey(billKey: string): string {
   return `bills/evidence/${billKey}.json`;
 }
 
-/** Legacy per-bill analysis documents (pre-OpenRouter removal); not written by current pipeline. */
-export function buildBillNarrativeKey(billKey: string): string {
-  return `bills/narrative/${billKey}.json`;
-}
-
 export function buildBillTrendSnapshotKey(
   congress: number,
   billKey: string,

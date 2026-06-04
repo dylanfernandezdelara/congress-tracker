@@ -12,7 +12,10 @@ import {
   buildBillEvidenceKey,
   buildBillTrendSnapshotKey,
   buildChamberContextKey,
+  buildSessionOverviewKey,
+  buildVoteLedgerKey,
 } from "../storage";
+import { canBuildBillKey } from "../domain/bill-ref";
 import { computePct, type Env } from "../config";
 import type { FetchConfig } from "../fetch";
 import type { FixtureHttp } from "../harness";
@@ -82,17 +85,6 @@ export async function publishMemberActivity(
   }
 
   console.log("[d1] Member activity documents publish complete");
-}
-
-export function canBuildBillKey(bill: BillRef | undefined): bill is BillRef {
-  return Boolean(
-    bill &&
-    typeof bill.congress === "number" &&
-    typeof bill.type === "string" &&
-    bill.type.trim() &&
-    typeof bill.number === "string" &&
-    bill.number.trim()
-  );
 }
 
 export function collectUniqueBills(
@@ -271,4 +263,49 @@ export async function materializeReadModels(
     activityIndex,
     materialization
   );
+}
+
+type MaterializationPrerequisitesInput = {
+  ledger: VoteLedger | null;
+  overview: SessionOverview | null;
+  activityIndex: ActivityIndexJson | null;
+};
+
+type MaterializationPrerequisites = {
+  ledger: VoteLedger;
+  overview: SessionOverview;
+  activityIndex: ActivityIndexJson | null;
+};
+
+export async function readMaterializationPrerequisites(
+  db: D1Database
+): Promise<MaterializationPrerequisitesInput> {
+  const [ledger, overview, activityIndex] = await Promise.all([
+    readDocumentJson<VoteLedger>(db, buildVoteLedgerKey()),
+    readDocumentJson<SessionOverview>(db, buildSessionOverviewKey()),
+    readDocumentJson<ActivityIndexJson>(db, buildActivitiesIndexKey()),
+  ]);
+  return { ledger, overview, activityIndex };
+}
+
+export function hasMaterializationPrerequisites(
+  prereqs: MaterializationPrerequisitesInput
+): prereqs is MaterializationPrerequisites {
+  return prereqs.ledger !== null && prereqs.overview !== null;
+}
+
+function requireMaterializationPrerequisites(
+  prereqs: MaterializationPrerequisitesInput
+): MaterializationPrerequisites {
+  if (!hasMaterializationPrerequisites(prereqs)) {
+    throw new Error("Materialization job missing ledger or overview in storage");
+  }
+  return prereqs;
+}
+
+export async function materializeReadModelsFromStorage(env: Env): Promise<void> {
+  const prereqs = requireMaterializationPrerequisites(
+    await readMaterializationPrerequisites(env.SENATE_DB)
+  );
+  await materializeReadModels(env, prereqs.ledger, prereqs.overview, prereqs.activityIndex);
 }

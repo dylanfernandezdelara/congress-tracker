@@ -1,3 +1,16 @@
+import type { BillRef } from "../types";
+
+export function canBuildBillKey(bill: BillRef | undefined): bill is BillRef {
+  return Boolean(
+    bill &&
+      typeof bill.congress === "number" &&
+      typeof bill.type === "string" &&
+      bill.type.trim() &&
+      typeof bill.number === "string" &&
+      bill.number.trim()
+  );
+}
+
 export function normalizeHistoricalBillType(rawType: string): string {
   const normalized = rawType.toUpperCase().replace(/[^A-Z]/g, "");
   if (normalized === "HR") return "H.R.";
