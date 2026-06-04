@@ -9,7 +9,7 @@ const expectedVoteId = process.env.HARNESS_EXPECTED_VOTE_ID ?? '119:2:14'
 const expectedVoteNumber = process.env.HARNESS_EXPECTED_VOTE_NUMBER ?? '14'
 const expectedVoteTitle = process.env.HARNESS_EXPECTED_VOTE_TITLE ?? 'Border Infrastructure Modernization Act'
 /** When "1", skip GET /__pipeline/status. The unified worker stays up for the whole
- * harness run, so this is no longer set by harness:ci; retained as a manual escape hatch. */
+ * harness run, so this is no longer set by npm test; retained as a manual escape hatch. */
 const skipPipelineStatus = process.env.HARNESS_ASSERT_SKIP_PIPELINE_STATUS === '1'
 
 async function fetchJson(url) {

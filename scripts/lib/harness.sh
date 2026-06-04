@@ -1,4 +1,4 @@
-# Shared harness helpers for harness-quick.sh and harness-ci.sh.
+# Shared harness helpers for harness-ci.sh.
 # Source after scripts/harness-env.sh (ROOT_DIR must be set). This file sources proc.sh.
 # Safe to source multiple times; do not enable errexit here.
 

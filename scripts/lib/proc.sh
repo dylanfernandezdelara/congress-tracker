@@ -1,4 +1,4 @@
-# Shared process/port helpers for harness and local dev scripts.
+# Shared process/port helpers for harness scripts.
 # Safe to source multiple times; do not enable errexit here.
 
 if [[ -n "${_PROC_LIB_PROC_SH:-}" ]]; then
