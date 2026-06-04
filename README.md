@@ -201,7 +201,7 @@ npm --prefix web install
 npm --prefix web exec -- playwright install --with-deps chromium
 ```
 
-`.dev.vars.example` defaults to replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) so first-run local dev works without live API keys. `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live`. `npm test` and `npm run screenshot:replay` boot the worker with explicit replay vars and a fixed `CLOCK`.
+`.dev.vars.example` defaults to replay mode (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) so first-run local dev works without live API keys. `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live`. `npm test` and `npm run preview:replay` boot the worker with explicit replay vars and a fixed `CLOCK`.
 
 Evidence thresholds (`EVIDENCE_*`, `ACTIVITY_LOOKBACK_DAYS`, `DATA_FRESHNESS_MAX_HOURS`) have code defaults and are overridable via env when tuning.
 
@@ -234,29 +234,23 @@ Typical local startup flow:
 3. Verify freshness with `http://127.0.0.1:8787/__pipeline/status` and `http://127.0.0.1:8787/briefings/latest.json`.
 4. Open `http://127.0.0.1:5173`.
 
-### UI screenshots
+### UI preview (deterministic replay)
 
 For agent/UI review with deterministic replay data:
 
 ```bash
-npm run screenshot:replay
+npm run preview:replay
 ```
 
-This starts the real Worker with explicit replay vars, triggers ingestion, asserts replay API data, starts Vite against that Worker, and writes mobile PNGs under `target/screenshots/`.
+This starts the real Worker with explicit replay vars, triggers ingestion, asserts canonical API data, starts Vite against that Worker, prints local URLs and expected routes, and keeps running until interrupted. Use Cursor Cloud browser/screenshot artifacts for captures — screenshots are never committed to the repo.
 
-To refresh committed docs reference images:
-
-```bash
-npm run docs:snapshots
-```
-
-For ad-hoc screenshots with the web dev server already running:
+Optional ad-hoc Playwright capture with the web dev server already running:
 
 ```bash
 npm run snapshot
 ```
 
-Set `FULL_PAGE=1` for a full-page PNG, or `VIEWPORT_WIDTH` / `VIEWPORT_HEIGHT` for a custom viewport. Requires Playwright Chromium (`./scripts/cursor-cloud-setup.sh`, or `npm --prefix web exec -- playwright install --with-deps chromium` after web deps are installed).
+Set `OUT` to a path under `target/` (gitignored). Set `FULL_PAGE=1` for a full-page PNG, or `VIEWPORT_WIDTH` / `VIEWPORT_HEIGHT` for a custom viewport. Requires Playwright Chromium (`./scripts/cursor-cloud-setup.sh`, or `npm --prefix web exec -- playwright install --with-deps chromium` after web deps are installed).
 
 ### Seed historical backfill locally
 

@@ -18,6 +18,7 @@ workers/senate_data_worker/wrangler.remote.toml
 /target/
 web/artifacts/
 web/output/
+docs/screenshots/
 senate-*.png
 .playwright-cli/
 

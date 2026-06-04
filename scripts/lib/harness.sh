@@ -122,7 +122,7 @@ harness_wait_for_web() {
   wait_for_url "${HARNESS_WEB_URL}" "Web app"
 }
 
-# Bootstraps replay worker + optional web for harness-ci / screenshot-replay.
+# Bootstraps replay worker + optional web for harness-ci / preview-replay.
 # Args: worker_start_message api_assert_timing start_web
 #   api_assert_timing: none | before-web | after-web
 #   start_web: 0 | 1

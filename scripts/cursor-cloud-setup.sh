@@ -14,7 +14,7 @@ npm --prefix "${WORKER_DIR}" ci
 echo "Installing web dependencies..."
 npm --prefix "${WEB_DIR}" ci
 
-echo "Installing Playwright Chromium (for npm test, npm run screenshot:replay, and npm run snapshot)..."
+echo "Installing Playwright Chromium (for npm test and optional npm run snapshot)..."
 npm --prefix "${WEB_DIR}" exec -- playwright install --with-deps chromium
 
 if [[ ! -f "${DEV_VARS}" ]]; then

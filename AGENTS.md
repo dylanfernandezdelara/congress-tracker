@@ -8,7 +8,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 
 ### Install and setup
 - Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing).
-- Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test`, `npm run screenshot:replay`, and `npm run snapshot`; see `./scripts/cursor-cloud-setup.sh`).
+- Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test`; see `./scripts/cursor-cloud-setup.sh`).
 
 ### Local setup
 - Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example defaults to replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) and sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
@@ -30,13 +30,12 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - From repo root: `npm test` (worker typecheck and tests, web tests and build, then the deterministic replay harness with Playwright).
 - Worker scheduled smoke (live sources only): `npm --prefix workers/senate_data_worker run smoke:scheduled`
 
-### UI screenshots
-- **Agents (hermetic replay):** `npm run screenshot:replay` — starts the worker with explicit replay vars (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, fixed `CLOCK`), ingests, asserts API data, starts Vite against that worker, writes mobile PNGs under `target/screenshots/`. Does not use `.dev.vars` for data source.
-- **Docs images:** `npm run docs:snapshots` — runs the replay screenshot flow and copies outputs into `docs/screenshots/`. See `docs/AGENTS.md`.
-- **Manual / desktop:** With dev servers already running: `npm run snapshot` (Playwright Chromium; set `URL` if not on `:5173`; `FULL_PAGE=1` for full-page capture).
+### UI preview and screenshots
+- **Agents (hermetic replay):** `npm run preview:replay` — starts the worker with explicit replay vars (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, fixed `CLOCK`), ingests, asserts API data, starts Vite against that worker, prints URLs/routes, and stays running until interrupted. Capture screenshots with Cursor Cloud browser tooling; never commit PNGs. See `docs/AGENTS.md`.
+- **Manual Playwright (optional):** With dev servers already running: `npm run snapshot` (set `URL` if not on `:5173`; `OUT` under `target/`; not for repo check-in).
 
 ### UI and design review
-- Prefer `npm run screenshot:replay` over hand-starting worker/web with `.dev.vars`. For interactive debugging, replay still uses explicit vars via the harness scripts; live ingestion requires `DATA_SOURCE=live` (not omitting `DATA_SOURCE`) plus real API keys in `.dev.vars` or secrets.
+- Prefer `npm run preview:replay` over hand-starting worker/web with `.dev.vars`. For interactive debugging, replay still uses explicit vars via the harness scripts; live ingestion requires `DATA_SOURCE=live` (not omitting `DATA_SOURCE`) plus real API keys in `.dev.vars` or secrets.
 - Replay-backed preview deploys use `[env.preview]` in `workers/senate_data_worker/wrangler.toml` (`wrangler deploy --env preview`).
 
 ## Key Rules
@@ -50,7 +49,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 - Commit and push directly to `main` when explicitly requested and validation is green; create a feature branch and PR when explicitly requested.
 
 ## Freshness And Debugging
-- Harness artifacts, including Playwright failure assets, land in `target/harness/`. Replay screenshot runs use `target/screenshots/` (state, logs, assertions, PNGs).
+- Harness artifacts, including Playwright failure assets, land in `target/harness/`. Replay preview runs use `target/preview/` (state, logs, assertions).
 - The canonical replay fixture corpus lives behind `REPLAY_FIXTURE_SET=canonical`; refresh it with `npm --prefix workers/senate_data_worker run fixtures:harness:refresh` when intentionally re-basing the deterministic story.
 - Worker health endpoint: `http://127.0.0.1:8787/health`.
 - Pipeline status endpoint: `http://127.0.0.1:8787/__pipeline/status`.
@@ -90,7 +89,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 
 Solo-contributor workflow: push fixes directly to `main` (no PRs or `cursor/*` branches) unless the user asks otherwise.
 
-Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh`. Start `npm run dev:worker` and `npm run dev:web` in separate terminals when you need the local stack.
+Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh`. For deterministic UI review, run `npm run preview:replay` (single command; replay vars, ingestion, API assert, Vite). For ad-hoc debugging, start `npm run dev:worker` and `npm run dev:web` in separate terminals.
 
 - End-to-end check: `npm test`.
 - Store real `CONGRESS_API_KEY` / `GOVINFO_API_KEY` in Cursor **Secrets**, not in committed files, when testing live ingestion.
