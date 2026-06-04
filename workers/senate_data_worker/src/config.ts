@@ -49,11 +49,6 @@ export function parseIntSafe(value: string | undefined, fallback: number): numbe
   if (Number.isNaN(parsed)) return fallback;
   return parsed;
 }
-
-export function parsePct(value: string | undefined, fallback: number): number {
-  return Math.max(0, Math.min(parseIntSafe(value, fallback), 100));
-}
-
 export function computePct(numerator: number, denominator: number): number {
   if (denominator <= 0) return 0;
   return Number(((numerator / denominator) * 100).toFixed(2));
