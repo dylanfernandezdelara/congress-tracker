@@ -25,7 +25,6 @@ export type {
   EvidenceEndpoint,
   EvidenceEndpointStatus,
   EvidenceSourceAvailability,
-  FeaturedSenatorEntry,
   LikelyReason,
   LikelyReasonCategory,
   PartyPositionAnalysis,

@@ -56,7 +56,6 @@ describe("extractBillImpactEvidence", () => {
     expect(impact.how_much[0].value_numeric).toBe(2_500_000_000);
     expect(impact.who.length).toBeGreaterThan(0);
     expect(impact.where.states_mentioned).toEqual(expect.arrayContaining(["CA", "NY"]));
-    expect(impact.richness_score).toBeGreaterThanOrEqual(60);
   });
 
   it("builds trend snapshot with totals", () => {
@@ -67,7 +66,7 @@ describe("extractBillImpactEvidence", () => {
     expect(trend.snapshot_date).toBe("2026-02-18");
   });
 
-  it("detects state abbreviations and penalizes unknown-heavy evidence", () => {
+  it("detects state abbreviations and records unknowns for sparse evidence", () => {
     const sparseEvidence: BillEvidenceRaw = {
       ...rawEvidence,
       source_text: [
@@ -83,7 +82,6 @@ describe("extractBillImpactEvidence", () => {
     const impact = extractBillImpactEvidence(bill, sparseEvidence, { session: 2 });
     expect(impact.where.states_mentioned).toEqual(expect.arrayContaining(["CA", "TX"]));
     expect(impact.unknowns.length).toBeGreaterThan(0);
-    expect(impact.richness_score).toBeLessThan(40);
   });
 
   it("captures policy deltas for governance-style text without fiscal amounts", () => {
@@ -117,6 +115,5 @@ describe("extractBillImpactEvidence", () => {
     expect((impact.policy_deltas ?? []).length).toBeGreaterThan(0);
     expect((impact.policy_deltas ?? []).some((delta) => delta.action === "nullify")).toBe(true);
     expect((impact.policy_deltas ?? []).some((delta) => delta.action === "reinstate")).toBe(true);
-    expect(impact.richness_score).toBeGreaterThan(0);
   });
 });

@@ -276,26 +276,6 @@ function buildWhatSignals(ref: BillRef, sourceText: string[]): string[] {
   return unique(candidates).slice(0, 8);
 }
 
-function computeRichnessScore(params: {
-  amountCount: number;
-  recipientCount: number;
-  stateSignal: boolean;
-  dateSignal: boolean;
-  policyDeltaCount: number;
-  unknownCount: number;
-}): number {
-  let score = 0;
-  if (params.amountCount > 0) score += 35;
-  if (params.recipientCount > 0) score += 25;
-  if (params.stateSignal) score += 20;
-  if (params.dateSignal) score += 15;
-  if (params.policyDeltaCount > 0) score += 20;
-  if (params.policyDeltaCount > 2) score += 5;
-  if (params.amountCount > 0 && params.recipientCount > 0) score += 5;
-  if (params.unknownCount > 0) score -= Math.min(30, params.unknownCount * 8);
-  return Math.max(0, Math.min(100, score));
-}
-
 export interface ExtractImpactOptions {
   session: number;
   generatedAt?: string;
@@ -323,15 +303,6 @@ export function extractBillImpactEvidence(
   );
   const what = buildWhatSignals(ref, sourceText);
 
-  const richnessScore = computeRichnessScore({
-    amountCount: amounts.length,
-    recipientCount: recipients.length,
-    stateSignal: states.length > 0 || geographyScope === "state-formula",
-    dateSignal: dateSignals.length > 0,
-    policyDeltaCount: policyDeltas.length,
-    unknownCount: unknowns.length,
-  });
-
   return {
     schema_version: 1,
     bill_key: evidenceRaw.bill_key,
@@ -349,7 +320,6 @@ export function extractBillImpactEvidence(
     },
     unknowns,
     policy_deltas: policyDeltas,
-    richness_score: richnessScore,
     summary_evidence: sourceText.slice(0, 10),
   };
 }
@@ -372,7 +342,6 @@ export function buildTrendSnapshot(
     geography_scope: evidence.where.geography_scope,
     states_mentioned: evidence.where.states_mentioned,
     policy_area: ref.policy_area,
-    richness_score: evidence.richness_score,
     source_availability: evidence.source_availability,
   };
 }

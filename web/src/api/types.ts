@@ -31,7 +31,6 @@ export type {
   EvidenceEndpoint,
   EvidenceEndpointStatus,
   EvidenceSourceAvailability,
-  FeaturedSenatorEntry,
   HistoricalVoteReference,
   LikelyReason,
   LikelyReasonCategory,

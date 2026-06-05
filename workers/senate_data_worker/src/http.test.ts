@@ -24,7 +24,6 @@ const mockBriefing: BriefingFeedResponse = {
       outcome_label: "Passed the Senate hurdle",
       status: "passed",
       category: "Senate business",
-      significance: "high",
       tally: { yea: 52, nay: 48, present: 0, absent: 0 },
       crossed_party_lines: [],
       source_coverage: {

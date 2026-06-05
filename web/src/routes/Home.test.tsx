@@ -29,7 +29,6 @@ function makeItem(overrides: Partial<BriefingFeedItem> = {}): BriefingFeedItem {
     outcome_label: 'The measure passed with bipartisan support.',
     status: 'passed',
     category: 'Appropriations',
-    significance: 'high',
     tally: {
       yea: 61,
       nay: 39,

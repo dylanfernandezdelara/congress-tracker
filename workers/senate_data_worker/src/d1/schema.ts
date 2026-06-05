@@ -16,8 +16,6 @@ CREATE TABLE IF NOT EXISTS votes (
   thread_key TEXT NOT NULL,
   issue_key TEXT,
   status TEXT NOT NULL,
-  significance TEXT NOT NULL,
-  score INTEGER NOT NULL,
   summary TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, session, vote_number)
@@ -56,7 +54,6 @@ CREATE TABLE IF NOT EXISTS bills (
   summary TEXT,
   policy_area TEXT,
   url TEXT,
-  significance TEXT,
   category TEXT,
   updated_at TEXT NOT NULL
 );
@@ -77,16 +74,6 @@ CREATE TABLE IF NOT EXISTS issue_thread_votes (
   session INTEGER NOT NULL,
   vote_number INTEGER NOT NULL,
   PRIMARY KEY (thread_key, congress, session, vote_number)
-);
-
-CREATE TABLE IF NOT EXISTS importance_scores (
-  congress INTEGER NOT NULL,
-  session INTEGER NOT NULL,
-  vote_number INTEGER NOT NULL,
-  score INTEGER NOT NULL,
-  reasons_json TEXT NOT NULL,
-  generated_at TEXT NOT NULL,
-  PRIMARY KEY (congress, session, vote_number)
 );
 
 CREATE TABLE IF NOT EXISTS historical_context (

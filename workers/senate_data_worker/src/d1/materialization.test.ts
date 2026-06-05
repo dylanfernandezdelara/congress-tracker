@@ -19,7 +19,6 @@ const briefingPayload = {
       outcome_label: "Passed",
       status: "passed",
       category: "legislation",
-      significance: "high",
       tally: { yea: 60, nay: 40, present: 0, absent: 0 },
       crossed_party_lines: [],
       source_coverage: {

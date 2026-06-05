@@ -244,7 +244,6 @@ export interface BillImpactEvidence {
   where: GeographySignal;
   unknowns: UnknownReason[];
   policy_deltas?: PolicyDelta[];
-  richness_score: number; // 0-100
   summary_evidence: string[];
 }
 
@@ -260,7 +259,6 @@ export interface BillTrendSnapshot {
   geography_scope: GeographyScope;
   states_mentioned: string[];
   policy_area?: string;
-  richness_score: number;
   source_availability: EvidenceSourceAvailability;
 }
 
@@ -345,8 +343,6 @@ export interface BillAnalysis {
   key_provisions: string[];
   why_it_matters: string;
   hidden_provisions: string | null;
-  significance: "high" | "medium" | "low";
-  significance_reason: string;
   category: string;
   affects: string[];
   money_flows?: string[];
@@ -358,7 +354,6 @@ export interface BillAnalysis {
   analysis_version?: string;
   evidence_fingerprint?: string;
   evidence_generated_at?: string;
-  richness_score?: number;
   structured_amounts?: AmountEvidence[];
   structured_recipients?: RecipientEvidence[];
   geography_scope?: GeographyScope;
@@ -555,13 +550,10 @@ export interface MemberInsight {
   kind: MemberInsightKind;
   title: string;
   detail: string;
-  score: number;
   evidence: InsightEvidence[];
 }
 
 export interface MemberDeterministicSummary {
-  featured_score: number;
-  featured_reasons: string[];
   latest_activity_date?: string;
   deterministic_points: string[];
   insights: MemberInsight[];
@@ -600,13 +592,6 @@ export interface MemberActivityJson {
   errors: SourceError[];
 }
 
-export interface FeaturedSenatorEntry {
-  bioguide_id: string;
-  score: number;
-  reasons: string[];
-  latest_activity_date?: string;
-}
-
 export interface ActivityIndexEntry {
   activity_id: string;
   source: ActivitySource;
@@ -622,7 +607,6 @@ export interface ActivityIndexJson {
   generated_at: string;
   window: ActivityWindow;
   activities: ActivityIndexEntry[];
-  featured_senators?: FeaturedSenatorEntry[];
 }
 
 // ============================================================================

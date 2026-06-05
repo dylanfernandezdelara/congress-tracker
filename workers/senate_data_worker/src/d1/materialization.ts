@@ -12,11 +12,6 @@ import { normalizeVoteStatus } from "../domain/vote-status";
 import { buildVoteDetailResponse } from "../read-model";
 import type { VoteDetails } from "../xml";
 import { ensureSchemaOnce } from "../storage/schema";
-import {
-  buildImportanceReasonsJson,
-  significanceToScore,
-} from "../domain/significance-score";
-import type { SignificanceLevel } from "../platform-types";
 
 function toSqlBool(value: boolean): number {
   return value ? 1 : 0;
@@ -87,7 +82,6 @@ export async function writePlatformMaterializationToD1(
 
   await db.prepare("DELETE FROM vote_members WHERE congress = ? AND session = ?").bind(ledger.congress, ledger.session).run();
   await db.prepare("DELETE FROM issue_thread_votes WHERE congress = ? AND session = ?").bind(ledger.congress, ledger.session).run();
-  await db.prepare("DELETE FROM importance_scores WHERE congress = ? AND session = ?").bind(ledger.congress, ledger.session).run();
   await db.prepare("DELETE FROM historical_context WHERE congress = ? AND session = ?").bind(ledger.congress, ledger.session).run();
   await db.prepare("DELETE FROM vote_read_models WHERE congress = ? AND session = ?").bind(ledger.congress, ledger.session).run();
 
@@ -102,8 +96,8 @@ export async function writePlatformMaterializationToD1(
       .prepare(
         `INSERT OR REPLACE INTO votes (
           congress, session, vote_number, vote_date, title, question, result, issue,
-          bill_key, policy_area, thread_key, issue_key, status, significance, score, summary, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          bill_key, policy_area, thread_key, issue_key, status, summary, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         detail.vote.congress,
@@ -119,44 +113,18 @@ export async function writePlatformMaterializationToD1(
         threadKey,
         buildIssueKey(sourceEntry, bill),
         detail.vote.status,
-        item?.significance ?? bill?.analysis?.significance ?? "low",
-        significanceToScore(
-          (item?.significance ?? bill?.analysis?.significance ?? "low") as SignificanceLevel
-        ),
         item?.summary ?? `Senate vote on ${detail.vote.title}.`,
         now
       )
       .run();
-
-    if (item) {
-      const significance = item.significance;
-      await db
-        .prepare(
-          `INSERT OR REPLACE INTO importance_scores (
-            congress, session, vote_number, score, reasons_json, generated_at
-          ) VALUES (?, ?, ?, ?, ?, ?)`
-        )
-        .bind(
-          item.congress,
-          item.session,
-          item.vote_number,
-          significanceToScore(significance),
-          buildImportanceReasonsJson(
-            significance,
-            bill?.analysis?.significance_reason
-          ),
-          materialization.briefing.generated_at
-        )
-        .run();
-    }
 
     if (billKey && bill) {
       await db
         .prepare(
           `INSERT OR REPLACE INTO bills (
             bill_key, congress, bill_type, bill_number, title, summary, policy_area, url,
-            significance, category, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            category, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           billKey,
@@ -167,7 +135,6 @@ export async function writePlatformMaterializationToD1(
           bill.summary ?? null,
           bill.policy_area ?? null,
           bill.url ?? null,
-          bill.analysis?.significance ?? null,
           bill.analysis?.category ?? null,
           now
         )
@@ -318,8 +285,8 @@ export async function writeHistoricalVoteBatchToD1(
       .prepare(
         `INSERT OR IGNORE INTO votes (
           congress, session, vote_number, vote_date, title, question, result, issue,
-          bill_key, policy_area, thread_key, issue_key, status, significance, score, summary, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          bill_key, policy_area, thread_key, issue_key, status, summary, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         detail.congress,
@@ -335,8 +302,6 @@ export async function writeHistoricalVoteBatchToD1(
         threadKey,
         issueKey,
         normalizeVoteStatus(detail.vote_result),
-        "low",
-        significanceToScore("low"),
         `Historical Senate vote on ${detail.vote_title}.`,
         now
       )

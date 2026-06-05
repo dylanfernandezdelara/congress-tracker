@@ -2,7 +2,6 @@ import type { BillRef, PartyPositionAnalysis, VoteContentConfidence, VoteContent
 
 export type VoteCast = "yea" | "nay" | "present" | "notVoting";
 export type VoteStatus = "passed" | "rejected" | "in-progress";
-export type SignificanceLevel = "high" | "medium" | "low";
 export type SourceCoverageLevel = "full" | "partial" | "minimal";
 export type ArgumentSourceType =
   | "congress_record"
@@ -47,7 +46,6 @@ export interface BriefingFeedItem {
   outcome_label: string;
   status: VoteStatus;
   category: string;
-  significance: SignificanceLevel;
   bill?: BillRef;
   tally: BriefingVoteSummary;
   crossed_party_lines: BriefingCrossover[];
@@ -166,8 +164,6 @@ export interface PlatformDbVote {
   policy_area?: string;
   thread_key: string;
   status: VoteStatus;
-  significance: SignificanceLevel;
-  score: number;
   summary: string;
   updated_at: string;
 }
@@ -193,7 +189,6 @@ export interface PlatformDbBill {
   summary?: string;
   policy_area?: string;
   url?: string;
-  significance?: SignificanceLevel;
   category?: string;
   updated_at: string;
 }

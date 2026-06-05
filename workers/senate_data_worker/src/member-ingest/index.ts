@@ -38,7 +38,7 @@ import type {
   SourceError,
 } from "../types";
 import { applyActivityMetadata, buildActivityIndex, getActivityDate } from "./activity";
-import { buildFeaturedSenators, buildMemberSummary } from "./summary";
+import { buildMemberSummary } from "./summary";
 import {
   DEFAULT_FETCH_CONFIG,
   DEFAULT_WINDOW_DAYS,
@@ -338,14 +338,11 @@ export async function runMemberIngestion(
     activity.summary = buildMemberSummary(activity);
   }
 
-  const featuredSenators = buildFeaturedSenators(memberActivities);
-
   const activityIndex = buildActivityIndex(
     memberActivities,
     windowStart,
     windowEnd,
-    generatedAt,
-    featuredSenators
+    generatedAt
   );
 
   return {

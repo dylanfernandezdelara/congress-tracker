@@ -81,6 +81,14 @@ function parseAlterAddColumn(statement: string): { table: string; column: string
   return { table: match[1].toLowerCase(), column: match[2].toLowerCase() };
 }
 
+function parseAlterDropColumn(statement: string): { table: string; column: string } | null {
+  const match = statement.match(
+    /ALTER\s+TABLE\s+["`]?(\w+)["`]?\s+DROP\s+COLUMN\s+["`]?(\w+)["`]?/i
+  );
+  if (!match) return null;
+  return { table: match[1].toLowerCase(), column: match[2].toLowerCase() };
+}
+
 function parseDropTable(statement: string): string | null {
   const match = statement.match(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["`]?(\w+)["`]?/i);
   return match ? match[1].toLowerCase() : null;
@@ -115,6 +123,16 @@ function applyStatement(state: NetSchema, statement: string): void {
     const cols = state.tables.get(alter.table) ?? new Set<string>();
     cols.add(alter.column);
     state.tables.set(alter.table, cols);
+    return;
+  }
+
+  const dropColumn = parseAlterDropColumn(statement);
+  if (dropColumn) {
+    const cols = state.tables.get(dropColumn.table);
+    if (cols) {
+      cols.delete(dropColumn.column);
+      state.tables.set(dropColumn.table, cols);
+    }
     return;
   }
 
@@ -264,7 +282,6 @@ describe("schema drift guard", () => {
         "bills",
         "daily_briefings",
         "historical_context",
-        "importance_scores",
         "ingested_vote_details",
         "issue_thread_votes",
         "issue_threads",

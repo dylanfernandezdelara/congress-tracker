@@ -237,7 +237,7 @@ function buildFeedItem(
   const tally = computeTallies(entry, overview);
   const crossovers = computeCrossovers(entry, overview);
   const procedure = describeProcedure(entry);
-  const { profile, significance } = buildVoteContentContext(ledger, entry, bill, procedure);
+  const profile = buildVoteContentContext(ledger, entry, bill, procedure);
   const summary = buildSummary(entry, bill, tally);
   const category = extractCategory(entry, bill);
   const status = toStatus(entry.result);
@@ -253,7 +253,6 @@ function buildFeedItem(
     outcome_label: status === "passed" ? "Passed the Senate hurdle" : "Failed in the Senate",
     status,
     category,
-    significance,
     bill,
     tally,
     crossed_party_lines: crossovers,
@@ -416,7 +415,7 @@ export function buildVoteDetailResponse(
   const crossovers = computeCrossovers(entry, overview);
   const partyBreakdown = computePartyBreakdown(entry, overview);
   const feedItem = buildFeedItem(ledger, overview, entry, billLookup);
-  const voteContentProfile = buildVoteContentContext(ledger, entry, bill, describeProcedure(entry)).profile;
+  const voteContentProfile = buildVoteContentContext(ledger, entry, bill, describeProcedure(entry));
   const threadKey = buildThreadKey(entry, bill);
   const issueKey = buildIssueKey(entry, bill);
   const issueTitle = buildIssueTitle(entry, bill);

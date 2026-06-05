@@ -8,7 +8,6 @@ import type {
   VoteLedgerEntry,
   VoteSourceBasis,
 } from "./types";
-import type { SignificanceLevel } from "./platform-types";
 
 type ProcedureKind =
   | "motion_to_discharge"
@@ -365,24 +364,13 @@ function buildPublicImpactSummary(args: {
   return "No official bill summary is available in the current feed.";
 }
 
-function normalizeSignificanceFromBill(bill: BillRef | undefined): SignificanceLevel {
-  const v = bill?.analysis?.significance;
-  if (v === "high" || v === "medium" || v === "low") return v;
-  return "medium";
-}
-
-export interface VoteContentContext {
-  profile: VoteContentProfile;
-  significance: SignificanceLevel;
-}
-
-/** Derives readable vote content (summary fields and significance) without ranking or scoring. */
+/** Derives readable vote content (summary fields) without ranking or scoring. */
 export function buildVoteContentContext(
   ledger: VoteLedger,
   entry: VoteLedgerEntry,
   bill: BillRef | undefined,
   procedure: ProcedureDescriptor | null
-): VoteContentContext {
+): VoteContentProfile {
   const officialSummary = extractOfficialBillSummary(bill);
   const analysisSummary = extractAnalysisSummary(bill);
   const targetType = resolveTargetType(entry, bill, procedure);
@@ -428,14 +416,5 @@ export function buildVoteContentContext(
     source_basis: basis,
   };
 
-  const significance = normalizeSignificanceFromBill(bill);
-  let adjustedSignificance: SignificanceLevel = significance;
-  if (confidence === "high" && (stage === "final_passage" || stage === "confirmation")) {
-    adjustedSignificance = significance === "low" ? "medium" : significance;
-  }
-  if (confidence === "low" && stage === "budget_waiver") {
-    adjustedSignificance = "low";
-  }
-
-  return { profile, significance: adjustedSignificance };
+  return profile;
 }

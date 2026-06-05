@@ -7,7 +7,6 @@ import type {
   ActivityIndexEntry,
   ActivityIndexJson,
   ActivityItem,
-  FeaturedSenatorEntry,
   MemberActivityJson,
 } from "../types";
 import { extractTopicsFromBill } from "./helpers";
@@ -63,8 +62,7 @@ export function buildActivityIndex(
   memberActivities: MemberActivityJson[],
   windowStart: string,
   windowEnd: string,
-  generatedAt: string,
-  featuredSenators: FeaturedSenatorEntry[]
+  generatedAt: string
 ): ActivityIndexJson {
   const index = new Map<string, ActivityIndexEntry>();
 
@@ -120,6 +118,5 @@ export function buildActivityIndex(
     generated_at: generatedAt,
     window: { start_date: windowStart, end_date: windowEnd },
     activities,
-    featured_senators: featuredSenators,
   };
 }
