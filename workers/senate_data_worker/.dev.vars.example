@@ -1,4 +1,10 @@
 # Local dev defaults to replay fixtures (no live API keys required).
+#
+# `wrangler dev` reads this file (and wrangler.toml [vars]) — it does NOT read
+# the shell's process.env. On Cursor Cloud, set CONGRESS_API_KEY / GOVINFO_API_KEY /
+# PIPELINE_ADMIN_TOKEN (and optionally DATA_SOURCE) in the Secrets dashboard; the
+# setup script (scripts/cursor-cloud-setup.sh) bridges those env values into
+# .dev.vars on start, so the same secrets work locally and in the cloud.
 DATA_SOURCE=replay
 REPLAY_FIXTURE_SET=canonical
 

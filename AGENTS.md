@@ -7,12 +7,12 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 ## Commands
 
 ### Install and setup
-- Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing).
+- Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing, and bridges any `CONGRESS_API_KEY` / `GOVINFO_API_KEY` / `PIPELINE_ADMIN_TOKEN` / `DATA_SOURCE` set in the environment — e.g. Cursor Cloud Secrets — into `.dev.vars` since `wrangler dev` does not read `process.env`).
 - Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test`; see `./scripts/cursor-cloud-setup.sh`).
 
 ### Local setup
 - Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example defaults to replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) and sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
-- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live`.
+- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live`. On Cursor Cloud, store these in the Secrets dashboard rather than committing them; `scripts/cursor-cloud-setup.sh` copies them from the environment into `.dev.vars` on each start so `wrangler dev` picks them up.
 - Deterministic test runs boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
 - Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
 
