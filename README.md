@@ -186,11 +186,13 @@ The platform read-model schema lives in:
 
 ### Local setup (first run)
 
-One-shot bootstrap (worker and web `npm ci`, Playwright Chromium, `.dev.vars` from the example when missing):
+One-shot bootstrap (worker and web `npm ci`, Playwright Chromium, `.dev.vars` from the example when missing or empty):
 
 ```bash
 ./scripts/cursor-cloud-setup.sh
 ```
+
+On Cursor Cloud, store `CONGRESS_API_KEY`, `GOVINFO_API_KEY`, and other vars listed in `BRIDGED_VARS` (`scripts/lib/dev-vars.sh`) in the Secrets dashboard. The setup script bridges them into `.dev.vars` on each start because `wrangler dev` does not read shell `process.env`.
 
 Or set up manually:
 

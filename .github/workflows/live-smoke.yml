@@ -47,11 +47,7 @@ jobs:
         env:
           CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
           GOVINFO_API_KEY: ${{ secrets.GOVINFO_API_KEY }}
-        run: |
-          cat > .dev.vars <<EOF
-          CONGRESS_API_KEY=${CONGRESS_API_KEY}
-          GOVINFO_API_KEY=${GOVINFO_API_KEY}
-          EOF
+        run: ../../scripts/write-dev-vars-keys.sh .dev.vars CONGRESS_API_KEY GOVINFO_API_KEY
 
       - name: Run live smoke
         if: steps.secrets.outputs.run_smoke == 'true'
