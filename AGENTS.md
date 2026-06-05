@@ -7,7 +7,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 ## Commands
 
 ### Install and setup
-- Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing, and bridges any `CONGRESS_API_KEY` / `GOVINFO_API_KEY` / `PIPELINE_ADMIN_TOKEN` / `DATA_SOURCE` set in the environment — e.g. Cursor Cloud Secrets — into `.dev.vars` since `wrangler dev` does not read `process.env`).
+- Run `./scripts/cursor-cloud-setup.sh` (`npm ci` in worker and web, Playwright Chromium, creates `workers/senate_data_worker/.dev.vars` from `.dev.vars.example` when missing, and bridges any bridged vars set in the environment — `CONGRESS_API_KEY` / `GOVINFO_API_KEY` / `PIPELINE_ADMIN_TOKEN` plus the replay/CORS knobs `DATA_SOURCE` / `REPLAY_FIXTURE_SET` / `CLOCK` / `ALLOWED_ORIGIN`, e.g. from Cursor Cloud Secrets — into `.dev.vars` since `wrangler dev` does not read `process.env`).
 - Or install manually: `npm --prefix workers/senate_data_worker install`, `npm --prefix web install`, then `npm --prefix web exec -- playwright install --with-deps chromium` (required for `npm test`; see `./scripts/cursor-cloud-setup.sh`).
 
 ### Local setup

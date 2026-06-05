@@ -27,11 +27,30 @@ fi
 # Cloud, however, exposes Secrets dashboard values as process.env. Bridge those
 # (and any locally exported overrides) into `.dev.vars` so the same secrets work
 # seamlessly in local dev and on Cursor Cloud without editing this file by hand.
+#
+# Note on rotation: bridging is upsert-only and never deletes lines, so values
+# rotated *off* in the environment persist in `.dev.vars` until the file is
+# recreated. Cursor Cloud VMs are ephemeral (a fresh VM has no `.dev.vars`, so
+# it is rebuilt from the example and re-bridged); when rotating secrets on a
+# long-lived VM or locally, delete `.dev.vars` and re-run this script.
+
+# Emit a dotenv-safe value: wrangler parses `.dev.vars` as dotenv, where bare
+# `#` starts a comment and only double-quoted values may contain spaces or
+# escaped newlines. Quote and escape so keys/tokens with special characters
+# round-trip intact instead of being silently truncated.
+dotenv_quote() {
+  local v="$1"
+  v="${v//\\/\\\\}"
+  v="${v//\"/\\\"}"
+  v="${v//$'\n'/\\n}"
+  printf '"%s"' "${v}"
+}
+
 upsert_dev_var() {
   local key="$1" value="$2" tmp
   tmp="$(mktemp)"
   grep -vE "^${key}=" "${DEV_VARS}" >"${tmp}" 2>/dev/null || true
-  printf '%s=%s\n' "${key}" "${value}" >>"${tmp}"
+  printf '%s=%s\n' "${key}" "$(dotenv_quote "${value}")" >>"${tmp}"
   mv "${tmp}" "${DEV_VARS}"
 }
 
@@ -46,10 +65,16 @@ BRIDGED_VARS=(
 )
 
 for var in "${BRIDGED_VARS[@]}"; do
-  if [[ -n "${!var:-}" ]]; then
-    upsert_dev_var "${var}" "${!var}"
+  value="${!var:-}"
+  # Treat unset and whitespace-only values as absent so a blank dashboard entry
+  # does not overwrite committed defaults with a misleading non-empty line.
+  if [[ -n "${value}" && ! "${value}" =~ ^[[:space:]]+$ ]]; then
+    upsert_dev_var "${var}" "${value}"
     echo "  bridged ${var} from environment into .dev.vars"
   fi
 done
+
+# Bridged secrets live in `.dev.vars`; keep it readable only by the owner.
+chmod 600 "${DEV_VARS}" 2>/dev/null || true
 
 echo "Cursor Cloud setup complete."

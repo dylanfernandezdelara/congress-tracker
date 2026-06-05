@@ -16,5 +16,7 @@ GOVINFO_API_KEY=your_govinfo_api_key
 # CORS: use * for local dev (Vite :5173 -> API :8787); set a specific origin in prod
 ALLOWED_ORIGIN=*
 
-# Evidence thresholds use code defaults; override via EVIDENCE_* /
-# ACTIVITY_LOOKBACK_DAYS / DATA_FRESHNESS_MAX_HOURS env vars when actively tuning.
+# Evidence thresholds use code defaults; when actively tuning, add EVIDENCE_* /
+# ACTIVITY_LOOKBACK_DAYS / DATA_FRESHNESS_MAX_HOURS lines here (they are not in
+# the setup script's bridge list, so `wrangler dev` only picks them up from this
+# file or wrangler.toml [vars], not from process.env).
