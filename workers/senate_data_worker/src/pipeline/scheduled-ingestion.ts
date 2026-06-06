@@ -2,20 +2,15 @@ import type { PipelineJob } from "../platform-types";
 import type { Env } from "../config";
 import type { FetchConfig } from "../fetch";
 import { buildRuntime, type Runtime } from "../runtime";
-import type { VoteLedger } from "../types";
 import {
   buildVoteLedgerUpdate,
   discoverVoteLedgerUpdates,
 } from "../ingest";
 import { runMemberIngestion } from "../member-ingest";
-import { readDocumentJson, writeDocumentJson } from "../storage/documents";
-import { buildVoteLedgerKey, buildSessionOverviewKey, hasPublishedReadModels } from "../storage";
 import {
   collectUniqueBills,
   buildBillEvidencePipeline,
   materializeReadModels,
-  publishChamberContext,
-  publishMemberActivity,
 } from "./materialize";
 import {
   attachEvidenceToActivities,
@@ -32,11 +27,6 @@ import {
 } from "./logging";
 import { enqueuePipelineJob } from "./jobs";
 
-/**
- * Core ingestion logic, separated for use with ctx.waitUntil.
- * Orchestrates member ingestion, bill evidence, vote-ledger updates, and read-model
- * materialization; the Senate vote menu is fetched once per run.
- */
 export async function runScheduledIngestion(
   env: Env,
   runtime: Runtime = buildRuntime(env)
@@ -52,34 +42,17 @@ export async function runScheduledIngestion(
   const now = runtime.clock.now();
   const fetchConfig: FetchConfig = { ...PIPELINE_FETCH_CONFIG, fixture: runtime.fixtureHttp };
 
-  const existingLedger = await readDocumentJson<VoteLedger>(env.SENATE_DB, buildVoteLedgerKey());
-
   const menuVotes = await runTimed(runId, "fetch_vote_menu", () =>
     fetchAndParseVoteMenu(config.congress, config.session, fetchConfig)
   );
 
   const discovery = await runTimed(runId, "discover_vote_updates", () =>
-    discoverVoteLedgerUpdates(config, existingLedger, {
-      db: env.SENATE_DB,
+    discoverVoteLedgerUpdates(config, null, {
       fetchConfig,
       now,
       menuVotes: menuVotes ?? undefined,
     })
   );
-
-  if (discovery.missingVoteNumbers.length === 0 && (await hasPublishedReadModels(env.SENATE_DB))) {
-    logEvent("scheduled_ingestion_noop", {
-      run_id: runId,
-      duration_ms: Date.now() - startTime,
-      congress: config.congress,
-      session: config.session,
-      known_vote_count: discovery.existingVoteNumbers.size,
-      eligible_vote_count: discovery.eligibleVotes.length,
-      latest_eligible_vote_date: discovery.latestEligibleVoteDate,
-      new_vote_count: 0,
-    });
-    return;
-  }
 
   const memberResult = await runTimed(runId, "member_ingestion", () =>
     runMemberIngestion(
@@ -102,21 +75,11 @@ export async function runScheduledIngestion(
   }
   const membersIndex = memberResult.membersIndex;
 
-  const effectiveActivityIndex = await resolveActivityIndex(env.SENATE_DB, memberResult);
-  if (
-    (memberResult.activityIndex?.activities?.length ?? 0) === 0 &&
-    effectiveActivityIndex?.activities?.length
-  ) {
-    logEvent("activity_index_fallback_reused", {
-      run_id: runId,
-      previous_generated_at: effectiveActivityIndex.generated_at,
-      previous_count: effectiveActivityIndex.activities.length,
-    });
-  }
+  const effectiveActivityIndex = resolveActivityIndex(memberResult);
 
   const billsByKey = collectUniqueBills(memberResult.memberActivities, effectiveActivityIndex);
   const evidencePipeline = await runTimed(runId, "bill_evidence_pipeline", () =>
-    buildBillEvidencePipeline(env.SENATE_DB, billsByKey, {
+    buildBillEvidencePipeline(billsByKey, {
       runId,
       congressApiKey: config.congressApiKey,
       session: config.session,
@@ -133,33 +96,14 @@ export async function runScheduledIngestion(
     evidencePipeline.impactByKey
   );
 
-  await runTimed(runId, "publish_member_activity_core", async () => {
-    await publishMemberActivity(
-      env.SENATE_DB,
-      membersIndex,
-      memberResult.memberActivities,
-      memberResult.windowEnd,
-      effectiveActivityIndex
-    );
-    await publishChamberContext(env.SENATE_DB, memberResult.windowEnd, memberResult.context);
-  });
-
   const { ledger, overview } = await runTimed(runId, "build_vote_ledger", () =>
-    buildVoteLedgerUpdate(config, membersIndex, existingLedger, fetchConfig, {
-      db: env.SENATE_DB,
+    buildVoteLedgerUpdate(config, membersIndex, null, fetchConfig, {
       discovery,
       now,
       menuVotes: menuVotes ?? undefined,
     })
   );
-  const newVoteNumbers = diffVoteNumbers(ledger, existingLedger);
-
-  await runTimed(runId, "publish_vote_ledger", async () => {
-    await writeDocumentJson(env.SENATE_DB, buildVoteLedgerKey(), ledger, { skipIfUnchanged: true });
-    await writeDocumentJson(env.SENATE_DB, buildSessionOverviewKey(), overview, {
-      skipIfUnchanged: true,
-    });
-  });
+  const newVoteNumbers = diffVoteNumbers(ledger, null);
 
   const allErrors = [...memberResult.errors, ...evidencePipeline.errors];
   const coverage = summarizeCoverage(
@@ -199,9 +143,6 @@ export async function runScheduledIngestion(
   });
 }
 
-/**
- * Scheduled handler for cron triggers.
- */
 export function handleScheduled(
   controller: ScheduledController,
   env: Env,

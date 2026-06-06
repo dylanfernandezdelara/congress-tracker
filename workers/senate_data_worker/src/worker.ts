@@ -13,23 +13,15 @@ import { buildRuntime } from "./runtime";
 import { handleFetch as handleFetchInner } from "./http/router";
 import { handleScheduled as handleScheduledInner } from "./pipeline/scheduled-ingestion";
 import { handleQueue as handleQueueInner } from "./pipeline/jobs";
-import { ensureSchemaOnce } from "./storage";
-
-async function withSchema<T>(env: Env, run: () => T | Promise<T>): Promise<T> {
-  await ensureSchemaOnce(env.SENATE_DB);
-  return run();
-}
 
 export default {
   fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
-    return withSchema(env, () => handleFetchInner(request, env));
+    return handleFetchInner(request, env);
   },
   scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    return withSchema(env, () =>
-      handleScheduledInner(controller, env, ctx, buildRuntime(env))
-    );
+    return handleScheduledInner(controller, env, ctx, buildRuntime(env));
   },
   queue(batch: MessageBatch<PipelineJob>, env: Env, ctx: ExecutionContext) {
-    return withSchema(env, () => handleQueueInner(batch, env, ctx, buildRuntime(env)));
+    return handleQueueInner(batch, env, ctx, buildRuntime(env));
   },
 } satisfies ExportedHandler<Env, PipelineJob>;

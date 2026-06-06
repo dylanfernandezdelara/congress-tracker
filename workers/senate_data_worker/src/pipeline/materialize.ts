@@ -1,20 +1,7 @@
 import { buildBillKey } from "../congress";
 import { harvestBillEvidence, EVIDENCE_ENDPOINT_TIERS } from "../bill-evidence";
-import { buildTrendSnapshot, extractBillImpactEvidence } from "../impact-extract";
-import { readDocumentJson, writeDocumentJson } from "../storage/documents";
+import { extractBillImpactEvidence } from "../impact-extract";
 import { mapWithConcurrency } from "../concurrency";
-import { buildPipelineMaterialization } from "../read-model";
-import { writePlatformMaterializationToD1 } from "../d1/materialization";
-import {
-  buildLatestChamberContextKey,
-  buildMembersIndexKey,
-  buildActivitiesIndexKey,
-  buildBillEvidenceKey,
-  buildBillTrendSnapshotKey,
-  buildChamberContextKey,
-  buildSessionOverviewKey,
-  buildVoteLedgerKey,
-} from "../storage";
 import { canBuildBillKey } from "../domain/bill-ref";
 import { computePct, type Env } from "../config";
 import type { FetchConfig } from "../fetch";
@@ -22,15 +9,12 @@ import type { FixtureHttp } from "../harness";
 import { logEvent } from "./logging";
 import type {
   MemberActivityJson,
-  MemberIndexJson,
   ActivityIndexJson,
   VoteLedger,
   SessionOverview,
   BillRef,
   BillImpactEvidence,
-  BillEvidenceRecord,
   EvidenceEndpoint,
-  MemberActivityContext,
   SourceError,
 } from "../types";
 
@@ -53,38 +37,7 @@ export interface BillEvidencePipelineOptions {
   maxBills: number;
   billConcurrency: number;
   endpointFanout: number;
-  /** Harness fixture transport applied to every evidence fetch. */
   fixture?: FixtureHttp;
-}
-
-export async function publishChamberContext(
-  db: D1Database,
-  windowEnd: string,
-  context: MemberActivityContext
-): Promise<void> {
-  await writeDocumentJson(db, buildChamberContextKey(windowEnd), context, { skipIfUnchanged: true });
-  await writeDocumentJson(db, buildLatestChamberContextKey(), context, { skipIfUnchanged: true });
-}
-
-export async function readLatestChamberContext(db: D1Database): Promise<MemberActivityContext | null> {
-  return readDocumentJson<MemberActivityContext>(db, buildLatestChamberContextKey());
-}
-
-export async function publishMemberActivity(
-  db: D1Database,
-  membersIndex: MemberIndexJson,
-  _memberActivities: MemberActivityJson[],
-  _windowEnd: string,
-  activityIndex: ActivityIndexJson | null
-): Promise<void> {
-  console.log("[d1] Publishing member activity documents...");
-
-  await writeDocumentJson(db, buildMembersIndexKey(), membersIndex, { skipIfUnchanged: true });
-  if (activityIndex) {
-    await writeDocumentJson(db, buildActivitiesIndexKey(), activityIndex, { skipIfUnchanged: true });
-  }
-
-  console.log("[d1] Member activity documents publish complete");
 }
 
 export function collectUniqueBills(
@@ -119,7 +72,6 @@ export function attachImpactEvidenceToBill(
 }
 
 export async function buildBillEvidencePipeline(
-  db: D1Database,
   billsByKey: Map<string, BillRef>,
   options: BillEvidencePipelineOptions
 ): Promise<BillEvidencePipelineResult> {
@@ -185,21 +137,6 @@ export async function buildBillEvidencePipeline(
     const impact = extractBillImpactEvidence(bill, harvested.evidence, {
       session: options.session,
     });
-    const snapshotDate = impact.generated_at.slice(0, 10);
-    const trendSnapshot = buildTrendSnapshot(bill, impact, snapshotDate);
-    const record: BillEvidenceRecord = {
-      schema_version: 1,
-      generated_at: impact.generated_at,
-      raw: harvested.evidence,
-      impact,
-    };
-    await writeDocumentJson(db, buildBillEvidenceKey(key), record, { skipIfUnchanged: true });
-    await writeDocumentJson(
-      db,
-      buildBillTrendSnapshotKey(bill.congress, key, snapshotDate),
-      trendSnapshot,
-      { skipIfUnchanged: true }
-    );
     impactByKey.set(key, impact);
     billInputs.push({ bill, impactEvidence: impact });
   });
@@ -249,22 +186,6 @@ export async function buildBillEvidencePipeline(
   };
 }
 
-export async function materializeReadModels(
-  env: Env,
-  ledger: VoteLedger,
-  overview: SessionOverview,
-  activityIndex: ActivityIndexJson | null
-): Promise<void> {
-  const materialization = buildPipelineMaterialization(ledger, overview, activityIndex);
-  await writePlatformMaterializationToD1(
-    env.SENATE_DB,
-    ledger,
-    overview,
-    activityIndex,
-    materialization
-  );
-}
-
 type MaterializationPrerequisitesInput = {
   ledger: VoteLedger | null;
   overview: SessionOverview | null;
@@ -277,15 +198,17 @@ type MaterializationPrerequisites = {
   activityIndex: ActivityIndexJson | null;
 };
 
+export async function materializeReadModels(
+  _env: Env,
+  _ledger: VoteLedger,
+  _overview: SessionOverview,
+  _activityIndex: ActivityIndexJson | null
+): Promise<void> {}
+
 export async function readMaterializationPrerequisites(
-  db: D1Database
+  _db: D1Database
 ): Promise<MaterializationPrerequisitesInput> {
-  const [ledger, overview, activityIndex] = await Promise.all([
-    readDocumentJson<VoteLedger>(db, buildVoteLedgerKey()),
-    readDocumentJson<SessionOverview>(db, buildSessionOverviewKey()),
-    readDocumentJson<ActivityIndexJson>(db, buildActivitiesIndexKey()),
-  ]);
-  return { ledger, overview, activityIndex };
+  return { ledger: null, overview: null, activityIndex: null };
 }
 
 export function hasMaterializationPrerequisites(
@@ -294,18 +217,4 @@ export function hasMaterializationPrerequisites(
   return prereqs.ledger !== null && prereqs.overview !== null;
 }
 
-function requireMaterializationPrerequisites(
-  prereqs: MaterializationPrerequisitesInput
-): MaterializationPrerequisites {
-  if (!hasMaterializationPrerequisites(prereqs)) {
-    throw new Error("Materialization job missing ledger or overview in storage");
-  }
-  return prereqs;
-}
-
-export async function materializeReadModelsFromStorage(env: Env): Promise<void> {
-  const prereqs = requireMaterializationPrerequisites(
-    await readMaterializationPrerequisites(env.SENATE_DB)
-  );
-  await materializeReadModels(env, prereqs.ledger, prereqs.overview, prereqs.activityIndex);
-}
+export async function materializeReadModelsFromStorage(_env: Env): Promise<void> {}

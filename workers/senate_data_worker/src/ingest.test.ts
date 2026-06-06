@@ -1,7 +1,6 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { buildVoteLedgerUpdate } from "./ingest";
 import type { MemberIndexJson, VoteLedger } from "./types";
-import type { VoteDetails } from "./xml";
 
 const membersIndex: MemberIndexJson = {
   congress: 119,
@@ -87,50 +86,6 @@ function existingLedger(voteNumbers: number[]): VoteLedger {
   };
 }
 
-function createIngestedDetailsDb(initialDetails: VoteDetails[] = []): D1Database & { storedDetails: Map<number, VoteDetails> } {
-  const storedDetails = new Map(initialDetails.map((detail) => [detail.vote_number, detail] as const));
-  const db = {
-    storedDetails,
-    async batch(statements: D1PreparedStatement[]) {
-      await Promise.all(statements.map((statement) => statement.run()));
-      return statements.map(() => ({ success: true, meta: { duration: 0 } }));
-    },
-    prepare(sql: string) {
-      const normalized = sql.replace(/\s+/g, " ").trim();
-      let bound: unknown[] = [];
-      const statement = {
-        bind(...values: unknown[]) {
-          bound = values;
-          return statement;
-        },
-        async run() {
-          if (normalized.startsWith("INSERT OR REPLACE INTO ingested_vote_details")) {
-            const detail = JSON.parse(String(bound[4])) as VoteDetails;
-            storedDetails.set(detail.vote_number, detail);
-          }
-          return { success: true, meta: { duration: 0 } };
-        },
-        async all<T>() {
-          if (normalized.includes("FROM ingested_vote_details")) {
-            const rows = Array.from(storedDetails.values()).map((detail) =>
-              normalized.includes("payload_json")
-                ? { vote_number: detail.vote_number, payload_json: JSON.stringify(detail) }
-                : { vote_number: detail.vote_number }
-            );
-            return { results: rows, success: true, meta: { duration: 0 } } as T;
-          }
-          if (normalized.includes("FROM votes")) {
-            return { results: [], success: true, meta: { duration: 0 } } as T;
-          }
-          return { results: [], success: true, meta: { duration: 0 } } as T;
-        },
-      };
-      return statement as unknown as D1PreparedStatement;
-    },
-  };
-  return db as unknown as D1Database & { storedDetails: Map<number, VoteDetails> };
-}
-
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -165,7 +120,7 @@ describe("buildVoteLedgerUpdate", () => {
     expect(requestedUrls.filter((url) => url.includes("roll_call_votes"))).toHaveLength(0);
   });
 
-  it("stores newly fetched vote details in D1 and uses cached details on repeat", async () => {
+  it("fetches vote details only once when no ledger exists", async () => {
     let detailFetchCount = 0;
     vi.stubGlobal(
       "fetch",
@@ -187,26 +142,22 @@ describe("buildVoteLedgerUpdate", () => {
         return new Response("not found", { status: 404 });
       })
     );
-    const db = createIngestedDetailsDb();
 
     const first = await buildVoteLedgerUpdate(
       { congress: 119, session: 1, targetState: "ALL", congressApiKey: "test" },
       membersIndex,
       null,
-      { maxRetries: 0, timeoutMs: 1000, concurrency: 1 },
-      { db }
+      { maxRetries: 0, timeoutMs: 1000, concurrency: 1 }
     );
     const second = await buildVoteLedgerUpdate(
       { congress: 119, session: 1, targetState: "ALL", congressApiKey: "test" },
       membersIndex,
-      null,
-      { maxRetries: 0, timeoutMs: 1000, concurrency: 1 },
-      { db }
+      first.ledger,
+      { maxRetries: 0, timeoutMs: 1000, concurrency: 1 }
     );
 
     expect(first.ledger.total_votes).toBe(1);
     expect(second.ledger.total_votes).toBe(1);
     expect(detailFetchCount).toBe(1);
-    expect(db.storedDetails.size).toBe(1);
   });
 });

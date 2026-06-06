@@ -1,9 +1,6 @@
-import { readLatestBriefingFromD1, readVoteDetailFromD1 } from "../d1/materialization";
-import { readLatestBriefingGeneratedAt } from "../storage";
 import { parseIntSafe, type Env } from "../config";
 import { buildRuntime } from "../runtime";
 import { authorizePipelineAdmin } from "../pipeline-auth";
-import { readPipelineStatus } from "../storage";
 import {
   hasMaterializationPrerequisites,
   materializeReadModels,
@@ -17,6 +14,11 @@ import {
   cacheHealth,
   cacheLatest,
 } from "./responses";
+
+const STORAGE_UNAVAILABLE = {
+  error: "storage_not_configured",
+  message: "D1 storage layer has not been implemented yet.",
+} as const;
 
 function isPipelineAdminPath(pathname: string): boolean {
   return pathname === "/__pipeline/status" || pathname.startsWith("/__pipeline/run/");
@@ -40,28 +42,13 @@ async function healthDataResponse(
   json: (body: unknown, init?: ResponseInit) => Response
 ): Promise<Response> {
   const maxFreshHours = Math.max(1, parseIntSafe(env.DATA_FRESHNESS_MAX_HOURS, 36));
-  const generatedAt = await readLatestBriefingGeneratedAt(env.SENATE_DB);
-  if (!generatedAt) {
-    return json(
-      {
-        status: "stale",
-        message: "No materialized briefing found in D1.",
-        max_fresh_hours: maxFreshHours,
-      },
-      { status: 503, headers: { "Cache-Control": cacheHealth } }
-    );
-  }
-  const generatedAtMs = new Date(generatedAt).getTime();
-  const ageHours = Number(((Date.now() - generatedAtMs) / 3_600_000).toFixed(2));
-  const fresh = Number.isFinite(generatedAtMs) && ageHours <= maxFreshHours;
   return json(
     {
-      status: fresh ? "ok" : "stale",
-      generated_at: generatedAt,
-      age_hours: ageHours,
+      status: "stale",
+      message: STORAGE_UNAVAILABLE.message,
       max_fresh_hours: maxFreshHours,
     },
-    { status: fresh ? 200 : 503, headers: { "Cache-Control": cacheHealth } }
+    { status: 503, headers: { "Cache-Control": cacheHealth } }
   );
 }
 
@@ -94,19 +81,12 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   }
 
   if (pathname === "/briefings/latest.json") {
-    const payload = await readLatestBriefingFromD1(env.SENATE_DB);
-    if (!payload) return notFound(pathname);
-    return json(payload, { status: 200, headers: { "Cache-Control": cacheLatest } });
+    return json(STORAGE_UNAVAILABLE, { status: 503, headers: { "Cache-Control": cacheLatest } });
   }
 
   const voteDetailMatch = pathname.match(/^\/votes\/(\d+)\/(\d+)\/(\d+)\.json$/);
   if (voteDetailMatch) {
-    const congress = Number(voteDetailMatch[1]);
-    const session = Number(voteDetailMatch[2]);
-    const voteNumber = Number(voteDetailMatch[3]);
-    const payload = await readVoteDetailFromD1(env.SENATE_DB, congress, session, voteNumber);
-    if (!payload) return notFound(pathname);
-    return json(payload, { status: 200, headers: { "Cache-Control": cacheLatest } });
+    return json(STORAGE_UNAVAILABLE, { status: 503, headers: { "Cache-Control": cacheLatest } });
   }
 
   return notFound(pathname);
@@ -139,13 +119,16 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     if (unauthorized) return unauthorized;
   }
 
-  // One runtime per admin run, mirroring worker.ts scheduled/queue handlers.
   const adminRuntime = adminPath ? buildRuntime(env) : null;
 
   if (pathname === "/__pipeline/status") {
-    const pipelineStatus = await readPipelineStatus(env.SENATE_DB);
     return json(
-      { status: "ok", queue_enabled: Boolean(env.PIPELINE_QUEUE), d1_enabled: true, ...pipelineStatus },
+      {
+        status: "ok",
+        queue_enabled: Boolean(env.PIPELINE_QUEUE),
+        d1_enabled: true,
+        storage_configured: false,
+      },
       { status: 200, headers: { "Cache-Control": cacheHealth } }
     );
   }
@@ -154,7 +137,7 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     const prereqs = await readMaterializationPrerequisites(env.SENATE_DB);
     if (!hasMaterializationPrerequisites(prereqs)) {
       return json(
-        { error: "missing_prerequisites", message: "Ledger or overview data is missing from storage." },
+        { error: "missing_prerequisites", message: STORAGE_UNAVAILABLE.message },
         { status: 503 }
       );
     }
@@ -201,6 +184,5 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     );
   }
 
-  // Public read routes (and 404 fallthrough).
   return handlePublicFetch(request, env);
 }
