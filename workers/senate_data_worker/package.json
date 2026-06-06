@@ -19,8 +19,5 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.16",
     "wrangler": "^4.54.0"
-  },
-  "dependencies": {
-    "fast-xml-parser": "^5.3.3"
   }
 }

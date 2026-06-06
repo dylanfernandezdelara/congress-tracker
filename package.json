@@ -4,7 +4,6 @@
     "dev:worker": "npm --prefix workers/senate_data_worker run dev",
     "dev:web": "npm --prefix web run dev",
     "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/preview-replay-contract.test.mjs scripts/cursor-cloud-setup-contract.test.mjs",
-    "test:harness": "./scripts/harness-ci.sh",
     "preview:replay": "./scripts/preview-replay.sh",
     "snapshot": "npm --prefix web run ui:snap",
     "deploy": "npm --prefix workers/senate_data_worker run deploy",
