@@ -31,7 +31,7 @@ fi
 
 tracked_docs_screenshots="$(git ls-files 'docs/screenshots/*.png' || true)"
 if [[ -n "${tracked_docs_screenshots}" ]]; then
-  echo "Tracked docs/screenshots PNGs must not be committed (use npm run preview:replay + Cursor Cloud capture):"
+  echo "Tracked docs/screenshots PNGs must not be committed (use Cursor Cloud capture instead):"
   printf '%s\n' "${tracked_docs_screenshots}"
   exit 1
 fi

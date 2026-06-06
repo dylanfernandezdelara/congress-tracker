@@ -5,17 +5,13 @@
   "scripts": {
     "dev": "wrangler dev --config wrangler.toml",
     "deploy": "wrangler deploy --config wrangler.toml",
-    "smoke:scheduled": "bash scripts/run-ingest-local.sh",
-    "fixtures:harness:refresh": "node scripts/refresh-harness-fixtures.mjs",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "briefing:feed": "tsx scripts/print-briefing-feed.ts"
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260103.0",
     "@types/node": "^22.19.17",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16",
     "wrangler": "^4.54.0"

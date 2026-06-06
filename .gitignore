@@ -12,7 +12,6 @@ node_modules/
 
 # Cloudflare Wrangler
 .wrangler/
-workers/senate_data_worker/wrangler.remote.toml
 
 # Build artifacts
 /target/

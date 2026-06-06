@@ -1,5 +1,7 @@
 # Web Design Language
 
+> **Note:** The app is in a product reset with a minimal placeholder shell. This document preserves the intended visual direction for the next UI build.
+
 This document defines the visual direction for the `web/` application.
 It is intentionally directional rather than exhaustive. Use it to make
 consistent design decisions, not to block sensible improvements.
