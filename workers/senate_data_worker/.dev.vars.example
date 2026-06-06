@@ -2,10 +2,11 @@
 DATA_SOURCE=replay
 REPLAY_FIXTURE_SET=canonical
 
-# Live ingestion (Congress.gov / GovInfo) — set real keys and switch DATA_SOURCE to live
-# when intentionally pulling from upstream.
-CONGRESS_API_KEY=your_congress_api_key
-GOVINFO_API_KEY=your_govinfo_api_key
+# Live ingestion (Congress.gov / GovInfo) — set real keys and switch DATA_SOURCE
+# to live when intentionally pulling from upstream. Cursor Cloud Secrets with
+# these names are copied into .dev.vars by scripts/cursor-cloud-setup.sh.
+# CONGRESS_API_KEY=
+# GOVINFO_API_KEY=
 
 # CORS: use * for local dev (Vite :5173 -> API :8787); set a specific origin in prod
 ALLOWED_ORIGIN=*
