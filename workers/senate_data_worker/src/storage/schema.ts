@@ -1,17 +1,13 @@
-import { ensurePlatformSchema } from "../d1/schema";
-
+// SCHEMA_REDESIGN: D1 tables are not created until the new data model lands.
 const schemaReadyByDb = new WeakMap<D1Database, Promise<void>>();
 const knownDatabases = new Set<D1Database>();
 
-/**
- * Local/test lazy schema alignment. Production should rely on applied D1 migrations;
- * this remains a safety net for Wrangler dev, Vitest, and the deterministic harness.
- */
+/** Schema alignment is intentionally disabled until the D1 model is redesigned. */
 export function shouldRunLazySchemaAlignment(): boolean {
-  return true;
+  return false;
 }
 
-/** Ensures D1 platform tables exist once per database per isolate. */
+/** No-op placeholder until a new D1 schema is introduced. */
 export function ensureSchemaOnce(db: D1Database): Promise<void> {
   if (!shouldRunLazySchemaAlignment()) {
     return Promise.resolve();
@@ -20,10 +16,7 @@ export function ensureSchemaOnce(db: D1Database): Promise<void> {
   knownDatabases.add(db);
   let ready = schemaReadyByDb.get(db);
   if (!ready) {
-    ready = ensurePlatformSchema(db).catch((error) => {
-      schemaReadyByDb.delete(db);
-      throw error;
-    });
+    ready = Promise.resolve();
     schemaReadyByDb.set(db, ready);
   }
   return ready;
