@@ -3,11 +3,8 @@
   "scripts": {
     "dev:worker": "npm --prefix workers/senate_data_worker run dev",
     "dev:web": "npm --prefix web run dev",
-    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/preview-replay-contract.test.mjs scripts/cursor-cloud-setup-contract.test.mjs",
-    "preview:replay": "./scripts/preview-replay.sh",
-    "snapshot": "npm --prefix web run ui:snap",
+    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/cursor-cloud-setup-contract.test.mjs",
     "deploy": "npm --prefix workers/senate_data_worker run deploy",
-    "refresh:remote": "./scripts/refresh-remote.sh",
     "public:check": "./scripts/public-readiness-check.sh",
     "public:scan:tracked-secrets": "./scripts/scan-tracked-secrets.sh",
     "public:scan:history-secrets": "./scripts/scan-history-secrets.sh",

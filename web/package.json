@@ -8,9 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "ui:snap": "node scripts/snapshot.mjs",
-    "ui:snap:all": "PATHS=/,/about,/votes/119/2/14 node scripts/snapshot.mjs"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
