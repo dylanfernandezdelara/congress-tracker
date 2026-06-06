@@ -192,6 +192,8 @@ One-shot bootstrap (worker and web `npm ci`, Playwright Chromium, `.dev.vars` fr
 ./scripts/cursor-cloud-setup.sh
 ```
 
+On Cursor Cloud, store `CONGRESS_API_KEY` and `GOVINFO_API_KEY` in Secrets. The setup script copies non-empty values with those names into `.dev.vars` so `wrangler dev` reads them the same way it reads local secrets; `DATA_SOURCE=live` is still an explicit `.dev.vars` choice.
+
 Or set up manually:
 
 ```bash

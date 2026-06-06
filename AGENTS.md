@@ -12,7 +12,7 @@ Cloudflare-native Senate vote intelligence app with two runtime surfaces:
 
 ### Local setup
 - Copy `workers/senate_data_worker/.dev.vars.example` to `workers/senate_data_worker/.dev.vars`, or use `./scripts/cursor-cloud-setup.sh`. The example defaults to replay (`DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`) and sets `ALLOWED_ORIGIN=*` so the Vite app at `:5173` can call the worker at `:8787`. Use a specific origin in production deploy secrets, not in the committed example.
-- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live`.
+- `CONGRESS_API_KEY` and `GOVINFO_API_KEY` are required only for **live ingestion** — set real keys and switch `DATA_SOURCE` to `live`. Cursor Cloud Secrets with those names are copied into `.dev.vars` by `./scripts/cursor-cloud-setup.sh`; other runtime vars remain explicit `.dev.vars`/Wrangler config.
 - Deterministic test runs boot workers with `DATA_SOURCE=replay`, `REPLAY_FIXTURE_SET=canonical`, and a fixed `CLOCK`.
 - Local D1 bindings are already configured in the Wrangler config; do not change remote resource IDs just to make local development work.
 
