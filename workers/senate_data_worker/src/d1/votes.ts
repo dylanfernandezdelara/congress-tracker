@@ -1,0 +1,93 @@
+import type { PassageVote } from "../types";
+import { ensureSchema } from "./schema";
+
+export async function upsertVote(db: D1Database, vote: PassageVote): Promise<void> {
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `INSERT INTO votes (
+        chamber, congress, session, roll_number,
+        bill_congress, bill_type, bill_number,
+        question, result, yeas, nays, vote_date, is_passage
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      ON CONFLICT(chamber, congress, session, roll_number) DO UPDATE SET
+        bill_congress = excluded.bill_congress,
+        bill_type = excluded.bill_type,
+        bill_number = excluded.bill_number,
+        question = excluded.question,
+        result = excluded.result,
+        yeas = excluded.yeas,
+        nays = excluded.nays,
+        vote_date = excluded.vote_date`
+    )
+    .bind(
+      vote.chamber,
+      vote.congress,
+      vote.session,
+      vote.rollNumber,
+      vote.bill.congress,
+      vote.bill.type,
+      vote.bill.number,
+      vote.question,
+      vote.result,
+      vote.yeas,
+      vote.nays,
+      vote.voteDate
+    )
+    .run();
+}
+
+export interface BillVoteKey {
+  bill_congress: number;
+  bill_type: string;
+  bill_number: number;
+  latest_passage_date: string;
+}
+
+export async function selectRecentVotedBills(
+  db: D1Database,
+  lookbackDate: string,
+  limit: number
+): Promise<BillVoteKey[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT bill_congress, bill_type, bill_number, MAX(vote_date) AS latest_passage_date
+       FROM votes
+       WHERE is_passage = 1 AND vote_date >= ?
+       GROUP BY bill_congress, bill_type, bill_number
+       ORDER BY latest_passage_date DESC
+       LIMIT ?`
+    )
+    .bind(lookbackDate, limit)
+    .all<BillVoteKey>();
+  return results ?? [];
+}
+
+export interface VoteRow {
+  chamber: string;
+  question: string;
+  result: string;
+  yeas: number;
+  nays: number;
+  vote_date: string;
+}
+
+export async function getPassageVotesForBill(
+  db: D1Database,
+  congress: number,
+  billType: string,
+  billNumber: number
+): Promise<VoteRow[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT chamber, question, result, yeas, nays, vote_date
+       FROM votes
+       WHERE bill_congress = ? AND bill_type = ? AND bill_number = ? AND is_passage = 1
+       ORDER BY vote_date DESC`
+    )
+    .bind(congress, billType, billNumber)
+    .all<VoteRow>();
+  return results ?? [];
+}

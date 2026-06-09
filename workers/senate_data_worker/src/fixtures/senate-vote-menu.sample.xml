@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?><vote_summary>
+  <congress>119</congress>
+  <session>2</session>
+  <congress_year>2026</congress_year>
+  <votes>
+    <vote>
+      <vote_number>00163</vote_number>
+      <vote_date>05-Jun</vote_date>
+      <issue>S. 2</issue>
+      <question>On Passage of the Bill</question>
+      <result>Passed</result>
+      <vote_tally>
+        <yeas>52</yeas>
+        <nays>47</nays>
+      </vote_tally>
+      <title>Sample bill title</title>
+    </vote>
+    <vote>
+      <vote_number>00164</vote_number>
+      <vote_date>05-Jun</vote_date>
+      <issue>PN851-4</issue>
+      <question>On the Cloture Motion</question>
+      <result>Agreed to</result>
+      <vote_tally>
+        <yeas>49</yeas>
+        <nays>42</nays>
+      </vote_tally>
+      <title>Nomination</title>
+    </vote>
+  </votes>
+</vote_summary>

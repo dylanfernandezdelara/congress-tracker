@@ -1,8 +1,7 @@
-name = "senate-data-api-worker"
+name = "congress-tracker-api"
 main = "src/worker.ts"
 compatibility_date = "2025-12-10"
 
-# Cron is wired for future ingestion; the current scheduled handler is a no-op.
 [triggers]
 crons = ["0 10 * * *"]
 
@@ -12,24 +11,22 @@ cpu_ms = 300000
 [vars]
 CONGRESS = "119"
 SESSION = "2"
-TARGET_STATE = "ALL"
 # Production: set to your deployed frontend origin (do not use "*" publicly).
 # ALLOWED_ORIGIN = "https://your-site.example"
 
 [[d1_databases]]
-binding = "SENATE_DB"
-database_name = "senate-platform-local"
+binding = "DB"
+database_name = "congress-tracker"
 database_id = "00000000-0000-0000-0000-000000000000"
 preview_database_id = "00000000-0000-0000-0000-000000000000"
 
 [env.preview.vars]
 CONGRESS = "119"
 SESSION = "2"
-TARGET_STATE = "ALL"
 ALLOWED_ORIGIN = "*"
 
 [[env.preview.d1_databases]]
-binding = "SENATE_DB"
-database_name = "senate-platform-local"
+binding = "DB"
+database_name = "congress-tracker"
 database_id = "00000000-0000-0000-0000-000000000000"
 preview_database_id = "00000000-0000-0000-0000-000000000000"

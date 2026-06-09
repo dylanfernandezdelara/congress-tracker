@@ -1,18 +1,16 @@
 /**
- * Senate Data Worker — minimal shell pending full redesign.
- *
- * Serves a health check and placeholder responses for API routes that will be
- * reimplemented with the new storage and ingestion design.
+ * Congress Tracker worker — vote ingestion, digest rewrite, feed API.
  */
 
 import type { Env } from "./config";
 import { handleFetch } from "./http/router";
+import { runFeedPipeline } from "./pipeline/run-feed";
 
 export default {
   fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
     return handleFetch(request, env);
   },
-  scheduled(_controller: ScheduledController, _env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.resolve());
+  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runFeedPipeline(env).then(() => undefined));
   },
 } satisfies ExportedHandler<Env>;
