@@ -1,53 +1,43 @@
+import { fetchFeed } from '../api/client'
+import type { FeedItem } from '../api/types'
+import { FeedCard } from '../components/FeedCard'
 import { useAsyncData } from '../hooks/useAsyncData'
-import { fetchHealth, type HealthResponse } from '../api/client'
 
 export default function Home() {
-  const { data, error, isLoading } = useAsyncData<HealthResponse>({
+  const { data, error, isLoading } = useAsyncData<FeedItem[]>({
     deps: [],
-    load: fetchHealth,
-    mapError: () => 'Could not reach the worker at the configured API URL.',
+    load: fetchFeed,
+    mapError: () => 'Could not load the bill feed. The worker may still be ingesting data.',
   })
 
   return (
-    <main className="space-y-6">
-      <header className="space-y-2 border-b border-border pb-6">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Product reset
-        </p>
-        <h1 className="font-serif text-4xl font-semibold text-foreground">Congress Tracker</h1>
-        <p className="max-w-2xl text-base text-muted-foreground">
-          The app shell is running while congressional data models, storage, and UI are redesigned
-          from scratch. Cloudflare Worker and D1 bindings remain wired; product APIs and tables are
-          not defined yet.
+    <main className="space-y-10">
+      <header className="header-band space-y-3 pb-8">
+        <p className="kicker text-xs font-semibold uppercase tracking-[0.24em] text-accent">Recent passage votes</p>
+        <h1 className="document-title text-4xl font-semibold text-heading">Congress Tracker</h1>
+        <p className="max-w-xl text-base text-body">
+          Bills that received an official floor roll-call vote, rewritten in plain English. Flip any
+          card to read the official CRS summary.
         </p>
       </header>
 
-      <section className="rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm">
-        <h2 className="text-lg font-semibold">Worker connectivity</h2>
-        {isLoading ? <p className="mt-3 text-sm text-muted-foreground">Checking /health…</p> : null}
-        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
-        {data ? (
-          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">Status</dt>
-              <dd className="font-medium">{data.status}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Congress / session</dt>
-              <dd className="font-medium">
-                {data.congress} / {data.session}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Target state</dt>
-              <dd className="font-medium">{data.target_state}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Timestamp</dt>
-              <dd className="font-medium">{data.timestamp}</dd>
-            </div>
-          </dl>
-        ) : null}
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading feed…</p>
+      ) : null}
+
+      {error ? <p className="text-sm text-accent">{error}</p> : null}
+
+      {!isLoading && !error && data?.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No recent passage votes in the lookback window yet. Run the ingestion pipeline to populate
+          the feed.
+        </p>
+      ) : null}
+
+      <section className="feed-list space-y-12">
+        {data?.map((item) => (
+          <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
+        ))}
       </section>
     </main>
   )

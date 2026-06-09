@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=DM+Serif+Display&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,28 +7,18 @@
 @layer base {
   :root {
     color-scheme: light;
-    --twc-background: 42 31% 94%;
-    --twc-foreground: 24 11% 14%;
-    --twc-card: 40 43% 97%;
-    --twc-card-foreground: 24 11% 14%;
-    --twc-popover: 40 43% 97%;
-    --twc-popover-foreground: 24 11% 14%;
-    --twc-primary: 215 29% 33%;
-    --twc-primary-foreground: 38 40% 97%;
-    --twc-secondary: 38 24% 88%;
-    --twc-secondary-foreground: 24 11% 18%;
-    --twc-muted: 39 23% 90%;
-    --twc-muted-foreground: 24 9% 38%;
-    --twc-accent: 215 29% 33%;
-    --twc-accent-foreground: 38 40% 97%;
-    --twc-destructive: 8 53% 39%;
-    --twc-destructive-foreground: 38 40% 97%;
-    --twc-border: 34 18% 76%;
-    --twc-input: 34 18% 76%;
-    --twc-ring: 215 29% 33%;
-    --radius: 20px;
-    --font-sans: 'Public Sans', system-ui, sans-serif;
-    --font-serif: 'Source Serif 4', Georgia, serif;
+    --twc-background: 43 44% 91%;
+    --twc-foreground: 215 45% 31%;
+    --twc-heading: 218 55% 20%;
+    --twc-card: 43 44% 95%;
+    --twc-card-foreground: 215 45% 31%;
+    --twc-muted-foreground: 38 12% 54%;
+    --twc-accent: 11 66% 47%;
+    --twc-border: 40 28% 82%;
+    --twc-pass: 145 25% 35%;
+    --twc-fail: 11 66% 47%;
+    --font-sans: 'Bricolage Grotesque', system-ui, sans-serif;
+    --font-serif: 'DM Serif Display', Georgia, serif;
   }
 
   *,
@@ -43,145 +33,123 @@
   #root {
     min-height: 100%;
     margin: 0;
-    overscroll-behavior: none;
-  }
-
-  html {
-    background: hsl(var(--twc-background));
   }
 
   body {
-    @apply font-sans text-foreground antialiased;
-    background-color: hsl(var(--twc-background));
+    @apply font-sans antialiased;
+    color: hsl(var(--twc-foreground));
+    background-color: #f5eedd;
     background-image:
-      radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 28%),
-      linear-gradient(180deg, rgba(247, 243, 235, 0.98) 0%, rgba(242, 236, 226, 0.98) 100%);
-    overscroll-behavior: none;
-    position: relative;
+      radial-gradient(circle at 1px 1px, rgba(22, 41, 78, 0.07) 1px, transparent 0),
+      linear-gradient(180deg, #f5eedd 0%, #efe6d4 100%);
+    background-size: 12px 12px, auto;
   }
 
-  a {
-    @apply text-inherit;
+  .text-heading {
+    color: hsl(var(--twc-heading));
   }
 
-  code {
-    @apply rounded-md border border-border/70 bg-background/85 px-1.5 py-0.5 font-mono text-[0.9em];
+  .text-body {
+    color: hsl(var(--twc-foreground));
   }
 
-  body::before,
-  body::after {
-    content: '';
-    inset: 0;
-    pointer-events: none;
-    position: fixed;
+  .text-pass {
+    color: hsl(var(--twc-pass));
   }
 
-  body::before {
-    background-image:
-      repeating-linear-gradient(
-        to right,
-        rgba(74, 93, 128, 0.045) 0,
-        rgba(74, 93, 128, 0.045) 1px,
-        transparent 1px,
-        transparent 132px
-      ),
-      repeating-linear-gradient(
-        to bottom,
-        rgba(74, 93, 128, 0.03) 0,
-        rgba(74, 93, 128, 0.03) 1px,
-        transparent 1px,
-        transparent 132px
-      );
-    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 72%);
-  }
-
-  body::after {
-    background-image: radial-gradient(rgba(55, 44, 27, 0.08) 0.7px, transparent 0.7px);
-    background-size: 10px 10px;
-    opacity: 0.18;
-  }
-
-  ::selection {
-    background: rgba(96, 117, 154, 0.18);
+  .text-fail {
+    color: hsl(var(--twc-fail));
   }
 }
 
 @layer components {
-  .document-frame {
-    @apply relative overflow-hidden rounded-[30px] shadow-sheet;
-    background-color: hsl(var(--twc-background) / 0.9);
-    border: 1px solid hsl(var(--twc-border) / 0.8);
-    background-image:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0)),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.32), rgba(247, 243, 235, 0.14));
-  }
-
-  .paper-panel {
-    @apply relative overflow-hidden rounded-[24px] text-card-foreground shadow-sheet-sm;
-    background-color: hsl(var(--twc-card) / 0.95);
-    border: 1px solid hsl(var(--twc-border) / 0.85);
-    background-image:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.74), rgba(249, 244, 236, 0.28)),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0));
-  }
-
-  .document-kicker {
-    @apply text-[0.7rem] font-semibold uppercase tracking-[0.24em];
-    color: hsl(var(--twc-primary) / 0.8);
-  }
-
   .document-title {
     font-family: var(--font-serif), Georgia, serif;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.02em;
     text-wrap: balance;
   }
 
-  .document-label {
-    @apply text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-muted-foreground;
+  .header-band {
+    border-bottom: 1px solid hsl(var(--twc-border) / 0.8);
+    background-image: radial-gradient(circle at 1px 1px, rgba(22, 41, 78, 0.1) 1px, transparent 0);
+    background-size: 8px 8px;
   }
 
-  .note-panel {
-    @apply rounded-[18px] p-4;
-    background-color: hsl(var(--twc-background) / 0.78);
-    border: 1px solid hsl(var(--twc-border) / 0.7);
+  .dossier-tile {
+    @apply rounded-lg border border-border/80 bg-card/90 p-6 shadow-sm;
+    background-color: hsl(var(--twc-card) / 0.92);
   }
 
-  .evidence-block {
-    @apply rounded-[18px] p-4;
-    background-color: hsl(var(--twc-background) / 0.72);
-    border: 1px solid hsl(var(--twc-border) / 0.75);
+  .dossier-back {
+    background-image: radial-gradient(circle at 1px 1px, rgba(22, 41, 78, 0.05) 1px, transparent 0);
+    background-size: 10px 10px;
   }
 
-  .draft-grid {
-    background-image:
-      linear-gradient(to right, rgba(77, 96, 131, 0.08) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(77, 96, 131, 0.08) 1px, transparent 1px),
-      linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(248, 243, 234, 0.3));
-    background-position: center;
-    background-size:
-      132px 132px,
-      132px 132px,
-      auto;
+  .docket-line {
+    @apply text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground;
   }
 
-  .section-rule {
-    @apply pt-5;
-    border-top: 1px solid hsl(var(--twc-border) / 0.7);
+  .term-chip {
+    @apply rounded-md border border-border/70 bg-background/60 px-2 py-0.5 text-xs text-body;
   }
 
   .ink-link {
-    @apply underline underline-offset-4 transition-colors hover:text-foreground;
-    color: hsl(var(--twc-primary));
-    text-decoration-color: hsl(var(--twc-primary) / 0.25);
-  }
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+    @apply font-medium text-[hsl(var(--twc-foreground))] underline underline-offset-4 transition-colors;
+    text-decoration-color: hsl(var(--twc-accent) / 0.35);
   }
 
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
+  .ink-link:hover {
+    color: hsl(var(--twc-accent));
+  }
+
+  .flip-card {
+    perspective: 1200px;
+  }
+
+  .flip-card-inner {
+    position: relative;
+    min-height: 280px;
+    transition: transform 0.5s ease;
+    transform-style: preserve-3d;
+  }
+
+  .flip-card-inner.is-flipped {
+    transform: rotateY(180deg);
+  }
+
+  .flip-card-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .flip-card-back {
+    position: absolute;
+    inset: 0;
+    transform: rotateY(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flip-card-inner {
+      transition: none;
+      transform: none !important;
+    }
+
+    .flip-card-front {
+      display: block;
+    }
+
+    .flip-card-back {
+      position: static;
+      transform: none;
+      display: none;
+    }
+
+    .flip-card-inner.is-flipped .flip-card-front {
+      display: none;
+    }
+
+    .flip-card-inner.is-flipped .flip-card-back {
+      display: block;
+    }
   }
 }
