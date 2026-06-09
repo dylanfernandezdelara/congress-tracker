@@ -1,60 +1,44 @@
 # Congress Tracker
 
-`congress-tracker` is a Cloudflare-native Senate vote intelligence app. The repository is in a **deliberate product reset**: platform wiring (Cloudflare Worker, D1 binding, Vite + React shell) remains, while congressional data models, storage schema, ingestion, and product UI are being redesigned from scratch.
+Cloudflare-native app that surfaces **recent U.S. Congress bills with official passage roll-call votes**, rewritten into plain English from official CRS summaries.
 
 ## Developer quick start
+
+```bash
+./scripts/cursor-cloud-setup.sh
+cp workers/senate_data_worker/.dev.vars.example workers/senate_data_worker/.dev.vars
+# Edit .dev.vars: add CONGRESS_API_KEY and OPENROUTER_API_KEY
+```
 
 In separate terminals:
 
 ```bash
-npm run dev:worker
-npm run dev:web
+npm run dev:worker   # http://127.0.0.1:8787
+npm run dev:web      # http://127.0.0.1:5173
 ```
 
-Then open `http://127.0.0.1:5173`. The placeholder homepage checks worker connectivity via `GET /health`.
-
-One-time setup:
+Populate the feed (requires API keys in `.dev.vars`):
 
 ```bash
-./scripts/cursor-cloud-setup.sh
+curl -fsS http://127.0.0.1:8787/__pipeline/run/feed
 ```
 
-Or manually:
+Then open `http://127.0.0.1:5173` for the scrollable flip-card feed.
 
-```bash
-cp workers/senate_data_worker/.dev.vars.example workers/senate_data_worker/.dev.vars
-npm --prefix workers/senate_data_worker install
-npm --prefix web install
-```
-
-## Architecture (current reset state)
+## Architecture
 
 ```text
-Cloudflare Worker (minimal shell)
-  GET /health                         -> 200
-  GET /health/data                    -> 503 not_implemented
-  GET /briefings/latest.json          -> 503 not_implemented
-  GET /votes/:c/:s/:n.json            -> 503 not_implemented
+Cloudflare Worker
+  cron + GET /__pipeline/run/feed  -> ingest House/Senate passage votes, CRS summaries, LLM digest
+  GET /feed/latest.json              -> pre-built feed (digest + votes + raw CRS)
+  GET /health                        -> liveness
         |
         v
-Web app (placeholder shell)
-  single page + /health connectivity check
+Vite + React (letterpress UI)
+  scrollable feed of flip-cards
 ```
 
-D1 (`SENATE_DB`) is bound in Wrangler for future schema work. There are no migrations or tables yet.
-
-## Repository layout
-
-```text
-congress-tracker/
-├── web/
-│   └── src/           # placeholder React shell
-├── workers/
-│   └── senate_data_worker/
-│       ├── src/       # minimal worker HTTP shell
-│       └── wrangler.toml
-└── scripts/
-```
+D1 (`DB`) stores `votes` and `bill_digests`.
 
 ## Testing
 
@@ -66,14 +50,16 @@ npm test
 
 ```bash
 cd workers/senate_data_worker
+wrangler d1 create congress-tracker   # once; update database_id in wrangler.toml
+wrangler secret put CONGRESS_API_KEY
+wrangler secret put OPENROUTER_API_KEY
 npm run deploy
 ```
 
-Set `ALLOWED_ORIGIN` to your deployed frontend origin in production (do not use `*` publicly).
+Set `ALLOWED_ORIGIN` to your frontend origin in production. Build the web app with `VITE_API_URL` pointing at the deployed worker URL.
 
-## HTTP API (current)
+## HTTP API
 
-- `GET /health` — worker liveness and config metadata
-- `GET /health/data` — not implemented (503)
-- `GET /briefings/latest.json` — not implemented (503)
-- `GET /votes/:congress/:session/:voteNumber.json` — not implemented (503)
+- `GET /health` — worker liveness
+- `GET /feed/latest.json` — recent bills with passage votes and digests
+- `GET /__pipeline/run/feed` — trigger ingestion (optional `PIPELINE_ADMIN_TOKEN`)

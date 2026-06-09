@@ -1,5 +1,4 @@
-const SCHEMA_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS votes (
+CREATE TABLE IF NOT EXISTS votes (
   chamber TEXT NOT NULL,
   congress INTEGER NOT NULL,
   session INTEGER NOT NULL,
@@ -14,8 +13,9 @@ const SCHEMA_STATEMENTS = [
   vote_date TEXT NOT NULL,
   is_passage INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (chamber, congress, session, roll_number)
-)`,
-  `CREATE TABLE IF NOT EXISTS bill_digests (
+);
+
+CREATE TABLE IF NOT EXISTS bill_digests (
   congress INTEGER NOT NULL,
   bill_type TEXT NOT NULL,
   number INTEGER NOT NULL,
@@ -26,20 +26,4 @@ const SCHEMA_STATEMENTS = [
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, number)
-)`,
-];
-
-let schemaApplied = false;
-
-export async function ensureSchema(db: D1Database): Promise<void> {
-  if (schemaApplied) return;
-  for (const sql of SCHEMA_STATEMENTS) {
-    await db.prepare(sql).run();
-  }
-  schemaApplied = true;
-}
-
-/** Reset flag for tests. */
-export function resetSchemaFlag(): void {
-  schemaApplied = false;
-}
+);

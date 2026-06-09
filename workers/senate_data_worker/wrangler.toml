@@ -17,8 +17,8 @@ SESSION = "2"
 [[d1_databases]]
 binding = "DB"
 database_name = "congress-tracker"
-database_id = "00000000-0000-0000-0000-000000000000"
-preview_database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"
+preview_database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"
 
 [env.preview.vars]
 CONGRESS = "119"
@@ -28,5 +28,5 @@ ALLOWED_ORIGIN = "*"
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "congress-tracker"
-database_id = "00000000-0000-0000-0000-000000000000"
-preview_database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"
+preview_database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"

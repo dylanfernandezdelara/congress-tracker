@@ -1,10 +1,8 @@
 # CORS: use * for local dev (Vite :5173 -> API :8787); set a specific origin in prod
 ALLOWED_ORIGIN=*
 
-# Required for ingestion
-CONGRESS_API_KEY=your_congress_api_key
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=openai/gpt-4o-mini
-
-# Optional: protect /__pipeline/run/feed in deployed environments
-# PIPELINE_ADMIN_TOKEN=your_pipeline_token
+# Copy to .dev.vars and set locally (never commit real values):
+# CONGRESS_API_KEY=...
+# OPENROUTER_API_KEY=...
+# OPENROUTER_MODEL=openai/gpt-4o-mini
+# PIPELINE_ADMIN_TOKEN=...  (optional, for deployed /__pipeline/run/feed)

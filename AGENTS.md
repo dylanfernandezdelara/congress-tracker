@@ -1,11 +1,11 @@
 # Congress Tracker
 
-Cloudflare-native Senate vote intelligence app in **product reset** mode. Platform wiring (Worker + D1 binding + Vite shell) is preserved; data models, ingestion, storage schema, and product UI are being redesigned from scratch.
+Cloudflare-native app: ingest House + Senate **passage** roll-call votes, join CRS summaries, rewrite to plain English via OpenRouter, serve a flip-card feed.
 
 ## Runtime surfaces
 
-- `workers/senate_data_worker/wrangler.toml` — Cloudflare Worker (minimal HTTP shell)
-- `web/` — Vite + React placeholder frontend
+- `workers/senate_data_worker/wrangler.toml` — Cloudflare Worker (ingestion + API)
+- `web/` — Vite + React feed UI
 
 ## Commands
 
@@ -15,49 +15,39 @@ Cloudflare-native Senate vote intelligence app in **product reset** mode. Platfo
 ./scripts/cursor-cloud-setup.sh
 ```
 
-Or manually: `npm --prefix workers/senate_data_worker ci`, `npm --prefix web ci`, and copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars`.
+Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONGRESS_API_KEY`, `OPENROUTER_API_KEY`, and optionally `OPENROUTER_MODEL`.
 
 ### Local development
 
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
-- Point the web app at a non-default worker: `VITE_API_URL=http://127.0.0.1:8787 npm run dev:web`
+- Trigger ingestion: `curl -fsS http://127.0.0.1:8787/__pipeline/run/feed`
+- Feed JSON: `http://127.0.0.1:8787/feed/latest.json`
 
 ### Verification
-
-From repo root:
 
 ```bash
 npm test
 ```
 
-Runs worker typecheck/tests, web tests/build, and the cursor-cloud setup contract test.
+## API
 
-## Current API behavior
-
-- `GET /health` — returns 200 with worker config metadata
-- `GET /health/data`, `GET /briefings/latest.json`, `GET /votes/:c/:s/:n.json` — return 503 `not_implemented` until the redesign lands
+- `GET /health`
+- `GET /feed/latest.json`
+- `GET /__pipeline/run/feed` (cron also runs daily at 10:00 UTC)
 
 ## Project structure
 
-- `workers/senate_data_worker/src/worker.ts` — Worker entry (`fetch` + no-op `scheduled`)
-- `workers/senate_data_worker/src/http/router.ts` — HTTP router
-- `workers/senate_data_worker/src/config.ts` — `Env` bindings (D1 + public vars)
-- `web/src/` — placeholder React shell
+- `workers/senate_data_worker/src/pipeline/run-feed.ts` — ingestion orchestrator
+- `workers/senate_data_worker/src/sources/` — House/Senate vote + Congress.gov clients
+- `workers/senate_data_worker/src/synthesis/` — OpenRouter digest rewrite
+- `workers/senate_data_worker/src/storage/feed.ts` — feed read model
+- `web/src/components/FlipCard.tsx` — flip-card UI
 
 ## Key rules
 
-- Prefer the commands above over guessing root-level npm scripts.
+- Prefer commands in this file over guessing root-level npm scripts.
 - Default to `npm test` for verification.
-- Never commit secrets from `.dev.vars` or local Wrangler state.
-- Commit and push directly to `main` when explicitly requested and validation is green; create a feature branch and PR when explicitly requested.
-- Local D1 bindings are configured in Wrangler; do not change remote resource IDs just to make local development work.
-
-## Cursor Cloud
-
-Solo-contributor workflow: push fixes directly to `main` (no PRs or `cursor/*` branches) unless the user asks otherwise.
-
-Repo-level agent VMs use `.cursor/environment.json`. On each start, Cursor runs `./scripts/cursor-cloud-setup.sh`. For local debugging, start `npm run dev:worker` and `npm run dev:web` in separate terminals.
-
-- End-to-end check: `npm test`.
-- CI uses Node.js 20 (`.github/workflows/ci.yml`).
+- Never commit secrets from `.dev.vars`.
+- `FEED_MAX_BILLS`, `VOTE_LOOKBACK_DAYS`, `DIGEST_MAX_NEW_REWRITES` are module constants in `src/constants.ts`.
+- Always `git fetch origin` before starting work on a fresh session.

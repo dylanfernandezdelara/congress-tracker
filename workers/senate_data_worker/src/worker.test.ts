@@ -2,15 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import handler from "./worker";
 
 function createMockDb(): D1Database {
+  const runResult = { success: true, meta: { duration: 0 } };
+  const stmt = () => ({
+    bind: vi.fn(() => stmt()),
+    all: vi.fn(async () => ({ results: [] })),
+    first: vi.fn(async () => null),
+    run: vi.fn(async () => runResult),
+  });
   return {
     exec: vi.fn(async () => {}),
-    prepare: vi.fn(() => ({
-      bind: vi.fn(() => ({
-        all: vi.fn(async () => ({ results: [] })),
-        first: vi.fn(async () => null),
-        run: vi.fn(async () => ({})),
-      })),
-    })),
+    prepare: vi.fn(() => stmt()),
   } as unknown as D1Database;
 }
 
