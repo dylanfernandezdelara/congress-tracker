@@ -9,7 +9,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function formatBillDocket(type: string, number: number, congress: number): string {
   const label = TYPE_LABELS[type.toUpperCase()] ?? type
-  return `${label} ${number} · ${congress}th`
+  return `${label} ${number} · ${congress}th Congress`
 }
 
 export function congressGovBillUrl(congress: number, type: string, number: number): string {
@@ -19,12 +19,12 @@ export function congressGovBillUrl(congress: number, type: string, number: numbe
 
 export function formatVoteDate(iso: string): string {
   const d = new Date(iso + 'T12:00:00')
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export function voteResultClass(result: string): string {
   const r = result.toLowerCase()
   if (r.includes('pass') || r.includes('agreed')) return 'text-pass'
   if (r.includes('fail') || r.includes('reject')) return 'text-fail'
-  return 'text-muted-foreground'
+  return 'text-faint'
 }

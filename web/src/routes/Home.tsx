@@ -1,44 +1,74 @@
+import { useState } from 'react'
+
 import { fetchFeed } from '../api/client'
 import type { FeedItem } from '../api/types'
 import { FeedCard } from '../components/FeedCard'
 import { useAsyncData } from '../hooks/useAsyncData'
 
+const LOOKBACK_DAYS = 45
+
+function FeedSkeleton() {
+  return (
+    <div className="space-y-5" aria-hidden="true">
+      <div className="skeleton-card" />
+      <div className="skeleton-card" />
+      <div className="skeleton-card" />
+    </div>
+  )
+}
+
 export default function Home() {
+  const [retryKey, setRetryKey] = useState(0)
   const { data, error, isLoading } = useAsyncData<FeedItem[]>({
-    deps: [],
+    deps: [retryKey],
     load: fetchFeed,
-    mapError: () => 'Could not load the bill feed. The worker may still be ingesting data.',
+    mapError: () => "Couldn't load the feed.",
   })
 
+  const showFeed = !isLoading && !error && data && data.length > 0
+
   return (
-    <main className="space-y-10">
-      <header className="header-band space-y-3 pb-8">
-        <p className="kicker text-xs font-semibold uppercase tracking-[0.24em] text-accent">Recent passage votes</p>
-        <h1 className="document-title text-4xl font-semibold text-heading">Congress Tracker</h1>
-        <p className="max-w-xl text-base text-body">
-          Bills that received an official floor roll-call vote, rewritten in plain English. Flip any
-          card to read the official CRS summary.
+    <main className="space-y-5">
+      <header className="space-y-4 pb-1">
+        <div className="flex items-baseline justify-between gap-4">
+          <h1 className="flex items-center gap-1.5 text-[15px] font-medium tracking-normal text-foreground">
+            Congress Tracker
+            <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+          </h1>
+          {data && !error && !isLoading ? (
+            <p className="shrink-0 text-xs text-faint">
+              {data.length} {data.length === 1 ? 'bill' : 'bills'} · last {LOOKBACK_DAYS} days
+            </p>
+          ) : null}
+        </div>
+        <p className="text-sm text-secondary">
+          Plain-English summaries of every bill that just passed the House or Senate.
         </p>
+        <div className="border-t border-white/8" />
       </header>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading feed…</p>
-      ) : null}
+      {isLoading ? <FeedSkeleton /> : null}
 
-      {error ? <p className="text-sm text-accent">{error}</p> : null}
+      {error ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-white/8 bg-card px-6 py-8 text-center">
+          <p className="text-sm text-secondary">{error}</p>
+          <button type="button" className="ghost-button" onClick={() => setRetryKey((k) => k + 1)}>
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {!isLoading && !error && data?.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No recent passage votes in the lookback window yet. Run the ingestion pipeline to populate
-          the feed.
-        </p>
+        <p className="text-sm text-faint">No passage votes in the last {LOOKBACK_DAYS} days.</p>
       ) : null}
 
-      <section className="feed-list space-y-12">
-        {data?.map((item) => (
-          <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
-        ))}
-      </section>
+      {showFeed ? (
+        <section className="space-y-5">
+          {data.map((item) => (
+            <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
+          ))}
+        </section>
+      ) : null}
     </main>
   )
 }

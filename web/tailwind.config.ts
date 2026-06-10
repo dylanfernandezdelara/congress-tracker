@@ -4,33 +4,24 @@ import tailwindcssAnimate from 'tailwindcss-animate'
 const config: Config = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
-    container: {
-      center: true,
-      padding: '1rem',
-      screens: {
-        '2xl': '720px',
-      },
-    },
     extend: {
       colors: {
         border: 'hsl(var(--twc-border))',
-        background: '#f5eedd',
+        background: 'hsl(var(--twc-background))',
         foreground: 'hsl(var(--twc-foreground))',
-        heading: 'hsl(var(--twc-heading))',
+        secondary: 'hsl(var(--twc-secondary))',
+        faint: 'hsl(var(--twc-faint))',
         card: {
           DEFAULT: 'hsl(var(--twc-card))',
-          foreground: 'hsl(var(--twc-card-foreground))',
-        },
-        muted: {
-          foreground: 'hsl(var(--twc-muted-foreground))',
         },
         accent: {
           DEFAULT: 'hsl(var(--twc-accent))',
         },
+        pass: 'hsl(var(--twc-pass))',
+        fail: 'hsl(var(--twc-fail))',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        serif: ['var(--font-serif)', 'Georgia', 'serif'],
       },
     },
   },

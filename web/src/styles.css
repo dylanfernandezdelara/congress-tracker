@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=DM+Serif+Display&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,25 +6,23 @@
 
 @layer base {
   :root {
-    color-scheme: light;
-    --twc-background: 43 44% 91%;
-    --twc-foreground: 215 45% 31%;
-    --twc-heading: 218 55% 20%;
-    --twc-card: 43 44% 95%;
-    --twc-card-foreground: 215 45% 31%;
-    --twc-muted-foreground: 38 12% 54%;
-    --twc-accent: 11 66% 47%;
-    --twc-border: 40 28% 82%;
-    --twc-pass: 145 25% 35%;
-    --twc-fail: 11 66% 47%;
-    --font-sans: 'Bricolage Grotesque', system-ui, sans-serif;
-    --font-serif: 'DM Serif Display', Georgia, serif;
+    color-scheme: dark;
+    --twc-background: 0 0% 4%;
+    --twc-foreground: 0 0% 93%;
+    --twc-secondary: 0 0% 63%;
+    --twc-faint: 0 0% 45%;
+    --twc-card: 0 0% 7%;
+    --twc-border: 0 0% 100% / 0.08;
+    --twc-border-hover: 0 0% 100% / 0.14;
+    --twc-accent: 24 90% 58%;
+    --twc-pass: 151 45% 55%;
+    --twc-fail: 0 65% 60%;
+    --font-sans: 'Inter', system-ui, sans-serif;
   }
 
   *,
   *::before,
   *::after {
-    @apply border-border;
     box-sizing: border-box;
   }
 
@@ -36,21 +34,38 @@
   }
 
   body {
-    @apply font-sans antialiased;
+    @apply font-sans antialiased tabular-nums;
+    font-feature-settings: 'cv11', 'ss01';
     color: hsl(var(--twc-foreground));
-    background-color: #f5eedd;
-    background-image:
-      radial-gradient(circle at 1px 1px, rgba(22, 41, 78, 0.07) 1px, transparent 0),
-      linear-gradient(180deg, #f5eedd 0%, #efe6d4 100%);
-    background-size: 12px 12px, auto;
+    background-color: hsl(var(--twc-background));
+    background-image: radial-gradient(
+      ellipse 120% 600px at 50% 0%,
+      hsl(0 0% 100% / 0.04),
+      transparent
+    );
   }
 
-  .text-heading {
-    color: hsl(var(--twc-heading));
+  ::selection {
+    background-color: hsl(var(--twc-accent) / 0.25);
+    color: hsl(var(--twc-foreground));
   }
 
-  .text-body {
-    color: hsl(var(--twc-foreground));
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  .text-secondary {
+    color: hsl(var(--twc-secondary));
+  }
+
+  .text-faint {
+    color: hsl(var(--twc-faint));
   }
 
   .text-pass {
@@ -60,46 +75,54 @@
   .text-fail {
     color: hsl(var(--twc-fail));
   }
-}
 
-@layer components {
-  .document-title {
-    font-family: var(--font-serif), Georgia, serif;
-    letter-spacing: -0.02em;
-    text-wrap: balance;
+  .feed-card-surface {
+    @apply h-full overflow-hidden rounded-xl border bg-card p-6 sm:p-7;
+    border-color: hsl(var(--twc-border));
+    transition:
+      border-color 0.2s ease,
+      transform 0.2s ease;
   }
 
-  .header-band {
-    border-bottom: 1px solid hsl(var(--twc-border) / 0.8);
-    background-image: radial-gradient(circle at 1px 1px, rgba(22, 41, 78, 0.1) 1px, transparent 0);
-    background-size: 8px 8px;
+  .flip-card:hover .feed-card-surface,
+  .flip-card:focus-within .feed-card-surface {
+    border-color: hsl(var(--twc-border-hover));
   }
 
-  .dossier-tile {
-    @apply rounded-lg border border-border/80 bg-card/90 p-6 shadow-sm;
-    background-color: hsl(var(--twc-card) / 0.92);
+  .flip-card:hover .flip-card-inner,
+  .flip-card:focus-within .flip-card-inner {
+    transform: translateY(-1px);
   }
 
-  .dossier-back {
-    background-image: radial-gradient(circle at 1px 1px, rgba(22, 41, 78, 0.05) 1px, transparent 0);
-    background-size: 10px 10px;
+  .flip-card:hover .flip-card-inner.is-flipped,
+  .flip-card:focus-within .flip-card-inner.is-flipped {
+    transform: translateY(-1px) rotateY(180deg);
   }
 
-  .docket-line {
-    @apply text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground;
+  .congress-link {
+    @apply text-secondary underline-offset-4 transition-colors;
+    text-decoration-line: underline;
+    text-decoration-color: hsl(var(--twc-border-hover));
   }
 
-  .term-chip {
-    @apply rounded-md border border-border/70 bg-background/60 px-2 py-0.5 text-xs text-body;
-  }
-
-  .ink-link {
-    @apply font-medium text-[hsl(var(--twc-foreground))] underline underline-offset-4 transition-colors;
-    text-decoration-color: hsl(var(--twc-accent) / 0.35);
-  }
-
-  .ink-link:hover {
+  .congress-link:hover {
     color: hsl(var(--twc-accent));
+    text-decoration-color: hsl(var(--twc-accent) / 0.5);
+  }
+
+  .summary-fade {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 10;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+  }
+
+  .skeleton-card {
+    @apply animate-pulse rounded-xl;
+    height: 260px;
+    background-color: hsl(0 0% 100% / 0.04);
   }
 
   .flip-card {
@@ -110,7 +133,9 @@
     position: relative;
     min-height: 280px;
     cursor: pointer;
-    transition: transform 0.5s ease;
+    transition:
+      transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1),
+      translate 0.2s ease;
     transform-style: preserve-3d;
   }
 
@@ -118,7 +143,14 @@
     transform: rotateY(180deg);
   }
 
+  .flip-card-inner:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 4px;
+    border-radius: 0.75rem;
+  }
+
   .flip-card-face {
+    @apply h-full;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
@@ -129,7 +161,38 @@
     transform: rotateY(180deg);
   }
 
+  .congress-link:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  .ghost-button {
+    @apply rounded-md border px-4 py-1.5 text-sm text-secondary transition-colors;
+    border-color: hsl(0 0% 100% / 0.1);
+  }
+
+  .ghost-button:hover {
+    border-color: hsl(0 0% 100% / 0.2);
+    color: hsl(var(--twc-foreground));
+  }
+
+  .ghost-button:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 2px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
+    .flip-card:hover .flip-card-inner,
+    .flip-card:focus-within .flip-card-inner {
+      transform: none;
+    }
+
+    .flip-card:hover .flip-card-inner.is-flipped,
+    .flip-card:focus-within .flip-card-inner.is-flipped {
+      transform: none !important;
+    }
+
     .flip-card-inner {
       transition: none;
       transform: none !important;

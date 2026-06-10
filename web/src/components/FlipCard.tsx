@@ -3,6 +3,7 @@ import { type KeyboardEvent, type ReactNode, useId, useState } from 'react'
 type FlipCardProps = {
   front: ReactNode
   back: ReactNode
+  titleId?: string
   flipLabel?: string
   backLabel?: string
 }
@@ -10,11 +11,13 @@ type FlipCardProps = {
 export function FlipCard({
   front,
   back,
+  titleId,
   flipLabel = 'Flip to official summary',
   backLabel = 'Back to plain summary',
 }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
   const id = useId()
+  const labelledBy = titleId ?? `${id}-title`
 
   const toggle = () => setFlipped((v) => !v)
 
@@ -26,7 +29,7 @@ export function FlipCard({
   }
 
   return (
-    <article className="flip-card" aria-labelledby={`${id}-title`}>
+    <article className="flip-card" aria-labelledby={labelledBy}>
       <div
         className={`flip-card-inner ${flipped ? 'is-flipped' : ''}`}
         role="button"
@@ -39,9 +42,6 @@ export function FlipCard({
         <div className="flip-card-face flip-card-front">{front}</div>
         <div className="flip-card-face flip-card-back">{back}</div>
       </div>
-      <p className="mt-3 text-center text-xs text-muted-foreground" aria-hidden="true">
-        {flipped ? 'Tap to return' : 'Tap card to flip'}
-      </p>
     </article>
   )
 }

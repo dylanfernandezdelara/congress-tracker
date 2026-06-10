@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 import type { FeedItem } from '../api/types'
 import {
   congressGovBillUrl,
@@ -11,75 +13,109 @@ type FeedCardProps = {
   item: FeedItem
 }
 
+function VoteSplitBar({ yeas, nays }: { yeas: number; nays: number }) {
+  const total = yeas + nays
+  if (total === 0) {
+    return <div className="h-1 w-full rounded-full bg-white/8" />
+  }
+
+  return (
+    <div className="flex h-1 w-full gap-0.5 overflow-hidden rounded-full bg-white/8">
+      {yeas > 0 ? <div className="rounded-full bg-pass" style={{ flex: yeas }} /> : null}
+      {nays > 0 ? <div className="rounded-full bg-fail opacity-75" style={{ flex: nays }} /> : null}
+    </div>
+  )
+}
+
 export function FeedCard({ item }: FeedCardProps) {
+  const headingId = useId()
   const docket = formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
   const headline = item.digest?.headline ?? item.bill.title ?? docket
   const body = item.digest?.what_it_does ?? item.raw_summary_text ?? 'Summary not available yet.'
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
+  const keyPoints = item.digest?.key_points?.slice(0, 3) ?? []
 
   const front = (
-    <div className="dossier-tile space-y-4">
-      <p className="docket-line tabular-nums">{docket}</p>
-      <h2 className="document-title text-2xl font-semibold text-heading">{headline}</h2>
-      <p className="text-base leading-relaxed text-body">{body}</p>
+    <div className="feed-card-surface flex flex-col">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[12px] font-normal uppercase tracking-widest text-faint">{docket}</p>
+        {item.policy_area ? (
+          <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-secondary">
+            {item.policy_area}
+          </span>
+        ) : null}
+      </div>
 
-      {item.digest?.key_points?.length ? (
-        <ul className="list-disc space-y-1 pl-5 text-sm text-body">
-          {item.digest.key_points.map((point) => (
-            <li key={point}>{point}</li>
-          ))}
-        </ul>
-      ) : null}
+      <h2
+        id={headingId}
+        className="mt-3 line-clamp-3 text-[19px] font-semibold leading-[1.3] text-foreground"
+      >
+        {headline}
+      </h2>
 
-      {item.digest?.terms_explained?.length ? (
-        <div className="flex flex-wrap gap-2">
-          {item.digest.terms_explained.map((t) => (
-            <span key={t.term} className="term-chip" title={t.plain}>
-              {t.term}
-            </span>
+      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-secondary">{body}</p>
+
+      {item.passage_votes.length > 0 ? (
+        <div className="mt-5 space-y-3 border-t border-white/8 pt-4">
+          {item.passage_votes.map((v) => (
+            <div key={`${v.chamber}-${v.date}-${v.question}`} className="space-y-1.5">
+              <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                <p>
+                  <span className="font-medium text-foreground">{v.chamber}</span>{' '}
+                  <span className={voteResultClass(v.result)}>{v.result}</span>
+                </p>
+                <p className="shrink-0 text-secondary">
+                  {v.yeas}–{v.nays}
+                  <span className="text-faint"> · {formatVoteDate(v.date)}</span>
+                </p>
+              </div>
+              <VoteSplitBar yeas={v.yeas} nays={v.nays} />
+            </div>
           ))}
         </div>
       ) : null}
 
-      <div className="space-y-2 border-t border-border/70 pt-4">
-        {item.passage_votes.map((v) => (
-          <p key={`${v.chamber}-${v.date}-${v.question}`} className="vote-line tabular-nums text-sm">
-            <span className="font-medium text-heading">{v.chamber}</span>
-            <span className="text-muted-foreground"> · </span>
-            <span className={voteResultClass(v.result)}>{v.result}</span>
-            <span className="text-muted-foreground">
-              {' '}
-              · {v.yeas}–{v.nays} · {formatVoteDate(v.date)}
-            </span>
-          </p>
-        ))}
-      </div>
-
-      {item.policy_area ? (
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.policy_area}</p>
-      ) : null}
+      <p className="mt-auto pt-4 text-right text-[11px] text-faint">Flip for official text ↺</p>
     </div>
   )
 
   const back = (
-    <div className="dossier-tile dossier-back space-y-4">
-      <p className="official-stamp text-xs font-semibold uppercase tracking-[0.24em] text-heading">
-        Official summary
-      </p>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-body">
+    <div className="feed-card-surface flex h-full flex-col">
+      <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
+
+      {keyPoints.length > 0 ? (
+        <div className="mt-4">
+          <p className="text-[11px] uppercase tracking-widest text-faint">Key points</p>
+          <ul className="mt-2 space-y-1.5">
+            {keyPoints.map((point) => (
+              <li key={point} className="flex gap-2 text-[13px] leading-relaxed text-secondary">
+                <span className="text-faint" aria-hidden="true">
+                  –
+                </span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <p className="summary-fade mt-4 flex-1 whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
         {item.raw_summary_text ?? 'No official CRS summary on file.'}
       </p>
-      <a
-        href={sourceUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="ink-link text-sm"
-        onClick={(e) => e.stopPropagation()}
-      >
-        View on congress.gov ↗
-      </a>
+
+      <div className="mt-4 border-t border-white/8 pt-4">
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="congress-link text-[13px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Read on congress.gov ↗
+        </a>
+      </div>
     </div>
   )
 
-  return <FlipCard front={front} back={back} />
+  return <FlipCard front={front} back={back} titleId={headingId} />
 }
