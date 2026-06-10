@@ -79,9 +79,11 @@ Use this only if you want browser-openable previews without involving the agent.
 - **Preview versions reuse production bindings and secrets**, including the D1
   database. Treat the preview as having production data access.
 - The admin ingestion route `/__pipeline/run/feed` writes to D1. It is reachable
-  on preview URLs too. Set a `PIPELINE_ADMIN_TOKEN` secret
-  (`wrangler secret put PIPELINE_ADMIN_TOKEN`) so this endpoint requires a token
-  and cannot be triggered by anyone who discovers a preview URL.
+  on preview URLs too. Production already has `PIPELINE_ADMIN_TOKEN` set via
+  `wrangler secret put PIPELINE_ADMIN_TOKEN`, so the endpoint requires a token
+  and cannot be triggered without it. Preview versions inherit production
+  secrets; set the same secret (or a separate preview-only token) if you need
+  to call the route from a preview URL.
 - Preview URLs are public on `workers.dev`. To restrict them, use
   [Cloudflare Access on preview URLs](https://developers.cloudflare.com/workers/configuration/previews/#manage-access-to-preview-urls).
 - Cron triggers only fire on the deployed production version, not on preview
