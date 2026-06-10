@@ -37,6 +37,28 @@ export function trimDisplayTitle(title: string): string {
   return title.replace(BOILERPLATE_TITLE_SUFFIX, '').trim()
 }
 
+function collapseWhitespace(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
+export function summaryBodyText(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return trimmed
+
+  const newlineIndex = trimmed.indexOf('\n')
+  if (newlineIndex === -1) return collapseWhitespace(trimmed)
+
+  const firstLine = trimmed.slice(0, newlineIndex).trim()
+  const remainder = trimmed.slice(newlineIndex + 1).trim()
+  const endsWithSentencePunctuation = /[.!?]$/.test(firstLine)
+
+  if (!endsWithSentencePunctuation && remainder.length > 0) {
+    return collapseWhitespace(remainder)
+  }
+
+  return collapseWhitespace(trimmed)
+}
+
 function normalizeBillRef(typeRaw: string, number: string): string {
   const compact = typeRaw.replace(/\s+/g, '').toUpperCase()
   if (compact === 'HR' || compact === 'H.R') return `H.R. ${number}`

@@ -6,6 +6,7 @@ import {
   formatBillDocket,
   formatVoteDate,
   proceduralHeadline,
+  summaryBodyText,
   trimDisplayTitle,
   voteResultClass,
 } from '../utils/billLabels'
@@ -39,7 +40,10 @@ export function FeedCard({ item }: FeedCardProps) {
   const headline = hasDigestHeadline
     ? trimDisplayTitle(item.digest!.headline!)
     : (proceduralTitle ?? trimDisplayTitle(item.bill.title ?? docket))
-  const body = item.digest?.what_it_does ?? item.raw_summary_text ?? 'Summary not available yet.'
+  const body =
+    item.digest?.what_it_does ??
+    (item.raw_summary_text ? summaryBodyText(item.raw_summary_text) : null) ??
+    'Summary not available yet.'
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const keyPoints = item.digest?.key_points?.slice(0, 3) ?? []
   const policyLabel = isProcedural ? 'Procedural' : item.policy_area
