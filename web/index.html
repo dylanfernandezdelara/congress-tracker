@@ -2,6 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var stored = localStorage.getItem('theme')
+        var theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark'
+        document.documentElement.dataset.theme = theme
+      })()
+    </script>
     <link
       rel="icon"
       type="image/svg+xml"
@@ -12,7 +24,8 @@
       name="description"
       content="Plain-English summaries of bills that just passed the House or Senate."
     />
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
     <title>Congress Tracker</title>
   </head>
   <body>

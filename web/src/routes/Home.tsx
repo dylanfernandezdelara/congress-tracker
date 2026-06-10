@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { fetchFeed } from '../api/client'
 import type { FeedItem } from '../api/types'
 import { FeedCard } from '../components/FeedCard'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { useAsyncData } from '../hooks/useAsyncData'
 
 const LOOKBACK_DAYS = 45
@@ -31,10 +32,13 @@ export default function Home() {
     <main className="space-y-5">
       <header className="space-y-4 pb-1">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-          <h1 className="flex items-center gap-1.5 text-[15px] font-medium tracking-normal text-foreground">
-            Congress Tracker
-            <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden="true" />
-          </h1>
+          <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-1">
+            <h1 className="flex items-center gap-1.5 text-[15px] font-medium tracking-normal text-foreground">
+              Congress Tracker
+              <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+            </h1>
+            <ThemeToggle />
+          </div>
           {data && !error && !isLoading ? (
             <p className="text-xs text-faint">
               {data.length} {data.length === 1 ? 'bill' : 'bills'} · last {LOOKBACK_DAYS} days
@@ -44,13 +48,13 @@ export default function Home() {
         <p className="text-sm text-secondary">
           Plain-English summaries of every bill that just passed the House or Senate.
         </p>
-        <div className="border-t border-white/8" />
+        <div className="border-t border-border" />
       </header>
 
       {isLoading ? <FeedSkeleton /> : null}
 
       {error ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-white/8 bg-card px-6 py-8 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-8 text-center">
           <p className="text-sm text-secondary">{error}</p>
           <button type="button" className="ghost-button" onClick={() => setRetryKey((k) => k + 1)}>
             Retry

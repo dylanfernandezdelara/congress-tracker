@@ -6,7 +6,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(var(--twc-border))',
+        border: {
+          DEFAULT: 'hsl(var(--twc-border))',
+          hover: 'hsl(var(--twc-border-hover))',
+          muted: 'hsl(var(--twc-border-muted))',
+        },
         background: 'hsl(var(--twc-background))',
         foreground: 'hsl(var(--twc-foreground))',
         secondary: 'hsl(var(--twc-secondary))',
@@ -19,6 +23,9 @@ const config: Config = {
         },
         pass: 'hsl(var(--twc-pass))',
         fail: 'hsl(var(--twc-fail))',
+        surface: {
+          subtle: 'hsl(var(--twc-surface-subtle))',
+        },
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],

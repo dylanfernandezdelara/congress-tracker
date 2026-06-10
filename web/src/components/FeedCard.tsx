@@ -19,11 +19,11 @@ type FeedCardProps = {
 function VoteSplitBar({ yeas, nays }: { yeas: number; nays: number }) {
   const total = yeas + nays
   if (total === 0) {
-    return <div className="h-1 w-full rounded-full bg-white/8" />
+    return <div className="h-1 w-full rounded-full bg-surface-subtle" />
   }
 
   return (
-    <div className="flex h-1 w-full gap-0.5 overflow-hidden rounded-full bg-white/8">
+    <div className="flex h-1 w-full gap-0.5 overflow-hidden rounded-full bg-surface-subtle">
       {yeas > 0 ? <div className="rounded-full bg-pass" style={{ flex: yeas }} /> : null}
       {nays > 0 ? <div className="rounded-full bg-fail opacity-75" style={{ flex: nays }} /> : null}
     </div>
@@ -55,7 +55,7 @@ export function FeedCard({ item }: FeedCardProps) {
           {docket}
         </p>
         {policyLabel ? (
-          <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-secondary">
+          <span className="rounded-full border border-border-muted px-2 py-0.5 text-[11px] text-secondary">
             {policyLabel}
           </span>
         ) : null}
@@ -72,7 +72,7 @@ export function FeedCard({ item }: FeedCardProps) {
 
       <div className="mt-auto">
         {item.passage_votes.length > 0 ? (
-          <div className="space-y-3 border-t border-white/8 pt-4">
+          <div className="space-y-3 border-t border-border pt-4">
             {item.passage_votes.map((v) => (
               <div key={`${v.chamber}-${v.date}-${v.question}`} className="space-y-1.5">
                 <div className="flex items-baseline justify-between gap-3 text-[13px]">
@@ -127,7 +127,7 @@ export function FeedCard({ item }: FeedCardProps) {
         </p>
       </div>
 
-      <footer className="mt-auto flex shrink-0 items-center justify-between gap-4 border-t border-white/8 pt-4">
+      <footer className="mt-auto flex shrink-0 items-center justify-between gap-4 border-t border-border pt-4">
         <a
           href={sourceUrl}
           target="_blank"
