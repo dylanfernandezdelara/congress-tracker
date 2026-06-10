@@ -3,6 +3,8 @@ const TYPE_LABELS: Record<string, string> = {
   S: 'S.',
   HRES: 'H.Res.',
   SRES: 'S.Res.',
+  HCONRES: 'H.Con.Res.',
+  SCONRES: 'S.Con.Res.',
   HJRES: 'H.J.Res.',
   SJRES: 'S.J.Res.',
 }
@@ -13,6 +15,8 @@ const PROVIDING_FOR_CONSIDERATION_PATTERN =
   /^Providing for consideration of the (?:bill|joint resolution|resolution) \(?(H\.?\s?R\.?|H\. ?Res\.?|S\.|S\. ?Res\.?)\s?(\d+)\)?,? (?:to |which )?(.+)$/i
 
 const RULE_WAIVER_PATTERN = /^Waiving a requirement of clause .+ of rule .+/i
+
+const NULLIFICATION_PATTERN = /^Providing that (.+?) shall have no force or effect\.?$/i
 
 export function formatBillDocket(type: string, number: number, congress: number): string {
   const label = TYPE_LABELS[type.toUpperCase()] ?? type
@@ -42,6 +46,12 @@ function normalizeBillRef(typeRaw: string, number: string): string {
   return `${typeRaw.trim()} ${number}`
 }
 
+function normalizeResolutionRefs(subject: string): string {
+  return subject
+    .replace(/\bHouse Resolution (\d+)\b/gi, 'H.Res. $1')
+    .replace(/\bSenate Resolution (\d+)\b/gi, 'S.Res. $1')
+}
+
 function capitalizeFirst(text: string): string {
   if (!text) return text
   return text.charAt(0).toUpperCase() + text.slice(1)
@@ -58,6 +68,12 @@ function truncateAtWordBoundary(text: string, maxLength: number): string {
 export function proceduralHeadline(title: string): string | null {
   if (RULE_WAIVER_PATTERN.test(title)) {
     return 'Fast-tracks floor consideration (rule waiver)'
+  }
+
+  const nullification = title.match(NULLIFICATION_PATTERN)
+  if (nullification) {
+    const subject = truncateAtWordBoundary(normalizeResolutionRefs(nullification[1].trim()), 80)
+    return `Nullifies ${subject}`
   }
 
   const match = title.match(PROVIDING_FOR_CONSIDERATION_PATTERN)

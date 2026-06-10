@@ -127,7 +127,7 @@
   }
 
   .flip-card-inner {
-    position: relative;
+    display: grid;
     min-height: 280px;
     cursor: pointer;
     transition:
@@ -147,14 +147,13 @@
   }
 
   .flip-card-face {
-    @apply h-full;
+    grid-area: 1 / 1;
+    min-height: 100%;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
 
   .flip-card-back {
-    position: absolute;
-    inset: 0;
     transform: rotateY(180deg);
   }
 
@@ -200,7 +199,6 @@
     }
 
     .flip-card-back {
-      position: static;
       transform: none;
       display: none;
     }

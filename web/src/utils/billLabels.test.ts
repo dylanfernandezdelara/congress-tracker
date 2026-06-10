@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { proceduralHeadline, trimDisplayTitle } from './billLabels'
+import { formatBillDocket, proceduralHeadline, trimDisplayTitle } from './billLabels'
+
+describe('formatBillDocket', () => {
+  it('formats concurrent resolutions', () => {
+    expect(formatBillDocket('hconres', 84, 119)).toBe('H.Con.Res. 84 · 119th Congress')
+  })
+
+  it('formats joint resolutions', () => {
+    expect(formatBillDocket('HJRES', 12, 119)).toBe('H.J.Res. 12 · 119th Congress')
+  })
+})
 
 describe('trimDisplayTitle', () => {
   it('removes the boilerplate suffix', () => {
@@ -29,6 +39,13 @@ describe('proceduralHeadline', () => {
       'Waiving a requirement of clause 6(a) of rule XIII with respect to consideration of certain resolutions reported from the Committee on Rules.'
 
     expect(proceduralHeadline(title)).toBe('Fast-tracks floor consideration (rule waiver)')
+  })
+
+  it('rewrites nullification resolutions', () => {
+    const title =
+      'Providing that section 11 of House Resolution 1224 shall have no force or effect.'
+
+    expect(proceduralHeadline(title)).toBe('Nullifies section 11 of H.Res. 1224')
   })
 
   it('returns null for non-matching titles', () => {
