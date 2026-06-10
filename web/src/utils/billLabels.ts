@@ -7,6 +7,13 @@ const TYPE_LABELS: Record<string, string> = {
   SJRES: 'S.J.Res.',
 }
 
+const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
+
+const PROVIDING_FOR_CONSIDERATION_PATTERN =
+  /^Providing for consideration of the (?:bill|joint resolution|resolution) \(?(H\.?\s?R\.?|H\. ?Res\.?|S\.|S\. ?Res\.?)\s?(\d+)\)?,? (?:to |which )?(.+)$/i
+
+const RULE_WAIVER_PATTERN = /^Waiving a requirement of clause .+ of rule .+/i
+
 export function formatBillDocket(type: string, number: number, congress: number): string {
   const label = TYPE_LABELS[type.toUpperCase()] ?? type
   return `${label} ${number} · ${congress}th Congress`
@@ -22,10 +29,45 @@ export function formatVoteDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
-
 export function trimDisplayTitle(title: string): string {
   return title.replace(BOILERPLATE_TITLE_SUFFIX, '').trim()
+}
+
+function normalizeBillRef(typeRaw: string, number: string): string {
+  const compact = typeRaw.replace(/\s+/g, '').toUpperCase()
+  if (compact === 'HR' || compact === 'H.R') return `H.R. ${number}`
+  if (compact.startsWith('H') && compact.includes('RES')) return `H.Res. ${number}`
+  if (compact === 'S' || compact === 'S.') return `S. ${number}`
+  if (compact.startsWith('S') && compact.includes('RES')) return `S.Res. ${number}`
+  return `${typeRaw.trim()} ${number}`
+}
+
+function capitalizeFirst(text: string): string {
+  if (!text) return text
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function truncateAtWordBoundary(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  const slice = text.slice(0, maxLength)
+  const lastSpace = slice.lastIndexOf(' ')
+  if (lastSpace <= 0) return `${slice.trimEnd()}…`
+  return `${slice.slice(0, lastSpace).trimEnd()}…`
+}
+
+export function proceduralHeadline(title: string): string | null {
+  if (RULE_WAIVER_PATTERN.test(title)) {
+    return 'Fast-tracks floor consideration (rule waiver)'
+  }
+
+  const match = title.match(PROVIDING_FOR_CONSIDERATION_PATTERN)
+  if (!match) return null
+
+  const [, billType, billNumber, subjectRaw] = match
+  const billId = normalizeBillRef(billType, billNumber)
+  const subject = truncateAtWordBoundary(capitalizeFirst(trimDisplayTitle(subjectRaw.trim())), 80)
+
+  return `Sets up House debate on ${billId}: ${subject}`
 }
 
 export function voteResultClass(result: string): string {

@@ -68,10 +68,6 @@
     color: hsl(var(--twc-faint));
   }
 
-  .text-pass {
-    color: hsl(var(--twc-pass));
-  }
-
   .text-fail {
     color: hsl(var(--twc-fail));
   }
