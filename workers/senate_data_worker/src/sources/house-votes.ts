@@ -1,6 +1,7 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
-import type { PassageVote } from "../types";
+import type { IngestVotesResult, PassageVote } from "../types";
+import { voteKey } from "../vote-key";
 import { parseHouseLegislation } from "./bill-ref";
 import { fetchJson } from "./http";
 import { isPassageVote } from "./passage";
@@ -61,12 +62,14 @@ function withinLookback(isoDate: string, lookbackStart: string): boolean {
 
 export async function ingestHousePassageVotes(
   env: Env,
-  lookbackStart: string
-): Promise<PassageVote[]> {
+  lookbackStart: string,
+  knownKeys: ReadonlySet<string> = new Set()
+): Promise<IngestVotesResult> {
   const apiKey = env.CONGRESS_API_KEY;
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const out: PassageVote[] = [];
+  let skipped = 0;
   let nextUrl: string | null =
     `https://api.congress.gov/v3/house-vote/${congress}/${session}?format=json&limit=50&api_key=${apiKey}`;
 
@@ -77,6 +80,17 @@ export async function ingestHousePassageVotes(
     for (const item of items) {
       if (!withinLookback(item.startDate, lookbackStart)) continue;
       if (!item.legislationNumber || !item.legislationType) continue;
+
+      const key = voteKey({
+        chamber: "House",
+        congress,
+        session,
+        rollNumber: item.rollCallNumber,
+      });
+      if (knownKeys.has(key)) {
+        skipped += 1;
+        continue;
+      }
 
       const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
       const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
@@ -116,5 +130,5 @@ export async function ingestHousePassageVotes(
     }
   }
 
-  return out;
+  return { votes: out, skipped };
 }

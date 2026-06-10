@@ -19,6 +19,11 @@ export interface PassageVote {
   voteDate: string;
 }
 
+export interface IngestVotesResult {
+  votes: PassageVote[];
+  skipped: number;
+}
+
 export interface BillDigestContent {
   headline: string;
   what_it_does: string;
