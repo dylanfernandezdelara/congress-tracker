@@ -65,10 +65,11 @@ the frontend separately.
 
 ## Preview deployments
 
-Open a PR (or run `wrangler versions upload`) to get a Cloudflare **preview URL**
-that serves the full app without touching production traffic. See
-[`docs/PREVIEW_DEPLOYMENTS.md`](docs/PREVIEW_DEPLOYMENTS.md) for setup and safety
-notes.
+Run `npm run preview` to build the app and upload a Cloudflare **preview
+version** — it prints a browser-openable URL that serves the full app without
+touching production traffic. In Cursor Cloud, just ask the agent for a preview.
+See [`docs/PREVIEW_DEPLOYMENTS.md`](docs/PREVIEW_DEPLOYMENTS.md) for details and
+safety notes.
 
 ## HTTP API
 

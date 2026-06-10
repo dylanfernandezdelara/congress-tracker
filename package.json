@@ -4,6 +4,7 @@
     "dev:worker": "npm --prefix workers/senate_data_worker run dev",
     "dev:web": "npm --prefix web run dev",
     "build:web": "npm --prefix web run build",
+    "preview": "npm run build:web && npm --prefix workers/senate_data_worker run preview:upload",
     "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/cursor-cloud-setup-contract.test.mjs",
     "deploy": "npm run build:web && npm --prefix workers/senate_data_worker run deploy",
     "public:check": "./scripts/public-readiness-check.sh",

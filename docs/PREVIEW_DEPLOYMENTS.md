@@ -31,32 +31,31 @@ Each upload yields two URLs:
 - **Commit preview URL**: `https://<version-id>-congress-tracker-api.<subdomain>.workers.dev` (unique per upload).
 - **Branch alias URL**: `https://<branch>-congress-tracker-api.<subdomain>.workers.dev` (stable across commits on the same branch, when uploaded with `--preview-alias`).
 
-## Option A — GitHub Actions on every PR (implemented)
+## Primary — ask the Cursor Cloud agent (no PR, no secrets)
 
-`.github/workflows/preview.yml` runs on each pull request: it builds the web app,
-uploads a preview version aliased to the branch, and comments both preview URLs
-on the PR.
+A Cursor Cloud agent runs in an environment that already has `wrangler` and the
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` it needs. So the simplest flow
+is to just ask the agent for a preview after it makes changes:
 
-One-time setup (you must do this in GitHub + Cloudflare; an agent cannot set
-repository secrets):
+```bash
+npm run preview
+```
 
-1. Create a scoped Cloudflare API token at
-   <https://dash.cloudflare.com/profile/api-tokens> using the
-   **"Edit Cloudflare Workers"** template (scope it to this account/zone).
-2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**:
-   - `CLOUDFLARE_API_TOKEN` — the token from step 1.
-   - `CLOUDFLARE_ACCOUNT_ID` — your account ID (`wrangler whoami` shows it).
+This builds `web/dist` and runs `wrangler versions upload`, which prints a
+**Version Preview URL** the agent can paste back into the chat. Add a stable
+per-branch alias with:
 
-Then the flow from Cursor Cloud is simply:
+```bash
+npm run build:web
+cd workers/senate_data_worker
+npx wrangler versions upload --preview-alias my-branch
+# -> https://my-branch-congress-tracker-api.<subdomain>.workers.dev
+```
 
-1. Commit to a branch and open a PR.
-2. Wait for the **Preview Deploy** check; the bot comments the preview URL.
-3. Open the URL in your browser.
+You can also run `npm run preview` yourself from any shell that has the two
+Cloudflare env vars set. No GitHub Actions, secrets, or pull request required.
 
-Forked-PR builds are intentionally skipped (forks can't read secrets, and running
-untrusted code with credentials is unsafe).
-
-## Option B — Cloudflare Workers Builds (recommended, no GitHub secret)
+## Optional — Cloudflare Workers Builds (native git previews)
 
 Cloudflare's native git integration removes the need to store a long-lived token
 in GitHub. One-time setup in the Cloudflare dashboard:
@@ -71,19 +70,7 @@ in GitHub. One-time setup in the Cloudflare dashboard:
 
 Cloudflare then builds each push, deploys `main` to production, and posts
 preview URLs as PR comments automatically — the same UX as Cloudflare Pages.
-
-If you adopt Option B, you can delete `.github/workflows/preview.yml` to avoid
-duplicate uploads.
-
-## Manual one-off preview (from any shell, including a Cursor Cloud agent)
-
-```bash
-npm run build:web
-cd workers/senate_data_worker
-npx wrangler versions upload --preview-alias my-branch
-```
-
-Requires `CLOUDFLARE_API_TOKEN` (and `CLOUDFLARE_ACCOUNT_ID`) in the environment.
+Use this only if you want browser-openable previews without involving the agent.
 
 ## Safety notes
 
