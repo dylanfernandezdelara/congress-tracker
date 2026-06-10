@@ -69,7 +69,13 @@ export function FeedCard({ item }: FeedCardProps) {
       <p className="whitespace-pre-wrap text-sm leading-relaxed text-body">
         {item.raw_summary_text ?? 'No official CRS summary on file.'}
       </p>
-      <a href={sourceUrl} target="_blank" rel="noreferrer" className="ink-link text-sm">
+      <a
+        href={sourceUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="ink-link text-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
         View on congress.gov ↗
       </a>
     </div>
