@@ -11,12 +11,12 @@ export default function Home() {
   })
 
   return (
-    <main className="space-y-8">
+    <main className="space-y-8 lg:space-y-10">
       <header className="garden-header">
         <p className="garden-welcome">Welcome!</p>
         <p className="garden-meta garden-meta-accent">Recent passage votes</p>
-        <h1 className="document-title text-4xl text-heading">Congress Tracker</h1>
-        <p className="garden-prose max-w-xl text-base text-body">
+        <h1 className="document-title text-4xl text-heading sm:text-5xl">Congress Tracker</h1>
+        <p className="garden-prose text-base text-body sm:max-w-none lg:text-lg">
           Bills that received an official floor roll-call vote, rewritten in plain English. Flip any
           card to read the official CRS summary.
         </p>
@@ -37,7 +37,7 @@ export default function Home() {
         </p>
       ) : null}
 
-      <section className="feed-list space-y-8">
+      <section className="feed-list space-y-8 lg:space-y-10">
         {data?.map((item) => (
           <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
         ))}

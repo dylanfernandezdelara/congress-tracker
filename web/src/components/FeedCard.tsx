@@ -41,7 +41,7 @@ export function FeedCard({ item }: FeedCardProps) {
         </div>
       ) : null}
 
-      <div className="space-y-2 border-t border-border pt-4">
+      <div className="space-y-2 border-t border-border pt-4 sm:pt-5">
         {item.passage_votes.map((v) => (
           <p key={`${v.chamber}-${v.date}-${v.question}`} className="garden-prose tabular-nums text-sm">
             <span className="font-semibold text-secondary">{v.chamber}</span>
