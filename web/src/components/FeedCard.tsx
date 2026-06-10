@@ -5,6 +5,7 @@ import {
   congressGovBillUrl,
   formatBillDocket,
   formatVoteDate,
+  trimDisplayTitle,
   voteResultClass,
 } from '../utils/billLabels'
 import { FlipCard } from './FlipCard'
@@ -30,17 +31,23 @@ function VoteSplitBar({ yeas, nays }: { yeas: number; nays: number }) {
 export function FeedCard({ item }: FeedCardProps) {
   const headingId = useId()
   const docket = formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
-  const headline = item.digest?.headline ?? item.bill.title ?? docket
+  const rawHeadline = item.digest?.headline ?? item.bill.title ?? docket
+  const headline = trimDisplayTitle(rawHeadline)
   const body = item.digest?.what_it_does ?? item.raw_summary_text ?? 'Summary not available yet.'
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const keyPoints = item.digest?.key_points?.slice(0, 3) ?? []
 
   const front = (
-    <div className="feed-card-surface flex flex-col">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[12px] font-normal uppercase tracking-widest text-faint">{docket}</p>
+    <div className="feed-card-surface flex h-full flex-col">
+      <div className="flex items-center justify-between gap-3">
+        <p className="whitespace-nowrap text-[12px] font-normal uppercase tracking-widest text-faint">
+          {docket}
+        </p>
         {item.policy_area ? (
-          <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-secondary">
+          <span
+            className="min-w-0 max-w-[45%] truncate rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-secondary"
+            title={item.policy_area}
+          >
             {item.policy_area}
           </span>
         ) : null}
@@ -75,18 +82,17 @@ export function FeedCard({ item }: FeedCardProps) {
         </div>
       ) : null}
 
-      <p className="mt-auto pt-4 text-right text-[11px] text-faint">Flip for official text ↺</p>
+      <p className="mt-auto pt-4 text-right text-[12px] text-secondary">Flip for official text ↺</p>
     </div>
   )
 
   const back = (
     <div className="feed-card-surface flex h-full flex-col">
-      <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
+      <div className="shrink-0">
+        <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
 
-      {keyPoints.length > 0 ? (
-        <div className="mt-4">
-          <p className="text-[11px] uppercase tracking-widest text-faint">Key points</p>
-          <ul className="mt-2 space-y-1.5">
+        {keyPoints.length > 0 ? (
+          <ul className="mt-3 space-y-1.5">
             {keyPoints.map((point) => (
               <li key={point} className="flex gap-2 text-[13px] leading-relaxed text-secondary">
                 <span className="text-faint" aria-hidden="true">
@@ -96,14 +102,16 @@ export function FeedCard({ item }: FeedCardProps) {
               </li>
             ))}
           </ul>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
-      <p className="summary-fade mt-4 flex-1 whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
-        {item.raw_summary_text ?? 'No official CRS summary on file.'}
-      </p>
+      <div className={`summary-fade-container ${keyPoints.length > 0 ? 'mt-3' : 'mt-4'}`}>
+        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
+          {item.raw_summary_text ?? 'No official CRS summary on file.'}
+        </p>
+      </div>
 
-      <div className="mt-4 border-t border-white/8 pt-4">
+      <footer className="mt-auto shrink-0 border-t border-white/8 pt-4">
         <a
           href={sourceUrl}
           target="_blank"
@@ -113,7 +121,7 @@ export function FeedCard({ item }: FeedCardProps) {
         >
           Read on congress.gov ↗
         </a>
-      </div>
+      </footer>
     </div>
   )
 

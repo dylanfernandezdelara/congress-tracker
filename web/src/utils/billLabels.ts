@@ -22,9 +22,15 @@ export function formatVoteDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
+
+export function trimDisplayTitle(title: string): string {
+  return title.replace(BOILERPLATE_TITLE_SUFFIX, '').trim()
+}
+
 export function voteResultClass(result: string): string {
   const r = result.toLowerCase()
-  if (r.includes('pass') || r.includes('agreed')) return 'text-pass'
   if (r.includes('fail') || r.includes('reject')) return 'text-fail'
+  if (r.includes('pass') || r.includes('agreed')) return 'text-secondary'
   return 'text-faint'
 }
