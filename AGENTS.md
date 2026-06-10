@@ -30,6 +30,23 @@ Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONG
 npm test
 ```
 
+### Preview deployments (browser-openable, no production impact)
+
+The Worker serves the bundled React app (Workers static assets), so one preview
+URL shows the whole app. To produce a shareable preview URL:
+
+```bash
+npm run preview   # builds web/dist + `wrangler versions upload`; prints a Preview URL
+```
+
+- A Cursor Cloud agent runs with `wrangler` + `CLOUDFLARE_API_TOKEN` /
+  `CLOUDFLARE_ACCOUNT_ID` already set, so when the user asks for a preview, just
+  run `npm run preview` and paste the printed URL into the chat.
+- For a stable per-branch URL: `cd workers/senate_data_worker && npx wrangler versions upload --preview-alias <name>`.
+- Previews never receive production traffic (`versions upload` ≠ `deploy`), but
+  they reuse production bindings (incl. the D1 database).
+- Full details and safety notes: `docs/PREVIEW_DEPLOYMENTS.md`.
+
 ## API
 
 - `GET /health`
@@ -51,3 +68,4 @@ npm test
 - Never commit secrets from `.dev.vars`.
 - `FEED_MAX_BILLS`, `VOTE_LOOKBACK_DAYS`, `DIGEST_MAX_NEW_REWRITES` are module constants in `src/constants.ts`.
 - Always `git fetch origin` before starting work on a fresh session.
+- When the user wants to see changes in a browser, run `npm run preview` and share the printed Cloudflare Preview URL (it does not touch production).
