@@ -4,8 +4,9 @@ import {
   VOTE_LOOKBACK_DAYS,
 } from "../constants";
 import type { Env } from "../config";
+import { congressNumber } from "../config";
 import { digestExists, upsertDigest } from "../d1/digests";
-import { upsertVote, selectRecentVotedBills } from "../d1/votes";
+import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestHousePassageVotes } from "../sources/house-votes";
 import { ingestSenatePassageVotes } from "../sources/senate-votes";
@@ -26,6 +27,7 @@ function billLabel(type: string, number: number, congress: number): string {
 
 export interface RunFeedResult {
   votesUpserted: number;
+  votesSkipped: number;
   billsSelected: number;
   digestsWritten: number;
   digestsSkipped: number;
@@ -33,13 +35,16 @@ export interface RunFeedResult {
 
 export async function runFeedPipeline(env: Env): Promise<RunFeedResult> {
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
+  const congress = congressNumber(env);
+  const knownVoteKeys = await selectExistingVoteKeys(env.DB, lookback, congress);
 
-  const [houseVotes, senateVotes] = await Promise.all([
-    ingestHousePassageVotes(env, lookback),
-    ingestSenatePassageVotes(env, lookback),
+  const [houseResult, senateResult] = await Promise.all([
+    ingestHousePassageVotes(env, lookback, knownVoteKeys),
+    ingestSenatePassageVotes(env, lookback, knownVoteKeys),
   ]);
 
-  for (const vote of [...houseVotes, ...senateVotes]) {
+  const newVotes = [...houseResult.votes, ...senateResult.votes];
+  for (const vote of newVotes) {
     await upsertVote(env.DB, vote);
   }
 
@@ -94,7 +99,8 @@ export async function runFeedPipeline(env: Env): Promise<RunFeedResult> {
   }
 
   return {
-    votesUpserted: houseVotes.length + senateVotes.length,
+    votesUpserted: newVotes.length,
+    votesSkipped: houseResult.skipped + senateResult.skipped,
     billsSelected: bills.length,
     digestsWritten,
     digestsSkipped,

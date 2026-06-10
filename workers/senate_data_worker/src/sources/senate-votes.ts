@@ -1,6 +1,7 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
-import type { PassageVote } from "../types";
+import type { IngestVotesResult, PassageVote } from "../types";
+import { voteKey } from "../vote-key";
 import { parseSenateIssue } from "./bill-ref";
 import { fetchText } from "./http";
 import { isPassageVote } from "./passage";
@@ -75,12 +76,25 @@ export function parseSenateVoteMenuXml(xml: string, congress: number, session: n
 
 export async function ingestSenatePassageVotes(
   env: Env,
-  lookbackStart: string
-): Promise<PassageVote[]> {
+  lookbackStart: string,
+  knownKeys: ReadonlySet<string> = new Set()
+): Promise<IngestVotesResult> {
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const url = `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${congress}_${session}.xml`;
   const xml = await fetchText(url);
   const all = parseSenateVoteMenuXml(xml, congress, session);
-  return all.filter((v) => v.voteDate >= lookbackStart);
+
+  const votes: PassageVote[] = [];
+  let skipped = 0;
+  for (const vote of all) {
+    if (vote.voteDate < lookbackStart) continue;
+    if (knownKeys.has(voteKey(vote))) {
+      skipped += 1;
+      continue;
+    }
+    votes.push(vote);
+  }
+
+  return { votes, skipped };
 }

@@ -1,5 +1,42 @@
 import type { PassageVote } from "../types";
+import { voteKey } from "../vote-key";
 import { ensureSchema } from "./schema";
+
+export interface ExistingVoteKeyRow {
+  chamber: string;
+  congress: number;
+  session: number;
+  roll_number: number;
+}
+
+export async function selectExistingVoteKeys(
+  db: D1Database,
+  lookbackDate: string,
+  congress: number
+): Promise<Set<string>> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT chamber, congress, session, roll_number
+       FROM votes
+       WHERE is_passage = 1 AND vote_date >= ? AND congress = ?`
+    )
+    .bind(lookbackDate, congress)
+    .all<ExistingVoteKeyRow>();
+
+  const keys = new Set<string>();
+  for (const row of results ?? []) {
+    keys.add(
+      voteKey({
+        chamber: row.chamber as PassageVote["chamber"],
+        congress: row.congress,
+        session: row.session,
+        rollNumber: row.roll_number,
+      })
+    );
+  }
+  return keys;
+}
 
 export async function upsertVote(db: D1Database, vote: PassageVote): Promise<void> {
   await ensureSchema(db);
