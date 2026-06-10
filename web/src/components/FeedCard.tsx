@@ -39,13 +39,13 @@ export function FeedCard({ item }: FeedCardProps) {
 
   const front = (
     <div className="feed-card-surface flex h-full flex-col">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="whitespace-nowrap text-[12px] font-normal uppercase tracking-widest text-faint">
           {docket}
         </p>
         {item.policy_area ? (
           <span
-            className="min-w-0 max-w-[45%] truncate rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-secondary"
+            className="max-w-full truncate rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-secondary"
             title={item.policy_area}
           >
             {item.policy_area}
@@ -111,7 +111,7 @@ export function FeedCard({ item }: FeedCardProps) {
         </p>
       </div>
 
-      <footer className="mt-auto shrink-0 border-t border-white/8 pt-4">
+      <footer className="mt-auto flex shrink-0 items-center justify-between gap-4 border-t border-white/8 pt-4">
         <a
           href={sourceUrl}
           target="_blank"
@@ -121,6 +121,7 @@ export function FeedCard({ item }: FeedCardProps) {
         >
           Read on congress.gov ↗
         </a>
+        <span className="shrink-0 text-[12px] text-secondary">Flip back ↺</span>
       </footer>
     </div>
   )

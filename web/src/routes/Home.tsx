@@ -30,13 +30,13 @@ export default function Home() {
   return (
     <main className="space-y-5">
       <header className="space-y-4 pb-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
           <h1 className="flex items-center gap-1.5 text-[15px] font-medium tracking-normal text-foreground">
             Congress Tracker
             <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden="true" />
           </h1>
           {data && !error && !isLoading ? (
-            <p className="shrink-0 text-xs text-faint">
+            <p className="text-xs text-faint">
               {data.length} {data.length === 1 ? 'bill' : 'bills'} · last {LOOKBACK_DAYS} days
             </p>
           ) : null}
