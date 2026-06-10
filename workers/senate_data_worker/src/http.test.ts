@@ -48,11 +48,32 @@ describe("HTTP API", () => {
     expect(body).toEqual([]);
   });
 
-  it("returns 404 for unknown routes", async () => {
+  it("returns 404 for unknown routes when no asset binding is present", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/briefings/latest.json"),
       createMockEnv() as any
     );
+    expect(response.status).toBe(404);
+  });
+
+  it("serves the SPA shell for non-API navigations when ASSETS is bound", async () => {
+    const assetResponse = new Response("<!DOCTYPE html>", { status: 200 });
+    const ASSETS = { fetch: vi.fn(async () => assetResponse) };
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/some/client/route"),
+      createMockEnv({ ASSETS }) as any
+    );
+    expect(ASSETS.fetch).toHaveBeenCalledOnce();
+    expect(response).toBe(assetResponse);
+  });
+
+  it("keeps JSON 404s for unknown API paths even when ASSETS is bound", async () => {
+    const ASSETS = { fetch: vi.fn(async () => new Response("html")) };
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/does-not-exist.json"),
+      createMockEnv({ ASSETS }) as any
+    );
+    expect(ASSETS.fetch).not.toHaveBeenCalled();
     expect(response.status).toBe(404);
   });
 });

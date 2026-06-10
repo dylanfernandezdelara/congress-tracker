@@ -82,7 +82,21 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     }
   }
 
+  // Unknown API path under a JSON namespace stays JSON to keep clients honest;
+  // everything else is a frontend navigation served by the static-asset
+  // binding (SPA fallback returns index.html). When ASSETS is absent (unit
+  // tests, API-only deploys) we preserve the original JSON 404 contract.
+  if (env.ASSETS && !isApiPath(pathname)) {
+    return env.ASSETS.fetch(request);
+  }
+
   return notFound(pathname);
+}
+
+const API_PATH_PREFIXES = ["/health", "/feed/", "/__pipeline/"];
+
+function isApiPath(pathname: string): boolean {
+  return API_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
 
 /** HTTP entry for the unified worker. */

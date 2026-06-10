@@ -3,6 +3,11 @@
  */
 export interface Env {
   DB: D1Database;
+  /**
+   * Static-asset fetcher for the bundled React app (web/dist).
+   * Optional so unit tests can construct an Env without the binding.
+   */
+  ASSETS?: Fetcher;
   CONGRESS: string;
   SESSION: string;
   ALLOWED_ORIGIN?: string;
