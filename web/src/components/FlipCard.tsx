@@ -18,7 +18,7 @@ export function FlipCard({
 
   const toggle = () => setFlipped((v) => !v)
 
-  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       toggle()
@@ -27,19 +27,21 @@ export function FlipCard({
 
   return (
     <article className="flip-card" aria-labelledby={`${id}-title`}>
-      <div className={`flip-card-inner ${flipped ? 'is-flipped' : ''}`}>
-        <div className="flip-card-face flip-card-front">{front}</div>
-        <div className="flip-card-face flip-card-back">{back}</div>
-      </div>
-      <button
-        type="button"
-        className="flip-control ink-link mt-4"
+      <div
+        className={`flip-card-inner ${flipped ? 'is-flipped' : ''}`}
+        role="button"
+        tabIndex={0}
         onClick={toggle}
         onKeyDown={onKeyDown}
         aria-pressed={flipped}
+        aria-label={flipped ? backLabel : flipLabel}
       >
-        {flipped ? `← ${backLabel}` : `${flipLabel} →`}
-      </button>
+        <div className="flip-card-face flip-card-front">{front}</div>
+        <div className="flip-card-face flip-card-back">{back}</div>
+      </div>
+      <p className="mt-3 text-center text-xs text-muted-foreground" aria-hidden="true">
+        {flipped ? 'Tap to return' : 'Tap card to flip'}
+      </p>
     </article>
   )
 }

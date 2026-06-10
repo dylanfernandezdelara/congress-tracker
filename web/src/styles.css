@@ -109,6 +109,7 @@
   .flip-card-inner {
     position: relative;
     min-height: 280px;
+    cursor: pointer;
     transition: transform 0.5s ease;
     transform-style: preserve-3d;
   }
