@@ -154,6 +154,9 @@
   }
 
   .flip-card-back {
+    height: 0;
+    min-height: 100%;
+    overflow: hidden;
     transform: rotateY(180deg);
   }
 
@@ -199,6 +202,9 @@
     }
 
     .flip-card-back {
+      height: 0;
+      min-height: 100%;
+      overflow: hidden;
       transform: none;
       display: none;
     }
@@ -209,6 +215,9 @@
 
     .flip-card-inner.is-flipped .flip-card-back {
       display: block;
+      height: auto;
+      min-height: 100%;
+      overflow: hidden;
     }
   }
 }
