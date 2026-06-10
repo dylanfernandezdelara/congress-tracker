@@ -48,15 +48,27 @@ npm test
 
 ## Deployment
 
+The Worker serves both the API and the bundled React app (Workers static
+assets), so a single deploy ships everything from one origin:
+
 ```bash
 cd workers/senate_data_worker
 wrangler d1 create congress-tracker   # once; update database_id in wrangler.toml
 wrangler secret put CONGRESS_API_KEY
 wrangler secret put OPENROUTER_API_KEY
-npm run deploy
+cd ../.. && npm run deploy            # builds web/dist, then deploys the Worker
 ```
 
-Set `ALLOWED_ORIGIN` to your frontend origin in production. Build the web app with `VITE_API_URL` pointing at the deployed worker URL.
+Because the app and API share an origin, the production build calls the API with
+relative URLs — no `VITE_API_URL` needed. Set `VITE_API_URL` only if you host
+the frontend separately.
+
+## Preview deployments
+
+Open a PR (or run `wrangler versions upload`) to get a Cloudflare **preview URL**
+that serves the full app without touching production traffic. See
+[`docs/PREVIEW_DEPLOYMENTS.md`](docs/PREVIEW_DEPLOYMENTS.md) for setup and safety
+notes.
 
 ## HTTP API
 
