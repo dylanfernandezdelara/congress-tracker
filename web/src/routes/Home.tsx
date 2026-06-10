@@ -13,9 +13,7 @@ export default function Home() {
   return (
     <main className="space-y-8">
       <header className="garden-header">
-        <pre className="garden-welcome" aria-hidden="true">
-          <code>Welcome!</code>
-        </pre>
+        <p className="garden-welcome">Welcome!</p>
         <p className="garden-meta garden-meta-accent">Recent passage votes</p>
         <h1 className="document-title text-4xl text-heading">Congress Tracker</h1>
         <p className="garden-prose max-w-xl text-base text-body">

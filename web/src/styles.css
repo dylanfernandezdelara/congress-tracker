@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,7 +10,7 @@
     --twc-background: 42 55% 91%;
     --twc-foreground: 219 44% 31%;
     --twc-heading: 220 56% 20%;
-    --twc-card: 42 55% 91%;
+    --twc-card: 43 48% 97%;
     --twc-card-foreground: 219 44% 31%;
     --twc-muted-foreground: 40 15% 53%;
     --twc-accent: 11 65% 48%;
@@ -19,8 +19,6 @@
     --twc-fail: 11 65% 48%;
     --twc-secondary: 212 50% 31%;
     --font-sans: 'Bricolage Grotesque', system-ui, sans-serif;
-    --font-serif: 'DM Serif Display', Georgia, serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
   }
 
   *,
@@ -85,8 +83,7 @@
 
 @layer components {
   .document-title {
-    font-family: var(--font-serif), Georgia, serif;
-    font-weight: 400;
+    font-weight: 600;
     text-wrap: balance;
   }
 
@@ -95,24 +92,8 @@
   }
 
   .garden-welcome {
-    font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-    border: none;
-    border-radius: 0;
+    @apply text-sm font-medium text-muted-foreground;
     margin: 0;
-    padding: 0;
-    font-size: 0.95rem;
-    line-height: 1;
-    color: hsl(var(--twc-foreground));
-    background: transparent;
-    overflow-x: auto;
-  }
-
-  .garden-welcome code {
-    font-family: inherit;
-    background: transparent;
-    padding: 0;
-    border-radius: 0;
-    color: inherit;
   }
 
   .garden-meta {
@@ -125,9 +106,10 @@
   }
 
   .garden-card {
-    @apply border border-border p-4;
-    background-color: #f5eedd;
+    @apply border border-border/90 p-5;
+    background-color: hsl(var(--twc-card));
     border-radius: 0;
+    box-shadow: 0 1px 0 hsl(var(--twc-border) / 0.9), 0 4px 16px hsl(var(--twc-heading) / 0.06);
   }
 
   .garden-card-back {
@@ -185,8 +167,7 @@
   }
 
   .flip-card-inner {
-    position: relative;
-    min-height: 280px;
+    display: grid;
     cursor: pointer;
     transition: transform 0.5s ease;
     transform-style: preserve-3d;
@@ -197,13 +178,13 @@
   }
 
   .flip-card-face {
+    grid-area: 1 / 1;
+    min-width: 0;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
 
   .flip-card-back {
-    position: absolute;
-    inset: 0;
     transform: rotateY(180deg);
   }
 
@@ -218,7 +199,6 @@
     }
 
     .flip-card-back {
-      position: static;
       transform: none;
       display: none;
     }

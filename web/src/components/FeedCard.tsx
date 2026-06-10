@@ -64,7 +64,7 @@ export function FeedCard({ item }: FeedCardProps) {
   const back = (
     <div className="garden-card garden-card-back space-y-4">
       <p className="garden-meta">Official summary</p>
-      <blockquote className="garden-prose m-0 border-0 p-0 text-sm text-body">
+      <blockquote className="garden-prose m-0 whitespace-pre-wrap border-0 p-0 text-sm text-body">
         {item.raw_summary_text ?? 'No official CRS summary on file.'}
       </blockquote>
       <a
