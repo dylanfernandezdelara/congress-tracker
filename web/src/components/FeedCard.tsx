@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { type ReactNode, useCallback, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import type { FeedItem } from '../api/types'
 import {
@@ -14,6 +14,48 @@ import { FlipCard } from './FlipCard'
 
 type FeedCardProps = {
   item: FeedItem
+}
+
+type SummaryScrollContainerProps = {
+  className?: string
+  children: ReactNode
+}
+
+function SummaryScrollContainer({ className = '', children }: SummaryScrollContainerProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [atEnd, setAtEnd] = useState(false)
+
+  const updateScrollEnd = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    const noOverflow = el.scrollHeight <= el.clientHeight + 4
+    const scrolledToEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
+    setAtEnd(noOverflow || scrolledToEnd)
+  }, [])
+
+  useLayoutEffect(() => {
+    updateScrollEnd()
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(updateScrollEnd)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [updateScrollEnd, children])
+
+  return (
+    <div
+      ref={ref}
+      className={`summary-fade-container ${atEnd ? 'is-scrolled-to-end' : ''} ${className}`.trim()}
+      role="region"
+      aria-label="Official summary text"
+      tabIndex={0}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onScroll={updateScrollEnd}
+    >
+      {children}
+    </div>
+  )
 }
 
 function VoteSplitBar({ yeas, nays }: { yeas: number; nays: number }) {
@@ -119,30 +161,27 @@ export function FeedCard({ item }: FeedCardProps) {
         ) : null}
       </div>
 
-      <div
-        className={`summary-fade-container ${keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}`}
-        role="region"
-        aria-label="Official summary text"
-        tabIndex={0}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
+      <SummaryScrollContainer
+        className={keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}
       >
         <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
           {item.raw_summary_text ?? 'No official CRS summary on file.'}
         </p>
-      </div>
+      </SummaryScrollContainer>
 
       <footer className="mt-auto flex shrink-0 items-center justify-between gap-4 border-t border-border pt-4">
         <a
           href={sourceUrl}
           target="_blank"
           rel="noreferrer"
-          className="congress-link text-[13px]"
+          className="congress-link shrink-0 whitespace-nowrap text-[13px]"
           onClick={(e) => e.stopPropagation()}
         >
           Read on congress.gov ↗
         </a>
-        <span className="shrink-0 text-[12px] text-secondary">Flip back ↺</span>
+        <span className="hidden shrink-0 text-[12px] text-secondary min-[360px]:inline">
+          Flip back ↺
+        </span>
       </footer>
     </div>
   )
