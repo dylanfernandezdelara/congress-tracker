@@ -64,7 +64,7 @@ export function FeedCard({ item }: FeedCardProps) {
         {headline}
       </h2>
 
-      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-secondary">{body}</p>
+      <p className="mb-5 mt-3 line-clamp-3 text-sm leading-relaxed text-secondary">{body}</p>
 
       <div className="mt-auto">
         {item.passage_votes.length > 0 ? (
