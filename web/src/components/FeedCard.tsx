@@ -121,6 +121,11 @@ export function FeedCard({ item }: FeedCardProps) {
 
       <div
         className={`summary-fade-container ${keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}`}
+        role="region"
+        aria-label="Official summary text"
+        tabIndex={0}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
           {item.raw_summary_text ?? 'No official CRS summary on file.'}
