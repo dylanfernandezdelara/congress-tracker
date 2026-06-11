@@ -2,6 +2,7 @@ import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { FeedItem } from '../api/types'
+import { SUMMARY_PREVIEW_MAX_CHARS } from '../utils/billLabels'
 import { FeedCard } from './FeedCard'
 
 const longDigest =
@@ -40,13 +41,14 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
 }
 
 describe('FeedCard', () => {
-  it('renders the full digest summary on the front without character truncation', () => {
+  it('caps the digest summary on the front with a word-boundary ellipsis', () => {
     const { container } = render(<FeedCard item={makeItem()} />)
     const body = container.querySelector('.flip-card-front p.text-secondary')
+    const text = body?.textContent?.trim() ?? ''
 
-    expect(body?.textContent?.trim()).toBe(longDigest.trim())
-    expect(body?.textContent?.length ?? 0).toBeGreaterThan(180)
-    expect(body?.textContent).not.toMatch(/…$/)
+    expect(text.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
+    expect(text).toMatch(/…$/)
+    expect(text).not.toBe(longDigest.trim())
   })
 
   it('keeps the full official CRS summary on the back', () => {
@@ -69,10 +71,30 @@ describe('FeedCard', () => {
     expect(content).not.toBeNull()
     expect(surface).not.toBeNull()
     expect(flipHint).not.toBeNull()
-    expect(body?.textContent?.trim()).toBe(longDigest.trim())
+    const text = body?.textContent?.trim() ?? ''
+    expect(text.length).toBeGreaterThan(0)
+    expect(text.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
+    expect(text).toMatch(/…$/)
     expect(body?.closest('.flip-card-front')).toBe(front)
     expect(flipHint?.closest('.flip-card-front')).toBe(front)
     expect(content?.contains(surface ?? null)).toBe(true)
     expect(front?.className).toContain('flip-card-face')
+  })
+
+  it('caps the raw summary fallback on the front while keeping the full text on the back', () => {
+    const { container } = render(
+      <FeedCard
+        item={makeItem({
+          digest: null,
+        })}
+      />,
+    )
+    const body = container.querySelector('.flip-card-front p.text-secondary')
+    const backSummary = container.querySelector('.flip-card-back .whitespace-pre-wrap')
+    const text = body?.textContent?.trim() ?? ''
+
+    expect(text.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
+    expect(text).toMatch(/…$/)
+    expect(backSummary?.textContent).toBe(longCrsSummary)
   })
 })

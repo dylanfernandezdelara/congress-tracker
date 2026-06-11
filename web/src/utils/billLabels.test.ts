@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   formatBillDocket,
   proceduralHeadline,
+  SUMMARY_PREVIEW_MAX_CHARS,
   summaryBodyText,
+  summaryPreviewText,
   trimDisplayTitle,
 } from './billLabels'
 
@@ -60,6 +62,34 @@ describe('summaryBodyText', () => {
 
     expect(result).toBe(paragraph.repeat(5).trim())
     expect(result).not.toMatch(/…$/)
+  })
+})
+
+describe('summaryPreviewText', () => {
+  it('returns short text unchanged when under the limit', () => {
+    const short = 'This bill funds infrastructure projects.'
+
+    expect(summaryPreviewText(short)).toBe(short)
+    expect(summaryPreviewText(short)).not.toMatch(/…$/)
+  })
+
+  it('caps long text at a word boundary with an ellipsis', () => {
+    const long =
+      'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(
+        5,
+      )
+    const result = summaryPreviewText(long)
+
+    expect(result.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
+    expect(result).toMatch(/…$/)
+    expect(result).not.toMatch(/\s…$/)
+    expect(result).not.toBe(long.trim())
+  })
+
+  it('collapses internal whitespace and newlines', () => {
+    const raw = 'Line one.\n\nLine   two   continues here.'
+
+    expect(summaryPreviewText(raw)).toBe('Line one. Line two continues here.')
   })
 })
 
