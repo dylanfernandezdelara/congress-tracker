@@ -120,7 +120,7 @@
     }
 
     .flip-card:hover .flip-card-inner.is-flipped {
-      transform: translateY(-1px) rotateY(180deg);
+      transform: translateY(-1px) rotateX(180deg);
     }
 
     .theme-toggle:hover {
@@ -226,7 +226,7 @@
   }
 
   .flip-card-inner.is-flipped {
-    transform: rotateY(180deg);
+    transform: rotateX(180deg);
   }
 
   .flip-card-inner:focus-visible {
@@ -262,7 +262,7 @@
     flex-direction: column;
     overflow: hidden;
     visibility: hidden;
-    transform: rotateY(180deg);
+    transform: rotateX(180deg);
   }
 
   .flip-card-inner.is-flipped .flip-card-back {
