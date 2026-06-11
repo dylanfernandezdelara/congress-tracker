@@ -263,6 +263,77 @@
     overflow: hidden;
   }
 
+  @media (max-width: 639px), (pointer: coarse) {
+    .flip-card-inner {
+      --flip-card-mobile-height: calc(100dvh - 15rem);
+      min-height: var(--flip-card-mobile-height);
+      max-height: var(--flip-card-mobile-height);
+      align-content: stretch;
+    }
+
+    .flip-card-face {
+      display: flex;
+      flex-direction: column;
+      max-height: var(--flip-card-mobile-height);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      scrollbar-width: thin;
+      scrollbar-color: hsl(var(--twc-faint) / 0.55) transparent;
+    }
+
+    .flip-card-face::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .flip-card-face::-webkit-scrollbar-thumb {
+      background: hsl(var(--twc-faint) / 0.55);
+      border-radius: 2px;
+    }
+
+    .flip-card-back-clip {
+      height: auto;
+      min-height: 100%;
+      overflow: visible;
+    }
+
+    .feed-card-surface {
+      overflow: visible;
+      min-height: min-content;
+    }
+
+    .summary-fade-container {
+      flex: none;
+      min-height: auto;
+      overflow: visible;
+      touch-action: auto;
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+
+    .feed-card-surface .line-clamp-3 {
+      display: block;
+      overflow: visible;
+      -webkit-line-clamp: unset;
+      line-clamp: unset;
+    }
+
+    .flip-card-inner {
+      cursor: default;
+    }
+  }
+
+  .flip-card-hint {
+    cursor: pointer;
+    touch-action: manipulation;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+  }
+
   .congress-link:focus-visible {
     outline: 2px solid hsl(var(--twc-accent));
     outline-offset: 2px;

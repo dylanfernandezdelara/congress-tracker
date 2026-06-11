@@ -39,8 +39,8 @@ Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHu
 1. `npm test`
 2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`
 3. Run thermonuclear review on the branch diff; fix CRITICAL and WARNING findings; repeat until CLEAR
-4. When the user wants to inspect UI: `npm run preview` and paste the Cloudflare Preview URL
-5. Include QA results, review outcome, and preview URL in the PR description
+4. `npm run preview` — paste the Cloudflare Preview URL into chat and the PR (do not wait for the user to ask)
+5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
 
 `qa:web` checks iPhone SE (320px), iPhone 14 (390px), desktop (1280px), and wide desktop (1440px) in both light and dark mode. It verifies the header, theme toggle, feed card, and headline are not clipped, and that the requested theme is active. Override the target URL with `QA_WEB_URL` if Vite uses a non-default port. Screenshots and a JSON summary land in `artifacts/qa-viewports/`.
 
@@ -56,8 +56,8 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 ```
 
 - A Cursor Cloud agent runs with `wrangler` + `CLOUDFLARE_API_TOKEN` /
-  `CLOUDFLARE_ACCOUNT_ID` already set, so when the user asks for a preview, just
-  run `npm run preview` and paste the printed URL into the chat.
+  `CLOUDFLARE_ACCOUNT_ID` already set. Step 4 of the ship checklist runs
+  `npm run preview` and pastes the printed URL — do not wait for the user to ask.
 - For a stable per-branch URL: `cd workers/senate_data_worker && npx wrangler versions upload --preview-alias <name>`.
 - Previews never receive production traffic (`versions upload` ≠ `deploy`), but
   they reuse production bindings (incl. the D1 database).
@@ -84,4 +84,4 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - Never commit secrets from `.dev.vars`.
 - `FEED_MAX_BILLS`, `VOTE_LOOKBACK_DAYS`, `DIGEST_MAX_NEW_REWRITES` are module constants in `src/constants.ts`.
 - Always `git fetch origin` before starting work on a fresh session.
-- When the user wants to see changes in a browser, run `npm run preview` and share the printed Cloudflare Preview URL (it does not touch production).
+- After `web/` work, follow the ship checklist above (tests → `qa:web` → thermonuclear review → preview URL). Never publish a preview URL without attempting QA and review first.
