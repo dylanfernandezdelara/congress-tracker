@@ -54,8 +54,10 @@ export function FlipCard({
     if (!el || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(updateBackScrollEnd)
     observer.observe(el)
+    const content = el.firstElementChild
+    if (content) observer.observe(content)
     return () => observer.disconnect()
-  }, [flipped, back, updateBackScrollEnd])
+  }, [flipped, updateBackScrollEnd])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     pointerStart.current = { x: e.clientX, y: e.clientY }
