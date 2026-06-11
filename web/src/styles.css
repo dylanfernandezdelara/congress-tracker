@@ -269,6 +269,13 @@
       min-height: auto;
       max-height: none;
       align-content: start;
+      transform: none;
+      transform-style: flat;
+      transition: translate 0.2s ease;
+    }
+
+    .flip-card-inner.is-flipped {
+      transform: none;
     }
 
     /* Only the visible face participates in layout so long back text
