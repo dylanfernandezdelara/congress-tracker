@@ -3,7 +3,9 @@ import {
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
+  useCallback,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -26,11 +28,34 @@ export function FlipCard({
   backLabel = 'Back to plain summary',
 }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
+  const [backScrolledToEnd, setBackScrolledToEnd] = useState(false)
   const id = useId()
   const labelledBy = titleId ?? `${id}-title`
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
+  const backClipRef = useRef<HTMLDivElement>(null)
 
   const toggle = () => setFlipped((v) => !v)
+
+  const updateBackScrollEnd = useCallback(() => {
+    const el = backClipRef.current
+    if (!el) return
+    const noOverflow = el.scrollHeight <= el.clientHeight + 4
+    const scrolledToEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
+    setBackScrolledToEnd(noOverflow || scrolledToEnd)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!flipped) {
+      setBackScrolledToEnd(false)
+      return
+    }
+    updateBackScrollEnd()
+    const el = backClipRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(updateBackScrollEnd)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [flipped, back, updateBackScrollEnd])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     pointerStart.current = { x: e.clientX, y: e.clientY }
@@ -68,7 +93,11 @@ export function FlipCard({
           <div className="flip-card-content">{front}</div>
         </div>
         <div className="flip-card-face flip-card-back">
-          <div className="flip-card-back-clip">
+          <div
+            ref={backClipRef}
+            className={`flip-card-back-clip ${backScrolledToEnd ? 'is-scrolled-to-end' : ''}`}
+            onScroll={updateBackScrollEnd}
+          >
             <div className="flip-card-content">{back}</div>
           </div>
         </div>

@@ -292,7 +292,8 @@
   }
 
   .flip-card-back .flip-card-content {
-    height: 100%;
+    height: auto;
+    min-height: 100%;
     transform: rotateX(0deg);
     opacity: 0;
   }
@@ -308,7 +309,45 @@
     height: 100%;
     min-height: 0;
     width: 100%;
-    overflow: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--twc-faint) / 0.55) transparent;
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 2.5rem), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 2.5rem), transparent 100%);
+  }
+
+  .flip-card-back-clip::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .flip-card-back-clip::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .flip-card-back-clip::-webkit-scrollbar-thumb {
+    background: hsl(var(--twc-faint) / 0.55);
+    border-radius: 3px;
+  }
+
+  .flip-card-back-clip.is-scrolled-to-end {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .flip-card-back .feed-card-surface {
+    height: auto;
+    overflow: visible;
+  }
+
+  .flip-card-back .summary-fade-container {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   @media (max-width: 639px), (pointer: coarse) {
