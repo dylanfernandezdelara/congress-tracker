@@ -129,9 +129,15 @@ async function auditPage(page) {
     }
     if (headline) collectHorizontalClipping(headline.getBoundingClientRect(), 'feed headline')
 
-    if (viewportWidth < 640 && card) {
-      const body = card.querySelector('.feed-card-surface > p.text-secondary')
-      const footer = card.querySelector('.feed-card-surface > div:last-child')
+    const touchLayout =
+      viewportWidth < 640 ||
+      (typeof window.matchMedia === 'function' &&
+        window.matchMedia('(max-width: 639px), (pointer: coarse)').matches)
+
+    if (touchLayout && card) {
+      const front = card.querySelector('.flip-card-front .feed-card-surface')
+      const body = front?.querySelector('p.text-secondary')
+      const footer = front?.querySelector('div:last-child')
       if (body && footer) {
         const gap = footer.getBoundingClientRect().top - body.getBoundingClientRect().bottom
         if (gap > 48) {
