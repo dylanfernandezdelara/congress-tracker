@@ -30,6 +30,19 @@ Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONG
 npm test
 ```
 
+### PR viewport QA (required for `web/` changes)
+
+Before opening or updating any PR that touches `web/`, run mobile and desktop viewport QA:
+
+```bash
+npm run dev:web   # separate terminal
+npm run qa:web
+```
+
+`qa:web` checks iPhone SE (320px), iPhone 14 (390px), desktop (1280px), and wide desktop (1440px) in both light and dark mode. It verifies the header, theme toggle, and feed card layout are not clipped. Screenshots and a JSON summary land in `artifacts/qa-viewports/`.
+
+Include the QA pass/fail summary in the PR description for every web UI PR.
+
 ### Preview deployments (browser-openable, no production impact)
 
 The Worker serves the bundled React app (Workers static assets), so one preview
