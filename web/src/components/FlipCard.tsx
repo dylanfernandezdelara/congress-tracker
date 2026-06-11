@@ -77,6 +77,50 @@ export function FlipCard({
     }
   }
 
+  const onBackClipKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const el = backClipRef.current
+    if (!el) return
+
+    let delta = 0
+    switch (e.key) {
+      case 'ArrowDown':
+        delta = 48
+        break
+      case 'ArrowUp':
+        delta = -48
+        break
+      case 'PageDown':
+        delta = el.clientHeight * 0.9
+        break
+      case 'PageUp':
+        delta = -el.clientHeight * 0.9
+        break
+      case 'Home':
+        el.scrollTop = 0
+        updateBackScrollEnd()
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      case 'End':
+        el.scrollTop = el.scrollHeight
+        updateBackScrollEnd()
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      case ' ':
+      case 'Enter':
+        e.stopPropagation()
+        return
+      default:
+        return
+    }
+
+    el.scrollTop += delta
+    updateBackScrollEnd()
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   return (
     <article className="flip-card" aria-labelledby={labelledBy}>
       <div
@@ -96,9 +140,13 @@ export function FlipCard({
           <div
             ref={backClipRef}
             className={`flip-card-back-clip ${backScrolledToEnd ? 'is-scrolled-to-end' : ''}`}
+            role="region"
+            aria-label="Official summary"
+            tabIndex={flipped ? 0 : -1}
             onScroll={updateBackScrollEnd}
+            onKeyDown={onBackClipKeyDown}
           >
-            <div className="flip-card-content">{back}</div>
+            <div className="flip-card-back-body">{back}</div>
           </div>
         </div>
       </div>
