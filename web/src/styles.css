@@ -214,13 +214,15 @@
 
   .flip-card-inner {
     display: grid;
+    position: relative;
     min-height: 280px;
     cursor: pointer;
     touch-action: manipulation;
     transition:
-      transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1),
+      transform 0.55s cubic-bezier(0.4, 0, 0.2, 1),
       translate 0.2s ease;
     transform-style: preserve-3d;
+    will-change: transform;
   }
 
   .flip-card-inner.is-flipped {
@@ -235,13 +237,30 @@
 
   .flip-card-face {
     grid-area: 1 / 1;
-    min-height: 100%;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-    transition: visibility 0s 0.15s;
+    transition: visibility 0s 0.28s;
+  }
+
+  .flip-card-front {
+    position: relative;
+    z-index: 1;
+    align-self: start;
+    width: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
   }
 
   .flip-card-back {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     visibility: hidden;
     transform: rotateY(180deg);
   }
@@ -257,102 +276,19 @@
   .flip-card-back-clip {
     display: flex;
     flex-direction: column;
-    height: 0;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
     width: 100%;
     overflow: hidden;
   }
 
   @media (max-width: 639px), (pointer: coarse) {
     .flip-card-inner {
-      --flip-card-mobile-height: calc(100dvh - 15rem);
       min-height: auto;
-      max-height: none;
-      align-content: start;
-      transform: none;
-      transform-style: flat;
-      transition: translate 0.2s ease;
     }
 
-    .flip-card-inner.is-flipped {
-      transform: none;
-    }
-
-    /* Only the visible face participates in layout so long back text
-       does not stretch the front card. */
     .flip-card-front {
-      display: flex;
-      flex-direction: column;
-      min-height: auto;
-      max-height: var(--flip-card-mobile-height);
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      touch-action: pan-y;
-      scrollbar-width: thin;
-      scrollbar-color: hsl(var(--twc-faint) / 0.55) transparent;
-      transform: none;
-      visibility: visible;
-    }
-
-    .flip-card-back {
-      display: none;
-      transform: none;
-      visibility: hidden;
-    }
-
-    .flip-card-inner.is-flipped .flip-card-front {
-      display: none;
-      visibility: hidden;
-    }
-
-    .flip-card-inner.is-flipped .flip-card-back {
-      display: flex;
-      flex-direction: column;
-      min-height: auto;
-      max-height: var(--flip-card-mobile-height);
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      touch-action: pan-y;
-      scrollbar-width: thin;
-      scrollbar-color: hsl(var(--twc-faint) / 0.55) transparent;
-      visibility: visible;
-    }
-
-    .flip-card-face {
-      min-height: auto;
-    }
-
-    .flip-card-face::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    .flip-card-face::-webkit-scrollbar-thumb {
-      background: hsl(var(--twc-faint) / 0.55);
-      border-radius: 2px;
-    }
-
-    .flip-card-back-clip {
-      height: auto;
-      min-height: auto;
-      overflow: visible;
-    }
-
-    .feed-card-surface {
-      height: auto;
-      overflow: visible;
-      min-height: min-content;
-      flex: none;
-    }
-
-    .summary-fade-container {
-      flex: none;
-      min-height: auto;
-      overflow: visible;
-      touch-action: auto;
-      -webkit-mask-image: none;
-      mask-image: none;
+      max-height: calc(100dvh - 15rem);
     }
 
     .feed-card-surface .line-clamp-3 {
@@ -361,7 +297,6 @@
       -webkit-line-clamp: unset;
       line-clamp: unset;
     }
-
   }
 
   .congress-link:focus-visible {
@@ -422,13 +357,13 @@
     }
 
     .flip-card-inner.is-flipped .flip-card-back {
-      display: block;
+      display: flex;
       visibility: visible;
     }
 
     .flip-card-inner.is-flipped .flip-card-back-clip {
-      height: auto;
-      min-height: 100%;
+      height: 100%;
+      min-height: 0;
     }
   }
 }
