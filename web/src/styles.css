@@ -183,13 +183,18 @@
   }
 
   .theme-toggle {
-    @apply relative flex shrink-0 items-center justify-center rounded-md text-secondary transition-colors;
+    @apply relative flex shrink-0 items-center justify-center overflow-visible rounded-md text-secondary transition-colors;
     width: 32px;
     height: 32px;
     border: 1px solid transparent;
     background: transparent;
     cursor: pointer;
     touch-action: manipulation;
+  }
+
+  .theme-toggle svg {
+    display: block;
+    overflow: visible;
   }
 
   .theme-toggle::after {
