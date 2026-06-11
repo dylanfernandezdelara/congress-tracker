@@ -284,6 +284,7 @@
     flex-direction: column;
     overflow: hidden;
     pointer-events: none;
+    transform: rotateX(180deg);
   }
 
   .flip-card-inner.is-flipped .flip-card-back {
@@ -291,15 +292,19 @@
     pointer-events: auto;
   }
 
-  .flip-card-back .flip-card-content {
-    height: 100%;
-    transform: rotateX(0deg);
+  .flip-card-back-body {
     opacity: 0;
+    transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .flip-card-inner.is-flipped .flip-card-back .flip-card-content {
-    transform: rotateX(-180deg);
+  .flip-card-inner.is-flipped .flip-card-back-body {
     opacity: 1;
+  }
+
+  .flip-card-back-clip:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 
   .flip-card-back-clip {
@@ -308,7 +313,45 @@
     height: 100%;
     min-height: 0;
     width: 100%;
-    overflow: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--twc-faint) / 0.55) transparent;
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 2.5rem), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 2.5rem), transparent 100%);
+  }
+
+  .flip-card-back-clip::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .flip-card-back-clip::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .flip-card-back-clip::-webkit-scrollbar-thumb {
+    background: hsl(var(--twc-faint) / 0.55);
+    border-radius: 3px;
+  }
+
+  .flip-card-back-clip.is-scrolled-to-end {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .flip-card-back .feed-card-surface {
+    height: auto;
+    overflow: visible;
+  }
+
+  .flip-card-back .summary-fade-container {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
   @media (max-width: 639px), (pointer: coarse) {
@@ -374,10 +417,23 @@
       visibility: visible;
     }
 
+    .flip-card-inner {
+      min-height: 280px;
+    }
+
     .flip-card-back {
+      position: relative;
+      inset: auto;
       visibility: hidden;
       transform: none;
       display: none;
+      height: auto;
+      min-height: 280px;
+    }
+
+    .flip-card-back-body {
+      opacity: 1;
+      transition: none;
     }
 
     .flip-card-inner.is-flipped .flip-card-front {
@@ -388,11 +444,14 @@
     .flip-card-inner.is-flipped .flip-card-back {
       display: flex;
       visibility: visible;
+      flex: 1 1 auto;
     }
 
-    .flip-card-inner.is-flipped .flip-card-back-clip {
-      height: 100%;
-      min-height: 0;
+    .flip-card-back-clip {
+      height: auto;
+      max-height: calc(100dvh - 15rem);
+      min-height: 240px;
+      flex: 1 1 auto;
     }
   }
 }

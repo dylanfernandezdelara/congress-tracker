@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useId } from 'react'
 
 import type { FeedItem } from '../api/types'
 import {
@@ -14,48 +14,6 @@ import { FlipCard } from './FlipCard'
 
 type FeedCardProps = {
   item: FeedItem
-}
-
-type SummaryScrollContainerProps = {
-  className?: string
-  children: ReactNode
-}
-
-function SummaryScrollContainer({ className = '', children }: SummaryScrollContainerProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [atEnd, setAtEnd] = useState(false)
-
-  const updateScrollEnd = useCallback(() => {
-    const el = ref.current
-    if (!el) return
-    const noOverflow = el.scrollHeight <= el.clientHeight + 4
-    const scrolledToEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
-    setAtEnd(noOverflow || scrolledToEnd)
-  }, [])
-
-  useLayoutEffect(() => {
-    updateScrollEnd()
-    const el = ref.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(updateScrollEnd)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [updateScrollEnd, children])
-
-  return (
-    <div
-      ref={ref}
-      className={`summary-fade-container ${atEnd ? 'is-scrolled-to-end' : ''} ${className}`.trim()}
-      role="region"
-      aria-label="Official summary text"
-      tabIndex={0}
-      onClick={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-      onScroll={updateScrollEnd}
-    >
-      {children}
-    </div>
-  )
 }
 
 function VoteSplitBar({ yeas, nays }: { yeas: number; nays: number }) {
@@ -143,8 +101,8 @@ export function FeedCard({ item }: FeedCardProps) {
   )
 
   const back = (
-    <div className="feed-card-surface flex h-full min-h-0 flex-col">
-      <div className="shrink-0">
+    <div className="feed-card-surface flex flex-col">
+      <div>
         <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
 
         {isProcedural && item.bill.title ? (
@@ -165,15 +123,15 @@ export function FeedCard({ item }: FeedCardProps) {
         ) : null}
       </div>
 
-      <SummaryScrollContainer
-        className={keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}
+      <div
+        className={`summary-fade-container ${keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}`}
       >
         <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
           {item.raw_summary_text ?? 'No official CRS summary on file.'}
         </p>
-      </SummaryScrollContainer>
+      </div>
 
-      <footer className="mt-auto max-sm:mt-0 flex shrink-0 items-center justify-between gap-4 border-t border-border pt-4">
+      <footer className="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">
         <a
           href={sourceUrl}
           target="_blank"
