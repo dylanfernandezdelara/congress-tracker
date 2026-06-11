@@ -56,11 +56,23 @@ describe('FeedCard', () => {
     expect(backSummary?.textContent).toBe(longCrsSummary)
   })
 
-  it('uses the mobile scroll container for the front face', () => {
+  it('wraps digest content in the front scroll face structure', () => {
     const { container } = render(<FeedCard item={makeItem()} />)
 
     const front = container.querySelector('.flip-card-front')
+    const content = container.querySelector('.flip-card-front .flip-card-content')
+    const surface = container.querySelector('.flip-card-front .feed-card-surface')
+    const body = container.querySelector('.flip-card-front p.text-secondary')
+    const flipHint = container.querySelector('.flip-card-front .flip-card-flip-hint')
+
     expect(front).not.toBeNull()
-    expect(front?.className).toContain('flip-card-front')
+    expect(content).not.toBeNull()
+    expect(surface).not.toBeNull()
+    expect(flipHint).not.toBeNull()
+    expect(body?.textContent?.trim()).toBe(longDigest.trim())
+    expect(body?.closest('.flip-card-front')).toBe(front)
+    expect(flipHint?.closest('.flip-card-front')).toBe(front)
+    expect(content?.contains(surface ?? null)).toBe(true)
+    expect(front?.className).toContain('flip-card-face')
   })
 })

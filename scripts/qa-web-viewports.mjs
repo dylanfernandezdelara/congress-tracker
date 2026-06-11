@@ -23,13 +23,17 @@ const VIEWPORTS = [
 
 const THEMES = ['light', 'dark']
 
+const LONG_DIGEST_SENTENCE =
+  'This bill provides a longer generated explanation for readers about funding, oversight, reporting, and assistance programs that should remain fully readable on mobile. '
+const LONG_DIGEST = LONG_DIGEST_SENTENCE.repeat(6).trim()
+
 const MOCK_FEED = [
   {
     bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
     policy_area: 'Defense',
     digest: {
       headline: 'Plain headline for readers',
-      what_it_does: 'It does something important in plain language.',
+      what_it_does: LONG_DIGEST,
       key_points: ['Point one'],
       terms_explained: [],
     },
@@ -144,12 +148,38 @@ async function auditPage(page) {
         issues.push('flip card is not tappable on touch layout')
       }
 
-      const front = card.querySelector('.flip-card-front .feed-card-surface')
-      const flipHint = front?.querySelector('.flip-card-flip-hint')
-      if (front && flipHint) {
-        const gap = front.getBoundingClientRect().bottom - flipHint.getBoundingClientRect().bottom
+      const surface = card.querySelector('.flip-card-front .feed-card-surface')
+      const flipHint = surface?.querySelector('.flip-card-flip-hint')
+      if (surface && flipHint) {
+        const gap = surface.getBoundingClientRect().bottom - flipHint.getBoundingClientRect().bottom
         if (gap > 32) {
           issues.push(`excessive blank space in feed card (${Math.round(gap)}px below flip hint)`)
+        }
+      }
+
+      const frontScroll = card.querySelector('.flip-card-front')
+      if (frontScroll) {
+        const overflowY = window.getComputedStyle(frontScroll).overflowY
+        if (overflowY !== 'auto' && overflowY !== 'scroll') {
+          issues.push(`front scroll container overflow-y is "${overflowY}", expected auto or scroll`)
+        }
+
+        if (frontScroll.scrollHeight <= frontScroll.clientHeight + 1) {
+          issues.push(
+            `front scroll container does not overflow on touch layout (scrollHeight ${frontScroll.scrollHeight} <= clientHeight ${frontScroll.clientHeight})`,
+          )
+        }
+
+        const frontRect = frontScroll.getBoundingClientRect()
+        collectHorizontalClipping(frontRect, 'flip card front')
+        if (frontRect.bottom <= 0 || frontRect.top >= viewportHeight) {
+          issues.push('flip card front not visible in viewport')
+        }
+        if (frontRect.top < -0.5) {
+          issues.push('flip card front clipped on the top')
+        }
+        if (frontRect.bottom > viewportHeight + 0.5) {
+          issues.push('flip card front clipped on the bottom')
         }
       }
     }
