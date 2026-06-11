@@ -15,6 +15,7 @@ node_modules/
 
 # Build artifacts
 /target/
+artifacts/
 web/artifacts/
 web/output/
 docs/screenshots/
@@ -30,3 +31,4 @@ senate-*.png
 # OS files
 .DS_Store
 Thumbs.db
+.qa/

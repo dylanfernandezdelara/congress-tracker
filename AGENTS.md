@@ -17,6 +17,8 @@ Cloudflare-native app: ingest House + Senate **passage** roll-call votes, join C
 
 Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONGRESS_API_KEY`, `OPENROUTER_API_KEY`, and optionally `OPENROUTER_MODEL`.
 
+`cursor-cloud-setup.sh` also installs root Playwright tooling used by `npm run qa:web`.
+
 ### Local development
 
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
@@ -29,6 +31,20 @@ Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONG
 ```bash
 npm test
 ```
+
+### Cursor Cloud ship checklist (required for `web/` changes)
+
+Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHub Actions. Every agent session should follow this before opening or updating a PR:
+
+1. `npm test`
+2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`
+3. Run thermonuclear review on the branch diff; fix CRITICAL and WARNING findings; repeat until CLEAR
+4. When the user wants to inspect UI: `npm run preview` and paste the Cloudflare Preview URL
+5. Include QA results, review outcome, and preview URL in the PR description
+
+`qa:web` checks iPhone SE (320px), iPhone 14 (390px), desktop (1280px), and wide desktop (1440px) in both light and dark mode. It verifies the header, theme toggle, feed card, and headline are not clipped, and that the requested theme is active. Override the target URL with `QA_WEB_URL` if Vite uses a non-default port. Screenshots and a JSON summary land in `artifacts/qa-viewports/`.
+
+Agent context lives in this file and `.cursor/rules/` (`pr-viewport-qa.mdc`, `pr-thermonuclear-review.mdc`) so any Cursor session picks up the same workflow without depending on GitHub.
 
 ### Preview deployments (browser-openable, no production impact)
 

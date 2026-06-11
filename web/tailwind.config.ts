@@ -4,31 +4,27 @@ import tailwindcssAnimate from 'tailwindcss-animate'
 const config: Config = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
-    container: {
-      center: true,
-      padding: '1rem',
-      screens: {
-        '2xl': '680px',
-      },
-    },
     extend: {
       colors: {
-        border: 'hsl(var(--twc-border))',
-        background: '#f5eedd',
+        border: {
+          DEFAULT: 'hsl(var(--twc-border))',
+          hover: 'hsl(var(--twc-border-hover))',
+          muted: 'hsl(var(--twc-border-muted))',
+        },
+        background: 'hsl(var(--twc-background))',
         foreground: 'hsl(var(--twc-foreground))',
-        heading: 'hsl(var(--twc-heading))',
+        secondary: 'hsl(var(--twc-secondary))',
+        faint: 'hsl(var(--twc-faint))',
         card: {
           DEFAULT: 'hsl(var(--twc-card))',
-          foreground: 'hsl(var(--twc-card-foreground))',
-        },
-        muted: {
-          foreground: 'hsl(var(--twc-muted-foreground))',
         },
         accent: {
           DEFAULT: 'hsl(var(--twc-accent))',
         },
-        secondary: {
-          DEFAULT: 'hsl(var(--twc-secondary))',
+        pass: 'hsl(var(--twc-pass))',
+        fail: 'hsl(var(--twc-fail))',
+        surface: {
+          subtle: 'hsl(var(--twc-surface-subtle))',
         },
       },
       fontFamily: {

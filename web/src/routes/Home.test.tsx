@@ -35,6 +35,7 @@ describe('Home', () => {
     render(<Home />)
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-    expect(screen.getByText(/Senate/)).toBeInTheDocument()
+    expect(screen.getByText('Passed')).toBeInTheDocument()
+    expect(screen.getByText('52–47')).toBeInTheDocument()
   })
 })
