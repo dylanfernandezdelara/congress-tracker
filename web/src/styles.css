@@ -54,15 +54,25 @@
     box-sizing: border-box;
   }
 
-  html,
-  body,
-  #root {
-    min-height: 100%;
+  html {
+    height: 100%;
     margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background-color: hsl(var(--twc-background));
+    background-image: radial-gradient(
+      ellipse 120% 600px at 50% 0%,
+      hsl(var(--twc-glow)),
+      transparent
+    );
   }
 
   body {
     @apply font-sans antialiased tabular-nums;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
     font-feature-settings: 'cv11', 'ss01';
     color: hsl(var(--twc-foreground));
     background-color: hsl(var(--twc-background));
@@ -71,6 +81,15 @@
       hsl(var(--twc-glow)),
       transparent
     );
+  }
+
+  #root {
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   ::selection {
