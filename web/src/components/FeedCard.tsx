@@ -114,7 +114,7 @@ export function FeedCard({ item }: FeedCardProps) {
         {body}
       </p>
 
-      <div className="mt-auto">
+      <div className="mt-auto max-sm:mt-0">
         {item.passage_votes.length > 0 ? (
           <div className="space-y-3 border-t border-border pt-4">
             {item.passage_votes.map((v) => (

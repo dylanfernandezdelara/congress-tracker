@@ -266,14 +266,14 @@
   @media (max-width: 639px), (pointer: coarse) {
     .flip-card-inner {
       --flip-card-mobile-height: calc(100dvh - 15rem);
-      min-height: var(--flip-card-mobile-height);
       max-height: var(--flip-card-mobile-height);
-      align-content: stretch;
+      align-content: start;
     }
 
     .flip-card-face {
       display: flex;
       flex-direction: column;
+      min-height: auto;
       max-height: var(--flip-card-mobile-height);
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
@@ -294,13 +294,15 @@
 
     .flip-card-back-clip {
       height: auto;
-      min-height: 100%;
+      min-height: auto;
       overflow: visible;
     }
 
     .feed-card-surface {
+      height: auto;
       overflow: visible;
       min-height: min-content;
+      flex: none;
     }
 
     .summary-fade-container {

@@ -129,6 +129,17 @@ async function auditPage(page) {
     }
     if (headline) collectHorizontalClipping(headline.getBoundingClientRect(), 'feed headline')
 
+    if (viewportWidth < 640 && card) {
+      const body = card.querySelector('.feed-card-surface > p.text-secondary')
+      const footer = card.querySelector('.feed-card-surface > div:last-child')
+      if (body && footer) {
+        const gap = footer.getBoundingClientRect().top - body.getBoundingClientRect().bottom
+        if (gap > 48) {
+          issues.push(`excessive blank space in feed card (${Math.round(gap)}px between summary and footer)`)
+        }
+      }
+    }
+
     return {
       issues,
       theme: document.documentElement.dataset.theme ?? 'light',
