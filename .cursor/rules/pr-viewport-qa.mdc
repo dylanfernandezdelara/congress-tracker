@@ -4,7 +4,9 @@ globs: web/**
 alwaysApply: false
 ---
 
-# PR viewport QA
+# PR viewport QA (Cursor / Cursor Cloud)
+
+Run in the agent session — not via GitHub Actions.
 
 For every PR that changes `web/`:
 

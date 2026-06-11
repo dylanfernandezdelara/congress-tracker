@@ -3,7 +3,9 @@ description: Run thermonuclear review in a loop before marking PR work complete
 alwaysApply: true
 ---
 
-# PR thermonuclear review
+# PR thermonuclear review (Cursor / Cursor Cloud)
+
+Run in the agent session — not via GitHub Actions.
 
 Before marking a task complete or opening/updating a PR:
 

@@ -1,9 +1,5 @@
 name: CI
 
-permissions:
-  contents: read
-  pull-requests: read
-
 on:
   push:
     branches: [main]
@@ -13,28 +9,6 @@ on:
     - cron: "0 12 * * 1"
 
 jobs:
-  detect-web-ui-changes:
-    name: Detect web UI changes
-    runs-on: ubuntu-latest
-    outputs:
-      web: ${{ steps.filter.outputs.web }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Detect changed paths
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            web:
-              - 'web/**'
-              - 'scripts/qa-web-viewports.mjs'
-              - 'scripts/qa-web-viewports-contract.test.mjs'
-              - 'package.json'
-              - 'package-lock.json'
-              - '.github/workflows/ci.yml'
-
   verify:
     name: Verify
     runs-on: ubuntu-latest
@@ -47,9 +21,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install root dependencies
-        run: npm ci
-
       - name: Install worker dependencies
         run: npm ci
         working-directory: workers/senate_data_worker
@@ -60,39 +31,6 @@ jobs:
 
       - name: Run tests
         run: npm test
-
-  viewport-qa:
-    name: Web viewport QA
-    needs: detect-web-ui-changes
-    if: needs.detect-web-ui-changes.outputs.web == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install root dependencies
-        run: npm ci
-
-      - name: Install web dependencies
-        run: npm ci
-        working-directory: web
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Start web dev server
-        run: npm run dev -- --host localhost --port 5173 &
-        working-directory: web
-
-      - name: Run viewport QA
-        run: npm run qa:web
-        env:
-          QA_WEB_URL: http://localhost:5173
 
   public-readiness:
     name: Public Readiness Checks
