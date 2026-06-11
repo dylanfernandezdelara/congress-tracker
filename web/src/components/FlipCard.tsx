@@ -31,7 +31,7 @@ export function FlipCard({
   const [backScrolledToEnd, setBackScrolledToEnd] = useState(false)
   const id = useId()
   const labelledBy = titleId ?? `${id}-title`
-  const pointerStart = useRef<{ x: number; y: number } | null>(null)
+  const pointerStart = useRef<{ x: number; y: number; scrollTop?: number } | null>(null)
   const backClipRef = useRef<HTMLDivElement>(null)
 
   const toggle = () => setFlipped((v) => !v)
@@ -60,13 +60,30 @@ export function FlipCard({
   }, [flipped, updateBackScrollEnd])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    pointerStart.current = { x: e.clientX, y: e.clientY }
+    const clip = flipped ? backClipRef.current : null
+    pointerStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollTop: clip?.scrollTop,
+    }
   }
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const start = pointerStart.current
     pointerStart.current = null
-    if (start && shouldIgnoreFlipClick(start.x, start.y, e.clientX, e.clientY)) {
+    const endScrollTop = flipped ? backClipRef.current?.scrollTop : undefined
+    if (
+      start &&
+      shouldIgnoreFlipClick(
+        start.x,
+        start.y,
+        e.clientX,
+        e.clientY,
+        undefined,
+        start.scrollTop,
+        endScrollTop,
+      )
+    ) {
       return
     }
     toggle()
