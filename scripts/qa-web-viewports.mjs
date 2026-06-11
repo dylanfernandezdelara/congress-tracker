@@ -145,7 +145,7 @@ async function auditPage(page) {
       }
 
       const front = card.querySelector('.flip-card-front .feed-card-surface')
-      const flipHint = front?.querySelector('p.pt-4')
+      const flipHint = front?.querySelector('.flip-card-flip-hint')
       if (front && flipHint) {
         const gap = front.getBoundingClientRect().bottom - flipHint.getBoundingClientRect().bottom
         if (gap > 32) {

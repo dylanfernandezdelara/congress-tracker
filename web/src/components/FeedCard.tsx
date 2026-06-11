@@ -135,7 +135,9 @@ export function FeedCard({ item }: FeedCardProps) {
           </div>
         ) : null}
 
-        <p className="pt-4 text-right text-[12px] text-secondary">Flip for official text ↺</p>
+        <p className="flip-card-flip-hint pt-4 text-right text-[12px] text-secondary">
+          Flip for official text ↺
+        </p>
       </div>
     </div>
   )
