@@ -29,3 +29,10 @@ test('cursor-cloud setup installs root QA tooling', () => {
   assert.match(setup, /npm --prefix "\$\{ROOT_DIR\}" ci/)
   assert.match(setup, /playwright install chromium/)
 })
+
+test('CI workflow runs viewport QA when web UI changes', () => {
+  const ci = fs.readFileSync(path.join(rootDir, '.github', 'workflows', 'ci.yml'), 'utf8')
+  assert.match(ci, /viewport-qa:/)
+  assert.match(ci, /npm run qa:web/)
+  assert.match(ci, /dorny\/paths-filter@v3/)
+})

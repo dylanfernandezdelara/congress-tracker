@@ -9,6 +9,28 @@ on:
     - cron: "0 12 * * 1"
 
 jobs:
+  detect-web-ui-changes:
+    name: Detect web UI changes
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'web/**'
+              - 'scripts/qa-web-viewports.mjs'
+              - 'scripts/qa-web-viewports-contract.test.mjs'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/ci.yml'
+
   verify:
     name: Verify
     runs-on: ubuntu-latest
@@ -37,6 +59,8 @@ jobs:
 
   viewport-qa:
     name: Web viewport QA
+    needs: detect-web-ui-changes
+    if: needs.detect-web-ui-changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

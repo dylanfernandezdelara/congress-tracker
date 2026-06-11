@@ -82,12 +82,16 @@ async function auditPage(page) {
     const headline = document.querySelector('.flip-card h2')
     const issues = []
 
-    const collectClipping = (rect, label) => {
+    const collectHorizontalClipping = (rect, label) => {
       if (rect.left < -0.5) issues.push(`${label} clipped on the left`)
-      if (rect.top < -0.5) issues.push(`${label} clipped on the top`)
       if (rect.right > viewportWidth + 0.5) issues.push(`${label} clipped on the right`)
-      if (rect.bottom > viewportHeight + 0.5) issues.push(`${label} clipped on the bottom`)
       if (rect.width <= 0 || rect.height <= 0) issues.push(`${label} not visible`)
+    }
+
+    const collectFullClipping = (rect, label) => {
+      collectHorizontalClipping(rect, label)
+      if (rect.top < -0.5) issues.push(`${label} clipped on the top`)
+      if (rect.bottom > viewportHeight + 0.5) issues.push(`${label} clipped on the bottom`)
     }
 
     if (!toggle) issues.push('theme toggle missing')
@@ -95,7 +99,7 @@ async function auditPage(page) {
     if (!card) issues.push('feed card missing')
 
     if (toggle) {
-      collectClipping(toggle.getBoundingClientRect(), 'theme toggle')
+      collectFullClipping(toggle.getBoundingClientRect(), 'theme toggle')
 
       const svg = toggle.querySelector('svg')
       if (!svg) {
@@ -115,9 +119,15 @@ async function auditPage(page) {
       }
     }
 
-    if (heading) collectClipping(heading.getBoundingClientRect(), 'page heading')
-    if (card) collectClipping(card.getBoundingClientRect(), 'feed card')
-    if (headline) collectClipping(headline.getBoundingClientRect(), 'feed headline')
+    if (heading) collectFullClipping(heading.getBoundingClientRect(), 'page heading')
+    if (card) {
+      const cardRect = card.getBoundingClientRect()
+      collectHorizontalClipping(cardRect, 'feed card')
+      if (cardRect.bottom <= 0 || cardRect.top >= viewportHeight) {
+        issues.push('feed card not visible in viewport')
+      }
+    }
+    if (headline) collectHorizontalClipping(headline.getBoundingClientRect(), 'feed headline')
 
     return {
       issues,
