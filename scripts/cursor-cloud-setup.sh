@@ -8,11 +8,17 @@ WEB_DIR="${ROOT_DIR}/web"
 DEV_VARS="${WORKER_DIR}/.dev.vars"
 DEV_VARS_EXAMPLE="${WORKER_DIR}/.dev.vars.example"
 
+echo "Installing root dependencies (viewport QA tooling)..."
+npm --prefix "${ROOT_DIR}" ci
+
 echo "Installing worker dependencies..."
 npm --prefix "${WORKER_DIR}" ci
 
 echo "Installing web dependencies..."
 npm --prefix "${WEB_DIR}" ci
+
+echo "Installing Playwright Chromium for viewport QA..."
+npx --prefix "${ROOT_DIR}" playwright install chromium
 
 if [[ ! -f "${DEV_VARS}" ]]; then
   echo "Creating ${DEV_VARS} from example..."
