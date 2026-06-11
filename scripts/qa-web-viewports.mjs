@@ -33,7 +33,7 @@ const MOCK_FEED = [
       key_points: ['Point one'],
       terms_explained: [],
     },
-    raw_summary_text: 'Official CRS summary text.',
+    raw_summary_text: `${'Official CRS summary text. '.repeat(40)}`.trim(),
     passage_votes: [
       {
         chamber: 'Senate',
@@ -136,12 +136,11 @@ async function auditPage(page) {
 
     if (touchLayout && card) {
       const front = card.querySelector('.flip-card-front .feed-card-surface')
-      const body = front?.querySelector('p.text-secondary')
-      const footer = front?.querySelector('div:last-child')
-      if (body && footer) {
-        const gap = footer.getBoundingClientRect().top - body.getBoundingClientRect().bottom
-        if (gap > 48) {
-          issues.push(`excessive blank space in feed card (${Math.round(gap)}px between summary and footer)`)
+      const flipHint = front?.querySelector('p.pt-4')
+      if (front && flipHint) {
+        const gap = front.getBoundingClientRect().bottom - flipHint.getBoundingClientRect().bottom
+        if (gap > 32) {
+          issues.push(`excessive blank space in feed card (${Math.round(gap)}px below flip hint)`)
         }
       }
     }

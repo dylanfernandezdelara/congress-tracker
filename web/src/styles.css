@@ -266,11 +266,14 @@
   @media (max-width: 639px), (pointer: coarse) {
     .flip-card-inner {
       --flip-card-mobile-height: calc(100dvh - 15rem);
-      max-height: var(--flip-card-mobile-height);
+      min-height: auto;
+      max-height: none;
       align-content: start;
     }
 
-    .flip-card-face {
+    /* Only the visible face participates in layout so long back text
+       does not stretch the front card. */
+    .flip-card-front {
       display: flex;
       flex-direction: column;
       min-height: auto;
@@ -281,6 +284,37 @@
       touch-action: pan-y;
       scrollbar-width: thin;
       scrollbar-color: hsl(var(--twc-faint) / 0.55) transparent;
+      transform: none;
+      visibility: visible;
+    }
+
+    .flip-card-back {
+      display: none;
+      transform: none;
+      visibility: hidden;
+    }
+
+    .flip-card-inner.is-flipped .flip-card-front {
+      display: none;
+      visibility: hidden;
+    }
+
+    .flip-card-inner.is-flipped .flip-card-back {
+      display: flex;
+      flex-direction: column;
+      min-height: auto;
+      max-height: var(--flip-card-mobile-height);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      scrollbar-width: thin;
+      scrollbar-color: hsl(var(--twc-faint) / 0.55) transparent;
+      visibility: visible;
+    }
+
+    .flip-card-face {
+      min-height: auto;
     }
 
     .flip-card-face::-webkit-scrollbar {

@@ -91,7 +91,7 @@ export function FeedCard({ item }: FeedCardProps) {
   const policyLabel = isProcedural ? 'Procedural' : item.policy_area
 
   const front = (
-    <div className="feed-card-surface flex h-full flex-col">
+    <div className="feed-card-surface flex h-full max-sm:h-auto flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="whitespace-nowrap text-[12px] font-normal uppercase tracking-widest text-faint">
           {docket}
@@ -141,7 +141,7 @@ export function FeedCard({ item }: FeedCardProps) {
   )
 
   const back = (
-    <div className="feed-card-surface flex h-full flex-col">
+    <div className="feed-card-surface flex h-full max-sm:h-auto flex-col">
       <div className="shrink-0">
         <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
 
@@ -171,7 +171,7 @@ export function FeedCard({ item }: FeedCardProps) {
         </p>
       </SummaryScrollContainer>
 
-      <footer className="mt-auto flex shrink-0 items-center justify-between gap-4 border-t border-border pt-4">
+      <footer className="mt-auto max-sm:mt-0 flex shrink-0 items-center justify-between gap-4 border-t border-border pt-4">
         <a
           href={sourceUrl}
           target="_blank"
