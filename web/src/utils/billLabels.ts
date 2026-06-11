@@ -10,6 +10,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
+export const SUMMARY_PREVIEW_MAX_CHARS = 180
 
 const PROVIDING_FOR_CONSIDERATION_PATTERN =
   /^Providing for consideration of the (?:bill|joint resolution|resolution) \(?(H\.?\s?R\.?|H\. ?Res\.?|S\.|S\. ?Res\.?)\s?(\d+)\)?,? (?:to |which )?(.+)$/i
@@ -46,17 +47,17 @@ export function summaryBodyText(raw: string): string {
   if (!trimmed) return trimmed
 
   const newlineIndex = trimmed.indexOf('\n')
-  if (newlineIndex === -1) return collapseWhitespace(trimmed)
+  if (newlineIndex === -1) return summaryPreviewText(trimmed)
 
   const firstLine = trimmed.slice(0, newlineIndex).trim()
   const remainder = trimmed.slice(newlineIndex + 1).trim()
   const endsWithSentencePunctuation = /[.!?]$/.test(firstLine)
 
   if (!endsWithSentencePunctuation && remainder.length > 0) {
-    return collapseWhitespace(remainder)
+    return summaryPreviewText(remainder)
   }
 
-  return collapseWhitespace(trimmed)
+  return summaryPreviewText(trimmed)
 }
 
 function normalizeBillRef(typeRaw: string, number: string): string {
@@ -81,10 +82,15 @@ function capitalizeFirst(text: string): string {
 
 function truncateAtWordBoundary(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
-  const slice = text.slice(0, maxLength)
+  const suffix = '…'
+  const slice = text.slice(0, maxLength - suffix.length)
   const lastSpace = slice.lastIndexOf(' ')
-  if (lastSpace <= 0) return `${slice.trimEnd()}…`
-  return `${slice.slice(0, lastSpace).trimEnd()}…`
+  if (lastSpace <= 0) return `${slice.trimEnd()}${suffix}`
+  return `${slice.slice(0, lastSpace).trimEnd()}${suffix}`
+}
+
+export function summaryPreviewText(text: string): string {
+  return truncateAtWordBoundary(collapseWhitespace(text), SUMMARY_PREVIEW_MAX_CHARS)
 }
 
 export function proceduralHeadline(title: string): string | null {

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   formatBillDocket,
   proceduralHeadline,
+  SUMMARY_PREVIEW_MAX_CHARS,
   summaryBodyText,
+  summaryPreviewText,
   trimDisplayTitle,
 } from './billLabels'
 
@@ -50,6 +52,26 @@ describe('summaryBodyText', () => {
 
   it('returns the heading when there is no remainder', () => {
     expect(summaryBodyText('Ukraine Support Act')).toBe('Ukraine Support Act')
+  })
+
+  it('caps long raw summaries at a word boundary', () => {
+    const raw = `Ukraine Support Act\n\n${'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(5)}`
+    const result = summaryBodyText(raw)
+
+    expect(result.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
+    expect(result).toMatch(/…$/)
+    expect(result).not.toMatch(/\s…$/)
+  })
+})
+
+describe('summaryPreviewText', () => {
+  it('caps generated digest summaries too', () => {
+    const result = summaryPreviewText(
+      'This bill provides a longer generated explanation for readers about funding, oversight, reporting, and assistance programs that should be concise on the front of the card. '.repeat(3),
+    )
+
+    expect(result.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
+    expect(result).toMatch(/…$/)
   })
 })
 

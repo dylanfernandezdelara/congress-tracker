@@ -6,6 +6,7 @@ import {
   formatBillDocket,
   formatVoteDate,
   proceduralHeadline,
+  summaryPreviewText,
   summaryBodyText,
   trimDisplayTitle,
   voteResultClass,
@@ -41,7 +42,7 @@ export function FeedCard({ item }: FeedCardProps) {
     ? trimDisplayTitle(item.digest!.headline!)
     : (proceduralTitle ?? trimDisplayTitle(item.bill.title ?? docket))
   const body =
-    item.digest?.what_it_does ??
+    (item.digest?.what_it_does ? summaryPreviewText(item.digest.what_it_does) : null) ??
     (item.raw_summary_text ? summaryBodyText(item.raw_summary_text) : null) ??
     'Summary not available yet.'
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
