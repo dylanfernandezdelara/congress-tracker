@@ -17,6 +17,8 @@ Cloudflare-native app: ingest House + Senate **passage** roll-call votes, join C
 
 Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONGRESS_API_KEY`, `OPENROUTER_API_KEY`, and optionally `OPENROUTER_MODEL`.
 
+`cursor-cloud-setup.sh` also installs root Playwright tooling used by `npm run qa:web`.
+
 ### Local development
 
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
@@ -39,9 +41,18 @@ npm run dev:web   # separate terminal
 npm run qa:web
 ```
 
-`qa:web` checks iPhone SE (320px), iPhone 14 (390px), desktop (1280px), and wide desktop (1440px) in both light and dark mode. It verifies the header, theme toggle, and feed card layout are not clipped. Screenshots and a JSON summary land in `artifacts/qa-viewports/`.
+`qa:web` checks iPhone SE (320px), iPhone 14 (390px), desktop (1280px), and wide desktop (1440px) in both light and dark mode. It verifies the header, theme toggle, feed card, and headline are not clipped, and that the requested theme is active. Override the target URL with `QA_WEB_URL` if Vite uses a non-default port. Screenshots and a JSON summary land in `artifacts/qa-viewports/`.
 
-Include the QA pass/fail summary in the PR description for every web UI PR.
+CI also runs `viewport-qa` on every PR. Include the QA pass/fail summary in the PR description for every web UI PR.
+
+### PR thermonuclear review (required before shipping)
+
+When you believe a task is complete:
+
+1. Run thermonuclear review on the branch diff.
+2. Fix CRITICAL and WARNING findings.
+3. Re-run review and verification until no actionable issues remain.
+4. Include the final review outcome in the PR description.
 
 ### Preview deployments (browser-openable, no production impact)
 

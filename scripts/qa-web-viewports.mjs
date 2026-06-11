@@ -48,12 +48,6 @@ const MOCK_FEED = [
   },
 ]
 
-function assertOk(condition, message) {
-  if (!condition) {
-    throw new Error(message)
-  }
-}
-
 async function loadPlaywright() {
   try {
     return await import('playwright')
@@ -80,20 +74,28 @@ async function waitForServer(url) {
 
 async function auditPage(page) {
   return page.evaluate(() => {
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
     const toggle = document.querySelector('.theme-toggle')
     const heading = document.querySelector('h1')
     const card = document.querySelector('.flip-card')
+    const headline = document.querySelector('.flip-card h2')
     const issues = []
+
+    const collectClipping = (rect, label) => {
+      if (rect.left < -0.5) issues.push(`${label} clipped on the left`)
+      if (rect.top < -0.5) issues.push(`${label} clipped on the top`)
+      if (rect.right > viewportWidth + 0.5) issues.push(`${label} clipped on the right`)
+      if (rect.bottom > viewportHeight + 0.5) issues.push(`${label} clipped on the bottom`)
+      if (rect.width <= 0 || rect.height <= 0) issues.push(`${label} not visible`)
+    }
 
     if (!toggle) issues.push('theme toggle missing')
     if (!heading) issues.push('page heading missing')
+    if (!card) issues.push('feed card missing')
 
     if (toggle) {
-      const rect = toggle.getBoundingClientRect()
-      if (rect.left < -0.5) issues.push('theme toggle clipped on the left')
-      if (rect.top < -0.5) issues.push('theme toggle clipped on the top')
-      if (rect.right > window.innerWidth + 0.5) issues.push('theme toggle clipped on the right')
-      if (rect.bottom > window.innerHeight + 0.5) issues.push('theme toggle clipped on the bottom')
+      collectClipping(toggle.getBoundingClientRect(), 'theme toggle')
 
       const svg = toggle.querySelector('svg')
       if (!svg) {
@@ -113,12 +115,9 @@ async function auditPage(page) {
       }
     }
 
-    if (heading) {
-      const rect = heading.getBoundingClientRect()
-      if (rect.width <= 0 || rect.height <= 0) issues.push('page heading not visible')
-    }
-
-    if (!card) issues.push('feed card missing')
+    if (heading) collectClipping(heading.getBoundingClientRect(), 'page heading')
+    if (card) collectClipping(card.getBoundingClientRect(), 'feed card')
+    if (headline) collectClipping(headline.getBoundingClientRect(), 'feed headline')
 
     return {
       issues,
@@ -155,15 +154,22 @@ async function main() {
           })
         })
 
+        await page.route('https://fonts.googleapis.com/**', async (route) => route.abort())
+        await page.route('https://fonts.gstatic.com/**', async (route) => route.abort())
+
         await page.addInitScript((selectedTheme) => {
           localStorage.setItem('theme', selectedTheme)
           document.documentElement.dataset.theme = selectedTheme
         }, theme)
 
-        await page.goto(baseUrl, { waitUntil: 'networkidle' })
+        await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
         await page.getByText('Plain headline for readers').waitFor({ timeout: 10_000 })
 
         const audit = await auditPage(page)
+        if (audit.theme !== theme) {
+          audit.issues.push(`expected ${theme} theme but got ${audit.theme}`)
+        }
+
         const screenshotPath = path.join(outDir, `${caseId}.png`)
         await page.screenshot({ path: screenshotPath, fullPage: false })
 

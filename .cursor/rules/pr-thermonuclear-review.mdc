@@ -1,0 +1,16 @@
+---
+description: Run thermonuclear review in a loop before marking PR work complete
+alwaysApply: true
+---
+
+# PR thermonuclear review
+
+Before marking a task complete or opening/updating a PR:
+
+1. Run thermonuclear review on the branch diff.
+2. Fix CRITICAL and WARNING findings.
+3. Re-run review and affected tests (`npm test`, and `npm run qa:web` for `web/` changes).
+4. Repeat until no actionable CRITICAL or WARNING items remain.
+5. Summarize the final review outcome in the PR description.
+
+Do not skip review for small diffs or follow-up fixes.

@@ -19,3 +19,13 @@ test('qa:web script is wired in package.json', () => {
   assert.equal(packageJson.scripts['qa:web'], 'node scripts/qa-web-viewports.mjs')
   assert.ok(fs.existsSync(qaScript))
 })
+
+test('AGENTS.md requires thermonuclear review before shipping', () => {
+  assert.match(agents, /thermonuclear review/i)
+})
+
+test('cursor-cloud setup installs root QA tooling', () => {
+  const setup = fs.readFileSync(path.join(rootDir, 'scripts', 'cursor-cloud-setup.sh'), 'utf8')
+  assert.match(setup, /npm --prefix "\$\{ROOT_DIR\}" ci/)
+  assert.match(setup, /playwright install chromium/)
+})

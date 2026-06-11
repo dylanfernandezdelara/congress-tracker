@@ -1,6 +1,7 @@
 ---
 description: Require mobile and desktop viewport QA before shipping web UI PRs
-alwaysApply: true
+globs: web/**
+alwaysApply: false
 ---
 
 # PR viewport QA
