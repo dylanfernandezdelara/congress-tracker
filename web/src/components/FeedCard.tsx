@@ -18,13 +18,13 @@ export function FeedCard({ item }: FeedCardProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
 
   const front = (
-    <div className="dossier-tile space-y-4">
-      <p className="docket-line tabular-nums">{docket}</p>
-      <h2 className="document-title text-2xl font-semibold text-heading">{headline}</h2>
-      <p className="text-base leading-relaxed text-body">{body}</p>
+    <div className="garden-card space-y-4">
+      <p className="garden-meta tabular-nums">{docket}</p>
+      <h2 className="document-title text-2xl text-heading">{headline}</h2>
+      <p className="garden-prose text-base text-body">{body}</p>
 
       {item.digest?.key_points?.length ? (
-        <ul className="list-disc space-y-1 pl-5 text-sm text-body">
+        <ul className="garden-prose list-disc space-y-1 pl-5 text-sm text-body">
           {item.digest.key_points.map((point) => (
             <li key={point}>{point}</li>
           ))}
@@ -34,20 +34,20 @@ export function FeedCard({ item }: FeedCardProps) {
       {item.digest?.terms_explained?.length ? (
         <div className="flex flex-wrap gap-2">
           {item.digest.terms_explained.map((t) => (
-            <span key={t.term} className="term-chip" title={t.plain}>
+            <span key={t.term} className="garden-tag" title={t.plain}>
               {t.term}
             </span>
           ))}
         </div>
       ) : null}
 
-      <div className="space-y-2 border-t border-border/70 pt-4">
+      <div className="space-y-2 border-t border-border pt-4 sm:pt-5">
         {item.passage_votes.map((v) => (
-          <p key={`${v.chamber}-${v.date}-${v.question}`} className="vote-line tabular-nums text-sm">
-            <span className="font-medium text-heading">{v.chamber}</span>
+          <p key={`${v.chamber}-${v.date}-${v.question}`} className="garden-prose tabular-nums text-sm">
+            <span className="font-semibold text-secondary">{v.chamber}</span>
             <span className="text-muted-foreground"> · </span>
             <span className={voteResultClass(v.result)}>{v.result}</span>
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground/80">
               {' '}
               · {v.yeas}–{v.nays} · {formatVoteDate(v.date)}
             </span>
@@ -56,24 +56,22 @@ export function FeedCard({ item }: FeedCardProps) {
       </div>
 
       {item.policy_area ? (
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.policy_area}</p>
+        <p className="garden-meta normal-case tracking-normal opacity-80">{item.policy_area}</p>
       ) : null}
     </div>
   )
 
   const back = (
-    <div className="dossier-tile dossier-back space-y-4">
-      <p className="official-stamp text-xs font-semibold uppercase tracking-[0.24em] text-heading">
-        Official summary
-      </p>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-body">
+    <div className="garden-card garden-card-back space-y-4">
+      <p className="garden-meta">Official summary</p>
+      <blockquote className="garden-prose m-0 whitespace-pre-wrap border-0 p-0 text-sm text-body">
         {item.raw_summary_text ?? 'No official CRS summary on file.'}
-      </p>
+      </blockquote>
       <a
         href={sourceUrl}
         target="_blank"
         rel="noreferrer"
-        className="ink-link text-sm"
+        className="garden-link text-sm"
         onClick={(e) => e.stopPropagation()}
       >
         View on congress.gov ↗

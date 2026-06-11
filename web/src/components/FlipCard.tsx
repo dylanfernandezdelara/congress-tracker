@@ -39,7 +39,7 @@ export function FlipCard({
         <div className="flip-card-face flip-card-front">{front}</div>
         <div className="flip-card-face flip-card-back">{back}</div>
       </div>
-      <p className="mt-3 text-center text-xs text-muted-foreground" aria-hidden="true">
+      <p className="garden-meta mt-4 text-center normal-case tracking-normal sm:mt-5" aria-hidden="true">
         {flipped ? 'Tap to return' : 'Tap card to flip'}
       </p>
     </article>

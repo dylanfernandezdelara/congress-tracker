@@ -8,7 +8,7 @@ const config: Config = {
       center: true,
       padding: '1rem',
       screens: {
-        '2xl': '720px',
+        '2xl': '680px',
       },
     },
     extend: {
@@ -27,10 +27,12 @@ const config: Config = {
         accent: {
           DEFAULT: 'hsl(var(--twc-accent))',
         },
+        secondary: {
+          DEFAULT: 'hsl(var(--twc-secondary))',
+        },
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        serif: ['var(--font-serif)', 'Georgia', 'serif'],
       },
     },
   },
