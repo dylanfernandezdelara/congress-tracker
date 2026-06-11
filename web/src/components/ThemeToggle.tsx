@@ -1,9 +1,24 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark'
 
+const THEME_COLOR: Record<Theme, string> = {
+  light: '#fafafa',
+  dark: '#0a0a0a',
+}
+
 function readTheme(): Theme {
-  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+}
+
+function syncThemeColor(theme: Theme) {
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme])
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme
+  localStorage.setItem('theme', theme)
+  syncThemeColor(theme)
 }
 
 function SunIcon() {
@@ -51,10 +66,13 @@ function MoonIcon() {
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(readTheme)
 
+  useLayoutEffect(() => {
+    syncThemeColor(readTheme())
+  }, [])
+
   const toggle = () => {
     const next: Theme = theme === 'dark' ? 'light' : 'dark'
-    document.documentElement.dataset.theme = next
-    localStorage.setItem('theme', next)
+    applyTheme(next)
     setTheme(next)
   }
 

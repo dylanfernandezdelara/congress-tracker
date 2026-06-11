@@ -4,29 +4,6 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
-    --twc-background: 0 0% 4%;
-    --twc-foreground: 0 0% 93%;
-    --twc-secondary: 0 0% 63%;
-    --twc-faint: 0 0% 45%;
-    --twc-card: 0 0% 7%;
-    --twc-border: 0 0% 100% / 0.08;
-    --twc-border-hover: 0 0% 100% / 0.18;
-    --twc-border-muted: 0 0% 100% / 0.1;
-    --twc-surface-subtle: 0 0% 100% / 0.08;
-    --twc-skeleton: 0 0% 100% / 0.04;
-    --twc-link-decoration: 0 0% 100% / 0.2;
-    --twc-ghost-border: 0 0% 100% / 0.1;
-    --twc-ghost-border-hover: 0 0% 100% / 0.2;
-    --twc-glow: 0 0% 100% / 0.04;
-    --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.35);
-    --twc-accent: 24 90% 58%;
-    --twc-pass: 151 45% 55%;
-    --twc-fail: 0 65% 60%;
-    --font-sans: 'Inter', system-ui, sans-serif;
-  }
-
-  [data-theme='light'] {
     color-scheme: light;
     --twc-background: 0 0% 98%;
     --twc-foreground: 0 0% 9%;
@@ -46,6 +23,29 @@
     --twc-accent: 24 85% 50%;
     --twc-pass: 151 55% 36%;
     --twc-fail: 0 65% 48%;
+    --font-sans: 'Inter', system-ui, sans-serif;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+    --twc-background: 0 0% 4%;
+    --twc-foreground: 0 0% 93%;
+    --twc-secondary: 0 0% 63%;
+    --twc-faint: 0 0% 45%;
+    --twc-card: 0 0% 7%;
+    --twc-border: 0 0% 100% / 0.08;
+    --twc-border-hover: 0 0% 100% / 0.18;
+    --twc-border-muted: 0 0% 100% / 0.1;
+    --twc-surface-subtle: 0 0% 100% / 0.08;
+    --twc-skeleton: 0 0% 100% / 0.04;
+    --twc-link-decoration: 0 0% 100% / 0.2;
+    --twc-ghost-border: 0 0% 100% / 0.1;
+    --twc-ghost-border-hover: 0 0% 100% / 0.2;
+    --twc-glow: 0 0% 100% / 0.04;
+    --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.35);
+    --twc-accent: 24 90% 58%;
+    --twc-pass: 151 45% 55%;
+    --twc-fail: 0 65% 60%;
   }
 
   *,
