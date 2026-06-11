@@ -79,7 +79,7 @@ jobs:
         working-directory: web
 
       - name: Install Playwright Chromium
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Start web dev server
         run: npm run dev -- --host localhost --port 5173 &
