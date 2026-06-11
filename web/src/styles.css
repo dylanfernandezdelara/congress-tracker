@@ -362,19 +362,6 @@
       line-clamp: unset;
     }
 
-    .flip-card-inner {
-      cursor: default;
-    }
-  }
-
-  .flip-card-hint {
-    cursor: pointer;
-    touch-action: manipulation;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    font: inherit;
-    color: inherit;
   }
 
   .congress-link:focus-visible {

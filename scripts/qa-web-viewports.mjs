@@ -135,6 +135,15 @@ async function auditPage(page) {
         window.matchMedia('(max-width: 639px), (pointer: coarse)').matches)
 
     if (touchLayout && card) {
+      if (card.querySelector('.flip-card-hint')) {
+        issues.push('external flip button present on touch layout (card should be tappable)')
+      }
+
+      const inner = card.querySelector('.flip-card-inner')
+      if (inner?.getAttribute('role') !== 'button') {
+        issues.push('flip card is not tappable on touch layout')
+      }
+
       const front = card.querySelector('.flip-card-front .feed-card-surface')
       const flipHint = front?.querySelector('p.pt-4')
       if (front && flipHint) {
