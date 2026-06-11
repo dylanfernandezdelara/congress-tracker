@@ -81,11 +81,10 @@ function capitalizeFirst(text: string): string {
 
 function truncateAtWordBoundary(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
-  const suffix = '…'
-  const slice = text.slice(0, maxLength - suffix.length)
+  const slice = text.slice(0, maxLength)
   const lastSpace = slice.lastIndexOf(' ')
-  if (lastSpace <= 0) return `${slice.trimEnd()}${suffix}`
-  return `${slice.slice(0, lastSpace).trimEnd()}${suffix}`
+  if (lastSpace <= 0) return `${slice.trimEnd()}…`
+  return `${slice.slice(0, lastSpace).trimEnd()}…`
 }
 
 export function proceduralHeadline(title: string): string | null {
