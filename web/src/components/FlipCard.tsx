@@ -32,6 +32,7 @@ export function FlipCard({
   const id = useId()
   const labelledBy = titleId ?? `${id}-title`
   const pointerStart = useRef<{ x: number; y: number; scrollTop?: number } | null>(null)
+  const frontClipRef = useRef<HTMLDivElement>(null)
   const backClipRef = useRef<HTMLDivElement>(null)
 
   const toggle = () => setFlipped((v) => !v)
@@ -60,7 +61,7 @@ export function FlipCard({
   }, [flipped, updateBackScrollEnd])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    const clip = flipped ? backClipRef.current : null
+    const clip = flipped ? backClipRef.current : frontClipRef.current
     pointerStart.current = {
       x: e.clientX,
       y: e.clientY,
@@ -71,7 +72,7 @@ export function FlipCard({
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const start = pointerStart.current
     pointerStart.current = null
-    const endScrollTop = flipped ? backClipRef.current?.scrollTop : undefined
+    const endScrollTop = (flipped ? backClipRef.current : frontClipRef.current)?.scrollTop
     if (
       start &&
       shouldIgnoreFlipClick(
@@ -152,7 +153,7 @@ export function FlipCard({
         aria-pressed={flipped}
         aria-label={flipped ? backLabel : flipLabel}
       >
-        <div className="flip-card-face flip-card-front">
+        <div className="flip-card-face flip-card-front" ref={frontClipRef}>
           <div className="flip-card-content">{front}</div>
         </div>
         <div className="flip-card-face flip-card-back">

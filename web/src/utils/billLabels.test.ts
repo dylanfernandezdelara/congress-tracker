@@ -51,6 +51,16 @@ describe('summaryBodyText', () => {
   it('returns the heading when there is no remainder', () => {
     expect(summaryBodyText('Ukraine Support Act')).toBe('Ukraine Support Act')
   })
+
+  it('keeps long raw summaries without truncation', () => {
+    const paragraph =
+      'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '
+    const raw = `Ukraine Support Act\n\n${paragraph.repeat(5)}`
+    const result = summaryBodyText(raw)
+
+    expect(result).toBe(paragraph.repeat(5).trim())
+    expect(result).not.toMatch(/…$/)
+  })
 })
 
 describe('proceduralHeadline', () => {

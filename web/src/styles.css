@@ -369,6 +369,11 @@
       -webkit-line-clamp: unset;
       line-clamp: unset;
     }
+
+    .flip-card-front .feed-card-surface {
+      height: auto;
+      overflow: visible;
+    }
   }
 
   .congress-link:focus-visible {
