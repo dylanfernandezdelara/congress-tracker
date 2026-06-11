@@ -239,7 +239,13 @@
     grid-area: 1 / 1;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-    transition: visibility 0s 0.28s;
+  }
+
+  .flip-card-content {
+    transform-style: preserve-3d;
+    transition:
+      transform 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .flip-card-front {
@@ -253,6 +259,17 @@
     touch-action: pan-y;
   }
 
+  .flip-card-front .flip-card-content {
+    transform: rotateX(0deg);
+    opacity: 1;
+  }
+
+  .flip-card-inner.is-flipped .flip-card-front .flip-card-content {
+    transform: rotateX(-180deg);
+    opacity: 0;
+    transition-delay: 0s, 0.27s;
+  }
+
   .flip-card-back {
     position: absolute;
     inset: 0;
@@ -261,16 +278,24 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    visibility: hidden;
-    transform: rotateX(180deg);
+    pointer-events: none;
   }
 
   .flip-card-inner.is-flipped .flip-card-back {
-    visibility: visible;
+    pointer-events: auto;
   }
 
-  .flip-card-inner.is-flipped .flip-card-front {
-    visibility: hidden;
+  .flip-card-back .flip-card-content {
+    height: 100%;
+    transform: rotateX(180deg);
+    opacity: 0;
+    transition-delay: 0s, 0.27s;
+  }
+
+  .flip-card-inner.is-flipped .flip-card-back .flip-card-content {
+    transform: rotateX(-180deg);
+    opacity: 1;
+    transition-delay: 0s, 0.27s;
   }
 
   .flip-card-back-clip {

@@ -64,9 +64,13 @@ export function FlipCard({
         aria-pressed={flipped}
         aria-label={flipped ? backLabel : flipLabel}
       >
-        <div className="flip-card-face flip-card-front">{front}</div>
+        <div className="flip-card-face flip-card-front">
+          <div className="flip-card-content">{front}</div>
+        </div>
         <div className="flip-card-face flip-card-back">
-          <div className="flip-card-back-clip">{back}</div>
+          <div className="flip-card-back-clip">
+            <div className="flip-card-content">{back}</div>
+          </div>
         </div>
       </div>
     </article>
