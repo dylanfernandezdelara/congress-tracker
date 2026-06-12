@@ -18,7 +18,7 @@ ${params.rawSummary}
 Return ONLY valid JSON:
 {
   "headline": "8-12 words, no jargon",
-  "what_it_does": "2-3 sentences, max ~35 words, at roughly grade 7-8 reading level",
+  "what_it_does": "2-3 sentences, max ~60 words, at roughly grade 7-8 reading level",
   "key_points": ["max 4 short bullets"],
   "terms_explained": [{ "term": "ACRONYM", "plain": "short plain definition" }]
 }
@@ -27,5 +27,5 @@ Rules:
 - Use only facts from the summary and metadata above. Do not invent context.
 - Replace or define jargon and acronyms for a lay reader.
 - Keep language neutral and concise.
-- Keep "what_it_does" under 35 words so it fits on the card without truncation.`;
+- Keep "what_it_does" under 60 words so it fits on the card without truncation.`;
 }

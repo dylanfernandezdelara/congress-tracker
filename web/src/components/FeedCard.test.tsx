@@ -7,7 +7,7 @@ import { FeedCard } from './FeedCard'
 
 const longDigest =
   'This bill provides a longer generated explanation for readers about funding, oversight, reporting, and assistance programs that should remain fully readable on mobile. '.repeat(
-    3,
+    5,
   )
 
 const longCrsSummary = `Ukraine Support Act

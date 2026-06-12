@@ -41,7 +41,10 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
-export const SUMMARY_PREVIEW_MAX_CHARS = 220
+// Upper bound on the front-of-card preview. The front face still scrolls
+// (see .flip-card-front in styles.css); this only prevents a no-digest bill
+// from rendering its entire multi-paragraph CRS summary as one giant card.
+export const SUMMARY_PREVIEW_MAX_CHARS = 600
 
 export function summaryPreviewText(text: string): string {
   const collapsed = collapseWhitespace(text)

@@ -76,7 +76,7 @@ describe('summaryPreviewText', () => {
   it('caps long text at a word boundary with an ellipsis', () => {
     const long =
       'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(
-        5,
+        7,
       )
     const result = summaryPreviewText(long)
 
