@@ -135,9 +135,36 @@ export function proceduralHeadline(title: string): string | null {
   return `Sets up House debate on ${billId}: ${subject}`
 }
 
+function normalizeVoteResult(result: string): string {
+  return result.toLowerCase()
+}
+
+function voteResultIndicatesFailure(normalized: string): boolean {
+  return (
+    normalized.includes('fail') ||
+    normalized.includes('reject') ||
+    normalized.includes('defeat') ||
+    normalized.includes('disagreed') ||
+    normalized.includes('not agreed')
+  )
+}
+
+function voteResultIndicatesPassage(normalized: string): boolean {
+  if (voteResultIndicatesFailure(normalized)) return false
+  return normalized.includes('pass') || normalized.includes('agreed')
+}
+
+export function billDidNotPass(votes: Array<{ result: string }>): boolean {
+  if (votes.length === 0) return false
+  const normalized = votes.map((v) => normalizeVoteResult(v.result))
+  const anyPassage = normalized.some(voteResultIndicatesPassage)
+  const anyFailure = normalized.some(voteResultIndicatesFailure)
+  return anyFailure && !anyPassage
+}
+
 export function voteResultClass(result: string): string {
-  const r = result.toLowerCase()
-  if (r.includes('fail') || r.includes('reject')) return 'text-fail'
-  if (r.includes('pass') || r.includes('agreed')) return 'text-secondary'
+  const normalized = normalizeVoteResult(result)
+  if (voteResultIndicatesFailure(normalized)) return 'text-fail'
+  if (voteResultIndicatesPassage(normalized)) return 'text-secondary'
   return 'text-faint'
 }

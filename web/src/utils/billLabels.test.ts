@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  billDidNotPass,
   formatBillDocket,
   proceduralHeadline,
   SUMMARY_PREVIEW_MAX_CHARS,
   summaryBodyText,
   summaryPreviewText,
   trimDisplayTitle,
+  voteResultClass,
 } from './billLabels'
 
 describe('formatBillDocket', () => {
@@ -90,6 +92,67 @@ describe('summaryPreviewText', () => {
     const raw = 'Line one.\n\nLine   two   continues here.'
 
     expect(summaryPreviewText(raw)).toBe('Line one. Line two continues here.')
+  })
+})
+
+describe('billDidNotPass', () => {
+  it('returns false for an empty vote list', () => {
+    expect(billDidNotPass([])).toBe(false)
+  })
+
+  it('returns false when a vote passed', () => {
+    expect(billDidNotPass([{ result: 'Passed' }])).toBe(false)
+  })
+
+  it('returns false when a vote was agreed to', () => {
+    expect(billDidNotPass([{ result: 'Agreed to' }])).toBe(false)
+  })
+
+  it('returns true when a vote failed', () => {
+    expect(billDidNotPass([{ result: 'Failed' }])).toBe(true)
+  })
+
+  it('returns true when a Senate bill was defeated', () => {
+    expect(billDidNotPass([{ result: 'Bill Defeated' }])).toBe(true)
+  })
+
+  it('returns true when all votes failed or were rejected', () => {
+    expect(billDidNotPass([{ result: 'Failed' }, { result: 'Rejected' }])).toBe(true)
+  })
+
+  it('returns false when at least one vote passed among mixed results', () => {
+    expect(
+      billDidNotPass([
+        { result: 'Failed' },
+        { result: 'Passed' },
+      ]),
+    ).toBe(false)
+  })
+
+  it('returns false when the result string is blank', () => {
+    expect(billDidNotPass([{ result: '' }])).toBe(false)
+  })
+
+  it('returns false when the result string is unrecognized', () => {
+    expect(billDidNotPass([{ result: 'Cloture Motion' }])).toBe(false)
+  })
+
+  it('returns true when a vote was disagreed to', () => {
+    expect(billDidNotPass([{ result: 'Disagreed to' }])).toBe(true)
+  })
+
+  it('returns true when a vote was not agreed to', () => {
+    expect(billDidNotPass([{ result: 'Not Agreed to' }])).toBe(true)
+  })
+})
+
+describe('voteResultClass', () => {
+  it('marks Senate defeat results as fail', () => {
+    expect(voteResultClass('Bill Defeated')).toBe('text-fail')
+  })
+
+  it('marks disagreed results as fail', () => {
+    expect(voteResultClass('Disagreed to')).toBe('text-fail')
   })
 })
 

@@ -2,6 +2,7 @@ import { useId } from 'react'
 
 import type { FeedItem } from '../api/types'
 import {
+  billDidNotPass,
   congressGovBillUrl,
   formatBillDocket,
   formatVoteDate,
@@ -50,6 +51,7 @@ export function FeedCard({ item }: FeedCardProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const keyPoints = item.digest?.key_points?.slice(0, 3) ?? []
   const policyLabel = isProcedural ? 'Procedural' : item.policy_area
+  const didNotPass = billDidNotPass(item.passage_votes)
 
   const front = (
     <div className="feed-card-surface flex flex-col">
@@ -57,10 +59,19 @@ export function FeedCard({ item }: FeedCardProps) {
         <p className="whitespace-nowrap text-[12px] font-normal uppercase tracking-widest text-faint">
           {docket}
         </p>
-        {policyLabel ? (
-          <span className="rounded-full border border-border-muted px-2 py-0.5 text-[11px] text-secondary">
-            {policyLabel}
-          </span>
+        {didNotPass || policyLabel ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {didNotPass ? (
+              <span className="rounded-full border border-fail/35 px-2 py-0.5 text-[11px] text-fail">
+                Did not pass
+              </span>
+            ) : null}
+            {policyLabel ? (
+              <span className="rounded-full border border-border-muted px-2 py-0.5 text-[11px] text-secondary">
+                {policyLabel}
+              </span>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -80,7 +91,21 @@ export function FeedCard({ item }: FeedCardProps) {
           <div className="space-y-3 border-t border-border pt-4">
             {item.passage_votes.map((v) => (
               <div key={`${v.chamber}-${v.date}-${v.question}`} className="space-y-1.5">
-                <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                <div className="space-y-0.5 text-[13px] sm:hidden">
+                  <p>
+                    <span className="font-medium text-foreground">{v.chamber}</span>
+                  </p>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p>
+                      <span className={voteResultClass(v.result)}>{v.result}</span>{' '}
+                      <span className="text-secondary">
+                        {v.yeas}–{v.nays}
+                      </span>
+                    </p>
+                    <p className="shrink-0 text-faint">{formatVoteDate(v.date)}</p>
+                  </div>
+                </div>
+                <div className="hidden items-baseline justify-between gap-3 text-[13px] sm:flex">
                   <p>
                     <span className="font-medium text-foreground">{v.chamber}</span>{' '}
                     <span className={voteResultClass(v.result)}>{v.result}</span>
@@ -106,7 +131,10 @@ export function FeedCard({ item }: FeedCardProps) {
   const back = (
     <div className="feed-card-surface flex flex-col">
       <div>
-        <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
+        <p className="text-[11px] uppercase tracking-widest text-faint">{docket}</p>
+        <p className="mt-1 text-[11px] uppercase tracking-widest text-faint">
+          Official CRS summary
+        </p>
 
         {isProcedural && item.bill.title ? (
           <p className="mt-2 text-[12px] leading-relaxed text-faint">{item.bill.title}</p>
