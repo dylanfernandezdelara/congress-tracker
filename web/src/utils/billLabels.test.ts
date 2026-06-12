@@ -8,6 +8,7 @@ import {
   summaryBodyText,
   summaryPreviewText,
   trimDisplayTitle,
+  voteResultClass,
 } from './billLabels'
 
 describe('formatBillDocket', () => {
@@ -111,6 +112,10 @@ describe('billDidNotPass', () => {
     expect(billDidNotPass([{ result: 'Failed' }])).toBe(true)
   })
 
+  it('returns true when a Senate bill was defeated', () => {
+    expect(billDidNotPass([{ result: 'Bill Defeated' }])).toBe(true)
+  })
+
   it('returns true when all votes failed or were rejected', () => {
     expect(billDidNotPass([{ result: 'Failed' }, { result: 'Rejected' }])).toBe(true)
   })
@@ -122,6 +127,20 @@ describe('billDidNotPass', () => {
         { result: 'Passed' },
       ]),
     ).toBe(false)
+  })
+
+  it('returns false when the result string is blank', () => {
+    expect(billDidNotPass([{ result: '' }])).toBe(false)
+  })
+
+  it('returns false when the result string is unrecognized', () => {
+    expect(billDidNotPass([{ result: 'Cloture Motion' }])).toBe(false)
+  })
+})
+
+describe('voteResultClass', () => {
+  it('marks Senate defeat results as fail', () => {
+    expect(voteResultClass('Bill Defeated')).toBe('text-fail')
   })
 })
 
