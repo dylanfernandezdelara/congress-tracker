@@ -1,12 +1,15 @@
 {
   "name": "congress-tracker",
   "scripts": {
+    "setup": "./scripts/cursor-cloud-setup.sh",
+    "verify:local": "./scripts/verify-local-env.sh",
+    "seed": "./scripts/seed-local-feed.sh",
     "dev:worker": "npm --prefix workers/senate_data_worker run dev",
     "dev:web": "npm --prefix web run dev",
     "build:web": "npm --prefix web run build",
     "preview": "npm run build:web && npm --prefix workers/senate_data_worker run preview:upload",
     "qa:web": "node scripts/qa-web-viewports.mjs",
-    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/cursor-cloud-setup-contract.test.mjs scripts/qa-web-viewports-contract.test.mjs",
+    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/cursor-cloud-setup-contract.test.mjs scripts/qa-web-viewports-contract.test.mjs scripts/seed-local-feed-contract.test.mjs scripts/verify-local-env-contract.test.mjs",
     "deploy": "npm run build:web && npm --prefix workers/senate_data_worker run deploy",
     "public:check": "./scripts/public-readiness-check.sh",
     "public:scan:tracked-secrets": "./scripts/scan-tracked-secrets.sh",

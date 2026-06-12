@@ -12,18 +12,21 @@ Cloudflare-native app: ingest House + Senate **passage** roll-call votes, join C
 ### Install and setup
 
 ```bash
-./scripts/cursor-cloud-setup.sh
+npm run setup # same as ./scripts/cursor-cloud-setup.sh (Cursor Cloud runs this via .cursor/environment.json)
 ```
 
 Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONGRESS_API_KEY`, `OPENROUTER_API_KEY`, and optionally `OPENROUTER_MODEL`.
 
-`cursor-cloud-setup.sh` also installs root Playwright tooling used by `npm run qa:web`.
+`npm run setup` also installs root Playwright tooling used by `npm run qa:web`.
+
+Local ↔ Cursor Cloud parity: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md). Quick check: `npm run verify:local`. Seed local feed (offline, no keys): `npm run seed`.
 
 ### Local development
 
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
-- Trigger ingestion: `curl -fsS http://127.0.0.1:8787/__pipeline/run/feed`
+- Seed sample feed (offline, no keys): `npm run seed`
+- Trigger live ingestion (needs API keys): `curl -fsS http://127.0.0.1:8787/__pipeline/run/feed`
 - Feed JSON: `http://127.0.0.1:8787/feed/latest.json`
 
 ### Verification

@@ -5,9 +5,9 @@ Cloudflare-native app that surfaces **recent U.S. Congress bills with official p
 ## Developer quick start
 
 ```bash
-./scripts/cursor-cloud-setup.sh
-cp workers/senate_data_worker/.dev.vars.example workers/senate_data_worker/.dev.vars
-# Edit .dev.vars: add CONGRESS_API_KEY and OPENROUTER_API_KEY
+npm run setup        # install deps + Playwright, scaffold .dev.vars
+npm run seed         # offline: fill local D1 with sample bills (no API keys)
+npm run verify:local # optional preflight check
 ```
 
 In separate terminals:
@@ -17,13 +17,18 @@ npm run dev:worker   # http://127.0.0.1:8787
 npm run dev:web      # http://127.0.0.1:5173
 ```
 
-Populate the feed (requires API keys in `.dev.vars`):
+Then open `http://127.0.0.1:5173` for the scrollable flip-card feed — the
+seeded sample bills appear immediately, no keys required.
+
+To pull **real** data instead of the sample, add `CONGRESS_API_KEY` and
+`OPENROUTER_API_KEY` to `workers/senate_data_worker/.dev.vars`, then run live
+ingestion (mirrors the production cron):
 
 ```bash
 curl -fsS http://127.0.0.1:8787/__pipeline/run/feed
 ```
 
-Then open `http://127.0.0.1:5173` for the scrollable flip-card feed.
+Local ↔ Cursor Cloud parity details: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md).
 
 ## Architecture
 
