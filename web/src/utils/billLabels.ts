@@ -135,9 +135,24 @@ export function proceduralHeadline(title: string): string | null {
   return `Sets up House debate on ${billId}: ${subject}`
 }
 
-export function voteResultClass(result: string): string {
+function voteResultIndicatesFailure(result: string): boolean {
   const r = result.toLowerCase()
-  if (r.includes('fail') || r.includes('reject')) return 'text-fail'
-  if (r.includes('pass') || r.includes('agreed')) return 'text-secondary'
+  return r.includes('fail') || r.includes('reject')
+}
+
+function voteResultIndicatesPassage(result: string): boolean {
+  const r = result.toLowerCase()
+  if (voteResultIndicatesFailure(r)) return false
+  return r.includes('pass') || r.includes('agreed')
+}
+
+export function billDidNotPass(votes: Array<{ result: string }>): boolean {
+  if (votes.length === 0) return false
+  return !votes.some((v) => voteResultIndicatesPassage(v.result))
+}
+
+export function voteResultClass(result: string): string {
+  if (voteResultIndicatesFailure(result)) return 'text-fail'
+  if (voteResultIndicatesPassage(result)) return 'text-secondary'
   return 'text-faint'
 }

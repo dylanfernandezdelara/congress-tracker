@@ -81,6 +81,46 @@ describe('FeedCard', () => {
     expect(front?.className).toContain('flip-card-face')
   })
 
+  it('shows a Did not pass pill when all passage votes failed', () => {
+    const { container } = render(
+      <FeedCard
+        item={makeItem({
+          passage_votes: [
+            {
+              chamber: 'Senate',
+              question: 'On Passage of the Bill',
+              result: 'Failed',
+              yeas: 40,
+              nays: 55,
+              date: '2026-06-05',
+            },
+          ],
+        })}
+      />,
+    )
+
+    expect(container.textContent).toContain('Did not pass')
+  })
+
+  it('does not show a Did not pass pill when a passage vote passed', () => {
+    const { container } = render(<FeedCard item={makeItem()} />)
+
+    expect(container.textContent).not.toContain('Did not pass')
+  })
+
+  it('shows the bill docket on the back face', () => {
+    const { container } = render(
+      <FeedCard
+        item={makeItem({
+          bill: { congress: 119, type: 'HR', number: 8428, title: 'Sample Act' },
+        })}
+      />,
+    )
+
+    const back = container.querySelector('.flip-card-back')
+    expect(back?.textContent).toContain('H.R. 8428 · 119th Congress')
+  })
+
   it('caps the raw summary fallback on the front while keeping the full text on the back', () => {
     const { container } = render(
       <FeedCard

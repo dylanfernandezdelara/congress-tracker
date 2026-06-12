@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  billDidNotPass,
   formatBillDocket,
   proceduralHeadline,
   SUMMARY_PREVIEW_MAX_CHARS,
@@ -90,6 +91,37 @@ describe('summaryPreviewText', () => {
     const raw = 'Line one.\n\nLine   two   continues here.'
 
     expect(summaryPreviewText(raw)).toBe('Line one. Line two continues here.')
+  })
+})
+
+describe('billDidNotPass', () => {
+  it('returns false for an empty vote list', () => {
+    expect(billDidNotPass([])).toBe(false)
+  })
+
+  it('returns false when a vote passed', () => {
+    expect(billDidNotPass([{ result: 'Passed' }])).toBe(false)
+  })
+
+  it('returns false when a vote was agreed to', () => {
+    expect(billDidNotPass([{ result: 'Agreed to' }])).toBe(false)
+  })
+
+  it('returns true when a vote failed', () => {
+    expect(billDidNotPass([{ result: 'Failed' }])).toBe(true)
+  })
+
+  it('returns true when all votes failed or were rejected', () => {
+    expect(billDidNotPass([{ result: 'Failed' }, { result: 'Rejected' }])).toBe(true)
+  })
+
+  it('returns false when at least one vote passed among mixed results', () => {
+    expect(
+      billDidNotPass([
+        { result: 'Failed' },
+        { result: 'Passed' },
+      ]),
+    ).toBe(false)
   })
 })
 
