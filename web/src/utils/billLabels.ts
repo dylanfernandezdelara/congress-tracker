@@ -143,7 +143,9 @@ function voteResultIndicatesFailure(normalized: string): boolean {
   return (
     normalized.includes('fail') ||
     normalized.includes('reject') ||
-    normalized.includes('defeat')
+    normalized.includes('defeat') ||
+    normalized.includes('disagreed') ||
+    normalized.includes('not agreed')
   )
 }
 

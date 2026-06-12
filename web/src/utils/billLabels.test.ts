@@ -136,11 +136,23 @@ describe('billDidNotPass', () => {
   it('returns false when the result string is unrecognized', () => {
     expect(billDidNotPass([{ result: 'Cloture Motion' }])).toBe(false)
   })
+
+  it('returns true when a vote was disagreed to', () => {
+    expect(billDidNotPass([{ result: 'Disagreed to' }])).toBe(true)
+  })
+
+  it('returns true when a vote was not agreed to', () => {
+    expect(billDidNotPass([{ result: 'Not Agreed to' }])).toBe(true)
+  })
 })
 
 describe('voteResultClass', () => {
   it('marks Senate defeat results as fail', () => {
     expect(voteResultClass('Bill Defeated')).toBe('text-fail')
+  })
+
+  it('marks disagreed results as fail', () => {
+    expect(voteResultClass('Disagreed to')).toBe('text-fail')
   })
 })
 
