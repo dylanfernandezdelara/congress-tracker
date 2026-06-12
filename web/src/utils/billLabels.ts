@@ -41,6 +41,33 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
+// Upper bound on the front-of-card preview. The front face still scrolls
+// (see .flip-card-front in styles.css); this only prevents a no-digest bill
+// from rendering its entire multi-paragraph CRS summary as one giant card.
+export const SUMMARY_PREVIEW_MAX_CHARS = 600
+
+export function summaryPreviewText(text: string): string {
+  const collapsed = collapseWhitespace(text)
+  if (collapsed.length <= SUMMARY_PREVIEW_MAX_CHARS) {
+    return collapsed
+  }
+
+  const ellipsis = '…'
+  const maxContentLength = SUMMARY_PREVIEW_MAX_CHARS - ellipsis.length
+  const slice = collapsed.slice(0, maxContentLength)
+  const lastSpace = slice.lastIndexOf(' ')
+
+  let truncated: string
+  if (lastSpace <= 0) {
+    truncated = slice.trimEnd()
+  } else {
+    truncated = slice.slice(0, lastSpace).trimEnd()
+  }
+
+  truncated = truncated.replace(/[.,;:]+$/, '').trimEnd()
+  return `${truncated}${ellipsis}`
+}
+
 export function summaryBodyText(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) return trimmed

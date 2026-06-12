@@ -164,12 +164,6 @@ async function auditPage(page) {
           issues.push(`front scroll container overflow-y is "${overflowY}", expected auto or scroll`)
         }
 
-        if (frontScroll.scrollHeight <= frontScroll.clientHeight + 1) {
-          issues.push(
-            `front scroll container does not overflow on touch layout (scrollHeight ${frontScroll.scrollHeight} <= clientHeight ${frontScroll.clientHeight})`,
-          )
-        }
-
         const frontRect = frontScroll.getBoundingClientRect()
         collectHorizontalClipping(frontRect, 'flip card front')
         if (frontRect.bottom <= 0 || frontRect.top >= viewportHeight) {
