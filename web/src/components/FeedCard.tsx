@@ -91,7 +91,21 @@ export function FeedCard({ item }: FeedCardProps) {
           <div className="space-y-3 border-t border-border pt-4">
             {item.passage_votes.map((v) => (
               <div key={`${v.chamber}-${v.date}-${v.question}`} className="space-y-1.5">
-                <div className="flex items-baseline justify-between gap-3 text-[13px] max-sm:flex-col max-sm:items-start max-sm:justify-start max-sm:gap-0.5">
+                <div className="space-y-0.5 text-[13px] sm:hidden">
+                  <p>
+                    <span className="font-medium text-foreground">{v.chamber}</span>
+                  </p>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p>
+                      <span className={voteResultClass(v.result)}>{v.result}</span>{' '}
+                      <span className="text-secondary">
+                        {v.yeas}–{v.nays}
+                      </span>
+                    </p>
+                    <p className="shrink-0 text-faint">{formatVoteDate(v.date)}</p>
+                  </div>
+                </div>
+                <div className="hidden items-baseline justify-between gap-3 text-[13px] sm:flex">
                   <p>
                     <span className="font-medium text-foreground">{v.chamber}</span>{' '}
                     <span className={voteResultClass(v.result)}>{v.result}</span>
