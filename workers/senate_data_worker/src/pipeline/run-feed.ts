@@ -5,7 +5,7 @@ import {
 } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { digestExists, upsertDigest } from "../d1/digests";
+import { getDigest, upsertDigest } from "../d1/digests";
 import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestHousePassageVotes } from "../sources/house-votes";
@@ -55,13 +55,13 @@ export async function runFeedPipeline(env: Env): Promise<RunFeedResult> {
   let newRewrites = 0;
 
   for (const row of bills) {
-    const exists = await digestExists(
+    const existing = await getDigest(
       env.DB,
       row.bill_congress,
       row.bill_type,
       row.bill_number
     );
-    if (exists) {
+    if (existing?.digest_json != null) {
       digestsSkipped += 1;
       continue;
     }
