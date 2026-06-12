@@ -27,6 +27,8 @@ const SCHEMA_STATEMENTS = [
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, number)
 )`,
+  `CREATE INDEX IF NOT EXISTS idx_votes_passage_date ON votes (is_passage, vote_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_votes_bill ON votes (bill_congress, bill_type, bill_number)`,
 ];
 
 let schemaApplied = false;

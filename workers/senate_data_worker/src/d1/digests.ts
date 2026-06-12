@@ -11,22 +11,6 @@ export interface DigestRow {
   digest_json: string | null;
 }
 
-export async function digestExists(
-  db: D1Database,
-  congress: number,
-  billType: string,
-  number: number
-): Promise<boolean> {
-  await ensureSchema(db);
-  const row = await db
-    .prepare(
-      `SELECT 1 FROM bill_digests WHERE congress = ? AND bill_type = ? AND number = ? LIMIT 1`
-    )
-    .bind(congress, billType, number)
-    .first();
-  return row != null;
-}
-
 export async function upsertDigest(
   db: D1Database,
   params: {
