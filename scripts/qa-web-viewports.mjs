@@ -175,6 +175,16 @@ async function auditPage(page) {
         if (frontRect.bottom > viewportHeight + 0.5) {
           issues.push('flip card front clipped on the bottom')
         }
+
+        const congressLink = frontScroll.querySelector('.congress-link')
+        if (congressLink) {
+          collectHorizontalClipping(congressLink.getBoundingClientRect(), 'congress.gov link')
+        }
+
+        const frontFlipHint = frontScroll.querySelector('.flip-card-flip-hint')
+        if (frontFlipHint) {
+          collectHorizontalClipping(frontFlipHint.getBoundingClientRect(), 'flip hint')
+        }
       }
     }
 
