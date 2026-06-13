@@ -121,6 +121,20 @@ describe('FeedCard', () => {
     expect(back?.textContent).toContain('H.R. 8428 · 119th Congress')
   })
 
+  it('shows the congress.gov link on the front face', () => {
+    const { container } = render(<FeedCard item={makeItem()} />)
+
+    const frontLink = container.querySelector('.flip-card-front .congress-link')
+    const backLink = container.querySelector('.flip-card-back .congress-link')
+
+    expect(frontLink).not.toBeNull()
+    expect(frontLink).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/bill/119th-congress/senate-bill/2',
+    )
+    expect(backLink).toBeNull()
+  })
+
   it('caps the raw summary fallback on the front while keeping the full text on the back', () => {
     const { container } = render(
       <FeedCard

@@ -121,9 +121,24 @@ export function FeedCard({ item }: FeedCardProps) {
           </div>
         ) : null}
 
-        <p className="flip-card-flip-hint pt-4 text-right text-[12px] text-secondary">
-          Flip for official text ↺
-        </p>
+        <footer
+          className={`flex items-center justify-between gap-4 pt-4 ${
+            item.passage_votes.length === 0 ? 'border-t border-border' : ''
+          }`}
+        >
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="congress-link shrink-0 whitespace-nowrap text-[13px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Read on congress.gov ↗
+          </a>
+          <p className="flip-card-flip-hint shrink-0 text-right text-[12px] text-secondary">
+            Flip for official text ↺
+          </p>
+        </footer>
       </div>
     </div>
   )
@@ -162,19 +177,8 @@ export function FeedCard({ item }: FeedCardProps) {
         </p>
       </div>
 
-      <footer className="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="congress-link shrink-0 whitespace-nowrap text-[13px]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          Read on congress.gov ↗
-        </a>
-        <span className="hidden shrink-0 text-[12px] text-secondary min-[360px]:inline">
-          Flip back ↺
-        </span>
+      <footer className="mt-4 border-t border-border pt-4 text-right">
+        <span className="text-[12px] text-secondary">Flip back ↺</span>
       </footer>
     </div>
   )
