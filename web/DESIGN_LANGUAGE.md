@@ -27,7 +27,7 @@ Two families only:
 ## Components
 
 - **Feed card** — docket line, serif headline, plain summary, passage vote lines, optional policy tag
-- **Flip card** — front = digestible view; back = official CRS summary + congress.gov link
+- **Flip card** — front = digestible view + congress.gov link; back = official CRS summary
 - **Reduced motion** — cross-fade swap instead of 3D flip
 
 ## Rules

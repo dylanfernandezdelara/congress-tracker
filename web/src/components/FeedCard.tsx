@@ -122,7 +122,7 @@ export function FeedCard({ item }: FeedCardProps) {
         ) : null}
 
         <footer
-          className={`flex items-center justify-between gap-4 pt-4 ${
+          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-4 ${
             item.passage_votes.length === 0 ? 'border-t border-border' : ''
           }`}
         >
@@ -135,7 +135,7 @@ export function FeedCard({ item }: FeedCardProps) {
           >
             Read on congress.gov ↗
           </a>
-          <p className="flip-card-flip-hint shrink-0 text-right text-[12px] text-secondary">
+          <p className="flip-card-flip-hint min-w-0 text-right text-[12px] text-secondary">
             Flip for official text ↺
           </p>
         </footer>
