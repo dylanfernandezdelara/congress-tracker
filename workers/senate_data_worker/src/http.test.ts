@@ -48,6 +48,49 @@ describe("HTTP API", () => {
     expect(body).toEqual([]);
   });
 
+  it("returns session stats", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/session.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      congress: 119,
+      session: 2,
+      house: { passage_vote_count: 0 },
+      senate: { passage_vote_count: 0 },
+    });
+  });
+
+  it("returns pulse stats", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/pulse.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ congress: 119, session: 2, house: { close_votes: [] } });
+  });
+
+  it("requires chamber for defectors", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/defectors.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("returns empty defectors for chamber", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/defectors.json?chamber=House"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ chamber: "House", defectors: [] });
+  });
+
   it("returns 404 for unknown routes when no asset binding is present", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/briefings/latest.json"),

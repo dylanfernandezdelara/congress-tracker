@@ -38,6 +38,35 @@ export async function selectExistingVoteKeys(
   return keys;
 }
 
+export async function selectExistingVoteKeysForSession(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<Set<string>> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT chamber, congress, session, roll_number
+       FROM votes
+       WHERE is_passage = 1 AND congress = ? AND session = ?`
+    )
+    .bind(congress, session)
+    .all<ExistingVoteKeyRow>();
+
+  const keys = new Set<string>();
+  for (const row of results ?? []) {
+    keys.add(
+      voteKey({
+        chamber: row.chamber as PassageVote["chamber"],
+        congress: row.congress,
+        session: row.session,
+        rollNumber: row.roll_number,
+      })
+    );
+  }
+  return keys;
+}
+
 export async function upsertVote(db: D1Database, vote: PassageVote): Promise<void> {
   await ensureSchema(db);
   await db

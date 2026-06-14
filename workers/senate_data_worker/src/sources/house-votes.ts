@@ -62,7 +62,7 @@ function withinLookback(isoDate: string, lookbackStart: string): boolean {
 
 export async function ingestHousePassageVotes(
   env: Env,
-  lookbackStart: string,
+  lookbackStart: string | null,
   knownKeys: ReadonlySet<string> = new Set()
 ): Promise<IngestVotesResult> {
   const apiKey = env.CONGRESS_API_KEY;
@@ -78,7 +78,7 @@ export async function ingestHousePassageVotes(
     const items = data.houseRollCallVotes ?? [];
 
     for (const item of items) {
-      if (!withinLookback(item.startDate, lookbackStart)) continue;
+      if (lookbackStart && !withinLookback(item.startDate, lookbackStart)) continue;
       if (!item.legislationNumber || !item.legislationType) continue;
 
       const key = voteKey({
@@ -120,7 +120,7 @@ export async function ingestHousePassageVotes(
     }
 
     const oldest = items[items.length - 1];
-    if (oldest && !withinLookback(oldest.startDate, lookbackStart)) {
+    if (lookbackStart && oldest && !withinLookback(oldest.startDate, lookbackStart)) {
       break;
     }
 

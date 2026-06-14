@@ -4,11 +4,9 @@ import Home from './routes/Home'
 function App() {
   return (
     <BrowserRouter>
-      <div className="mx-auto min-h-screen w-full max-w-[640px] px-6 py-16 sm:py-20">
-        <Routes>
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="*" element={<Home />} />
+      </Routes>
     </BrowserRouter>
   )
 }

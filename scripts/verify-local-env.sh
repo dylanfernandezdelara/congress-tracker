@@ -73,6 +73,19 @@ else
   status "${WARN}" ".dev.vars missing — run 'npm run setup' (copies the example; offline 'npm run seed' still works)."
 fi
 
+# --- Optional: Cloudflare / Wrangler (preview + remote D1 MCP) ----------------
+if command -v npx >/dev/null 2>&1; then
+  if npx wrangler whoami >/dev/null 2>&1; then
+    status "${PASS}" "Wrangler authenticated (preview / remote D1 ready)"
+  elif [[ -n "${CLOUDFLARE_API_TOKEN:-}" && -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+    status "${PASS}" "Cloudflare API token + account ID set"
+  else
+    status "${WARN}" "Wrangler not authenticated — run 'npx wrangler login' before 'npm run preview' or remote D1 MCP queries."
+  fi
+else
+  status "${WARN}" "npx not found — cannot check Wrangler auth"
+fi
+
 # --- Optional: probe a running worker -------------------------------------
 if command -v curl >/dev/null 2>&1; then
   if curl -fsS --max-time 2 "${WORKER_URL}/health" >/dev/null 2>&1; then

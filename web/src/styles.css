@@ -360,7 +360,7 @@
     }
 
     .flip-card-front {
-      max-height: calc(100dvh - 15rem);
+      max-height: calc(100dvh - 18rem);
     }
 
     .feed-card-surface .line-clamp-3 {
@@ -395,6 +395,56 @@
   .ghost-button:focus-visible {
     outline: 2px solid hsl(var(--twc-accent));
     outline-offset: 2px;
+  }
+
+  .page-grid {
+    display: grid;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  @media (min-width: 1024px) {
+    .page-grid {
+      grid-template-columns: 260px minmax(0, 1fr) 280px;
+      gap: 2rem;
+    }
+  }
+
+  .page-main {
+    max-width: 640px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  @media (min-width: 1024px) {
+    .page-main {
+      max-width: none;
+      margin-inline: 0;
+    }
+  }
+
+  .sidebar-panel {
+    position: sticky;
+    top: 1.5rem;
+  }
+
+  .sidebar-widget + .sidebar-widget {
+    margin-top: 0.25rem;
+  }
+
+  .site-header .text-center {
+    padding-inline: 0.25rem;
+  }
+
+  @media (max-width: 639px) {
+    .page-shell {
+      padding-top: 1.5rem;
+      padding-bottom: 2rem;
+    }
+
+    .site-header {
+      gap: 0.75rem;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
