@@ -32,14 +32,27 @@ export async function getMember(
   db: D1Database,
   bioguideId: string
 ): Promise<MemberRecord | null> {
+  const map = await getMembersByIds(db, [bioguideId]);
+  return map.get(bioguideId) ?? null;
+}
+
+export async function getMembersByIds(
+  db: D1Database,
+  bioguideIds: string[]
+): Promise<Map<string, MemberRecord>> {
   await ensureSchema(db);
-  const row = await db
+  const unique = [...new Set(bioguideIds)];
+  const map = new Map<string, MemberRecord>();
+  if (unique.length === 0) return map;
+
+  const placeholders = unique.map(() => "?").join(", ");
+  const { results } = await db
     .prepare(
       `SELECT bioguide_id, name, chamber, party, state, district
-       FROM members WHERE bioguide_id = ?`
+       FROM members WHERE bioguide_id IN (${placeholders})`
     )
-    .bind(bioguideId)
-    .first<{
+    .bind(...unique)
+    .all<{
       bioguide_id: string;
       name: string;
       chamber: string;
@@ -48,13 +61,16 @@ export async function getMember(
       district: number | null;
     }>();
 
-  if (!row) return null;
-  return {
-    bioguideId: row.bioguide_id,
-    name: row.name,
-    chamber: row.chamber as MemberRecord["chamber"],
-    party: row.party,
-    state: row.state,
-    district: row.district,
-  };
+  for (const row of results ?? []) {
+    map.set(row.bioguide_id, {
+      bioguideId: row.bioguide_id,
+      name: row.name,
+      chamber: row.chamber as MemberRecord["chamber"],
+      party: row.party,
+      state: row.state,
+      district: row.district,
+    });
+  }
+
+  return map;
 }

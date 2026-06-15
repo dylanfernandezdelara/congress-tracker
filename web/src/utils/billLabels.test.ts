@@ -154,6 +154,10 @@ describe('voteResultClass', () => {
   it('marks disagreed results as fail', () => {
     expect(voteResultClass('Disagreed to')).toBe('text-fail')
   })
+
+  it('marks passed results as pass', () => {
+    expect(voteResultClass('Passed')).toBe('text-pass')
+  })
 })
 
 describe('proceduralHeadline', () => {

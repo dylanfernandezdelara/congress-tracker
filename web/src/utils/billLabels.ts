@@ -165,6 +165,6 @@ export function billDidNotPass(votes: Array<{ result: string }>): boolean {
 export function voteResultClass(result: string): string {
   const normalized = normalizeVoteResult(result)
   if (voteResultIndicatesFailure(normalized)) return 'text-fail'
-  if (voteResultIndicatesPassage(normalized)) return 'text-secondary'
+  if (voteResultIndicatesPassage(normalized)) return 'text-pass'
   return 'text-faint'
 }

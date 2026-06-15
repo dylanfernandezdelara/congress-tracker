@@ -51,6 +51,18 @@ function createTestDb(): D1Database {
             ],
           };
         }
+        if (sql.includes("FROM members WHERE bioguide_id IN")) {
+          const members: Record<string, object> = {
+            A001: { bioguide_id: "A001", name: "Alice", chamber: "Senate", party: "D", state: "MA", district: null },
+            A002: { bioguide_id: "A002", name: "Bob", chamber: "Senate", party: "D", state: "NY", district: null },
+            A003: { bioguide_id: "A003", name: "Dana", chamber: "Senate", party: "D", state: "IL", district: null },
+            B001: { bioguide_id: "B001", name: "Carol", chamber: "Senate", party: "R", state: "TX", district: null },
+          };
+          const results = args
+            .map((id) => members[id as string])
+            .filter((row): row is object => row !== undefined);
+          return { results };
+        }
         return { results: [] };
       },
       first: async () => {

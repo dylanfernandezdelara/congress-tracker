@@ -58,11 +58,17 @@ export default function Home() {
   const defectors = useAsyncData<{ house: DefectorEntry[]; senate: DefectorEntry[] }>({
     deps: [retryKey],
     load: async () => {
-      const [house, senate] = await Promise.all([
+      const [houseResult, senateResult] = await Promise.allSettled([
         fetchDefectors('House'),
         fetchDefectors('Senate'),
       ])
-      return { house: house.defectors, senate: senate.defectors }
+      if (houseResult.status === 'rejected' && senateResult.status === 'rejected') {
+        throw houseResult.reason
+      }
+      return {
+        house: houseResult.status === 'fulfilled' ? houseResult.value.defectors : [],
+        senate: senateResult.status === 'fulfilled' ? senateResult.value.defectors : [],
+      }
     },
     mapError: () => "Couldn't load defectors.",
   })
@@ -70,11 +76,22 @@ export default function Home() {
   const portfolios = useAsyncData<{ house: PortfolioMovers; senate: PortfolioMovers }>({
     deps: [retryKey],
     load: async () => {
-      const [house, senate] = await Promise.all([
+      const [houseResult, senateResult] = await Promise.allSettled([
         fetchPortfolioStats('House'),
         fetchPortfolioStats('Senate'),
       ])
-      return { house, senate }
+      if (houseResult.status === 'rejected' && senateResult.status === 'rejected') {
+        throw senateResult.reason
+      }
+      const emptyMovers: PortfolioMovers = {
+        gainers: [],
+        losers: [],
+        disclaimer: 'Estimates from public disclosures.',
+      }
+      return {
+        house: houseResult.status === 'fulfilled' ? houseResult.value : emptyMovers,
+        senate: senateResult.status === 'fulfilled' ? senateResult.value : emptyMovers,
+      }
     },
     mapError: () => "Couldn't load portfolio stats.",
   })

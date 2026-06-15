@@ -12,6 +12,7 @@ import {
   trimDisplayTitle,
   voteResultClass,
 } from '../utils/billLabels'
+import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 import { FlipCard } from './FlipCard'
 
 type FeedCardProps = {
@@ -56,7 +57,7 @@ export function FeedCard({ item }: FeedCardProps) {
   const front = (
     <div className="feed-card-surface flex flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <p className="whitespace-nowrap text-[12px] font-normal uppercase tracking-widest text-faint">
+        <p className="whitespace-nowrap text-[12px] font-normal text-faint">
           {docket}
         </p>
         {didNotPass || policyLabel ? (
@@ -67,7 +68,10 @@ export function FeedCard({ item }: FeedCardProps) {
               </span>
             ) : null}
             {policyLabel ? (
-              <span className="rounded-full border border-border-muted px-2 py-0.5 text-[11px] text-secondary">
+              <span
+                className={policyAreaChipClass(policyLabel)}
+                style={policyAreaChipStyle(policyLabel)}
+              >
                 {policyLabel}
               </span>
             ) : null}
@@ -82,38 +86,26 @@ export function FeedCard({ item }: FeedCardProps) {
         {headline}
       </h2>
 
-      <p className="mb-5 mt-3 line-clamp-3 max-sm:line-clamp-none text-sm leading-relaxed text-secondary">
+      <p className="mt-3 line-clamp-3 max-sm:line-clamp-none text-sm leading-relaxed text-secondary">
         {body}
       </p>
 
-      <div className="mt-auto max-sm:mt-0">
+      <div className="feed-card-footer mt-4 w-full border-t border-border pt-5">
         {item.passage_votes.length > 0 ? (
-          <div className="space-y-3 border-t border-border pt-4">
+          <div className="space-y-3">
             {item.passage_votes.map((v) => (
               <div key={`${v.chamber}-${v.date}-${v.question}`} className="space-y-1.5">
-                <div className="space-y-0.5 text-[13px] sm:hidden">
-                  <p>
-                    <span className="font-medium text-foreground">{v.chamber}</span>
-                  </p>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p>
-                      <span className={voteResultClass(v.result)}>{v.result}</span>{' '}
-                      <span className="text-secondary">
-                        {v.yeas}–{v.nays}
-                      </span>
+                <div className="space-y-0.5">
+                  <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <p className={`font-medium ${voteResultClass(v.result)}`}>{v.result}</p>
+                    <p className="shrink-0 text-secondary">
+                      {v.yeas}–{v.nays}
                     </p>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <p className="font-medium text-foreground">{v.chamber}</p>
                     <p className="shrink-0 text-faint">{formatVoteDate(v.date)}</p>
                   </div>
-                </div>
-                <div className="hidden items-baseline justify-between gap-3 text-[13px] sm:flex">
-                  <p>
-                    <span className="font-medium text-foreground">{v.chamber}</span>{' '}
-                    <span className={voteResultClass(v.result)}>{v.result}</span>
-                  </p>
-                  <p className="shrink-0 text-secondary">
-                    {v.yeas}–{v.nays}
-                    <span className="text-faint"> · {formatVoteDate(v.date)}</span>
-                  </p>
                 </div>
                 <VoteSplitBar yeas={v.yeas} nays={v.nays} />
               </div>
@@ -122,8 +114,8 @@ export function FeedCard({ item }: FeedCardProps) {
         ) : null}
 
         <footer
-          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-4 ${
-            item.passage_votes.length === 0 ? 'border-t border-border' : ''
+          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 ${
+            item.passage_votes.length > 0 ? 'pt-4' : ''
           }`}
         >
           <a
@@ -146,7 +138,7 @@ export function FeedCard({ item }: FeedCardProps) {
   const back = (
     <div className="feed-card-surface flex flex-col">
       <div>
-        <p className="text-[11px] uppercase tracking-widest text-faint">{docket}</p>
+        <p className="text-[11px] text-faint">{docket}</p>
         <p className="mt-1 text-[11px] uppercase tracking-widest text-faint">
           Official CRS summary
         </p>

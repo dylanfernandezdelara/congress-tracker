@@ -11,7 +11,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"],
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "../../shared/**/*.ts"],
   "exclude": ["node_modules"]
 }
 

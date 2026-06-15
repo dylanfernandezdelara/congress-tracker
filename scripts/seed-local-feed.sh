@@ -124,30 +124,30 @@ VALUES
    '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO members (bioguide_id, name, chamber, party, state, district, updated_at) VALUES
-  ('H001', 'Rep. Sample Crossover (local)', 'House', 'D', 'CA', 12, '${D_RECENT}T00:00:00.000Z'),
-  ('H002', 'Rep. Sample Loyal (local)', 'House', 'D', 'NY', 10, '${D_RECENT}T00:00:00.000Z'),
-  ('LIS:S001', 'Sen. Sample Crossover (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
-  ('LIS:S002', 'Sen. Sample Loyal (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
-  ('H003', 'Rep. Portfolio Gainer (local)', 'House', 'D', 'CA', NULL, '${D_RECENT}T00:00:00.000Z'),
-  ('H004', 'Rep. Portfolio Loser (local)', 'House', 'R', 'SC', NULL, '${D_RECENT}T00:00:00.000Z');
+  ('LOCAL:H001', 'Rep. Sample Crossover (local)', 'House', 'D', 'CA', 12, '${D_RECENT}T00:00:00.000Z'),
+  ('LOCAL:H002', 'Rep. Sample Loyal (local)', 'House', 'D', 'NY', 10, '${D_RECENT}T00:00:00.000Z'),
+  ('LOCAL:S001', 'Sen. Sample Crossover (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
+  ('LOCAL:S002', 'Sen. Sample Loyal (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
+  ('LOCAL:H003', 'Rep. Portfolio Gainer (local)', 'House', 'D', 'CA', NULL, '${D_RECENT}T00:00:00.000Z'),
+  ('LOCAL:H004', 'Rep. Portfolio Loser (local)', 'House', 'R', 'SC', NULL, '${D_RECENT}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO member_votes (chamber, congress, session, roll_number, bioguide_id, position) VALUES
-  ('House', 119, 2, 9001, 'H001', 'Nay'),
-  ('House', 119, 2, 9001, 'H002', 'Yea'),
-  ('House', 119, 2, 9003, 'H001', 'Nay'),
-  ('House', 119, 2, 9003, 'H002', 'Yea'),
-  ('Senate', 119, 2, 9002, 'LIS:S001', 'Nay'),
-  ('Senate', 119, 2, 9002, 'LIS:S002', 'Yea');
+  ('House', 119, 2, 9001, 'LOCAL:H001', 'Nay'),
+  ('House', 119, 2, 9001, 'LOCAL:H002', 'Yea'),
+  ('House', 119, 2, 9003, 'LOCAL:H001', 'Nay'),
+  ('House', 119, 2, 9003, 'LOCAL:H002', 'Yea'),
+  ('Senate', 119, 2, 9002, 'LOCAL:S001', 'Nay'),
+  ('Senate', 119, 2, 9002, 'LOCAL:S002', 'Yea');
 
 INSERT INTO financial_transactions (bioguide_id, ticker, asset_description, transaction_type, amount_min, amount_max, transaction_date, filed_date) VALUES
-  ('H003', 'NVDA', 'NVDA common stock', 'purchase', 50000, 100000, '${D_RECENT}', '${D_RECENT}'),
-  ('H004', 'BA', 'BA common stock', 'sale', 1000, 15000, '${D_RECENT}', '${D_RECENT}');
+  ('LOCAL:H003', 'NVDA', 'NVDA common stock', 'purchase', 50000, 100000, '${D_RECENT}', '${D_RECENT}'),
+  ('LOCAL:H004', 'BA', 'BA common stock', 'sale', 1000, 15000, '${D_RECENT}', '${D_RECENT}');
 
 INSERT OR REPLACE INTO portfolio_snapshots (bioguide_id, as_of_date, estimated_value_usd, session_return_pct) VALUES
-  ('H003', '${D_RECENT}', 250000, 18.6),
-  ('H004', '${D_RECENT}', 80000, -4.1),
-  ('LIS:S001', '${D_MID}', 120000, 6.2),
-  ('LIS:S002', '${D_MID}', 95000, -2.5);
+  ('LOCAL:H003', '${D_RECENT}', 250000, 18.6),
+  ('LOCAL:H004', '${D_RECENT}', 80000, -4.1),
+  ('LOCAL:S001', '${D_MID}', 120000, 6.2),
+  ('LOCAL:S002', '${D_MID}', 95000, -2.5);
 SQL
 
 if [[ "${SEED_PRINT_SQL:-}" == "1" ]]; then

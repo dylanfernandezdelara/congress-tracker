@@ -11,6 +11,8 @@ export interface Env {
   CONGRESS: string;
   SESSION: string;
   ALLOWED_ORIGIN?: string;
+  /** Local dev only: set to 1 in .dev.vars to allow synthetic disclosure seeding. */
+  ENABLE_SAMPLE_DISCLOSURES?: string;
   CONGRESS_API_KEY: string;
   OPENROUTER_API_KEY: string;
   OPENROUTER_MODEL?: string;

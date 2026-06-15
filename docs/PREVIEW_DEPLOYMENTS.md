@@ -10,7 +10,7 @@ The React app (`web/`) is bundled into the existing Worker
 (`congress-tracker-api`) using [Workers static assets](https://developers.cloudflare.com/workers/static-assets/):
 
 - Static files (`/`, `/assets/*`) are served directly from `web/dist`.
-- API paths (`/health`, `/feed/*`, `/__pipeline/*`) fall through to the Worker.
+- API paths (`/health`, `/feed/*`, `/stats/*`, `/__pipeline/*`) fall through to the Worker.
 - Unknown navigations return the SPA shell (`index.html`) via
   `not_found_handling = "single-page-application"`.
 
@@ -84,6 +84,13 @@ Use this only if you want browser-openable previews without involving the agent.
   and cannot be triggered without it. Preview versions inherit production
   secrets; set the same secret (or a separate preview-only token) if you need
   to call the route from a preview URL.
+- Additional admin routes (`session-backfill`, `member-votes`) also write to the
+  shared D1 binding. Run them after deploy if you want sidebar member spotlights
+  on a preview (cron still runs feed only). See `AGENTS.md` for the backfill
+  sequence.
+- `/__pipeline/run/disclosures` is local-dev only (`ENABLE_SAMPLE_DISCLOSURES=1`
+  and `ALLOWED_ORIGIN=*` in `.dev.vars`). Do not enable on production or preview
+  Workers — preview D1 is the same database as production.
 - Preview URLs are public on `workers.dev`. To restrict them, use
   [Cloudflare Access on preview URLs](https://developers.cloudflare.com/workers/configuration/previews/#manage-access-to-preview-urls).
 - Cron triggers only fire on the deployed production version, not on preview

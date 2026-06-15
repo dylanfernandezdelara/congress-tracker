@@ -100,6 +100,40 @@
     color: hsl(var(--twc-fail));
   }
 
+  .policy-chip {
+    --policy-chip-fg: hsl(var(--policy-h, 0) 48% 34%);
+    --policy-chip-bg: hsl(var(--policy-h, 0) 72% 93%);
+    --policy-chip-border: hsl(var(--policy-h, 0) 42% 76%);
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid var(--policy-chip-border);
+    padding: 0.125rem 0.5rem;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--policy-chip-fg);
+    background-color: var(--policy-chip-bg);
+  }
+
+  [data-theme='dark'] .policy-chip {
+    --policy-chip-fg: hsl(var(--policy-h, 0) 58% 78%);
+    --policy-chip-bg: hsl(var(--policy-h, 0) 32% 16%);
+    --policy-chip-border: hsl(var(--policy-h, 0) 28% 28%);
+  }
+
+  .policy-chip-neutral {
+    --policy-chip-fg: hsl(var(--twc-secondary));
+    --policy-chip-bg: hsl(var(--twc-surface-subtle) / 0.35);
+    --policy-chip-border: hsl(var(--twc-border-muted));
+  }
+
+  [data-theme='dark'] .policy-chip-neutral {
+    --policy-chip-fg: hsl(var(--twc-secondary));
+    --policy-chip-bg: hsl(var(--twc-surface-subtle) / 0.5);
+    --policy-chip-border: hsl(var(--twc-border-muted));
+  }
+
   .feed-card-surface {
     @apply h-full overflow-hidden rounded-xl border bg-card p-6 sm:p-7;
     border-color: hsl(var(--twc-border));
@@ -215,7 +249,7 @@
   .flip-card-inner {
     display: grid;
     position: relative;
-    min-height: 280px;
+    min-height: 0;
     cursor: pointer;
     touch-action: manipulation;
     transition:
@@ -401,11 +435,28 @@
     display: grid;
     gap: 1.5rem;
     align-items: start;
+    grid-template-areas:
+      'main'
+      'members'
+      'pulse';
+  }
+
+  .page-sidebar-left {
+    grid-area: members;
+  }
+
+  .page-main {
+    grid-area: main;
+  }
+
+  .page-sidebar-right {
+    grid-area: pulse;
   }
 
   @media (min-width: 1024px) {
     .page-grid {
       grid-template-columns: 260px minmax(0, 1fr) 280px;
+      grid-template-areas: 'members main pulse';
       gap: 2rem;
     }
   }
@@ -424,16 +475,113 @@
   }
 
   .sidebar-panel {
-    position: sticky;
-    top: 1.5rem;
+    position: static;
+  }
+
+  @media (min-width: 1024px) {
+    .sidebar-panel {
+      position: sticky;
+      top: 1.5rem;
+    }
+  }
+
+  .sidebar-coverage {
+    margin-bottom: 0.25rem;
+  }
+
+  .sidebar-disclaimer {
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .member-spotlight-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 0.75rem;
+  }
+
+  .member-spotlight {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .member-spotlight-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .member-spotlight-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+
+  .member-spotlight-party {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .member-spotlight-hook {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--secondary);
+  }
+
+  .member-spotlight-empty {
+    margin: 0.75rem 0 0;
+    font-size: 0.75rem;
+    color: var(--faint);
   }
 
   .sidebar-widget + .sidebar-widget {
     margin-top: 0.25rem;
   }
 
-  .site-header .text-center {
-    padding-inline: 0.25rem;
+  .site-header {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.25rem;
+    text-align: center;
+  }
+
+  .site-header .theme-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .site-header-title {
+    margin: 0;
+    max-width: 20ch;
+    font-size: clamp(1.625rem, 4.5vw, 2.25rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--foreground);
+  }
+
+  .site-header-meta {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--faint);
+  }
+
+  .site-header-rule {
+    width: 100%;
+    margin-top: 0.75rem;
   }
 
   @media (max-width: 639px) {
@@ -443,7 +591,11 @@
     }
 
     .site-header {
-      gap: 0.75rem;
+      gap: 0.4rem;
+    }
+
+    .site-header-title {
+      padding-inline: 2.5rem;
     }
   }
 

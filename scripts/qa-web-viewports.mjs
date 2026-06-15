@@ -82,6 +82,7 @@ async function auditPage(page) {
     const viewportHeight = window.innerHeight
     const toggle = document.querySelector('.theme-toggle')
     const heading = document.querySelector('h1')
+    const membersSidebar = document.querySelector('[aria-label="Members in Congress"]')
     const card = document.querySelector('.flip-card')
     const headline = document.querySelector('.flip-card h2')
     const issues = []
@@ -100,6 +101,7 @@ async function auditPage(page) {
 
     if (!toggle) issues.push('theme toggle missing')
     if (!heading) issues.push('page heading missing')
+    if (!membersSidebar) issues.push('members sidebar missing')
     if (!card) issues.push('feed card missing')
 
     if (toggle) {

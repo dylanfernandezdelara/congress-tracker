@@ -44,6 +44,29 @@ function parseChamber(value: string | null): Chamber | null {
   return null;
 }
 
+function parseStatsLimit(url: URL, fallback = 5): number {
+  return Math.min(
+    20,
+    Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? String(fallback), 10) || fallback)
+  );
+}
+
+async function handleStatsJson(
+  json: (body: unknown, init?: ResponseInit) => Response,
+  load: () => Promise<unknown>,
+  errorMessage: string
+): Promise<Response> {
+  try {
+    return json(await load(), {
+      status: 200,
+      headers: { "Cache-Control": cacheLatest },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : errorMessage;
+    return json({ error: "stats_error", message }, { status: 500 });
+  }
+}
+
 async function handlePipelineRoute(
   request: Request,
   env: Env,
@@ -123,29 +146,25 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   const asOf = new Date().toISOString();
 
   if (pathname === "/stats/session.json") {
-    try {
-      const stats = await buildSessionStats(env.DB, congress, session);
-      return json(
-        { congress, session, ...stats, as_of: asOf },
-        { status: 200, headers: { "Cache-Control": cacheLatest } }
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "session stats unavailable";
-      return json({ error: "stats_error", message }, { status: 500 });
-    }
+    return handleStatsJson(
+      json,
+      async () => {
+        const stats = await buildSessionStats(env.DB, congress, session);
+        return { congress, session, ...stats, as_of: asOf };
+      },
+      "session stats unavailable"
+    );
   }
 
   if (pathname === "/stats/pulse.json") {
-    try {
-      const pulse = await buildPulseStats(env.DB, congress, session);
-      return json(
-        { congress, session, ...pulse, as_of: asOf },
-        { status: 200, headers: { "Cache-Control": cacheLatest } }
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "pulse stats unavailable";
-      return json({ error: "stats_error", message }, { status: 500 });
-    }
+    return handleStatsJson(
+      json,
+      async () => {
+        const pulse = await buildPulseStats(env.DB, congress, session);
+        return { congress, session, ...pulse, as_of: asOf };
+      },
+      "pulse stats unavailable"
+    );
   }
 
   if (pathname === "/stats/defectors.json") {
@@ -153,17 +172,15 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     if (!chamber) {
       return json({ error: "bad_request", message: "chamber must be House or Senate" }, { status: 400 });
     }
-    const limit = Math.min(20, Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "5", 10) || 5));
-    try {
-      const defectors = await computeDefectors(env.DB, congress, session, chamber, limit);
-      return json(
-        { chamber, congress, session, defectors, as_of: asOf },
-        { status: 200, headers: { "Cache-Control": cacheLatest } }
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "defectors unavailable";
-      return json({ error: "stats_error", message }, { status: 500 });
-    }
+    const limit = parseStatsLimit(url);
+    return handleStatsJson(
+      json,
+      async () => {
+        const defectors = await computeDefectors(env.DB, congress, session, chamber, limit);
+        return { chamber, congress, session, defectors, as_of: asOf };
+      },
+      "defectors unavailable"
+    );
   }
 
   if (pathname === "/stats/portfolios.json") {
@@ -171,17 +188,15 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     if (!chamber) {
       return json({ error: "bad_request", message: "chamber must be House or Senate" }, { status: 400 });
     }
-    const limit = Math.min(20, Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "5", 10) || 5));
-    try {
-      const movers = await buildPortfolioMovers(env.DB, chamber, limit);
-      return json(
-        { chamber, congress, session, ...movers, as_of: asOf },
-        { status: 200, headers: { "Cache-Control": cacheLatest } }
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "portfolio stats unavailable";
-      return json({ error: "stats_error", message }, { status: 500 });
-    }
+    const limit = parseStatsLimit(url);
+    return handleStatsJson(
+      json,
+      async () => {
+        const movers = await buildPortfolioMovers(env.DB, chamber, limit);
+        return { chamber, congress, session, ...movers, as_of: asOf };
+      },
+      "portfolio stats unavailable"
+    );
   }
 
   if (env.ASSETS && !isApiPath(pathname)) {

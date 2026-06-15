@@ -1,40 +1,17 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import {
+  clearSampleDisclosureRows,
   insertFinancialTransaction,
   upsertPortfolioSnapshot,
 } from "../d1/disclosures";
 import { upsertMember } from "../d1/members";
 
-/** Synthetic disclosure rows for dev until PTR ingestion is wired. Never use real bioguide IDs. */
+/** Matches LOCAL:* portfolio movers in scripts/seed-local-feed.sh — never use real bioguide IDs. */
 const SAMPLE_DISCLOSURES = [
   {
-    bioguideId: "LOCAL:S001",
-    name: "Sample Senator A (local disclosure)",
-    chamber: "Senate" as const,
-    party: "D",
-    state: "MA",
-    ticker: "MSFT",
-    transactionType: "purchase",
-    amountMin: 1000,
-    amountMax: 15000,
-    returnPct: 12.4,
-  },
-  {
-    bioguideId: "LOCAL:S002",
-    name: "Sample Senator B (local disclosure)",
-    chamber: "Senate" as const,
-    party: "R",
-    state: "FL",
-    ticker: "XOM",
-    transactionType: "sale",
-    amountMin: 15000,
-    amountMax: 50000,
-    returnPct: -8.2,
-  },
-  {
-    bioguideId: "LOCAL:H001",
-    name: "Sample Representative A (local disclosure)",
+    bioguideId: "LOCAL:H003",
+    name: "Rep. Portfolio Gainer (local)",
     chamber: "House" as const,
     party: "D",
     state: "CA",
@@ -45,8 +22,8 @@ const SAMPLE_DISCLOSURES = [
     returnPct: 18.6,
   },
   {
-    bioguideId: "LOCAL:H002",
-    name: "Sample Representative B (local disclosure)",
+    bioguideId: "LOCAL:H004",
+    name: "Rep. Portfolio Loser (local)",
     chamber: "House" as const,
     party: "R",
     state: "SC",
@@ -56,6 +33,30 @@ const SAMPLE_DISCLOSURES = [
     amountMax: 15000,
     returnPct: -4.1,
   },
+  {
+    bioguideId: "LOCAL:S001",
+    name: "Sen. Sample Crossover (local)",
+    chamber: "Senate" as const,
+    party: "R",
+    state: "TX",
+    ticker: "MSFT",
+    transactionType: "purchase",
+    amountMin: 1000,
+    amountMax: 15000,
+    returnPct: 6.2,
+  },
+  {
+    bioguideId: "LOCAL:S002",
+    name: "Sen. Sample Loyal (local)",
+    chamber: "Senate" as const,
+    party: "R",
+    state: "TX",
+    ticker: "XOM",
+    transactionType: "sale",
+    amountMin: 15000,
+    amountMax: 50000,
+    returnPct: -2.5,
+  },
 ];
 
 export interface RunDisclosuresResult {
@@ -64,13 +65,31 @@ export interface RunDisclosuresResult {
   snapshotsUpserted: number;
 }
 
+function isSampleDisclosuresEnabled(env: Env): boolean {
+  const flag = env.ENABLE_SAMPLE_DISCLOSURES?.trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+}
+
 export async function runDisclosuresPipeline(env: Env): Promise<RunDisclosuresResult> {
+  if (!isSampleDisclosuresEnabled(env)) {
+    throw new Error(
+      "Synthetic disclosures pipeline is disabled (set ENABLE_SAMPLE_DISCLOSURES=1 in .dev.vars for local dev only)"
+    );
+  }
+  if (env.ALLOWED_ORIGIN?.trim() !== "*") {
+    throw new Error(
+      "Synthetic disclosures pipeline is local-dev only (set ALLOWED_ORIGIN=* in .dev.vars)"
+    );
+  }
+
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const asOf = new Date().toISOString().slice(0, 10);
   let membersSeeded = 0;
   let transactionsInserted = 0;
   let snapshotsUpserted = 0;
+
+  await clearSampleDisclosureRows(env.DB);
 
   for (const sample of SAMPLE_DISCLOSURES) {
     await upsertMember(env.DB, {

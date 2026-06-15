@@ -1,5 +1,5 @@
 import type { Chamber, DefectorEntry } from "../types";
-import { getMember } from "../d1/members";
+import { getMembersByIds } from "../d1/members";
 import { selectMemberVotesForSession } from "../d1/member-votes";
 
 const YEA_POSITIONS = new Set(["Yea", "Aye", "Yes"]);
@@ -51,15 +51,19 @@ export async function computeDefectors(
   const rows = await selectMemberVotesForSession(db, congress, session, chamber);
   if (rows.length === 0) return [];
 
+  const uniqueIds = [...new Set(rows.map((row) => row.bioguide_id))];
+  const memberRows = await getMembersByIds(db, uniqueIds);
   const members = new Map<string, { party: string | null; state: string | null; name: string }>();
-  for (const row of rows) {
-    if (!members.has(row.bioguide_id)) {
-      const m = await getMember(db, row.bioguide_id);
-      members.set(row.bioguide_id, {
-        party: m?.party ?? null,
-        state: m?.state ?? null,
-        name: m?.name ?? row.bioguide_id,
-      });
+  for (const [bioguideId, record] of memberRows) {
+    members.set(bioguideId, {
+      party: record.party,
+      state: record.state,
+      name: record.name,
+    });
+  }
+  for (const bioguideId of uniqueIds) {
+    if (!members.has(bioguideId)) {
+      members.set(bioguideId, { party: null, state: null, name: bioguideId });
     }
   }
 

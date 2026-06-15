@@ -1,9 +1,11 @@
-import type { PortfolioEntry, PortfolioMovers } from "../types";
+import type { Chamber, PortfolioEntry, PortfolioMovers } from "../types";
 import { ensureSchema } from "./schema";
-import { getMember } from "./members";
 
 const DISCLAIMER =
   "Estimates from public STOCK Act disclosures; amounts are reported in ranges and filings may lag by weeks.";
+
+const SAMPLE_DISCLAIMER =
+  "Local sample portfolio estimates for development only; not real disclosure data.";
 
 export interface FinancialTransaction {
   bioguideId: string;
@@ -62,19 +64,22 @@ export async function upsertPortfolioSnapshot(
 
 interface SnapshotRow {
   bioguide_id: string;
+  name: string;
+  party: string | null;
+  state: string | null;
   session_return_pct: number;
   as_of_date: string;
 }
 
 export async function buildPortfolioMovers(
   db: D1Database,
-  chamber: string,
+  chamber: Chamber,
   limit: number
 ): Promise<PortfolioMovers> {
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT ps.bioguide_id, ps.session_return_pct, ps.as_of_date
+      `SELECT ps.bioguide_id, m.name, m.party, m.state, ps.session_return_pct, ps.as_of_date
        FROM portfolio_snapshots ps
        JOIN members m ON m.bioguide_id = ps.bioguide_id
        WHERE m.chamber = ?
@@ -90,18 +95,14 @@ export async function buildPortfolioMovers(
     }
   }
 
-  const entries: PortfolioEntry[] = [];
-  for (const row of latestByMember.values()) {
-    const member = await getMember(db, row.bioguide_id);
-    entries.push({
-      bioguide_id: row.bioguide_id,
-      name: member?.name ?? row.bioguide_id,
-      party: member?.party ?? null,
-      state: member?.state ?? null,
-      session_return_pct: row.session_return_pct,
-      as_of_date: row.as_of_date,
-    });
-  }
+  const entries: PortfolioEntry[] = [...latestByMember.values()].map((row) => ({
+    bioguide_id: row.bioguide_id,
+    name: row.name,
+    party: row.party,
+    state: row.state,
+    session_return_pct: row.session_return_pct,
+    as_of_date: row.as_of_date,
+  }));
 
   const sorted = [...entries].sort((a, b) => b.session_return_pct - a.session_return_pct);
   const gainers = sorted.filter((e) => e.session_return_pct > 0).slice(0, limit);
@@ -110,5 +111,22 @@ export async function buildPortfolioMovers(
     .sort((a, b) => a.session_return_pct - b.session_return_pct)
     .slice(0, limit);
 
-  return { gainers, losers, disclaimer: DISCLAIMER };
+  const hasSampleOnly =
+    entries.length > 0 && entries.every((entry) => entry.bioguide_id.startsWith("LOCAL:"));
+
+  return {
+    gainers,
+    losers,
+    disclaimer: hasSampleOnly ? SAMPLE_DISCLAIMER : DISCLAIMER,
+  };
+}
+
+export async function clearSampleDisclosureRows(db: D1Database): Promise<void> {
+  await ensureSchema(db);
+  await db
+    .prepare(`DELETE FROM financial_transactions WHERE bioguide_id LIKE 'LOCAL:%'`)
+    .run();
+  await db
+    .prepare(`DELETE FROM portfolio_snapshots WHERE bioguide_id LIKE 'LOCAL:%'`)
+    .run();
 }
