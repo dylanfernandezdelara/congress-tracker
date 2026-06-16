@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Congress Tracker — Impact First (Direction C)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: hsl(0 0% 98%);
+      --fg: hsl(0 0% 9%);
+      --secondary: hsl(0 0% 38%);
+      --faint: hsl(0 0% 56%);
+      --card: hsl(0 0% 100%);
+      --border: hsl(0 0% 0% / 0.08);
+      --border-hover: hsl(0 0% 0% / 0.16);
+      --accent: hsl(24 85% 50%);
+      --accent-soft: hsl(24 85% 50% / 0.12);
+      --pass: hsl(151 55% 36%);
+      --pass-soft: hsl(151 55% 36% / 0.12);
+      --fail: hsl(0 65% 48%);
+      --fail-soft: hsl(0 65% 48% / 0.1);
+      --muted-soft: hsl(0 0% 50% / 0.1);
+      --shadow: 0 4px 24px rgb(0 0 0 / 0.08);
+      --radius-card: 18px;
+      --radius-pill: 999px;
+      --max-width: 720px;
+      --glow: radial-gradient(ellipse 80% 50% at 50% -20%, hsl(24 85% 50% / 0.08), transparent);
+    }
+
+    [data-theme="dark"] {
+      --bg: hsl(0 0% 4%);
+      --fg: hsl(0 0% 93%);
+      --secondary: hsl(0 0% 63%);
+      --faint: hsl(0 0% 45%);
+      --card: hsl(0 0% 7%);
+      --border: hsl(0 0% 100% / 0.08);
+      --border-hover: hsl(0 0% 100% / 0.18);
+      --accent: hsl(24 90% 58%);
+      --accent-soft: hsl(24 90% 58% / 0.15);
+      --pass: hsl(151 45% 55%);
+      --pass-soft: hsl(151 45% 55% / 0.14);
+      --fail: hsl(0 65% 60%);
+      --fail-soft: hsl(0 65% 60% / 0.12);
+      --muted-soft: hsl(0 0% 60% / 0.12);
+      --shadow: 0 4px 24px rgb(0 0 0 / 0.35);
+      --glow: radial-gradient(ellipse 80% 50% at 50% -20%, hsl(24 90% 58% / 0.12), transparent);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      background-image: var(--glow);
+      background-repeat: no-repeat;
+      color: var(--fg);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+    .page {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 1rem 1rem 3rem;
+    }
+
+    @media (min-width: 390px) {
+      .page { padding: 1.25rem 1.25rem 4rem; }
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.8125rem;
+      color: var(--faint);
+      text-decoration: none;
+      margin-bottom: 1.25rem;
+    }
+    .back-link:hover { color: var(--secondary); }
+
+    /* Header */
+    .hero {
+      margin-bottom: 1.75rem;
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(1.375rem, 4vw, 1.75rem);
+      font-weight: 700;
+      line-height: 1.2;
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-date {
+      font-size: 0.8125rem;
+      color: var(--faint);
+      margin: 0;
+    }
+
+    .hero-summary {
+      font-size: 0.9375rem;
+      color: var(--secondary);
+      margin: 0.75rem 0 0;
+      line-height: 1.55;
+    }
+
+    .theme-toggle {
+      flex-shrink: 0;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--fg);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.125rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .theme-toggle:hover { border-color: var(--border-hover); }
+    .theme-toggle:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Filters */
+    .filters {
+      margin-top: 1.25rem;
+    }
+
+    .filters-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--faint);
+      margin: 0 0 0.5rem;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .filter-chip {
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--secondary);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .filter-chip:hover { border-color: var(--border-hover); }
+    .filter-chip[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    .filter-chip:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .filter-count {
+      font-size: 0.8125rem;
+      color: var(--faint);
+      margin: 0.6rem 0 0;
+    }
+
+    /* Feed */
+    .feed {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .impact-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      transition: border-color 0.15s;
+    }
+    @media (min-width: 390px) {
+      .impact-card { padding: 1.5rem; }
+    }
+    .impact-card:hover { border-color: var(--border-hover); }
+    .impact-card.is-muted {
+      opacity: 0.92;
+      border-style: dashed;
+    }
+
+    .impact-headline {
+      font-size: clamp(1.125rem, 3.5vw, 1.375rem);
+      font-weight: 600;
+      line-height: 1.35;
+      margin: 0 0 0.85rem;
+      letter-spacing: -0.01em;
+    }
+    .impact-card.is-muted .impact-headline {
+      color: var(--secondary);
+      font-weight: 500;
+    }
+    .stayed-label {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--faint);
+      background: var(--muted-soft);
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-pill);
+      margin-bottom: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .affects-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .affect-tag {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.3rem 0.65rem;
+      border-radius: var(--radius-pill);
+      line-height: 1.3;
+    }
+    .affect-tag--health { background: hsl(200 70% 45% / 0.14); color: hsl(200 55% 38%); }
+    .affect-tag--veterans { background: hsl(260 50% 50% / 0.14); color: hsl(260 45% 42%); }
+    .affect-tag--students { background: hsl(220 70% 50% / 0.14); color: hsl(220 55% 42%); }
+    .affect-tag--safety { background: hsl(30 70% 45% / 0.14); color: hsl(30 60% 38%); }
+    .affect-tag--disaster { background: hsl(180 50% 40% / 0.14); color: hsl(180 45% 32%); }
+    .affect-tag--money { background: hsl(151 45% 40% / 0.14); color: hsl(151 40% 32%); }
+    .affect-tag--default { background: var(--accent-soft); color: var(--accent); }
+    [data-theme="dark"] .affect-tag--health { color: hsl(200 60% 72%); }
+    [data-theme="dark"] .affect-tag--veterans { color: hsl(260 50% 75%); }
+    [data-theme="dark"] .affect-tag--students { color: hsl(220 60% 75%); }
+    [data-theme="dark"] .affect-tag--safety { color: hsl(30 70% 72%); }
+    [data-theme="dark"] .affect-tag--disaster { color: hsl(180 45% 68%); }
+    [data-theme="dark"] .affect-tag--money { color: hsl(151 45% 68%); }
+
+    .meta-line {
+      font-size: 0.8125rem;
+      color: var(--faint);
+      margin: 0 0 0.5rem;
+      line-height: 1.45;
+    }
+    .meta-line strong {
+      color: var(--secondary);
+      font-weight: 500;
+    }
+
+    .vote-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.5rem;
+      font-size: 0.8125rem;
+      margin-bottom: 1rem;
+    }
+    .vote-chamber { font-weight: 600; color: var(--secondary); }
+    .vote-result { font-weight: 500; }
+    .vote-result--pass { color: var(--pass); }
+    .vote-result--fail { color: var(--faint); }
+    .vote-counts {
+      font-variant-numeric: tabular-nums;
+      color: var(--faint);
+    }
+    .vote-margin {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-pill);
+      background: var(--muted-soft);
+      color: var(--faint);
+    }
+    .vote-margin--close {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* Expandable */
+    .details-toggle {
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--accent);
+      background: none;
+      border: none;
+      padding: 0.25rem 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+    }
+    .details-toggle:hover { text-decoration: underline; }
+    .details-toggle:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .details-toggle .chevron {
+      display: inline-block;
+      transition: transform 0.2s;
+      font-size: 0.7rem;
+    }
+    .details-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+
+    .details-panel {
+      font-size: 0.875rem;
+      color: var(--secondary);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+      padding: 0.85rem 1rem;
+      background: var(--bg);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .details-panel[hidden] { display: none; }
+    .details-panel p { margin: 0 0 0.75rem; }
+    .details-panel ul {
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+    .details-panel li { margin-bottom: 0.35rem; }
+    .details-panel li:last-child { margin-bottom: 0; }
+
+    /* Actions */
+    .card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+      padding-top: 0.25rem;
+      border-top: 1px solid var(--border);
+      margin-top: 0.25rem;
+      padding-top: 1rem;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.6rem 1.1rem;
+      border-radius: var(--radius-pill);
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { opacity: 0.92; }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--border-hover); }
+
+    .btn-quiet {
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--faint);
+      background: none;
+      border: none;
+      padding: 0.5rem 0.25rem;
+      cursor: pointer;
+      text-decoration: none;
+      margin-left: auto;
+    }
+    .btn-quiet:hover { color: var(--accent); }
+    .btn-quiet:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    /* Elections CTA */
+    .elections-cta {
+      background: var(--accent-soft);
+      border: 1px solid hsl(24 85% 50% / 0.25);
+      border-radius: var(--radius-card);
+      padding: 1.25rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    @media (min-width: 390px) {
+      .elections-cta { padding: 1.5rem; }
+    }
+    [data-theme="dark"] .elections-cta {
+      border-color: hsl(24 90% 58% / 0.3);
+    }
+
+    .elections-cta h2 {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      margin: 0 0 0.35rem;
+      color: var(--fg);
+    }
+    .elections-cta .elections-sub {
+      font-size: 0.875rem;
+      color: var(--secondary);
+      margin: 0 0 1rem;
+    }
+
+    .election-list {
+      list-style: none;
+      margin: 0 0 1rem;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .election-item {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.25rem 0.75rem;
+      font-size: 0.875rem;
+      padding: 0.65rem 0.85rem;
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .election-title { font-weight: 600; color: var(--fg); }
+    .election-meta { font-size: 0.8125rem; color: var(--faint); }
+
+    /* Dialog */
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgb(0 0 0 / 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 100;
+    }
+    .dialog-backdrop[hidden] { display: none; }
+
+    .dialog {
+      background: var(--card);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      width: 100%;
+      max-width: 400px;
+      padding: 1.5rem;
+    }
+    .dialog h2 {
+      font-size: 1.125rem;
+      margin: 0 0 0.35rem;
+    }
+    .dialog p {
+      font-size: 0.875rem;
+      color: var(--secondary);
+      margin: 0 0 1.25rem;
+    }
+    .dialog-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .dialog-actions .btn { width: 100%; text-align: center; }
+    .dialog-close {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      width: 2rem;
+      height: 2rem;
+      border: none;
+      background: none;
+      color: var(--faint);
+      font-size: 1.25rem;
+      cursor: pointer;
+      border-radius: var(--radius-pill);
+    }
+    .dialog-close:hover { color: var(--fg); }
+    .dialog-close:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .dialog-wrap { position: relative; }
+
+    .empty-state {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--faint);
+      font-size: 0.9375rem;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <a href="./index.html" class="back-link">← All directions</a>
+
+    <header class="hero">
+      <div class="hero-top">
+        <div>
+          <h1>How yesterday's votes touch your life</h1>
+          <p class="hero-date" id="hero-date"></p>
+        </div>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">
+          <span id="theme-icon" aria-hidden="true">☀️</span>
+        </button>
+      </div>
+      <p class="hero-summary" id="hero-summary"></p>
+
+      <div class="filters">
+        <p class="filters-label">Filter by life area</p>
+        <div class="filter-row" id="filter-chips" role="group" aria-label="Life area filters"></div>
+        <p class="filter-count" id="filter-count" aria-live="polite"></p>
+      </div>
+    </header>
+
+    <main class="feed" id="feed" aria-label="Impact feed"></main>
+  </div>
+
+  <div class="dialog-backdrop" id="share-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="share-title">
+    <div class="dialog-wrap">
+      <div class="dialog">
+        <button type="button" class="dialog-close" id="dialog-close" aria-label="Close dialog">×</button>
+        <h2 id="share-title">Share this vote</h2>
+        <p id="share-preview"></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-primary" id="btn-copy-link">Copy link</button>
+          <button type="button" class="btn btn-secondary" id="btn-text-friend">Text a friend</button>
+          <button type="button" class="btn btn-secondary" id="btn-email">Email</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DATA = {
+      "asOf": "2026-06-16T11:00:00-04:00",
+      "summary": {
+        "passedYesterday": 5,
+        "closeVotes": 2,
+        "house": 3,
+        "senate": 2
+      },
+      "feed": [
+        {
+          "bill": { "congress": 119, "type": "S", "number": 1582, "title": "A bill to cap monthly out-of-pocket insulin costs and require Medicare price negotiation for high-cost drugs." },
+          "policy_area": "Health",
+          "affects": ["People with diabetes", "Medicare seniors", "Insurers"],
+          "impact": "If you use insulin, your monthly cost would be capped at $35 starting next year.",
+          "digest": {
+            "headline": "Senate caps insulin at $35 a month for most insured patients",
+            "what_it_does": "Limits what insured patients pay for insulin to $35 per month and directs Medicare to negotiate prices on a list of the most expensive drugs. Costs above the cap are absorbed by insurers and manufacturers rather than patients.",
+            "key_points": [
+              "Caps insulin out-of-pocket cost at $35/month for people with insurance",
+              "Requires Medicare to negotiate prices on the 20 highest-cost drugs",
+              "Penalizes manufacturers that raise prices faster than inflation"
+            ],
+            "terms_explained": [
+              { "term": "Out-of-pocket cost", "plain": "The amount you pay yourself, after insurance pays its share." },
+              { "term": "Price negotiation", "plain": "The government bargaining directly with drug makers to lower the price it pays." }
+            ]
+          },
+          "raw_summary_text": "This Act caps cost-sharing for a covered insulin product at $35 per month for plan years beginning on or after January 1, 2027. It further directs the Secretary to identify negotiation-eligible drugs and to publish maximum fair prices. Manufacturers exceeding the inflation benchmark are subject to rebates payable to the Treasury.",
+          "passage_votes": [
+            { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Passed", "yeas": 51, "nays": 49, "date": "2026-06-15", "margin": 1, "marginLabel": "Squeaker" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 4321, "title": "To authorize additional border security personnel, technology, and asylum processing capacity." },
+          "policy_area": "Immigration",
+          "affects": ["Border communities", "Asylum seekers", "CBP officers"],
+          "impact": "Adds funding for faster asylum decisions and more border staff; no direct change to your taxes.",
+          "digest": {
+            "headline": "House narrowly funds more border agents and faster asylum processing",
+            "what_it_does": "Authorizes hiring thousands of additional border and asylum officers, funds surveillance technology, and sets deadlines for processing asylum claims. It does not change who qualifies for asylum.",
+            "key_points": [
+              "Funds ~5,000 new border and asylum personnel",
+              "Sets a 180-day target to decide asylum claims",
+              "Adds sensor and camera technology along the southern border"
+            ],
+            "terms_explained": [
+              { "term": "Asylum", "plain": "Protection given to people who can't safely return to their home country." }
+            ]
+          },
+          "raw_summary_text": "This bill authorizes appropriations for U.S. Customs and Border Protection to increase staffing levels and deploy detection technology. It establishes adjudication timelines for credible-fear and asylum determinations and requires quarterly reporting to Congress.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 219, "nays": 211, "date": "2026-06-15", "margin": 8, "marginLabel": "Close" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 2811, "title": "To expand telehealth access for veterans in rural areas." },
+          "policy_area": "Armed Forces and National Security",
+          "affects": ["Rural veterans", "VA clinicians"],
+          "impact": "If you're a veteran far from a VA clinic, more visits could happen by video.",
+          "digest": {
+            "headline": "Veterans gain permanent telehealth access in a near-unanimous vote",
+            "what_it_does": "Makes permanent the VA's authority to provide care by video and phone across state lines, and funds broadband stipends for veterans in rural areas.",
+            "key_points": [
+              "Permanently authorizes cross-state VA telehealth",
+              "Funds connectivity stipends for rural veterans",
+              "Requires the VA to report on wait times"
+            ],
+            "terms_explained": [
+              { "term": "Telehealth", "plain": "Seeing a doctor by video or phone instead of in person." }
+            ]
+          },
+          "raw_summary_text": "This Act permanently authorizes the Department of Veterans Affairs to furnish hospital care and medical services through telehealth regardless of the locations of the provider or veteran, and authorizes a grant program for connectivity.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 415, "nays": 10, "date": "2026-06-15", "margin": 405, "marginLabel": "Lopsided" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "S", "number": 870, "title": "To reduce interest rates on federal student loans and pause accrual during hardship." },
+          "policy_area": "Education",
+          "affects": ["Student borrowers", "Recent graduates"],
+          "impact": "This one failed — federal student loan interest rules stay as they are for now.",
+          "digest": {
+            "headline": "Student-loan interest relief falls two votes short in the Senate",
+            "what_it_does": "Would have lowered interest rates on new federal student loans and paused interest during documented financial hardship. The measure did not pass.",
+            "key_points": [
+              "Proposed lower fixed rates on new federal loans",
+              "Would pause interest accrual during hardship deferment",
+              "Failed 48-52; no change takes effect"
+            ],
+            "terms_explained": [
+              { "term": "Interest accrual", "plain": "Interest piling up on what you owe, even while payments are paused." }
+            ]
+          },
+          "raw_summary_text": "This bill would have amended the Higher Education Act to reduce interest rates and suspend interest accrual during periods of qualifying economic hardship. The motion failed to achieve passage.",
+          "passage_votes": [
+            { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Did not pass", "yeas": 48, "nays": 52, "date": "2026-06-15", "margin": 2, "marginLabel": "Squeaker" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 99, "title": "Making supplemental appropriations for disaster recovery and rebuilding." },
+          "policy_area": "Emergency Management",
+          "affects": ["Disaster-hit homeowners", "FEMA", "State governments"],
+          "impact": "Releases rebuilding money to recent disaster areas; helps if your county was federally declared.",
+          "digest": {
+            "headline": "House approves $24B in disaster recovery funding",
+            "what_it_does": "Provides supplemental funding for FEMA disaster relief, low-interest rebuilding loans, and grants to states recovering from recent hurricanes and wildfires.",
+            "key_points": [
+              "$24B in supplemental disaster relief",
+              "Expands low-interest rebuilding loans for homeowners",
+              "Sends block grants to hard-hit states"
+            ],
+            "terms_explained": [
+              { "term": "Supplemental appropriation", "plain": "Extra money approved outside the normal yearly budget." }
+            ]
+          },
+          "raw_summary_text": "This Act makes supplemental appropriations for the Disaster Relief Fund and authorizes the Small Business Administration to issue disaster loans. Funds remain available until expended.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 300, "nays": 120, "date": "2026-06-14", "margin": 180, "marginLabel": "Comfortable" }
+          ],
+          "latest_passage_date": "2026-06-14"
+        }
+      ],
+      "upcomingElections": [
+        { "title": "OH-06 Special Election (House)", "date": "2026-07-21", "daysAway": 35, "registerBy": "2026-06-22" },
+        { "title": "Statewide Primary", "date": "2026-08-04", "daysAway": 49, "registerBy": "2026-07-06" }
+      ]
+    };
+
+    const LIFE_AREAS = ['All', 'Health', 'Money', 'Veterans', 'Students', 'Safety/Immigration', 'Disaster'];
+
+    const POLICY_TO_BUCKET = {
+      'Health': 'Health',
+      'Immigration': 'Safety/Immigration',
+      'Armed Forces and National Security': 'Veterans',
+      'Education': 'Students',
+      'Emergency Management': 'Disaster'
+    };
+
+    const AFFECT_HINTS = {
+      'Health': ['diabetes', 'medicare', 'insulin', 'health', 'medical', 'insurer'],
+      'Money': ['loan', 'interest', 'tax', 'cost', 'borrower', 'graduate'],
+      'Veterans': ['veteran', 'va '],
+      'Students': ['student', 'graduate', 'borrower'],
+      'Safety/Immigration': ['border', 'asylum', 'cbp', 'immigration'],
+      'Disaster': ['disaster', 'fema', 'homeowner']
+    };
+
+    const MARGIN_LABELS = {
+      'Squeaker': 'razor-thin',
+      'Close': 'close',
+      'Comfortable': 'comfortable',
+      'Lopsided': 'lopsided'
+    };
+
+    const TAG_TONES = {
+      'Health': 'health',
+      'Veterans': 'veterans',
+      'Students': 'students',
+      'Safety/Immigration': 'safety',
+      'Disaster': 'disaster',
+      'Money': 'money'
+    };
+
+    let activeFilters = new Set(['All']);
+    let shareTarget = null;
+
+    function getItemBuckets(item) {
+      const buckets = new Set();
+      const policyBucket = POLICY_TO_BUCKET[item.policy_area];
+      if (policyBucket) buckets.add(policyBucket);
+
+      const haystack = [
+        item.policy_area,
+        ...(item.affects || []),
+        item.impact,
+        item.digest?.headline || ''
+      ].join(' ').toLowerCase();
+
+      for (const [bucket, hints] of Object.entries(AFFECT_HINTS)) {
+        if (hints.some(h => haystack.includes(h))) buckets.add(bucket);
+      }
+      return buckets;
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+
+    function formatShortDate(iso) {
+      const d = new Date(iso + 'T12:00:00');
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function docket(bill) {
+      return `${bill.type} ${bill.number} · ${bill.congress}th Congress`;
+    }
+
+    function isFailed(item) {
+      const vote = item.passage_votes?.[0];
+      return vote && vote.result === 'Did not pass';
+    }
+
+    function displayImpact(item) {
+      if (!isFailed(item)) return item.impact;
+      const cleaned = item.impact
+        .replace(/^this one failed\s*[—–-]\s*/i, '')
+        .replace(/\.$/, '');
+      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1) + (cleaned.endsWith('.') ? '' : '.');
+    }
+
+    function marginClass(label) {
+      return (label === 'Squeaker' || label === 'Close') ? 'vote-margin--close' : '';
+    }
+
+    function tagTone(item) {
+      const buckets = getItemBuckets(item);
+      for (const b of buckets) {
+        if (TAG_TONES[b]) return TAG_TONES[b];
+      }
+      return 'default';
+    }
+
+    function itemMatchesFilter(item) {
+      if (activeFilters.has('All')) return true;
+      const buckets = getItemBuckets(item);
+      for (const f of activeFilters) {
+        if (buckets.has(f)) return true;
+      }
+      return false;
+    }
+
+    function buildSummaryLine() {
+      const s = DATA.summary;
+      return `${s.passedYesterday} bills passed yesterday (${s.house} House, ${s.senate} Senate) — ${s.closeVotes} were decided by a handful of votes.`;
+    }
+
+    function renderVoteLine(vote) {
+      const passed = vote.result === 'Passed';
+      const marginText = MARGIN_LABELS[vote.marginLabel] || vote.marginLabel.toLowerCase();
+      const resultClass = passed ? 'vote-result--pass' : 'vote-result--fail';
+      const resultText = passed ? 'Passed' : 'Did not pass';
+      return `
+        <span class="vote-chamber">${vote.chamber}</span>
+        <span class="vote-result ${resultClass}">· ${resultText}</span>
+        <span class="vote-counts" aria-label="Yeas ${vote.yeas}, nays ${vote.nays}">${vote.yeas}–${vote.nays}</span>
+        <span class="vote-margin ${marginClass(vote.marginLabel)}">· ${marginText}</span>
+      `;
+    }
+
+    function renderImpactCard(item, index) {
+      const vote = item.passage_votes[0];
+      const failed = isFailed(item);
+      const buckets = [...getItemBuckets(item)].filter(b => b !== 'All').join(' ');
+
+      const affectTags = (item.affects || []).map(a =>
+        `<span class="affect-tag affect-tag--${tagTone(item)}">${escapeHtml(a)}</span>`
+      ).join('');
+
+      const keyPoints = (item.digest.key_points || [])
+        .map(kp => `<li>${escapeHtml(kp)}</li>`).join('');
+
+      return `
+        <article class="impact-card${failed ? ' is-muted' : ''}"
+                 data-index="${index}"
+                 data-buckets="${escapeHtml(buckets)}"
+                 aria-labelledby="impact-${index}">
+          ${failed ? '<span class="stayed-label">Stayed the same</span>' : ''}
+          <h2 class="impact-headline" id="impact-${index}">
+            ${escapeHtml(failed ? displayImpact(item) : item.impact)}
+          </h2>
+          <div class="affects-row" aria-label="Who this touches">${affectTags}</div>
+          <p class="meta-line">
+            <strong>${escapeHtml(item.digest.headline)}</strong> · ${escapeHtml(docket(item.bill))}
+          </p>
+          <div class="vote-line" role="group" aria-label="Vote result">
+            ${renderVoteLine(vote)}
+          </div>
+          <button type="button"
+                  class="details-toggle"
+                  aria-expanded="false"
+                  aria-controls="details-${index}"
+                  data-details="${index}">
+            <span class="chevron" aria-hidden="true">▶</span>
+            Why this matters / details
+          </button>
+          <div class="details-panel" id="details-${index}" hidden>
+            <p>${escapeHtml(item.digest.what_it_does)}</p>
+            ${keyPoints ? `<ul>${keyPoints}</ul>` : ''}
+          </div>
+          <div class="card-actions">
+            <button type="button" class="btn btn-primary btn-share" data-share="${index}">Share this</button>
+            <button type="button" class="btn btn-secondary btn-rep" data-rep="${index}">Tell your rep</button>
+            <a href="#" class="btn-quiet" data-source="${index}" rel="noopener noreferrer">Read source ↗</a>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderElectionsCta() {
+      const count = DATA.upcomingElections.length;
+      const items = DATA.upcomingElections.map(e => `
+        <li class="election-item">
+          <span class="election-title">${escapeHtml(e.title)}</span>
+          <span class="election-meta">Vote ${formatShortDate(e.date)} · Register by ${formatShortDate(e.registerBy)}</span>
+        </li>
+      `).join('');
+
+      return `
+        <aside class="elections-cta" aria-labelledby="elections-heading">
+          <h2 id="elections-heading">You can vote in ${count} upcoming elections</h2>
+          <p class="elections-sub">Registration deadlines are coming up — mark your calendar.</p>
+          <ul class="election-list">${items}</ul>
+          <button type="button" class="btn btn-primary" id="btn-reminders">Get reminders</button>
+        </aside>
+      `;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function renderFilters() {
+      const container = document.getElementById('filter-chips');
+      container.innerHTML = LIFE_AREAS.map(area => `
+        <button type="button"
+                class="filter-chip"
+                data-filter="${area}"
+                aria-pressed="${activeFilters.has(area) ? 'true' : 'false'}">${area}</button>
+      `).join('');
+    }
+
+    function updateFilterCount(visible) {
+      const total = DATA.feed.length;
+      const label = visible === total
+        ? `Showing all ${total} votes`
+        : `Showing ${visible} of ${total} votes`;
+      document.getElementById('filter-count').textContent = label;
+    }
+
+    function renderFeed() {
+      const feed = document.getElementById('feed');
+      const fragments = [];
+      let visible = 0;
+      let cardCount = 0;
+
+      DATA.feed.forEach((item, index) => {
+        if (!itemMatchesFilter(item)) return;
+        visible++;
+        fragments.push(renderImpactCard(item, index));
+        cardCount++;
+        if (cardCount === 2) {
+          fragments.push(renderElectionsCta());
+        }
+      });
+
+      if (visible === 0) {
+        feed.innerHTML = '<p class="empty-state">No votes match these filters. Try selecting a different life area.</p>';
+      } else {
+        feed.innerHTML = fragments.join('');
+        if (cardCount < 2) {
+          feed.insertAdjacentHTML('beforeend', renderElectionsCta());
+        }
+        bindCardEvents();
+        bindElectionEvents();
+      }
+      updateFilterCount(visible);
+    }
+
+    function bindCardEvents() {
+      document.querySelectorAll('.details-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const expanded = btn.getAttribute('aria-expanded') === 'true';
+          const panel = document.getElementById(btn.getAttribute('aria-controls'));
+          btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+          panel.hidden = expanded;
+        });
+      });
+
+      document.querySelectorAll('.btn-share').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.share, 10);
+          openShareDialog(DATA.feed[idx]);
+        });
+      });
+
+      document.querySelectorAll('.btn-rep').forEach(btn => {
+        btn.addEventListener('click', () => {
+          alert('In the real app, this would open your representative\'s contact page based on your address.');
+        });
+      });
+
+      document.querySelectorAll('[data-source]').forEach(link => {
+        link.addEventListener('click', e => {
+          e.preventDefault();
+          alert('In the real app, this would link to Congress.gov for the full bill text.');
+        });
+      });
+    }
+
+    function bindElectionEvents() {
+      const btn = document.getElementById('btn-reminders');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          alert('Reminder signup would open here — email or calendar integration.');
+        });
+      }
+    }
+
+    function openShareDialog(item) {
+      shareTarget = item;
+      const preview = isFailed(item)
+        ? `Stayed the same: ${displayImpact(item)}`
+        : item.impact;
+      document.getElementById('share-preview').textContent = preview;
+      const dialog = document.getElementById('share-dialog');
+      dialog.hidden = false;
+      document.getElementById('btn-copy-link').focus();
+    }
+
+    function closeShareDialog() {
+      document.getElementById('share-dialog').hidden = true;
+      shareTarget = null;
+    }
+
+    function initTheme() {
+      const stored = localStorage.getItem('ct-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = stored || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+      updateThemeIcon(theme);
+    }
+
+    function updateThemeIcon(theme) {
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '🌙' : '☀️';
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('ct-theme', next);
+      updateThemeIcon(next);
+    }
+
+    function init() {
+      document.getElementById('hero-date').textContent = formatDate(DATA.asOf);
+      document.getElementById('hero-summary').textContent = buildSummaryLine();
+
+      initTheme();
+      renderFilters();
+      renderFeed();
+
+      document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+      document.getElementById('filter-chips').addEventListener('click', e => {
+        const chip = e.target.closest('.filter-chip');
+        if (!chip) return;
+        const area = chip.dataset.filter;
+
+        if (area === 'All') {
+          activeFilters = new Set(['All']);
+        } else {
+          activeFilters.delete('All');
+          if (activeFilters.has(area)) {
+            activeFilters.delete(area);
+            if (activeFilters.size === 0) activeFilters.add('All');
+          } else {
+            activeFilters.add(area);
+          }
+        }
+
+        renderFilters();
+        renderFeed();
+      });
+
+      document.getElementById('dialog-close').addEventListener('click', closeShareDialog);
+      document.getElementById('share-dialog').addEventListener('click', e => {
+        if (e.target.id === 'share-dialog') closeShareDialog();
+      });
+
+      document.getElementById('btn-copy-link').addEventListener('click', () => {
+        const text = shareTarget
+          ? `Congress Tracker: ${isFailed(shareTarget) ? 'Stayed the same — ' : ''}${shareTarget.digest.headline}`
+          : '';
+        navigator.clipboard?.writeText(text).then(() => {
+          alert('Link copied to clipboard (stub).');
+        }).catch(() => alert('Copy link (stub): ' + text));
+      });
+
+      document.getElementById('btn-text-friend').addEventListener('click', () => {
+        alert('Would open your phone\'s SMS app with a pre-filled message.');
+      });
+
+      document.getElementById('btn-email').addEventListener('click', () => {
+        alert('Would open your email client with a pre-filled subject and body.');
+      });
+
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !document.getElementById('share-dialog').hidden) {
+          closeShareDialog();
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

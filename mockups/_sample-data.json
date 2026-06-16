@@ -1,0 +1,132 @@
+{
+  "_comment": "Canonical sample feed for UI mockups. Fields mirror the real FeedItem model (bill, policy_area, digest{headline,what_it_does,key_points,terms_explained}, raw_summary_text, passage_votes[], latest_passage_date) PLUS exploratory fields the redesign may want: affects[] (groups touched), impact (one-line 'what changes for a person'), margin + marginLabel (close-vote signal). Inline this data into each mockup so files open via file://.",
+  "asOf": "2026-06-16T11:00:00-04:00",
+  "summary": {
+    "passedYesterday": 5,
+    "closeVotes": 2,
+    "house": 3,
+    "senate": 2
+  },
+  "feed": [
+    {
+      "bill": { "congress": 119, "type": "S", "number": 1582, "title": "A bill to cap monthly out-of-pocket insulin costs and require Medicare price negotiation for high-cost drugs." },
+      "policy_area": "Health",
+      "affects": ["People with diabetes", "Medicare seniors", "Insurers"],
+      "impact": "If you use insulin, your monthly cost would be capped at $35 starting next year.",
+      "digest": {
+        "headline": "Senate caps insulin at $35 a month for most insured patients",
+        "what_it_does": "Limits what insured patients pay for insulin to $35 per month and directs Medicare to negotiate prices on a list of the most expensive drugs. Costs above the cap are absorbed by insurers and manufacturers rather than patients.",
+        "key_points": [
+          "Caps insulin out-of-pocket cost at $35/month for people with insurance",
+          "Requires Medicare to negotiate prices on the 20 highest-cost drugs",
+          "Penalizes manufacturers that raise prices faster than inflation"
+        ],
+        "terms_explained": [
+          { "term": "Out-of-pocket cost", "plain": "The amount you pay yourself, after insurance pays its share." },
+          { "term": "Price negotiation", "plain": "The government bargaining directly with drug makers to lower the price it pays." }
+        ]
+      },
+      "raw_summary_text": "This Act caps cost-sharing for a covered insulin product at $35 per month for plan years beginning on or after January 1, 2027. It further directs the Secretary to identify negotiation-eligible drugs and to publish maximum fair prices. Manufacturers exceeding the inflation benchmark are subject to rebates payable to the Treasury.",
+      "passage_votes": [
+        { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Passed", "yeas": 51, "nays": 49, "date": "2026-06-15", "margin": 1, "marginLabel": "Squeaker" }
+      ],
+      "latest_passage_date": "2026-06-15"
+    },
+    {
+      "bill": { "congress": 119, "type": "HR", "number": 4321, "title": "To authorize additional border security personnel, technology, and asylum processing capacity." },
+      "policy_area": "Immigration",
+      "affects": ["Border communities", "Asylum seekers", "CBP officers"],
+      "impact": "Adds funding for faster asylum decisions and more border staff; no direct change to your taxes.",
+      "digest": {
+        "headline": "House narrowly funds more border agents and faster asylum processing",
+        "what_it_does": "Authorizes hiring thousands of additional border and asylum officers, funds surveillance technology, and sets deadlines for processing asylum claims. It does not change who qualifies for asylum.",
+        "key_points": [
+          "Funds ~5,000 new border and asylum personnel",
+          "Sets a 180-day target to decide asylum claims",
+          "Adds sensor and camera technology along the southern border"
+        ],
+        "terms_explained": [
+          { "term": "Asylum", "plain": "Protection given to people who can't safely return to their home country." }
+        ]
+      },
+      "raw_summary_text": "This bill authorizes appropriations for U.S. Customs and Border Protection to increase staffing levels and deploy detection technology. It establishes adjudication timelines for credible-fear and asylum determinations and requires quarterly reporting to Congress.",
+      "passage_votes": [
+        { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 219, "nays": 211, "date": "2026-06-15", "margin": 8, "marginLabel": "Close" }
+      ],
+      "latest_passage_date": "2026-06-15"
+    },
+    {
+      "bill": { "congress": 119, "type": "HR", "number": 2811, "title": "To expand telehealth access for veterans in rural areas." },
+      "policy_area": "Armed Forces and National Security",
+      "affects": ["Rural veterans", "VA clinicians"],
+      "impact": "If you're a veteran far from a VA clinic, more visits could happen by video.",
+      "digest": {
+        "headline": "Veterans gain permanent telehealth access in a near-unanimous vote",
+        "what_it_does": "Makes permanent the VA's authority to provide care by video and phone across state lines, and funds broadband stipends for veterans in rural areas.",
+        "key_points": [
+          "Permanently authorizes cross-state VA telehealth",
+          "Funds connectivity stipends for rural veterans",
+          "Requires the VA to report on wait times"
+        ],
+        "terms_explained": [
+          { "term": "Telehealth", "plain": "Seeing a doctor by video or phone instead of in person." }
+        ]
+      },
+      "raw_summary_text": "This Act permanently authorizes the Department of Veterans Affairs to furnish hospital care and medical services through telehealth regardless of the locations of the provider or veteran, and authorizes a grant program for connectivity.",
+      "passage_votes": [
+        { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 415, "nays": 10, "date": "2026-06-15", "margin": 405, "marginLabel": "Lopsided" }
+      ],
+      "latest_passage_date": "2026-06-15"
+    },
+    {
+      "bill": { "congress": 119, "type": "S", "number": 870, "title": "To reduce interest rates on federal student loans and pause accrual during hardship." },
+      "policy_area": "Education",
+      "affects": ["Student borrowers", "Recent graduates"],
+      "impact": "This one failed — federal student loan interest rules stay as they are for now.",
+      "digest": {
+        "headline": "Student-loan interest relief falls two votes short in the Senate",
+        "what_it_does": "Would have lowered interest rates on new federal student loans and paused interest during documented financial hardship. The measure did not pass.",
+        "key_points": [
+          "Proposed lower fixed rates on new federal loans",
+          "Would pause interest accrual during hardship deferment",
+          "Failed 48-52; no change takes effect"
+        ],
+        "terms_explained": [
+          { "term": "Interest accrual", "plain": "Interest piling up on what you owe, even while payments are paused." }
+        ]
+      },
+      "raw_summary_text": "This bill would have amended the Higher Education Act to reduce interest rates and suspend interest accrual during periods of qualifying economic hardship. The motion failed to achieve passage.",
+      "passage_votes": [
+        { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Did not pass", "yeas": 48, "nays": 52, "date": "2026-06-15", "margin": 2, "marginLabel": "Squeaker" }
+      ],
+      "latest_passage_date": "2026-06-15"
+    },
+    {
+      "bill": { "congress": 119, "type": "HR", "number": 99, "title": "Making supplemental appropriations for disaster recovery and rebuilding." },
+      "policy_area": "Emergency Management",
+      "affects": ["Disaster-hit homeowners", "FEMA", "State governments"],
+      "impact": "Releases rebuilding money to recent disaster areas; helps if your county was federally declared.",
+      "digest": {
+        "headline": "House approves $24B in disaster recovery funding",
+        "what_it_does": "Provides supplemental funding for FEMA disaster relief, low-interest rebuilding loans, and grants to states recovering from recent hurricanes and wildfires.",
+        "key_points": [
+          "$24B in supplemental disaster relief",
+          "Expands low-interest rebuilding loans for homeowners",
+          "Sends block grants to hard-hit states"
+        ],
+        "terms_explained": [
+          { "term": "Supplemental appropriation", "plain": "Extra money approved outside the normal yearly budget." }
+        ]
+      },
+      "raw_summary_text": "This Act makes supplemental appropriations for the Disaster Relief Fund and authorizes the Small Business Administration to issue disaster loans. Funds remain available until expended.",
+      "passage_votes": [
+        { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 300, "nays": 120, "date": "2026-06-14", "margin": 180, "marginLabel": "Comfortable" }
+      ],
+      "latest_passage_date": "2026-06-14"
+    }
+  ],
+  "upcomingElections": [
+    { "title": "OH-06 Special Election (House)", "date": "2026-07-21", "daysAway": 35, "registerBy": "2026-06-22" },
+    { "title": "Statewide Primary", "date": "2026-08-04", "daysAway": 49, "registerBy": "2026-07-06" }
+  ]
+}

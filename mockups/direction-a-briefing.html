@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Congress Briefing — Congress Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: hsl(0 0% 98%);
+      --fg: hsl(0 0% 9%);
+      --secondary: hsl(0 0% 38%);
+      --faint: hsl(0 0% 56%);
+      --card: hsl(0 0% 100%);
+      --border: hsl(0 0% 0% / 0.08);
+      --border-hover: hsl(0 0% 0% / 0.16);
+      --accent: hsl(24 85% 50%);
+      --pass: hsl(151 55% 36%);
+      --fail: hsl(0 65% 48%);
+      --shadow: 0 4px 24px rgb(0 0 0 / 0.08);
+      --radius-card: 16px;
+      --radius-pill: 9999px;
+      --max-width: 680px;
+      --glow: radial-gradient(ellipse 120% 60% at 50% -20%, hsl(24 85% 50% / 0.06), transparent 70%);
+    }
+
+    [data-theme="dark"] {
+      --bg: hsl(0 0% 4%);
+      --fg: hsl(0 0% 93%);
+      --secondary: hsl(0 0% 63%);
+      --faint: hsl(0 0% 45%);
+      --card: hsl(0 0% 7%);
+      --border: hsl(0 0% 100% / 0.08);
+      --border-hover: hsl(0 0% 100% / 0.18);
+      --accent: hsl(24 90% 58%);
+      --pass: hsl(151 45% 55%);
+      --fail: hsl(0 65% 60%);
+      --shadow: 0 4px 24px rgb(0 0 0 / 0.35);
+      --glow: radial-gradient(ellipse 120% 60% at 50% -20%, hsl(24 90% 58% / 0.08), transparent 70%);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--fg);
+      background: var(--bg);
+      background-image: var(--glow);
+      background-repeat: no-repeat;
+      min-height: 100vh;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    a { color: inherit; }
+
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      z-index: 100;
+    }
+    .skip-link:focus { left: 0; }
+
+    .page {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 1.25rem 3rem;
+    }
+
+    @media (min-width: 390px) {
+      .page { padding-left: 1.5rem; padding-right: 1.5rem; }
+    }
+
+    /* Nav */
+    .back-nav {
+      padding: 1rem 0 0.5rem;
+    }
+    .back-nav a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.8125rem;
+      color: var(--faint);
+      text-decoration: none;
+      min-height: 44px;
+      padding: 0.25rem 0;
+    }
+    .back-nav a:hover { color: var(--secondary); }
+
+    /* Masthead */
+    .masthead {
+      padding: 1.25rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.75rem;
+    }
+
+    .masthead-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .kicker {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 0.5rem;
+    }
+
+    .masthead h1 {
+      font-size: clamp(1.75rem, 5vw, 2.125rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin: 0 0 0.5rem;
+    }
+
+    .masthead-date {
+      font-size: 0.9375rem;
+      color: var(--secondary);
+      margin: 0;
+    }
+
+    .digest-line {
+      margin: 1.25rem 0 0;
+      font-size: 1.0625rem;
+      color: var(--secondary);
+      line-height: 1.5;
+    }
+
+    .digest-line strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    /* Theme toggle */
+    .theme-toggle {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      background: var(--card);
+      color: var(--secondary);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .theme-toggle:hover { border-color: var(--border-hover); }
+    .theme-toggle svg { width: 18px; height: 18px; }
+    .theme-toggle .icon-sun { display: none; }
+    .theme-toggle .icon-moon { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+    /* Feed */
+    .feed {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .feed-heading {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin: 0 0 0.25rem;
+    }
+
+    /* Card */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      transition: border-color 0.15s;
+    }
+
+    @media (min-width: 390px) {
+      .card { padding: 1.5rem; }
+    }
+
+    .card--failed {
+      opacity: 0.88;
+      border-color: hsl(0 65% 48% / 0.2);
+      background: linear-gradient(to bottom, hsl(0 65% 48% / 0.04), var(--card) 40%);
+    }
+    [data-theme="dark"] .card--failed {
+      border-color: hsl(0 65% 60% / 0.25);
+      background: linear-gradient(to bottom, hsl(0 65% 60% / 0.06), var(--card) 40%);
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+      margin-bottom: 0.875rem;
+    }
+
+    .docket {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chamber-result {
+      font-size: 0.8125rem;
+      color: var(--secondary);
+    }
+    .chamber-result .result--pass { color: var(--pass); font-weight: 600; }
+    .chamber-result .result--fail { color: var(--fail); font-weight: 600; }
+
+    .margin-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.625rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border-radius: var(--radius-pill);
+      background: var(--border);
+      color: var(--secondary);
+    }
+    .margin-chip--tight {
+      background: hsl(24 85% 50% / 0.12);
+      color: var(--accent);
+    }
+    [data-theme="dark"] .margin-chip--tight {
+      background: hsl(24 90% 58% / 0.15);
+    }
+    .margin-chip--fail {
+      background: hsl(0 65% 48% / 0.12);
+      color: var(--fail);
+    }
+    [data-theme="dark"] .margin-chip--fail {
+      background: hsl(0 65% 60% / 0.15);
+    }
+
+    .card-headline {
+      font-size: clamp(1.25rem, 4vw, 1.4375rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      margin: 0 0 0.75rem;
+    }
+    .card--failed .card-headline { color: var(--secondary); }
+
+    .what-it-does {
+      font-size: 0.9375rem;
+      color: var(--secondary);
+      margin: 0 0 1rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .affects-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.375rem;
+      margin-bottom: 1.125rem;
+    }
+    .affects-label {
+      font-size: 0.75rem;
+      color: var(--faint);
+      margin-right: 0.25rem;
+    }
+    .affect-tag {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 500;
+      color: var(--secondary);
+      background: var(--border);
+      border-radius: var(--radius-pill);
+      white-space: nowrap;
+    }
+
+    /* Vote bar */
+    .vote-block {
+      margin-bottom: 1.125rem;
+    }
+    .vote-bar-wrap {
+      display: flex;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      overflow: hidden;
+      background: var(--border);
+      margin-bottom: 0.5rem;
+    }
+    .vote-bar-yea {
+      background: var(--pass);
+      transition: width 0.3s ease;
+    }
+    .vote-bar-nay {
+      background: var(--fail);
+      flex: 1;
+    }
+    .card--failed .vote-bar-yea { opacity: 0.5; }
+
+    .vote-numbers {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.8125rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .vote-split {
+      font-weight: 600;
+      color: var(--fg);
+    }
+    .vote-date {
+      color: var(--faint);
+      font-size: 0.75rem;
+    }
+
+    /* Actions */
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding-top: 0.25rem;
+      border-top: 1px solid var(--border);
+      margin-top: 0.25rem;
+      padding-top: 1rem;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0.5rem 0.875rem;
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--secondary);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .action-btn:hover {
+      border-color: var(--border-hover);
+      color: var(--fg);
+    }
+    .action-btn--link {
+      gap: 0.25rem;
+    }
+
+    /* Disclosure */
+    .disclosure {
+      margin-top: 1rem;
+    }
+    .disclosure-trigger {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      width: 100%;
+      min-height: 44px;
+      padding: 0.5rem 0;
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--faint);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+    }
+    .disclosure-trigger:hover { color: var(--secondary); }
+    .disclosure-chevron {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .disclosure-trigger[aria-expanded="true"] .disclosure-chevron {
+      transform: rotate(90deg);
+    }
+    .disclosure-panel {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease;
+    }
+    .disclosure-panel.is-open {
+      max-height: 500px;
+    }
+    .disclosure-content {
+      padding: 0.75rem 0 0.25rem;
+      font-size: 0.8125rem;
+      color: var(--secondary);
+      line-height: 1.6;
+      border-top: 1px dashed var(--border);
+    }
+
+    /* Footer elections */
+    .elections {
+      margin-top: 2.5rem;
+      padding: 1.5rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow);
+    }
+    .elections h2 {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.375rem;
+    }
+    .elections-intro {
+      font-size: 0.875rem;
+      color: var(--secondary);
+      margin: 0 0 1.25rem;
+    }
+    .election-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .election-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .election-item:last-child {
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    .election-title {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      margin: 0;
+    }
+    .election-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      font-size: 0.8125rem;
+      color: var(--secondary);
+    }
+    .election-days {
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .elections-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      margin-top: 1.25rem;
+      padding: 0.625rem 1.25rem;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--fg);
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .elections-cta:hover {
+      background: hsl(24 85% 50% / 0.08);
+    }
+    [data-theme="dark"] .elections-cta:hover {
+      background: hsl(24 90% 58% / 0.12);
+    }
+
+    /* Share dialog */
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgb(0 0 0 / 0.4);
+      z-index: 50;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .dialog-backdrop.is-open {
+      opacity: 1;
+      visibility: visible;
+    }
+    @media (min-width: 480px) {
+      .dialog-backdrop {
+        align-items: center;
+      }
+    }
+
+    .dialog {
+      width: 100%;
+      max-width: 360px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      transform: translateY(16px);
+      transition: transform 0.2s;
+    }
+    .dialog-backdrop.is-open .dialog {
+      transform: translateY(0);
+    }
+
+    .dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .dialog-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+    .dialog-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: var(--border);
+      border-radius: var(--radius-pill);
+      color: var(--secondary);
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+    .dialog-close:hover { background: var(--border-hover); }
+
+    .share-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .share-option {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      min-height: 48px;
+      padding: 0.75rem 1rem;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--fg);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .share-option:hover {
+      border-color: var(--border-hover);
+      background: var(--border);
+    }
+    .share-option svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      color: var(--secondary);
+    }
+    .share-toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      padding: 0.625rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: white;
+      background: var(--fg);
+      border-radius: var(--radius-pill);
+      z-index: 60;
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      pointer-events: none;
+    }
+    .share-toast.is-visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .site-footer {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--faint);
+    }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <div class="page">
+    <nav class="back-nav" aria-label="Mockup navigation">
+      <a href="./index.html">← All directions</a>
+    </nav>
+
+    <header class="masthead">
+      <div class="masthead-top">
+        <div>
+          <p class="kicker">Congress Tracker</p>
+          <h1>The Congress Briefing</h1>
+          <p class="masthead-date" id="masthead-date">Monday, June 16, 2026</p>
+        </div>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">
+          <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+      </div>
+      <p class="digest-line" id="digest-line"></p>
+    </header>
+
+    <main id="main">
+      <p class="feed-heading">Yesterday in Congress</p>
+      <section class="feed" id="feed" aria-label="Congress vote feed"></section>
+
+      <aside class="elections" aria-labelledby="elections-heading">
+        <h2 id="elections-heading">Elections you can vote in</h2>
+        <p class="elections-intro">Upcoming races where your registration deadline is approaching.</p>
+        <ul class="election-list" id="election-list"></ul>
+        <button type="button" class="elections-cta" id="check-registration">Check your registration</button>
+      </aside>
+    </main>
+
+    <footer class="site-footer">
+      <p>Prototype mockup — Direction A: The Briefing</p>
+    </footer>
+  </div>
+
+  <div class="dialog-backdrop" id="share-dialog" role="dialog" aria-modal="true" aria-labelledby="share-dialog-title" hidden>
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 id="share-dialog-title">Share this vote</h2>
+        <button type="button" class="dialog-close" id="share-dialog-close" aria-label="Close dialog">×</button>
+      </div>
+      <div class="share-options">
+        <button type="button" class="share-option" id="share-copy">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy link
+        </button>
+        <a href="#" class="share-option" id="share-text">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Text a friend
+        </a>
+        <a href="#" class="share-option" id="share-email">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Email
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="share-toast" id="share-toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const DATA = {
+      "_comment": "Canonical sample feed for UI mockups. Fields mirror the real FeedItem model (bill, policy_area, digest{headline,what_it_does,key_points,terms_explained}, raw_summary_text, passage_votes[], latest_passage_date) PLUS exploratory fields the redesign may want: affects[] (groups touched), impact (one-line 'what changes for a person'), margin + marginLabel (close-vote signal). Inline this data into each mockup so files open via file://.",
+      "asOf": "2026-06-16T11:00:00-04:00",
+      "summary": {
+        "passedYesterday": 5,
+        "closeVotes": 2,
+        "house": 3,
+        "senate": 2
+      },
+      "feed": [
+        {
+          "bill": { "congress": 119, "type": "S", "number": 1582, "title": "A bill to cap monthly out-of-pocket insulin costs and require Medicare price negotiation for high-cost drugs." },
+          "policy_area": "Health",
+          "affects": ["People with diabetes", "Medicare seniors", "Insurers"],
+          "impact": "If you use insulin, your monthly cost would be capped at $35 starting next year.",
+          "digest": {
+            "headline": "Senate caps insulin at $35 a month for most insured patients",
+            "what_it_does": "Limits what insured patients pay for insulin to $35 per month and directs Medicare to negotiate prices on a list of the most expensive drugs. Costs above the cap are absorbed by insurers and manufacturers rather than patients.",
+            "key_points": [
+              "Caps insulin out-of-pocket cost at $35/month for people with insurance",
+              "Requires Medicare to negotiate prices on the 20 highest-cost drugs",
+              "Penalizes manufacturers that raise prices faster than inflation"
+            ],
+            "terms_explained": [
+              { "term": "Out-of-pocket cost", "plain": "The amount you pay yourself, after insurance pays its share." },
+              { "term": "Price negotiation", "plain": "The government bargaining directly with drug makers to lower the price it pays." }
+            ]
+          },
+          "raw_summary_text": "This Act caps cost-sharing for a covered insulin product at $35 per month for plan years beginning on or after January 1, 2027. It further directs the Secretary to identify negotiation-eligible drugs and to publish maximum fair prices. Manufacturers exceeding the inflation benchmark are subject to rebates payable to the Treasury.",
+          "passage_votes": [
+            { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Passed", "yeas": 51, "nays": 49, "date": "2026-06-15", "margin": 1, "marginLabel": "Squeaker" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 4321, "title": "To authorize additional border security personnel, technology, and asylum processing capacity." },
+          "policy_area": "Immigration",
+          "affects": ["Border communities", "Asylum seekers", "CBP officers"],
+          "impact": "Adds funding for faster asylum decisions and more border staff; no direct change to your taxes.",
+          "digest": {
+            "headline": "House narrowly funds more border agents and faster asylum processing",
+            "what_it_does": "Authorizes hiring thousands of additional border and asylum officers, funds surveillance technology, and sets deadlines for processing asylum claims. It does not change who qualifies for asylum.",
+            "key_points": [
+              "Funds ~5,000 new border and asylum personnel",
+              "Sets a 180-day target to decide asylum claims",
+              "Adds sensor and camera technology along the southern border"
+            ],
+            "terms_explained": [
+              { "term": "Asylum", "plain": "Protection given to people who can't safely return to their home country." }
+            ]
+          },
+          "raw_summary_text": "This bill authorizes appropriations for U.S. Customs and Border Protection to increase staffing levels and deploy detection technology. It establishes adjudication timelines for credible-fear and asylum determinations and requires quarterly reporting to Congress.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 219, "nays": 211, "date": "2026-06-15", "margin": 8, "marginLabel": "Close" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 2811, "title": "To expand telehealth access for veterans in rural areas." },
+          "policy_area": "Armed Forces and National Security",
+          "affects": ["Rural veterans", "VA clinicians"],
+          "impact": "If you're a veteran far from a VA clinic, more visits could happen by video.",
+          "digest": {
+            "headline": "Veterans gain permanent telehealth access in a near-unanimous vote",
+            "what_it_does": "Makes permanent the VA's authority to provide care by video and phone across state lines, and funds broadband stipends for veterans in rural areas.",
+            "key_points": [
+              "Permanently authorizes cross-state VA telehealth",
+              "Funds connectivity stipends for rural veterans",
+              "Requires the VA to report on wait times"
+            ],
+            "terms_explained": [
+              { "term": "Telehealth", "plain": "Seeing a doctor by video or phone instead of in person." }
+            ]
+          },
+          "raw_summary_text": "This Act permanently authorizes the Department of Veterans Affairs to furnish hospital care and medical services through telehealth regardless of the locations of the provider or veteran, and authorizes a grant program for connectivity.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 415, "nays": 10, "date": "2026-06-15", "margin": 405, "marginLabel": "Lopsided" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "S", "number": 870, "title": "To reduce interest rates on federal student loans and pause accrual during hardship." },
+          "policy_area": "Education",
+          "affects": ["Student borrowers", "Recent graduates"],
+          "impact": "This one failed — federal student loan interest rules stay as they are for now.",
+          "digest": {
+            "headline": "Student-loan interest relief falls two votes short in the Senate",
+            "what_it_does": "Would have lowered interest rates on new federal student loans and paused interest during documented financial hardship. The measure did not pass.",
+            "key_points": [
+              "Proposed lower fixed rates on new federal loans",
+              "Would pause interest accrual during hardship deferment",
+              "Failed 48-52; no change takes effect"
+            ],
+            "terms_explained": [
+              { "term": "Interest accrual", "plain": "Interest piling up on what you owe, even while payments are paused." }
+            ]
+          },
+          "raw_summary_text": "This bill would have amended the Higher Education Act to reduce interest rates and suspend interest accrual during periods of qualifying economic hardship. The motion failed to achieve passage.",
+          "passage_votes": [
+            { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Did not pass", "yeas": 48, "nays": 52, "date": "2026-06-15", "margin": 2, "marginLabel": "Squeaker" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 99, "title": "Making supplemental appropriations for disaster recovery and rebuilding." },
+          "policy_area": "Emergency Management",
+          "affects": ["Disaster-hit homeowners", "FEMA", "State governments"],
+          "impact": "Releases rebuilding money to recent disaster areas; helps if your county was federally declared.",
+          "digest": {
+            "headline": "House approves $24B in disaster recovery funding",
+            "what_it_does": "Provides supplemental funding for FEMA disaster relief, low-interest rebuilding loans, and grants to states recovering from recent hurricanes and wildfires.",
+            "key_points": [
+              "$24B in supplemental disaster relief",
+              "Expands low-interest rebuilding loans for homeowners",
+              "Sends block grants to hard-hit states"
+            ],
+            "terms_explained": [
+              { "term": "Supplemental appropriation", "plain": "Extra money approved outside the normal yearly budget." }
+            ]
+          },
+          "raw_summary_text": "This Act makes supplemental appropriations for the Disaster Relief Fund and authorizes the Small Business Administration to issue disaster loans. Funds remain available until expended.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 300, "nays": 120, "date": "2026-06-14", "margin": 180, "marginLabel": "Comfortable" }
+          ],
+          "latest_passage_date": "2026-06-14"
+        }
+      ],
+      "upcomingElections": [
+        { "title": "OH-06 Special Election (House)", "date": "2026-07-21", "daysAway": 35, "registerBy": "2026-06-22" },
+        { "title": "Statewide Primary", "date": "2026-08-04", "daysAway": 49, "registerBy": "2026-07-06" }
+      ]
+    };
+
+    // --- Theme ---
+    const THEME_KEY = 'congress-tracker-theme';
+    const themeToggle = document.getElementById('theme-toggle');
+
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+
+    function initTheme() {
+      const stored = localStorage.getItem(THEME_KEY);
+      if (stored === 'dark' || stored === 'light') {
+        applyTheme(stored);
+      } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        applyTheme('dark');
+      }
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const next = isDark ? 'light' : 'dark';
+      applyTheme(next);
+      localStorage.setItem(THEME_KEY, next);
+    });
+
+    initTheme();
+
+    // --- Helpers ---
+    function formatBillDocket(bill) {
+      const type = bill.type === 'HR' ? 'H.R.' : bill.type + '.';
+      return `${type} ${bill.number} · ${bill.congress}th Congress`;
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso + 'T12:00:00');
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatLongDate(iso) {
+      const d = new Date(iso + 'T12:00:00');
+      return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    function isFailed(result) {
+      return result === 'Did not pass';
+    }
+
+    function marginChipClass(label, failed) {
+      if (failed) return 'margin-chip--fail';
+      if (label === 'Squeaker' || label === 'Close') return 'margin-chip--tight';
+      return '';
+    }
+
+    function congressGovUrl(bill) {
+      const type = bill.type.toLowerCase();
+      return `https://www.congress.gov/bill/${bill.congress}th-congress/${type === 'hr' ? 'house-bill' : 'senate-bill'}/${bill.number}`;
+    }
+
+    function buildDigestLine(summary) {
+      const close = summary.closeVotes === 1 ? '1 by a razor-thin margin' : `${summary.closeVotes} by razor-thin margins`;
+      return `Yesterday: <strong>${summary.passedYesterday} bills passed</strong> in Congress — ${close}.`;
+    }
+
+    // --- Masthead ---
+    document.getElementById('digest-line').innerHTML = buildDigestLine(DATA.summary);
+    document.getElementById('masthead-date').textContent = formatLongDate('2026-06-16');
+
+    // --- Feed ---
+    const feedEl = document.getElementById('feed');
+
+    function renderCard(item, index) {
+      const vote = item.passage_votes[0];
+      const failed = isFailed(vote.result);
+      const total = vote.yeas + vote.nays;
+      const yeaPct = total > 0 ? (vote.yeas / total) * 100 : 50;
+      const billId = `${item.bill.type}${item.bill.number}`;
+
+      const card = document.createElement('article');
+      card.className = 'card' + (failed ? ' card--failed' : '');
+      card.setAttribute('aria-labelledby', `headline-${index}`);
+
+      const resultClass = failed ? 'result--fail' : 'result--pass';
+      const chipClass = marginChipClass(vote.marginLabel, failed);
+
+      card.innerHTML = `
+        <div class="card-meta">
+          <span class="docket">${formatBillDocket(item.bill)}</span>
+          <span class="chamber-result">${vote.chamber} · <span class="${resultClass}">${vote.result}</span></span>
+          <span class="margin-chip ${chipClass}">${vote.marginLabel}</span>
+        </div>
+        <h2 class="card-headline" id="headline-${index}">${item.digest.headline}</h2>
+        <p class="what-it-does">${item.digest.what_it_does}</p>
+        <div class="affects-row">
+          <span class="affects-label">Who this affects</span>
+          ${item.affects.map(a => `<span class="affect-tag">${a}</span>`).join('')}
+        </div>
+        <div class="vote-block">
+          <div class="vote-bar-wrap" role="img" aria-label="Vote split: ${vote.yeas} yeas, ${vote.nays} nays">
+            <div class="vote-bar-yea" style="width: ${yeaPct}%"></div>
+            <div class="vote-bar-nay"></div>
+          </div>
+          <div class="vote-numbers">
+            <span class="vote-split">${vote.yeas}–${vote.nays}</span>
+            <span class="vote-date">${formatDate(vote.date)}</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="action-btn share-btn" data-index="${index}" data-headline="${item.digest.headline.replace(/"/g, '&quot;')}" data-bill="${billId}">Share</button>
+          <button type="button" class="action-btn contact-btn">Contact your rep</button>
+          <a href="${congressGovUrl(item.bill)}" class="action-btn action-btn--link" target="_blank" rel="noopener noreferrer">Read on congress.gov ↗</a>
+        </div>
+        <div class="disclosure">
+          <button type="button" class="disclosure-trigger" aria-expanded="false" aria-controls="summary-${index}" id="disclosure-${index}">
+            <svg class="disclosure-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            Official summary
+          </button>
+          <div class="disclosure-panel" id="summary-${index}" role="region" aria-labelledby="disclosure-${index}">
+            <div class="disclosure-content">${item.raw_summary_text}</div>
+          </div>
+        </div>
+      `;
+
+      return card;
+    }
+
+    DATA.feed.forEach((item, i) => {
+      feedEl.appendChild(renderCard(item, i));
+    });
+
+    // --- Disclosures ---
+    feedEl.addEventListener('click', (e) => {
+      const trigger = e.target.closest('.disclosure-trigger');
+      if (!trigger) return;
+      const expanded = trigger.getAttribute('aria-expanded') === 'true';
+      const panel = document.getElementById(trigger.getAttribute('aria-controls'));
+      trigger.setAttribute('aria-expanded', String(!expanded));
+      panel.classList.toggle('is-open', !expanded);
+    });
+
+    // --- Elections ---
+    const electionList = document.getElementById('election-list');
+    DATA.upcomingElections.forEach(election => {
+      const li = document.createElement('li');
+      li.className = 'election-item';
+      li.innerHTML = `
+        <h3 class="election-title">${election.title}</h3>
+        <div class="election-meta">
+          <span>${formatDate(election.date)}</span>
+          <span class="election-days">${election.daysAway} days away</span>
+          <span>Register by ${formatDate(election.registerBy)}</span>
+        </div>
+      `;
+      electionList.appendChild(li);
+    });
+
+    document.getElementById('check-registration').addEventListener('click', () => {
+      showToast('Registration check is a stub in this prototype.');
+    });
+
+    // --- Share dialog ---
+    const shareDialog = document.getElementById('share-dialog');
+    const shareDialogClose = document.getElementById('share-dialog-close');
+    const shareCopy = document.getElementById('share-copy');
+    const shareText = document.getElementById('share-text');
+    const shareEmail = document.getElementById('share-email');
+    const shareToast = document.getElementById('share-toast');
+    let lastFocused = null;
+    let currentShare = { headline: '', bill: '' };
+
+    function openShareDialog(headline, bill) {
+      currentShare = { headline, bill };
+      lastFocused = document.activeElement;
+      shareDialog.hidden = false;
+      shareDialog.classList.add('is-open');
+      const url = `https://congresstracker.example/vote/${bill}`;
+      shareText.href = `sms:?body=${encodeURIComponent(headline + ' — ' + url)}`;
+      shareEmail.href = `mailto:?subject=${encodeURIComponent('Congress vote: ' + headline)}&body=${encodeURIComponent(headline + '\n\n' + url)}`;
+      shareDialogClose.focus();
+    }
+
+    function closeShareDialog() {
+      shareDialog.classList.remove('is-open');
+      shareDialog.hidden = true;
+      if (lastFocused) lastFocused.focus();
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+      shareToast.textContent = msg;
+      shareToast.classList.add('is-visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => shareToast.classList.remove('is-visible'), 2500);
+    }
+
+    feedEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.share-btn');
+      if (btn) {
+        openShareDialog(btn.dataset.headline, btn.dataset.bill);
+      }
+      const contact = e.target.closest('.contact-btn');
+      if (contact) {
+        showToast('Contact-your-rep flow is a stub in this prototype.');
+      }
+    });
+
+    shareDialogClose.addEventListener('click', closeShareDialog);
+    shareDialog.addEventListener('click', (e) => {
+      if (e.target === shareDialog) closeShareDialog();
+    });
+
+    shareCopy.addEventListener('click', async () => {
+      const url = `https://congresstracker.example/vote/${currentShare.bill}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copied to clipboard');
+      } catch {
+        showToast('Copy failed — link: ' + url);
+      }
+      closeShareDialog();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && shareDialog.classList.contains('is-open')) {
+        closeShareDialog();
+      }
+    });
+  </script>
+</body>
+</html>

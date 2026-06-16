@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Congress Tracker — Signal Feed (Direction B)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: hsl(0 0% 98%);
+      --fg: hsl(0 0% 9%);
+      --secondary: hsl(0 0% 38%);
+      --faint: hsl(0 0% 56%);
+      --card: hsl(0 0% 100%);
+      --border: hsl(0 0% 0% / 0.08);
+      --border-hover: hsl(0 0% 0% / 0.16);
+      --accent: hsl(24 85% 50%);
+      --accent-subtle: hsl(24 85% 50% / 0.12);
+      --pass: hsl(151 55% 36%);
+      --pass-subtle: hsl(151 55% 36% / 0.12);
+      --fail: hsl(0 65% 48%);
+      --fail-subtle: hsl(0 65% 48% / 0.1);
+      --shadow: 0 4px 24px rgb(0 0 0 / 0.08);
+      --radius-card: 13px;
+      --radius-pill: 999px;
+      --feed-width: 640px;
+      --rail-width: 200px;
+      --topbar-h: 56px;
+      --glow: radial-gradient(ellipse 80% 50% at 50% -20%, hsl(24 85% 50% / 0.06), transparent);
+    }
+
+    [data-theme="dark"] {
+      --bg: hsl(0 0% 4%);
+      --fg: hsl(0 0% 93%);
+      --secondary: hsl(0 0% 63%);
+      --faint: hsl(0 0% 45%);
+      --card: hsl(0 0% 7%);
+      --border: hsl(0 0% 100% / 0.08);
+      --border-hover: hsl(0 0% 100% / 0.18);
+      --accent: hsl(24 90% 58%);
+      --accent-subtle: hsl(24 90% 58% / 0.15);
+      --pass: hsl(151 45% 55%);
+      --pass-subtle: hsl(151 45% 55% / 0.12);
+      --fail: hsl(0 65% 60%);
+      --fail-subtle: hsl(0 65% 60% / 0.12);
+      --shadow: 0 4px 24px rgb(0 0 0 / 0.35);
+      --glow: radial-gradient(ellipse 80% 50% at 50% -20%, hsl(24 90% 58% / 0.08), transparent);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      background-image: var(--glow);
+      background-attachment: fixed;
+      color: var(--fg);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: hsl(from var(--bg) h s l / 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .back-link {
+      font-size: 13px;
+      color: var(--faint);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    .app-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .topbar-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .result-count {
+      font-size: 12px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--fg);
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .theme-toggle:hover { border-color: var(--border-hover); }
+
+    .filter-row-mobile {
+      display: flex;
+      gap: 6px;
+      padding: 0 16px 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .filter-row-mobile::-webkit-scrollbar { display: none; }
+
+    .filter-row-mobile .filter-pill { flex-shrink: 0; }
+
+    /* Hide mobile filter row on desktop */
+    @media (min-width: 1024px) {
+      .filter-row-mobile { display: none; }
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px 16px 48px;
+    }
+
+    @media (min-width: 1024px) {
+      .layout {
+        grid-template-columns: var(--rail-width) minmax(0, var(--feed-width)) var(--rail-width);
+        justify-content: center;
+        gap: 32px;
+        padding: 24px 24px 64px;
+      }
+    }
+
+    /* ── Left rail ── */
+    .nav-rail {
+      display: none;
+    }
+
+    @media (min-width: 1024px) {
+      .nav-rail {
+        display: block;
+        position: sticky;
+        top: calc(var(--topbar-h) + 16px);
+        align-self: start;
+        max-height: calc(100vh - var(--topbar-h) - 32px);
+        overflow-y: auto;
+      }
+    }
+
+    .rail-heading {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--faint);
+      margin-bottom: 10px;
+    }
+
+    .nav-rail .filter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-rail .filter-pill {
+      width: 100%;
+      justify-content: flex-start;
+      text-align: left;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+
+    /* ── Feed ── */
+    .feed-col { min-width: 0; }
+
+    .feed-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+
+    .feed-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .feed-header .result-count-desktop {
+      font-size: 13px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 1023px) {
+      .feed-header .result-count-desktop { display: none; }
+    }
+
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--faint);
+      font-size: 14px;
+    }
+
+    /* ── Filter pills (shared) ── */
+    .filter-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      color: var(--secondary);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .filter-pill:hover {
+      border-color: var(--border-hover);
+      color: var(--fg);
+    }
+
+    .filter-pill[aria-pressed="true"] {
+      background: var(--accent-subtle);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow);
+      transition: border-color 0.15s;
+      overflow: hidden;
+    }
+
+    .card:hover { border-color: var(--border-hover); }
+
+    .card--failed {
+      opacity: 0.82;
+      border-color: hsl(from var(--fail) h s l / 0.25);
+    }
+    .card--failed .card-summary { background: var(--fail-subtle); }
+
+    .card-toggle {
+      display: block;
+      width: 100%;
+      padding: 0;
+      border: none;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .card-summary {
+      padding: 12px 14px;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-radius: var(--radius-pill);
+      background: hsl(from var(--fg) h s l / 0.06);
+      color: var(--secondary);
+    }
+
+    .result-badge {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--pass);
+    }
+    .result-badge--fail { color: var(--fail); }
+
+    .margin-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      border-radius: var(--radius-pill);
+      background: hsl(from var(--fg) h s l / 0.05);
+      color: var(--secondary);
+      border: 1px solid transparent;
+    }
+
+    .margin-pill--close {
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border-color: hsl(from var(--accent) h s l / 0.35);
+    }
+
+    .card-headline {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: -0.01em;
+      margin-bottom: 4px;
+    }
+
+    .card-docket {
+      font-size: 12px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card-details-hint {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--faint);
+    }
+
+    .card-details-hint svg {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.2s;
+    }
+
+    .card[aria-expanded="true"] .card-details-hint svg {
+      transform: rotate(180deg);
+    }
+
+    .card-body {
+      display: none;
+      padding: 0 14px 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .card[aria-expanded="true"] .card-body { display: block; }
+
+    .card-what {
+      font-size: 13px;
+      color: var(--secondary);
+      margin: 12px 0 10px;
+      line-height: 1.55;
+    }
+
+    .card-points {
+      list-style: none;
+      margin-bottom: 12px;
+    }
+
+    .card-points li {
+      font-size: 13px;
+      color: var(--secondary);
+      padding: 3px 0 3px 16px;
+      position: relative;
+      line-height: 1.45;
+    }
+
+    .card-points li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .affects-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .affects-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--faint);
+      width: 100%;
+      margin-bottom: 2px;
+    }
+
+    .affect-tag {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: var(--radius-pill);
+      background: hsl(from var(--fg) h s l / 0.05);
+      color: var(--secondary);
+      border: 1px solid var(--border);
+    }
+
+    .vote-detail {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      font-size: 12px;
+      color: var(--faint);
+      margin-bottom: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--fg);
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .action-btn:hover { border-color: var(--border-hover); }
+
+    .action-btn--primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .action-btn--primary:hover {
+      filter: brightness(1.08);
+      border-color: var(--accent);
+    }
+
+    .action-btn--ghost {
+      background: transparent;
+    }
+
+    /* ── Right rail ── */
+    .context-rail { min-width: 0; }
+
+    @media (min-width: 1024px) {
+      .context-rail {
+        position: sticky;
+        top: calc(var(--topbar-h) + 16px);
+        align-self: start;
+        max-height: calc(100vh - var(--topbar-h) - 32px);
+        overflow-y: auto;
+      }
+    }
+
+    .context-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .context-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      letter-spacing: -0.01em;
+    }
+
+    .summary-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat {
+      padding: 8px;
+      border-radius: 8px;
+      background: hsl(from var(--fg) h s l / 0.04);
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--faint);
+      margin-top: 2px;
+    }
+
+    .rep-placeholder {
+      font-size: 13px;
+      color: var(--secondary);
+      margin-bottom: 10px;
+      line-height: 1.45;
+    }
+
+    .election-list {
+      list-style: none;
+    }
+
+    .election-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .election-list li:last-child { border-bottom: none; padding-bottom: 0; }
+
+    .election-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .election-meta {
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgb(0 0 0 / 0.45);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop[aria-hidden="false"] { display: flex; }
+
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 360px;
+      padding: 20px;
+    }
+
+    .modal h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .modal-sub {
+      font-size: 13px;
+      color: var(--faint);
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+
+    .modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .modal-wrap { position: relative; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--fg);
+      color: var(--bg);
+      padding: 10px 18px;
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 300;
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="topbar-inner">
+      <div class="topbar-brand">
+        <a href="./index.html" class="back-link">← All directions</a>
+        <span class="app-title">Congress Tracker</span>
+      </div>
+      <div class="topbar-actions">
+        <span class="result-count" id="result-count-mobile" aria-live="polite">5 results</span>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+          <span id="theme-icon" aria-hidden="true">☀</span>
+        </button>
+      </div>
+    </div>
+    <div class="filter-row-mobile" id="filter-row-mobile" role="toolbar" aria-label="Filter feed"></div>
+  </header>
+
+  <div class="layout">
+    <nav class="nav-rail" aria-label="Filters">
+      <p class="rail-heading">Filter</p>
+      <div class="filter-list" id="filter-list-desktop" role="toolbar"></div>
+    </nav>
+
+    <main class="feed-col" id="main-content">
+      <div class="feed-header">
+        <h2>Recent votes</h2>
+        <span class="result-count-desktop" id="result-count-desktop" aria-live="polite">5 results</span>
+      </div>
+      <div class="feed-list" id="feed-list" role="feed" aria-label="Congressional vote feed"></div>
+    </main>
+
+    <aside class="context-rail" aria-label="Context">
+      <div class="context-card" id="summary-card">
+        <h3>This week</h3>
+        <div class="summary-stats" id="summary-stats"></div>
+      </div>
+      <div class="context-card">
+        <h3>Your representatives</h3>
+        <p class="rep-placeholder">See how your senators and representative voted on these bills.</p>
+        <button type="button" class="action-btn action-btn--ghost" style="width:100%;justify-content:center" id="set-state-btn">Set your state</button>
+      </div>
+      <div class="context-card">
+        <h3>Upcoming elections</h3>
+        <ul class="election-list" id="election-list"></ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="modal-backdrop" id="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-title" aria-hidden="true">
+    <div class="modal-wrap">
+      <div class="modal">
+        <button type="button" class="modal-close" id="modal-close" aria-label="Close dialog">×</button>
+        <h2 id="share-title">Share this vote</h2>
+        <p class="modal-sub" id="share-subtitle"></p>
+        <div class="modal-actions">
+          <button type="button" class="action-btn action-btn--primary" id="share-copy">Copy link</button>
+          <button type="button" class="action-btn" id="share-text">Text a friend</button>
+          <button type="button" class="action-btn" id="share-email">Email</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const DATA = {
+      "_comment": "Canonical sample feed for UI mockups. Fields mirror the real FeedItem model (bill, policy_area, digest{headline,what_it_does,key_points,terms_explained}, raw_summary_text, passage_votes[], latest_passage_date) PLUS exploratory fields the redesign may want: affects[] (groups touched), impact (one-line 'what changes for a person'), margin + marginLabel (close-vote signal). Inline this data into each mockup so files open via file://.",
+      "asOf": "2026-06-16T11:00:00-04:00",
+      "summary": {
+        "passedYesterday": 5,
+        "closeVotes": 2,
+        "house": 3,
+        "senate": 2
+      },
+      "feed": [
+        {
+          "bill": { "congress": 119, "type": "S", "number": 1582, "title": "A bill to cap monthly out-of-pocket insulin costs and require Medicare price negotiation for high-cost drugs." },
+          "policy_area": "Health",
+          "affects": ["People with diabetes", "Medicare seniors", "Insurers"],
+          "impact": "If you use insulin, your monthly cost would be capped at $35 starting next year.",
+          "digest": {
+            "headline": "Senate caps insulin at $35 a month for most insured patients",
+            "what_it_does": "Limits what insured patients pay for insulin to $35 per month and directs Medicare to negotiate prices on a list of the most expensive drugs. Costs above the cap are absorbed by insurers and manufacturers rather than patients.",
+            "key_points": [
+              "Caps insulin out-of-pocket cost at $35/month for people with insurance",
+              "Requires Medicare to negotiate prices on the 20 highest-cost drugs",
+              "Penalizes manufacturers that raise prices faster than inflation"
+            ],
+            "terms_explained": [
+              { "term": "Out-of-pocket cost", "plain": "The amount you pay yourself, after insurance pays its share." },
+              { "term": "Price negotiation", "plain": "The government bargaining directly with drug makers to lower the price it pays." }
+            ]
+          },
+          "raw_summary_text": "This Act caps cost-sharing for a covered insulin product at $35 per month for plan years beginning on or after January 1, 2027. It further directs the Secretary to identify negotiation-eligible drugs and to publish maximum fair prices. Manufacturers exceeding the inflation benchmark are subject to rebates payable to the Treasury.",
+          "passage_votes": [
+            { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Passed", "yeas": 51, "nays": 49, "date": "2026-06-15", "margin": 1, "marginLabel": "Squeaker" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 4321, "title": "To authorize additional border security personnel, technology, and asylum processing capacity." },
+          "policy_area": "Immigration",
+          "affects": ["Border communities", "Asylum seekers", "CBP officers"],
+          "impact": "Adds funding for faster asylum decisions and more border staff; no direct change to your taxes.",
+          "digest": {
+            "headline": "House narrowly funds more border agents and faster asylum processing",
+            "what_it_does": "Authorizes hiring thousands of additional border and asylum officers, funds surveillance technology, and sets deadlines for processing asylum claims. It does not change who qualifies for asylum.",
+            "key_points": [
+              "Funds ~5,000 new border and asylum personnel",
+              "Sets a 180-day target to decide asylum claims",
+              "Adds sensor and camera technology along the southern border"
+            ],
+            "terms_explained": [
+              { "term": "Asylum", "plain": "Protection given to people who can't safely return to their home country." }
+            ]
+          },
+          "raw_summary_text": "This bill authorizes appropriations for U.S. Customs and Border Protection to increase staffing levels and deploy detection technology. It establishes adjudication timelines for credible-fear and asylum determinations and requires quarterly reporting to Congress.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 219, "nays": 211, "date": "2026-06-15", "margin": 8, "marginLabel": "Close" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 2811, "title": "To expand telehealth access for veterans in rural areas." },
+          "policy_area": "Armed Forces and National Security",
+          "affects": ["Rural veterans", "VA clinicians"],
+          "impact": "If you're a veteran far from a VA clinic, more visits could happen by video.",
+          "digest": {
+            "headline": "Veterans gain permanent telehealth access in a near-unanimous vote",
+            "what_it_does": "Makes permanent the VA's authority to provide care by video and phone across state lines, and funds broadband stipends for veterans in rural areas.",
+            "key_points": [
+              "Permanently authorizes cross-state VA telehealth",
+              "Funds connectivity stipends for rural veterans",
+              "Requires the VA to report on wait times"
+            ],
+            "terms_explained": [
+              { "term": "Telehealth", "plain": "Seeing a doctor by video or phone instead of in person." }
+            ]
+          },
+          "raw_summary_text": "This Act permanently authorizes the Department of Veterans Affairs to furnish hospital care and medical services through telehealth regardless of the locations of the provider or veteran, and authorizes a grant program for connectivity.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 415, "nays": 10, "date": "2026-06-15", "margin": 405, "marginLabel": "Lopsided" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "S", "number": 870, "title": "To reduce interest rates on federal student loans and pause accrual during hardship." },
+          "policy_area": "Education",
+          "affects": ["Student borrowers", "Recent graduates"],
+          "impact": "This one failed — federal student loan interest rules stay as they are for now.",
+          "digest": {
+            "headline": "Student-loan interest relief falls two votes short in the Senate",
+            "what_it_does": "Would have lowered interest rates on new federal student loans and paused interest during documented financial hardship. The measure did not pass.",
+            "key_points": [
+              "Proposed lower fixed rates on new federal loans",
+              "Would pause interest accrual during hardship deferment",
+              "Failed 48-52; no change takes effect"
+            ],
+            "terms_explained": [
+              { "term": "Interest accrual", "plain": "Interest piling up on what you owe, even while payments are paused." }
+            ]
+          },
+          "raw_summary_text": "This bill would have amended the Higher Education Act to reduce interest rates and suspend interest accrual during periods of qualifying economic hardship. The motion failed to achieve passage.",
+          "passage_votes": [
+            { "chamber": "Senate", "question": "On Passage of the Bill", "result": "Did not pass", "yeas": 48, "nays": 52, "date": "2026-06-15", "margin": 2, "marginLabel": "Squeaker" }
+          ],
+          "latest_passage_date": "2026-06-15"
+        },
+        {
+          "bill": { "congress": 119, "type": "HR", "number": 99, "title": "Making supplemental appropriations for disaster recovery and rebuilding." },
+          "policy_area": "Emergency Management",
+          "affects": ["Disaster-hit homeowners", "FEMA", "State governments"],
+          "impact": "Releases rebuilding money to recent disaster areas; helps if your county was federally declared.",
+          "digest": {
+            "headline": "House approves $24B in disaster recovery funding",
+            "what_it_does": "Provides supplemental funding for FEMA disaster relief, low-interest rebuilding loans, and grants to states recovering from recent hurricanes and wildfires.",
+            "key_points": [
+              "$24B in supplemental disaster relief",
+              "Expands low-interest rebuilding loans for homeowners",
+              "Sends block grants to hard-hit states"
+            ],
+            "terms_explained": [
+              { "term": "Supplemental appropriation", "plain": "Extra money approved outside the normal yearly budget." }
+            ]
+          },
+          "raw_summary_text": "This Act makes supplemental appropriations for the Disaster Relief Fund and authorizes the Small Business Administration to issue disaster loans. Funds remain available until expended.",
+          "passage_votes": [
+            { "chamber": "House", "question": "On Passage", "result": "Passed", "yeas": 300, "nays": 120, "date": "2026-06-14", "margin": 180, "marginLabel": "Comfortable" }
+          ],
+          "latest_passage_date": "2026-06-14"
+        }
+      ],
+      "upcomingElections": [
+        { "title": "OH-06 Special Election (House)", "date": "2026-07-21", "daysAway": 35, "registerBy": "2026-06-22" },
+        { "title": "Statewide Primary", "date": "2026-08-04", "daysAway": 49, "registerBy": "2026-07-06" }
+      ]
+    };
+
+    /* ── Helpers ── */
+    function formatDocket(bill) {
+      return `${bill.type} ${bill.number} · ${bill.congress}th Congress`;
+    }
+
+    function isCloseVote(vote) {
+      return vote.margin <= 10 || vote.marginLabel === 'Squeaker' || vote.marginLabel === 'Close';
+    }
+
+    function isFailed(vote) {
+      return vote.result === 'Did not pass';
+    }
+
+    function getPrimaryVote(item) {
+      return item.passage_votes[0];
+    }
+
+    function getPolicyAreas() {
+      const areas = [...new Set(DATA.feed.map(i => i.policy_area))];
+      return areas.sort();
+    }
+
+    function getFilters() {
+      const base = [
+        { id: 'all', label: 'All' },
+        { id: 'house', label: 'House' },
+        { id: 'senate', label: 'Senate' },
+        { id: 'close', label: 'Close votes' }
+      ];
+      getPolicyAreas().forEach(area => {
+        base.push({ id: 'area:' + area, label: area });
+      });
+      return base;
+    }
+
+    function matchesFilter(item, filterId) {
+      const vote = getPrimaryVote(item);
+      if (filterId === 'all') return true;
+      if (filterId === 'house') return vote.chamber === 'House';
+      if (filterId === 'senate') return vote.chamber === 'Senate';
+      if (filterId === 'close') return isCloseVote(vote);
+      if (filterId.startsWith('area:')) return item.policy_area === filterId.slice(5);
+      return true;
+    }
+
+    function congressGovUrl(bill) {
+      const type = bill.type.toLowerCase().replace('.', '');
+      return `https://www.congress.gov/bill/${bill.congress}th-congress/${type === 'hr' ? 'house-bill' : 'senate-bill'}/${bill.number}`;
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso + 'T12:00:00');
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function escapeHtml(str) {
+      const el = document.createElement('span');
+      el.textContent = str;
+      return el.innerHTML;
+    }
+
+    /* ── State ── */
+    let activeFilter = 'all';
+    let expandedCardId = null;
+    let shareItem = null;
+    let lastFocus = null;
+
+    /* ── Theme ── */
+    function initTheme() {
+      const saved = localStorage.getItem('ct-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+      updateThemeIcon(theme);
+    }
+
+    function updateThemeIcon(theme) {
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☾' : '☀';
+    }
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('ct-theme', next);
+      updateThemeIcon(next);
+    });
+
+    /* ── Filters UI ── */
+    function renderFilterPills(container, variant) {
+      container.innerHTML = '';
+      getFilters().forEach(f => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'filter-pill';
+        btn.dataset.filter = f.id;
+        btn.textContent = f.label;
+        btn.setAttribute('aria-pressed', f.id === activeFilter ? 'true' : 'false');
+        btn.addEventListener('click', () => setFilter(f.id));
+        container.appendChild(btn);
+      });
+    }
+
+    function setFilter(id) {
+      activeFilter = id;
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.setAttribute('aria-pressed', btn.dataset.filter === id ? 'true' : 'false');
+      });
+      renderFeed();
+    }
+
+    /* ── Feed rendering ── */
+    function renderFeed() {
+      const filtered = DATA.feed.filter(item => matchesFilter(item, activeFilter));
+      const count = filtered.length;
+      const countText = count === 1 ? '1 result' : `${count} results`;
+      document.getElementById('result-count-mobile').textContent = countText;
+      document.getElementById('result-count-desktop').textContent = countText;
+
+      const list = document.getElementById('feed-list');
+      list.innerHTML = '';
+
+      if (count === 0) {
+        list.innerHTML = '<p class="empty-state">No votes match this filter. Try a broader category.</p>';
+        return;
+      }
+
+      filtered.forEach((item, idx) => {
+        const vote = getPrimaryVote(item);
+        const failed = isFailed(vote);
+        const close = isCloseVote(vote);
+        const cardId = `card-${idx}`;
+        const expanded = expandedCardId === cardId;
+
+        const card = document.createElement('article');
+        card.className = 'card' + (failed ? ' card--failed' : '');
+        card.id = cardId;
+        card.setAttribute('role', 'article');
+        card.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+
+        const marginClass = close ? 'margin-pill margin-pill--close' : 'margin-pill';
+        const resultClass = failed ? 'result-badge result-badge--fail' : 'result-badge';
+        const marginText = `${vote.marginLabel} · ${vote.yeas}–${vote.nays}`;
+
+        card.innerHTML = `
+          <button type="button" class="card-toggle" aria-controls="${cardId}-body" id="${cardId}-btn">
+            <div class="card-summary">
+              <div class="card-meta">
+                <span class="badge">${escapeHtml(vote.chamber)}</span>
+                <span class="${resultClass}">${escapeHtml(vote.result)}</span>
+                <span class="${marginClass}">${escapeHtml(marginText)}</span>
+              </div>
+              <p class="card-headline">${escapeHtml(item.digest.headline)}</p>
+              <p class="card-docket">${escapeHtml(formatDocket(item.bill))}</p>
+              <div class="card-details-hint">
+                <span>${expanded ? 'Collapse' : 'Details'}</span>
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 4.5L6 7.5L9 4.5"/></svg>
+              </div>
+            </div>
+          </button>
+          <div class="card-body" id="${cardId}-body">
+            <p class="card-what">${escapeHtml(item.digest.what_it_does)}</p>
+            <ul class="card-points">
+              ${item.digest.key_points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+            </ul>
+            <div class="affects-row">
+              <span class="affects-label">Who this affects</span>
+              ${item.affects.map(a => `<span class="affect-tag">${escapeHtml(a)}</span>`).join('')}
+            </div>
+            <div class="vote-detail">
+              <span>${escapeHtml(vote.question)}</span>
+              <span>${formatDate(vote.date)}</span>
+            </div>
+            <div class="action-row">
+              <button type="button" class="action-btn action-btn--primary share-btn" data-idx="${DATA.feed.indexOf(item)}">Share</button>
+              <button type="button" class="action-btn contact-btn">Contact rep</button>
+              <a class="action-btn action-btn--ghost" href="${congressGovUrl(item.bill)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Read on congress.gov ↗</a>
+            </div>
+          </div>
+        `;
+
+        const toggle = card.querySelector('.card-toggle');
+        toggle.addEventListener('click', () => toggleCard(cardId));
+        toggle.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleCard(cardId);
+          }
+        });
+
+        card.querySelector('.share-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          openShareModal(item);
+        });
+
+        card.querySelector('.contact-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          showToast('Contact rep — stub for prototype');
+        });
+
+        list.appendChild(card);
+      });
+    }
+
+    function toggleCard(cardId) {
+      if (expandedCardId === cardId) {
+        expandedCardId = null;
+      } else {
+        expandedCardId = cardId;
+      }
+      renderFeed();
+      if (expandedCardId) {
+        const btn = document.getElementById(expandedCardId + '-btn');
+        if (btn) btn.focus();
+      }
+    }
+
+    /* ── Context rail ── */
+    function renderSummary() {
+      const s = DATA.summary;
+      document.getElementById('summary-stats').innerHTML = `
+        <div class="stat"><div class="stat-value">${s.passedYesterday}</div><div class="stat-label">Passed yesterday</div></div>
+        <div class="stat"><div class="stat-value">${s.closeVotes}</div><div class="stat-label">Close votes</div></div>
+        <div class="stat"><div class="stat-value">${s.house}</div><div class="stat-label">House</div></div>
+        <div class="stat"><div class="stat-value">${s.senate}</div><div class="stat-label">Senate</div></div>
+      `;
+    }
+
+    function renderElections() {
+      document.getElementById('election-list').innerHTML = DATA.upcomingElections.map(e => `
+        <li>
+          <div class="election-title">${escapeHtml(e.title)}</div>
+          <div class="election-meta">${formatDate(e.date)} · ${e.daysAway} days away · Register by ${formatDate(e.registerBy)}</div>
+        </li>
+      `).join('');
+    }
+
+    /* ── Share modal ── */
+    function openShareModal(item) {
+      shareItem = item;
+      lastFocus = document.activeElement;
+      const vote = getPrimaryVote(item);
+      document.getElementById('share-subtitle').textContent = item.digest.headline;
+      const modal = document.getElementById('share-modal');
+      modal.setAttribute('aria-hidden', 'false');
+      document.getElementById('share-copy').focus();
+    }
+
+    function closeShareModal() {
+      document.getElementById('share-modal').setAttribute('aria-hidden', 'true');
+      shareItem = null;
+      if (lastFocus) lastFocus.focus();
+    }
+
+    document.getElementById('modal-close').addEventListener('click', closeShareModal);
+    document.getElementById('share-modal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeShareModal();
+    });
+
+    document.getElementById('share-copy').addEventListener('click', () => {
+      const url = congressGovUrl(shareItem.bill);
+      navigator.clipboard.writeText(url).then(() => showToast('Link copied!')).catch(() => showToast('Copy: ' + url));
+    });
+
+    document.getElementById('share-text').addEventListener('click', () => {
+      const vote = getPrimaryVote(shareItem);
+      const text = `${shareItem.digest.headline} (${vote.marginLabel}, ${vote.yeas}–${vote.nays})`;
+      const sms = `sms:?body=${encodeURIComponent(text + ' ' + congressGovUrl(shareItem.bill))}`;
+      window.open(sms, '_blank');
+      showToast('Opening text message…');
+    });
+
+    document.getElementById('share-email').addEventListener('click', () => {
+      const subject = encodeURIComponent('Interesting vote: ' + shareItem.digest.headline);
+      const body = encodeURIComponent(shareItem.digest.headline + '\n\n' + congressGovUrl(shareItem.bill));
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    });
+
+    /* ── Toast ── */
+    let toastTimer;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+    }
+
+    document.getElementById('set-state-btn').addEventListener('click', () => {
+      showToast('Set your state — stub for prototype');
+    });
+
+    /* ── Keyboard ── */
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (document.getElementById('share-modal').getAttribute('aria-hidden') === 'false') {
+          closeShareModal();
+        } else if (expandedCardId) {
+          expandedCardId = null;
+          renderFeed();
+        }
+      }
+    });
+
+    /* ── Init ── */
+    initTheme();
+    renderFilterPills(document.getElementById('filter-list-desktop'));
+    renderFilterPills(document.getElementById('filter-row-mobile'));
+    renderSummary();
+    renderElections();
+    renderFeed();
+  </script>
+</body>
+</html>

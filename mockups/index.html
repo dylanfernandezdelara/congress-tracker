@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Congress Tracker — UI direction mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: hsl(0 0% 98%);
+        --fg: hsl(0 0% 9%);
+        --secondary: hsl(0 0% 38%);
+        --faint: hsl(0 0% 56%);
+        --card: hsl(0 0% 100%);
+        --border: hsl(0 0% 0% / 0.08);
+        --border-hover: hsl(0 0% 0% / 0.16);
+        --accent: hsl(24 85% 50%);
+        --pass: hsl(151 55% 36%);
+        --fail: hsl(0 65% 48%);
+        --shadow: 0 4px 24px rgb(0 0 0 / 0.08);
+      }
+      [data-theme='dark'] {
+        --bg: hsl(0 0% 4%);
+        --fg: hsl(0 0% 93%);
+        --secondary: hsl(0 0% 63%);
+        --faint: hsl(0 0% 45%);
+        --card: hsl(0 0% 7%);
+        --border: hsl(0 0% 100% / 0.08);
+        --border-hover: hsl(0 0% 100% / 0.18);
+        --accent: hsl(24 90% 58%);
+        --pass: hsl(151 45% 55%);
+        --fail: hsl(0 65% 60%);
+        --shadow: 0 4px 24px rgb(0 0 0 / 0.35);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        color: var(--fg);
+        background: var(--bg);
+        background-image: radial-gradient(ellipse 120% 600px at 50% 0%, hsl(0 0% 0% / 0.03), transparent);
+        line-height: 1.5;
+      }
+      [data-theme='dark'] body {
+        background-image: radial-gradient(ellipse 120% 600px at 50% 0%, hsl(0 0% 100% / 0.04), transparent);
+      }
+      .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 20px 80px; }
+      header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+      .sub { color: var(--secondary); font-size: 15px; margin: 12px 0 0; max-width: 60ch; }
+      .toggle {
+        border: 1px solid var(--border); background: var(--card); color: var(--secondary);
+        border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer;
+      }
+      .toggle:hover { border-color: var(--border-hover); color: var(--fg); }
+      .grid { display: grid; gap: 18px; margin-top: 32px; grid-template-columns: 1fr; }
+      @media (min-width: 760px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+      .card {
+        display: flex; flex-direction: column; border: 1px solid var(--border); background: var(--card);
+        border-radius: 16px; padding: 22px; text-decoration: none; color: inherit; transition: all 0.18s ease;
+      }
+      .card:hover { border-color: var(--border-hover); box-shadow: var(--shadow); transform: translateY(-2px); }
+      .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; }
+      .card h2 { font-size: 18px; margin: 10px 0 6px; letter-spacing: -0.01em; }
+      .card p { color: var(--secondary); font-size: 13.5px; margin: 0 0 14px; flex: 1; }
+      .card .go { font-size: 13px; font-weight: 600; color: var(--fg); }
+      .card .go::after { content: ' →'; color: var(--accent); }
+      .note { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 24px; color: var(--secondary); font-size: 14px; }
+      .note h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin: 0 0 10px; }
+      .note ul { margin: 0; padding-left: 18px; }
+      .note li { margin: 6px 0; }
+      code { background: var(--border); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div>
+          <span class="tag">Prototype · for discussion</span>
+          <h1 style="margin-top: 8px">Congress Tracker — UI directions</h1>
+        </div>
+        <button class="toggle" id="theme">◐ Theme</button>
+      </header>
+      <p class="sub">
+        Three divergent takes on the same two jobs: <strong>(1) know what Congress just voted on</strong>
+        and <strong>(2) understand how it affects real people</strong> — with built-in ways to share a vote
+        and contact your representative. Open each on your phone and on desktop, toggle light/dark, and tell
+        me which pieces to combine. These are throwaway HTML, not the real app.
+      </p>
+
+      <div class="grid">
+        <a class="card" href="./direction-a-briefing.html">
+          <span class="tag">Direction A</span>
+          <h2>The Briefing</h2>
+          <p>Calm, editorial, single-column morning read. Leads with a one-line "yesterday in Congress" digest, then trustworthy plain-English cards. Minimal chrome. Optimized for the daily mobile check-in.</p>
+          <span class="go">Open</span>
+        </a>
+        <a class="card" href="./direction-b-signal-feed.html">
+          <span class="tag">Direction B</span>
+          <h2>Signal Feed</h2>
+          <p>Scan-first, app-like feed with sticky filter pills (House / Senate / Close votes / Topics). Compact cards expand on tap for detail + actions. "Close votes" are first-class and shareable.</p>
+          <span class="go">Open</span>
+        </a>
+        <a class="card" href="./direction-c-impact-first.html">
+          <span class="tag">Direction C</span>
+          <h2>Impact-First</h2>
+          <p>Human-centered. Each item is framed as "what changes for you," tagged by who it touches (Veterans, Renters, Students…). Action-forward: Share + Tell-your-rep are primary.</p>
+          <span class="go">Open</span>
+        </a>
+      </div>
+
+      <div class="note">
+        <h3>What to evaluate</h3>
+        <ul>
+          <li><strong>Job 1 — what passed:</strong> can you scan yesterday's results in ~10 seconds on mobile?</li>
+          <li><strong>Job 2 — who it affects:</strong> does the "impact" framing feel clear and trustworthy, not preachy?</li>
+          <li><strong>Close votes:</strong> are narrowly-passed votes easy to spot and share?</li>
+          <li><strong>Action:</strong> are Share and Contact-your-rep obvious without cluttering the read?</li>
+          <li><strong>Elections:</strong> where should "upcoming elections you can vote in" live — feed, footer, or its own tab?</li>
+        </ul>
+        <p style="margin-top: 16px">Sample data lives in <code>mockups/_sample-data.json</code> and is inlined into each page.</p>
+      </div>
+    </div>
+    <script>
+      const root = document.documentElement;
+      const saved = localStorage.getItem('mock-theme');
+      if (saved) root.setAttribute('data-theme', saved);
+      document.getElementById('theme').addEventListener('click', () => {
+        const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem('mock-theme', next);
+      });
+    </script>
+  </body>
+</html>
