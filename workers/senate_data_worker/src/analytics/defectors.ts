@@ -12,26 +12,32 @@ function normalizePosition(position: string): "yea" | "nay" | "other" {
   return "other";
 }
 
-function partyMajority(
+/**
+ * Majority side (yea/nay) for each party on a single roll. Computed once per
+ * roll so the per-member defection check is O(members) rather than O(members²).
+ */
+function partyMajoritiesForRoll(
   positions: Array<{ party: string | null; position: string }>
-): "yea" | "nay" | null {
-  const counts = new Map<string, number>();
+): Map<string, "yea" | "nay" | null> {
+  const tallies = new Map<string, { yea: number; nay: number }>();
   for (const { party, position } of positions) {
     if (!party) continue;
     const norm = normalizePosition(position);
     if (norm === "other") continue;
-    const key = `${party}:${norm}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    const tally = tallies.get(party) ?? { yea: 0, nay: 0 };
+    tally[norm] += 1;
+    tallies.set(party, tally);
   }
 
-  let best: { party: string; side: "yea" | "nay"; count: number } | null = null;
-  for (const [key, count] of counts) {
-    const [party, side] = key.split(":");
-    if (!best || count > best.count) {
-      best = { party, side: side as "yea" | "nay", count };
+  const majorities = new Map<string, "yea" | "nay" | null>();
+  for (const [party, tally] of tallies) {
+    if (tally.yea === 0 && tally.nay === 0) {
+      majorities.set(party, null);
+    } else {
+      majorities.set(party, tally.yea >= tally.nay ? "yea" : "nay");
     }
   }
-  return best?.side ?? null;
+  return majorities;
 }
 
 function congressGovMemberUrl(bioguideId: string): string {
@@ -83,29 +89,33 @@ export async function computeDefectors(
   for (const rollRows of byRoll.values()) {
     const margin = Math.abs(rollRows[0].yeas - rollRows[0].nays);
     const weight = 1 / Math.max(1, margin);
-    const partyPositions = rollRows.map((r) => ({
-      party: members.get(r.bioguide_id)?.party ?? null,
-      position: r.position,
-    }));
+    const partyMajorities = partyMajoritiesForRoll(
+      rollRows.map((r) => ({
+        party: members.get(r.bioguide_id)?.party ?? null,
+        position: r.position,
+      }))
+    );
 
     for (const row of rollRows) {
       const member = members.get(row.bioguide_id);
       if (!member?.party) continue;
-      const partySide = partyMajority(
-        partyPositions.filter((p) => p.party === member.party)
-      );
+      const partySide = partyMajorities.get(member.party) ?? null;
       const memberSide = normalizePosition(row.position);
       if (partySide === null || memberSide === "other" || memberSide === partySide) continue;
 
       const current = scores.get(row.bioguide_id) ?? { crossVotes: 0, decidingScore: 0 };
       current.crossVotes += 1;
       current.decidingScore += weight;
-      current.recent = {
-        bill_type: row.bill_type,
-        bill_number: row.bill_number,
-        congress: row.bill_congress,
-        margin,
-      };
+      // Rows arrive newest-first (ORDER BY vote_date DESC), so the first cross
+      // vote we see for a member is their most recent — keep that one.
+      if (!current.recent) {
+        current.recent = {
+          bill_type: row.bill_type,
+          bill_number: row.bill_number,
+          congress: row.bill_congress,
+          margin,
+        };
+      }
       scores.set(row.bioguide_id, current);
     }
   }

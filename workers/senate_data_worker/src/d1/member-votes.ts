@@ -21,6 +21,37 @@ export async function upsertMemberVote(db: D1Database, vote: MemberVoteRecord): 
     .run();
 }
 
+/**
+ * Upsert all member votes for a roll in a single atomic D1 batch. The batch is
+ * one transaction (all-or-nothing), so a roll is never left partially written —
+ * which keeps the `countMemberVotesForRoll > 0` skip check in the pipeline a
+ * safe completion marker. Each statement stays within the 100-param limit.
+ */
+export async function upsertMemberVotesBatch(
+  db: D1Database,
+  votes: MemberVoteRecord[]
+): Promise<void> {
+  if (votes.length === 0) return;
+  await ensureSchema(db);
+  const stmt = db.prepare(
+    `INSERT INTO member_votes (chamber, congress, session, roll_number, bioguide_id, position)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(chamber, congress, session, roll_number, bioguide_id) DO UPDATE SET
+       position = excluded.position`
+  );
+  const batch = votes.map((vote) =>
+    stmt.bind(
+      vote.chamber,
+      vote.congress,
+      vote.session,
+      vote.rollNumber,
+      vote.bioguideId,
+      vote.position
+    )
+  );
+  await db.batch(batch);
+}
+
 export interface RollCallKey {
   chamber: string;
   congress: number;
@@ -73,6 +104,7 @@ export interface MemberVoteWithRoll {
   bill_type: string;
   bill_number: number;
   bill_congress: number;
+  vote_date: string;
 }
 
 export async function selectMemberVotesForSession(
@@ -85,12 +117,13 @@ export async function selectMemberVotesForSession(
   const { results } = await db
     .prepare(
       `SELECT mv.bioguide_id, mv.position, mv.chamber, mv.congress, mv.session, mv.roll_number,
-              v.yeas, v.nays, v.bill_type, v.bill_number, v.bill_congress
+              v.yeas, v.nays, v.bill_type, v.bill_number, v.bill_congress, v.vote_date
        FROM member_votes mv
        JOIN votes v
          ON v.chamber = mv.chamber AND v.congress = mv.congress
         AND v.session = mv.session AND v.roll_number = mv.roll_number
-       WHERE mv.congress = ? AND mv.session = ? AND mv.chamber = ?`
+       WHERE mv.congress = ? AND mv.session = ? AND mv.chamber = ?
+       ORDER BY v.vote_date DESC`
     )
     .bind(congress, session, chamber)
     .all<MemberVoteWithRoll>();

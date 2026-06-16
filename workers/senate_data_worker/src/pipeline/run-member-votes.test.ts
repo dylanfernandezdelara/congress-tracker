@@ -1,0 +1,110 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MemberRecord, MemberVoteRecord } from "../types";
+import type { RollCallKey } from "../d1/member-votes";
+
+const {
+  selectPassageRollCalls,
+  countMemberVotesForRoll,
+  upsertMemberVotesBatch,
+  upsertMembersBatch,
+  fetchHouseMemberVotes,
+  fetchSenateMemberVotes,
+} = vi.hoisted(() => ({
+  selectPassageRollCalls: vi.fn(),
+  countMemberVotesForRoll: vi.fn(),
+  upsertMemberVotesBatch: vi.fn(async () => {}),
+  upsertMembersBatch: vi.fn(async () => {}),
+  fetchHouseMemberVotes: vi.fn(),
+  fetchSenateMemberVotes: vi.fn(),
+}));
+
+vi.mock("../d1/schema", () => ({ ensureSchema: vi.fn(async () => {}) }));
+vi.mock("../d1/member-votes", () => ({
+  selectPassageRollCalls,
+  countMemberVotesForRoll,
+  upsertMemberVotesBatch,
+}));
+vi.mock("../d1/members", () => ({ upsertMembersBatch }));
+vi.mock("../sources/house-member-votes", () => ({ fetchHouseMemberVotes }));
+vi.mock("../sources/senate-member-votes", () => ({ fetchSenateMemberVotes }));
+
+import { runMemberVotesPipeline } from "./run-member-votes";
+import { MEMBER_VOTES_MAX_ROLLS_PER_RUN } from "../constants";
+
+const env = { DB: {}, CONGRESS: "119", SESSION: "2" } as any;
+
+function houseRoll(rollNumber: number): RollCallKey {
+  return { chamber: "House", congress: 119, session: 2, roll_number: rollNumber };
+}
+
+function fakeFetch(memberIds: string[]) {
+  const members: MemberRecord[] = memberIds.map((id) => ({
+    bioguideId: id,
+    name: `Member ${id}`,
+    chamber: "House",
+    party: "D",
+    state: "CA",
+    district: 1,
+  }));
+  return (
+    _env: unknown,
+    congress: number,
+    session: number,
+    rollNumber: number
+  ): Promise<{ members: MemberRecord[]; votes: MemberVoteRecord[] }> => {
+    const votes: MemberVoteRecord[] = memberIds.map((id) => ({
+      chamber: "House",
+      congress,
+      session,
+      rollNumber,
+      bioguideId: id,
+      position: "Yea",
+    }));
+    return Promise.resolve({ members, votes });
+  };
+}
+
+describe("runMemberVotesPipeline", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    countMemberVotesForRoll.mockResolvedValue(0);
+    fetchHouseMemberVotes.mockImplementation(fakeFetch(["A", "B"]));
+    fetchSenateMemberVotes.mockImplementation(fakeFetch([]));
+  });
+
+  it("batches writes and dedupes members across rolls", async () => {
+    selectPassageRollCalls.mockResolvedValue([houseRoll(1), houseRoll(2)]);
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(2);
+    expect(result.rollsRemaining).toBe(0);
+    expect(result.votesUpserted).toBe(4);
+    // Members A and B appear on both rolls but are upserted once.
+    expect(result.membersUpserted).toBe(2);
+    expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips rolls that already have member votes (idempotent re-run)", async () => {
+    selectPassageRollCalls.mockResolvedValue([houseRoll(1), houseRoll(2)]);
+    countMemberVotesForRoll.mockResolvedValueOnce(0).mockResolvedValueOnce(435);
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(1);
+    expect(result.rollsSkipped).toBe(1);
+    expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps rolls per invocation and reports the remainder", async () => {
+    const rolls = Array.from({ length: MEMBER_VOTES_MAX_ROLLS_PER_RUN + 5 }, (_, i) =>
+      houseRoll(i + 1)
+    );
+    selectPassageRollCalls.mockResolvedValue(rolls);
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(MEMBER_VOTES_MAX_ROLLS_PER_RUN);
+    expect(result.rollsRemaining).toBe(5);
+  });
+});
