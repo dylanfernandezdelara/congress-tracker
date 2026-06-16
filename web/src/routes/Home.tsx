@@ -22,6 +22,28 @@ import { useAsyncData } from '../hooks/useAsyncData'
 
 const LOOKBACK_DAYS = 45
 
+/**
+ * Load a per-chamber stat for both chambers, tolerating a single-chamber
+ * failure. Throws only when both chambers reject (so the sidebar shows an
+ * error), otherwise falls back to `empty` for the failed chamber.
+ */
+async function bothChambers<T>(
+  load: (chamber: 'House' | 'Senate') => Promise<T>,
+  empty: T,
+): Promise<{ house: T; senate: T }> {
+  const [houseResult, senateResult] = await Promise.allSettled([
+    load('House'),
+    load('Senate'),
+  ])
+  if (houseResult.status === 'rejected' && senateResult.status === 'rejected') {
+    throw houseResult.reason
+  }
+  return {
+    house: houseResult.status === 'fulfilled' ? houseResult.value : empty,
+    senate: senateResult.status === 'fulfilled' ? senateResult.value : empty,
+  }
+}
+
 function FeedSkeleton() {
   return (
     <div className="space-y-5" aria-hidden="true">
@@ -57,42 +79,22 @@ export default function Home() {
 
   const defectors = useAsyncData<{ house: DefectorEntry[]; senate: DefectorEntry[] }>({
     deps: [retryKey],
-    load: async () => {
-      const [houseResult, senateResult] = await Promise.allSettled([
-        fetchDefectors('House'),
-        fetchDefectors('Senate'),
-      ])
-      if (houseResult.status === 'rejected' && senateResult.status === 'rejected') {
-        throw houseResult.reason
-      }
-      return {
-        house: houseResult.status === 'fulfilled' ? houseResult.value.defectors : [],
-        senate: senateResult.status === 'fulfilled' ? senateResult.value.defectors : [],
-      }
-    },
+    load: () =>
+      bothChambers<DefectorEntry[]>(
+        async (chamber) => (await fetchDefectors(chamber)).defectors,
+        [],
+      ),
     mapError: () => "Couldn't load defectors.",
   })
 
   const portfolios = useAsyncData<{ house: PortfolioMovers; senate: PortfolioMovers }>({
     deps: [retryKey],
-    load: async () => {
-      const [houseResult, senateResult] = await Promise.allSettled([
-        fetchPortfolioStats('House'),
-        fetchPortfolioStats('Senate'),
-      ])
-      if (houseResult.status === 'rejected' && senateResult.status === 'rejected') {
-        throw senateResult.reason
-      }
-      const emptyMovers: PortfolioMovers = {
+    load: () =>
+      bothChambers<PortfolioMovers>(fetchPortfolioStats, {
         gainers: [],
         losers: [],
         disclaimer: 'Estimates from public disclosures.',
-      }
-      return {
-        house: houseResult.status === 'fulfilled' ? houseResult.value : emptyMovers,
-        senate: senateResult.status === 'fulfilled' ? senateResult.value : emptyMovers,
-      }
-    },
+      }),
     mapError: () => "Couldn't load portfolio stats.",
   })
 
