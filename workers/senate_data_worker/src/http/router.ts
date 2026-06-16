@@ -9,7 +9,13 @@ import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
 import { buildFeed } from "../storage/feed";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildSessionStats } from "../storage/session-stats";
-import type { Chamber } from "../types";
+import type {
+  Chamber,
+  DefectorsResponse,
+  PortfoliosResponse,
+  PulseStatsResponse,
+  SessionStatsResponse,
+} from "../types";
 import {
   buildCorsHeaders,
   buildJsonResponse,
@@ -31,12 +37,18 @@ function healthResponse(env: Env, json: (body: unknown, init?: ResponseInit) => 
 
 function authorizePipeline(request: Request, env: Env): boolean {
   const token = env.PIPELINE_ADMIN_TOKEN?.trim();
-  if (!token) return true;
-  const url = new URL(request.url);
-  const queryToken = url.searchParams.get("token");
-  const auth = request.headers.get("Authorization");
-  const bearer = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
-  return queryToken === token || bearer === token;
+  if (token) {
+    const url = new URL(request.url);
+    const queryToken = url.searchParams.get("token");
+    const auth = request.headers.get("Authorization");
+    const bearer = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+    return queryToken === token || bearer === token;
+  }
+  // No admin token configured: only allow these write pipelines in explicit
+  // local/dev mode (ALLOWED_ORIGIN="*"). Production sets a specific origin (or
+  // leaves it unset), so it fails closed instead of exposing the routes — they
+  // hit upstream APIs and write to the shared production D1.
+  return env.ALLOWED_ORIGIN?.trim() === "*";
 }
 
 function parseChamber(value: string | null): Chamber | null {
@@ -51,9 +63,9 @@ function parseStatsLimit(url: URL, fallback = 5): number {
   );
 }
 
-async function handleStatsJson(
+async function handleStatsJson<T>(
   json: (body: unknown, init?: ResponseInit) => Response,
-  load: () => Promise<unknown>,
+  load: () => Promise<T>,
   errorMessage: string
 ): Promise<Response> {
   try {
@@ -67,11 +79,11 @@ async function handleStatsJson(
   }
 }
 
-async function handlePipelineRoute(
+async function handlePipelineRoute<T extends object>(
   request: Request,
   env: Env,
   json: (body: unknown, init?: ResponseInit) => Response,
-  run: () => Promise<unknown>
+  run: () => Promise<T>
 ): Promise<Response> {
   if (request.method !== "GET") {
     return json({ error: "method_not_allowed" }, { status: 405 });
@@ -81,7 +93,7 @@ async function handlePipelineRoute(
   }
   try {
     const result = await run();
-    return json({ ok: true, ...((result as object) ?? {}) });
+    return json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "pipeline failed";
     return json({ ok: false, error: message }, { status: 500 });
@@ -148,7 +160,7 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   if (pathname === "/stats/session.json") {
     return handleStatsJson(
       json,
-      async () => {
+      async (): Promise<SessionStatsResponse> => {
         const stats = await buildSessionStats(env.DB, congress, session);
         return { congress, session, ...stats, as_of: asOf };
       },
@@ -159,7 +171,7 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   if (pathname === "/stats/pulse.json") {
     return handleStatsJson(
       json,
-      async () => {
+      async (): Promise<PulseStatsResponse> => {
         const pulse = await buildPulseStats(env.DB, congress, session);
         return { congress, session, ...pulse, as_of: asOf };
       },
@@ -175,7 +187,7 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     const limit = parseStatsLimit(url);
     return handleStatsJson(
       json,
-      async () => {
+      async (): Promise<DefectorsResponse> => {
         const defectors = await computeDefectors(env.DB, congress, session, chamber, limit);
         return { chamber, congress, session, defectors, as_of: asOf };
       },
@@ -191,7 +203,7 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     const limit = parseStatsLimit(url);
     return handleStatsJson(
       json,
-      async () => {
+      async (): Promise<PortfoliosResponse> => {
         const movers = await buildPortfolioMovers(env.DB, chamber, limit);
         return { chamber, congress, session, ...movers, as_of: asOf };
       },
