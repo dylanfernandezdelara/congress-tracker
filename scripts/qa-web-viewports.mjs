@@ -88,6 +88,7 @@ async function auditPage(page) {
     const viewportHeight = window.innerHeight
     const toggle = document.querySelector('.theme-toggle')
     const heading = document.querySelector('h1')
+    const siteNav = document.querySelector('.site-nav')
     const membersSidebar = document.querySelector('[aria-label="Members in Congress"]')
     const card = document.querySelector('.flip-card')
     const headline = document.querySelector('.flip-card h2')
@@ -107,7 +108,8 @@ async function auditPage(page) {
 
     if (!toggle) issues.push('theme toggle missing')
     if (!heading) issues.push('page heading missing')
-    if (!membersSidebar) issues.push('members sidebar missing')
+    if (!siteNav) issues.push('site navigation missing')
+    if (membersSidebar) issues.push('sidebar stats visible on feed page')
     if (!card) issues.push('feed card missing')
 
     if (toggle) {
@@ -334,6 +336,23 @@ async function main() {
         if (audit.theme !== theme) {
           audit.issues.push(`expected ${theme} theme but got ${audit.theme}`)
         }
+
+        await page.goto(`${baseUrl.replace(/\/$/, '')}/stats`, { waitUntil: 'domcontentloaded' })
+        await page.getByLabel('Members in Congress').waitFor({ timeout: 10_000 })
+        const statsIssues = await page.evaluate(() => {
+          const issues = []
+          if (!document.querySelector('[aria-label="Members in Congress"]')) {
+            issues.push('members section missing on stats page')
+          }
+          if (!document.querySelector('[aria-label="Legislative pulse"]')) {
+            issues.push('pulse section missing on stats page')
+          }
+          if (!document.querySelector('.site-nav')) {
+            issues.push('site navigation missing on stats page')
+          }
+          return issues
+        })
+        audit.issues.push(...statsIssues)
 
         const screenshotPath = path.join(outDir, `${caseId}.png`)
         await page.screenshot({ path: screenshotPath, fullPage: false })

@@ -1,26 +1,18 @@
 import type { ReactNode } from 'react'
 
 import { SiteHeader } from './SiteHeader'
+import { SiteNav } from './SiteNav'
 
 type PageShellProps = {
-  leftSidebar: ReactNode
-  rightRail: ReactNode
   children: ReactNode
 }
 
-export function PageShell({ leftSidebar, rightRail, children }: PageShellProps) {
+export function PageShell({ children }: PageShellProps) {
   return (
     <div className="page-shell mx-auto min-h-screen w-full max-w-[1440px] px-4 py-10 sm:px-6 sm:py-16 lg:py-20">
       <SiteHeader />
-      <div className="page-grid mt-6">
-        <aside className="page-sidebar-left" aria-label="Members in Congress">
-          {leftSidebar}
-        </aside>
-        <div className="page-main min-w-0">{children}</div>
-        <aside className="page-sidebar-right" aria-label="Legislative pulse">
-          {rightRail}
-        </aside>
-      </div>
+      <SiteNav />
+      <div className="page-main mt-6 min-w-0">{children}</div>
     </div>
   )
 }

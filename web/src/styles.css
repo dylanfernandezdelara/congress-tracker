@@ -470,33 +470,39 @@
     @apply min-w-[3.5rem] px-1 text-center text-xs tabular-nums text-secondary;
   }
 
-  .page-grid {
-    display: grid;
-    gap: 1.5rem;
-    align-items: start;
-    grid-template-areas:
-      'main'
-      'members'
-      'pulse';
+  .site-nav {
+    @apply flex items-center justify-center gap-5 border-t border-border pt-3;
   }
 
-  .page-sidebar-left {
-    grid-area: members;
+  .site-nav-link {
+    @apply text-xs text-faint transition-colors;
   }
 
-  .page-main {
-    grid-area: main;
+  .site-nav-link:hover {
+    color: hsl(var(--twc-secondary));
   }
 
-  .page-sidebar-right {
-    grid-area: pulse;
+  .site-nav-link.is-active {
+    color: hsl(var(--twc-secondary));
+  }
+
+  .site-nav-link:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  .stats-page {
+    @apply mx-auto max-w-[640px] space-y-8;
   }
 
   @media (min-width: 1024px) {
-    .page-grid {
-      grid-template-columns: 260px minmax(0, 1fr) 280px;
-      grid-template-areas: 'members main pulse';
+    .stats-page {
+      max-width: none;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 2rem;
+      align-items: start;
     }
   }
 
