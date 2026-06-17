@@ -279,7 +279,7 @@ async function main() {
           deviceScaleFactor: viewport.width < 500 ? 2 : 1,
         })
 
-        await page.route('**/feed/latest.json', async (route) => {
+        await page.route('**/feed/latest.json**', async (route) => {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
