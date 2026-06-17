@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import Home from './Home'
@@ -90,10 +90,13 @@ vi.mock('../api/client', () => ({
 
 describe('Home', () => {
   it('renders the feed with a digestible headline', async () => {
-    render(<Home />)
+    const { container } = render(<Home />)
     expect(screen.getByRole('heading', { name: 'What is Congress Doing?' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-    expect(screen.getByText('Passed')).toBeInTheDocument()
-    expect(screen.getByText('52–47')).toBeInTheDocument()
+
+    const front = container.querySelector('.flip-card-front')
+    expect(front).not.toBeNull()
+    expect(within(front as HTMLElement).getByText('Flip for vote details ↺')).toBeInTheDocument()
+    expect(within(front as HTMLElement).queryByText('Passed')).not.toBeInTheDocument()
   })
 })

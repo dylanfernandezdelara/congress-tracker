@@ -51,6 +51,24 @@ describe('FeedCard', () => {
     expect(text).not.toBe(longDigest.trim())
   })
 
+  it('shows vote details on the back face, not the front', () => {
+    const { container } = render(<FeedCard item={makeItem()} />)
+
+    expect(container.querySelector('.flip-card-front')?.textContent).not.toContain('Passed')
+    expect(container.querySelector('.flip-card-front')?.textContent).not.toContain('52–47')
+    expect(container.querySelector('.flip-card-back')?.textContent).toContain('Vote details')
+    expect(container.querySelector('.flip-card-back')?.textContent).toContain('Passed')
+    expect(container.querySelector('.flip-card-back')?.textContent).toContain('52–47')
+  })
+
+  it('shows the flip hint for vote details on the front face', () => {
+    const { container } = render(<FeedCard item={makeItem()} />)
+
+    expect(container.querySelector('.flip-card-front')?.textContent).toContain(
+      'Flip for vote details ↺',
+    )
+  })
+
   it('keeps the full official CRS summary on the back', () => {
     const { container } = render(<FeedCard item={makeItem()} />)
     const backSummary = container.querySelector('.flip-card-back .whitespace-pre-wrap')

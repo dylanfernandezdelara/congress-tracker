@@ -228,17 +228,6 @@ export default function Home() {
 
         {showFeed ? (
           <section id="feed-top" className="space-y-5">
-            {isMobile ? (
-              <FeedPagination
-                page={page}
-                pageCount={pageCount}
-                hasMore={hasMore}
-                isLoading={feed.isLoading}
-                onPrevious={() => goToPage(page - 1)}
-                onNext={() => goToPage(page + 1)}
-              />
-            ) : null}
-
             {isPageTransition ? <FeedSkeleton /> : null}
 
             {!isPageTransition
