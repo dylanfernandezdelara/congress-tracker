@@ -60,3 +60,16 @@ for (const key of ['localStorage', 'sessionStorage'] as const) {
     Object.defineProperty(jsdomWindow, key, descriptor)
   }
 }
+
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })
+}
