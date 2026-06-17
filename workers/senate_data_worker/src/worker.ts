@@ -10,7 +10,31 @@ export default {
   fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
     return handleFetch(request, env);
   },
-  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runFeedPipeline(env).then(() => undefined));
+  scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      runFeedPipeline(env)
+        .then((result) => {
+          console.log(
+            JSON.stringify({
+              event: "feed_pipeline_complete",
+              cron: controller.cron,
+              scheduledTime: controller.scheduledTime,
+              ...result,
+            }),
+          );
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            JSON.stringify({
+              event: "feed_pipeline_failed",
+              cron: controller.cron,
+              scheduledTime: controller.scheduledTime,
+              error: message,
+            }),
+          );
+          throw err;
+        }),
+    );
   },
 } satisfies ExportedHandler<Env>;

@@ -60,6 +60,21 @@ function withinLookback(isoDate: string, lookbackStart: string): boolean {
   return voteDateFromIso(isoDate) >= lookbackStart;
 }
 
+function newestVoteDateOnPage(items: HouseVoteListItem[]): string | null {
+  if (items.length === 0) return null;
+  let newest = voteDateFromIso(items[0]!.startDate);
+  for (const item of items) {
+    const date = voteDateFromIso(item.startDate);
+    if (date > newest) newest = date;
+  }
+  return newest;
+}
+
+function pageEntirelyBeforeLookback(items: HouseVoteListItem[], lookbackStart: string): boolean {
+  const newest = newestVoteDateOnPage(items);
+  return newest !== null && newest < lookbackStart;
+}
+
 export async function ingestHousePassageVotes(
   env: Env,
   lookbackStart: string | null,
@@ -119,9 +134,14 @@ export async function ingestHousePassageVotes(
       });
     }
 
-    const oldest = items[items.length - 1];
-    if (lookbackStart && oldest && !withinLookback(oldest.startDate, lookbackStart)) {
-      break;
+    if (lookbackStart && pageEntirelyBeforeLookback(items, lookbackStart)) {
+      // Congress.gov returns House votes oldest-first. Early pages can predate the
+      // lookback window; keep paging until we reach recent votes.
+      nextUrl = data.pagination?.next ?? null;
+      if (nextUrl && !nextUrl.includes("api_key=")) {
+        nextUrl += nextUrl.includes("?") ? `&api_key=${apiKey}` : `?api_key=${apiKey}`;
+      }
+      continue;
     }
 
     nextUrl = data.pagination?.next ?? null;
