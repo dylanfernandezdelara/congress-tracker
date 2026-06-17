@@ -27,7 +27,6 @@ export function SiteHeader() {
       <ThemeToggle />
       <h1 className="site-header-title">What is Congress Doing?</h1>
       <p className="site-header-meta">{timestamp} · Washington, DC</p>
-      <div className="site-header-rule border-t border-border" aria-hidden="true" />
     </header>
   )
 }

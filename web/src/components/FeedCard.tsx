@@ -19,6 +19,34 @@ type FeedCardProps = {
   item: FeedItem
 }
 
+function PassageVoteDetails({ item }: { item: FeedItem }) {
+  if (item.passage_votes.length === 0) {
+    return <p className="text-[13px] text-faint">No passage vote recorded yet.</p>
+  }
+
+  return (
+    <div className="space-y-3">
+      {item.passage_votes.map((v) => (
+        <div key={`${v.chamber}-${v.date}-${v.question}`} className="space-y-1.5">
+          <div className="space-y-0.5">
+            <div className="flex items-baseline justify-between gap-3 text-[13px]">
+              <p className={`font-medium ${voteResultClass(v.result)}`}>{v.result}</p>
+              <p className="shrink-0 text-secondary">
+                {v.yeas}–{v.nays}
+              </p>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 text-[13px]">
+              <p className="font-medium text-foreground">{v.chamber}</p>
+              <p className="shrink-0 text-faint">{formatVoteDate(v.date)}</p>
+            </div>
+          </div>
+          <VoteSplitBar yeas={v.yeas} nays={v.nays} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function VoteSplitBar({ yeas, nays }: { yeas: number; nays: number }) {
   const total = yeas + nays
   if (total === 0) {
@@ -90,48 +118,20 @@ export function FeedCard({ item }: FeedCardProps) {
         {body}
       </p>
 
-      <div className="feed-card-footer mt-4 w-full border-t border-border pt-5">
-        {item.passage_votes.length > 0 ? (
-          <div className="space-y-3">
-            {item.passage_votes.map((v) => (
-              <div key={`${v.chamber}-${v.date}-${v.question}`} className="space-y-1.5">
-                <div className="space-y-0.5">
-                  <div className="flex items-baseline justify-between gap-3 text-[13px]">
-                    <p className={`font-medium ${voteResultClass(v.result)}`}>{v.result}</p>
-                    <p className="shrink-0 text-secondary">
-                      {v.yeas}–{v.nays}
-                    </p>
-                  </div>
-                  <div className="flex items-baseline justify-between gap-3 text-[13px]">
-                    <p className="font-medium text-foreground">{v.chamber}</p>
-                    <p className="shrink-0 text-faint">{formatVoteDate(v.date)}</p>
-                  </div>
-                </div>
-                <VoteSplitBar yeas={v.yeas} nays={v.nays} />
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        <footer
-          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 ${
-            item.passage_votes.length > 0 ? 'pt-4' : ''
-          }`}
+      <footer className="feed-card-footer mt-4 flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-5">
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="congress-link shrink-0 whitespace-nowrap text-[13px]"
+          onClick={(e) => e.stopPropagation()}
         >
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="congress-link shrink-0 whitespace-nowrap text-[13px]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Read on congress.gov ↗
-          </a>
-          <p className="flip-card-flip-hint min-w-0 text-right text-[12px] text-secondary">
-            Flip for official text ↺
-          </p>
-        </footer>
-      </div>
+          Read on congress.gov ↗
+        </a>
+        <p className="flip-card-flip-hint min-w-0 text-right text-[12px] text-secondary">
+          Flip for vote details ↺
+        </p>
+      </footer>
     </div>
   )
 
@@ -139,9 +139,14 @@ export function FeedCard({ item }: FeedCardProps) {
     <div className="feed-card-surface flex flex-col">
       <div>
         <p className="text-[11px] text-faint">{docket}</p>
-        <p className="mt-1 text-[11px] uppercase tracking-widest text-faint">
-          Official CRS summary
-        </p>
+        <p className="mt-1 text-[11px] uppercase tracking-widest text-faint">Vote details</p>
+        <div className="mt-3">
+          <PassageVoteDetails item={item} />
+        </div>
+      </div>
+
+      <div className="mt-5 border-t border-border pt-5">
+        <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
 
         {isProcedural && item.bill.title ? (
           <p className="mt-2 text-[12px] leading-relaxed text-faint">{item.bill.title}</p>
@@ -159,14 +164,14 @@ export function FeedCard({ item }: FeedCardProps) {
             ))}
           </ul>
         ) : null}
-      </div>
 
-      <div
-        className={`summary-fade-container ${keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}`}
-      >
-        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
-          {item.raw_summary_text ?? 'No official CRS summary on file.'}
-        </p>
+        <div
+          className={`summary-fade-container ${keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}`}
+        >
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
+            {item.raw_summary_text ?? 'No official CRS summary on file.'}
+          </p>
+        </div>
       </div>
 
       <footer className="mt-4 border-t border-border pt-4 text-right">
@@ -175,5 +180,13 @@ export function FeedCard({ item }: FeedCardProps) {
     </div>
   )
 
-  return <FlipCard front={front} back={back} titleId={headingId} />
+  return (
+    <FlipCard
+      front={front}
+      back={back}
+      titleId={headingId}
+      flipLabel="Flip to vote details"
+      backLabel="Back to plain summary"
+    />
+  )
 }

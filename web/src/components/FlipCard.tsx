@@ -161,7 +161,7 @@ export function FlipCard({
             ref={backClipRef}
             className={`flip-card-back-clip ${backScrolledToEnd ? 'is-scrolled-to-end' : ''}`}
             role="region"
-            aria-label="Official summary"
+            aria-label="Vote details and official summary"
             tabIndex={flipped ? 0 : -1}
             onScroll={updateBackScrollEnd}
             onKeyDown={onBackClipKeyDown}
