@@ -14,12 +14,16 @@ jobs:
       - name: Trigger production feed ingest
         env:
           PIPELINE_ADMIN_TOKEN: ${{ secrets.PIPELINE_ADMIN_TOKEN }}
-          WORKER_URL: https://congress-tracker-api.fernandezdelaradylan.workers.dev
+          WORKER_URL: ${{ vars.WORKER_URL || 'https://congress-tracker-api.fernandezdelaradylan.workers.dev' }}
         run: |
           if [ -z "${PIPELINE_ADMIN_TOKEN}" ]; then
-            echo "PIPELINE_ADMIN_TOKEN secret is not configured; skipping backup ingest."
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "PIPELINE_ADMIN_TOKEN secret is required for scheduled backup ingest."
+              exit 1
+            fi
+            echo "PIPELINE_ADMIN_TOKEN secret is not configured; skipping manual ingest."
             exit 0
           fi
-          curl -fsS \
+          curl -fsS --max-time 600 \
             -H "Authorization: Bearer ${PIPELINE_ADMIN_TOKEN}" \
             "${WORKER_URL}/__pipeline/run/feed"

@@ -83,6 +83,13 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 `session-backfill` then `member-votes` against the target Worker before expecting left-rail
 member spotlights. Local offline: `npm run seed` populates sample sidebar data.
 
+**Daily ingest (production):** Cloudflare cron runs `runFeedPipeline` at **10:00 UTC** (see
+`[triggers]` in `workers/senate_data_worker/wrangler.toml`). The pipeline only upserts **new**
+passage votes (skips known roll-call keys) and writes digests for bills that do not yet have one
+(capped by `DIGEST_MAX_NEW_REWRITES`). GitHub Actions backup: `.github/workflows/daily-ingest.yml`
+at 10:15 UTC — requires `PIPELINE_ADMIN_TOKEN` in **GitHub Actions secrets** (same value as the
+Worker secret) and optionally `WORKER_URL` in repository variables.
+
 Shared stats JSON types live in `shared/stats-api-types.ts` (imported by worker + web).
 
 ## Project structure
