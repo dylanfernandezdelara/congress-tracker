@@ -55,3 +55,37 @@ export interface FeedItem {
   passage_votes: FeedPassageVote[];
   latest_passage_date: string;
 }
+
+export type {
+  ChamberPulse,
+  ChamberStats,
+  CloseVoteEntry,
+  DateRange,
+  DefectorEntry,
+  DefectorsResponse,
+  PortfolioEntry,
+  PortfolioMovers,
+  PortfoliosResponse,
+  PolicyHeatEntry,
+  PulseStatsResponse,
+  SessionStatsResponse,
+  ThisWeekSummary,
+} from "../../../shared/stats-api-types";
+
+export interface MemberRecord {
+  bioguideId: string;
+  name: string;
+  chamber: Chamber;
+  party: string | null;
+  state: string | null;
+  district: number | null;
+}
+
+export interface MemberVoteRecord {
+  chamber: Chamber;
+  congress: number;
+  session: number;
+  rollNumber: number;
+  bioguideId: string;
+  position: string;
+}

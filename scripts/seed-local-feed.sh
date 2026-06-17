@@ -63,6 +63,42 @@ CREATE TABLE IF NOT EXISTS bill_digests (
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, number)
 );
+CREATE TABLE IF NOT EXISTS members (
+  bioguide_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  chamber TEXT NOT NULL,
+  party TEXT,
+  state TEXT,
+  district INTEGER,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS member_votes (
+  chamber TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  roll_number INTEGER NOT NULL,
+  bioguide_id TEXT NOT NULL,
+  position TEXT NOT NULL,
+  PRIMARY KEY (chamber, congress, session, roll_number, bioguide_id)
+);
+CREATE TABLE IF NOT EXISTS financial_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bioguide_id TEXT NOT NULL,
+  ticker TEXT,
+  asset_description TEXT,
+  transaction_type TEXT NOT NULL,
+  amount_min INTEGER,
+  amount_max INTEGER,
+  transaction_date TEXT NOT NULL,
+  filed_date TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+  bioguide_id TEXT NOT NULL,
+  as_of_date TEXT NOT NULL,
+  estimated_value_usd REAL,
+  session_return_pct REAL NOT NULL,
+  PRIMARY KEY (bioguide_id, as_of_date)
+);
 
 INSERT OR REPLACE INTO votes
   (chamber, congress, session, roll_number, bill_congress, bill_type, bill_number, question, result, yeas, nays, vote_date, is_passage)
@@ -86,6 +122,32 @@ VALUES
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"House passes a federal spending oversight bill (local sample)","what_it_does":"Adds reporting requirements for large federal contracts and creates a public dashboard for tracking agency spending.","key_points":["Requires agencies to publish contract performance data","Stands up a public spending dashboard","Adds penalties for repeated reporting failures"],"terms_explained":[{"term":"Federal contract","plain":"An agreement where the government pays a company to provide goods or services."},{"term":"Oversight","plain":"Monitoring done to make sure money and programs are used as intended."}]}',
    '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO members (bioguide_id, name, chamber, party, state, district, updated_at) VALUES
+  ('LOCAL:H001', 'Rep. Sample Crossover (local)', 'House', 'D', 'CA', 12, '${D_RECENT}T00:00:00.000Z'),
+  ('LOCAL:H002', 'Rep. Sample Loyal (local)', 'House', 'D', 'NY', 10, '${D_RECENT}T00:00:00.000Z'),
+  ('LOCAL:S001', 'Sen. Sample Crossover (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
+  ('LOCAL:S002', 'Sen. Sample Loyal (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
+  ('LOCAL:H003', 'Rep. Portfolio Gainer (local)', 'House', 'D', 'CA', NULL, '${D_RECENT}T00:00:00.000Z'),
+  ('LOCAL:H004', 'Rep. Portfolio Loser (local)', 'House', 'R', 'SC', NULL, '${D_RECENT}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO member_votes (chamber, congress, session, roll_number, bioguide_id, position) VALUES
+  ('House', 119, 2, 9001, 'LOCAL:H001', 'Nay'),
+  ('House', 119, 2, 9001, 'LOCAL:H002', 'Yea'),
+  ('House', 119, 2, 9003, 'LOCAL:H001', 'Nay'),
+  ('House', 119, 2, 9003, 'LOCAL:H002', 'Yea'),
+  ('Senate', 119, 2, 9002, 'LOCAL:S001', 'Nay'),
+  ('Senate', 119, 2, 9002, 'LOCAL:S002', 'Yea');
+
+INSERT INTO financial_transactions (bioguide_id, ticker, asset_description, transaction_type, amount_min, amount_max, transaction_date, filed_date) VALUES
+  ('LOCAL:H003', 'NVDA', 'NVDA common stock', 'purchase', 50000, 100000, '${D_RECENT}', '${D_RECENT}'),
+  ('LOCAL:H004', 'BA', 'BA common stock', 'sale', 1000, 15000, '${D_RECENT}', '${D_RECENT}');
+
+INSERT OR REPLACE INTO portfolio_snapshots (bioguide_id, as_of_date, estimated_value_usd, session_return_pct) VALUES
+  ('LOCAL:H003', '${D_RECENT}', 250000, 18.6),
+  ('LOCAL:H004', '${D_RECENT}', 80000, -4.1),
+  ('LOCAL:S001', '${D_MID}', 120000, 6.2),
+  ('LOCAL:S002', '${D_MID}', 95000, -2.5);
 SQL
 
 if [[ "${SEED_PRINT_SQL:-}" == "1" ]]; then
@@ -97,7 +159,7 @@ SEED_FILE="$(mktemp -t seed-local-feed.XXXXXX.sql)"
 trap 'rm -f "${SEED_FILE}"' EXIT
 printf '%s\n' "${SEED_SQL}" >"${SEED_FILE}"
 
-echo "Seeding local D1 (${DB_NAME}) with sample passage votes + digests..."
+echo "Seeding local D1 (${DB_NAME}) with sample passage votes, digests, and sidebar stats..."
 # Run from the worker dir so --local resolves the same .wrangler/state store
 # that `npm run dev:worker` (wrangler dev) uses.
 ( cd "${WORKER_DIR}" && npx wrangler d1 execute "${DB_NAME}" --local --file "${SEED_FILE}" )
@@ -108,6 +170,7 @@ Local feed seeded. Next:
   npm run dev:worker   # http://127.0.0.1:8787
   npm run dev:web      # http://127.0.0.1:5173
   curl -fsS http://127.0.0.1:8787/feed/latest.json
+  curl -fsS http://127.0.0.1:8787/stats/session.json
 
 Seeded rows are clearly marked "(local sample)" and contain no live data.
 DONE

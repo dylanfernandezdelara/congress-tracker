@@ -1,6 +1,9 @@
 # CORS: use * for local dev (Vite :5173 -> API :8787); set a specific origin in prod
 ALLOWED_ORIGIN=*
 
+# Local-only synthetic disclosure seeding (GET /__pipeline/run/disclosures). Never set in production.
+ENABLE_SAMPLE_DISCLOSURES=1
+
 # Copy to .dev.vars and set locally (never commit real values):
 # CONGRESS_API_KEY=...
 # OPENROUTER_API_KEY=...

@@ -48,6 +48,85 @@ describe("HTTP API", () => {
     expect(body).toEqual([]);
   });
 
+  it("returns session stats", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/session.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      congress: 119,
+      session: 2,
+      house: { passage_vote_count: 0 },
+      senate: { passage_vote_count: 0 },
+    });
+  });
+
+  it("returns pulse stats", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/pulse.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ congress: 119, session: 2, house: { close_votes: [] } });
+  });
+
+  it("requires chamber for defectors", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/defectors.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("returns empty defectors for chamber", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/defectors.json?chamber=House"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ chamber: "House", defectors: [] });
+  });
+
+  it("rejects write pipelines in production when no admin token is set", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/__pipeline/run/member-votes"),
+      createMockEnv({ ALLOWED_ORIGIN: "https://congress.example" }) as any
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it("allows write pipelines in local dev mode (ALLOWED_ORIGIN=*)", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/__pipeline/run/member-votes"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: true, rollsRemaining: 0 });
+  });
+
+  it("requires a matching token when PIPELINE_ADMIN_TOKEN is set", async () => {
+    const env = createMockEnv({
+      ALLOWED_ORIGIN: "https://congress.example",
+      PIPELINE_ADMIN_TOKEN: "s3cret",
+    });
+    const denied = await handlePublicFetch(
+      new Request("https://worker.example.com/__pipeline/run/member-votes"),
+      env as any
+    );
+    expect(denied.status).toBe(401);
+
+    const allowed = await handlePublicFetch(
+      new Request("https://worker.example.com/__pipeline/run/member-votes?token=s3cret"),
+      env as any
+    );
+    expect(allowed.status).toBe(200);
+  });
+
   it("returns 404 for unknown routes when no asset binding is present", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/briefings/latest.json"),

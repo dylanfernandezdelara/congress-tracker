@@ -82,6 +82,7 @@ async function auditPage(page) {
     const viewportHeight = window.innerHeight
     const toggle = document.querySelector('.theme-toggle')
     const heading = document.querySelector('h1')
+    const membersSidebar = document.querySelector('[aria-label="Members in Congress"]')
     const card = document.querySelector('.flip-card')
     const headline = document.querySelector('.flip-card h2')
     const issues = []
@@ -100,6 +101,7 @@ async function auditPage(page) {
 
     if (!toggle) issues.push('theme toggle missing')
     if (!heading) issues.push('page heading missing')
+    if (!membersSidebar) issues.push('members sidebar missing')
     if (!card) issues.push('feed card missing')
 
     if (toggle) {
@@ -195,6 +197,62 @@ async function auditPage(page) {
   })
 }
 
+const MOCK_SESSION_STATS = {
+  congress: 119,
+  session: 2,
+  as_of: '2026-06-14T00:00:00.000Z',
+  house: {
+    passage_vote_count: 2,
+    unique_bills_passed: 2,
+    avg_margin: 12,
+    closest_margin: 5,
+    date_range: { first: '2026-06-01', last: '2026-06-05' },
+    coverage_days: 5,
+  },
+  senate: {
+    passage_vote_count: 1,
+    unique_bills_passed: 1,
+    avg_margin: 5,
+    closest_margin: 5,
+    date_range: { first: '2026-06-05', last: '2026-06-05' },
+    coverage_days: 1,
+  },
+}
+
+const MOCK_PULSE_STATS = {
+  congress: 119,
+  session: 2,
+  as_of: '2026-06-14T00:00:00.000Z',
+  house: {
+    close_votes: [],
+    policy_heat: [{ policy_area: 'Defense', bill_count: 1 }],
+    this_week: { count: 1, headline: 'This week sample headline', bill_type: 's', bill_number: 2, congress: 119 },
+  },
+  senate: {
+    close_votes: [],
+    policy_heat: [],
+    this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
+  },
+}
+
+const MOCK_DEFECTORS = {
+  chamber: 'House',
+  congress: 119,
+  session: 2,
+  defectors: [],
+  as_of: '2026-06-14T00:00:00.000Z',
+}
+
+const MOCK_PORTFOLIOS = {
+  chamber: 'House',
+  congress: 119,
+  session: 2,
+  gainers: [],
+  losers: [],
+  disclaimer: 'Estimates from public disclosures.',
+  as_of: '2026-06-14T00:00:00.000Z',
+}
+
 async function main() {
   await waitForServer(baseUrl)
 
@@ -220,6 +278,38 @@ async function main() {
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify(MOCK_FEED),
+          })
+        })
+
+        await page.route('**/stats/session.json', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(MOCK_SESSION_STATS),
+          })
+        })
+
+        await page.route('**/stats/pulse.json', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(MOCK_PULSE_STATS),
+          })
+        })
+
+        await page.route('**/stats/defectors.json**', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(MOCK_DEFECTORS),
+          })
+        })
+
+        await page.route('**/stats/portfolios.json**', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(MOCK_PORTFOLIOS),
           })
         })
 

@@ -30,7 +30,7 @@ immediately, no API keys required.
 | Dependency install | `.cursor/environment.json` runs `cursor-cloud-setup.sh` on boot | `npm run setup` |
 | `.dev.vars` file | Created from the example by setup | `npm run setup` creates it; edit to add real keys |
 | Feed data | Live ingestion with injected `CONGRESS_API_KEY` / `OPENROUTER_API_KEY` | `npm run seed` (offline sample) **or** real keys + ingestion curl |
-| Cloudflare auth | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` injected | `wrangler login` (only needed for `npm run preview` / deploy) |
+| Cloudflare auth | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` injected | `npx wrangler login` (or API token env vars) — needed for `npm run preview` and remote D1 MCP queries |
 | Node version | Pinned image | `.nvmrc` (Node 20, matches CI) — run `nvm use` |
 | Sanity check | Agent ship checklist | `npm run verify:local` |
 

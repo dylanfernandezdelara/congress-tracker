@@ -1,12 +1,48 @@
 import { useState } from 'react'
 
-import { fetchFeed } from '../api/client'
-import type { FeedItem } from '../api/types'
+import {
+  fetchDefectors,
+  fetchFeed,
+  fetchPortfolioStats,
+  fetchPulseStats,
+  fetchSessionStats,
+} from '../api/client'
+import type {
+  DefectorEntry,
+  FeedItem,
+  PortfolioMovers,
+  PulseStatsResponse,
+  SessionStatsResponse,
+} from '../api/types'
 import { FeedCard } from '../components/FeedCard'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { LeftSidebar } from '../components/LeftSidebar'
+import { PageShell } from '../components/PageShell'
+import { RightRail } from '../components/RightRail'
 import { useAsyncData } from '../hooks/useAsyncData'
 
 const LOOKBACK_DAYS = 45
+
+/**
+ * Load a per-chamber stat for both chambers, tolerating a single-chamber
+ * failure. Throws only when both chambers reject (so the sidebar shows an
+ * error), otherwise falls back to `empty` for the failed chamber.
+ */
+async function bothChambers<T>(
+  load: (chamber: 'House' | 'Senate') => Promise<T>,
+  empty: T,
+): Promise<{ house: T; senate: T }> {
+  const [houseResult, senateResult] = await Promise.allSettled([
+    load('House'),
+    load('Senate'),
+  ])
+  if (houseResult.status === 'rejected' && senateResult.status === 'rejected') {
+    throw houseResult.reason
+  }
+  return {
+    house: houseResult.status === 'fulfilled' ? houseResult.value : empty,
+    senate: senateResult.status === 'fulfilled' ? senateResult.value : empty,
+  }
+}
 
 function FeedSkeleton() {
   return (
@@ -20,59 +56,99 @@ function FeedSkeleton() {
 
 export default function Home() {
   const [retryKey, setRetryKey] = useState(0)
-  const { data, error, isLoading } = useAsyncData<FeedItem[]>({
+
+  const reload = () => setRetryKey((k) => k + 1)
+
+  const feed = useAsyncData<FeedItem[]>({
     deps: [retryKey],
     load: fetchFeed,
     mapError: () => "Couldn't load the feed.",
   })
 
-  const showFeed = !isLoading && !error && data && data.length > 0
+  const session = useAsyncData<SessionStatsResponse>({
+    deps: [retryKey],
+    load: fetchSessionStats,
+    mapError: () => "Couldn't load session stats.",
+  })
+
+  const pulse = useAsyncData<PulseStatsResponse>({
+    deps: [retryKey],
+    load: fetchPulseStats,
+    mapError: () => "Couldn't load legislative pulse.",
+  })
+
+  const defectors = useAsyncData<{ house: DefectorEntry[]; senate: DefectorEntry[] }>({
+    deps: [retryKey],
+    load: () =>
+      bothChambers<DefectorEntry[]>(
+        async (chamber) => (await fetchDefectors(chamber)).defectors,
+        [],
+      ),
+    mapError: () => "Couldn't load defectors.",
+  })
+
+  const portfolios = useAsyncData<{ house: PortfolioMovers; senate: PortfolioMovers }>({
+    deps: [retryKey],
+    load: () =>
+      bothChambers<PortfolioMovers>(fetchPortfolioStats, {
+        gainers: [],
+        losers: [],
+        disclaimer: 'Estimates from public disclosures.',
+      }),
+    mapError: () => "Couldn't load portfolio stats.",
+  })
+
+  const showFeed = !feed.isLoading && !feed.error && feed.data && feed.data.length > 0
 
   return (
-    <main className="space-y-5">
-      <header className="space-y-4 pb-1">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-          <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-1">
-            <h1 className="flex items-center gap-1.5 text-[15px] font-medium tracking-normal text-foreground">
-              Congress Tracker
-              <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden="true" />
-            </h1>
-            <ThemeToggle />
+    <PageShell
+      leftSidebar={
+        <LeftSidebar
+          session={session.data}
+          defectors={defectors.data}
+          portfolios={portfolios.data}
+          sessionLoading={session.isLoading}
+          defectorsLoading={defectors.isLoading}
+          portfoliosLoading={portfolios.isLoading}
+          sessionError={session.error}
+          defectorsError={defectors.error}
+          portfoliosError={portfolios.error}
+          onRetry={reload}
+        />
+      }
+      rightRail={
+        <RightRail
+          pulse={pulse.data}
+          loading={pulse.isLoading}
+          error={pulse.error}
+          onRetry={reload}
+        />
+      }
+    >
+      <main className="space-y-5">
+        {feed.isLoading ? <FeedSkeleton /> : null}
+
+        {feed.error ? (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-8 text-center">
+            <p className="text-sm text-secondary">{feed.error}</p>
+            <button type="button" className="ghost-button" onClick={() => setRetryKey((k) => k + 1)}>
+              Retry
+            </button>
           </div>
-          {data && !error && !isLoading ? (
-            <p className="text-xs text-faint">
-              {data.length} {data.length === 1 ? 'bill' : 'bills'} · last {LOOKBACK_DAYS} days
-            </p>
-          ) : null}
-        </div>
-        <p className="text-sm text-secondary">
-          Plain-English summaries of every bill that just passed the House or Senate.
-        </p>
-        <div className="border-t border-border" />
-      </header>
+        ) : null}
 
-      {isLoading ? <FeedSkeleton /> : null}
+        {!feed.isLoading && !feed.error && feed.data?.length === 0 ? (
+          <p className="text-sm text-faint">No passage votes in the last {LOOKBACK_DAYS} days.</p>
+        ) : null}
 
-      {error ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-8 text-center">
-          <p className="text-sm text-secondary">{error}</p>
-          <button type="button" className="ghost-button" onClick={() => setRetryKey((k) => k + 1)}>
-            Retry
-          </button>
-        </div>
-      ) : null}
-
-      {!isLoading && !error && data?.length === 0 ? (
-        <p className="text-sm text-faint">No passage votes in the last {LOOKBACK_DAYS} days.</p>
-      ) : null}
-
-      {showFeed ? (
-        <section className="space-y-5">
-          {data.map((item) => (
-            <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
-          ))}
-        </section>
-      ) : null}
-    </main>
+        {showFeed && feed.data ? (
+          <section className="space-y-5">
+            {feed.data.map((item) => (
+              <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
+            ))}
+          </section>
+        ) : null}
+      </main>
+    </PageShell>
   )
 }

@@ -76,7 +76,7 @@ export function parseSenateVoteMenuXml(xml: string, congress: number, session: n
 
 export async function ingestSenatePassageVotes(
   env: Env,
-  lookbackStart: string,
+  lookbackStart: string | null,
   knownKeys: ReadonlySet<string> = new Set()
 ): Promise<IngestVotesResult> {
   const congress = congressNumber(env);
@@ -88,7 +88,7 @@ export async function ingestSenatePassageVotes(
   const votes: PassageVote[] = [];
   let skipped = 0;
   for (const vote of all) {
-    if (vote.voteDate < lookbackStart) continue;
+    if (lookbackStart && vote.voteDate < lookbackStart) continue;
     if (knownKeys.has(voteKey(vote))) {
       skipped += 1;
       continue;

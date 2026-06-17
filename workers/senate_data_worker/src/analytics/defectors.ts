@@ -1,0 +1,142 @@
+import type { Chamber, DefectorEntry } from "../types";
+import { getMembersByIds } from "../d1/members";
+import { selectMemberVotesForSession } from "../d1/member-votes";
+
+const YEA_POSITIONS = new Set(["Yea", "Aye", "Yes"]);
+const NAY_POSITIONS = new Set(["Nay", "No"]);
+
+function normalizePosition(position: string): "yea" | "nay" | "other" {
+  const trimmed = position.trim();
+  if (YEA_POSITIONS.has(trimmed)) return "yea";
+  if (NAY_POSITIONS.has(trimmed)) return "nay";
+  return "other";
+}
+
+/**
+ * Majority side (yea/nay) for each party on a single roll. Computed once per
+ * roll so the per-member defection check is O(members) rather than O(members²).
+ */
+function partyMajoritiesForRoll(
+  positions: Array<{ party: string | null; position: string }>
+): Map<string, "yea" | "nay" | null> {
+  const tallies = new Map<string, { yea: number; nay: number }>();
+  for (const { party, position } of positions) {
+    if (!party) continue;
+    const norm = normalizePosition(position);
+    if (norm === "other") continue;
+    const tally = tallies.get(party) ?? { yea: 0, nay: 0 };
+    tally[norm] += 1;
+    tallies.set(party, tally);
+  }
+
+  const majorities = new Map<string, "yea" | "nay" | null>();
+  for (const [party, tally] of tallies) {
+    if (tally.yea === 0 && tally.nay === 0) {
+      majorities.set(party, null);
+    } else {
+      majorities.set(party, tally.yea >= tally.nay ? "yea" : "nay");
+    }
+  }
+  return majorities;
+}
+
+function congressGovMemberUrl(bioguideId: string): string {
+  if (bioguideId.startsWith("LIS:")) {
+    return "https://www.senate.gov/general/contact_information/senators_cfm.cfm";
+  }
+  return `https://www.congress.gov/member/${bioguideId.toLowerCase()}`;
+}
+
+export async function computeDefectors(
+  db: D1Database,
+  congress: number,
+  session: number,
+  chamber: Chamber,
+  limit: number
+): Promise<DefectorEntry[]> {
+  const rows = await selectMemberVotesForSession(db, congress, session, chamber);
+  if (rows.length === 0) return [];
+
+  const uniqueIds = [...new Set(rows.map((row) => row.bioguide_id))];
+  const memberRows = await getMembersByIds(db, uniqueIds);
+  const members = new Map<string, { party: string | null; state: string | null; name: string }>();
+  for (const [bioguideId, record] of memberRows) {
+    members.set(bioguideId, {
+      party: record.party,
+      state: record.state,
+      name: record.name,
+    });
+  }
+  for (const bioguideId of uniqueIds) {
+    if (!members.has(bioguideId)) {
+      members.set(bioguideId, { party: null, state: null, name: bioguideId });
+    }
+  }
+
+  const byRoll = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const key = `${row.chamber}:${row.roll_number}`;
+    const list = byRoll.get(key) ?? [];
+    list.push(row);
+    byRoll.set(key, list);
+  }
+
+  const scores = new Map<
+    string,
+    { crossVotes: number; decidingScore: number; recent?: DefectorEntry["recent_example"] }
+  >();
+
+  for (const rollRows of byRoll.values()) {
+    const margin = Math.abs(rollRows[0].yeas - rollRows[0].nays);
+    const weight = 1 / Math.max(1, margin);
+    const partyMajorities = partyMajoritiesForRoll(
+      rollRows.map((r) => ({
+        party: members.get(r.bioguide_id)?.party ?? null,
+        position: r.position,
+      }))
+    );
+
+    for (const row of rollRows) {
+      const member = members.get(row.bioguide_id);
+      if (!member?.party) continue;
+      const partySide = partyMajorities.get(member.party) ?? null;
+      const memberSide = normalizePosition(row.position);
+      if (partySide === null || memberSide === "other" || memberSide === partySide) continue;
+
+      const current = scores.get(row.bioguide_id) ?? { crossVotes: 0, decidingScore: 0 };
+      current.crossVotes += 1;
+      current.decidingScore += weight;
+      // Rows arrive newest-first (ORDER BY vote_date DESC), so the first cross
+      // vote we see for a member is their most recent — keep that one.
+      if (!current.recent) {
+        current.recent = {
+          bill_type: row.bill_type,
+          bill_number: row.bill_number,
+          congress: row.bill_congress,
+          margin,
+        };
+      }
+      scores.set(row.bioguide_id, current);
+    }
+  }
+
+  const defectors: DefectorEntry[] = [];
+  for (const [bioguideId, score] of scores) {
+    const member = members.get(bioguideId);
+    if (!member) continue;
+    defectors.push({
+      bioguide_id: bioguideId,
+      name: member.name,
+      party: member.party ?? "?",
+      state: member.state ?? "?",
+      cross_vote_count: score.crossVotes,
+      deciding_score: score.decidingScore,
+      congress_gov_url: congressGovMemberUrl(bioguideId),
+      recent_example: score.recent,
+    });
+  }
+
+  return defectors
+    .sort((a, b) => b.deciding_score - a.deciding_score || b.cross_vote_count - a.cross_vote_count)
+    .slice(0, limit);
+}

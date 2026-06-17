@@ -29,3 +29,20 @@ export interface FeedItem {
   passage_votes: FeedPassageVote[]
   latest_passage_date: string
 }
+
+export type {
+  ChamberPulse,
+  ChamberStats,
+  CloseVoteEntry,
+  DateRange,
+  DefectorEntry,
+  DefectorsResponse,
+  PortfolioEntry,
+  PortfolioMovers,
+  PortfoliosResponse,
+  PolicyHeatEntry,
+  PulseStatsResponse,
+  SessionStatsResponse,
+  StatsChamber,
+  ThisWeekSummary,
+} from '../../../shared/stats-api-types'
