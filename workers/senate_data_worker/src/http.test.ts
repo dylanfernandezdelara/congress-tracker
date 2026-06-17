@@ -54,6 +54,32 @@ describe("HTTP API", () => {
     });
   });
 
+  it("parses feed pagination query params", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?limit=5&offset=10"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({
+      items: [],
+      total: 0,
+      limit: 5,
+      offset: 10,
+      has_more: false,
+    });
+  });
+
+  it("clamps feed offset to the max paginable window", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?limit=5&offset=999"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ limit: 5, offset: 45 });
+  });
+
   it("returns session stats", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/stats/session.json"),

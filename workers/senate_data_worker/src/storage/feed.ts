@@ -36,6 +36,7 @@ export async function buildFeedPage(
     countRecentVotedBills(env.DB, lookback),
     selectRecentVotedBills(env.DB, lookback, cappedLimit, offset),
   ]);
+  const cappedTotal = Math.min(total, FEED_MAX_BILLS);
   const items: FeedItem[] = [];
 
   for (const row of bills) {
@@ -76,10 +77,10 @@ export async function buildFeedPage(
 
   return {
     items,
-    total,
+    total: cappedTotal,
     limit: cappedLimit,
     offset,
-    has_more: offset + items.length < total,
+    has_more: offset + items.length < cappedTotal,
   };
 }
 

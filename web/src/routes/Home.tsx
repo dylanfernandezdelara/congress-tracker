@@ -63,11 +63,15 @@ function FeedSkeleton() {
 function FeedPagination({
   page,
   pageCount,
+  hasMore,
+  isLoading,
   onPrevious,
   onNext,
 }: {
   page: number
   pageCount: number
+  hasMore: boolean
+  isLoading: boolean
   onPrevious: () => void
   onNext: () => void
 }) {
@@ -82,7 +86,7 @@ function FeedPagination({
         type="button"
         className="ghost-button"
         onClick={onPrevious}
-        disabled={page <= 0}
+        disabled={page <= 0 || isLoading}
       >
         Previous
       </button>
@@ -93,7 +97,7 @@ function FeedPagination({
         type="button"
         className="ghost-button"
         onClick={onNext}
-        disabled={page >= pageCount - 1}
+        disabled={!hasMore || isLoading}
       >
         Next
       </button>
@@ -158,8 +162,13 @@ export default function Home() {
 
   const items = feed.data?.items ?? []
   const total = feed.data?.total ?? 0
+  const hasMore = feed.data?.has_more ?? false
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
-  const showFeed = !feed.isLoading && !feed.error && items.length > 0
+  const isInitialLoad = feed.isLoading && feed.data === null
+  const isPageTransition =
+    feed.isLoading && feed.data !== null && feed.data.offset !== offset
+  const visibleItems = isPageTransition ? [] : items
+  const showFeed = !feed.error && (visibleItems.length > 0 || isPageTransition)
 
   const goToPage = (nextPage: number) => {
     setPage(Math.max(0, Math.min(nextPage, pageCount - 1)))
@@ -202,7 +211,7 @@ export default function Home() {
       }
     >
       <main className="space-y-5">
-        {feed.isLoading ? <FeedSkeleton /> : null}
+        {isInitialLoad ? <FeedSkeleton /> : null}
 
         {feed.error ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-8 text-center">
@@ -213,7 +222,7 @@ export default function Home() {
           </div>
         ) : null}
 
-        {!feed.isLoading && !feed.error && total === 0 ? (
+        {!isInitialLoad && !feed.error && total === 0 ? (
           <p className="text-sm text-faint">No passage votes in the last {LOOKBACK_DAYS} days.</p>
         ) : null}
 
@@ -223,19 +232,30 @@ export default function Home() {
               <FeedPagination
                 page={page}
                 pageCount={pageCount}
+                hasMore={hasMore}
+                isLoading={feed.isLoading}
                 onPrevious={() => goToPage(page - 1)}
                 onNext={() => goToPage(page + 1)}
               />
             ) : null}
 
-            {items.map((item) => (
-              <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
-            ))}
+            {isPageTransition ? <FeedSkeleton /> : null}
+
+            {!isPageTransition
+              ? visibleItems.map((item) => (
+                  <FeedCard
+                    key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`}
+                    item={item}
+                  />
+                ))
+              : null}
 
             {isMobile ? (
               <FeedPagination
                 page={page}
                 pageCount={pageCount}
+                hasMore={hasMore}
+                isLoading={feed.isLoading}
                 onPrevious={() => goToPage(page - 1)}
                 onNext={() => goToPage(page + 1)}
               />
