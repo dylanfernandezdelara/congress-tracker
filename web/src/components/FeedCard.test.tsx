@@ -41,39 +41,49 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
 }
 
 describe('FeedCard', () => {
-  it('caps the digest summary on the front with a word-boundary ellipsis', () => {
+  it('shows the full digest summary on the front when a digest exists', () => {
     const { container } = render(<FeedCard item={makeItem()} />)
     const body = container.querySelector('.flip-card-front p.text-secondary')
     const text = body?.textContent?.trim() ?? ''
 
-    expect(text.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
-    expect(text).toMatch(/…$/)
-    expect(text).not.toBe(longDigest.trim())
+    expect(text).toBe(longDigest.trim())
+    expect(text.length).toBeGreaterThan(SUMMARY_PREVIEW_MAX_CHARS)
   })
 
-  it('shows vote details on the back face, not the front', () => {
+  it('shows vote details on the front face, not the back', () => {
     const { container } = render(<FeedCard item={makeItem()} />)
 
-    expect(container.querySelector('.flip-card-front')?.textContent).not.toContain('Passed')
-    expect(container.querySelector('.flip-card-front')?.textContent).not.toContain('52–47')
-    expect(container.querySelector('.flip-card-back')?.textContent).toContain('Vote details')
-    expect(container.querySelector('.flip-card-back')?.textContent).toContain('Passed')
-    expect(container.querySelector('.flip-card-back')?.textContent).toContain('52–47')
+    expect(container.querySelector('.flip-card-front')?.textContent).toContain('Passage votes')
+    expect(container.querySelector('.flip-card-front')?.textContent).toContain('Passed')
+    expect(container.querySelector('.flip-card-front')?.textContent).toContain('52–47')
+    expect(container.querySelector('.flip-card-back')?.textContent).not.toContain('Passed')
+    expect(container.querySelector('.flip-card-back')?.textContent).not.toContain('52–47')
   })
 
-  it('shows the flip hint for vote details on the front face', () => {
+  it('shows the flip hint for official text on the front face', () => {
     const { container } = render(<FeedCard item={makeItem()} />)
 
     expect(container.querySelector('.flip-card-front')?.textContent).toContain(
-      'Flip for vote details ↺',
+      'Flip for official text ↺',
     )
   })
 
-  it('keeps the full official CRS summary on the back', () => {
+  it('keeps only the official CRS summary on the back', () => {
     const { container } = render(<FeedCard item={makeItem()} />)
+    const back = container.querySelector('.flip-card-back')
     const backSummary = container.querySelector('.flip-card-back .whitespace-pre-wrap')
 
+    expect(back?.textContent).toContain('Official CRS summary')
+    expect(back?.textContent).not.toContain('Passage votes')
+    expect(back?.textContent).not.toContain('Point one')
     expect(backSummary?.textContent).toBe(longCrsSummary)
+  })
+
+  it('shows digest key points on the front face', () => {
+    const { container } = render(<FeedCard item={makeItem()} />)
+
+    expect(container.querySelector('.flip-card-front')?.textContent).toContain('Point one')
+    expect(container.querySelector('.flip-card-back')?.textContent).not.toContain('Point one')
   })
 
   it('wraps digest content in the front scroll face structure', () => {
@@ -91,8 +101,6 @@ describe('FeedCard', () => {
     expect(flipHint).not.toBeNull()
     const text = body?.textContent?.trim() ?? ''
     expect(text.length).toBeGreaterThan(0)
-    expect(text.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
-    expect(text).toMatch(/…$/)
     expect(body?.closest('.flip-card-front')).toBe(front)
     expect(flipHint?.closest('.flip-card-front')).toBe(front)
     expect(content?.contains(surface ?? null)).toBe(true)
@@ -168,5 +176,17 @@ describe('FeedCard', () => {
     expect(text.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
     expect(text).toMatch(/…$/)
     expect(backSummary?.textContent).toBe(longCrsSummary)
+  })
+
+  it('hides the flip hint when no raw summary is available', () => {
+    const { container } = render(
+      <FeedCard
+        item={makeItem({
+          raw_summary_text: null,
+        })}
+      />,
+    )
+
+    expect(container.querySelector('.flip-card-front .flip-card-flip-hint')).toBeNull()
   })
 })

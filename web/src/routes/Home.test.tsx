@@ -60,7 +60,7 @@ describe('Home', () => {
 
     const front = container.querySelector('.flip-card-front')
     expect(front).not.toBeNull()
-    expect(within(front as HTMLElement).getByText('Flip for vote details ↺')).toBeInTheDocument()
-    expect(within(front as HTMLElement).queryByText('Passed')).not.toBeInTheDocument()
+    expect(within(front as HTMLElement).getByText('Flip for official text ↺')).toBeInTheDocument()
+    expect(within(front as HTMLElement).getByText('Passed')).toBeInTheDocument()
   })
 })

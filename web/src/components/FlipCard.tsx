@@ -24,7 +24,7 @@ export function FlipCard({
   front,
   back,
   titleId,
-  flipLabel = 'Flip to official summary',
+  flipLabel = 'Flip to official CRS summary',
   backLabel = 'Back to plain summary',
 }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
@@ -161,7 +161,7 @@ export function FlipCard({
             ref={backClipRef}
             className={`flip-card-back-clip ${backScrolledToEnd ? 'is-scrolled-to-end' : ''}`}
             role="region"
-            aria-label="Vote details and official summary"
+            aria-label="Official CRS summary"
             tabIndex={flipped ? 0 : -1}
             onScroll={updateBackScrollEnd}
             onKeyDown={onBackClipKeyDown}

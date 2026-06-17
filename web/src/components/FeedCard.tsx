@@ -73,7 +73,7 @@ export function FeedCard({ item }: FeedCardProps) {
     : (proceduralTitle ?? trimDisplayTitle(item.bill.title ?? docket))
   const body =
     (item.digest?.what_it_does
-      ? summaryPreviewText(item.digest.what_it_does)
+      ? item.digest.what_it_does.trim()
       : item.raw_summary_text
         ? summaryPreviewText(summaryBodyText(item.raw_summary_text))
         : null) ?? 'Summary not available yet.'
@@ -81,13 +81,12 @@ export function FeedCard({ item }: FeedCardProps) {
   const keyPoints = item.digest?.key_points?.slice(0, 3) ?? []
   const policyLabel = isProcedural ? 'Procedural' : item.policy_area
   const didNotPass = billDidNotPass(item.passage_votes)
+  const hasRawSummary = Boolean(item.raw_summary_text?.trim())
 
   const front = (
     <div className="feed-card-surface flex flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <p className="whitespace-nowrap text-[12px] font-normal text-faint">
-          {docket}
-        </p>
+        <p className="whitespace-nowrap text-[12px] font-normal text-faint">{docket}</p>
         {didNotPass || policyLabel ? (
           <div className="flex flex-wrap items-center gap-2">
             {didNotPass ? (
@@ -114,9 +113,27 @@ export function FeedCard({ item }: FeedCardProps) {
         {headline}
       </h2>
 
-      <p className="mt-3 line-clamp-3 max-sm:line-clamp-none text-sm leading-relaxed text-secondary">
-        {body}
-      </p>
+      <p className="mt-3 text-sm leading-relaxed text-secondary">{body}</p>
+
+      {keyPoints.length > 0 ? (
+        <ul className="mt-4 space-y-1.5">
+          {keyPoints.map((point) => (
+            <li key={point} className="flex gap-2 text-[13px] leading-relaxed text-secondary">
+              <span className="text-faint" aria-hidden="true">
+                –
+              </span>
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="mt-5 border-t border-border pt-5">
+        <p className="text-[11px] uppercase tracking-widest text-faint">Passage votes</p>
+        <div className="mt-3">
+          <PassageVoteDetails item={item} />
+        </div>
+      </div>
 
       <footer className="feed-card-footer mt-4 flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-5">
         <a
@@ -128,9 +145,11 @@ export function FeedCard({ item }: FeedCardProps) {
         >
           Read on congress.gov ↗
         </a>
-        <p className="flip-card-flip-hint min-w-0 text-right text-[12px] text-secondary">
-          Flip for vote details ↺
-        </p>
+        {hasRawSummary ? (
+          <p className="flip-card-flip-hint min-w-0 text-right text-[12px] text-secondary">
+            Flip for official text ↺
+          </p>
+        ) : null}
       </footer>
     </div>
   )
@@ -139,39 +158,10 @@ export function FeedCard({ item }: FeedCardProps) {
     <div className="feed-card-surface flex flex-col">
       <div>
         <p className="text-[11px] text-faint">{docket}</p>
-        <p className="mt-1 text-[11px] uppercase tracking-widest text-faint">Vote details</p>
-        <div className="mt-3">
-          <PassageVoteDetails item={item} />
-        </div>
-      </div>
-
-      <div className="mt-5 border-t border-border pt-5">
-        <p className="text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
-
-        {isProcedural && item.bill.title ? (
-          <p className="mt-2 text-[12px] leading-relaxed text-faint">{item.bill.title}</p>
-        ) : null}
-
-        {keyPoints.length > 0 ? (
-          <ul className="mt-3 space-y-1.5">
-            {keyPoints.map((point) => (
-              <li key={point} className="flex gap-2 text-[13px] leading-relaxed text-secondary">
-                <span className="text-faint" aria-hidden="true">
-                  –
-                </span>
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        <div
-          className={`summary-fade-container ${keyPoints.length > 0 || isProcedural ? 'mt-3' : 'mt-4'}`}
-        >
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
-            {item.raw_summary_text ?? 'No official CRS summary on file.'}
-          </p>
-        </div>
+        <p className="mt-1 text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
+        <p className="mt-4 whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
+          {item.raw_summary_text ?? 'No official CRS summary on file.'}
+        </p>
       </div>
 
       <footer className="mt-4 border-t border-border pt-4 text-right">
@@ -185,7 +175,7 @@ export function FeedCard({ item }: FeedCardProps) {
       front={front}
       back={back}
       titleId={headingId}
-      flipLabel="Flip to vote details"
+      flipLabel="Flip to official CRS summary"
       backLabel="Back to plain summary"
     />
   )
