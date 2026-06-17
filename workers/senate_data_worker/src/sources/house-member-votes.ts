@@ -1,5 +1,4 @@
 import type { Env } from "../config";
-import { congressNumber, sessionNumber } from "../config";
 import type { MemberRecord, MemberVoteRecord } from "../types";
 import { fetchJson } from "./http";
 
