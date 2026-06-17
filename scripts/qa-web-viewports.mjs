@@ -27,30 +27,36 @@ const LONG_DIGEST_SENTENCE =
   'This bill provides a longer generated explanation for readers about funding, oversight, reporting, and assistance programs that should remain fully readable on mobile. '
 const LONG_DIGEST = LONG_DIGEST_SENTENCE.repeat(6).trim()
 
-const MOCK_FEED = [
-  {
-    bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
-    policy_area: 'Defense',
-    digest: {
-      headline: 'Plain headline for readers',
-      what_it_does: LONG_DIGEST,
-      key_points: ['Point one'],
-      terms_explained: [],
-    },
-    raw_summary_text: `${'Official CRS summary text. '.repeat(40)}`.trim(),
-    passage_votes: [
-      {
-        chamber: 'Senate',
-        question: 'On Passage of the Bill',
-        result: 'Passed',
-        yeas: 52,
-        nays: 47,
-        date: '2026-06-05',
+const MOCK_FEED = {
+  items: [
+    {
+      bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
+      policy_area: 'Defense',
+      digest: {
+        headline: 'Plain headline for readers',
+        what_it_does: LONG_DIGEST,
+        key_points: ['Point one'],
+        terms_explained: [],
       },
-    ],
-    latest_passage_date: '2026-06-05',
-  },
-]
+      raw_summary_text: `${'Official CRS summary text. '.repeat(40)}`.trim(),
+      passage_votes: [
+        {
+          chamber: 'Senate',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          yeas: 52,
+          nays: 47,
+          date: '2026-06-05',
+        },
+      ],
+      latest_passage_date: '2026-06-05',
+    },
+  ],
+  total: 1,
+  limit: 50,
+  offset: 0,
+  has_more: false,
+}
 
 async function loadPlaywright() {
   try {

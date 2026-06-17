@@ -444,6 +444,15 @@
     outline-offset: 2px;
   }
 
+  .feed-pagination {
+    @apply flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3;
+  }
+
+  .feed-pagination .ghost-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
   .page-grid {
     display: grid;
     gap: 1.5rem;

@@ -56,6 +56,14 @@ export interface FeedItem {
   latest_passage_date: string;
 }
 
+export interface FeedPageResponse {
+  items: FeedItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
 export type {
   ChamberPulse,
   ChamberStats,

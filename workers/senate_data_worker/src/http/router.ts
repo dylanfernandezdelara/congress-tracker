@@ -6,7 +6,8 @@ import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
-import { buildFeed } from "../storage/feed";
+import { FEED_DEFAULT_PAGE_SIZE, FEED_MAX_BILLS, FEED_MAX_PAGE_SIZE } from "../constants";
+import { buildFeedPage } from "../storage/feed";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildSessionStats } from "../storage/session-stats";
 import type {
@@ -61,6 +62,22 @@ function parseStatsLimit(url: URL, fallback = 5): number {
     20,
     Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? String(fallback), 10) || fallback)
   );
+}
+
+function parseFeedLimit(url: URL): number {
+  return Math.min(
+    FEED_MAX_PAGE_SIZE,
+    Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? String(FEED_DEFAULT_PAGE_SIZE), 10) || FEED_DEFAULT_PAGE_SIZE)
+  );
+}
+
+function parseFeedOffset(url: URL, limit: number): number {
+  const offset = Math.max(
+    0,
+    Number.parseInt(url.searchParams.get("offset") ?? "0", 10) || 0
+  );
+  const maxOffset = Math.max(0, FEED_MAX_BILLS - limit);
+  return Math.min(offset, maxOffset);
 }
 
 async function handleStatsJson<T>(
@@ -142,7 +159,9 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
 
   if (pathname === "/feed/latest.json") {
     try {
-      const feed = await buildFeed(env);
+      const limit = parseFeedLimit(url);
+      const offset = parseFeedOffset(url, limit);
+      const feed = await buildFeedPage(env, { limit, offset });
       return json(feed, {
         status: 200,
         headers: { "Cache-Control": cacheLatest },

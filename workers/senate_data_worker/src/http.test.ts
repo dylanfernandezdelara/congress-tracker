@@ -38,14 +38,20 @@ describe("HTTP API", () => {
     expect(body).toMatchObject({ status: "ok", congress: "119" });
   });
 
-  it("returns empty feed array", async () => {
+  it("returns empty feed page", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/feed/latest.json"),
       createMockEnv() as any
     );
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual([]);
+    expect(body).toEqual({
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+      has_more: false,
+    });
   });
 
   it("returns session stats", async () => {

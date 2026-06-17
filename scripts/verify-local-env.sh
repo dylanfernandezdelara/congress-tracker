@@ -91,7 +91,7 @@ if command -v curl >/dev/null 2>&1; then
   if curl -fsS --max-time 2 "${WORKER_URL}/health" >/dev/null 2>&1; then
     status "${PASS}" "Worker reachable at ${WORKER_URL}"
     feed_json="$(curl -fsS --max-time 4 "${WORKER_URL}/feed/latest.json" 2>/dev/null || true)"
-    if [[ "${feed_json}" == "["*"]" && "${feed_json}" != "[]" ]]; then
+    if [[ "${feed_json}" == *'"items"'* && "${feed_json}" != *'"items":[]'* ]]; then
       status "${PASS}" "Feed has data"
     else
       status "${WARN}" "Feed is empty — run 'npm run seed' (offline) or curl ${WORKER_URL}/__pipeline/run/feed (needs API keys)."

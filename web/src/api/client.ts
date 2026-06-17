@@ -1,7 +1,7 @@
 import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
-  FeedItem,
+  FeedPageResponse,
   PortfoliosResponse,
   PulseStatsResponse,
   SessionStatsResponse,
@@ -18,8 +18,12 @@ export async function fetchHealth(): Promise<HealthResponse> {
   return fetchJson<HealthResponse>('/health')
 }
 
-export async function fetchFeed(): Promise<FeedItem[]> {
-  return fetchJson<FeedItem[]>('/feed/latest.json')
+export async function fetchFeed(options: { limit: number; offset: number }): Promise<FeedPageResponse> {
+  const params = new URLSearchParams({
+    limit: String(options.limit),
+    offset: String(options.offset),
+  })
+  return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
 }
 
 export async function fetchSessionStats(): Promise<SessionStatsResponse> {

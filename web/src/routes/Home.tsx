@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   fetchDefectors,
@@ -9,7 +9,7 @@ import {
 } from '../api/client'
 import type {
   DefectorEntry,
-  FeedItem,
+  FeedPageResponse,
   PortfolioMovers,
   PulseStatsResponse,
   SessionStatsResponse,
@@ -18,7 +18,13 @@ import { FeedCard } from '../components/FeedCard'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { PageShell } from '../components/PageShell'
 import { RightRail } from '../components/RightRail'
+import {
+  FEED_DESKTOP_PAGE_SIZE,
+  FEED_MOBILE_PAGE_SIZE,
+  MOBILE_MEDIA_QUERY,
+} from '../constants/feed'
 import { useAsyncData } from '../hooks/useAsyncData'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 
 const LOOKBACK_DAYS = 45
 
@@ -54,14 +60,66 @@ function FeedSkeleton() {
   )
 }
 
+function FeedPagination({
+  page,
+  pageCount,
+  onPrevious,
+  onNext,
+}: {
+  page: number
+  pageCount: number
+  onPrevious: () => void
+  onNext: () => void
+}) {
+  if (pageCount <= 1) return null
+
+  return (
+    <nav
+      className="feed-pagination"
+      aria-label="Feed pages"
+    >
+      <button
+        type="button"
+        className="ghost-button"
+        onClick={onPrevious}
+        disabled={page <= 0}
+      >
+        Previous
+      </button>
+      <p className="text-sm text-secondary">
+        Page {page + 1} of {pageCount}
+      </p>
+      <button
+        type="button"
+        className="ghost-button"
+        onClick={onNext}
+        disabled={page >= pageCount - 1}
+      >
+        Next
+      </button>
+    </nav>
+  )
+}
+
 export default function Home() {
   const [retryKey, setRetryKey] = useState(0)
+  const [page, setPage] = useState(0)
+  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
+  const pageSize = isMobile ? FEED_MOBILE_PAGE_SIZE : FEED_DESKTOP_PAGE_SIZE
+  const offset = page * pageSize
 
-  const reload = () => setRetryKey((k) => k + 1)
+  const reload = () => {
+    setPage(0)
+    setRetryKey((k) => k + 1)
+  }
 
-  const feed = useAsyncData<FeedItem[]>({
-    deps: [retryKey],
-    load: fetchFeed,
+  useEffect(() => {
+    setPage(0)
+  }, [isMobile])
+
+  const feed = useAsyncData<FeedPageResponse>({
+    deps: [retryKey, pageSize, offset],
+    load: () => fetchFeed({ limit: pageSize, offset }),
     mapError: () => "Couldn't load the feed.",
   })
 
@@ -98,7 +156,25 @@ export default function Home() {
     mapError: () => "Couldn't load portfolio stats.",
   })
 
-  const showFeed = !feed.isLoading && !feed.error && feed.data && feed.data.length > 0
+  const items = feed.data?.items ?? []
+  const total = feed.data?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const showFeed = !feed.isLoading && !feed.error && items.length > 0
+
+  const goToPage = (nextPage: number) => {
+    setPage(Math.max(0, Math.min(nextPage, pageCount - 1)))
+  }
+
+  useEffect(() => {
+    if (page > 0 && page >= pageCount) {
+      setPage(Math.max(0, pageCount - 1))
+    }
+  }, [page, pageCount])
+
+  useEffect(() => {
+    if (!showFeed || page === 0) return
+    document.getElementById('feed-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [page, showFeed])
 
   return (
     <PageShell
@@ -131,21 +207,39 @@ export default function Home() {
         {feed.error ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-8 text-center">
             <p className="text-sm text-secondary">{feed.error}</p>
-            <button type="button" className="ghost-button" onClick={() => setRetryKey((k) => k + 1)}>
+            <button type="button" className="ghost-button" onClick={reload}>
               Retry
             </button>
           </div>
         ) : null}
 
-        {!feed.isLoading && !feed.error && feed.data?.length === 0 ? (
+        {!feed.isLoading && !feed.error && total === 0 ? (
           <p className="text-sm text-faint">No passage votes in the last {LOOKBACK_DAYS} days.</p>
         ) : null}
 
-        {showFeed && feed.data ? (
-          <section className="space-y-5">
-            {feed.data.map((item) => (
+        {showFeed ? (
+          <section id="feed-top" className="space-y-5">
+            {isMobile ? (
+              <FeedPagination
+                page={page}
+                pageCount={pageCount}
+                onPrevious={() => goToPage(page - 1)}
+                onNext={() => goToPage(page + 1)}
+              />
+            ) : null}
+
+            {items.map((item) => (
               <FeedCard key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`} item={item} />
             ))}
+
+            {isMobile ? (
+              <FeedPagination
+                page={page}
+                pageCount={pageCount}
+                onPrevious={() => goToPage(page - 1)}
+                onNext={() => goToPage(page + 1)}
+              />
+            ) : null}
           </section>
         ) : null}
       </main>

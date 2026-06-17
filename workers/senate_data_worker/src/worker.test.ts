@@ -42,6 +42,12 @@ describe("worker", () => {
       createMockEnv() as any
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([]);
+    expect(await response.json()).toEqual({
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+      has_more: false,
+    });
   });
 });

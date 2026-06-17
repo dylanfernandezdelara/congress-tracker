@@ -110,10 +110,30 @@ export interface BillVoteKey {
   latest_passage_date: string;
 }
 
+export async function countRecentVotedBills(
+  db: D1Database,
+  lookbackDate: string
+): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS total FROM (
+         SELECT 1
+         FROM votes
+         WHERE is_passage = 1 AND vote_date >= ?
+         GROUP BY bill_congress, bill_type, bill_number
+       )`
+    )
+    .bind(lookbackDate)
+    .first<{ total: number }>();
+  return row?.total ?? 0;
+}
+
 export async function selectRecentVotedBills(
   db: D1Database,
   lookbackDate: string,
-  limit: number
+  limit: number,
+  offset = 0
 ): Promise<BillVoteKey[]> {
   await ensureSchema(db);
   const { results } = await db
@@ -123,9 +143,9 @@ export async function selectRecentVotedBills(
        WHERE is_passage = 1 AND vote_date >= ?
        GROUP BY bill_congress, bill_type, bill_number
        ORDER BY latest_passage_date DESC
-       LIMIT ?`
+       LIMIT ? OFFSET ?`
     )
-    .bind(lookbackDate, limit)
+    .bind(lookbackDate, limit, offset)
     .all<BillVoteKey>();
   return results ?? [];
 }
