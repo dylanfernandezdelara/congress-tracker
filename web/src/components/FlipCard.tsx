@@ -18,6 +18,7 @@ type FlipCardProps = {
   titleId?: string
   flipLabel?: string
   backLabel?: string
+  flippable?: boolean
 }
 
 export function FlipCard({
@@ -26,6 +27,7 @@ export function FlipCard({
   titleId,
   flipLabel = 'Flip to official CRS summary',
   backLabel = 'Back to plain summary',
+  flippable = true,
 }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
   const [backScrolledToEnd, setBackScrolledToEnd] = useState(false)
@@ -35,7 +37,10 @@ export function FlipCard({
   const frontClipRef = useRef<HTMLDivElement>(null)
   const backClipRef = useRef<HTMLDivElement>(null)
 
-  const toggle = () => setFlipped((v) => !v)
+  const toggle = () => {
+    if (!flippable) return
+    setFlipped((v) => !v)
+  }
 
   const updateBackScrollEnd = useCallback(() => {
     const el = backClipRef.current
@@ -44,6 +49,12 @@ export function FlipCard({
     const scrolledToEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4
     setBackScrolledToEnd(noOverflow || scrolledToEnd)
   }, [])
+
+  useLayoutEffect(() => {
+    if (!flippable && flipped) {
+      setFlipped(false)
+    }
+  }, [flippable, flipped])
 
   useLayoutEffect(() => {
     if (!flipped) {
@@ -144,14 +155,14 @@ export function FlipCard({
   return (
     <article className="flip-card" aria-labelledby={labelledBy}>
       <div
-        className={`flip-card-inner ${flipped ? 'is-flipped' : ''}`}
-        role="button"
-        tabIndex={0}
-        onPointerDown={onPointerDown}
-        onClick={onClick}
-        onKeyDown={onKeyDown}
-        aria-pressed={flipped}
-        aria-label={flipped ? backLabel : flipLabel}
+        className={`flip-card-inner ${flipped ? 'is-flipped' : ''} ${flippable ? '' : 'is-not-flippable'}`}
+        role={flippable ? 'button' : undefined}
+        tabIndex={flippable ? 0 : undefined}
+        onPointerDown={flippable ? onPointerDown : undefined}
+        onClick={flippable ? onClick : undefined}
+        onKeyDown={flippable ? onKeyDown : undefined}
+        aria-pressed={flippable ? flipped : undefined}
+        aria-label={flippable ? (flipped ? backLabel : flipLabel) : undefined}
       >
         <div className="flip-card-face flip-card-front" ref={frontClipRef}>
           <div className="flip-card-content">{front}</div>

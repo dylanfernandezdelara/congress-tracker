@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { FeedItem } from '../api/types'
@@ -76,7 +76,7 @@ describe('FeedCard', () => {
     expect(back?.textContent).toContain('Official CRS summary')
     expect(back?.textContent).not.toContain('Passage votes')
     expect(back?.textContent).not.toContain('Point one')
-    expect(backSummary?.textContent).toBe(longCrsSummary)
+    expect(backSummary?.textContent).toBe(longCrsSummary.trim())
   })
 
   it('shows digest key points on the front face', () => {
@@ -175,7 +175,7 @@ describe('FeedCard', () => {
 
     expect(text.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
     expect(text).toMatch(/…$/)
-    expect(backSummary?.textContent).toBe(longCrsSummary)
+    expect(backSummary?.textContent).toBe(longCrsSummary.trim())
   })
 
   it('hides the flip hint when no raw summary is available', () => {
@@ -188,5 +188,24 @@ describe('FeedCard', () => {
     )
 
     expect(container.querySelector('.flip-card-front .flip-card-flip-hint')).toBeNull()
+    expect(container.querySelector('.flip-card-inner')).not.toHaveAttribute('role', 'button')
+  })
+
+  it('does not flip when no raw summary is available', () => {
+    const { container } = render(
+      <FeedCard
+        item={makeItem({
+          raw_summary_text: null,
+        })}
+      />,
+    )
+
+    const inner = container.querySelector('.flip-card-inner')
+    expect(inner).not.toBeNull()
+
+    fireEvent.pointerDown(inner!, { clientX: 20, clientY: 40, pointerId: 1 })
+    fireEvent.click(inner!, { clientX: 20, clientY: 40 })
+
+    expect(inner).not.toHaveClass('is-flipped')
   })
 })

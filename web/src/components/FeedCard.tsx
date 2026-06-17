@@ -81,7 +81,8 @@ export function FeedCard({ item }: FeedCardProps) {
   const keyPoints = item.digest?.key_points?.slice(0, 3) ?? []
   const policyLabel = isProcedural ? 'Procedural' : item.policy_area
   const didNotPass = billDidNotPass(item.passage_votes)
-  const hasRawSummary = Boolean(item.raw_summary_text?.trim())
+  const rawSummaryText = item.raw_summary_text?.trim() || null
+  const hasRawSummary = rawSummaryText !== null
 
   const front = (
     <div className="feed-card-surface flex flex-col">
@@ -128,7 +129,10 @@ export function FeedCard({ item }: FeedCardProps) {
         </ul>
       ) : null}
 
-      <div className="mt-5 border-t border-border pt-5">
+      <div
+        className="mt-5 border-t border-border pt-5"
+        onClick={(e) => e.stopPropagation()}
+      >
         <p className="text-[11px] uppercase tracking-widest text-faint">Passage votes</p>
         <div className="mt-3">
           <PassageVoteDetails item={item} />
@@ -160,7 +164,7 @@ export function FeedCard({ item }: FeedCardProps) {
         <p className="text-[11px] text-faint">{docket}</p>
         <p className="mt-1 text-[11px] uppercase tracking-widest text-faint">Official CRS summary</p>
         <p className="mt-4 whitespace-pre-wrap text-[13px] leading-relaxed text-secondary">
-          {item.raw_summary_text ?? 'No official CRS summary on file.'}
+          {rawSummaryText ?? 'No official CRS summary on file.'}
         </p>
       </div>
 
@@ -177,6 +181,7 @@ export function FeedCard({ item }: FeedCardProps) {
       titleId={headingId}
       flipLabel="Flip to official CRS summary"
       backLabel="Back to plain summary"
+      flippable={hasRawSummary}
     />
   )
 }

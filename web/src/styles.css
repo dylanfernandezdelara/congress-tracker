@@ -272,6 +272,10 @@
     will-change: transform;
   }
 
+  .flip-card-inner.is-not-flippable {
+    cursor: default;
+  }
+
   .flip-card-inner.is-flipped {
     transform: rotateX(180deg);
   }
