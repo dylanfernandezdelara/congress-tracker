@@ -64,6 +64,17 @@ wrangler secret put OPENROUTER_API_KEY
 cd ../.. && npm run deploy            # builds web/dist, then deploys the Worker
 ```
 
+### Auto-deploy on push to `main` (no GitHub Actions)
+
+Use Cloudflare **Workers Builds** to deploy production whenever `main` updates.
+One-time setup (GitHub OAuth in dashboard, then build triggers):
+
+See [`docs/PRODUCTION_DEPLOYMENTS.md`](docs/PRODUCTION_DEPLOYMENTS.md).
+
+Quick dashboard path: **Workers & Pages → congress-tracker-api → Settings → Builds → Connect GitHub**, then set build command to `npm ci && npm --prefix workers/senate_data_worker ci && npm --prefix web ci && npm run build:web` and deploy command to `npx wrangler deploy --config workers/senate_data_worker/wrangler.toml`.
+
+Or run `npm run setup:workers-builds` after creating a user-scoped Builds API token.
+
 Because the app and API share an origin, the production build calls the API with
 relative URLs — no `VITE_API_URL` needed. Set `VITE_API_URL` only if you host
 the frontend separately.

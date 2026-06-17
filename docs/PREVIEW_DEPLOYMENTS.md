@@ -55,7 +55,7 @@ npx wrangler versions upload --preview-alias my-branch
 You can also run `npm run preview` yourself from any shell that has the two
 Cloudflare env vars set. No GitHub Actions, secrets, or pull request required.
 
-## Optional — Cloudflare Workers Builds (native git previews)
+## Optional — Cloudflare Workers Builds (native git previews + production)
 
 Cloudflare's native git integration removes the need to store a long-lived token
 in GitHub. One-time setup in the Cloudflare dashboard:
@@ -63,14 +63,16 @@ in GitHub. One-time setup in the Cloudflare dashboard:
 1. **Workers & Pages → congress-tracker-api → Settings → Build** → connect the
    GitHub repository.
 2. Set the **production branch** to `main` and build command to:
-   `npm ci && npm --prefix web ci && npm run build:web`
-   (deploy command stays `npx wrangler deploy`).
+   `npm ci && npm --prefix workers/senate_data_worker ci && npm --prefix web ci && npm run build:web`
+   (deploy command: `npx wrangler deploy --config workers/senate_data_worker/wrangler.toml`).
 3. Enable
    [non-production branch builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/#configure-non-production-branch-builds).
 
 Cloudflare then builds each push, deploys `main` to production, and posts
 preview URLs as PR comments automatically — the same UX as Cloudflare Pages.
-Use this only if you want browser-openable previews without involving the agent.
+
+Full production auto-deploy guide: [`docs/PRODUCTION_DEPLOYMENTS.md`](PRODUCTION_DEPLOYMENTS.md).
+Scripted setup: `npm run setup:workers-builds` (requires user-scoped Builds API token).
 
 ## Safety notes
 
