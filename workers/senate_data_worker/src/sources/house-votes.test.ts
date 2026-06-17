@@ -68,4 +68,75 @@ describe("ingestHousePassageVotes", () => {
 
     fetchJson.mockRestore();
   });
+
+  it("pages past pre-lookback House votes because Congress.gov returns oldest-first", async () => {
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      if (url.includes("/200?")) {
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: 200,
+            sessionNumber: 2,
+            legislationNumber: "9001",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-10T12:00:00Z",
+            voteQuestion: "On Passage",
+            votePartyTotal: [{ yeaTotal: 220, nayTotal: 210 }],
+          },
+        };
+      }
+
+      if (url.includes("offset=2")) {
+        return {
+          houseRollCallVotes: [
+            {
+              congress: 119,
+              rollCallNumber: 200,
+              sessionNumber: 2,
+              legislationNumber: "9001",
+              legislationType: "HR",
+              result: "Passed",
+              startDate: "2026-06-10T12:00:00Z",
+            },
+          ],
+          pagination: {},
+        };
+      }
+
+      return {
+        houseRollCallVotes: [
+          {
+            congress: 119,
+            rollCallNumber: 1,
+            sessionNumber: 2,
+            legislationNumber: "1000",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-02-01T12:00:00Z",
+          },
+          {
+            congress: 119,
+            rollCallNumber: 2,
+            sessionNumber: 2,
+            legislationNumber: "1001",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-02-02T12:00:00Z",
+          },
+        ],
+        pagination: {
+          next: "https://api.congress.gov/v3/house-vote/119/2?offset=2&limit=50&format=json",
+        },
+      };
+    });
+
+    const result = await ingestHousePassageVotes(env, "2026-05-01", new Set());
+
+    expect(result.votes).toHaveLength(1);
+    expect(result.votes[0]?.rollNumber).toBe(200);
+    expect(fetchJson).toHaveBeenCalledTimes(3);
+
+    fetchJson.mockRestore();
+  });
 });

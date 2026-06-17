@@ -1,0 +1,51 @@
+# Backup daily feed ingest (production Worker cron runs at 10:00 UTC).
+#
+# Required GitHub Actions secret:
+#   PIPELINE_ADMIN_TOKEN — same value as `wrangler secret put PIPELINE_ADMIN_TOKEN`
+#
+# Optional repository variable:
+#   WORKER_URL — production Worker origin (defaults to workers.dev URL below)
+
+name: Daily feed ingest
+
+concurrency:
+  group: daily-feed-ingest
+  cancel-in-progress: true
+
+on:
+  schedule:
+    # 10:30 UTC — after the Worker cron at 10:00 UTC; concurrency avoids overlap.
+    - cron: "30 10 * * *"
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    name: Run feed pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger production feed ingest
+        env:
+          PIPELINE_ADMIN_TOKEN: ${{ secrets.PIPELINE_ADMIN_TOKEN }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+        run: |
+          DEFAULT_WORKER_URL="https://congress-tracker-api.fernandezdelaradylan.workers.dev"
+          TARGET_URL="${WORKER_URL:-$DEFAULT_WORKER_URL}"
+
+          if [ -z "${PIPELINE_ADMIN_TOKEN}" ]; then
+            echo "PIPELINE_ADMIN_TOKEN secret is required for daily feed ingest."
+            exit 1
+          fi
+
+          for attempt in 1 2 3; do
+            if curl -fsS --max-time 600 --retry 2 --retry-delay 30 \
+              -H "Authorization: Bearer ${PIPELINE_ADMIN_TOKEN}" \
+              "${TARGET_URL}/__pipeline/run/feed"; then
+              echo "Feed ingest succeeded on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Feed ingest attempt ${attempt} failed."
+            sleep 30
+          done
+
+          echo "Feed ingest failed after 3 attempts."
+          exit 1
