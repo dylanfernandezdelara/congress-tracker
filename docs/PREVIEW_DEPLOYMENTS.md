@@ -72,6 +72,25 @@ Cloudflare then builds each push, deploys `main` to production, and posts
 preview URLs as PR comments automatically — the same UX as Cloudflare Pages.
 Use this only if you want browser-openable previews without involving the agent.
 
+## Production deploys from `main`
+
+This repository also includes a GitHub Actions production deploy workflow:
+
+- `.github/workflows/deploy-production.yml`
+- Trigger: the `CI` workflow completes successfully on remote `main`
+- Manual fallback: `workflow_dispatch`
+- Command: `npm run deploy`
+
+The workflow requires these repository secrets:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+`npm run deploy` builds `web/dist` and deploys the Worker with
+`wrangler deploy --keep-vars`, so dashboard-managed Worker vars are retained
+instead of being deleted during deploy. Secrets are not deleted by Wrangler
+deploys.
+
 ## Safety notes
 
 - **Production is never affected by a preview.** `versions upload` does not shift
