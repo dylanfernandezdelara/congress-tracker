@@ -43,7 +43,17 @@ for arg in "$@"; do
 done
 
 ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}"
-API_TOKEN="${CLOUDFLARE_BUILDS_API_TOKEN:-${CLOUDFLARE_API_TOKEN:-}}"
+
+if [[ -n "${CLOUDFLARE_BUILDS_API_TOKEN:-}" ]]; then
+  API_TOKEN="${CLOUDFLARE_BUILDS_API_TOKEN}"
+elif [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+  echo "WARNING: CLOUDFLARE_BUILDS_API_TOKEN is not set; falling back to CLOUDFLARE_API_TOKEN." >&2
+  echo "         Account-scoped tokens (including Cursor Cloud tokens) return 'Invalid token'" >&2
+  echo "         from the Builds API. Create a user-scoped token per docs/PRODUCTION_DEPLOYMENTS.md." >&2
+  API_TOKEN="${CLOUDFLARE_API_TOKEN}"
+else
+  API_TOKEN=""
+fi
 
 if [[ -z "${ACCOUNT_ID}" || -z "${API_TOKEN}" ]]; then
   echo "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_BUILDS_API_TOKEN (user-scoped)." >&2
@@ -155,21 +165,64 @@ else
   echo "    repo_connection_uuid=${repo_connection_uuid}"
 fi
 
-echo "==> Creating production trigger (branch: ${PRODUCTION_BRANCH})..."
-prod_payload="$(trigger_payload "Deploy production" "${DEPLOY_COMMAND}" '["main"]' '[]')"
-prod_response="$(cf_api POST "/builds/triggers" "${prod_payload}")"
+echo "==> Checking for existing triggers..."
+existing_prod_trigger_uuid=""
 if [[ "${DRY_RUN}" -eq 0 ]]; then
-  prod_trigger_uuid="$(json_result_field "${prod_response}" "trigger_uuid")"
-  echo "    production trigger_uuid=${prod_trigger_uuid}"
+  triggers_response="$(cf_api GET "/builds/triggers?external_script_id=${WORKER_TAG}")"
+  existing_prod_trigger_uuid="$(python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+triggers = data.get("result") or []
+for t in triggers:
+    includes = t.get("branch_includes") or []
+    excludes = t.get("branch_excludes") or []
+    if "main" in includes and not excludes:
+        print(t.get("trigger_uuid", ""))
+        break
+' <<<"${triggers_response}")"
+else
+  echo "    [dry-run] GET /builds/triggers (skipping duplicate check)" >&2
+fi
+
+echo "==> Creating production trigger (branch: ${PRODUCTION_BRANCH})..."
+if [[ -n "${existing_prod_trigger_uuid}" ]]; then
+  prod_trigger_uuid="${existing_prod_trigger_uuid}"
+  echo "    Production trigger already exists (${prod_trigger_uuid}); skipping creation."
+else
+  prod_payload="$(trigger_payload "Deploy production" "${DEPLOY_COMMAND}" '["main"]' '[]')"
+  prod_response="$(cf_api POST "/builds/triggers" "${prod_payload}")"
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    prod_trigger_uuid="$(json_result_field "${prod_response}" "trigger_uuid")"
+    echo "    production trigger_uuid=${prod_trigger_uuid}"
+  fi
 fi
 
 if [[ "${CREATE_PREVIEW}" -eq 1 ]]; then
   echo "==> Creating preview trigger (all branches except ${PRODUCTION_BRANCH})..."
-  preview_payload="$(trigger_payload "Deploy preview branches" "${PREVIEW_DEPLOY_COMMAND}" '["*"]' '["main"]')"
-  preview_response="$(cf_api POST "/builds/triggers" "${preview_payload}")"
+  existing_preview_trigger=""
   if [[ "${DRY_RUN}" -eq 0 ]]; then
-    preview_trigger_uuid="$(json_result_field "${preview_response}" "trigger_uuid")"
-    echo "    preview trigger_uuid=${preview_trigger_uuid}"
+    existing_preview_trigger="$(python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+triggers = data.get("result") or []
+for t in triggers:
+    includes = t.get("branch_includes") or []
+    excludes = t.get("branch_excludes") or []
+    if "*" in includes and "main" in excludes:
+        print(t.get("trigger_uuid", ""))
+        break
+' <<<"${triggers_response}")"
+  fi
+
+  if [[ -n "${existing_preview_trigger}" ]]; then
+    echo "    Preview trigger already exists (${existing_preview_trigger}); skipping creation."
+  else
+    preview_payload="$(trigger_payload "Deploy preview branches" "${PREVIEW_DEPLOY_COMMAND}" '["*"]' '["main"]')"
+    preview_response="$(cf_api POST "/builds/triggers" "${preview_payload}")"
+    if [[ "${DRY_RUN}" -eq 0 ]]; then
+      preview_trigger_uuid="$(json_result_field "${preview_response}" "trigger_uuid")"
+      echo "    preview trigger_uuid=${preview_trigger_uuid}"
+    fi
   fi
 fi
 
