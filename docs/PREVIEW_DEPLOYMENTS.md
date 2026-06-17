@@ -77,8 +77,8 @@ Use this only if you want browser-openable previews without involving the agent.
 This repository also includes a GitHub Actions production deploy workflow:
 
 - `.github/workflows/deploy-production.yml`
-- Trigger: the `CI` workflow completes successfully on remote `main`
-- Manual fallback: `workflow_dispatch`
+- Trigger: push-triggered `CI` completes successfully on remote `main`
+- Manual fallback: `workflow_dispatch` from `main` only
 - Command: `npm run deploy`
 
 The workflow requires these repository secrets:
