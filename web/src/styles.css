@@ -467,7 +467,7 @@
   }
 
   .feed-pagination-status {
-    @apply min-w-[3.5rem] px-1 text-center text-xs tabular-nums text-faint;
+    @apply min-w-[3.5rem] px-1 text-center text-xs tabular-nums text-secondary;
   }
 
   .page-grid {
