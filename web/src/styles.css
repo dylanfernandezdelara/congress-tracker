@@ -471,7 +471,7 @@
   }
 
   .site-nav {
-    @apply flex items-center justify-center gap-5 border-t border-border pt-3;
+    @apply flex items-center justify-center gap-5 pt-2;
   }
 
   .site-nav-link {
@@ -622,11 +622,6 @@
     margin: 0;
     font-size: 0.75rem;
     color: var(--faint);
-  }
-
-  .site-header-rule {
-    width: 100%;
-    margin-top: 0.75rem;
   }
 
   @media (max-width: 639px) {
