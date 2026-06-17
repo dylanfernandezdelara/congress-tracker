@@ -64,7 +64,11 @@ in GitHub. One-time setup in the Cloudflare dashboard:
    GitHub repository.
 2. Set the **production branch** to `main` and build command to:
    `npm ci && npm --prefix web ci && npm run build:web`
-   (deploy command stays `npx wrangler deploy`).
+   Deploy command for **production (`main`)**:
+   `npx wrangler deploy --config workers/senate_data_worker/wrangler.toml`
+   (applies cron from `wrangler.toml`). For **non-production branch previews**, use
+   `npx wrangler versions upload --config workers/senate_data_worker/wrangler.toml`
+   — bare `wrangler versions upload` from the repo root fails without `--config`.
 3. Enable
    [non-production branch builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/#configure-non-production-branch-builds).
 

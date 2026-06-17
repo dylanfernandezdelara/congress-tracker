@@ -31,6 +31,7 @@ export default {
               cron: controller.cron,
               scheduledTime: controller.scheduledTime,
               error: message,
+              stack: err instanceof Error ? err.stack : undefined,
             }),
           );
           throw err;

@@ -84,11 +84,15 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 member spotlights. Local offline: `npm run seed` populates sample sidebar data.
 
 **Daily ingest (production):** Cloudflare cron runs `runFeedPipeline` at **10:00 UTC** (see
-`[triggers]` in `workers/senate_data_worker/wrangler.toml`). The pipeline only upserts **new**
-passage votes (skips known roll-call keys) and writes digests for bills that do not yet have one
-(capped by `DIGEST_MAX_NEW_REWRITES`). GitHub Actions backup: `.github/workflows/daily-ingest.yml`
-at 10:15 UTC — requires `PIPELINE_ADMIN_TOKEN` in **GitHub Actions secrets** (same value as the
-Worker secret) and optionally `WORKER_URL` in repository variables.
+`[triggers]` in `workers/senate_data_worker/wrangler.toml`). `wrangler deploy` applies that
+schedule; use `npm run deploy:triggers` in `workers/senate_data_worker` only after
+`wrangler versions upload` previews. The pipeline only upserts **new** passage votes (skips known
+roll-call keys) and writes digests for bills that do not yet have one (capped by
+`DIGEST_MAX_NEW_REWRITES`). Because Congress.gov lists House votes oldest-first, daily runs scan
+list pages until the lookback window is reached (~5 list requests per run for the current session).
+GitHub Actions backup: `.github/workflows/daily-ingest.yml` at 10:30 UTC — requires
+`PIPELINE_ADMIN_TOKEN` in **GitHub Actions secrets** (same value as the Worker secret) and
+optionally `WORKER_URL` in repository variables.
 
 Shared stats JSON types live in `shared/stats-api-types.ts` (imported by worker + web).
 
