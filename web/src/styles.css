@@ -445,12 +445,29 @@
   }
 
   .feed-pagination {
-    @apply flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3;
+    @apply flex items-center justify-center gap-1 py-2;
   }
 
-  .feed-pagination .ghost-button:disabled {
-    opacity: 0.45;
+  .feed-pagination-button {
+    @apply rounded-full px-2 py-1 text-lg leading-none text-faint transition-colors;
+  }
+
+  .feed-pagination-button:hover:not(:disabled) {
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-pagination-button:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 2px;
+  }
+
+  .feed-pagination-button:disabled {
+    opacity: 0.35;
     cursor: not-allowed;
+  }
+
+  .feed-pagination-status {
+    @apply min-w-[3.5rem] px-1 text-center text-xs tabular-nums text-faint;
   }
 
   .page-grid {

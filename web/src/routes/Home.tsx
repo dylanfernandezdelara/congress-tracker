@@ -78,28 +78,27 @@ function FeedPagination({
   if (pageCount <= 1) return null
 
   return (
-    <nav
-      className="feed-pagination"
-      aria-label="Feed pages"
-    >
+    <nav className="feed-pagination" aria-label="Feed pages">
       <button
         type="button"
-        className="ghost-button"
+        className="feed-pagination-button"
         onClick={onPrevious}
         disabled={page <= 0 || isLoading}
+        aria-label="Previous page"
       >
-        Previous
+        ‹
       </button>
-      <p className="text-sm text-secondary">
-        Page {page + 1} of {pageCount}
+      <p className="feed-pagination-status">
+        {page + 1} / {pageCount}
       </p>
       <button
         type="button"
-        className="ghost-button"
+        className="feed-pagination-button"
         onClick={onNext}
         disabled={!hasMore || isLoading}
+        aria-label="Next page"
       >
-        Next
+        ›
       </button>
     </nav>
   )
