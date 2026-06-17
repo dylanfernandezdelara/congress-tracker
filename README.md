@@ -35,7 +35,7 @@ Local ↔ Cursor Cloud parity details: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_
 ```text
 Cloudflare Worker
   cron + GET /__pipeline/run/feed  -> ingest House/Senate passage votes, CRS summaries, LLM digest
-  GET /feed/latest.json              -> pre-built feed (digest + votes + raw CRS)
+  GET /feed/latest.json              -> paginated feed (digest + votes + raw CRS)
   GET /health                        -> liveness
         |
         v
@@ -79,5 +79,8 @@ safety notes.
 ## HTTP API
 
 - `GET /health` — worker liveness
-- `GET /feed/latest.json` — recent bills with passage votes and digests
+- `GET /feed/latest.json` — paginated recent bills with passage votes and digests
+  - Query: `limit` (1–50, default 50), `offset` (default 0; clamped to the 50-bill feed window)
+  - Response: `{ items, total, limit, offset, has_more }` where `items` is the bill array and `total` is capped at 50
+  - **Breaking change:** this endpoint no longer returns a bare JSON array; consumers must read `items`
 - `GET /__pipeline/run/feed` — trigger ingestion (optional `PIPELINE_ADMIN_TOKEN`)

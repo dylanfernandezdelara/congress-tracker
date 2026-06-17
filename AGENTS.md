@@ -27,7 +27,7 @@ Local ↔ Cursor Cloud parity: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPM
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
 - Seed sample feed (offline, no keys): `npm run seed`
 - Trigger live ingestion (needs API keys): `curl -fsS http://127.0.0.1:8787/__pipeline/run/feed`
-- Feed JSON: `http://127.0.0.1:8787/feed/latest.json`
+- Feed JSON: `http://127.0.0.1:8787/feed/latest.json?limit=50&offset=0` (paginated object; read `items`)
 
 ### Verification
 
@@ -69,7 +69,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 ## API
 
 - `GET /health`
-- `GET /feed/latest.json`
+- `GET /feed/latest.json?limit=&offset=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; **not** a bare array)
 - `GET /stats/session.json` — per-chamber passage vote aggregates
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
