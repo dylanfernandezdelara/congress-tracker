@@ -242,15 +242,9 @@
   .feed-row-detail-panel {
     @apply mt-3 border-t pt-3;
     border-color: hsl(var(--twc-border));
-    /* Mobile: align with topic text (row padding + status dot + gap) */
+    /* Align with topic text: row padding + status dot + gap */
     padding-left: calc(0.75rem + 0.625rem + 0.75rem);
     animation: feed-row-detail-enter 0.25s ease forwards;
-  }
-
-  @media (min-width: 640px) {
-    .feed-row-detail-panel {
-      padding-left: calc(0.625rem + 0.75rem + 0.625rem);
-    }
   }
 
   .feed-row-detail {
@@ -641,7 +635,7 @@
     font-weight: 600;
     line-height: 1.15;
     letter-spacing: -0.02em;
-    color: var(--foreground);
+    color: hsl(var(--twc-foreground));
     padding-inline: 2.5rem;
   }
 
@@ -650,7 +644,7 @@
     max-width: 34ch;
     font-size: 0.75rem;
     line-height: 1.4;
-    color: var(--faint);
+    color: hsl(var(--twc-faint));
   }
 
   .page-shell {
