@@ -90,8 +90,9 @@ async function auditPage(page) {
     const heading = document.querySelector('h1')
     const siteNav = document.querySelector('.site-nav')
     const membersSidebar = document.querySelector('[aria-label="Members in Congress"]')
-    const card = document.querySelector('.flip-card')
-    const headline = document.querySelector('.flip-card h2')
+    const feedRow = document.querySelector('.feed-row')
+    const topic = document.querySelector('[data-feed-topic]')
+    const eventLine = document.querySelector('.feed-row-event')
     const issues = []
 
     const collectHorizontalClipping = (rect, label) => {
@@ -110,7 +111,7 @@ async function auditPage(page) {
     if (!heading) issues.push('page heading missing')
     if (!siteNav) issues.push('site navigation missing')
     if (membersSidebar) issues.push('sidebar stats visible on feed page')
-    if (!card) issues.push('feed card missing')
+    if (!feedRow) issues.push('feed row missing')
 
     if (toggle) {
       collectFullClipping(toggle.getBoundingClientRect(), 'theme toggle')
@@ -134,68 +135,32 @@ async function auditPage(page) {
     }
 
     if (heading) collectFullClipping(heading.getBoundingClientRect(), 'page heading')
-    if (card) {
-      const cardRect = card.getBoundingClientRect()
-      collectHorizontalClipping(cardRect, 'feed card')
-      if (cardRect.bottom <= 0 || cardRect.top >= viewportHeight) {
-        issues.push('feed card not visible in viewport')
+
+    if (feedRow) {
+      const rowRect = feedRow.getBoundingClientRect()
+      collectHorizontalClipping(rowRect, 'feed row')
+      if (rowRect.bottom <= 0 || rowRect.top >= viewportHeight) {
+        issues.push('feed row not visible in viewport')
+      }
+      if (rowRect.height > 120) {
+        issues.push(`collapsed feed row too tall (${Math.round(rowRect.height)}px, expected < 120px)`)
       }
     }
-    if (headline) collectHorizontalClipping(headline.getBoundingClientRect(), 'feed headline')
 
-    const touchLayout =
-      viewportWidth < 640 ||
-      (typeof window.matchMedia === 'function' &&
-        window.matchMedia('(max-width: 639px), (pointer: coarse)').matches)
+    if (topic) {
+      collectHorizontalClipping(topic.getBoundingClientRect(), 'feed topic')
+    } else {
+      issues.push('feed topic missing')
+    }
 
-    if (touchLayout && card) {
-      if (card.querySelector('.flip-card-hint')) {
-        issues.push('external flip button present on touch layout (card should be tappable)')
+    if (eventLine) {
+      const eventRect = eventLine.getBoundingClientRect()
+      collectHorizontalClipping(eventRect, 'feed event line')
+      if (eventRect.bottom <= 0 || eventRect.top >= viewportHeight) {
+        issues.push('feed event line not visible in viewport')
       }
-
-      const inner = card.querySelector('.flip-card-inner')
-      if (inner?.getAttribute('role') !== 'button') {
-        issues.push('flip card is not tappable on touch layout')
-      }
-
-      const surface = card.querySelector('.flip-card-front .feed-card-surface')
-      const flipHint = surface?.querySelector('.flip-card-flip-hint')
-      if (surface && flipHint) {
-        const gap = surface.getBoundingClientRect().bottom - flipHint.getBoundingClientRect().bottom
-        if (gap > 32) {
-          issues.push(`excessive blank space in feed card (${Math.round(gap)}px below flip hint)`)
-        }
-      }
-
-      const frontScroll = card.querySelector('.flip-card-front')
-      if (frontScroll) {
-        const overflowY = window.getComputedStyle(frontScroll).overflowY
-        if (overflowY !== 'auto' && overflowY !== 'scroll') {
-          issues.push(`front scroll container overflow-y is "${overflowY}", expected auto or scroll`)
-        }
-
-        const frontRect = frontScroll.getBoundingClientRect()
-        collectHorizontalClipping(frontRect, 'flip card front')
-        if (frontRect.bottom <= 0 || frontRect.top >= viewportHeight) {
-          issues.push('flip card front not visible in viewport')
-        }
-        if (frontRect.top < -0.5) {
-          issues.push('flip card front clipped on the top')
-        }
-        if (frontRect.bottom > viewportHeight + 0.5) {
-          issues.push('flip card front clipped on the bottom')
-        }
-
-        const congressLink = frontScroll.querySelector('.congress-link')
-        if (congressLink) {
-          collectHorizontalClipping(congressLink.getBoundingClientRect(), 'congress.gov link')
-        }
-
-        const frontFlipHint = frontScroll.querySelector('.flip-card-flip-hint')
-        if (frontFlipHint) {
-          collectHorizontalClipping(frontFlipHint.getBoundingClientRect(), 'flip hint')
-        }
-      }
+    } else {
+      issues.push('feed event line missing')
     }
 
     return {

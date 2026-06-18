@@ -63,6 +63,6 @@ describe('Home', () => {
     expect(feedList?.tagName).toBe('UL')
     expect(within(feedList as HTMLElement).getByText('Passed')).toBeInTheDocument()
     expect(screen.queryByText('Flip for vote details ↺')).not.toBeInTheDocument()
-    expect(container.querySelector('.flip-card-front')).toBeNull()
+    expect(container.querySelector('.feed-row')).not.toBeNull()
   })
 })

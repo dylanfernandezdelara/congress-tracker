@@ -4,9 +4,6 @@ import {
   billDidNotPass,
   formatBillDocket,
   proceduralHeadline,
-  SUMMARY_PREVIEW_MAX_CHARS,
-  summaryBodyText,
-  summaryPreviewText,
   trimDisplayTitle,
   voteResultClass,
 } from './billLabels'
@@ -30,68 +27,6 @@ describe('trimDisplayTitle', () => {
 
   it('removes the suffix without a leading comma', () => {
     expect(trimDisplayTitle('Sample bill and for other purposes.')).toBe('Sample bill')
-  })
-})
-
-describe('summaryBodyText', () => {
-  it('drops a heading line before the body', () => {
-    const raw = 'Ukraine Support Act\n\nThis bill addresses military aid to Ukraine.'
-
-    expect(summaryBodyText(raw)).toBe('This bill addresses military aid to Ukraine.')
-  })
-
-  it('keeps a single paragraph that starts with body text', () => {
-    const raw = 'This bill addresses military aid to Ukraine.'
-
-    expect(summaryBodyText(raw)).toBe('This bill addresses military aid to Ukraine.')
-  })
-
-  it('keeps text when the first line ends with sentence punctuation', () => {
-    const raw = 'This is a complete sentence.\n\nMore detail follows here.'
-
-    expect(summaryBodyText(raw)).toBe('This is a complete sentence. More detail follows here.')
-  })
-
-  it('returns the heading when there is no remainder', () => {
-    expect(summaryBodyText('Ukraine Support Act')).toBe('Ukraine Support Act')
-  })
-
-  it('keeps long raw summaries without truncation', () => {
-    const paragraph =
-      'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '
-    const raw = `Ukraine Support Act\n\n${paragraph.repeat(5)}`
-    const result = summaryBodyText(raw)
-
-    expect(result).toBe(paragraph.repeat(5).trim())
-    expect(result).not.toMatch(/…$/)
-  })
-})
-
-describe('summaryPreviewText', () => {
-  it('returns short text unchanged when under the limit', () => {
-    const short = 'This bill funds infrastructure projects.'
-
-    expect(summaryPreviewText(short)).toBe(short)
-    expect(summaryPreviewText(short)).not.toMatch(/…$/)
-  })
-
-  it('caps long text at a word boundary with an ellipsis', () => {
-    const long =
-      'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(
-        7,
-      )
-    const result = summaryPreviewText(long)
-
-    expect(result.length).toBeLessThanOrEqual(SUMMARY_PREVIEW_MAX_CHARS)
-    expect(result).toMatch(/…$/)
-    expect(result).not.toMatch(/\s…$/)
-    expect(result).not.toBe(long.trim())
-  })
-
-  it('collapses internal whitespace and newlines', () => {
-    const raw = 'Line one.\n\nLine   two   continues here.'
-
-    expect(summaryPreviewText(raw)).toBe('Line one. Line two continues here.')
   })
 })
 
