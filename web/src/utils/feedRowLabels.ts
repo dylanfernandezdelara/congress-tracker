@@ -22,6 +22,14 @@ export interface FeedEventLine {
   detail: string
 }
 
+export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
+  if (item.passage_votes.length === 0) return null
+
+  return item.passage_votes.reduce((latest, vote) =>
+    vote.date > latest.date ? vote : latest,
+  )
+}
+
 function isProceduralVoteQuestion(question: string): boolean {
   return PROCEDURAL_VOTE_QUESTION_PATTERN.test(question)
 }
@@ -34,14 +42,6 @@ export function isProceduralFeedItem(item: FeedItem): boolean {
   if (vote && isProceduralVoteQuestion(vote.question)) return true
 
   return false
-}
-
-export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
-  if (item.passage_votes.length === 0) return null
-
-  return item.passage_votes.reduce((latest, vote) =>
-    vote.date > latest.date ? vote : latest,
-  )
 }
 
 export function getFeedTopic(item: FeedItem): string {

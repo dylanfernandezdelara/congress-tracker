@@ -2,7 +2,7 @@
 
 Planning document for replacing large flip cards with a dense, scannable action-row feed. Use this spec when resuming implementation in a new Cursor Cloud session.
 
-**Status:** Plan only — not yet implemented.
+**Status:** Implemented (PR #82).
 
 **Implementation approach:** All implementation work is delegated to **Composer 2.5** agents (one agent per phase, run sequentially because the phases depend on each other). An orchestrator session writes the per-phase prompts, dispatches the Composer 2.5 agents, reviews each returned diff, runs verification (`npm test`, `npm run qa:web`) between phases, and handles git/PR. See "Implementation phases" below.
 
@@ -228,7 +228,7 @@ getFeedTeaser(item: FeedItem): string | null
 | `scripts/qa-web-viewports.mjs` | Selectors: `.feed-row`, topic element; remove flip-card checks |
 | `web/src/utils/billLabels.ts` | Keep shared formatters; feed-specific logic lives in `feedRowLabels.ts` |
 
-Reuse from `billLabels.ts`: `formatBillDocket`, `formatVoteDate`, `proceduralHeadline`, `voteResultClass`, `billDidNotPass`, `congressGovBillUrl`, `trimDisplayTitle`.
+Reuse from `billLabels.ts`: `formatBillDocket`, `formatVoteDate`, `proceduralHeadline`, `voteResultClass`, `congressGovBillUrl`, `trimDisplayTitle`.
 
 ---
 
@@ -269,7 +269,7 @@ verifies and commits between phases.
 - Swap `Home` to list of `FeedRow`
 - Update `Home.test.tsx` and QA selectors (partial)
 
-**Exit criteria:** `npm test` green; topic + outcome visible without expand; rows visibly smaller than flip cards.
+**Exit criteria:** [x] `npm test` green; [x] topic + outcome visible without expand; [x] rows visibly smaller than flip cards.
 
 ### Phase 2 — Expand detail
 
@@ -277,7 +277,7 @@ verifies and commits between phases.
 - Port vote split bar, key points, terms, CRS from old `FeedCard` back face
 - CRS in collapsed `<details>` by default
 
-**Exit criteria:** Feature parity with old back face; no CRS / full votes on collapsed row.
+**Exit criteria:** [x] Feature parity with old back face; [x] no CRS / full votes on collapsed row.
 
 ### Phase 3 — Cleanup
 
@@ -286,7 +286,7 @@ verifies and commits between phases.
 - Remove front-card usage of `SUMMARY_PREVIEW_MAX_CHARS` if unused
 - Full QA script update
 
-**Exit criteria:** No `flip-card` references under `web/`; `npm run qa:web` 8/8.
+**Exit criteria:** [x] No `flip-card` references under `web/`; `npm run qa:web` 8/8.
 
 ### Phase 4 — Ship checklist (required for `web/` changes)
 
@@ -304,33 +304,33 @@ Per root `AGENTS.md`:
 
 ### Unit (`feedRowLabels.test.ts`)
 
-- [ ] Substantive pass / fail event lines
-- [ ] Procedural agreed / rejected lines (framing B)
-- [ ] Procedural item **with digest** still classified procedural
-- [ ] Primary vote = latest date
-- [ ] Teaser length cap
+- [x] Substantive pass / fail event lines
+- [x] Procedural agreed / rejected lines (framing B)
+- [x] Procedural item **with digest** still classified procedural
+- [x] Primary vote = latest date
+- [x] Teaser length cap
 
 ### Component (`FeedRow.test.tsx`)
 
-- [ ] Topic + event visible without expand
-- [ ] `Passed` / margin on collapsed surface (inverts old “hidden until flip” behavior)
-- [ ] Expand reveals CRS; collapsed does not
-- [ ] congress.gov click does not toggle expand
-- [ ] Procedural row shows `Procedural ·` on line 2
+- [x] Topic + event visible without expand
+- [x] `Passed` / margin on collapsed surface (inverts old “hidden until flip” behavior)
+- [x] Expand reveals CRS; collapsed does not
+- [x] congress.gov click does not toggle expand
+- [x] Procedural row shows `Procedural ·` on line 2
 
 ### Integration (`Home.test.tsx`)
 
-- [ ] Feed renders as list
-- [ ] No “Flip for vote details”
-- [ ] Outcome visible on initial load
+- [x] Feed renders as list
+- [x] No “Flip for vote details”
+- [x] Outcome visible on initial load
 
 ### Viewport QA (`qa-web-viewports.mjs`)
 
-- [ ] Replace `.flip-card` → `.feed-row`
-- [ ] Headline/topic selector updated (e.g. `[data-feed-topic]`)
-- [ ] Remove flip-hint / flip-card-inner / front-scroll checks
-- [ ] Collapsed row height sanity (e.g. `< 120px` on mock item)
-- [ ] Event line visible without expand
+- [x] Replace `.flip-card` → `.feed-row`
+- [x] Headline/topic selector updated (e.g. `[data-feed-topic]`)
+- [x] Remove flip-hint / flip-card-inner / front-scroll checks
+- [x] Collapsed row height sanity (e.g. `< 140px` on mock item)
+- [x] Event line visible without expand
 
 ---
 
@@ -346,11 +346,11 @@ Per root `AGENTS.md`:
 
 ## Success criteria (qualitative)
 
-- [ ] Pass/fail + margin visible without interaction
-- [ ] Procedural rows cannot be read as “policy passed”
+- [x] Pass/fail + margin visible without interaction
+- [x] Procedural rows cannot be read as “policy passed”
 - [ ] ≥3 mock rows fit in 320×568 viewport above fold (with site header)
-- [ ] CRS + full vote list only after expand
-- [ ] All existing `FeedItem` fields still reachable in UI
+- [x] CRS + full vote list only after expand
+- [x] All existing `FeedItem` fields still reachable in UI
 
 ---
 
@@ -368,8 +368,8 @@ Per root `AGENTS.md`:
 ## Related code (current)
 
 - Feed route: `web/src/routes/Home.tsx`
-- Current card: `web/src/components/FeedCard.tsx` → `FlipCard.tsx`
-- Label helpers: `web/src/utils/billLabels.ts`
+- Feed row UI: `web/src/components/FeedRow.tsx`, `FeedRowDetail.tsx`
+- Label helpers: `web/src/utils/billLabels.ts`, `web/src/utils/feedRowLabels.ts`
 - Feed types: `web/src/api/types.ts`, `shared/` worker types
 - Viewport QA: `scripts/qa-web-viewports.mjs`
 

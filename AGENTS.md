@@ -102,8 +102,10 @@ Shared stats JSON types live in `shared/stats-api-types.ts` (imported by worker 
 - `workers/senate_data_worker/src/sources/` — House/Senate vote + Congress.gov clients
 - `workers/senate_data_worker/src/synthesis/` — OpenRouter digest rewrite
 - `workers/senate_data_worker/src/storage/feed.ts` — feed read model
+- `wrangler.toml` (repo root) — mirrors `workers/senate_data_worker/wrangler.toml` for Cloudflare Workers Builds
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI
 - `web/src/components/FeedRowDetail.tsx` — expanded feed row detail panel
+- `web/src/utils/feedRowLabels.ts` — topic, event line, procedural detection, teaser helpers
 
 ## Key rules
 

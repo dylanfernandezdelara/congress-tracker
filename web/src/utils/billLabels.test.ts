@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  billDidNotPass,
   formatBillDocket,
   proceduralHeadline,
   trimDisplayTitle,
@@ -27,57 +26,6 @@ describe('trimDisplayTitle', () => {
 
   it('removes the suffix without a leading comma', () => {
     expect(trimDisplayTitle('Sample bill and for other purposes.')).toBe('Sample bill')
-  })
-})
-
-describe('billDidNotPass', () => {
-  it('returns false for an empty vote list', () => {
-    expect(billDidNotPass([])).toBe(false)
-  })
-
-  it('returns false when a vote passed', () => {
-    expect(billDidNotPass([{ result: 'Passed' }])).toBe(false)
-  })
-
-  it('returns false when a vote was agreed to', () => {
-    expect(billDidNotPass([{ result: 'Agreed to' }])).toBe(false)
-  })
-
-  it('returns true when a vote failed', () => {
-    expect(billDidNotPass([{ result: 'Failed' }])).toBe(true)
-  })
-
-  it('returns true when a Senate bill was defeated', () => {
-    expect(billDidNotPass([{ result: 'Bill Defeated' }])).toBe(true)
-  })
-
-  it('returns true when all votes failed or were rejected', () => {
-    expect(billDidNotPass([{ result: 'Failed' }, { result: 'Rejected' }])).toBe(true)
-  })
-
-  it('returns false when at least one vote passed among mixed results', () => {
-    expect(
-      billDidNotPass([
-        { result: 'Failed' },
-        { result: 'Passed' },
-      ]),
-    ).toBe(false)
-  })
-
-  it('returns false when the result string is blank', () => {
-    expect(billDidNotPass([{ result: '' }])).toBe(false)
-  })
-
-  it('returns false when the result string is unrecognized', () => {
-    expect(billDidNotPass([{ result: 'Cloture Motion' }])).toBe(false)
-  })
-
-  it('returns true when a vote was disagreed to', () => {
-    expect(billDidNotPass([{ result: 'Disagreed to' }])).toBe(true)
-  })
-
-  it('returns true when a vote was not agreed to', () => {
-    expect(billDidNotPass([{ result: 'Not Agreed to' }])).toBe(true)
   })
 })
 

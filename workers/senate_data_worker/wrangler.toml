@@ -1,3 +1,7 @@
+# SYNC REQUIRED — keep this file aligned with wrangler.toml at the repo root
+# (name, compatibility_date, preview_urls, cron, vars, D1 binding/id/name must match).
+# Paths here are worker-dir-relative; root wrangler.toml uses repo-relative paths for
+# Cloudflare Workers Builds. npm scripts invoke this file via --config.
 name = "congress-tracker-api"
 main = "src/worker.ts"
 compatibility_date = "2025-12-10"

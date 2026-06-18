@@ -61,6 +61,28 @@ for (const key of ['localStorage', 'sessionStorage'] as const) {
   }
 }
 
+// jsdom does not implement HTML button keyboard activation; mirror Enter → click
+// so tests can assert native <button> behavior without a custom onKeyDown handler.
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      const target = event.target
+      if (
+        event.defaultPrevented ||
+        !(target instanceof HTMLButtonElement) ||
+        target.disabled ||
+        event.key !== 'Enter'
+      ) {
+        return
+      }
+      event.preventDefault()
+      target.click()
+    },
+    true,
+  )
+}
+
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,

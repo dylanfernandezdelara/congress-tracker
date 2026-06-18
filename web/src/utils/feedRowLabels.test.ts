@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { FeedItem } from '../api/types'
+import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   formatFeedEventLine,
   getFeedEventLine,
@@ -10,22 +10,12 @@ import {
   isProceduralFeedItem,
 } from './feedRowLabels'
 
-function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
-  return {
-    bill: { congress: 119, type: 'HR', number: 2913, title: 'Sample bill title' },
-    policy_area: 'Defense',
-    digest: null,
-    raw_summary_text: null,
-    passage_votes: [],
-    latest_passage_date: '2026-06-05',
-    ...overrides,
-  }
-}
-
 describe('getFeedEventLine', () => {
   it('formats substantive pass event lines', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 2913, title: 'Authorize support for Ukraine' },
+      digest: null,
+      raw_summary_text: null,
       passage_votes: [
         {
           chamber: 'Senate',
@@ -48,8 +38,10 @@ describe('getFeedEventLine', () => {
   })
 
   it('formats substantive fail event lines', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 8428, title: 'Rural hospital funding' },
+      digest: null,
+      raw_summary_text: null,
       passage_votes: [
         {
           chamber: 'House',
@@ -72,7 +64,7 @@ describe('getFeedEventLine', () => {
   })
 
   it('formats procedural agreed event lines with framing B', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       bill: {
         congress: 119,
         type: 'HRES',
@@ -101,7 +93,7 @@ describe('getFeedEventLine', () => {
   })
 
   it('formats procedural rejected event lines with framing B', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       bill: {
         congress: 119,
         type: 'HR',
@@ -128,13 +120,15 @@ describe('getFeedEventLine', () => {
   })
 
   it('classifies cloture votes as procedural via question pattern', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       bill: {
         congress: 119,
         type: 'S',
         number: 2282,
         title: 'A regular bill about infrastructure funding',
       },
+      digest: null,
+      raw_summary_text: null,
       passage_votes: [
         {
           chamber: 'Senate',
@@ -160,7 +154,7 @@ describe('getFeedEventLine', () => {
 
 describe('isProceduralFeedItem', () => {
   it('classifies procedural items with a digest as procedural', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       bill: {
         congress: 119,
         type: 'HRES',
@@ -200,18 +194,22 @@ describe('getPrimaryPassageVote', () => {
       date: '2026-06-05',
     }
 
-    expect(getPrimaryPassageVote(makeItem({ passage_votes: [older, newer] }))).toBe(newer)
-    expect(getPrimaryPassageVote(makeItem({ passage_votes: [newer, older] }))).toBe(newer)
+    expect(
+      getPrimaryPassageVote(makeFeedItem({ digest: null, passage_votes: [older, newer] })),
+    ).toBe(newer)
+    expect(
+      getPrimaryPassageVote(makeFeedItem({ digest: null, passage_votes: [newer, older] })),
+    ).toBe(newer)
   })
 })
 
 describe('getFeedTeaser', () => {
   it('returns null when there is no digest', () => {
-    expect(getFeedTeaser(makeItem())).toBeNull()
+    expect(getFeedTeaser(makeFeedItem({ digest: null }))).toBeNull()
   })
 
   it('caps teaser text at roughly 120 characters on a word boundary', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
         what_it_does:

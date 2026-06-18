@@ -62,23 +62,19 @@ Run `npm --prefix web test`.
 
 ---
 
-## Agent 3 — Feed cards & flip interaction
+## Agent 3 — Feed rows & expand detail
 
 **Model:** Composer 2.5  
-**Scope:** `web/src/components/FeedCard.tsx`, `web/src/components/FlipCard.tsx`
+**Scope:** `web/src/components/FeedRow.tsx`, `web/src/components/FeedRowDetail.tsx`
 
 ```
-Restyle feed cards to jzhao garden cards while keeping flip behavior.
+Implement the action-row feed (collapsed rows + inline expand detail).
 
 Tasks:
-1. Replace dossier-tile with garden-card (flat, square, 1px border or borderless on cream).
-2. Docket line → garden-meta; bill headline → document-title at weight 400.
-3. term-chip → garden-tag with optional # prefix via CSS ::before.
-4. Vote lines: secondary chamber name, pass/fail colors (#09ad7a / #c8482b), muted date metadata.
-5. Official summary back: blockquote-style left accent or decorative quote mark.
-6. ink-link → garden-link; congress.gov link stays external with ↗.
-7. Flip helper text: garden-meta size, centered.
-8. Ensure flip card min-height and 44px touch target; reduced-motion path unchanged.
+1. Collapsed row: topic, event line (outcome + margin), optional teaser, status dot, expand affordance.
+2. Expanded panel: vote history, digest sections, CRS in <details>, congress.gov link, policy/procedural chips.
+3. One row open at a time; aria-expanded / aria-controls / aria-labelledby on the toggle.
+4. Match design tokens (text-pass, text-fail, feed-list chrome) and FEED_REDESIGN_PLAN density targets.
 
 Run `npm --prefix web test`.
 ```

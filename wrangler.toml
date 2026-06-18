@@ -1,0 +1,29 @@
+# SYNC REQUIRED — keep this file aligned with workers/senate_data_worker/wrangler.toml
+# (name, compatibility_date, preview_urls, cron, vars, D1 binding/id/name must match).
+# Root paths are repo-relative for Cloudflare Workers Builds (`npx wrangler versions upload`
+# from repo root). npm scripts use workers/senate_data_worker/wrangler.toml via --config.
+name = "congress-tracker-api"
+main = "workers/senate_data_worker/src/worker.ts"
+compatibility_date = "2025-12-10"
+preview_urls = true
+
+[assets]
+directory = "web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[triggers]
+crons = ["0 10 * * *"]
+
+[limits]
+cpu_ms = 300000
+
+[vars]
+CONGRESS = "119"
+SESSION = "2"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "congress-tracker"
+database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"
+preview_database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"

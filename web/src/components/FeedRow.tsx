@@ -4,9 +4,9 @@ import type { FeedItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedEventLine,
-  getFeedStatusKind,
   getFeedTeaser,
   getFeedTopic,
+  type FeedEventLine,
   type FeedStatusKind,
 } from '../utils/feedRowLabels'
 import { FeedRowDetail } from './FeedRowDetail'
@@ -24,9 +24,7 @@ const OUTCOME_CLASS: Record<FeedStatusKind, string> = {
   none: 'text-faint',
 }
 
-function FeedRowEventLine({ item, eventId }: { item: FeedItem; eventId: string }) {
-  const line = getFeedEventLine(item)
-
+function FeedRowEventLine({ line, eventId }: { line: FeedEventLine; eventId: string }) {
   return (
     <p
       id={eventId}
@@ -49,7 +47,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const detailId = useId()
   const topic = getFeedTopic(item)
   const teaser = getFeedTeaser(item)
-  const statusKind = getFeedStatusKind(item)
+  const eventLine = getFeedEventLine(item)
 
   return (
     <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
@@ -58,12 +56,12 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           type="button"
           className="feed-row-toggle feed-row-inner"
           aria-expanded={isExpanded}
-          aria-controls={isExpanded ? detailId : undefined}
+          aria-controls={detailId}
           aria-labelledby={`${topicId} ${eventId}`}
           onClick={onToggle}
         >
           <span
-            className={`feed-row-status-dot feed-row-status-dot--${statusKind}`}
+            className={`feed-row-status-dot feed-row-status-dot--${eventLine.kind}`}
             aria-hidden="true"
           />
           <div className="feed-row-content">
@@ -87,7 +85,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                 </span>
               </div>
             </div>
-            <FeedRowEventLine item={item} eventId={eventId} />
+            <FeedRowEventLine line={eventLine} eventId={eventId} />
             {teaser ? (
               <p className="feed-row-teaser text-sm text-secondary line-clamp-1">{teaser}</p>
             ) : null}

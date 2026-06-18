@@ -1,42 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { FeedItem } from '../api/types'
+import { congressGovBillUrl } from '../utils/billLabels'
+import { makeFeedItem } from '../test/feedItemFixtures'
 import { FeedRow } from './FeedRow'
 
 const longCrsSummary = `Ukraine Support Act
 
 ${'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(4)}`
 
-function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
-  return {
-    bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
-    policy_area: 'Defense',
-    digest: {
-      headline: 'Plain headline for readers',
-      what_it_does: 'It does something important in plain language.',
-      key_points: ['Point one'],
-      terms_explained: [],
-    },
-    raw_summary_text: longCrsSummary,
-    passage_votes: [
-      {
-        chamber: 'Senate',
-        question: 'On Passage of the Bill',
-        result: 'Passed',
-        yeas: 52,
-        nays: 47,
-        date: '2026-06-05',
-      },
-    ],
-    latest_passage_date: '2026-06-05',
-    ...overrides,
-  }
-}
-
 describe('FeedRow', () => {
   it('shows topic and event line without expanding', () => {
-    render(<FeedRow item={makeItem()} isExpanded={false} onToggle={() => {}} />)
+    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
     expect(screen.getByText('Passed')).toBeInTheDocument()
@@ -44,39 +19,96 @@ describe('FeedRow', () => {
   })
 
   it('includes outcome and margin in the toggle accessible name', () => {
-    render(<FeedRow item={makeItem()} isExpanded={false} onToggle={() => {}} />)
+    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByRole('button', { name: /52–47/ })).toBeInTheDocument()
   })
 
+  it('shows Failed and margin for a substantive failed vote', () => {
+    const item = makeFeedItem({
+      passage_votes: [
+        {
+          chamber: 'House',
+          question: 'On Passage of the Bill',
+          result: 'Failed',
+          yeas: 198,
+          nays: 230,
+          date: '2026-06-04',
+        },
+      ],
+      latest_passage_date: '2026-06-04',
+    })
+
+    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /198–230/ })).toBeInTheDocument()
+  })
+
+  it('calls onToggle when the row button is clicked', () => {
+    const onToggle = vi.fn()
+
+    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={onToggle} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /52–47/ }))
+
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('exposes aria-controls on the collapsed toggle', () => {
+    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+
+    const toggle = screen.getByRole('button', { name: /52–47/ })
+    const controls = toggle.getAttribute('aria-controls')
+    expect(controls).toBeTruthy()
+    expect(controls!.length).toBeGreaterThan(0)
+  })
+
+  it('toggles on Enter via native button behavior', () => {
+    const onToggle = vi.fn()
+
+    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={onToggle} />)
+
+    const toggle = screen.getByRole('button', { name: /52–47/ })
+    fireEvent.keyDown(toggle, { key: 'Enter' })
+
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
   it('reveals CRS summary text when expanded', () => {
-    const { rerender } = render(
-      <FeedRow item={makeItem()} isExpanded={false} onToggle={() => {}} />,
-    )
+    const item = makeFeedItem({ raw_summary_text: longCrsSummary })
+    const { rerender } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.queryByText(/Ukraine Support Act/)).not.toBeInTheDocument()
 
-    rerender(<FeedRow item={makeItem()} isExpanded={true} onToggle={() => {}} />)
+    rerender(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
 
     expect(screen.getByText(/Ukraine Support Act/)).toBeInTheDocument()
   })
 
   it('does not toggle expand when the congress.gov link is clicked', () => {
     const onToggle = vi.fn()
+    const item = makeFeedItem()
 
-    render(<FeedRow item={makeItem()} isExpanded={true} onToggle={onToggle} />)
+    render(<FeedRow item={item} isExpanded={true} onToggle={onToggle} />)
 
     const toggle = screen.getByRole('button', { name: /52–47/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
 
-    fireEvent.click(screen.getByRole('link', { name: /Read on congress.gov/ }))
+    const link = screen.getByRole('link', { name: /Read on congress.gov/ })
+    expect(link).toHaveAttribute(
+      'href',
+      congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number),
+    )
+
+    fireEvent.click(link)
 
     expect(onToggle).not.toHaveBeenCalled()
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('shows Procedural on the event line for procedural rows', () => {
-    const item = makeItem({
+    const item = makeFeedItem({
       bill: {
         congress: 119,
         type: 'HRES',

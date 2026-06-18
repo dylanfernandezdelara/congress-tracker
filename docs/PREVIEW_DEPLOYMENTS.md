@@ -67,8 +67,9 @@ in GitHub. One-time setup in the Cloudflare dashboard:
    Deploy command for **production (`main`)**:
    `npx wrangler deploy --config workers/senate_data_worker/wrangler.toml`
    (applies cron from `wrangler.toml`). For **non-production branch previews**, use
-   `npx wrangler versions upload --config workers/senate_data_worker/wrangler.toml`
-   — bare `wrangler versions upload` from the repo root fails without `--config`.
+   `npx wrangler versions upload` from the repo root (root `wrangler.toml` mirrors the
+   worker config with repo-relative paths) or
+   `npx wrangler versions upload --config workers/senate_data_worker/wrangler.toml`.
 3. Enable
    [non-production branch builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/#configure-non-production-branch-builds).
 

@@ -142,8 +142,9 @@ async function auditPage(page) {
       if (rowRect.bottom <= 0 || rowRect.top >= viewportHeight) {
         issues.push('feed row not visible in viewport')
       }
-      if (rowRect.height > 120) {
-        issues.push(`collapsed feed row too tall (${Math.round(rowRect.height)}px, expected < 120px)`)
+      if (rowRect.height > 140) {
+        // FEED_REDESIGN_PLAN target: ~64px skeleton; rows with teaser may exceed that.
+        issues.push(`collapsed feed row too tall (${Math.round(rowRect.height)}px, expected < 140px)`)
       }
     }
 

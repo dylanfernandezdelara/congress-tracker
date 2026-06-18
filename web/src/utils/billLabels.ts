@@ -121,14 +121,6 @@ export function voteIndicatesFailure(result: string): boolean {
   return voteResultIndicatesFailure(normalizeVoteResult(result))
 }
 
-export function billDidNotPass(votes: Array<{ result: string }>): boolean {
-  if (votes.length === 0) return false
-  const normalized = votes.map((v) => normalizeVoteResult(v.result))
-  const anyPassage = normalized.some(voteResultIndicatesPassage)
-  const anyFailure = normalized.some(voteResultIndicatesFailure)
-  return anyFailure && !anyPassage
-}
-
 export function voteResultClass(result: string): string {
   const normalized = normalizeVoteResult(result)
   if (voteResultIndicatesFailure(normalized)) return 'text-fail'

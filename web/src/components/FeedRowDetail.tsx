@@ -68,8 +68,7 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
             >
               Procedural
             </span>
-          ) : null}
-          {policyArea ? (
+          ) : policyArea ? (
             <span
               className={policyAreaChipClass(policyArea)}
               style={policyAreaChipStyle(policyArea)}
@@ -139,7 +138,7 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
         <a
           href={sourceUrl}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="congress-link text-sm"
         >
           Read on congress.gov ↗
