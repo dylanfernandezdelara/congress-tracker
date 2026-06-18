@@ -19,6 +19,8 @@
     --twc-ghost-border: 0 0% 0% / 0.1;
     --twc-ghost-border-hover: 0 0% 0% / 0.2;
     --twc-glow: 0 0% 0% / 0.03;
+    --twc-row-hover: 0 0% 0% / 0.035;
+    --twc-row-active: 0 0% 0% / 0.05;
     --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.08);
     --twc-accent: 24 85% 50%;
     --twc-pass: 151 55% 36%;
@@ -42,6 +44,8 @@
     --twc-ghost-border: 0 0% 100% / 0.1;
     --twc-ghost-border-hover: 0 0% 100% / 0.2;
     --twc-glow: 0 0% 100% / 0.04;
+    --twc-row-hover: 0 0% 100% / 0.04;
+    --twc-row-active: 0 0% 100% / 0.06;
     --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.35);
     --twc-accent: 24 90% 58%;
     --twc-pass: 151 45% 55%;
@@ -164,6 +168,19 @@
     text-decoration-color: hsl(var(--twc-accent) / 0.5);
   }
 
+  .feed-main {
+    width: 100%;
+  }
+
+  @media (min-width: 1024px) {
+    /* On wide screens keep a comfortable reading measure instead of letting
+       rows stretch edge-to-edge (long line lengths hurt scannability). */
+    .feed-main {
+      max-width: 680px;
+      margin-inline: auto;
+    }
+  }
+
   .feed-list {
     @apply divide-y overflow-hidden rounded-lg border bg-card;
     border-color: hsl(var(--twc-border));
@@ -171,6 +188,23 @@
 
   .feed-row {
     @apply py-3 px-3;
+    transition: background-color 0.15s ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .feed-row:not(.is-expanded):hover {
+      background-color: hsl(var(--twc-row-hover));
+    }
+  }
+
+  .feed-row.is-expanded {
+    background-color: hsl(var(--twc-row-active));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .feed-row {
+      transition: none;
+    }
   }
 
   .feed-row-article {
