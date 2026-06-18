@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { fetchFeed } from '../api/client'
-import type { FeedPageResponse } from '../api/types'
+import type { FeedItem, FeedPageResponse } from '../api/types'
 import { FeedRow } from '../components/FeedRow'
 import {
   FEED_DESKTOP_PAGE_SIZE,
@@ -12,6 +12,10 @@ import { useAsyncData } from '../hooks/useAsyncData'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 
 const LOOKBACK_DAYS = 45
+
+function feedRowKey(item: FeedItem): string {
+  return `${item.bill.congress}-${item.bill.type}-${item.bill.number}`
+}
 
 function FeedSkeleton() {
   return (
@@ -70,6 +74,7 @@ function FeedPagination({
 export default function Home() {
   const [retryKey, setRetryKey] = useState(0)
   const [page, setPage] = useState(0)
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null)
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const pageSize = isMobile ? FEED_MOBILE_PAGE_SIZE : FEED_DESKTOP_PAGE_SIZE
   const offset = page * pageSize
@@ -82,6 +87,10 @@ export default function Home() {
   useEffect(() => {
     setPage(0)
   }, [isMobile])
+
+  useEffect(() => {
+    setExpandedRowKey(null)
+  }, [page, offset, retryKey])
 
   const feed = useAsyncData<FeedPageResponse>({
     deps: [retryKey, pageSize, offset],
@@ -137,12 +146,19 @@ export default function Home() {
 
           {!isPageTransition ? (
             <ul className="feed-list">
-              {visibleItems.map((item) => (
-                <FeedRow
-                  key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`}
-                  item={item}
-                />
-              ))}
+              {visibleItems.map((item) => {
+                const rowKey = feedRowKey(item)
+                return (
+                  <FeedRow
+                    key={rowKey}
+                    item={item}
+                    isExpanded={expandedRowKey === rowKey}
+                    onToggle={() =>
+                      setExpandedRowKey((current) => (current === rowKey ? null : rowKey))
+                    }
+                  />
+                )
+              })}
             </ul>
           ) : null}
 

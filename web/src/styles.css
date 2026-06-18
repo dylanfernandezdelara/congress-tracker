@@ -238,6 +238,101 @@
     @apply py-3 px-3;
   }
 
+  .feed-row-article {
+    @apply block;
+  }
+
+  .feed-row-toggle {
+    @apply flex w-full gap-3 border-0 bg-transparent p-0 text-left text-inherit;
+    cursor: pointer;
+    font: inherit;
+    touch-action: manipulation;
+  }
+
+  .feed-row-toggle:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .feed-row.is-expanded .feed-row-chevron {
+    transform: rotate(90deg);
+  }
+
+  .feed-row-chevron {
+    @apply inline-block transition-transform duration-200;
+  }
+
+  .feed-row-detail-panel {
+    @apply mt-3 border-t pt-3;
+    border-color: hsl(var(--twc-border));
+    padding-left: calc(0.625rem + 0.75rem + 0.625rem);
+    animation: feed-row-detail-enter 0.25s ease forwards;
+    overflow: hidden;
+  }
+
+  .feed-row-detail {
+    @apply space-y-4;
+  }
+
+  .feed-row-detail-section + .feed-row-detail-section {
+    @apply border-t pt-4;
+    border-color: hsl(var(--twc-border));
+  }
+
+  .feed-row-detail-heading {
+    @apply text-[11px] font-medium uppercase tracking-widest text-faint;
+  }
+
+  .feed-row-detail-footer {
+    @apply border-t pt-4;
+    border-color: hsl(var(--twc-border));
+  }
+
+  .feed-row-crs-details > summary {
+    list-style: none;
+  }
+
+  .feed-row-crs-details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .feed-row-crs-details > summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 0.2s ease;
+  }
+
+  .feed-row-crs-details[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  @keyframes feed-row-detail-enter {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+
+    to {
+      opacity: 1;
+      max-height: 4000px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .feed-row-detail-panel {
+      animation: none;
+    }
+
+    .feed-row-chevron {
+      transition: none;
+    }
+
+    .feed-row-crs-details > summary::before {
+      transition: none;
+    }
+  }
+
   .feed-row-inner {
     @apply flex gap-3;
   }
