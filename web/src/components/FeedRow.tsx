@@ -17,6 +17,7 @@ type FeedRowProps = {
 }
 
 export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
+  const badgeId = useId()
   const topicId = useId()
   const eventId = useId()
   const summaryId = useId()
@@ -34,13 +35,13 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${topicId} ${eventId}`}
+          aria-labelledby={`${badgeId} ${topicId} ${eventId}`}
           aria-describedby={summaryId}
           onClick={onToggle}
         >
           <div className="feed-row-main">
             <div className="feed-row-meta-row">
-              <span className={`feed-row-badge feed-row-badge--${meta.kind}`}>
+              <span id={badgeId} className={`feed-row-badge feed-row-badge--${meta.kind}`}>
                 {meta.outcomeLabel}
               </span>
               {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
@@ -82,16 +83,15 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           </span>
         </button>
 
-        {isExpanded ? (
-          <div
-            id={detailId}
-            className="feed-row-detail-panel"
-            role="region"
-            aria-label={`Details for ${topic}`}
-          >
-            <FeedRowDetail item={item} />
-          </div>
-        ) : null}
+        <div
+          id={detailId}
+          className="feed-row-detail-panel"
+          role="region"
+          aria-label={`Details for ${topic}`}
+          hidden={!isExpanded}
+        >
+          {isExpanded ? <FeedRowDetail item={item} /> : null}
+        </div>
       </article>
     </li>
   )

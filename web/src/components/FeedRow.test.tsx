@@ -24,6 +24,7 @@ describe('FeedRow', () => {
   it('includes outcome and margin in the toggle accessible name', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
+    expect(screen.getByRole('button', { name: /Passed/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /52–47/ })).toBeInTheDocument()
   })
 
