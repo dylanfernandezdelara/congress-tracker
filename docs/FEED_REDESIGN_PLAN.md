@@ -4,6 +4,8 @@ Planning document for replacing large flip cards with a dense, scannable action-
 
 **Status:** Plan only — not yet implemented.
 
+**Implementation approach:** All implementation work is delegated to **Composer 2.5** agents (one agent per phase, run sequentially because the phases depend on each other). An orchestrator session writes the per-phase prompts, dispatches the Composer 2.5 agents, reviews each returned diff, runs verification (`npm test`, `npm run qa:web`) between phases, and handles git/PR. See "Implementation phases" below.
+
 ---
 
 ## Product intent (locked)
@@ -253,6 +255,12 @@ Reuse from `billLabels.ts`: `formatBillDocket`, `formatVoteDate`, `proceduralHea
 ---
 
 ## Implementation phases
+
+Each phase below is implemented by a dedicated **Composer 2.5** agent. The phases are run
+sequentially (Phase 2 depends on Phase 1's `FeedRow`/`feedRowLabels`; Phase 3 depends on both),
+either by resuming a single Composer 2.5 agent across phases to preserve context or by dispatching
+a fresh Composer 2.5 agent per phase with a fully self-contained prompt. The orchestrator session
+verifies and commits between phases.
 
 ### Phase 1 — Collapsed rows
 
