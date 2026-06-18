@@ -4,7 +4,9 @@ import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   FEED_SUMMARY_PENDING,
   formatFeedEventLine,
+  getFeedEventDisplay,
   getFeedEventLine,
+  getFeedRowMeta,
   getFeedSummary,
   getFeedTopic,
   getPrimaryPassageVote,
@@ -259,7 +261,7 @@ describe('getFeedSummary', () => {
     })
   })
 
-  it('caps summary text at roughly 160 characters on a word boundary', () => {
+  it('caps summary text at roughly 120 characters on a word boundary', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
@@ -272,8 +274,87 @@ describe('getFeedSummary', () => {
 
     const summary = getFeedSummary(item)
     expect(summary.pending).toBe(false)
-    expect(summary.text.length).toBeLessThanOrEqual(160)
+    expect(summary.text.length).toBeLessThanOrEqual(120)
     expect(summary.text).toMatch(/…$/)
     expect(summary.text).not.toMatch(/\s…$/)
+  })
+})
+
+describe('getFeedRowMeta', () => {
+  it('extracts structured meta for a substantive pass', () => {
+    const item = makeFeedItem({
+      bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
+    })
+
+    expect(getFeedRowMeta(item)).toEqual({
+      kind: 'passed',
+      outcomeLabel: 'Passed',
+      chamber: 'Senate',
+      margin: '52–47',
+      billId: 'S. 2',
+    })
+  })
+
+  it('extracts structured meta for procedural rows', () => {
+    const item = makeFeedItem({
+      bill: {
+        congress: 119,
+        type: 'HRES',
+        number: 512,
+        title:
+          'Providing for consideration of the bill (H.R. 2913) to authorize support for Ukraine, and for other purposes.',
+      },
+      passage_votes: [
+        {
+          chamber: 'House',
+          question: 'On Agreeing to the Resolution',
+          result: 'Agreed to',
+          yeas: 218,
+          nays: 210,
+          date: '2026-06-04',
+        },
+      ],
+    })
+
+    expect(getFeedRowMeta(item)).toEqual({
+      kind: 'procedural',
+      outcomeLabel: 'Procedural',
+      chamber: 'House',
+      margin: '218–210',
+      billId: 'H.Res. 512',
+    })
+  })
+})
+
+describe('getFeedEventDisplay', () => {
+  it('shows de-duplicated vote copy for substantive rows', () => {
+    const item = makeFeedItem()
+    expect(getFeedEventDisplay(item)).toBe('52–47 in the Senate')
+  })
+
+  it('shows full procedural detail without repeating the badge label', () => {
+    const item = makeFeedItem({
+      bill: {
+        congress: 119,
+        type: 'HRES',
+        number: 512,
+        title:
+          'Providing for consideration of the bill (H.R. 2913) to authorize support for Ukraine, and for other purposes.',
+      },
+      passage_votes: [
+        {
+          chamber: 'House',
+          question: 'On Agreeing to the Resolution',
+          result: 'Agreed to',
+          yeas: 218,
+          nays: 210,
+          date: '2026-06-04',
+        },
+      ],
+    })
+
+    expect(getFeedEventDisplay(item)).toBe(
+      'House agreed 218–210 · debate rule for H.R. 2913',
+    )
   })
 })

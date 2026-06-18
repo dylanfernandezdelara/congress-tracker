@@ -24,6 +24,7 @@ describe('FeedRow', () => {
   it('includes outcome and margin in the toggle accessible name', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
+    expect(screen.getByRole('button', { name: /Passed/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /52–47/ })).toBeInTheDocument()
   })
 
@@ -177,6 +178,7 @@ describe('FeedRow', () => {
     const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     const eventLine = container.querySelector('.feed-row-event')
-    expect(eventLine?.textContent).toContain('Procedural ·')
+    expect(screen.getByText('Procedural')).toBeInTheDocument()
+    expect(eventLine?.textContent).toContain('agreed 218–210')
   })
 })

@@ -124,7 +124,7 @@ export default function Home() {
   }, [page, showFeed])
 
   return (
-    <main className="space-y-5">
+    <main className="feed-main space-y-5">
       {isInitialLoad ? <FeedSkeleton /> : null}
 
       {feed.error ? (

@@ -3,11 +3,10 @@ import { useId } from 'react'
 import type { FeedItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import {
-  getFeedEventLine,
+  getFeedEventDisplay,
+  getFeedRowMeta,
   getFeedSummary,
   getFeedTopic,
-  type FeedEventLine,
-  type FeedStatusKind,
 } from '../utils/feedRowLabels'
 import { FeedRowDetail } from './FeedRowDetail'
 
@@ -17,97 +16,82 @@ type FeedRowProps = {
   onToggle: () => void
 }
 
-const OUTCOME_CLASS: Record<FeedStatusKind, string> = {
-  passed: 'text-pass',
-  failed: 'text-fail',
-  procedural: 'text-secondary',
-  none: 'text-faint',
-}
-
-function FeedRowEventLine({ line, eventId }: { line: FeedEventLine; eventId: string }) {
-  return (
-    <p
-      id={eventId}
-      className={`feed-row-event text-sm${line.kind === 'none' ? ' text-faint' : ''}`}
-    >
-      <span className={`font-medium ${OUTCOME_CLASS[line.kind]}`}>{line.outcome}</span>
-      {line.detail ? (
-        <>
-          {' · '}
-          {line.detail}
-        </>
-      ) : null}
-    </p>
-  )
-}
-
 export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
+  const badgeId = useId()
   const topicId = useId()
   const eventId = useId()
   const summaryId = useId()
   const detailId = useId()
   const topic = getFeedTopic(item)
   const summary = getFeedSummary(item)
-  const eventLine = getFeedEventLine(item)
+  const meta = getFeedRowMeta(item)
+  const eventDisplay = getFeedEventDisplay(item)
 
   return (
-    <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
+    <li className={`feed-row feed-row--${meta.kind}${isExpanded ? ' is-expanded' : ''}`}>
       <article className="feed-row-article" aria-labelledby={topicId}>
         <button
           type="button"
-          className="feed-row-toggle feed-row-inner"
+          className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${topicId} ${eventId}`}
+          aria-labelledby={`${badgeId} ${topicId} ${eventId}`}
           aria-describedby={summaryId}
           onClick={onToggle}
         >
-          <span
-            className={`feed-row-status-dot feed-row-status-dot--${eventLine.kind}`}
-            aria-hidden="true"
-          />
-          <div className="feed-row-content">
-            <div className="feed-row-header">
-              <h2
-                id={topicId}
-                data-feed-topic
-                className="feed-row-topic text-base font-semibold line-clamp-2"
+          <div className="feed-row-main">
+            <div className="feed-row-meta-row">
+              <span id={badgeId} className={`feed-row-badge feed-row-badge--${meta.kind}`}>
+                {meta.outcomeLabel}
+              </span>
+              {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
+              <span className="feed-row-chip feed-row-chip--bill">{meta.billId}</span>
+              <time
+                className="feed-row-date"
+                dateTime={item.latest_passage_date}
               >
-                {topic}
-              </h2>
-              <div className="feed-row-meta">
-                <time
-                  className="feed-row-date text-sm text-faint"
-                  dateTime={item.latest_passage_date}
-                >
-                  {formatVoteDate(item.latest_passage_date)}
-                </time>
-                <span className="feed-row-chevron text-faint" aria-hidden="true">
-                  ›
-                </span>
-              </div>
+                {formatVoteDate(item.latest_passage_date)}
+              </time>
             </div>
-            <FeedRowEventLine line={eventLine} eventId={eventId} />
+
+            <h2
+              id={topicId}
+              data-feed-topic
+              className="feed-row-topic"
+            >
+              {topic}
+            </h2>
+
+            <p
+              id={eventId}
+              className={`feed-row-event${meta.kind === 'none' ? ' feed-row-event--muted' : ''}`}
+            >
+              {eventDisplay}
+            </p>
+
             <p
               id={summaryId}
               data-feed-summary
-              className={`feed-row-teaser text-sm line-clamp-2${summary.pending ? ' text-faint' : ' text-secondary'}`}
+              className={`feed-row-teaser${summary.pending ? ' feed-row-teaser--pending' : ''}`}
             >
               {summary.text}
             </p>
           </div>
+
+          <span className="feed-row-chevron" aria-hidden="true">
+            ›
+          </span>
         </button>
 
-        {isExpanded ? (
-          <div
-            id={detailId}
-            className="feed-row-detail-panel"
-            role="region"
-            aria-label={`Details for ${topic}`}
-          >
-            <FeedRowDetail item={item} />
-          </div>
-        ) : null}
+        <div
+          id={detailId}
+          className="feed-row-detail-panel"
+          role="region"
+          aria-label={`Details for ${topic}`}
+          hidden={!isExpanded}
+        >
+          {isExpanded ? <FeedRowDetail item={item} /> : null}
+        </div>
       </article>
     </li>
   )

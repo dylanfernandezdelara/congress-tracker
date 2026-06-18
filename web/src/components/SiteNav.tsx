@@ -5,13 +5,15 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function SiteNav() {
   return (
-    <nav className="site-nav" aria-label="Site sections">
-      <NavLink to="/" end className={linkClass}>
-        Feed
-      </NavLink>
-      <NavLink to="/stats" className={linkClass}>
-        Stats
-      </NavLink>
-    </nav>
+    <div className="site-nav-wrap">
+      <nav className="site-nav" aria-label="Site sections">
+        <NavLink to="/" end className={linkClass}>
+          Feed
+        </NavLink>
+        <NavLink to="/stats" className={linkClass}>
+          Stats
+        </NavLink>
+      </nav>
+    </div>
   )
 }
