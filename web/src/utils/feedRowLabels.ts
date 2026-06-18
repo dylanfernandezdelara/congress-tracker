@@ -155,3 +155,56 @@ export function formatFeedEventLine(line: FeedEventLine): string {
 export function getFeedStatusKind(item: FeedItem): FeedStatusKind {
   return getFeedEventLine(item).kind
 }
+
+export interface FeedRowMeta {
+  kind: FeedStatusKind
+  outcomeLabel: string
+  chamber: string | null
+  margin: string | null
+  billId: string
+}
+
+export function getFeedRowMeta(item: FeedItem): FeedRowMeta {
+  const vote = getPrimaryPassageVote(item)
+  const billId = formatShortBillId(item.bill.type, item.bill.number)
+
+  if (!vote) {
+    return {
+      kind: 'none',
+      outcomeLabel: 'No vote',
+      chamber: null,
+      margin: null,
+      billId,
+    }
+  }
+
+  const margin = `${vote.yeas}–${vote.nays}`
+
+  if (isProceduralFeedItem(item)) {
+    return {
+      kind: 'procedural',
+      outcomeLabel: 'Procedural',
+      chamber: vote.chamber,
+      margin,
+      billId,
+    }
+  }
+
+  const failed = voteIndicatesFailure(vote.result)
+  return {
+    kind: failed ? 'failed' : 'passed',
+    outcomeLabel: failed ? 'Failed' : 'Passed',
+    chamber: vote.chamber,
+    margin,
+    billId,
+  }
+}
+
+/** De-duplicated event copy for the collapsed card (badge/chips already carry outcome + bill). */
+export function getFeedEventDisplay(item: FeedItem): string {
+  const meta = getFeedRowMeta(item)
+  if (meta.kind === 'none') return 'No vote recorded'
+  if (meta.kind === 'procedural') return getFeedEventLine(item).detail
+  if (meta.chamber && meta.margin) return `${meta.margin} in the ${meta.chamber}`
+  return meta.margin ?? ''
+}

@@ -177,6 +177,7 @@ describe('FeedRow', () => {
     const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     const eventLine = container.querySelector('.feed-row-event')
-    expect(eventLine?.textContent).toContain('Procedural ·')
+    expect(screen.getByText('Procedural')).toBeInTheDocument()
+    expect(eventLine?.textContent).toContain('agreed 218–210')
   })
 })
