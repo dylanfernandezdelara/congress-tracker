@@ -75,17 +75,15 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               >
                 {topic}
               </h2>
-              <div className="feed-row-meta">
-                <time
-                  className="feed-row-date text-sm text-faint"
-                  dateTime={item.latest_passage_date}
-                >
-                  {formatVoteDate(item.latest_passage_date)}
-                </time>
-                <span className="feed-row-chevron text-faint" aria-hidden="true">
-                  ›
-                </span>
-              </div>
+              <time
+                className="feed-row-date text-sm text-faint"
+                dateTime={item.latest_passage_date}
+              >
+                {formatVoteDate(item.latest_passage_date)}
+              </time>
+              <span className="feed-row-chevron text-faint" aria-hidden="true">
+                ›
+              </span>
             </div>
             <FeedRowEventLine line={eventLine} eventId={eventId} />
             <p

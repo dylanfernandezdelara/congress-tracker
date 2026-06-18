@@ -310,6 +310,9 @@ async function main() {
           audit.issues.push(`expected ${theme} theme but got ${audit.theme}`)
         }
 
+        const feedScreenshotPath = path.join(outDir, `${caseId}.png`)
+        await page.screenshot({ path: feedScreenshotPath, fullPage: false })
+
         await page.goto(`${baseUrl.replace(/\/$/, '')}/stats`, { waitUntil: 'domcontentloaded' })
         await page.getByLabel('Members in Congress').waitFor({ timeout: 10_000 })
         const statsIssues = await page.evaluate(() => {
@@ -327,9 +330,6 @@ async function main() {
         })
         audit.issues.push(...statsIssues)
 
-        const screenshotPath = path.join(outDir, `${caseId}.png`)
-        await page.screenshot({ path: screenshotPath, fullPage: false })
-
         const passed = audit.issues.length === 0
         if (!passed) failures += 1
 
@@ -339,7 +339,7 @@ async function main() {
           theme,
           passed,
           issues: audit.issues,
-          screenshot: path.relative(rootDir, screenshotPath),
+          screenshot: path.relative(rootDir, feedScreenshotPath),
         })
 
         await page.close()
