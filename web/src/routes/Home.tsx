@@ -90,7 +90,7 @@ export default function Home() {
 
   useEffect(() => {
     setExpandedRowKey(null)
-  }, [page, offset, retryKey])
+  }, [offset, retryKey])
 
   const feed = useAsyncData<FeedPageResponse>({
     deps: [retryKey, pageSize, offset],

@@ -203,7 +203,6 @@
     border-color: hsl(var(--twc-border));
     padding-left: calc(0.625rem + 0.75rem + 0.625rem);
     animation: feed-row-detail-enter 0.25s ease forwards;
-    overflow: hidden;
   }
 
   .feed-row-detail {
@@ -245,12 +244,12 @@
   @keyframes feed-row-detail-enter {
     from {
       opacity: 0;
-      max-height: 0;
+      transform: translateY(-4px);
     }
 
     to {
       opacity: 1;
-      max-height: 4000px;
+      transform: translateY(0);
     }
   }
 
@@ -287,6 +286,10 @@
   .feed-row-status-dot--procedural {
     @apply rounded-full border border-dashed bg-transparent;
     border-color: hsl(var(--twc-faint));
+  }
+
+  .feed-row-status-dot--none {
+    background-color: hsl(var(--twc-faint) / 0.45);
   }
 
   .feed-row-content {

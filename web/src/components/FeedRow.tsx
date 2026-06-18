@@ -1,13 +1,13 @@
-import { type KeyboardEvent, useId } from 'react'
+import { useId } from 'react'
 
 import type { FeedItem } from '../api/types'
-import { formatVoteDate, voteResultClass } from '../utils/billLabels'
+import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedEventLine,
   getFeedStatusKind,
   getFeedTeaser,
   getFeedTopic,
-  getPrimaryPassageVote,
+  type FeedStatusKind,
 } from '../utils/feedRowLabels'
 import { FeedRowDetail } from './FeedRowDetail'
 
@@ -17,31 +17,26 @@ type FeedRowProps = {
   onToggle: () => void
 }
 
-function FeedRowEventLine({ item }: { item: FeedItem }) {
+const OUTCOME_CLASS: Record<FeedStatusKind, string> = {
+  passed: 'text-pass',
+  failed: 'text-fail',
+  procedural: 'text-secondary',
+  none: 'text-faint',
+}
+
+function FeedRowEventLine({ item, eventId }: { item: FeedItem; eventId: string }) {
   const line = getFeedEventLine(item)
-  const vote = getPrimaryPassageVote(item)
-
-  if (line === 'No vote recorded') {
-    return <p className="feed-row-event text-sm text-faint">{line}</p>
-  }
-
-  const separator = ' · '
-  const separatorIndex = line.indexOf(separator)
-  const outcome = separatorIndex === -1 ? line : line.slice(0, separatorIndex)
-  const remainder = separatorIndex === -1 ? '' : line.slice(separatorIndex + separator.length)
-
-  let outcomeClass = 'text-faint'
-  if (outcome === 'Passed' || outcome === 'Failed') {
-    outcomeClass = vote ? voteResultClass(vote.result) : 'text-faint'
-  }
 
   return (
-    <p className="feed-row-event text-sm">
-      <span className={`font-medium ${outcomeClass}`}>{outcome}</span>
-      {remainder ? (
+    <p
+      id={eventId}
+      className={`feed-row-event text-sm${line.kind === 'none' ? ' text-faint' : ''}`}
+    >
+      <span className={`font-medium ${OUTCOME_CLASS[line.kind]}`}>{line.outcome}</span>
+      {line.detail ? (
         <>
-          {separator}
-          {remainder}
+          {' · '}
+          {line.detail}
         </>
       ) : null}
     </p>
@@ -50,18 +45,11 @@ function FeedRowEventLine({ item }: { item: FeedItem }) {
 
 export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const topicId = useId()
+  const eventId = useId()
   const detailId = useId()
   const topic = getFeedTopic(item)
   const teaser = getFeedTeaser(item)
   const statusKind = getFeedStatusKind(item)
-  const expandLabel = isExpanded ? `Hide details for ${topic}` : `Show details for ${topic}`
-
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onToggle()
-    }
-  }
 
   return (
     <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
@@ -70,10 +58,9 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           type="button"
           className="feed-row-toggle feed-row-inner"
           aria-expanded={isExpanded}
-          aria-controls={detailId}
-          aria-label={expandLabel}
+          aria-controls={isExpanded ? detailId : undefined}
+          aria-labelledby={`${topicId} ${eventId}`}
           onClick={onToggle}
-          onKeyDown={onKeyDown}
         >
           <span
             className={`feed-row-status-dot feed-row-status-dot--${statusKind}`}
@@ -100,7 +87,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                 </span>
               </div>
             </div>
-            <FeedRowEventLine item={item} />
+            <FeedRowEventLine item={item} eventId={eventId} />
             {teaser ? (
               <p className="feed-row-teaser text-sm text-secondary line-clamp-1">{teaser}</p>
             ) : null}

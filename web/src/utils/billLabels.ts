@@ -69,7 +69,7 @@ function capitalizeFirst(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-function truncateAtWordBoundary(text: string, maxLength: number): string {
+export function truncateAtWordBoundary(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   const slice = text.slice(0, maxLength)
   const lastSpace = slice.lastIndexOf(' ')
@@ -119,10 +119,6 @@ function voteResultIndicatesPassage(normalized: string): boolean {
 
 export function voteIndicatesFailure(result: string): boolean {
   return voteResultIndicatesFailure(normalizeVoteResult(result))
-}
-
-export function voteIndicatesPassage(result: string): boolean {
-  return voteResultIndicatesPassage(normalizeVoteResult(result))
 }
 
 export function billDidNotPass(votes: Array<{ result: string }>): boolean {

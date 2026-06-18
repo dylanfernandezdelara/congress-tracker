@@ -43,10 +43,10 @@ describe('FeedRow', () => {
     expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
   })
 
-  it('shows the vote margin on the collapsed surface', () => {
+  it('includes outcome and margin in the toggle accessible name', () => {
     render(<FeedRow item={makeItem()} isExpanded={false} onToggle={() => {}} />)
 
-    expect(screen.getByText(/52–47/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /52–47/ })).toBeInTheDocument()
   })
 
   it('reveals CRS summary text when expanded', () => {
@@ -66,7 +66,7 @@ describe('FeedRow', () => {
 
     render(<FeedRow item={makeItem()} isExpanded={true} onToggle={onToggle} />)
 
-    const toggle = screen.getByRole('button', { name: /details for Plain headline for readers/ })
+    const toggle = screen.getByRole('button', { name: /52–47/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
 
     fireEvent.click(screen.getByRole('link', { name: /Read on congress.gov/ }))

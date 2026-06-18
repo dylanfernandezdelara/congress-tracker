@@ -17,7 +17,7 @@ npm run dev:worker   # http://127.0.0.1:8787
 npm run dev:web      # http://127.0.0.1:5173
 ```
 
-Then open `http://127.0.0.1:5173` for the scrollable flip-card feed — the
+Then open `http://127.0.0.1:5173` for the scrollable action-row feed — the
 seeded sample bills appear immediately, no keys required.
 
 To pull **real** data instead of the sample, add `CONGRESS_API_KEY` and
@@ -40,7 +40,7 @@ Cloudflare Worker
         |
         v
 Vite + React (letterpress UI)
-  scrollable feed of flip-cards
+  scrollable action-row feed
 ```
 
 D1 (`DB`) stores `votes` and `bill_digests`.

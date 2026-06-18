@@ -5,14 +5,35 @@ import {
   formatShortBillId,
   proceduralHeadline,
   trimDisplayTitle,
+  truncateAtWordBoundary,
   voteIndicatesFailure,
 } from './billLabels'
 
 const TEASER_MAX_CHARS = 120
 
+const PROCEDURAL_VOTE_QUESTION_PATTERN =
+  /cloture|motion to (recommit|table|proceed|discharge)|previous question|point of order|adjourn/i
+
+export type FeedStatusKind = 'passed' | 'failed' | 'procedural' | 'none'
+
+export interface FeedEventLine {
+  outcome: string
+  kind: FeedStatusKind
+  detail: string
+}
+
+function isProceduralVoteQuestion(question: string): boolean {
+  return PROCEDURAL_VOTE_QUESTION_PATTERN.test(question)
+}
+
 export function isProceduralFeedItem(item: FeedItem): boolean {
   const title = item.bill.title ?? ''
-  return proceduralHeadline(title) !== null
+  if (proceduralHeadline(title) !== null) return true
+
+  const vote = getPrimaryPassageVote(item)
+  if (vote && isProceduralVoteQuestion(vote.question)) return true
+
+  return false
 }
 
 export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
@@ -24,8 +45,6 @@ export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
 }
 
 export function getFeedTopic(item: FeedItem): string {
-  const docket = formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
-
   if (item.digest?.headline) {
     return trimDisplayTitle(item.digest.headline)
   }
@@ -38,60 +57,64 @@ export function getFeedTopic(item: FeedItem): string {
     return trimDisplayTitle(item.bill.title)
   }
 
-  return docket
-}
-
-function truncateTeaser(text: string): string {
-  const collapsed = text.replace(/\s+/g, ' ').trim()
-  if (collapsed.length <= TEASER_MAX_CHARS) return collapsed
-
-  const slice = collapsed.slice(0, TEASER_MAX_CHARS)
-  const lastSpace = slice.lastIndexOf(' ')
-  if (lastSpace <= 0) return `${slice.trimEnd()}…`
-  return `${slice.slice(0, lastSpace).trimEnd()}…`
+  return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
 }
 
 export function getFeedTeaser(item: FeedItem): string | null {
   if (!item.digest?.what_it_does) return null
-  return truncateTeaser(item.digest.what_it_does)
+  const collapsed = item.digest.what_it_does.replace(/\s+/g, ' ').trim()
+  return truncateAtWordBoundary(collapsed, TEASER_MAX_CHARS)
 }
 
 function getProceduralEventSuffix(item: FeedItem): string {
   const title = item.bill.title ?? ''
+  const shortBillId = formatShortBillId(item.bill.type, item.bill.number)
   const underlyingBillId = extractUnderlyingBillIdFromTitle(title)
+
   if (underlyingBillId) {
     return `debate rule for ${underlyingBillId}`
   }
 
-  return `rule for ${formatShortBillId(item.bill.type, item.bill.number)}`
+  if (proceduralHeadline(title) !== null) {
+    return `rule for ${shortBillId}`
+  }
+
+  return `procedural vote on ${shortBillId}`
 }
 
 function getSubstantiveOutcomeLabel(result: string): 'Passed' | 'Failed' {
   return voteIndicatesFailure(result) ? 'Failed' : 'Passed'
 }
 
-export function getFeedEventLine(item: FeedItem): string {
+export function getFeedEventLine(item: FeedItem): FeedEventLine {
   const vote = getPrimaryPassageVote(item)
   const billId = formatShortBillId(item.bill.type, item.bill.number)
 
   if (!vote) {
-    return 'No vote recorded'
+    return { outcome: 'No vote recorded', kind: 'none', detail: '' }
   }
 
   if (isProceduralFeedItem(item)) {
     const verb = voteIndicatesFailure(vote.result) ? 'rejected' : 'agreed'
-    return `Procedural · ${vote.chamber} ${verb} ${vote.yeas}–${vote.nays} · ${getProceduralEventSuffix(item)}`
+    return {
+      outcome: 'Procedural',
+      kind: 'procedural',
+      detail: `${vote.chamber} ${verb} ${vote.yeas}–${vote.nays} · ${getProceduralEventSuffix(item)}`,
+    }
   }
 
   const outcome = getSubstantiveOutcomeLabel(vote.result)
-  return `${outcome} · ${vote.chamber} · ${vote.yeas}–${vote.nays} · ${billId}`
+  return {
+    outcome,
+    kind: outcome === 'Failed' ? 'failed' : 'passed',
+    detail: `${vote.chamber} · ${vote.yeas}–${vote.nays} · ${billId}`,
+  }
 }
 
-export function getFeedStatusKind(item: FeedItem): 'passed' | 'failed' | 'procedural' {
-  if (isProceduralFeedItem(item)) return 'procedural'
+export function formatFeedEventLine(line: FeedEventLine): string {
+  return line.detail ? `${line.outcome} · ${line.detail}` : line.outcome
+}
 
-  const vote = getPrimaryPassageVote(item)
-  if (!vote) return 'failed'
-
-  return voteIndicatesFailure(vote.result) ? 'failed' : 'passed'
+export function getFeedStatusKind(item: FeedItem): FeedStatusKind {
+  return getFeedEventLine(item).kind
 }

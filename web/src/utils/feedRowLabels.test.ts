@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { FeedItem } from '../api/types'
 import {
+  formatFeedEventLine,
   getFeedEventLine,
   getFeedTeaser,
   getFeedTopic,
@@ -37,7 +38,13 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    expect(getFeedEventLine(item)).toBe('Passed · Senate · 52–47 · H.R. 2913')
+    const line = getFeedEventLine(item)
+    expect(line).toEqual({
+      outcome: 'Passed',
+      kind: 'passed',
+      detail: 'Senate · 52–47 · H.R. 2913',
+    })
+    expect(formatFeedEventLine(line)).toBe('Passed · Senate · 52–47 · H.R. 2913')
   })
 
   it('formats substantive fail event lines', () => {
@@ -55,7 +62,13 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    expect(getFeedEventLine(item)).toBe('Failed · House · 198–230 · H.R. 8428')
+    const line = getFeedEventLine(item)
+    expect(line).toEqual({
+      outcome: 'Failed',
+      kind: 'failed',
+      detail: 'House · 198–230 · H.R. 8428',
+    })
+    expect(formatFeedEventLine(line)).toBe('Failed · House · 198–230 · H.R. 8428')
   })
 
   it('formats procedural agreed event lines with framing B', () => {
@@ -79,7 +92,10 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    expect(getFeedEventLine(item)).toBe(
+    const line = getFeedEventLine(item)
+    expect(line.outcome).toBe('Procedural')
+    expect(line.kind).toBe('procedural')
+    expect(formatFeedEventLine(line)).toBe(
       'Procedural · House agreed 218–210 · debate rule for H.R. 2913',
     )
   })
@@ -105,7 +121,40 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    expect(getFeedEventLine(item)).toBe('Procedural · House rejected 198–230 · rule for H.R. 456')
+    const line = getFeedEventLine(item)
+    expect(line.outcome).toBe('Procedural')
+    expect(line.kind).toBe('procedural')
+    expect(formatFeedEventLine(line)).toBe('Procedural · House rejected 198–230 · rule for H.R. 456')
+  })
+
+  it('classifies cloture votes as procedural via question pattern', () => {
+    const item = makeItem({
+      bill: {
+        congress: 119,
+        type: 'S',
+        number: 2282,
+        title: 'A regular bill about infrastructure funding',
+      },
+      passage_votes: [
+        {
+          chamber: 'Senate',
+          question: 'On the Cloture Motion',
+          result: 'Passed',
+          yeas: 60,
+          nays: 40,
+          date: '2026-06-05',
+        },
+      ],
+    })
+
+    expect(isProceduralFeedItem(item)).toBe(true)
+
+    const line = getFeedEventLine(item)
+    expect(line.outcome).toBe('Procedural')
+    expect(line.kind).toBe('procedural')
+    expect(formatFeedEventLine(line)).toBe(
+      'Procedural · Senate agreed 60–40 · procedural vote on S. 2282',
+    )
   })
 })
 

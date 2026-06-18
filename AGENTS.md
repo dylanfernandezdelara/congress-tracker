@@ -1,6 +1,6 @@
 # Congress Tracker
 
-Cloudflare-native app: ingest House + Senate **passage** roll-call votes, join CRS summaries, rewrite to plain English via OpenRouter, serve a flip-card feed.
+Cloudflare-native app: ingest House + Senate **passage** roll-call votes, join CRS summaries, rewrite to plain English via OpenRouter, serve an action-row feed.
 
 ## Runtime surfaces
 
@@ -102,7 +102,8 @@ Shared stats JSON types live in `shared/stats-api-types.ts` (imported by worker 
 - `workers/senate_data_worker/src/sources/` — House/Senate vote + Congress.gov clients
 - `workers/senate_data_worker/src/synthesis/` — OpenRouter digest rewrite
 - `workers/senate_data_worker/src/storage/feed.ts` — feed read model
-- `web/src/components/FlipCard.tsx` — flip-card UI
+- `web/src/components/FeedRow.tsx` — collapsed feed row UI
+- `web/src/components/FeedRowDetail.tsx` — expanded feed row detail panel
 
 ## Key rules
 

@@ -1,5 +1,7 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
 import { congressGovBillUrl, formatVoteDate, voteResultClass } from '../utils/billLabels'
+import { isProceduralFeedItem } from '../utils/feedRowLabels'
+import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 
 type FeedRowDetailProps = {
   item: FeedItem
@@ -52,9 +54,32 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const digest = item.digest
   const keyPoints = digest?.key_points ?? []
   const terms = digest?.terms_explained ?? []
+  const isProcedural = isProceduralFeedItem(item)
+  const policyArea = item.policy_area
 
   return (
     <div className="feed-row-detail">
+      {isProcedural || policyArea ? (
+        <div className="feed-row-detail-chips flex flex-wrap gap-2">
+          {isProcedural ? (
+            <span
+              className={policyAreaChipClass('Procedural')}
+              style={policyAreaChipStyle('Procedural')}
+            >
+              Procedural
+            </span>
+          ) : null}
+          {policyArea ? (
+            <span
+              className={policyAreaChipClass(policyArea)}
+              style={policyAreaChipStyle(policyArea)}
+            >
+              {policyArea}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <section className="feed-row-detail-section">
         <h3 className="feed-row-detail-heading">Vote history</h3>
         <PassageVoteDetails votes={item.passage_votes} />
@@ -116,7 +141,6 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
           target="_blank"
           rel="noreferrer"
           className="congress-link text-sm"
-          onClick={(event) => event.stopPropagation()}
         >
           Read on congress.gov ↗
         </a>
