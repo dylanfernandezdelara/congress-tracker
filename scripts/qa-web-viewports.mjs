@@ -93,6 +93,7 @@ async function auditPage(page) {
     const feedRow = document.querySelector('.feed-row')
     const topic = document.querySelector('[data-feed-topic]')
     const eventLine = document.querySelector('.feed-row-event')
+    const summary = document.querySelector('[data-feed-summary]')
     const issues = []
 
     const collectHorizontalClipping = (rect, label) => {
@@ -162,6 +163,12 @@ async function auditPage(page) {
       }
     } else {
       issues.push('feed event line missing')
+    }
+
+    if (summary) {
+      collectHorizontalClipping(summary.getBoundingClientRect(), 'feed summary')
+    } else {
+      issues.push('feed summary missing')
     }
 
     return {

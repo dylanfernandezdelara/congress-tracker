@@ -77,6 +77,29 @@ export function truncateAtWordBoundary(text: string, maxLength: number): string 
   return `${slice.slice(0, lastSpace).trimEnd()}…`
 }
 
+function collapseWhitespace(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
+/** Strip a CRS title line when the body starts on the next line. */
+export function summaryBodyText(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return trimmed
+
+  const newlineIndex = trimmed.indexOf('\n')
+  if (newlineIndex === -1) return collapseWhitespace(trimmed)
+
+  const firstLine = trimmed.slice(0, newlineIndex).trim()
+  const remainder = trimmed.slice(newlineIndex + 1).trim()
+  const endsWithSentencePunctuation = /[.!?]$/.test(firstLine)
+
+  if (!endsWithSentencePunctuation && remainder.length > 0) {
+    return collapseWhitespace(remainder)
+  }
+
+  return collapseWhitespace(trimmed)
+}
+
 export function proceduralHeadline(title: string): string | null {
   if (RULE_WAIVER_PATTERN.test(title)) {
     return 'Fast-tracks floor consideration (rule waiver)'

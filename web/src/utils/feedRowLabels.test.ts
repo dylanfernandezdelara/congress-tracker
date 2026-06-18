@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
+  FEED_SUMMARY_PENDING,
   formatFeedEventLine,
   getFeedEventLine,
-  getFeedTeaser,
+  getFeedSummary,
   getFeedTopic,
   getPrimaryPassageVote,
   isProceduralFeedItem,
@@ -203,26 +204,76 @@ describe('getPrimaryPassageVote', () => {
   })
 })
 
-describe('getFeedTeaser', () => {
-  it('returns null when there is no digest', () => {
-    expect(getFeedTeaser(makeFeedItem({ digest: null }))).toBeNull()
+describe('getFeedSummary', () => {
+  it('prefers digest what_it_does over CRS text', () => {
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Sample headline',
+        what_it_does: 'Plain-language implications from the digest.',
+        key_points: ['Fallback point'],
+        terms_explained: [],
+      },
+      raw_summary_text: 'Official CRS summary text.',
+    })
+
+    expect(getFeedSummary(item)).toEqual({
+      text: 'Plain-language implications from the digest.',
+      pending: false,
+    })
   })
 
-  it('caps teaser text at roughly 120 characters on a word boundary', () => {
+  it('falls back to truncated CRS body text when digest is missing', () => {
+    const item = makeFeedItem({
+      digest: null,
+      raw_summary_text:
+        'No Aid for Ghost Students Act\n\nThis bill blocks federal aid for students enrolled at institutions with no physical campus.',
+    })
+
+    expect(getFeedSummary(item)).toEqual({
+      text: 'This bill blocks federal aid for students enrolled at institutions with no physical campus.',
+      pending: false,
+    })
+  })
+
+  it('falls back to the first key point when digest lacks what_it_does', () => {
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Sample headline',
+        what_it_does: '',
+        key_points: ['Requires agencies to publish contract performance data'],
+        terms_explained: [],
+      },
+      raw_summary_text: null,
+    })
+
+    expect(getFeedSummary(item)).toEqual({
+      text: 'Requires agencies to publish contract performance data',
+      pending: false,
+    })
+  })
+
+  it('returns a pending placeholder when no summary sources exist', () => {
+    expect(getFeedSummary(makeFeedItem({ digest: null, raw_summary_text: null }))).toEqual({
+      text: FEED_SUMMARY_PENDING,
+      pending: true,
+    })
+  })
+
+  it('caps summary text at roughly 160 characters on a word boundary', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
         what_it_does:
-          'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight requirements for federal agencies.',
+          'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight requirements for federal agencies that administer foreign military aid programs.',
         key_points: [],
         terms_explained: [],
       },
     })
 
-    const teaser = getFeedTeaser(item)
-    expect(teaser).not.toBeNull()
-    expect(teaser!.length).toBeLessThanOrEqual(120)
-    expect(teaser).toMatch(/…$/)
-    expect(teaser).not.toMatch(/\s…$/)
+    const summary = getFeedSummary(item)
+    expect(summary.pending).toBe(false)
+    expect(summary.text.length).toBeLessThanOrEqual(160)
+    expect(summary.text).toMatch(/…$/)
+    expect(summary.text).not.toMatch(/\s…$/)
   })
 })

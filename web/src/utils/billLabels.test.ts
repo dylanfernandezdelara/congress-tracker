@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatBillDocket,
   proceduralHeadline,
+  summaryBodyText,
   trimDisplayTitle,
   voteResultClass,
 } from './billLabels'
@@ -26,6 +27,30 @@ describe('trimDisplayTitle', () => {
 
   it('removes the suffix without a leading comma', () => {
     expect(trimDisplayTitle('Sample bill and for other purposes.')).toBe('Sample bill')
+  })
+})
+
+describe('summaryBodyText', () => {
+  it('drops a heading line before the body', () => {
+    const raw = 'Ukraine Support Act\n\nThis bill addresses military aid to Ukraine.'
+
+    expect(summaryBodyText(raw)).toBe('This bill addresses military aid to Ukraine.')
+  })
+
+  it('keeps a single paragraph that starts with body text', () => {
+    const raw = 'This bill addresses military aid to Ukraine.'
+
+    expect(summaryBodyText(raw)).toBe('This bill addresses military aid to Ukraine.')
+  })
+
+  it('keeps text when the first line ends with sentence punctuation', () => {
+    const raw = 'This is a complete sentence.\n\nMore detail follows here.'
+
+    expect(summaryBodyText(raw)).toBe('This is a complete sentence. More detail follows here.')
+  })
+
+  it('returns the heading when there is no remainder', () => {
+    expect(summaryBodyText('Ukraine Support Act')).toBe('Ukraine Support Act')
   })
 })
 

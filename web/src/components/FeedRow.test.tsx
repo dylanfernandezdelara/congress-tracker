@@ -10,11 +10,14 @@ const longCrsSummary = `Ukraine Support Act
 ${'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(4)}`
 
 describe('FeedRow', () => {
-  it('shows topic and event line without expanding', () => {
+  it('shows topic, event line, and digest summary without expanding', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
     expect(screen.getByText('Passed')).toBeInTheDocument()
+    expect(
+      screen.getByText('It does something important in plain language.'),
+    ).toBeInTheDocument()
     expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
   })
 
@@ -73,6 +76,31 @@ describe('FeedRow', () => {
     fireEvent.keyDown(toggle, { key: 'Enter' })
 
     expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a truncated CRS summary preview when collapsed without a digest', () => {
+    const item = makeFeedItem({
+      digest: null,
+      raw_summary_text: longCrsSummary,
+    })
+
+    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+
+    expect(screen.getByText(/This bill provides support to Ukraine/)).toBeInTheDocument()
+    expect(screen.queryByText(/Ukraine Support Act/)).not.toBeInTheDocument()
+    expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
+  })
+
+  it('shows Summary pending when no digest or CRS text is available', () => {
+    render(
+      <FeedRow
+        item={makeFeedItem({ digest: null, raw_summary_text: null })}
+        isExpanded={false}
+        onToggle={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('Summary pending')).toBeInTheDocument()
   })
 
   it('reveals CRS summary text when expanded', () => {

@@ -4,12 +4,20 @@ import {
   formatBillDocket,
   formatShortBillId,
   proceduralHeadline,
+  summaryBodyText,
   trimDisplayTitle,
   truncateAtWordBoundary,
   voteIndicatesFailure,
 } from './billLabels'
 
-const TEASER_MAX_CHARS = 120
+const TEASER_MAX_CHARS = 160
+
+export const FEED_SUMMARY_PENDING = 'Summary pending'
+
+export interface FeedSummary {
+  text: string
+  pending: boolean
+}
 
 const PROCEDURAL_VOTE_QUESTION_PATTERN =
   /cloture|motion to (recommit|table|proceed|discharge)|previous question|point of order|adjourn/i
@@ -60,10 +68,39 @@ export function getFeedTopic(item: FeedItem): string {
   return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
 }
 
-export function getFeedTeaser(item: FeedItem): string | null {
-  if (!item.digest?.what_it_does) return null
-  const collapsed = item.digest.what_it_does.replace(/\s+/g, ' ').trim()
+function collapseSummaryText(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
+function truncateFeedSummary(text: string): string {
+  const collapsed = collapseSummaryText(text)
+  if (!collapsed) return collapsed
   return truncateAtWordBoundary(collapsed, TEASER_MAX_CHARS)
+}
+
+function pickSummarySource(item: FeedItem): string | null {
+  const whatItDoes = item.digest?.what_it_does?.trim()
+  if (whatItDoes) return whatItDoes
+
+  const rawSummary = item.raw_summary_text?.trim()
+  if (rawSummary) {
+    const body = summaryBodyText(rawSummary)
+    if (body) return body
+  }
+
+  const firstKeyPoint = item.digest?.key_points?.find((point) => point.trim().length > 0)
+  if (firstKeyPoint) return firstKeyPoint.trim()
+
+  return null
+}
+
+export function getFeedSummary(item: FeedItem): FeedSummary {
+  const source = pickSummarySource(item)
+  if (!source) {
+    return { text: FEED_SUMMARY_PENDING, pending: true }
+  }
+
+  return { text: truncateFeedSummary(source), pending: false }
 }
 
 function getProceduralEventSuffix(item: FeedItem): string {

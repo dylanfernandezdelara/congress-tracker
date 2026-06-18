@@ -4,7 +4,7 @@ import type { FeedItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedEventLine,
-  getFeedTeaser,
+  getFeedSummary,
   getFeedTopic,
   type FeedEventLine,
   type FeedStatusKind,
@@ -46,7 +46,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const eventId = useId()
   const detailId = useId()
   const topic = getFeedTopic(item)
-  const teaser = getFeedTeaser(item)
+  const summary = getFeedSummary(item)
   const eventLine = getFeedEventLine(item)
 
   return (
@@ -86,9 +86,12 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               </div>
             </div>
             <FeedRowEventLine line={eventLine} eventId={eventId} />
-            {teaser ? (
-              <p className="feed-row-teaser text-sm text-secondary line-clamp-1">{teaser}</p>
-            ) : null}
+            <p
+              data-feed-summary
+              className={`feed-row-teaser text-sm line-clamp-2${summary.pending ? ' text-faint' : ' text-secondary'}`}
+            >
+              {summary.text}
+            </p>
           </div>
         </button>
 
