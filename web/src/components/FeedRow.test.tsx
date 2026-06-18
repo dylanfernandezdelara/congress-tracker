@@ -48,6 +48,17 @@ describe('FeedRow', () => {
     expect(screen.getByRole('button', { name: /198–230/ })).toBeInTheDocument()
   })
 
+  it('includes the summary in the toggle accessible description', () => {
+    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+
+    const toggle = screen.getByRole('button', { name: /52–47/ })
+    const summary = screen.getByText('It does something important in plain language.')
+    const describedBy = toggle.getAttribute('aria-describedby')
+
+    expect(describedBy).toBeTruthy()
+    expect(summary).toHaveAttribute('id', describedBy)
+  })
+
   it('calls onToggle when the row button is clicked', () => {
     const onToggle = vi.fn()
 

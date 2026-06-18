@@ -44,6 +44,7 @@ function FeedRowEventLine({ line, eventId }: { line: FeedEventLine; eventId: str
 export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const topicId = useId()
   const eventId = useId()
+  const summaryId = useId()
   const detailId = useId()
   const topic = getFeedTopic(item)
   const summary = getFeedSummary(item)
@@ -58,6 +59,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           aria-expanded={isExpanded}
           aria-controls={detailId}
           aria-labelledby={`${topicId} ${eventId}`}
+          aria-describedby={summaryId}
           onClick={onToggle}
         >
           <span
@@ -87,6 +89,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
             </div>
             <FeedRowEventLine line={eventLine} eventId={eventId} />
             <p
+              id={summaryId}
               data-feed-summary
               className={`feed-row-teaser text-sm line-clamp-2${summary.pending ? ' text-faint' : ' text-secondary'}`}
             >

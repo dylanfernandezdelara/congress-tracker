@@ -323,7 +323,7 @@
 
   .feed-row-skeleton {
     @apply animate-pulse py-3 px-3;
-    height: 64px;
+    height: 112px;
     background-color: hsl(var(--twc-skeleton));
   }
 
