@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { fetchFeed } from '../api/client'
 import type { FeedPageResponse } from '../api/types'
-import { FeedCard } from '../components/FeedCard'
+import { FeedRow } from '../components/FeedRow'
 import {
   FEED_DESKTOP_PAGE_SIZE,
   FEED_MOBILE_PAGE_SIZE,
@@ -15,11 +15,11 @@ const LOOKBACK_DAYS = 45
 
 function FeedSkeleton() {
   return (
-    <div className="space-y-5" aria-hidden="true">
-      <div className="skeleton-card" />
-      <div className="skeleton-card" />
-      <div className="skeleton-card" />
-    </div>
+    <ul className="feed-list" aria-hidden="true">
+      <li className="feed-row-skeleton" />
+      <li className="feed-row-skeleton" />
+      <li className="feed-row-skeleton" />
+    </ul>
   )
 }
 
@@ -135,14 +135,16 @@ export default function Home() {
         <section id="feed-top" className="space-y-5">
           {isPageTransition ? <FeedSkeleton /> : null}
 
-          {!isPageTransition
-            ? visibleItems.map((item) => (
-                <FeedCard
+          {!isPageTransition ? (
+            <ul className="feed-list">
+              {visibleItems.map((item) => (
+                <FeedRow
                   key={`${item.bill.congress}-${item.bill.type}-${item.bill.number}`}
                   item={item}
                 />
-              ))
-            : null}
+              ))}
+            </ul>
+          ) : null}
 
           {isMobile ? (
             <FeedPagination

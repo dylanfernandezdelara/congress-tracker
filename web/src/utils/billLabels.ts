@@ -18,9 +18,21 @@ const RULE_WAIVER_PATTERN = /^Waiving a requirement of clause .+ of rule .+/i
 
 const NULLIFICATION_PATTERN = /^Providing that (.+?) shall have no force or effect\.?$/i
 
-export function formatBillDocket(type: string, number: number, congress: number): string {
+export function formatShortBillId(type: string, number: number): string {
   const label = TYPE_LABELS[type.toUpperCase()] ?? type
-  return `${label} ${number} · ${congress}th Congress`
+  return `${label} ${number}`
+}
+
+export function formatBillDocket(type: string, number: number, congress: number): string {
+  return `${formatShortBillId(type, number)} · ${congress}th Congress`
+}
+
+export function extractUnderlyingBillIdFromTitle(title: string): string | null {
+  const match = title.match(PROVIDING_FOR_CONSIDERATION_PATTERN)
+  if (!match) return null
+
+  const [, billType, billNumber] = match
+  return normalizeBillRef(billType, billNumber)
 }
 
 export function congressGovBillUrl(congress: number, type: string, number: number): string {
@@ -152,6 +164,14 @@ function voteResultIndicatesFailure(normalized: string): boolean {
 function voteResultIndicatesPassage(normalized: string): boolean {
   if (voteResultIndicatesFailure(normalized)) return false
   return normalized.includes('pass') || normalized.includes('agreed')
+}
+
+export function voteIndicatesFailure(result: string): boolean {
+  return voteResultIndicatesFailure(normalizeVoteResult(result))
+}
+
+export function voteIndicatesPassage(result: string): boolean {
+  return voteResultIndicatesPassage(normalizeVoteResult(result))
 }
 
 export function billDidNotPass(votes: Array<{ result: string }>): boolean {

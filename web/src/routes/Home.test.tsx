@@ -51,16 +51,18 @@ function renderFeed() {
 }
 
 describe('Home', () => {
-  it('renders the feed with navigation and without sidebar stats', async () => {
+  it('renders the feed as a list with visible outcomes and no flip hints', async () => {
     const { container } = renderFeed()
     expect(screen.getByRole('heading', { name: 'What is Congress Doing?' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(screen.queryByLabelText('Members in Congress')).not.toBeInTheDocument()
 
-    const front = container.querySelector('.flip-card-front')
-    expect(front).not.toBeNull()
-    expect(within(front as HTMLElement).getByText('Flip for vote details ↺')).toBeInTheDocument()
-    expect(within(front as HTMLElement).queryByText('Passed')).not.toBeInTheDocument()
+    const feedList = container.querySelector('.feed-list')
+    expect(feedList).not.toBeNull()
+    expect(feedList?.tagName).toBe('UL')
+    expect(within(feedList as HTMLElement).getByText('Passed')).toBeInTheDocument()
+    expect(screen.queryByText('Flip for vote details ↺')).not.toBeInTheDocument()
+    expect(container.querySelector('.flip-card-front')).toBeNull()
   })
 })

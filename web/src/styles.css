@@ -229,6 +229,74 @@
     background-color: hsl(var(--twc-skeleton));
   }
 
+  .feed-list {
+    @apply divide-y overflow-hidden rounded-lg border bg-card;
+    border-color: hsl(var(--twc-border));
+  }
+
+  .feed-row {
+    @apply py-3 px-3;
+  }
+
+  .feed-row-inner {
+    @apply flex gap-3;
+  }
+
+  .feed-row-status-dot {
+    @apply mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full;
+  }
+
+  .feed-row-status-dot--passed {
+    background-color: hsl(var(--twc-pass));
+  }
+
+  .feed-row-status-dot--failed {
+    background-color: hsl(var(--twc-fail));
+  }
+
+  .feed-row-status-dot--procedural {
+    @apply rounded-full border border-dashed bg-transparent;
+    border-color: hsl(var(--twc-faint));
+  }
+
+  .feed-row-content {
+    @apply min-w-0 flex-1;
+  }
+
+  .feed-row-header {
+    @apply flex items-start justify-between gap-3;
+  }
+
+  .feed-row-topic {
+    @apply min-w-0 text-foreground;
+  }
+
+  .feed-row-meta {
+    @apply flex shrink-0 items-center gap-1.5;
+  }
+
+  .feed-row-date {
+    @apply whitespace-nowrap;
+  }
+
+  .feed-row-chevron {
+    @apply text-sm leading-none;
+  }
+
+  .feed-row-event {
+    @apply mt-1 text-secondary;
+  }
+
+  .feed-row-teaser {
+    @apply mt-1;
+  }
+
+  .feed-row-skeleton {
+    @apply animate-pulse py-3 px-3;
+    height: 64px;
+    background-color: hsl(var(--twc-skeleton));
+  }
+
   .theme-toggle {
     @apply relative flex shrink-0 items-center justify-center overflow-visible rounded-md text-secondary transition-colors;
     width: 32px;
