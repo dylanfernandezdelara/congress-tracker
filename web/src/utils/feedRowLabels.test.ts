@@ -259,7 +259,7 @@ describe('getFeedSummary', () => {
     })
   })
 
-  it('caps summary text at roughly 160 characters on a word boundary', () => {
+  it('caps summary text at roughly 120 characters on a word boundary', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
@@ -272,7 +272,7 @@ describe('getFeedSummary', () => {
 
     const summary = getFeedSummary(item)
     expect(summary.pending).toBe(false)
-    expect(summary.text.length).toBeLessThanOrEqual(160)
+    expect(summary.text.length).toBeLessThanOrEqual(120)
     expect(summary.text).toMatch(/…$/)
     expect(summary.text).not.toMatch(/\s…$/)
   })

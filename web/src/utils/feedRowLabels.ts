@@ -10,7 +10,7 @@ import {
   voteIndicatesFailure,
 } from './billLabels'
 
-const TEASER_MAX_CHARS = 160
+const TEASER_MAX_CHARS = 120
 
 export const FEED_SUMMARY_PENDING = 'Summary pending'
 

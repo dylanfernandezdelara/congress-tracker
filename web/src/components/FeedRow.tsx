@@ -91,7 +91,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
             <p
               id={summaryId}
               data-feed-summary
-              className={`feed-row-teaser text-sm line-clamp-2${summary.pending ? ' text-faint' : ' text-secondary'}`}
+              className={`feed-row-teaser text-sm line-clamp-1${summary.pending ? ' text-faint' : ' text-secondary'}`}
             >
               {summary.text}
             </p>
