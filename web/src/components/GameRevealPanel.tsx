@@ -69,9 +69,9 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
       </div>
 
       <p className="game-reveal-margin">
-        <time dateTime={reveal.vote.date}>{reveal.vote.yeas}–{reveal.vote.nays}</time>
+        {reveal.vote.yeas}–{reveal.vote.nays}
         {' · '}
-        {formatVoteDate(reveal.vote.date)}
+        <time dateTime={reveal.vote.date}>{formatVoteDate(reveal.vote.date)}</time>
       </p>
       <VoteSplitBar yeas={reveal.vote.yeas} nays={reveal.vote.nays} />
 
