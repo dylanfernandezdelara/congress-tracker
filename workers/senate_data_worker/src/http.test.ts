@@ -130,7 +130,7 @@ describe("HTTP API", () => {
     );
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ rounds: [], total: 0, limit: 0 });
+    expect(body).toEqual({ rounds: [], total: 0, limit: 20 });
   });
 
   it("requires id for game reveal", async () => {

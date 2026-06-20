@@ -112,8 +112,23 @@ function voteResultIndicatesFailure(normalized: string): boolean {
   )
 }
 
+function voteResultIndicatesPassage(normalized: string): boolean {
+  if (voteResultIndicatesFailure(normalized)) return false
+  return normalized.includes('pass') || normalized.includes('agreed')
+}
+
+export function voteIndicatesPassage(result: string): boolean {
+  return voteResultIndicatesPassage(normalizeVoteResult(result))
+}
+
 export function voteIndicatesFailure(result: string): boolean {
   return voteResultIndicatesFailure(normalizeVoteResult(result))
+}
+
+export function getGameCorrectAnswer(result: string): 'passed' | 'failed' | null {
+  if (voteIndicatesFailure(result)) return 'failed'
+  if (voteIndicatesPassage(result)) return 'passed'
+  return null
 }
 
 export function isProceduralVoteQuestion(question: string): boolean {
@@ -187,10 +202,6 @@ export function buildGamePrompt(input: GamePromptInput): GamePrompt | null {
   }
 
   return { headline, snippet }
-}
-
-export function getGameCorrectAnswer(result: string): 'passed' | 'failed' {
-  return voteIndicatesFailure(result) ? 'failed' : 'passed'
 }
 
 export function shuffleInPlace<T>(items: T[], random: () => number = Math.random): void {

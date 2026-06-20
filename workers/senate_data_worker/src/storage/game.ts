@@ -1,6 +1,11 @@
 import { GAME_DEFAULT_LIMIT, GAME_MAX_LIMIT, GAME_POOL_SIZE, VOTE_LOOKBACK_DAYS } from "../constants";
 import { getDigest } from "../d1/digests";
-import { selectGameVoteCandidates, getPartySplitForRoll, type GameVoteCandidateRow } from "../d1/game-votes";
+import {
+  getGameVoteByKey,
+  getPartySplitForRoll,
+  selectGameVoteCandidates,
+  type GameVoteCandidateRow,
+} from "../d1/game-votes";
 import { ensureSchema } from "../d1/schema";
 import { lookbackStartIso } from "../sources/congress-client";
 import type { BillDigestContent } from "../types";
@@ -14,6 +19,7 @@ import {
   buildGamePrompt,
   getGameCorrectAnswer,
   shuffleInPlace,
+  type GamePromptInput,
 } from "../../../../shared/feed-content";
 
 export interface GameRoundsOptions {
@@ -38,6 +44,7 @@ function candidateToRound(row: GameVoteCandidateRow): { id: string; prompt: { he
     rawSummaryText: row.raw_summary_text,
   });
   if (!prompt) return null;
+  if (getGameCorrectAnswer(row.result) === null) return null;
 
   return {
     id: voteKey({
@@ -64,7 +71,7 @@ export async function buildGameRounds(
 
   shuffleInPlace(rounds);
 
-  const limit = Math.min(options.limit, rounds.length);
+  const limit = Math.min(options.limit, GAME_MAX_LIMIT);
   return {
     rounds: rounds.slice(0, limit),
     total: rounds.length,
@@ -72,14 +79,30 @@ export async function buildGameRounds(
   };
 }
 
+function rowToRevealInput(row: GameVoteCandidateRow): GamePromptInput {
+  return {
+    title: row.title,
+    question: row.question,
+    digest: parseDigest(row.digest_json),
+    rawSummaryText: row.raw_summary_text,
+  };
+}
+
+function isEligibleGameRow(row: GameVoteCandidateRow): boolean {
+  return buildGamePrompt(rowToRevealInput(row)) !== null && getGameCorrectAnswer(row.result) !== null;
+}
+
 export async function buildGameReveal(db: D1Database, roundId: string): Promise<GameRevealResponse | null> {
   await ensureSchema(db);
   const parsed = parseVoteKey(roundId);
   if (!parsed) return null;
 
-  const candidates = await selectGameVoteCandidates(db, "1970-01-01", GAME_POOL_SIZE, parsed);
-  const row = candidates[0];
-  if (!row) return null;
+  const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
+  const row = await getGameVoteByKey(db, parsed, lookback);
+  if (!row || !isEligibleGameRow(row)) return null;
+
+  const correct = getGameCorrectAnswer(row.result);
+  if (!correct) return null;
 
   const digest = parseDigest(row.digest_json);
   const digestRow = await getDigest(db, row.bill_congress, row.bill_type, row.bill_number);
@@ -94,7 +117,7 @@ export async function buildGameReveal(db: D1Database, roundId: string): Promise<
 
   return {
     id: roundId,
-    correct: getGameCorrectAnswer(row.result),
+    correct,
     vote: {
       chamber: row.chamber as "House" | "Senate",
       question: row.question,

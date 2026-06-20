@@ -55,6 +55,7 @@ describe("feed-content game helpers", () => {
   it("classifies vote results", () => {
     expect(getGameCorrectAnswer("Passed")).toBe("passed");
     expect(getGameCorrectAnswer("Rejected")).toBe("failed");
+    expect(getGameCorrectAnswer("Withdrawn")).toBeNull();
     expect(voteIndicatesFailure("Not agreed to")).toBe(true);
   });
 });

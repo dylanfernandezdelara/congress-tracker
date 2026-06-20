@@ -43,23 +43,9 @@ const GAME_VOTE_SELECT = `
 export async function selectGameVoteCandidates(
   db: D1Database,
   lookbackDate: string,
-  limit: number,
-  key?: GameVoteKeyFilter
+  limit: number
 ): Promise<GameVoteCandidateRow[]> {
   await ensureSchema(db);
-
-  if (key) {
-    const { results } = await db
-      .prepare(
-        `${GAME_VOTE_SELECT}
-         AND v.chamber = ? AND v.congress = ? AND v.session = ? AND v.roll_number = ?
-         LIMIT 1`
-      )
-      .bind(key.chamber, key.congress, key.session, key.rollNumber)
-      .all<GameVoteCandidateRow>();
-    return results ?? [];
-  }
-
   const { results } = await db
     .prepare(
       `${GAME_VOTE_SELECT}
@@ -70,6 +56,24 @@ export async function selectGameVoteCandidates(
     .bind(lookbackDate, limit)
     .all<GameVoteCandidateRow>();
   return results ?? [];
+}
+
+export async function getGameVoteByKey(
+  db: D1Database,
+  key: GameVoteKeyFilter,
+  lookbackDate: string
+): Promise<GameVoteCandidateRow | null> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `${GAME_VOTE_SELECT}
+       AND v.chamber = ? AND v.congress = ? AND v.session = ? AND v.roll_number = ?
+       AND v.vote_date >= ?
+       LIMIT 1`
+    )
+    .bind(key.chamber, key.congress, key.session, key.rollNumber, lookbackDate)
+    .first<GameVoteCandidateRow>();
+  return row ?? null;
 }
 
 interface PartyPositionRow {
