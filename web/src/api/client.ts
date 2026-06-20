@@ -2,6 +2,8 @@ import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
   FeedPageResponse,
+  GameRevealResponse,
+  GameRoundsResponse,
   PortfoliosResponse,
   PulseStatsResponse,
   SessionStatsResponse,
@@ -40,4 +42,14 @@ export async function fetchDefectors(chamber: 'House' | 'Senate'): Promise<Defec
 
 export async function fetchPortfolioStats(chamber: 'House' | 'Senate'): Promise<PortfoliosResponse> {
   return fetchJson<PortfoliosResponse>(`/stats/portfolios.json?chamber=${chamber}&limit=5`)
+}
+
+export async function fetchGameRounds(limit = 20): Promise<GameRoundsResponse> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  return fetchJson<GameRoundsResponse>(`/game/rounds.json?${params}`)
+}
+
+export async function fetchGameReveal(id: string): Promise<GameRevealResponse> {
+  const params = new URLSearchParams({ id })
+  return fetchJson<GameRevealResponse>(`/game/reveal.json?${params}`)
 }

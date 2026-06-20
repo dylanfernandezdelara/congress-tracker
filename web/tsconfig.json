@@ -15,7 +15,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@congress-tracker/shared/*": ["../shared/*"]
+    }
   },
   "include": ["src", "../shared/**/*.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]

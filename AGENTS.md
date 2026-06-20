@@ -70,6 +70,8 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 
 - `GET /health`
 - `GET /feed/latest.json?limit=&offset=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; **not** a bare array)
+- `GET /game/rounds.json?limit=` — blind game rounds (`{ rounds, total, limit }`; prompts only, no vote outcomes)
+- `GET /game/reveal.json?id=` — post-guess reveal for a round id from `/game/rounds.json` (same eligibility + lookback as rounds)
 - `GET /stats/session.json` — per-chamber passage vote aggregates
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)

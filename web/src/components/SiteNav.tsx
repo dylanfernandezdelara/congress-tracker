@@ -10,6 +10,9 @@ export function SiteNav() {
         <NavLink to="/" end className={linkClass}>
           Feed
         </NavLink>
+        <NavLink to="/play" className={linkClass}>
+          Play
+        </NavLink>
         <NavLink to="/stats" className={linkClass}>
           Stats
         </NavLink>

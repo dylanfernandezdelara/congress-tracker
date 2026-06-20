@@ -1,8 +1,23 @@
-export interface BillDigestContent {
-  headline: string
-  what_it_does: string
-  key_points: string[]
-  terms_explained: Array<{ term: string; plain: string }>
+import type {
+  BillDigestContent,
+  GameBillRef,
+  GamePartySplit,
+  GamePassageVote,
+  GameRevealResponse,
+  GameRound,
+  GameRoundPrompt,
+  GameRoundsResponse,
+} from '@congress-tracker/shared/game-api-types'
+
+export type {
+  BillDigestContent,
+  GameBillRef,
+  GamePartySplit,
+  GamePassageVote,
+  GameRevealResponse,
+  GameRound,
+  GameRoundPrompt,
+  GameRoundsResponse,
 }
 
 export interface FeedBill {
