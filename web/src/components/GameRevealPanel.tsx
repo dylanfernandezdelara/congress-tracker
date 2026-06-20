@@ -51,8 +51,13 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
       className={`game-reveal${wasCorrect ? ' game-reveal--correct' : ' game-reveal--wrong'}`}
       aria-live="polite"
     >
-      <p className={`game-reveal-verdict${wasCorrect ? ' game-reveal-verdict--correct' : ' game-reveal-verdict--wrong'}`}>
-        {wasCorrect ? 'Correct' : 'Not quite'} — you guessed {guess}, it {reveal.correct}.
+      <p
+        className={`game-reveal-verdict${wasCorrect ? ' game-reveal-verdict--correct' : ' game-reveal-verdict--wrong'}`}
+      >
+        <span className="game-reveal-verdict-primary">{wasCorrect ? 'Correct' : 'Not quite'}</span>
+        <span className="game-reveal-verdict-detail">
+          You guessed {guess}. It {reveal.correct}.
+        </span>
       </p>
 
       <div className="game-reveal-meta">
@@ -61,13 +66,12 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
         </span>
         <span className="feed-row-chip">{reveal.vote.chamber}</span>
         <span className="feed-row-chip feed-row-chip--bill">{billId}</span>
-        <time className="feed-row-date" dateTime={reveal.vote.date}>
-          {formatVoteDate(reveal.vote.date)}
-        </time>
       </div>
 
       <p className="game-reveal-margin">
-        Final tally: {reveal.vote.yeas}–{reveal.vote.nays} in the {reveal.vote.chamber}
+        <time dateTime={reveal.vote.date}>{reveal.vote.yeas}–{reveal.vote.nays}</time>
+        {' · '}
+        {formatVoteDate(reveal.vote.date)}
       </p>
       <VoteSplitBar yeas={reveal.vote.yeas} nays={reveal.vote.nays} />
 

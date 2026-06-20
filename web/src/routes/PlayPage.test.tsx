@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -76,10 +76,13 @@ describe('PlayPage', () => {
     renderPlayPage()
 
     await screen.findByText('Aid package for allies')
-    fireEvent.click(screen.getByRole('button', { name: 'Passed' }))
+    const card = screen.getByRole('article')
+    fireEvent.click(within(card).getByRole('button', { name: 'Passed' }))
 
-    expect(await screen.findByText(/Correct — you guessed passed, it passed./)).toBeInTheDocument()
-    expect(screen.getByText('Final tally: 52–47 in the Senate')).toBeInTheDocument()
+    expect(await screen.findByText(/Correct/)).toBeInTheDocument()
+    expect(screen.getByText('You guessed passed. It passed.')).toBeInTheDocument()
+    expect(screen.getByText('52–47')).toBeInTheDocument()
+    expect(screen.getByText(/Jun 5/)).toBeInTheDocument()
     expect(screen.getByText('Party breakdown')).toBeInTheDocument()
   })
 })

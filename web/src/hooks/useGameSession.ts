@@ -179,7 +179,8 @@ export function useGameSession(): GameSessionState & GameSessionActions {
 
   const statusLabel = useMemo(() => {
     if (mode === 'timed') return `${score} correct · ${timedSecondsLeft}s left`
-    return `Streak ${streak} · Best this run ${score}`
+    if (streak === 0) return 'Streak mode · tap Passed or Failed'
+    return `Streak ${streak}`
   }, [mode, score, streak, timedSecondsLeft])
 
   return {
