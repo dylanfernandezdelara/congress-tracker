@@ -8,6 +8,7 @@ import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
 import { FEED_DEFAULT_PAGE_SIZE, FEED_MAX_BILLS, FEED_MAX_PAGE_SIZE } from "../constants";
 import { buildFeedPage } from "../storage/feed";
+import { buildGameReveal, buildGameRounds, parseGameLimit } from "../storage/game";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildSessionStats } from "../storage/session-stats";
 import type {
@@ -172,6 +173,40 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     }
   }
 
+  if (pathname === "/game/rounds.json") {
+    try {
+      const limit = parseGameLimit(url.searchParams.get("limit"));
+      const rounds = await buildGameRounds(env.DB, { limit });
+      return json(rounds, {
+        status: 200,
+        headers: { "Cache-Control": cacheLatest },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "game rounds unavailable";
+      return json({ error: "game_error", message }, { status: 500 });
+    }
+  }
+
+  if (pathname === "/game/reveal.json") {
+    const roundId = url.searchParams.get("id")?.trim();
+    if (!roundId) {
+      return json({ error: "bad_request", message: "id is required" }, { status: 400 });
+    }
+    try {
+      const reveal = await buildGameReveal(env.DB, roundId);
+      if (!reveal) {
+        return json({ error: "not_found", message: "Round not found" }, { status: 404 });
+      }
+      return json(reveal, {
+        status: 200,
+        headers: { "Cache-Control": cacheLatest },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "game reveal unavailable";
+      return json({ error: "game_error", message }, { status: 500 });
+    }
+  }
+
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const asOf = new Date().toISOString();
@@ -237,7 +272,7 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   return notFound(pathname);
 }
 
-const API_PATH_PREFIXES = ["/health", "/feed/", "/stats/", "/__pipeline/"];
+const API_PATH_PREFIXES = ["/health", "/feed/", "/game/", "/stats/", "/__pipeline/"];
 
 function isApiPath(pathname: string): boolean {
   return API_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));

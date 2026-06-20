@@ -123,6 +123,32 @@ describe("HTTP API", () => {
     expect(body).toMatchObject({ chamber: "House", defectors: [] });
   });
 
+  it("returns empty game rounds", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/game/rounds.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({ rounds: [], total: 0, limit: 0 });
+  });
+
+  it("requires id for game reveal", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/game/reveal.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 404 for unknown game reveal id", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/game/reveal.json?id=House:119:2:999"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(404);
+  });
+
   it("rejects write pipelines in production when no admin token is set", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/__pipeline/run/member-votes"),

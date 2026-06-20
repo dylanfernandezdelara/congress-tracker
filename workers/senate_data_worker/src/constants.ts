@@ -4,6 +4,9 @@ export const FEED_DEFAULT_PAGE_SIZE = 50;
 export const FEED_MAX_PAGE_SIZE = 50;
 export const VOTE_LOOKBACK_DAYS = 45;
 export const DIGEST_MAX_NEW_REWRITES = 20;
+export const GAME_DEFAULT_LIMIT = 20;
+export const GAME_MAX_LIMIT = 50;
+export const GAME_POOL_SIZE = 200;
 
 /**
  * Roll-call votes to backfill per /__pipeline/run/member-votes invocation.
