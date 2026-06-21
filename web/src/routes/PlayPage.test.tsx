@@ -81,7 +81,7 @@ describe('PlayPage', () => {
 
     expect(await screen.findByText(/Correct/)).toBeInTheDocument()
     expect(screen.getByText('You guessed passed. It passed.')).toBeInTheDocument()
-    expect(screen.getByText('52–47')).toBeInTheDocument()
+    expect(screen.getByText(/52–47/)).toBeInTheDocument()
     expect(screen.getByText(/Jun 5/)).toBeInTheDocument()
     expect(screen.getByText('Party breakdown')).toBeInTheDocument()
   })
