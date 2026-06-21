@@ -86,8 +86,8 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
         <section className="feed-row-detail-section">
           <h3 className="feed-row-detail-heading">Key points</h3>
           <ul className="feed-row-detail-list space-y-1.5">
-            {keyPoints.map((point) => (
-              <li key={point} className="flex gap-2 text-sm leading-relaxed text-secondary">
+            {keyPoints.map((point, index) => (
+              <li key={`${index}-${point}`} className="flex gap-2 text-sm leading-relaxed text-secondary">
                 <span className="text-faint" aria-hidden="true">
                   –
                 </span>

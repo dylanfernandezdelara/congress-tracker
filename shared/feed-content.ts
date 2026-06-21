@@ -39,6 +39,7 @@ export function truncateWords(text: string, maxWords: number): string {
 
 function protectAbbreviations(text: string): string {
   return text
+    .replace(/\bU\.S\.C\./gi, 'U§S§C§')
     .replace(/\bU\.S\./gi, 'U§S§')
     .replace(/\bU\.K\./gi, 'U§K§')
     .replace(/\bSec\.\s+\d+/gi, (match) => match.replace(/\./g, '§'))
@@ -255,7 +256,7 @@ function pickSummarySource(input: GamePromptInput): string | null {
   }
 
   const firstKeyPoint = input.digest?.key_points?.find((point) => point.trim().length > 0)
-  if (firstKeyPoint) return firstKeyPoint.trim()
+  if (firstKeyPoint) return normalizeDigestLead(firstKeyPoint)
 
   return null
 }

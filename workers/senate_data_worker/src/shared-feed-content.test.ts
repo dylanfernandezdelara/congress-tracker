@@ -90,5 +90,8 @@ describe("feed-content game helpers", () => {
     expect(
       normalizeDigestLead("Requires compliance with Sec. 401 of the FAA. More rules follow.")
     ).toBe("Requires compliance with Sec. 401 of the FAA.");
+    expect(
+      normalizeDigestLead("Amends Title 18 U.S.C. Section 401 to add penalties. More follows.")
+    ).toBe("Amends Title 18 U.S.C. Section 401 to add penalties.");
   });
 });
