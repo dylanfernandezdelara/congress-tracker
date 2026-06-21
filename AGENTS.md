@@ -42,8 +42,10 @@ Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHu
 1. `npm test`
 2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`
 3. Run thermonuclear review on the branch diff; fix CRITICAL and WARNING findings; repeat until CLEAR
-4. `npm run preview` — paste the Cloudflare Preview URL into chat and the PR (do not wait for the user to ask)
+4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask)
 5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
+
+Whenever you change the UI (`web/`), always share the preview URL in your reply so the user can click through and review the visual changes. Each `npm run preview` run prints a new version-specific URL; do not reuse an older link unless you confirm it matches the current build.
 
 `qa:web` checks iPhone SE (320px), iPhone 14 (390px), desktop (1280px), and wide desktop (1440px) in both light and dark mode. It verifies the header, theme toggle, feed card, and headline are not clipped, and that the requested theme is active. Override the target URL with `QA_WEB_URL` if Vite uses a non-default port. Screenshots and a JSON summary land in `artifacts/qa-viewports/`.
 
@@ -117,3 +119,4 @@ Shared stats JSON types live in `shared/stats-api-types.ts` (imported by worker 
 - `FEED_MAX_BILLS`, `VOTE_LOOKBACK_DAYS`, `DIGEST_MAX_NEW_REWRITES` are module constants in `src/constants.ts`.
 - Always `git fetch origin` before starting work on a fresh session.
 - After `web/` work, follow the ship checklist above (tests → `qa:web` → thermonuclear review → preview URL). Never publish a preview URL without attempting QA and review first.
+- After any UI change, always give the user the latest preview URL in chat so they can view the result in a browser.
