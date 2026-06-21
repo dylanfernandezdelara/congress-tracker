@@ -26,6 +26,81 @@ const TYPE_LABELS: Record<string, string> = {
 
 const GAME_SNIPPET_MAX_CHARS = 180
 
+export const DIGEST_LEAD_MAX_WORDS = 25
+export const DIGEST_BULLET_MAX_WORDS = 12
+export const DIGEST_MAX_BULLETS = 4
+export const FEED_COLLAPSED_MAX_BULLETS = 3
+
+export function truncateWords(text: string, maxWords: number): string {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length <= maxWords) return words.join(' ')
+  return `${words.slice(0, maxWords).join(' ')}…`
+}
+
+export function firstSentence(text: string): string {
+  const collapsed = collapseWhitespace(text)
+  if (!collapsed) return collapsed
+
+  const match = collapsed.match(/^[^.!?]+[.!?]/)
+  if (match) return match[0].trim()
+
+  return collapsed
+}
+
+export function normalizeDigestLead(text: string): string {
+  return truncateWords(firstSentence(text), DIGEST_LEAD_MAX_WORDS)
+}
+
+export function normalizeDigestBullets(points: string[]): string[] {
+  return points
+    .map((point) => truncateWords(point.trim(), DIGEST_BULLET_MAX_WORDS))
+    .filter((point) => point.length > 0)
+    .slice(0, DIGEST_MAX_BULLETS)
+}
+
+export interface FeedSummaryParts {
+  lead: string
+  bullets: string[]
+}
+
+export function buildFeedSummaryParts(input: {
+  whatItDoes: string | null | undefined
+  keyPoints: string[] | null | undefined
+  rawSummaryText: string | null | undefined
+  collapsedMaxBullets?: number
+}): FeedSummaryParts | null {
+  const maxBullets = input.collapsedMaxBullets ?? FEED_COLLAPSED_MAX_BULLETS
+  const whatItDoes = input.whatItDoes?.trim()
+
+  if (whatItDoes) {
+    return {
+      lead: normalizeDigestLead(whatItDoes),
+      bullets: normalizeDigestBullets(input.keyPoints ?? []).slice(0, maxBullets),
+    }
+  }
+
+  const rawSummary = input.rawSummaryText?.trim()
+  if (rawSummary) {
+    const body = summaryBodyText(rawSummary)
+    if (body) {
+      return {
+        lead: truncateAtWordBoundary(collapseWhitespace(body), 120),
+        bullets: [],
+      }
+    }
+  }
+
+  const firstKeyPoint = input.keyPoints?.find((point) => point.trim().length > 0)
+  if (firstKeyPoint) {
+    return {
+      lead: normalizeDigestLead(firstKeyPoint),
+      bullets: [],
+    }
+  }
+
+  return null
+}
+
 export function formatShortBillId(type: string, number: number): string {
   const label = TYPE_LABELS[type.toUpperCase()] ?? type
   return `${label} ${number}`

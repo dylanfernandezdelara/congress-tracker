@@ -10,7 +10,7 @@ const longCrsSummary = `Ukraine Support Act
 ${'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(4)}`
 
 describe('FeedRow', () => {
-  it('shows topic, policy area, and digest summary without expanding', () => {
+  it('shows topic, policy area, digest lead, and bullets without expanding', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
@@ -19,6 +19,7 @@ describe('FeedRow', () => {
     expect(
       screen.getByText('It does something important in plain language.'),
     ).toBeInTheDocument()
+    expect(screen.getByText('Point one')).toBeInTheDocument()
     expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
     const hiddenEvent = document.querySelector('.feed-row-event[hidden]')
     expect(hiddenEvent?.textContent).toContain('52–47 in the Senate')
@@ -56,7 +57,7 @@ describe('FeedRow', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     const toggle = screen.getByRole('button', { name: /52–47/ })
-    const summary = screen.getByText('It does something important in plain language.')
+    const summary = document.querySelector('[data-feed-summary]')
     const describedBy = toggle.getAttribute('aria-describedby')
 
     expect(describedBy).toBeTruthy()

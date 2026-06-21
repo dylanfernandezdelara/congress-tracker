@@ -23,9 +23,9 @@ const VIEWPORTS = [
 
 const THEMES = ['light', 'dark']
 
-const LONG_DIGEST_SENTENCE =
-  'This bill provides a longer generated explanation for readers about funding, oversight, reporting, and assistance programs that should remain fully readable on mobile. '
-const LONG_DIGEST = LONG_DIGEST_SENTENCE.repeat(6).trim()
+const LONG_DIGEST_LEAD =
+  'This bill blocks federal aid for students enrolled at institutions with no physical campus.'
+const LONG_DIGEST = `${LONG_DIGEST_LEAD} ${'It also adds reporting requirements. '.repeat(8)}`.trim()
 
 const MOCK_FEED = {
   items: [
@@ -35,7 +35,11 @@ const MOCK_FEED = {
       digest: {
         headline: 'Plain headline for readers',
         what_it_does: LONG_DIGEST,
-        key_points: ['Point one'],
+        key_points: [
+          'Blocks aid for ghost enrollments',
+          'Requires campus verification',
+          'Adds annual reporting rules',
+        ],
         terms_explained: [],
       },
       raw_summary_text: `${'Official CRS summary text. '.repeat(40)}`.trim(),
@@ -168,6 +172,13 @@ async function auditPage(page) {
         const lineClamp = summaryStyle.webkitLineClamp || summaryStyle.getPropertyValue('-webkit-line-clamp')
         if (lineClamp && lineClamp !== 'none' && lineClamp !== 'unset' && Number(lineClamp) > 0) {
           issues.push('feed summary is line-clamped on mobile')
+        }
+
+        const bullets = summary.querySelectorAll('.feed-row-summary-bullets li')
+        if (bullets.length === 0) {
+          issues.push('feed summary bullets missing on mobile')
+        } else if (bullets.length > 3) {
+          issues.push(`feed summary shows too many bullets on mobile (${bullets.length})`)
         }
       }
     } else {

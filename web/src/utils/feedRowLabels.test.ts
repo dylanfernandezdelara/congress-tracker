@@ -220,7 +220,7 @@ describe('getFeedSummary', () => {
     })
 
     expect(getFeedSummary(item)).toEqual({
-      text: 'Plain-language implications from the digest.',
+      text: 'Plain-language implications from the digest. Fallback point',
       pending: false,
     })
   })
@@ -262,13 +262,15 @@ describe('getFeedSummary', () => {
     })
   })
 
-  it('caps summary text at roughly 120 characters on a word boundary', () => {
+  it('caps combined summary text at roughly 120 characters on a word boundary', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
         what_it_does:
-          'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight requirements for federal agencies that administer foreign military aid programs.',
-        key_points: [],
+          'This bill provides support to Ukraine and allied countries through security assistance.',
+        key_points: [
+          'Financing and oversight requirements for federal agencies that administer foreign military aid programs across multiple regions.',
+        ],
         terms_explained: [],
       },
     })
@@ -361,25 +363,42 @@ describe('getFeedEventDisplay', () => {
 })
 
 describe('getFeedSummaryDisplay', () => {
-  it('truncates by default and returns full text when requested', () => {
-    const longText = `${'This bill provides support. '.repeat(12)}`.trim()
+  it('returns a lead sentence and bullet points from the digest', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Headline',
-        what_it_does: longText,
-        key_points: [],
+        what_it_does: 'Blocks federal aid for ghost students.',
+        key_points: ['Targets online-only schools', 'Requires enrollment verification'],
         terms_explained: [],
       },
     })
 
-    expect(getFeedSummaryDisplay(item).text.length).toBeLessThan(longText.length)
-    expect(getFeedSummaryDisplay(item, { full: true }).text).toBe(longText)
+    expect(getFeedSummaryDisplay(item)).toEqual({
+      lead: 'Blocks federal aid for ghost students.',
+      bullets: ['Targets online-only schools', 'Requires enrollment verification'],
+      pending: false,
+    })
+  })
+
+  it('keeps only the first sentence for long digest text', () => {
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Headline',
+        what_it_does:
+          'This bill blocks aid for ghost students. It also creates new reporting rules and audit requirements for schools.',
+        key_points: ['Requires annual audits'],
+        terms_explained: [],
+      },
+    })
+
+    expect(getFeedSummaryDisplay(item).lead).toBe('This bill blocks aid for ghost students.')
   })
 
   it('returns pending when no summary source exists', () => {
     const item = makeFeedItem({ digest: null, raw_summary_text: null })
-    expect(getFeedSummaryDisplay(item, { full: true })).toEqual({
-      text: FEED_SUMMARY_PENDING,
+    expect(getFeedSummaryDisplay(item)).toEqual({
+      lead: FEED_SUMMARY_PENDING,
+      bullets: [],
       pending: true,
     })
   })

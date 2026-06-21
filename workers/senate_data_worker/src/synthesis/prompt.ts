@@ -18,8 +18,8 @@ ${params.rawSummary}
 Return ONLY valid JSON:
 {
   "headline": "8-12 words, no jargon",
-  "what_it_does": "2-3 sentences, max ~60 words, at roughly grade 7-8 reading level",
-  "key_points": ["max 4 short bullets"],
+  "what_it_does": "Exactly one short sentence, max 25 words, grade 7-8 reading level",
+  "key_points": ["2-4 bullets, max 12 words each, highlight the most important changes"],
   "terms_explained": [{ "term": "ACRONYM", "plain": "short plain definition" }]
 }
 
@@ -27,5 +27,7 @@ Rules:
 - Use only facts from the summary and metadata above. Do not invent context.
 - Replace or define jargon and acronyms for a lay reader.
 - Keep language neutral and concise.
-- Keep "what_it_does" under 60 words so it fits on the card without truncation.`;
+- "what_it_does" must be a single sentence ending with . ! or ? — never multiple sentences.
+- Put specifics, thresholds, agencies, and deadlines in "key_points", not in "what_it_does".
+- Each "key_points" entry should be a scannable phrase, not a paragraph.`;
 }

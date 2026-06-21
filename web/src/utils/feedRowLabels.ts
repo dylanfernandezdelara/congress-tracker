@@ -1,10 +1,10 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
+import { buildFeedSummaryParts } from '@congress-tracker/shared/feed-content'
 import {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatShortBillId,
   proceduralHeadline,
-  summaryBodyText,
   trimDisplayTitle,
   truncateAtWordBoundary,
   voteIndicatesFailure,
@@ -16,6 +16,12 @@ export const FEED_SUMMARY_PENDING = 'Summary pending'
 
 export interface FeedSummary {
   text: string
+  pending: boolean
+}
+
+export interface FeedSummaryDisplay {
+  lead: string
+  bullets: string[]
   pending: boolean
 }
 
@@ -78,39 +84,39 @@ function truncateFeedSummary(text: string): string {
   return truncateAtWordBoundary(collapsed, TEASER_MAX_CHARS)
 }
 
-function pickSummarySource(item: FeedItem): string | null {
-  const whatItDoes = item.digest?.what_it_does?.trim()
-  if (whatItDoes) return whatItDoes
+function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
+  const parts = buildFeedSummaryParts({
+    whatItDoes: item.digest?.what_it_does,
+    keyPoints: item.digest?.key_points,
+    rawSummaryText: item.raw_summary_text,
+  })
 
-  const rawSummary = item.raw_summary_text?.trim()
-  if (rawSummary) {
-    const body = summaryBodyText(rawSummary)
-    if (body) return body
+  if (!parts) return null
+
+  return {
+    lead: parts.lead,
+    bullets: parts.bullets,
+    pending: false,
   }
-
-  const firstKeyPoint = item.digest?.key_points?.find((point) => point.trim().length > 0)
-  if (firstKeyPoint) return firstKeyPoint.trim()
-
-  return null
 }
 
 export function getFeedSummary(item: FeedItem): FeedSummary {
-  const source = pickSummarySource(item)
-  if (!source) {
+  const parts = getFeedSummaryParts(item)
+  if (!parts) {
     return { text: FEED_SUMMARY_PENDING, pending: true }
   }
 
-  return { text: truncateFeedSummary(source), pending: false }
+  const combined = [parts.lead, ...parts.bullets].join(' ')
+  return { text: truncateFeedSummary(combined), pending: false }
 }
 
-export function getFeedSummaryDisplay(item: FeedItem, options?: { full?: boolean }): FeedSummary {
-  const source = pickSummarySource(item)
-  if (!source) {
-    return { text: FEED_SUMMARY_PENDING, pending: true }
+export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
+  const parts = getFeedSummaryParts(item)
+  if (!parts) {
+    return { lead: FEED_SUMMARY_PENDING, bullets: [], pending: true }
   }
 
-  const text = options?.full ? collapseSummaryText(source) : truncateFeedSummary(source)
-  return { text, pending: false }
+  return parts
 }
 
 function getProceduralEventSuffix(item: FeedItem): string {

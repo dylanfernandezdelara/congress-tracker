@@ -1,3 +1,7 @@
+import {
+  normalizeDigestBullets,
+  normalizeDigestLead,
+} from "../../../../shared/feed-content";
 import type { Env } from "../config";
 import type { BillDigestContent } from "../types";
 import { buildDigestPrompt } from "./prompt";
@@ -17,7 +21,10 @@ export function parseDigestJson(text: string): BillDigestContent | null {
   try {
     const parsed = JSON.parse(raw) as BillDigestContent;
     if (!parsed.headline || !parsed.what_it_does) return null;
-    parsed.key_points = Array.isArray(parsed.key_points) ? parsed.key_points.slice(0, 4) : [];
+    parsed.what_it_does = normalizeDigestLead(parsed.what_it_does);
+    parsed.key_points = normalizeDigestBullets(
+      Array.isArray(parsed.key_points) ? parsed.key_points : [],
+    );
     parsed.terms_explained = Array.isArray(parsed.terms_explained)
       ? parsed.terms_explained.slice(0, 8)
       : [];
@@ -52,7 +59,7 @@ export async function rewriteSummary(
       model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0,
-      max_tokens: 800,
+      max_tokens: 500,
     }),
   });
 

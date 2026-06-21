@@ -1,4 +1,5 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
+import { normalizeDigestBullets, normalizeDigestLead } from '@congress-tracker/shared/feed-content'
 import { congressGovBillUrl, formatVoteDate } from '../utils/billLabels'
 import { isProceduralFeedItem } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
@@ -49,7 +50,8 @@ function PassageVoteDetails({ votes }: { votes: FeedPassageVote[] }) {
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const digest = item.digest
-  const keyPoints = digest?.key_points ?? []
+  const summaryLead = digest?.what_it_does ? normalizeDigestLead(digest.what_it_does) : null
+  const keyPoints = digest?.key_points ? normalizeDigestBullets(digest.key_points) : []
   const terms = digest?.terms_explained ?? []
   const isProcedural = isProceduralFeedItem(item)
 
@@ -71,11 +73,11 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
         <PassageVoteDetails votes={item.passage_votes} />
       </section>
 
-      {digest?.what_it_does ? (
+      {summaryLead ? (
         <section className="feed-row-detail-section">
           <h3 className="feed-row-detail-heading">What it does</h3>
           <p className="feed-row-detail-body text-sm leading-relaxed text-secondary">
-            {digest.what_it_does}
+            {summaryLead}
           </p>
         </section>
       ) : null}

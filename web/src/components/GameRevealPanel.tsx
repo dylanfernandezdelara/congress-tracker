@@ -1,4 +1,5 @@
 import type { GamePartySplit, GameRevealResponse } from '../api/types'
+import { normalizeDigestBullets, normalizeDigestLead } from '@congress-tracker/shared/feed-content'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 
 type GameRevealPanelProps = {
@@ -78,7 +79,16 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
       {reveal.party_split ? <PartySplitList splits={reveal.party_split} /> : null}
 
       {reveal.digest?.what_it_does ? (
-        <p className="game-reveal-summary">{reveal.digest.what_it_does}</p>
+        <div className="game-reveal-summary">
+          <p>{normalizeDigestLead(reveal.digest.what_it_does)}</p>
+          {normalizeDigestBullets(reveal.digest.key_points ?? []).length > 0 ? (
+            <ul className="feed-row-summary-bullets">
+              {normalizeDigestBullets(reveal.digest.key_points ?? []).map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       <a className="congress-link game-reveal-link" href={billUrl} target="_blank" rel="noreferrer">

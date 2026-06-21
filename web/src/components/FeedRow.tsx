@@ -1,8 +1,6 @@
 import { useId } from 'react'
 
 import type { FeedItem } from '../api/types'
-import { MOBILE_MEDIA_QUERY } from '../constants/feed'
-import { useMediaQuery } from '../hooks/useMediaQuery'
 import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedEventDisplay,
@@ -28,9 +26,8 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const eventId = useId()
   const summaryId = useId()
   const detailId = useId()
-  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const topic = getFeedTopic(item)
-  const summary = getFeedSummaryDisplay(item, { full: isMobile })
+  const summary = getFeedSummaryDisplay(item)
   const meta = getFeedRowMeta(item)
   const eventDisplay = getFeedEventDisplay(item)
   const policyArea = item.policy_area
@@ -95,13 +92,20 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               {eventDisplay}
             </p>
 
-            <p
+            <div
               id={summaryId}
               data-feed-summary
-              className={`feed-row-teaser${summary.pending ? ' feed-row-teaser--pending' : ''}`}
+              className={`feed-row-summary${summary.pending ? ' feed-row-summary--pending' : ''}`}
             >
-              {summary.text}
-            </p>
+              <p className="feed-row-teaser">{summary.lead}</p>
+              {summary.bullets.length > 0 ? (
+                <ul className="feed-row-summary-bullets" aria-label="Key points">
+                  {summary.bullets.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           </div>
 
           <span className="feed-row-chevron" aria-hidden="true">

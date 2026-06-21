@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildFeedSummaryParts,
   buildGamePrompt,
   getGameCorrectAnswer,
+  normalizeDigestLead,
   voteIndicatesFailure,
 } from "../../../shared/feed-content";
 
@@ -57,5 +59,22 @@ describe("feed-content game helpers", () => {
     expect(getGameCorrectAnswer("Rejected")).toBe("failed");
     expect(getGameCorrectAnswer("Withdrawn")).toBeNull();
     expect(voteIndicatesFailure("Not agreed to")).toBe(true);
+  });
+
+  it("normalizes digest leads and builds structured feed summaries", () => {
+    const lead = normalizeDigestLead(
+      "This bill blocks aid for ghost students. It also creates reporting rules and audit requirements."
+    );
+    expect(lead).toBe("This bill blocks aid for ghost students.");
+
+    const parts = buildFeedSummaryParts({
+      whatItDoes: lead,
+      keyPoints: ["Requires campus verification", "Adds annual reporting"],
+      rawSummaryText: null,
+    });
+    expect(parts).toEqual({
+      lead: "This bill blocks aid for ghost students.",
+      bullets: ["Requires campus verification", "Adds annual reporting"],
+    });
   });
 });
