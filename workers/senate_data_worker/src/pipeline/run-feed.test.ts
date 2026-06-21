@@ -34,6 +34,10 @@ vi.mock("../synthesis/openrouter", () => ({
   rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
 }));
 
+vi.mock("../synthesis/model", () => ({
+  resolveOpenRouterModel: vi.fn(async () => "nvidia/nemotron-3-ultra-550b-a55b:free"),
+}));
+
 vi.mock("../sources/house-votes", () => ({
   ingestHousePassageVotes: (...args: unknown[]) => mockIngestHousePassageVotes(...args),
 }));

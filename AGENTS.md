@@ -79,6 +79,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
 - `GET /__pipeline/run/feed` (cron also runs daily at 10:00 UTC)
+- `GET /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
 - `GET /__pipeline/run/session-backfill` — full-session vote backfill (admin)
 - `GET /__pipeline/run/member-votes` — ingest per-member passage votes (admin)
 - `GET /__pipeline/run/disclosures` — local-dev sample disclosures only (`ALLOWED_ORIGIN=*` and `ENABLE_SAMPLE_DISCLOSURES=1` in `.dev.vars`; never in production)

@@ -5,9 +5,8 @@ import {
 import type { Env } from "../config";
 import type { BillDigestContent } from "../types";
 import { buildDigestPrompt } from "./prompt";
+import { resolveOpenRouterModel } from "./model";
 import { extractAcronyms } from "../sources/html-clean";
-
-const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
 interface ChatResponse {
   choices?: Array<{ message?: { content?: string } }>;
@@ -41,9 +40,10 @@ export async function rewriteSummary(
     billLabel: string;
     policyArea: string | null;
     rawSummary: string;
-  }
+  },
+  modelOverride?: string
 ): Promise<BillDigestContent | null> {
-  const model = env.OPENROUTER_MODEL?.split(",")[0]?.trim() || DEFAULT_MODEL;
+  const model = modelOverride ?? (await resolveOpenRouterModel(env));
   const acronyms = extractAcronyms(params.rawSummary);
   const prompt = buildDigestPrompt({ ...params, acronyms });
 

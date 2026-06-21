@@ -59,7 +59,9 @@ Add keys to `workers/senate_data_worker/.dev.vars`:
 ```bash
 CONGRESS_API_KEY=...      # https://api.congress.gov/sign-up/
 OPENROUTER_API_KEY=...    # https://openrouter.ai/keys
-OPENROUTER_MODEL=openai/gpt-4o-mini   # optional
+# Optional override — must be a free OpenRouter model (e.g. nvidia/nemotron-3-ultra-550b-a55b:free).
+# When unset, the worker auto-selects the highest Artificial Analysis intelligence_index free model.
+# OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 ```
 
 Then, with the worker running:

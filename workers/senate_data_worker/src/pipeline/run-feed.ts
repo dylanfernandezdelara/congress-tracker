@@ -7,23 +7,12 @@ import type { Env } from "../config";
 import { congressNumber } from "../config";
 import { getDigest, upsertDigest } from "../d1/digests";
 import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
+import { billLabel } from "./bill-label";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestHousePassageVotes } from "../sources/house-votes";
 import { ingestSenatePassageVotes } from "../sources/senate-votes";
+import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
-
-function billLabel(type: string, number: number, congress: number): string {
-  const labels: Record<string, string> = {
-    HR: "H.R.",
-    S: "S.",
-    HRES: "H.Res.",
-    SRES: "S.Res.",
-    HJRES: "H.J.Res.",
-    SJRES: "S.J.Res.",
-  };
-  const prefix = labels[type.toUpperCase()] ?? type;
-  return `${prefix} ${number} (${congress}th Congress)`;
-}
 
 export interface RunFeedResult {
   votesUpserted: number;
@@ -49,6 +38,7 @@ export async function runFeedPipeline(env: Env): Promise<RunFeedResult> {
   }
 
   const bills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
+  const model = await resolveOpenRouterModel(env);
 
   let digestsWritten = 0;
   let digestsSkipped = 0;
@@ -76,12 +66,16 @@ export async function runFeedPipeline(env: Env): Promise<RunFeedResult> {
 
     let digest = null;
     if (bundle.rawSummaryText) {
-      digest = await rewriteSummary(env, {
-        title: bundle.title,
-        billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
-        policyArea: bundle.policyArea,
-        rawSummary: bundle.rawSummaryText,
-      });
+      digest = await rewriteSummary(
+        env,
+        {
+          title: bundle.title,
+          billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
+          policyArea: bundle.policyArea,
+          rawSummary: bundle.rawSummaryText,
+        },
+        model
+      );
     }
 
     await upsertDigest(env.DB, {

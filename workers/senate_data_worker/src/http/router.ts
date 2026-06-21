@@ -3,6 +3,7 @@ import { congressNumber, sessionNumber } from "../config";
 import { computeDefectors } from "../analytics/defectors";
 import { buildPortfolioMovers } from "../d1/disclosures";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
+import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
@@ -136,6 +137,13 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
 
   if (pathname === "/__pipeline/run/feed") {
     return handlePipelineRoute(request, env, json, () => runFeedPipeline(env));
+  }
+
+  if (pathname === "/__pipeline/run/digest-refresh") {
+    return handlePipelineRoute(request, env, json, async () => {
+      const bills = parseDigestRefreshRequest(url, env);
+      return runDigestRefreshPipeline(env, bills);
+    });
   }
 
   if (pathname === "/__pipeline/run/session-backfill") {

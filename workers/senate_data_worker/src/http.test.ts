@@ -167,6 +167,16 @@ describe("HTTP API", () => {
     expect(body).toMatchObject({ ok: true, rollsRemaining: 0 });
   });
 
+  it("requires bill identifiers for digest refresh", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/__pipeline/run/digest-refresh"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: false });
+  });
+
   it("requires a matching token when PIPELINE_ADMIN_TOKEN is set", async () => {
     const env = createMockEnv({
       ALLOWED_ORIGIN: "https://congress.example",

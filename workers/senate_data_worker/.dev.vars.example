@@ -7,5 +7,7 @@ ENABLE_SAMPLE_DISCLOSURES=1
 # Copy to .dev.vars and set locally (never commit real values):
 # CONGRESS_API_KEY=...
 # OPENROUTER_API_KEY=...
-# OPENROUTER_MODEL=openai/gpt-4o-mini
+# Optional override — must be a free OpenRouter model (e.g. google/gemma-4-31b-it:free).
+# When unset, the worker picks the highest Artificial Analysis intelligence_index free model.
+# OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 # PIPELINE_ADMIN_TOKEN=  # required to call GET /__pipeline/run/feed; leave blank locally to keep it open
