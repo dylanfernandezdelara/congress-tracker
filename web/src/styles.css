@@ -735,21 +735,12 @@
     padding-inline: 2.75rem;
   }
 
-  .site-header-meta {
-    margin: 0;
-    max-width: 36ch;
-    font-size: 0.8125rem;
-    line-height: 1.45;
-    color: hsl(var(--twc-faint));
-  }
-
   .page-shell--play .page-main {
     margin-top: 0.75rem;
   }
 
   @media (max-width: 639px) {
-    .page-shell--play .site-header--compact .site-header-title,
-    .page-shell--play .site-header--compact .site-header-meta {
+    .page-shell--play .site-header--compact .site-header-title {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -793,10 +784,6 @@
     .site-header-title {
       max-width: 20ch;
       padding-inline: 0;
-    }
-
-    .site-header-meta {
-      max-width: none;
     }
   }
 
