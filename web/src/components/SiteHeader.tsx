@@ -1,5 +1,3 @@
-import { ThemeToggle } from './ThemeToggle'
-
 type SiteHeaderProps = {
   compact?: boolean
 }
@@ -7,8 +5,7 @@ type SiteHeaderProps = {
 export function SiteHeader({ compact = false }: SiteHeaderProps) {
   return (
     <header className={`site-header${compact ? ' site-header--compact' : ''}`}>
-      <ThemeToggle />
-      <h1 className="site-header-title">What is Congress Doing?</h1>
+      <h1 className="site-header-title">Congress Tracker</h1>
     </header>
   )
 }

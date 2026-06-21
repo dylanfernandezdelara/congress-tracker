@@ -53,7 +53,7 @@ function renderFeed() {
 describe('Home', () => {
   it('renders the feed as a list with visible outcomes and no flip hints', async () => {
     const { container } = renderFeed()
-    expect(screen.getByRole('heading', { name: 'What is Congress Doing?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(screen.queryByLabelText('Members in Congress')).not.toBeInTheDocument()
