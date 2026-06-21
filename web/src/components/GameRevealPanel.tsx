@@ -83,8 +83,8 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
           <p>{normalizeDigestLead(reveal.digest.what_it_does)}</p>
           {normalizeDigestBullets(reveal.digest.key_points ?? []).length > 0 ? (
             <ul className="feed-row-summary-bullets">
-              {normalizeDigestBullets(reveal.digest.key_points ?? []).map((point) => (
-                <li key={point}>{point}</li>
+              {normalizeDigestBullets(reveal.digest.key_points ?? []).map((point, index) => (
+                <li key={`${index}-${point}`}>{point}</li>
               ))}
             </ul>
           ) : null}

@@ -100,8 +100,8 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               <p className="feed-row-teaser">{summary.lead}</p>
               {summary.bullets.length > 0 ? (
                 <ul className="feed-row-summary-bullets" aria-label="Key points">
-                  {summary.bullets.map((point) => (
-                    <li key={point}>{point}</li>
+                  {summary.bullets.map((point, index) => (
+                    <li key={`${index}-${point}`}>{point}</li>
                   ))}
                 </ul>
               ) : null}

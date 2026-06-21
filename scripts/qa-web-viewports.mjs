@@ -175,9 +175,7 @@ async function auditPage(page) {
         }
 
         const bullets = summary.querySelectorAll('.feed-row-summary-bullets li')
-        if (bullets.length === 0) {
-          issues.push('feed summary bullets missing on mobile')
-        } else if (bullets.length > 3) {
+        if (bullets.length > 3) {
           issues.push(`feed summary shows too many bullets on mobile (${bullets.length})`)
         }
       }

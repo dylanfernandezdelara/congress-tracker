@@ -77,4 +77,18 @@ describe("feed-content game helpers", () => {
       bullets: ["Requires campus verification", "Adds annual reporting"],
     });
   });
+
+  it("preserves common abbreviations when extracting the first sentence", () => {
+    expect(
+      normalizeDigestLead(
+        "This bill amends the U.S. Code to block federal aid. It also adds reporting rules."
+      )
+    ).toBe("This bill amends the U.S. Code to block federal aid.");
+    expect(
+      normalizeDigestLead("Appropriates $1.5 billion for defense programs. Oversight follows.")
+    ).toBe("Appropriates $1.5 billion for defense programs.");
+    expect(
+      normalizeDigestLead("Requires compliance with Sec. 401 of the FAA. More rules follow.")
+    ).toBe("Requires compliance with Sec. 401 of the FAA.");
+  });
 });

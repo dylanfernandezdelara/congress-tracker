@@ -37,14 +37,31 @@ export function truncateWords(text: string, maxWords: number): string {
   return `${words.slice(0, maxWords).join(' ')}…`
 }
 
+function protectAbbreviations(text: string): string {
+  return text
+    .replace(/\bU\.S\./gi, 'U§S§')
+    .replace(/\bU\.K\./gi, 'U§K§')
+    .replace(/\bSec\.\s+\d+/gi, (match) => match.replace(/\./g, '§'))
+    .replace(/\bNo\.\s+\d+/gi, (match) => match.replace(/\./g, '§'))
+    .replace(/\bH\.R\.\s*\d+/gi, (match) => match.replace(/\./g, '§'))
+    .replace(/\bS\.\s*\d+/gi, (match) => match.replace(/\./g, '§'))
+    .replace(/\$(\d+)\.(\d+)/g, (_, whole, fraction) => `$${whole}§${fraction}`)
+}
+
+function restoreAbbreviations(text: string): string {
+  return text.replace(/§/g, '.')
+}
+
 export function firstSentence(text: string): string {
   const collapsed = collapseWhitespace(text)
   if (!collapsed) return collapsed
 
-  const match = collapsed.match(/^[^.!?]+[.!?]/)
-  if (match) return match[0].trim()
+  const protectedText = protectAbbreviations(collapsed)
+  const boundary = protectedText.search(/[.!?](?:\s|$)/)
+  if (boundary === -1) return collapsed
 
-  return collapsed
+  const first = protectedText.slice(0, boundary + 1).trim()
+  return restoreAbbreviations(first)
 }
 
 export function normalizeDigestLead(text: string): string {
@@ -229,7 +246,7 @@ export interface GamePrompt {
 
 function pickSummarySource(input: GamePromptInput): string | null {
   const whatItDoes = input.digest?.what_it_does?.trim()
-  if (whatItDoes) return whatItDoes
+  if (whatItDoes) return normalizeDigestLead(whatItDoes)
 
   const rawSummary = input.rawSummaryText?.trim()
   if (rawSummary) {

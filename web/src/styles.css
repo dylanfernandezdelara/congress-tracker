@@ -409,10 +409,17 @@
   }
 
   @media (min-width: 640px) {
-    .feed-row-summary {
+    .feed-row-teaser {
       display: -webkit-box;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 4;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+
+    .feed-row-summary-bullets {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
       overflow: hidden;
     }
   }
