@@ -1,5 +1,5 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
-import { congressGovBillUrl, formatVoteDate, voteResultClass } from '../utils/billLabels'
+import { congressGovBillUrl, formatVoteDate } from '../utils/billLabels'
 import { isProceduralFeedItem } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 
@@ -32,15 +32,12 @@ function PassageVoteDetails({ votes }: { votes: FeedPassageVote[] }) {
         <div key={`${vote.chamber}-${vote.date}-${vote.question}`} className="space-y-1.5">
           <div className="space-y-0.5">
             <div className="flex items-baseline justify-between gap-3 text-sm">
-              <p className={`font-medium ${voteResultClass(vote.result)}`}>{vote.result}</p>
-              <p className="shrink-0 text-secondary">
+              <p className="font-medium text-foreground">{vote.chamber}</p>
+              <p className="shrink-0 font-medium tabular-nums text-secondary">
                 {vote.yeas}–{vote.nays}
               </p>
             </div>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <p className="font-medium text-foreground">{vote.chamber}</p>
-              <p className="shrink-0 text-faint">{formatVoteDate(vote.date)}</p>
-            </div>
+            <p className="text-sm text-faint">{formatVoteDate(vote.date)}</p>
           </div>
           <VoteSplitBar yeas={vote.yeas} nays={vote.nays} />
         </div>
@@ -55,27 +52,17 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const keyPoints = digest?.key_points ?? []
   const terms = digest?.terms_explained ?? []
   const isProcedural = isProceduralFeedItem(item)
-  const policyArea = item.policy_area
 
   return (
     <div className="feed-row-detail">
-      {isProcedural || policyArea ? (
+      {isProcedural ? (
         <div className="feed-row-detail-chips flex flex-wrap gap-2">
-          {isProcedural ? (
-            <span
-              className={policyAreaChipClass('Procedural')}
-              style={policyAreaChipStyle('Procedural')}
-            >
-              Procedural
-            </span>
-          ) : policyArea ? (
-            <span
-              className={policyAreaChipClass(policyArea)}
-              style={policyAreaChipStyle(policyArea)}
-            >
-              {policyArea}
-            </span>
-          ) : null}
+          <span
+            className={policyAreaChipClass('Procedural')}
+            style={policyAreaChipStyle('Procedural')}
+          >
+            Procedural
+          </span>
         </div>
       ) : null}
 

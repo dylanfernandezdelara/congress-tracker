@@ -10,15 +10,18 @@ const longCrsSummary = `Ukraine Support Act
 ${'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(4)}`
 
 describe('FeedRow', () => {
-  it('shows topic, event line, and digest summary without expanding', () => {
+  it('shows topic, policy area, and digest summary without expanding', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
+    expect(screen.getByText('Defense')).toBeInTheDocument()
     expect(screen.getByText('Passed')).toBeInTheDocument()
     expect(
       screen.getByText('It does something important in plain language.'),
     ).toBeInTheDocument()
     expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
+    const hiddenEvent = document.querySelector('.feed-row-event[hidden]')
+    expect(hiddenEvent?.textContent).toContain('52–47 in the Senate')
   })
 
   it('includes outcome and margin in the toggle accessible name', () => {

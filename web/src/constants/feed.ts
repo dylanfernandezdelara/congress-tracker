@@ -1,5 +1,5 @@
-/** Matches mobile feed layout breakpoints in styles.css. */
-export const MOBILE_MEDIA_QUERY = '(max-width: 639px), (pointer: coarse)'
+/** Matches `@media (max-width: 639px)` in styles.css. */
+export const MOBILE_MEDIA_QUERY = '(max-width: 639px)'
 
 /** Bills per page on mobile — keeps the feed from feeling like infinite scroll. */
 export const FEED_MOBILE_PAGE_SIZE = 5

@@ -8,6 +8,7 @@ import {
   getFeedEventLine,
   getFeedRowMeta,
   getFeedSummary,
+  getFeedSummaryDisplay,
   getFeedTopic,
   getPrimaryPassageVote,
   isProceduralFeedItem,
@@ -356,5 +357,30 @@ describe('getFeedEventDisplay', () => {
     expect(getFeedEventDisplay(item)).toBe(
       'House agreed 218–210 · debate rule for H.R. 2913',
     )
+  })
+})
+
+describe('getFeedSummaryDisplay', () => {
+  it('truncates by default and returns full text when requested', () => {
+    const longText = `${'This bill provides support. '.repeat(12)}`.trim()
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Headline',
+        what_it_does: longText,
+        key_points: [],
+        terms_explained: [],
+      },
+    })
+
+    expect(getFeedSummaryDisplay(item).text.length).toBeLessThan(longText.length)
+    expect(getFeedSummaryDisplay(item, { full: true }).text).toBe(longText)
+  })
+
+  it('returns pending when no summary source exists', () => {
+    const item = makeFeedItem({ digest: null, raw_summary_text: null })
+    expect(getFeedSummaryDisplay(item, { full: true })).toEqual({
+      text: FEED_SUMMARY_PENDING,
+      pending: true,
+    })
   })
 })

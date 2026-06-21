@@ -53,10 +53,10 @@ function FeedPagination({
         disabled={page <= 0 || isLoading}
         aria-label="Previous page"
       >
-        ‹
+        Previous
       </button>
       <p className="feed-pagination-status">
-        {page + 1} / {pageCount}
+        Page {page + 1} of {pageCount}
       </p>
       <button
         type="button"
@@ -65,7 +65,7 @@ function FeedPagination({
         disabled={!hasMore || isLoading}
         aria-label="Next page"
       >
-        ›
+        Next
       </button>
     </nav>
   )

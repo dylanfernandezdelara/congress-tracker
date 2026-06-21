@@ -103,6 +103,16 @@ export function getFeedSummary(item: FeedItem): FeedSummary {
   return { text: truncateFeedSummary(source), pending: false }
 }
 
+export function getFeedSummaryDisplay(item: FeedItem, options?: { full?: boolean }): FeedSummary {
+  const source = pickSummarySource(item)
+  if (!source) {
+    return { text: FEED_SUMMARY_PENDING, pending: true }
+  }
+
+  const text = options?.full ? collapseSummaryText(source) : truncateFeedSummary(source)
+  return { text, pending: false }
+}
+
 function getProceduralEventSuffix(item: FeedItem): string {
   const title = item.bill.title ?? ''
   const shortBillId = formatShortBillId(item.bill.type, item.bill.number)

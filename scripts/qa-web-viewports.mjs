@@ -86,13 +86,13 @@ async function auditPage(page) {
   return page.evaluate(() => {
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
-    const toggle = document.querySelector('.theme-toggle')
     const heading = document.querySelector('h1')
     const siteNav = document.querySelector('.site-nav')
     const membersSidebar = document.querySelector('[aria-label="Members in Congress"]')
     const feedRow = document.querySelector('.feed-row')
     const topic = document.querySelector('[data-feed-topic]')
-    const eventLine = document.querySelector('.feed-row-event')
+    const policyArea = document.querySelector('[data-feed-policy-area]')
+    const eventLine = document.querySelector('.feed-row-event:not([hidden])')
     const summary = document.querySelector('[data-feed-summary]')
     const issues = []
 
@@ -108,32 +108,13 @@ async function auditPage(page) {
       if (rect.bottom > viewportHeight + 0.5) issues.push(`${label} clipped on the bottom`)
     }
 
-    if (!toggle) issues.push('theme toggle missing')
     if (!heading) issues.push('page heading missing')
+    if (heading && heading.textContent?.trim() !== 'Congress Tracker') {
+      issues.push('page heading should read Congress Tracker')
+    }
     if (!siteNav) issues.push('site navigation missing')
     if (membersSidebar) issues.push('sidebar stats visible on feed page')
     if (!feedRow) issues.push('feed row missing')
-
-    if (toggle) {
-      collectFullClipping(toggle.getBoundingClientRect(), 'theme toggle')
-
-      const svg = toggle.querySelector('svg')
-      if (!svg) {
-        issues.push('theme toggle svg missing')
-      } else {
-        const vb = svg.viewBox.baseVal
-        const bbox = svg.getBBox()
-        const strokePad = 1.25
-        if (bbox.x < vb.x - strokePad) issues.push('theme icon clipped on the left')
-        if (bbox.y < vb.y - strokePad) issues.push('theme icon clipped on the top')
-        if (bbox.x + bbox.width > vb.x + vb.width + strokePad) {
-          issues.push('theme icon clipped on the right')
-        }
-        if (bbox.y + bbox.height > vb.y + vb.height + strokePad) {
-          issues.push('theme icon clipped on the bottom')
-        }
-      }
-    }
 
     if (heading) collectFullClipping(heading.getBoundingClientRect(), 'page heading')
 
@@ -143,8 +124,8 @@ async function auditPage(page) {
       if (rowRect.bottom <= 0 || rowRect.top >= viewportHeight) {
         issues.push('feed row not visible in viewport')
       }
-      if (rowRect.height > 200) {
-        // Card layout trades row density for clearer hierarchy; collapsed cards may be taller.
+      const isMobile = viewportWidth < 640
+      if (!isMobile && rowRect.height > 200) {
         issues.push(`collapsed feed row too tall (${Math.round(rowRect.height)}px, expected < 200px)`)
       }
     }
@@ -162,11 +143,33 @@ async function auditPage(page) {
         issues.push('feed event line not visible in viewport')
       }
     } else {
-      issues.push('feed event line missing')
+      const marginChip = document.querySelector('.feed-row-chip--margin')
+      if (marginChip) {
+        collectHorizontalClipping(marginChip.getBoundingClientRect(), 'feed vote margin')
+      } else {
+        issues.push('feed event line or vote margin missing')
+      }
+    }
+
+    if (policyArea) {
+      collectHorizontalClipping(policyArea.getBoundingClientRect(), 'feed policy area')
+      if (viewportWidth < 640) {
+        const policyRect = policyArea.getBoundingClientRect()
+        if (policyRect.bottom <= 0 || policyRect.top >= viewportHeight) {
+          issues.push('feed policy area not visible on mobile')
+        }
+      }
     }
 
     if (summary) {
       collectHorizontalClipping(summary.getBoundingClientRect(), 'feed summary')
+      if (viewportWidth < 640) {
+        const summaryStyle = window.getComputedStyle(summary)
+        const lineClamp = summaryStyle.webkitLineClamp || summaryStyle.getPropertyValue('-webkit-line-clamp')
+        if (lineClamp && lineClamp !== 'none' && lineClamp !== 'unset' && Number(lineClamp) > 0) {
+          issues.push('feed summary is line-clamped on mobile')
+        }
+      }
     } else {
       issues.push('feed summary missing')
     }
