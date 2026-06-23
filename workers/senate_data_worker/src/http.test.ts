@@ -42,8 +42,33 @@ describe("HTTP API", () => {
       createMockEnv() as any
     );
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body = (await response.json()) as {
+      status: string;
+      congress: string;
+      data?: { ingest?: { status: string; daily_cron_utc: string } };
+    };
     expect(body).toMatchObject({ status: "ok", congress: "119" });
+    expect(body.data?.ingest).toMatchObject({
+      status: "unknown",
+      daily_cron_utc: "0 10 * * *",
+    });
+  });
+
+  it("returns ingest monitor JSON", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/debug/ingest.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      ingest: { status: string; stale_after_hours: number };
+      alerting: unknown;
+    };
+    expect(body.ingest).toMatchObject({
+      status: "unknown",
+      stale_after_hours: 26,
+    });
+    expect(body.alerting).toBeDefined();
   });
 
   it("returns empty feed page", async () => {

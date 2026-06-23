@@ -92,6 +92,7 @@ describe("worker", () => {
     );
     await awaitScheduled();
 
+    expect(runFeedPipeline).toHaveBeenCalledWith(expect.anything(), { trigger: "scheduled" });
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('"event":"feed_pipeline_complete"'),
     );

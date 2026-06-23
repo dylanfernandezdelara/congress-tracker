@@ -1,3 +1,5 @@
+import type { IngestMonitorPayload } from '@congress-tracker/shared/ingest-api-types'
+
 import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
@@ -14,10 +16,27 @@ export interface HealthResponse {
   timestamp: string
   congress: string
   session: string
+  data?: {
+    ingest?: IngestMonitorPayload
+    error?: string
+  }
+}
+
+export interface IngestMonitorResponse {
+  as_of: string
+  ingest: IngestMonitorPayload
+  alerting: {
+    cloudflare_logs: string
+    external_monitor: string
+  }
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
   return fetchJson<HealthResponse>('/health')
+}
+
+export async function fetchIngestMonitor(): Promise<IngestMonitorResponse> {
+  return fetchJson<IngestMonitorResponse>('/debug/ingest.json')
 }
 
 export async function fetchFeed(options: { limit: number; offset: number }): Promise<FeedPageResponse> {

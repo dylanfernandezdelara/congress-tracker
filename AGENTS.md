@@ -80,7 +80,8 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 
 ## API
 
-- `GET /health`
+- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `stale` | `failed` | `unknown`)
+- `GET /debug/ingest.json` — detailed ingest monitor payload
 - `GET /feed/latest.json?limit=&offset=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; **not** a bare array)
 - `GET /game/rounds.json?limit=` — blind game rounds (`{ rounds, total, limit }`; prompts only, no vote outcomes)
 - `GET /game/reveal.json?id=` — post-guess reveal for a round id from `/game/rounds.json` (same eligibility + lookback as rounds)
@@ -105,6 +106,8 @@ schedule; use `npm run deploy:triggers` in `workers/senate_data_worker` only aft
 roll-call keys) and writes digests for bills that do not yet have one (capped by
 `DIGEST_MAX_NEW_REWRITES`). Because Congress.gov lists House votes oldest-first, daily runs scan
 list pages until the lookback window is reached (~5 list requests per run for the current session).
+Ingest success/failure is persisted in D1 (`pipeline_state`) and surfaced on `GET /health`
+(`data.ingest`) and `GET /debug/ingest.json`; web ops UI at `/debug`. See `docs/MONITORING.md`.
 Manual production ingestion is `POST /__pipeline/run/feed` on the deployed Worker with
 `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 
