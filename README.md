@@ -54,7 +54,14 @@ npm test
 ## Deployment
 
 The Worker serves both the API and the bundled React app (Workers static
-assets), so a single deploy ships everything from one origin:
+assets), so a single deploy ships everything from one origin.
+
+**Automatic:** pushes to `main` deploy production via Cloudflare Workers Builds
+(Wrangler + Cloudflare git integration — no GitHub Actions deploy workflow).
+See [`docs/PREVIEW_DEPLOYMENTS.md`](docs/PREVIEW_DEPLOYMENTS.md) for build
+commands and one-time setup (`npm run configure:cloudflare-builds`).
+
+**Manual** (local or agent):
 
 ```bash
 cd workers/senate_data_worker
