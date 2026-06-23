@@ -33,10 +33,10 @@ export const FEED_LEAD_MAX_WORDS = 25
 export const FEED_BULLET_MAX_WORDS = 12
 export const FEED_COLLAPSED_MAX_BULLETS = 4
 
-// Ingest caps align with collapsed feed targets; clip only pathological model output.
-export const DIGEST_LEAD_MAX_WORDS = FEED_LEAD_MAX_WORDS
-export const DIGEST_BULLET_MAX_WORDS = FEED_BULLET_MAX_WORDS
-export const DIGEST_MAX_BULLETS = FEED_COLLAPSED_MAX_BULLETS
+// Ingest caps: generous safety bounds for pathological model output at storage time.
+export const DIGEST_LEAD_MAX_WORDS = 60
+export const DIGEST_BULLET_MAX_WORDS = 40
+export const DIGEST_MAX_BULLETS = 8
 
 // Compact caps for the blind-game surfaces (prompt + reveal).
 export const GAME_LEAD_MAX_WORDS = FEED_LEAD_MAX_WORDS
@@ -116,7 +116,6 @@ export interface FeedSummaryParts {
 export function buildFeedSummaryParts(input: {
   whatItDoes: string | null | undefined
   keyPoints: string[] | null | undefined
-  rawSummaryText: string | null | undefined
 }): FeedSummaryParts | null {
   const whatItDoes = input.whatItDoes?.trim()
 

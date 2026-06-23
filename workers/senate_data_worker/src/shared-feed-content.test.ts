@@ -78,7 +78,6 @@ describe("feed-content game helpers", () => {
     const parts = buildFeedSummaryParts({
       whatItDoes: lead,
       keyPoints: ["Requires campus verification", "Adds annual reporting"],
-      rawSummaryText: null,
     });
     expect(parts).toEqual({
       lead: "This bill blocks aid for ghost students.",
@@ -87,14 +86,9 @@ describe("feed-content game helpers", () => {
   });
 
   it("does not show raw CRS on the collapsed card when no digest exists", () => {
-    const longBody =
-      "This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. ".repeat(
-        4
-      ).trim();
     const parts = buildFeedSummaryParts({
       whatItDoes: null,
       keyPoints: null,
-      rawSummaryText: `Ukraine Support Act\n\n${longBody}`,
     });
     expect(parts).toBeNull();
   });
