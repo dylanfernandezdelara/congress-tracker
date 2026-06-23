@@ -23,8 +23,11 @@ hardcoded API hostname.
 Previews use Cloudflare [version preview URLs](https://developers.cloudflare.com/workers/configuration/previews/)
 (`preview_urls = true` in `wrangler.toml`). `wrangler versions upload` creates a
 new immutable version with its own URL but leaves production on the currently
-deployed version. Production only changes via `wrangler versions deploy`
-(or the `deploy` npm script).
+deployed version.
+
+**Production** updates when `main` is pushed (Cloudflare Workers Builds runs
+`wrangler deploy`) or when you run `npm run deploy` manually. Preview uploads
+never shift production traffic.
 
 Each upload yields two URLs:
 
@@ -55,27 +58,46 @@ npx wrangler versions upload --preview-alias my-branch
 You can also run `npm run preview` yourself from any shell that has the two
 Cloudflare env vars set. No GitHub Actions, secrets, or pull request required.
 
-## Optional — Cloudflare Workers Builds (native git previews)
+## Production deploys — Cloudflare Workers Builds (no GitHub Actions)
 
-Cloudflare's native git integration removes the need to store a long-lived token
-in GitHub. One-time setup in the Cloudflare dashboard:
+This repo uses [Cloudflare Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/)
+(not GitHub Actions) for CI/CD:
 
-1. **Workers & Pages → congress-tracker-api → Settings → Build** → connect the
-   GitHub repository.
-2. Set the **production branch** to `main` and build command to:
-   `npm ci && npm --prefix web ci && npm run build:web`
-   Deploy command for **production (`main`)**:
-   `npx wrangler deploy --config workers/senate_data_worker/wrangler.toml`
-   (applies cron from `wrangler.toml`). For **non-production branch previews**, use
-   `npx wrangler versions upload` from the repo root (root `wrangler.toml` mirrors the
-   worker config with repo-relative paths) or
-   `npx wrangler versions upload --config workers/senate_data_worker/wrangler.toml`.
-3. Enable
-   [non-production branch builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/#configure-non-production-branch-builds).
+| Branch | Deploy command | Result |
+| --- | --- | --- |
+| `main` (production) | `npm --prefix workers/senate_data_worker run deploy` | Live at `https://congress-tracker-api.<subdomain>.workers.dev` |
+| Other branches (preview) | `npm --prefix workers/senate_data_worker run preview:upload` | Preview URLs only; production unchanged |
 
-Cloudflare then builds each push, deploys `main` to production, and posts
-preview URLs as PR comments automatically — the same UX as Cloudflare Pages.
-Use this only if you want browser-openable previews without involving the agent.
+Shared build command:
+
+```bash
+npm ci && npm --prefix workers/senate_data_worker ci && npm --prefix web ci && npm run build:web
+```
+
+Use the **repo-root** `wrangler.toml` in Workers Builds (paths are repo-relative).
+
+### One-time setup / fix deploy commands
+
+Run from a shell with a **user-scoped** API token that has **Workers Builds
+Configuration: Edit** (account deploy tokens cannot call the Builds API):
+
+```bash
+CLOUDFLARE_BUILDS_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... npm run configure:cloudflare-builds
+```
+
+Or set the same commands manually in **Workers & Pages → congress-tracker-api →
+Settings → Build**:
+
+- **Deploy command** (production branch `main`):
+  `npm --prefix workers/senate_data_worker run deploy`
+- **Non-production branch deploy command**:
+  `npm --prefix workers/senate_data_worker run preview:upload`
+
+Enable [non-production branch builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/#configure-non-production-branch-builds)
+so PR branches get preview URLs.
+
+After setup, every push to `main` deploys production automatically via Wrangler.
+No GitHub Actions deploy workflow is required.
 
 ## Safety notes
 

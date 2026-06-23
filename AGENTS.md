@@ -51,6 +51,16 @@ Whenever you change the UI (`web/`), always share the preview URL in your reply 
 
 Agent context lives in this file and `.cursor/rules/` (`pr-viewport-qa.mdc`, `pr-thermonuclear-review.mdc`) so any Cursor session picks up the same workflow without depending on GitHub.
 
+### Production deploys (Cloudflare Workers Builds, not GitHub Actions)
+
+Pushes to `main` should deploy production via Cloudflare Workers Builds
+(`wrangler deploy` via the worker package on the production trigger).
+PR branches use `wrangler versions upload` for preview URLs only.
+
+One-time or drift fix: `npm run configure:cloudflare-builds` (needs a user API
+token with Workers Builds Configuration: Edit). Details:
+[`docs/PREVIEW_DEPLOYMENTS.md`](docs/PREVIEW_DEPLOYMENTS.md).
+
 ### Preview deployments (browser-openable, no production impact)
 
 The Worker serves the bundled React app (Workers static assets), so one preview
