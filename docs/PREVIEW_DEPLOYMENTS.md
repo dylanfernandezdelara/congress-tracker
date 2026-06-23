@@ -74,7 +74,12 @@ Shared build command:
 npm ci && npm --prefix workers/senate_data_worker ci && npm --prefix web ci && npm run build:web
 ```
 
-Use the **repo-root** `wrangler.toml` in Workers Builds (paths are repo-relative).
+Set the Workers Builds **root directory** to the repo root (where `package.json`
+and the mirrored root `wrangler.toml` live). Use the **npm deploy commands**
+in the table above — they run Wrangler from `workers/senate_data_worker` with
+its pinned version and `wrangler.toml` (kept in sync with the root config via
+`wrangler-config-contract.test.mjs`). Do not substitute bare `npx wrangler …`
+at repo root in the dashboard.
 
 ### One-time setup / fix deploy commands
 
