@@ -1,3 +1,9 @@
+import {
+  FEED_BULLET_MAX_WORDS,
+  FEED_COLLAPSED_MAX_BULLETS,
+  FEED_LEAD_MAX_WORDS,
+} from "../../../../shared/feed-content";
+
 export function buildDigestPrompt(params: {
   title: string | null;
   billLabel: string;
@@ -18,8 +24,8 @@ ${params.rawSummary}
 Return ONLY valid JSON:
 {
   "headline": "8-12 words, no jargon",
-  "what_it_does": "Exactly one short sentence, max 25 words, grade 7-8 reading level",
-  "key_points": ["2-4 bullets, max 12 words each, highlight the most important changes"],
+  "what_it_does": "Exactly one short sentence, max ${FEED_LEAD_MAX_WORDS} words, grade 7-8 reading level",
+  "key_points": ["2-${FEED_COLLAPSED_MAX_BULLETS} bullets, max ${FEED_BULLET_MAX_WORDS} words each, highlight the most important changes"],
   "terms_explained": [{ "term": "ACRONYM", "plain": "short plain definition" }]
 }
 
@@ -29,5 +35,6 @@ Rules:
 - Keep language neutral and concise.
 - "what_it_does" must be a single sentence ending with . ! or ? — never multiple sentences.
 - Put specifics, thresholds, agencies, and deadlines in "key_points", not in "what_it_does".
-- Each "key_points" entry should be a scannable phrase, not a paragraph.`;
+- Each "key_points" entry should be a scannable phrase, not a paragraph.
+- Do not exceed the word limits above; overlong text will be cut off at ingest.`;
 }

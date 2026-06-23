@@ -28,26 +28,20 @@ const TYPE_LABELS: Record<string, string> = {
 
 const GAME_SNIPPET_MAX_CHARS = 180
 
-// Canonical caps applied when a digest is normalized for storage at ingestion
-// time (openrouter.ts) and when the feed renders it. They are intentionally
-// generous safety bounds that clip only pathological model output — a normal
-// plain-English digest is shown in full so the feed card is self-contained.
+// Feed collapsed card: glanceable plain-English digest (matches OpenRouter prompt targets).
+export const FEED_LEAD_MAX_WORDS = 25
+export const FEED_BULLET_MAX_WORDS = 12
+export const FEED_COLLAPSED_MAX_BULLETS = 4
+
+// Ingest caps: generous safety bounds for pathological model output at storage time.
 export const DIGEST_LEAD_MAX_WORDS = 60
 export const DIGEST_BULLET_MAX_WORDS = 40
 export const DIGEST_MAX_BULLETS = 8
 
-// The collapsed feed card shows every stored bullet.
-export const FEED_COLLAPSED_MAX_BULLETS = DIGEST_MAX_BULLETS
-
-// When no AI digest exists, the feed falls back to the CRS summary body. Cap it
-// generously; the complete CRS text is always available in the expanded detail.
-export const FEED_RAW_SUMMARY_LEAD_MAX_CHARS = 600
-
-// Compact caps for the blind-game surfaces (prompt + reveal). Kept deliberately
-// short so the game stays glanceable, independent of the feed's full-summary view.
-export const GAME_LEAD_MAX_WORDS = 25
-export const GAME_BULLET_MAX_WORDS = 12
-export const GAME_MAX_BULLETS = 4
+// Compact caps for the blind-game surfaces (prompt + reveal).
+export const GAME_LEAD_MAX_WORDS = FEED_LEAD_MAX_WORDS
+export const GAME_BULLET_MAX_WORDS = FEED_BULLET_MAX_WORDS
+export const GAME_MAX_BULLETS = FEED_COLLAPSED_MAX_BULLETS
 
 export function truncateWords(text: string, maxWords: number): string {
   const words = text.trim().split(/\s+/).filter(Boolean)
@@ -90,6 +84,19 @@ export function normalizeDigestLead(
   return truncateWords(firstSentence(text), maxWords)
 }
 
+/** Collapsed feed card: one short sentence capped at FEED_LEAD_MAX_WORDS. */
+export function formatCollapsedDigestLead(text: string): string {
+  return truncateWords(firstSentence(text.trim()), FEED_LEAD_MAX_WORDS)
+}
+
+/** Collapsed feed card: capped bullets for glanceable mobile layout. */
+export function formatCollapsedDigestBullets(points: string[]): string[] {
+  return normalizeDigestBullets(points, {
+    maxWords: FEED_BULLET_MAX_WORDS,
+    maxBullets: FEED_COLLAPSED_MAX_BULLETS,
+  })
+}
+
 export function normalizeDigestBullets(
   points: string[],
   options: { maxWords?: number; maxBullets?: number } = {},
@@ -109,34 +116,21 @@ export interface FeedSummaryParts {
 export function buildFeedSummaryParts(input: {
   whatItDoes: string | null | undefined
   keyPoints: string[] | null | undefined
-  rawSummaryText: string | null | undefined
-  collapsedMaxBullets?: number
 }): FeedSummaryParts | null {
-  const maxBullets = input.collapsedMaxBullets ?? FEED_COLLAPSED_MAX_BULLETS
   const whatItDoes = input.whatItDoes?.trim()
 
   if (whatItDoes) {
     return {
-      lead: normalizeDigestLead(whatItDoes),
-      bullets: normalizeDigestBullets(input.keyPoints ?? []).slice(0, maxBullets),
+      lead: formatCollapsedDigestLead(whatItDoes),
+      bullets: formatCollapsedDigestBullets(input.keyPoints ?? []),
     }
   }
 
-  const rawSummary = input.rawSummaryText?.trim()
-  if (rawSummary) {
-    const body = summaryBodyText(rawSummary)
-    if (body) {
-      return {
-        lead: truncateAtWordBoundary(collapseWhitespace(body), FEED_RAW_SUMMARY_LEAD_MAX_CHARS),
-        bullets: [],
-      }
-    }
-  }
-
+  // No OpenRouter digest yet — do not dump raw CRS on the collapsed card.
   const firstKeyPoint = input.keyPoints?.find((point) => point.trim().length > 0)
   if (firstKeyPoint) {
     return {
-      lead: normalizeDigestLead(firstKeyPoint),
+      lead: formatCollapsedDigestLead(firstKeyPoint),
       bullets: [],
     }
   }

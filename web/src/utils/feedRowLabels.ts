@@ -7,11 +7,8 @@ import {
   isProceduralGameVote,
   proceduralHeadline,
   trimDisplayTitle,
-  truncateAtWordBoundary,
   voteIndicatesFailure,
 } from '@congress-tracker/shared/feed-content'
-
-const TEASER_MAX_CHARS = 120
 
 export const FEED_SUMMARY_PENDING = 'Summary pending'
 
@@ -68,17 +65,10 @@ function collapseSummaryText(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
-function truncateFeedSummary(text: string): string {
-  const collapsed = collapseSummaryText(text)
-  if (!collapsed) return collapsed
-  return truncateAtWordBoundary(collapsed, TEASER_MAX_CHARS)
-}
-
 function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
   const parts = buildFeedSummaryParts({
     whatItDoes: item.digest?.what_it_does,
     keyPoints: item.digest?.key_points,
-    rawSummaryText: item.raw_summary_text,
   })
 
   if (!parts) return null
@@ -96,8 +86,8 @@ export function getFeedSummary(item: FeedItem): FeedSummary {
     return { text: FEED_SUMMARY_PENDING, pending: true }
   }
 
-  const combined = [parts.lead, ...parts.bullets].join(' ')
-  return { text: truncateFeedSummary(combined), pending: false }
+  const combined = collapseSummaryText([parts.lead, ...parts.bullets].join(' '))
+  return { text: combined, pending: false }
 }
 
 export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {

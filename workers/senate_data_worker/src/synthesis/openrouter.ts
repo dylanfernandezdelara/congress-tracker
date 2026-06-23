@@ -59,7 +59,7 @@ export async function rewriteSummary(
       model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0,
-      max_tokens: 500,
+      max_tokens: 1024,
     }),
   });
 

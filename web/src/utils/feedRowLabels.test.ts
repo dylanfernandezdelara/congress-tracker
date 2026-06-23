@@ -225,7 +225,7 @@ describe('getFeedSummary', () => {
     })
   })
 
-  it('falls back to truncated CRS body text when digest is missing', () => {
+  it('falls back to Summary pending when digest is missing even if CRS text exists', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text:
@@ -233,8 +233,8 @@ describe('getFeedSummary', () => {
     })
 
     expect(getFeedSummary(item)).toEqual({
-      text: 'This bill blocks federal aid for students enrolled at institutions with no physical campus.',
-      pending: false,
+      text: FEED_SUMMARY_PENDING,
+      pending: true,
     })
   })
 
@@ -262,7 +262,7 @@ describe('getFeedSummary', () => {
     })
   })
 
-  it('caps combined summary text at roughly 120 characters on a word boundary', () => {
+  it('caps combined summary text to collapsed feed word limits', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
@@ -277,9 +277,9 @@ describe('getFeedSummary', () => {
 
     const summary = getFeedSummary(item)
     expect(summary.pending).toBe(false)
-    expect(summary.text.length).toBeLessThanOrEqual(120)
-    expect(summary.text).toMatch(/…$/)
-    expect(summary.text).not.toMatch(/\s…$/)
+    expect(summary.text).toBe(
+      'This bill provides support to Ukraine and allied countries through security assistance. Financing and oversight requirements for federal agencies that administer foreign military aid…',
+    )
   })
 })
 

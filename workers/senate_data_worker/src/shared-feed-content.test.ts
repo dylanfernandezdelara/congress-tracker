@@ -69,7 +69,7 @@ describe("feed-content game helpers", () => {
     expect(proceduralHeadline(title)).toBe("Nullifies section 11 of H.Res. 1224");
   });
 
-  it("normalizes digest leads and builds structured feed summaries", () => {
+  it("normalizes digest leads at ingest and builds collapsed feed summaries", () => {
     const lead = normalizeDigestLead(
       "This bill blocks aid for ghost students. It also creates reporting rules and audit requirements."
     );
@@ -78,12 +78,19 @@ describe("feed-content game helpers", () => {
     const parts = buildFeedSummaryParts({
       whatItDoes: lead,
       keyPoints: ["Requires campus verification", "Adds annual reporting"],
-      rawSummaryText: null,
     });
     expect(parts).toEqual({
       lead: "This bill blocks aid for ghost students.",
       bullets: ["Requires campus verification", "Adds annual reporting"],
     });
+  });
+
+  it("does not show raw CRS on the collapsed card when no digest exists", () => {
+    const parts = buildFeedSummaryParts({
+      whatItDoes: null,
+      keyPoints: null,
+    });
+    expect(parts).toBeNull();
   });
 
   it("preserves common abbreviations when extracting the first sentence", () => {
