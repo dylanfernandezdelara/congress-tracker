@@ -128,10 +128,9 @@ async function auditPage(page) {
       if (rowRect.bottom <= 0 || rowRect.top >= viewportHeight) {
         issues.push('feed row not visible in viewport')
       }
-      const isMobile = viewportWidth < 640
-      if (!isMobile && rowRect.height > 200) {
-        issues.push(`collapsed feed row too tall (${Math.round(rowRect.height)}px, expected < 200px)`)
-      }
+      // The collapsed row height is intentionally content-driven now that the
+      // full summary is shown, so we no longer assert an absolute max height —
+      // the line-clamp guard below catches the truncation regressions we care about.
     }
 
     if (topic) {
@@ -167,16 +166,19 @@ async function auditPage(page) {
 
     if (summary) {
       collectHorizontalClipping(summary.getBoundingClientRect(), 'feed summary')
-      if (viewportWidth < 640) {
-        const summaryStyle = window.getComputedStyle(summary)
-        const lineClamp = summaryStyle.webkitLineClamp || summaryStyle.getPropertyValue('-webkit-line-clamp')
-        if (lineClamp && lineClamp !== 'none' && lineClamp !== 'unset' && Number(lineClamp) > 0) {
-          issues.push('feed summary is line-clamped on mobile')
-        }
 
-        const bullets = summary.querySelectorAll('.feed-row-summary-bullets li')
-        if (bullets.length > 3) {
-          issues.push(`feed summary shows too many bullets on mobile (${bullets.length})`)
+      // The feed must show the summary in full on every viewport, so guard against
+      // any line-clamp creeping back onto the teaser or the bullet list.
+      const clampTargets = [
+        ['feed teaser', summary.querySelector('.feed-row-teaser')],
+        ['feed summary bullets', summary.querySelector('.feed-row-summary-bullets')],
+      ]
+      for (const [label, element] of clampTargets) {
+        if (!element) continue
+        const style = window.getComputedStyle(element)
+        const lineClamp = style.webkitLineClamp || style.getPropertyValue('-webkit-line-clamp')
+        if (lineClamp && lineClamp !== 'none' && lineClamp !== 'unset' && Number(lineClamp) > 0) {
+          issues.push(`${label} is line-clamped (summary truncated)`)
         }
       }
     } else {

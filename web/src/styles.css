@@ -408,22 +408,6 @@
     font-style: italic;
   }
 
-  @media (min-width: 640px) {
-    .feed-row-teaser {
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      overflow: hidden;
-    }
-
-    .feed-row-summary-bullets {
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      overflow: hidden;
-    }
-  }
-
   @media (max-width: 639px) {
     .feed-row-main {
       overflow: visible;

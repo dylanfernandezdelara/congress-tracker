@@ -1,5 +1,11 @@
 import type { GamePartySplit, GameRevealResponse } from '../api/types'
-import { normalizeDigestBullets, normalizeDigestLead } from '@congress-tracker/shared/feed-content'
+import {
+  GAME_BULLET_MAX_WORDS,
+  GAME_LEAD_MAX_WORDS,
+  GAME_MAX_BULLETS,
+  normalizeDigestBullets,
+  normalizeDigestLead,
+} from '@congress-tracker/shared/feed-content'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 
 type GameRevealPanelProps = {
@@ -46,6 +52,10 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
   const billId = formatShortBillId(reveal.bill.type, reveal.bill.number)
   const billUrl = congressGovBillUrl(reveal.bill.congress, reveal.bill.type, reveal.bill.number)
   const outcomeLabel = reveal.correct === 'passed' ? 'Passed' : 'Failed'
+  const revealBullets = normalizeDigestBullets(reveal.digest?.key_points ?? [], {
+    maxWords: GAME_BULLET_MAX_WORDS,
+    maxBullets: GAME_MAX_BULLETS,
+  })
 
   return (
     <section
@@ -80,10 +90,10 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
 
       {reveal.digest?.what_it_does ? (
         <div className="game-reveal-summary">
-          <p>{normalizeDigestLead(reveal.digest.what_it_does)}</p>
-          {normalizeDigestBullets(reveal.digest.key_points ?? []).length > 0 ? (
+          <p>{normalizeDigestLead(reveal.digest.what_it_does, GAME_LEAD_MAX_WORDS)}</p>
+          {revealBullets.length > 0 ? (
             <ul className="feed-row-summary-bullets">
-              {normalizeDigestBullets(reveal.digest.key_points ?? []).map((point, index) => (
+              {revealBullets.map((point, index) => (
                 <li key={`${index}-${point}`}>{point}</li>
               ))}
             </ul>

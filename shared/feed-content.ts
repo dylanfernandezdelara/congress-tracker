@@ -28,10 +28,26 @@ const TYPE_LABELS: Record<string, string> = {
 
 const GAME_SNIPPET_MAX_CHARS = 180
 
-export const DIGEST_LEAD_MAX_WORDS = 25
-export const DIGEST_BULLET_MAX_WORDS = 12
-export const DIGEST_MAX_BULLETS = 4
-export const FEED_COLLAPSED_MAX_BULLETS = 3
+// Canonical caps applied when a digest is normalized for storage at ingestion
+// time (openrouter.ts) and when the feed renders it. They are intentionally
+// generous safety bounds that clip only pathological model output — a normal
+// plain-English digest is shown in full so the feed card is self-contained.
+export const DIGEST_LEAD_MAX_WORDS = 60
+export const DIGEST_BULLET_MAX_WORDS = 40
+export const DIGEST_MAX_BULLETS = 8
+
+// The collapsed feed card shows every stored bullet.
+export const FEED_COLLAPSED_MAX_BULLETS = DIGEST_MAX_BULLETS
+
+// When no AI digest exists, the feed falls back to the CRS summary body. Cap it
+// generously; the complete CRS text is always available in the expanded detail.
+export const FEED_RAW_SUMMARY_LEAD_MAX_CHARS = 600
+
+// Compact caps for the blind-game surfaces (prompt + reveal). Kept deliberately
+// short so the game stays glanceable, independent of the feed's full-summary view.
+export const GAME_LEAD_MAX_WORDS = 25
+export const GAME_BULLET_MAX_WORDS = 12
+export const GAME_MAX_BULLETS = 4
 
 export function truncateWords(text: string, maxWords: number): string {
   const words = text.trim().split(/\s+/).filter(Boolean)
@@ -67,15 +83,22 @@ export function firstSentence(text: string): string {
   return restoreAbbreviations(first)
 }
 
-export function normalizeDigestLead(text: string): string {
-  return truncateWords(firstSentence(text), DIGEST_LEAD_MAX_WORDS)
+export function normalizeDigestLead(
+  text: string,
+  maxWords: number = DIGEST_LEAD_MAX_WORDS,
+): string {
+  return truncateWords(firstSentence(text), maxWords)
 }
 
-export function normalizeDigestBullets(points: string[]): string[] {
+export function normalizeDigestBullets(
+  points: string[],
+  options: { maxWords?: number; maxBullets?: number } = {},
+): string[] {
+  const { maxWords = DIGEST_BULLET_MAX_WORDS, maxBullets = DIGEST_MAX_BULLETS } = options
   return points
-    .map((point) => truncateWords(point.trim(), DIGEST_BULLET_MAX_WORDS))
+    .map((point) => truncateWords(point.trim(), maxWords))
     .filter((point) => point.length > 0)
-    .slice(0, DIGEST_MAX_BULLETS)
+    .slice(0, maxBullets)
 }
 
 export interface FeedSummaryParts {
@@ -104,7 +127,7 @@ export function buildFeedSummaryParts(input: {
     const body = summaryBodyText(rawSummary)
     if (body) {
       return {
-        lead: truncateAtWordBoundary(collapseWhitespace(body), 120),
+        lead: truncateAtWordBoundary(collapseWhitespace(body), FEED_RAW_SUMMARY_LEAD_MAX_CHARS),
         bullets: [],
       }
     }
@@ -276,7 +299,7 @@ export interface GamePrompt {
 
 function pickSummarySource(input: GamePromptInput): string | null {
   const whatItDoes = input.digest?.what_it_does?.trim()
-  if (whatItDoes) return normalizeDigestLead(whatItDoes)
+  if (whatItDoes) return normalizeDigestLead(whatItDoes, GAME_LEAD_MAX_WORDS)
 
   const rawSummary = input.rawSummaryText?.trim()
   if (rawSummary) {
@@ -285,7 +308,7 @@ function pickSummarySource(input: GamePromptInput): string | null {
   }
 
   const firstKeyPoint = input.digest?.key_points?.find((point) => point.trim().length > 0)
-  if (firstKeyPoint) return normalizeDigestLead(firstKeyPoint)
+  if (firstKeyPoint) return normalizeDigestLead(firstKeyPoint, GAME_LEAD_MAX_WORDS)
 
   return null
 }
