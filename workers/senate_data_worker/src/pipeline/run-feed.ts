@@ -105,7 +105,18 @@ export async function runFeedPipeline(
     digestsSkipped,
   };
 
-  await recordFeedPipelineRun(env.DB, trigger, result);
+  try {
+    await recordFeedPipelineRun(env.DB, trigger, result);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      JSON.stringify({
+        event: "feed_pipeline_state_write_failed",
+        trigger,
+        error: message,
+      })
+    );
+  }
 
   return result;
 }

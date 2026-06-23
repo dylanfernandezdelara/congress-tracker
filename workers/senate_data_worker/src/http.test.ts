@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { FEED_PIPELINE_CRON_UTC } from "./constants";
 import { handlePublicFetch } from "./http/router";
 
 function createMockDb(): D1Database {
@@ -47,7 +48,7 @@ describe("HTTP API", () => {
       status: "ok",
       congress: "119",
       data: {
-        daily_cron_utc: "0 10 * * *",
+        daily_cron_utc: FEED_PIPELINE_CRON_UTC,
         admin_feed_ingest:
           "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
       },

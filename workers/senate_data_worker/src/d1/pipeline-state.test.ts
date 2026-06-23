@@ -5,6 +5,17 @@ import {
   getLatestPassageVoteDate,
   recordFeedPipelineRun,
 } from "./pipeline-state";
+import type { Env } from "../config";
+
+function createEnv(): Env {
+  return {
+    CONGRESS: "119",
+    SESSION: "2",
+    DB: {} as D1Database,
+    CONGRESS_API_KEY: "test",
+    OPENROUTER_API_KEY: "test",
+  };
+}
 
 function createMockDb(): D1Database {
   const store = new Map<string, string>();
@@ -30,6 +41,7 @@ function createMockDb(): D1Database {
           return value ? ({ value_json: value } as T) : null;
         }
         if (sql.includes("MAX(vote_date)")) {
+          expect(state.args[0]).toBe(119);
           return { latest_passage_vote_date: "2026-06-11" } as T;
         }
         return null;
@@ -68,8 +80,9 @@ describe("pipeline-state", () => {
     expect(lastRun?.completed_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("returns latest passage vote date", async () => {
-    const db = createMockDb();
-    await expect(getLatestPassageVoteDate(db)).resolves.toBe("2026-06-11");
+  it("returns latest passage vote date for the configured congress", async () => {
+    const env = createEnv();
+    env.DB = createMockDb();
+    await expect(getLatestPassageVoteDate(env)).resolves.toBe("2026-06-11");
   });
 });

@@ -8,7 +8,7 @@ import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
-import { FEED_DEFAULT_PAGE_SIZE, FEED_MAX_BILLS, FEED_MAX_PAGE_SIZE } from "../constants";
+import { FEED_DEFAULT_PAGE_SIZE, FEED_MAX_BILLS, FEED_MAX_PAGE_SIZE, FEED_PIPELINE_CRON_UTC } from "../constants";
 import { buildFeedPage } from "../storage/feed";
 import { buildGameReveal, buildGameRounds, parseGameLimit } from "../storage/game";
 import { buildPulseStats } from "../storage/pulse-stats";
@@ -60,10 +60,18 @@ async function healthResponse(
   env: Env,
   json: (body: unknown, init?: ResponseInit) => Response
 ): Promise<Response> {
-  const [latestPassageVoteDate, lastFeedIngest] = await Promise.all([
-    getLatestPassageVoteDate(env.DB),
-    getFeedPipelineRun(env.DB),
-  ]);
+  let latestPassageVoteDate: string | null = null;
+  let lastFeedIngest: Awaited<ReturnType<typeof getFeedPipelineRun>> = null;
+  let dataError: string | undefined;
+
+  try {
+    [latestPassageVoteDate, lastFeedIngest] = await Promise.all([
+      getLatestPassageVoteDate(env),
+      getFeedPipelineRun(env.DB),
+    ]);
+  } catch {
+    dataError = "data_unavailable";
+  }
 
   return json(
     {
@@ -74,8 +82,9 @@ async function healthResponse(
       data: {
         latest_passage_vote_date: latestPassageVoteDate,
         last_feed_ingest: lastFeedIngest,
-        daily_cron_utc: "0 10 * * *",
+        daily_cron_utc: FEED_PIPELINE_CRON_UTC,
         admin_feed_ingest: "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
+        ...(dataError ? { error: dataError } : {}),
       },
     },
     { status: 200, headers: { "Cache-Control": cacheHealth } }

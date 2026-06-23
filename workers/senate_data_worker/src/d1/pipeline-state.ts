@@ -1,4 +1,5 @@
 import { ensureSchema } from "./schema";
+import { congressNumber, type Env } from "../config";
 
 export interface FeedPipelineRunRecord {
   completed_at: string;
@@ -54,14 +55,15 @@ export async function getFeedPipelineRun(
   }
 }
 
-export async function getLatestPassageVoteDate(db: D1Database): Promise<string | null> {
-  await ensureSchema(db);
-  const row = await db
+export async function getLatestPassageVoteDate(env: Env): Promise<string | null> {
+  await ensureSchema(env.DB);
+  const row = await env.DB
     .prepare(
       `SELECT MAX(vote_date) AS latest_passage_vote_date
        FROM votes
-       WHERE is_passage = 1`
+       WHERE is_passage = 1 AND congress = ?1`
     )
+    .bind(congressNumber(env))
     .first<{ latest_passage_vote_date: string | null }>();
   return row?.latest_passage_vote_date ?? null;
 }

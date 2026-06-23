@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { FEED_PIPELINE_CRON_UTC } from "./constants";
 
 vi.mock("./pipeline/run-feed", () => ({
   runFeedPipeline: vi.fn(),
@@ -60,7 +61,7 @@ describe("worker", () => {
       status: "ok",
       congress: "119",
       session: "2",
-      data: { daily_cron_utc: "0 10 * * *" },
+      data: { daily_cron_utc: FEED_PIPELINE_CRON_UTC },
     });
   });
 
