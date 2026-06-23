@@ -2,12 +2,25 @@ import { type Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { computeDefectors } from "../analytics/defectors";
 import { buildPortfolioMovers } from "../d1/disclosures";
+import {
+  getFeedPipelineFailure,
+  getFeedPipelineSuccess,
+  getLatestPassageVoteDate,
+  getMissingDigestCount,
+} from "../d1/pipeline-state";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
-import { FEED_DEFAULT_PAGE_SIZE, FEED_MAX_BILLS, FEED_MAX_PAGE_SIZE } from "../constants";
+import {
+  FEED_DEFAULT_PAGE_SIZE,
+  FEED_MAX_BILLS,
+  FEED_MAX_PAGE_SIZE,
+  FEED_PIPELINE_CRON_UTC,
+  FEED_PIPELINE_STALE_HOURS,
+} from "../constants";
+import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildGameReveal, buildGameRounds, parseGameLimit } from "../storage/game";
 import { buildPulseStats } from "../storage/pulse-stats";
@@ -55,16 +68,82 @@ function authorizePipeline(request: Request, env: Env): boolean {
   return env.DEV_OPEN_PIPELINE?.trim() === "1";
 }
 
-function healthResponse(env: Env, json: (body: unknown, init?: ResponseInit) => Response): Response {
+async function loadIngestMonitor(env: Env) {
+  const [
+    latestPassageVoteDate,
+    missingDigestCount,
+    lastSuccess,
+    lastFailure,
+  ] = await Promise.all([
+    getLatestPassageVoteDate(env),
+    getMissingDigestCount(env),
+    getFeedPipelineSuccess(env.DB),
+    getFeedPipelineFailure(env.DB),
+  ]);
+
+  return buildIngestMonitorPayload({
+    now: new Date(),
+    staleAfterHours: FEED_PIPELINE_STALE_HOURS,
+    dailyCronUtc: FEED_PIPELINE_CRON_UTC,
+    latestPassageVoteDate,
+    missingDigestCount,
+    lastSuccess,
+    lastFailure,
+  });
+}
+
+async function healthResponse(
+  env: Env,
+  json: (body: unknown, init?: ResponseInit) => Response
+): Promise<Response> {
+  let ingest: Awaited<ReturnType<typeof loadIngestMonitor>> | undefined;
+  let dataError: string | undefined;
+
+  try {
+    ingest = await loadIngestMonitor(env);
+  } catch {
+    dataError = "data_unavailable";
+  }
+
   return json(
     {
       status: "ok",
       timestamp: new Date().toISOString(),
       congress: env.CONGRESS,
       session: env.SESSION,
+      data: {
+        ingest,
+        ...(dataError ? { error: dataError } : {}),
+      },
     },
     { status: 200, headers: { "Cache-Control": cacheHealth } }
   );
+}
+
+async function ingestMonitorResponse(
+  env: Env,
+  json: (body: unknown, init?: ResponseInit) => Response
+): Promise<Response> {
+  try {
+    const ingest = await loadIngestMonitor(env);
+    return json(
+      {
+        as_of: new Date().toISOString(),
+        ingest,
+        alerting: {
+          cloudflare_logs: "Filter Workers Observability for event feed_pipeline_failed or origin scheduled.",
+          external_monitor:
+            "Poll GET /health or /debug/ingest.json and alert when data.ingest.status is not ok.",
+        },
+      },
+      { status: 200, headers: { "Cache-Control": cacheNoStore } }
+    );
+  } catch {
+    return json(
+      { error: "ingest_monitor_unavailable", message: "Could not load ingest monitor data." },
+      { status: 500, headers: { "Cache-Control": cacheNoStore } }
+    );
+  }
 }
 
 function parseChamber(value: string | null): Chamber | null {
@@ -148,7 +227,9 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   }
 
   if (pathname === "/__pipeline/run/feed") {
-    return handlePipelineRoute(request, env, json, () => runFeedPipeline(env));
+    return handlePipelineRoute(request, env, json, () =>
+      runFeedPipeline(env, { trigger: "admin" })
+    );
   }
 
   if (pathname === "/__pipeline/run/digest-refresh") {
@@ -176,6 +257,10 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
 
   if (pathname === "/health") {
     return healthResponse(env, json);
+  }
+
+  if (pathname === "/debug/ingest.json") {
+    return ingestMonitorResponse(env, json);
   }
 
   if (pathname === "/feed/latest.json") {
@@ -289,7 +374,7 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   return notFound(pathname);
 }
 
-const API_PATH_PREFIXES = ["/health", "/feed/", "/game/", "/stats/", "/__pipeline/"];
+const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/game/", "/stats/", "/__pipeline/"];
 
 function isApiPath(pathname: string): boolean {
   return API_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));

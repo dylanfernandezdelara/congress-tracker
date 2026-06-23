@@ -12,7 +12,7 @@ export default {
   },
   scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(
-      runFeedPipeline(env)
+      runFeedPipeline(env, { trigger: "scheduled" })
         .then((result) => {
           console.log(
             JSON.stringify({

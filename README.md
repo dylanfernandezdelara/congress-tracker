@@ -73,8 +73,11 @@ cd ../.. && npm run deploy            # builds web/dist, then deploys the Worker
 
 Production cron (`0 10 * * *` in `workers/senate_data_worker/wrangler.toml`) runs the feed
 pipeline daily via the Worker's `scheduled` handler. The pipeline only upserts **new** passage
-votes and writes digests for bills missing one. To manually trigger production ingestion, POST to
-`/__pipeline/run/feed` on the deployed Worker with `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
+votes and writes digests for bills missing one. Ingest health is recorded in D1 and exposed on
+`GET /health` (`data.ingest`) and `GET /debug/ingest.json`; see [`docs/MONITORING.md`](docs/MONITORING.md).
+The web app has a temporary ops page at `/debug` (not linked in navigation). To manually trigger
+production ingestion, POST to `/__pipeline/run/feed` on the deployed Worker with
+`Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 
 Because the app and API share an origin, the production build calls the API with
 relative URLs — no `VITE_API_URL` needed. Set `VITE_API_URL` only if you host
@@ -90,7 +93,8 @@ safety notes.
 
 ## HTTP API
 
-- `GET /health` — worker liveness
+- `GET /health` — worker liveness plus `data.ingest` freshness (`ok` | `stale` | `failed` | `unknown`)
+- `GET /debug/ingest.json` — detailed ingest monitor payload (same status logic as `/health`)
 - `GET /feed/latest.json` — paginated recent bills with passage votes and digests
   - Query: `limit` (1–50, default 50), `offset` (default 0; clamped to the 50-bill feed window)
   - Response: `{ items, total, limit, offset, has_more }` where `items` is the bill array and `total` is capped at 50

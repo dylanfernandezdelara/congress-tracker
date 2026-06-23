@@ -25,3 +25,9 @@ export const MEMBER_VOTES_MAX_ROLLS_PER_RUN = 150;
 export const SESSION_BACKFILL_MAX_NEW_VOTES = 200;
 
 export const USER_AGENT = "congress-tracker/0.1";
+
+/** Daily feed ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml. */
+export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
+
+/** Alert if no successful scheduled ingest within this many hours after cron. */
+export const FEED_PIPELINE_STALE_HOURS = 26;

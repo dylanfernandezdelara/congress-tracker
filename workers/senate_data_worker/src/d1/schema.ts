@@ -63,6 +63,11 @@ const SCHEMA_STATEMENTS = [
   session_return_pct REAL NOT NULL,
   PRIMARY KEY (bioguide_id, as_of_date)
 )`,
+  `CREATE TABLE IF NOT EXISTS pipeline_state (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_passage_date ON votes (is_passage, vote_date)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_bill ON votes (bill_congress, bill_type, bill_number)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_congress_session ON votes (congress, session, chamber)`,
