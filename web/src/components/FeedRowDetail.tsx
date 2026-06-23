@@ -1,5 +1,4 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
-import { normalizeDigestBullets, normalizeDigestLead } from '@congress-tracker/shared/feed-content'
 import { congressGovBillUrl, formatVoteDate } from '../utils/billLabels'
 import { isProceduralFeedItem } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
@@ -49,10 +48,6 @@ function PassageVoteDetails({ votes }: { votes: FeedPassageVote[] }) {
 
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
-  const digest = item.digest
-  const summaryLead = digest?.what_it_does ? normalizeDigestLead(digest.what_it_does) : null
-  const keyPoints = digest?.key_points ? normalizeDigestBullets(digest.key_points) : []
-  const terms = digest?.terms_explained ?? []
   const isProcedural = isProceduralFeedItem(item)
 
   return (
@@ -71,56 +66,6 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
       <section className="feed-row-detail-section">
         <h3 className="feed-row-detail-heading">Vote history</h3>
         <PassageVoteDetails votes={item.passage_votes} />
-      </section>
-
-      {summaryLead ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">What it does</h3>
-          <p className="feed-row-detail-body text-sm leading-relaxed text-secondary">
-            {summaryLead}
-          </p>
-        </section>
-      ) : null}
-
-      {keyPoints.length > 0 ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">Key points</h3>
-          <ul className="feed-row-detail-list space-y-1.5">
-            {keyPoints.map((point, index) => (
-              <li key={`${index}-${point}`} className="flex gap-2 text-sm leading-relaxed text-secondary">
-                <span className="text-faint" aria-hidden="true">
-                  –
-                </span>
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {terms.length > 0 ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">Terms explained</h3>
-          <dl className="feed-row-detail-terms space-y-2">
-            {terms.map((entry) => (
-              <div key={entry.term}>
-                <dt className="text-sm font-medium text-foreground">{entry.term}</dt>
-                <dd className="mt-0.5 text-sm leading-relaxed text-secondary">{entry.plain}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      ) : null}
-
-      <section className="feed-row-detail-section">
-        <details className="feed-row-crs-details" aria-label="Official CRS summary">
-          <summary className="feed-row-detail-heading cursor-pointer select-none">
-            Official CRS summary
-          </summary>
-          <p className="feed-row-detail-body mt-2 whitespace-pre-wrap text-sm leading-relaxed text-secondary">
-            {item.raw_summary_text ?? 'No official CRS summary on file.'}
-          </p>
-        </details>
       </section>
 
       <footer className="feed-row-detail-footer">
