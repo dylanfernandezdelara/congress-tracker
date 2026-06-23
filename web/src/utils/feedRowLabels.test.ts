@@ -225,7 +225,7 @@ describe('getFeedSummary', () => {
     })
   })
 
-  it('falls back to truncated CRS body text when digest is missing', () => {
+  it('falls back to the full CRS body text when digest is missing', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text:
@@ -262,7 +262,7 @@ describe('getFeedSummary', () => {
     })
   })
 
-  it('caps combined summary text at roughly 120 characters on a word boundary', () => {
+  it('returns the full combined summary text without truncation', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
@@ -277,9 +277,10 @@ describe('getFeedSummary', () => {
 
     const summary = getFeedSummary(item)
     expect(summary.pending).toBe(false)
-    expect(summary.text.length).toBeLessThanOrEqual(120)
-    expect(summary.text).toMatch(/…$/)
-    expect(summary.text).not.toMatch(/\s…$/)
+    expect(summary.text).toBe(
+      'This bill provides support to Ukraine and allied countries through security assistance. Financing and oversight requirements for federal agencies that administer foreign military aid programs across multiple regions.',
+    )
+    expect(summary.text).not.toMatch(/…$/)
   })
 })
 

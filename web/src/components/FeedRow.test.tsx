@@ -94,7 +94,7 @@ describe('FeedRow', () => {
     expect(onToggle).toHaveBeenCalledTimes(1)
   })
 
-  it('shows a truncated CRS summary preview when collapsed without a digest', () => {
+  it('shows the full CRS summary body when collapsed without a digest', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text: longCrsSummary,
@@ -102,9 +102,13 @@ describe('FeedRow', () => {
 
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
-    expect(screen.getByText(/This bill provides support to Ukraine/)).toBeInTheDocument()
+    const teaser = document.querySelector('.feed-row-teaser')
+    expect(teaser?.textContent).toContain(
+      'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight.',
+    )
+    expect(teaser?.textContent?.match(/financing, and oversight\./g)?.length).toBe(4)
+    expect(teaser?.textContent).not.toMatch(/…$/)
     expect(screen.queryByText(/Ukraine Support Act/)).not.toBeInTheDocument()
-    expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
   })
 
   it('shows Summary pending when no digest or CRS text is available', () => {

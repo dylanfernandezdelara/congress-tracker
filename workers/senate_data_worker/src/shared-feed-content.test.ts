@@ -69,7 +69,7 @@ describe("feed-content game helpers", () => {
     expect(proceduralHeadline(title)).toBe("Nullifies section 11 of H.Res. 1224");
   });
 
-  it("normalizes digest leads and builds structured feed summaries", () => {
+  it("normalizes digest leads at ingest and shows full structured feed summaries", () => {
     const lead = normalizeDigestLead(
       "This bill blocks aid for ghost students. It also creates reporting rules and audit requirements."
     );
@@ -84,6 +84,20 @@ describe("feed-content game helpers", () => {
       lead: "This bill blocks aid for ghost students.",
       bullets: ["Requires campus verification", "Adds annual reporting"],
     });
+  });
+
+  it("shows the full CRS body when no digest exists", () => {
+    const longBody =
+      "This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. ".repeat(
+        4
+      ).trim();
+    const parts = buildFeedSummaryParts({
+      whatItDoes: null,
+      keyPoints: null,
+      rawSummaryText: `Ukraine Support Act\n\n${longBody}`,
+    });
+    expect(parts).toEqual({ lead: longBody, bullets: [] });
+    expect(parts?.lead).not.toMatch(/…$/);
   });
 
   it("preserves common abbreviations when extracting the first sentence", () => {

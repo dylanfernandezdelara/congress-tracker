@@ -11,7 +11,7 @@ import {
   voteIndicatesFailure,
 } from '@congress-tracker/shared/feed-content'
 
-const TEASER_MAX_CHARS = 120
+const FEED_SUMMARY_ARIA_MAX_CHARS = 200
 
 export const FEED_SUMMARY_PENDING = 'Summary pending'
 
@@ -68,12 +68,6 @@ function collapseSummaryText(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
-function truncateFeedSummary(text: string): string {
-  const collapsed = collapseSummaryText(text)
-  if (!collapsed) return collapsed
-  return truncateAtWordBoundary(collapsed, TEASER_MAX_CHARS)
-}
-
 function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
   const parts = buildFeedSummaryParts({
     whatItDoes: item.digest?.what_it_does,
@@ -90,14 +84,22 @@ function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
   }
 }
 
+export function getFeedSummaryAriaDescription(item: FeedItem): string {
+  const parts = getFeedSummaryParts(item)
+  if (!parts) return FEED_SUMMARY_PENDING
+
+  const combined = collapseSummaryText([parts.lead, ...parts.bullets].join(' '))
+  return truncateAtWordBoundary(combined, FEED_SUMMARY_ARIA_MAX_CHARS)
+}
+
 export function getFeedSummary(item: FeedItem): FeedSummary {
   const parts = getFeedSummaryParts(item)
   if (!parts) {
     return { text: FEED_SUMMARY_PENDING, pending: true }
   }
 
-  const combined = [parts.lead, ...parts.bullets].join(' ')
-  return { text: truncateFeedSummary(combined), pending: false }
+  const combined = collapseSummaryText([parts.lead, ...parts.bullets].join(' '))
+  return { text: combined, pending: false }
 }
 
 export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {

@@ -39,9 +39,8 @@ export const DIGEST_MAX_BULLETS = 8
 // The collapsed feed card shows every stored bullet.
 export const FEED_COLLAPSED_MAX_BULLETS = DIGEST_MAX_BULLETS
 
-// When no AI digest exists, the feed falls back to the CRS summary body. Cap it
-// generously; the complete CRS text is always available in the expanded detail.
-export const FEED_RAW_SUMMARY_LEAD_MAX_CHARS = 600
+// When no AI digest exists, the feed falls back to the CRS summary body. Show the
+// full body on the collapsed card; the expanded detail also includes the raw CRS text.
 
 // Compact caps for the blind-game surfaces (prompt + reveal). Kept deliberately
 // short so the game stays glanceable, independent of the feed's full-summary view.
@@ -90,6 +89,22 @@ export function normalizeDigestLead(
   return truncateWords(firstSentence(text), maxWords)
 }
 
+/** Feed display: first sentence only, no word-cap ellipsis. Ingest caps pathological output. */
+export function formatDigestLeadForDisplay(text: string): string {
+  return firstSentence(text.trim())
+}
+
+/** Feed display: trim and cap bullet count without word-cap ellipsis. */
+export function formatDigestBulletsForDisplay(
+  points: string[],
+  maxBullets: number = FEED_COLLAPSED_MAX_BULLETS,
+): string[] {
+  return points
+    .map((point) => point.trim())
+    .filter((point) => point.length > 0)
+    .slice(0, maxBullets)
+}
+
 export function normalizeDigestBullets(
   points: string[],
   options: { maxWords?: number; maxBullets?: number } = {},
@@ -117,8 +132,8 @@ export function buildFeedSummaryParts(input: {
 
   if (whatItDoes) {
     return {
-      lead: normalizeDigestLead(whatItDoes),
-      bullets: normalizeDigestBullets(input.keyPoints ?? []).slice(0, maxBullets),
+      lead: formatDigestLeadForDisplay(whatItDoes),
+      bullets: formatDigestBulletsForDisplay(input.keyPoints ?? [], maxBullets),
     }
   }
 
@@ -127,7 +142,7 @@ export function buildFeedSummaryParts(input: {
     const body = summaryBodyText(rawSummary)
     if (body) {
       return {
-        lead: truncateAtWordBoundary(collapseWhitespace(body), FEED_RAW_SUMMARY_LEAD_MAX_CHARS),
+        lead: collapseWhitespace(body),
         bullets: [],
       }
     }
@@ -136,7 +151,7 @@ export function buildFeedSummaryParts(input: {
   const firstKeyPoint = input.keyPoints?.find((point) => point.trim().length > 0)
   if (firstKeyPoint) {
     return {
-      lead: normalizeDigestLead(firstKeyPoint),
+      lead: formatDigestLeadForDisplay(firstKeyPoint),
       bullets: [],
     }
   }

@@ -5,6 +5,7 @@ import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedEventDisplay,
   getFeedRowMeta,
+  getFeedSummaryAriaDescription,
   getFeedSummaryDisplay,
   getFeedTopic,
   isProceduralFeedItem,
@@ -26,8 +27,14 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const eventId = useId()
   const summaryId = useId()
   const detailId = useId()
+  const summaryAriaId = useId()
   const topic = getFeedTopic(item)
   const summary = getFeedSummaryDisplay(item)
+  const summaryAria = getFeedSummaryAriaDescription(item)
+  const fullSummaryText = summary.pending
+    ? summary.lead
+    : [summary.lead, ...summary.bullets].join(' ').replace(/\s+/g, ' ').trim()
+  const needsAriaSnippet = !summary.pending && summaryAria !== fullSummaryText
   const meta = getFeedRowMeta(item)
   const eventDisplay = getFeedEventDisplay(item)
   const policyArea = item.policy_area
@@ -42,7 +49,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           aria-expanded={isExpanded}
           aria-controls={detailId}
           aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProceduralFeedItem(item) ? ` ${policyAreaId}` : ''}${meta.margin && (meta.kind === 'passed' || meta.kind === 'failed') ? ` ${marginId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
-          aria-describedby={summaryId}
+          aria-describedby={needsAriaSnippet ? summaryAriaId : summaryId}
           onClick={onToggle}
         >
           <div className="feed-row-main">
@@ -106,6 +113,9 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                 </ul>
               ) : null}
             </div>
+            {needsAriaSnippet ? (
+              <span id={summaryAriaId} className="sr-only">{summaryAria}</span>
+            ) : null}
           </div>
 
           <span className="feed-row-chevron" aria-hidden="true">
