@@ -73,10 +73,8 @@ cd ../.. && npm run deploy            # builds web/dist, then deploys the Worker
 
 Production cron (`0 10 * * *` in `workers/senate_data_worker/wrangler.toml`) runs the feed
 pipeline daily via the Worker's `scheduled` handler. The pipeline only upserts **new** passage
-votes and writes digests for bills missing one. GitHub Actions runs a backup ingest at 10:30 UTC
-(`.github/workflows/daily-ingest.yml`); add `PIPELINE_ADMIN_TOKEN` to **GitHub Actions secrets**
-(same value as `wrangler secret put PIPELINE_ADMIN_TOKEN`). Optionally set a `WORKER_URL`
-repository variable if the workers.dev hostname changes.
+votes and writes digests for bills missing one. To manually trigger production ingestion, POST to
+`/__pipeline/run/feed` on the deployed Worker with `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 
 Because the app and API share an origin, the production build calls the API with
 relative URLs — no `VITE_API_URL` needed. Set `VITE_API_URL` only if you host

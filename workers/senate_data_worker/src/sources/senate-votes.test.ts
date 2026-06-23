@@ -13,7 +13,7 @@ const sample = readFileSync(join(here, "../fixtures/senate-vote-menu.sample.xml"
 describe("parseSenateVoteMenuXml", () => {
   it("keeps passage votes linked to bills", () => {
     const votes = parseSenateVoteMenuXml(sample, 119, 2);
-    expect(votes).toHaveLength(1);
+    expect(votes).toHaveLength(2);
     expect(votes[0]).toMatchObject({
       chamber: "Senate",
       rollNumber: 163,
@@ -22,6 +22,16 @@ describe("parseSenateVoteMenuXml", () => {
       yeas: 52,
       nays: 47,
       voteDate: "2026-06-05",
+    });
+    expect(votes[1]).toMatchObject({
+      chamber: "Senate",
+      rollNumber: 182,
+      bill: { congress: 119, type: "HR", number: 6644 },
+      question: "Motion to Concur in the House Amendment to the Senate Amendment to H.R. 6644 with an Amendment (SA 5823)",
+      result: "Agreed to",
+      yeas: 85,
+      nays: 5,
+      voteDate: "2026-06-22",
     });
   });
 
@@ -35,7 +45,8 @@ describe("parseSenateVoteMenuXml", () => {
     const result = await ingestSenatePassageVotes(env, "2026-01-01", knownKeys);
 
     expect(result.skipped).toBe(1);
-    expect(result.votes).toHaveLength(0);
+    expect(result.votes).toHaveLength(1);
+    expect(result.votes[0]?.rollNumber).toBe(182);
 
     fetchText.mockRestore();
   });

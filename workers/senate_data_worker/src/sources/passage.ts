@@ -3,6 +3,7 @@ const PASSAGE_PATTERNS = [
   /^on passage/i,
   /^on motion to suspend the rules and pass/i,
   /^on agreeing to the resolution/i,
+  /^motion to concur in/i,
 ];
 
 export function isPassageVote(question: string): boolean {

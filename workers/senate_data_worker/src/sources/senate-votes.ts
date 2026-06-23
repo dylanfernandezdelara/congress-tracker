@@ -37,7 +37,8 @@ export function parseSenateVoteMenuXml(xml: string, congress: number, session: n
 
   for (const block of blocks) {
     const question = getTag(block, "question");
-    if (!isPassageVote(question)) continue;
+    const title = getTag(block, "title");
+    if (!isPassageVote(question) && !isPassageVote(title)) continue;
 
     const issue = getTag(block, "issue");
     const bill = parseSenateIssue(issue, congress);
@@ -52,13 +53,15 @@ export function parseSenateVoteMenuXml(xml: string, congress: number, session: n
     const yeasT = Number.parseInt(getTag(tallyBlock, "yeas"), 10) || yeas;
     const naysT = Number.parseInt(getTag(tallyBlock, "nays"), 10) || nays;
 
+    const displayQuestion = isPassageVote(title) ? title.split(";")[0]!.trim() : question;
+
     votes.push({
       chamber: "Senate",
       congress,
       session,
       rollNumber: voteNumber,
       bill,
-      question: question.replace(/\s+/g, " ").trim(),
+      question: displayQuestion.replace(/\s+/g, " ").trim(),
       result: getTag(block, "result"),
       yeas: yeasT,
       nays: naysT,

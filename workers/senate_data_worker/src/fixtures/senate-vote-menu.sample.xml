@@ -27,5 +27,17 @@
       </vote_tally>
       <title>Nomination</title>
     </vote>
+    <vote>
+      <vote_number>00182</vote_number>
+      <vote_date>22-Jun</vote_date>
+      <issue>H.R. 6644</issue>
+      <question>On the Motion</question>
+      <result>Agreed to</result>
+      <vote_tally>
+        <yeas>85</yeas>
+        <nays>5</nays>
+      </vote_tally>
+      <title>Motion to Concur in the House Amendment to the Senate Amendment to H.R. 6644 with an Amendment (SA 5823); A bill a bill to increase the supply of housing in America, and for other purposes.</title>
+    </vote>
   </votes>
 </vote_summary>

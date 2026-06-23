@@ -105,9 +105,8 @@ schedule; use `npm run deploy:triggers` in `workers/senate_data_worker` only aft
 roll-call keys) and writes digests for bills that do not yet have one (capped by
 `DIGEST_MAX_NEW_REWRITES`). Because Congress.gov lists House votes oldest-first, daily runs scan
 list pages until the lookback window is reached (~5 list requests per run for the current session).
-GitHub Actions backup: `.github/workflows/daily-ingest.yml` at 10:30 UTC — requires
-`PIPELINE_ADMIN_TOKEN` in **GitHub Actions secrets** (same value as the Worker secret) and
-optionally `WORKER_URL` in repository variables.
+Manual production ingestion is `POST /__pipeline/run/feed` on the deployed Worker with
+`Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 
 Shared stats JSON types live in `shared/stats-api-types.ts` (imported by worker + web).
 
