@@ -120,15 +120,12 @@ describe('FeedRow', () => {
     expect(screen.getByText('Summary pending')).toBeInTheDocument()
   })
 
-  it('reveals CRS summary text when expanded', () => {
+  it('does not show CRS summary text when expanded', () => {
     const item = makeFeedItem({ raw_summary_text: longCrsSummary })
-    const { rerender } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+
+    render(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
 
     expect(screen.queryByText(/Ukraine Support Act/)).not.toBeInTheDocument()
-
-    rerender(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
-
-    expect(screen.getByText(/Ukraine Support Act/)).toBeInTheDocument()
   })
 
   it('does not toggle expand when the congress.gov link is clicked', () => {

@@ -48,7 +48,6 @@ function PassageVoteDetails({ votes }: { votes: FeedPassageVote[] }) {
 
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
-  const terms = item.digest?.terms_explained ?? []
   const isProcedural = isProceduralFeedItem(item)
 
   return (
@@ -67,31 +66,6 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
       <section className="feed-row-detail-section">
         <h3 className="feed-row-detail-heading">Vote history</h3>
         <PassageVoteDetails votes={item.passage_votes} />
-      </section>
-
-      {terms.length > 0 ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">Terms explained</h3>
-          <dl className="feed-row-detail-terms space-y-2">
-            {terms.map((entry) => (
-              <div key={entry.term}>
-                <dt className="text-sm font-medium text-foreground">{entry.term}</dt>
-                <dd className="mt-0.5 text-sm leading-relaxed text-secondary">{entry.plain}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      ) : null}
-
-      <section className="feed-row-detail-section">
-        <details className="feed-row-crs-details" aria-label="Official CRS summary">
-          <summary className="feed-row-detail-heading cursor-pointer select-none">
-            Official CRS summary
-          </summary>
-          <p className="feed-row-detail-body mt-2 whitespace-pre-wrap text-sm leading-relaxed text-secondary">
-            {item.raw_summary_text ?? 'No official CRS summary on file.'}
-          </p>
-        </details>
       </section>
 
       <footer className="feed-row-detail-footer">
