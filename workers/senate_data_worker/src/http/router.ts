@@ -107,7 +107,10 @@ async function healthResponse(
 
   return json(
     {
-      status: "ok",
+      status:
+        ingest && (ingest.status === "failed" || ingest.status === "stale")
+          ? "degraded"
+          : "ok",
       timestamp: new Date().toISOString(),
       congress: env.CONGRESS,
       session: env.SESSION,

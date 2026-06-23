@@ -63,6 +63,28 @@ describe("evaluateIngestMonitorStatus", () => {
     expect(result.status).toBe("stale");
   });
 
+  it("ignores admin failures when scheduled ingest succeeded", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      lastSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 5,
+        digestsWritten: 2,
+        digestsSkipped: 3,
+      },
+      lastFailure: {
+        failed_at: "2026-06-23T11:00:00.000Z",
+        trigger: "admin",
+        error: "Manual run failed",
+      },
+    });
+    expect(result.status).toBe("ok");
+  });
+
   it("marks unknown when no scheduled success exists", () => {
     const result = evaluateIngestMonitorStatus({
       now,

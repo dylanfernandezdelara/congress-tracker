@@ -29,7 +29,8 @@ scheduled freshness on their own.
    `0 10 * * *`. Failed runs also log structured JSON from the scheduled handler.
 
 2. **External uptime monitor** — poll `/health` or `/debug/ingest.json` and alert when
-   `data.ingest.status` (or `ingest.status`) is not `ok`.
+   `data.ingest.status` (or `ingest.status`) is not `ok`, or when top-level `/health`
+   `status` is `degraded` (ingest stale or failed).
 
 3. **Manual override** — `POST /__pipeline/run/feed` with
    `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.

@@ -13,15 +13,18 @@ export function evaluateIngestMonitorStatus(params: {
 }): Pick<IngestMonitorPayload, "status" | "message" | "last_scheduled_success"> {
   const lastScheduledSuccess =
     params.lastSuccess?.trigger === "scheduled" ? params.lastSuccess : null;
+  const lastScheduledFailure =
+    params.lastFailure?.trigger === "scheduled" ? params.lastFailure : null;
 
   if (
-    params.lastFailure &&
+    lastScheduledFailure &&
     (!lastScheduledSuccess ||
-      Date.parse(params.lastFailure.failed_at) > Date.parse(lastScheduledSuccess.completed_at))
+      Date.parse(lastScheduledFailure.failed_at) >
+        Date.parse(lastScheduledSuccess.completed_at))
   ) {
     return {
       status: "failed",
-      message: `Last scheduled ingest failed: ${params.lastFailure.error}`,
+      message: `Last scheduled ingest failed: ${lastScheduledFailure.error}`,
       last_scheduled_success: lastScheduledSuccess,
     };
   }
