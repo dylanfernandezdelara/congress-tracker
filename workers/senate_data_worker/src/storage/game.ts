@@ -1,5 +1,5 @@
 import { GAME_DEFAULT_LIMIT, GAME_MAX_LIMIT, GAME_POOL_SIZE, VOTE_LOOKBACK_DAYS } from "../constants";
-import { getDigest } from "../d1/digests";
+import { parseStoredDigest } from "../d1/digests";
 import {
   getGameVoteByKey,
   getPartySplitForRoll,
@@ -8,7 +8,6 @@ import {
 } from "../d1/game-votes";
 import { ensureSchema } from "../d1/schema";
 import { lookbackStartIso } from "../sources/congress-client";
-import type { BillDigestContent } from "../types";
 import { voteKey, parseVoteKey } from "../vote-key";
 import type {
   GamePartySplit,
@@ -26,17 +25,8 @@ export interface GameRoundsOptions {
   limit: number;
 }
 
-function parseDigest(json: string | null): BillDigestContent | null {
-  if (!json) return null;
-  try {
-    return JSON.parse(json) as BillDigestContent;
-  } catch {
-    return null;
-  }
-}
-
 function candidateToRound(row: GameVoteCandidateRow): { id: string; prompt: { headline: string; snippet: string } } | null {
-  const digest = parseDigest(row.digest_json);
+  const digest = parseStoredDigest(row.digest_json);
   const prompt = buildGamePrompt({
     title: row.title,
     question: row.question,
@@ -83,7 +73,7 @@ function rowToRevealInput(row: GameVoteCandidateRow): GamePromptInput {
   return {
     title: row.title,
     question: row.question,
-    digest: parseDigest(row.digest_json),
+    digest: parseStoredDigest(row.digest_json),
     rawSummaryText: row.raw_summary_text,
   };
 }
@@ -104,8 +94,7 @@ export async function buildGameReveal(db: D1Database, roundId: string): Promise<
   const correct = getGameCorrectAnswer(row.result);
   if (!correct) return null;
 
-  const digest = parseDigest(row.digest_json);
-  const digestRow = await getDigest(db, row.bill_congress, row.bill_type, row.bill_number);
+  const digest = parseStoredDigest(row.digest_json);
 
   let partySplit: GamePartySplit[] | null = null;
   try {
@@ -130,9 +119,9 @@ export async function buildGameReveal(db: D1Database, roundId: string): Promise<
       congress: row.bill_congress,
       type: row.bill_type,
       number: row.bill_number,
-      title: digestRow?.title ?? row.title ?? null,
+      title: row.title ?? null,
     },
-    policy_area: digestRow?.policy_area ?? null,
+    policy_area: row.policy_area ?? null,
     digest,
     party_split: partySplit,
   };

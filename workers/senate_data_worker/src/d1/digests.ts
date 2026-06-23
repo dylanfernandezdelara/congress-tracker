@@ -1,5 +1,18 @@
-import type { BillDigestContent } from "../types";
+import type { BillDigestContent } from "../../../../shared/game-api-types";
 import { ensureSchema } from "./schema";
+
+export type { BillDigestContent };
+
+export function parseStoredDigest(json: string | null): BillDigestContent | null {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json) as BillDigestContent;
+    if (!parsed.headline || !parsed.what_it_does) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 export interface DigestRow {
   congress: number;

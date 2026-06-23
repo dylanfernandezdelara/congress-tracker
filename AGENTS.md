@@ -26,7 +26,7 @@ Local ↔ Cursor Cloud parity: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPM
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
 - Seed sample feed (offline, no keys): `npm run seed`
-- Trigger live ingestion (needs API keys): `curl -fsS http://127.0.0.1:8787/__pipeline/run/feed`
+- Trigger live ingestion (needs API keys): `curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed`
 - Feed JSON: `http://127.0.0.1:8787/feed/latest.json?limit=50&offset=0` (paginated object; read `items`)
 
 ### Verification
@@ -78,11 +78,11 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
-- `GET /__pipeline/run/feed` (cron also runs daily at 10:00 UTC)
-- `GET /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
-- `GET /__pipeline/run/session-backfill` — full-session vote backfill (admin)
-- `GET /__pipeline/run/member-votes` — ingest per-member passage votes (admin)
-- `GET /__pipeline/run/disclosures` — local-dev sample disclosures only (`ALLOWED_ORIGIN=*` and `ENABLE_SAMPLE_DISCLOSURES=1` in `.dev.vars`; never in production)
+- `POST /__pipeline/run/feed` (cron also runs daily at 10:00 UTC)
+- `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
+- `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)
+- `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin)
+- `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 
 **Sidebar data backfill (production/preview):** Cron runs feed only. After deploy, run
 `session-backfill` then `member-votes` against the target Worker before expecting left-rail

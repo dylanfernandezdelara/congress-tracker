@@ -22,14 +22,12 @@ export interface PassageVote {
 export interface IngestVotesResult {
   votes: PassageVote[];
   skipped: number;
+  truncated?: boolean;
 }
 
-export interface BillDigestContent {
-  headline: string;
-  what_it_does: string;
-  key_points: string[];
-  terms_explained: Array<{ term: string; plain: string }>;
-}
+import type { BillDigestContent } from "../../../shared/game-api-types";
+
+export type { BillDigestContent };
 
 export interface FeedBill {
   congress: number;

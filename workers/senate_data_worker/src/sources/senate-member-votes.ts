@@ -2,12 +2,7 @@ import { congressNumber, sessionNumber } from "../config";
 import type { Env } from "../config";
 import type { MemberRecord, MemberVoteRecord } from "../types";
 import { fetchText } from "./http";
-
-function getTag(xml: string, tag: string): string {
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
-  const m = xml.match(re);
-  return m ? m[1].trim() : "";
-}
+import { getTag } from "./senate-xml";
 
 function memberId(lisMemberId: string): string {
   return lisMemberId ? `LIS:${lisMemberId}` : "";

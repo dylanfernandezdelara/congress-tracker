@@ -25,7 +25,7 @@ To pull **real** data instead of the sample, add `CONGRESS_API_KEY` and
 ingestion (mirrors the production cron):
 
 ```bash
-curl -fsS http://127.0.0.1:8787/__pipeline/run/feed
+curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed
 ```
 
 Local ↔ Cursor Cloud parity details: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md).
@@ -34,7 +34,7 @@ Local ↔ Cursor Cloud parity details: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_
 
 ```text
 Cloudflare Worker
-  cron + GET /__pipeline/run/feed  -> ingest House/Senate passage votes, CRS summaries, LLM digest
+  cron + POST /__pipeline/run/feed  -> ingest House/Senate passage votes, CRS summaries, LLM digest
   GET /feed/latest.json              -> paginated feed (digest + votes + raw CRS)
   GET /health                        -> liveness
         |
@@ -90,4 +90,4 @@ safety notes.
   - Query: `limit` (1–50, default 50), `offset` (default 0; clamped to the 50-bill feed window)
   - Response: `{ items, total, limit, offset, has_more }` where `items` is the bill array and `total` is capped at 50
   - **Breaking change:** this endpoint no longer returns a bare JSON array; consumers must read `items`
-- `GET /__pipeline/run/feed` — trigger ingestion (optional `PIPELINE_ADMIN_TOKEN`)
+- `POST /__pipeline/run/feed` — trigger ingestion (optional `PIPELINE_ADMIN_TOKEN`; local dev uses `DEV_OPEN_PIPELINE=1`)

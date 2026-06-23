@@ -1,14 +1,15 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
-import { buildFeedSummaryParts } from '@congress-tracker/shared/feed-content'
 import {
+  buildFeedSummaryParts,
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatShortBillId,
+  isProceduralGameVote,
   proceduralHeadline,
   trimDisplayTitle,
   truncateAtWordBoundary,
   voteIndicatesFailure,
-} from './billLabels'
+} from '@congress-tracker/shared/feed-content'
 
 const TEASER_MAX_CHARS = 120
 
@@ -24,9 +25,6 @@ export interface FeedSummaryDisplay {
   bullets: string[]
   pending: boolean
 }
-
-const PROCEDURAL_VOTE_QUESTION_PATTERN =
-  /cloture|motion to (recommit|table|proceed|discharge)|previous question|point of order|adjourn/i
 
 export type FeedStatusKind = 'passed' | 'failed' | 'procedural' | 'none'
 
@@ -44,18 +42,10 @@ export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
   )
 }
 
-function isProceduralVoteQuestion(question: string): boolean {
-  return PROCEDURAL_VOTE_QUESTION_PATTERN.test(question)
-}
-
 export function isProceduralFeedItem(item: FeedItem): boolean {
-  const title = item.bill.title ?? ''
-  if (proceduralHeadline(title) !== null) return true
-
   const vote = getPrimaryPassageVote(item)
-  if (vote && isProceduralVoteQuestion(vote.question)) return true
-
-  return false
+  if (!vote) return false
+  return isProceduralGameVote(item.bill.title, vote.question)
 }
 
 export function getFeedTopic(item: FeedItem): string {

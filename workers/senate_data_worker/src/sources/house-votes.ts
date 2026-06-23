@@ -84,13 +84,15 @@ function nextPageUrl(raw: string | undefined | null, apiKey: string): string | n
 export async function ingestHousePassageVotes(
   env: Env,
   lookbackStart: string | null,
-  knownKeys: ReadonlySet<string> = new Set()
+  knownKeys: ReadonlySet<string> = new Set(),
+  maxNewVotes?: number
 ): Promise<IngestVotesResult> {
   const apiKey = env.CONGRESS_API_KEY;
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const out: PassageVote[] = [];
   let skipped = 0;
+  let truncated = false;
   let nextUrl: string | null =
     `https://api.congress.gov/v3/house-vote/${congress}/${session}?format=json&limit=50&api_key=${apiKey}`;
 
@@ -138,7 +140,14 @@ export async function ingestHousePassageVotes(
         nays,
         voteDate: voteDateFromIso(detail.startDate),
       });
+
+      if (maxNewVotes !== undefined && out.length >= maxNewVotes) {
+        truncated = true;
+        break;
+      }
     }
+
+    if (truncated) break;
 
     nextUrl = nextPageUrl(data.pagination?.next, apiKey);
     if (lookbackStart && pageEntirelyBeforeLookback(items, lookbackStart)) {
@@ -148,5 +157,5 @@ export async function ingestHousePassageVotes(
     }
   }
 
-  return { votes: out, skipped };
+  return { votes: out, skipped, truncated: truncated || undefined };
 }

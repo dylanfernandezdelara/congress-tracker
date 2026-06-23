@@ -67,7 +67,7 @@ OPENROUTER_API_KEY=...    # https://openrouter.ai/keys
 Then, with the worker running:
 
 ```bash
-curl -fsS http://127.0.0.1:8787/__pipeline/run/feed
+curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed
 ```
 
 This mirrors what the daily cron does in production. Senate votes come from a

@@ -1,7 +1,10 @@
 # CORS: use * for local dev (Vite :5173 -> API :8787); set a specific origin in prod
 ALLOWED_ORIGIN=*
 
-# Local-only synthetic disclosure seeding (GET /__pipeline/run/disclosures). Never set in production.
+# Local-only: allow POST /__pipeline/run/* without PIPELINE_ADMIN_TOKEN (never set in production)
+DEV_OPEN_PIPELINE=1
+
+# Local-only synthetic disclosure seeding (POST /__pipeline/run/disclosures). Never set in production.
 ENABLE_SAMPLE_DISCLOSURES=1
 
 # Copy to .dev.vars and set locally (never commit real values):
@@ -10,4 +13,4 @@ ENABLE_SAMPLE_DISCLOSURES=1
 # Optional override — must be a free OpenRouter model (e.g. google/gemma-4-31b-it:free).
 # When unset, the worker picks the highest Artificial Analysis intelligence_index free model.
 # OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
-# PIPELINE_ADMIN_TOKEN=  # required to call GET /__pipeline/run/feed; leave blank locally to keep it open
+# PIPELINE_ADMIN_TOKEN=  # when set, POST with Authorization: Bearer <token>

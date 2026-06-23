@@ -38,6 +38,7 @@ jobs:
 
           for attempt in 1 2 3; do
             if curl -fsS --max-time 600 --retry 2 --retry-delay 30 \
+              -X POST \
               -H "Authorization: Bearer ${PIPELINE_ADMIN_TOKEN}" \
               "${TARGET_URL}/__pipeline/run/feed"; then
               echo "Feed ingest succeeded on attempt ${attempt}."

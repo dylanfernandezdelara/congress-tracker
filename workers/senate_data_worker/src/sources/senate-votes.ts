@@ -4,6 +4,7 @@ import type { IngestVotesResult, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { parseSenateIssue } from "./bill-ref";
 import { fetchText } from "./http";
+import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
 
 const MONTHS: Record<string, string> = {
@@ -27,12 +28,6 @@ function parseSenateVoteDate(voteDate: string, congressYear: string): string {
   const day = m[1].padStart(2, "0");
   const mon = MONTHS[m[2]] ?? "01";
   return `${congressYear}-${mon}-${day}`;
-}
-
-function getTag(xml: string, tag: string): string {
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
-  const m = xml.match(re);
-  return m ? m[1].trim() : "";
 }
 
 export function parseSenateVoteMenuXml(xml: string, congress: number, session: number): PassageVote[] {

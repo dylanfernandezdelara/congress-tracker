@@ -38,6 +38,7 @@ const eligibleRow: GameVoteCandidateRow = {
     key_points: [],
     terms_explained: [],
   }),
+  policy_area: "Foreign Affairs",
 };
 
 describe("buildGameRounds", () => {
@@ -72,6 +73,7 @@ describe("buildGameReveal", () => {
       id: "Senate:119:2:7",
       correct: "passed",
       vote: { yeas: 52, nays: 47 },
+      policy_area: "Foreign Affairs",
     });
     expect(getGameCorrectAnswer(eligibleRow.result)).toBe("passed");
     expect(

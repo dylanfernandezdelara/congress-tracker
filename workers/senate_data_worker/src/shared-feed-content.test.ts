@@ -4,6 +4,7 @@ import {
   buildGamePrompt,
   getGameCorrectAnswer,
   normalizeDigestLead,
+  proceduralHeadline,
   voteIndicatesFailure,
 } from "../../../shared/feed-content";
 
@@ -59,6 +60,13 @@ describe("feed-content game helpers", () => {
     expect(getGameCorrectAnswer("Rejected")).toBe("failed");
     expect(getGameCorrectAnswer("Withdrawn")).toBeNull();
     expect(voteIndicatesFailure("Not agreed to")).toBe(true);
+  });
+
+  it("rewrites nullification resolutions", () => {
+    const title =
+      "Providing that section 11 of House Resolution 1224 shall have no force or effect.";
+
+    expect(proceduralHeadline(title)).toBe("Nullifies section 11 of H.Res. 1224");
   });
 
   it("normalizes digest leads and builds structured feed summaries", () => {

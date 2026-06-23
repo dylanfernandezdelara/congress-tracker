@@ -1,6 +1,6 @@
 import { FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
 import type { Env } from "../config";
-import { getDigest } from "../d1/digests";
+import { getDigest, parseStoredDigest } from "../d1/digests";
 import { ensureSchema } from "../d1/schema";
 import {
   countRecentVotedBills,
@@ -8,20 +8,11 @@ import {
   selectRecentVotedBills,
 } from "../d1/votes";
 import { lookbackStartIso } from "../sources/congress-client";
-import type { BillDigestContent, Chamber, FeedItem, FeedPageResponse } from "../types";
+import type { Chamber, FeedItem, FeedPageResponse } from "../types";
 
 export interface FeedPageOptions {
   limit: number;
   offset: number;
-}
-
-function parseDigest(json: string | null): BillDigestContent | null {
-  if (!json) return null;
-  try {
-    return JSON.parse(json) as BillDigestContent;
-  } catch {
-    return null;
-  }
 }
 
 export async function buildFeedPage(
@@ -61,7 +52,7 @@ export async function buildFeedPage(
         title: digestRow?.title ?? null,
       },
       policy_area: digestRow?.policy_area ?? null,
-      digest: parseDigest(digestRow?.digest_json ?? null),
+      digest: parseStoredDigest(digestRow?.digest_json ?? null),
       raw_summary_text: digestRow?.raw_summary_text ?? null,
       passage_votes: votes.map((v) => ({
         chamber: v.chamber as Chamber,

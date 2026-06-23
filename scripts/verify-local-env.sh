@@ -94,7 +94,7 @@ if command -v curl >/dev/null 2>&1; then
     if [[ "${feed_json}" == *'"items"'* && "${feed_json}" != *'"items":[]'* ]]; then
       status "${PASS}" "Feed has data"
     else
-      status "${WARN}" "Feed is empty — run 'npm run seed' (offline) or curl ${WORKER_URL}/__pipeline/run/feed (needs API keys)."
+      status "${WARN}" "Feed is empty — run 'npm run seed' (offline) or curl -X POST ${WORKER_URL}/__pipeline/run/feed (needs API keys)."
     fi
   else
     status "${WARN}" "Worker not running at ${WORKER_URL} — start it with 'npm run dev:worker' (optional check)."

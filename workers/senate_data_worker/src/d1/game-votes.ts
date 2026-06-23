@@ -1,6 +1,7 @@
 import { ensureSchema } from "./schema";
 import type { PassageVote } from "../types";
 import type { GamePartySplit } from "../../../../shared/game-api-types";
+import { isNayVotePosition, isYeaVotePosition } from "../../../../shared/vote-positions";
 
 export interface GameVoteCandidateRow {
   chamber: string;
@@ -18,6 +19,7 @@ export interface GameVoteCandidateRow {
   title: string | null;
   raw_summary_text: string | null;
   digest_json: string | null;
+  policy_area: string | null;
 }
 
 export interface GameVoteKeyFilter {
@@ -31,7 +33,7 @@ const GAME_VOTE_SELECT = `
   SELECT v.chamber, v.congress, v.session, v.roll_number,
          v.bill_congress, v.bill_type, v.bill_number,
          v.question, v.result, v.yeas, v.nays, v.vote_date,
-         d.title, d.raw_summary_text, d.digest_json
+         d.title, d.raw_summary_text, d.digest_json, d.policy_area
   FROM votes v
   LEFT JOIN bill_digests d
     ON d.congress = v.bill_congress
@@ -91,16 +93,6 @@ function normalizeParty(party: string | null): string {
   return trimmed.slice(0, 12);
 }
 
-function isYeaPosition(position: string): boolean {
-  const normalized = position.toLowerCase();
-  return normalized.includes("yea") || normalized.includes("aye") || normalized === "yes";
-}
-
-function isNayPosition(position: string): boolean {
-  const normalized = position.toLowerCase();
-  return normalized.includes("nay") || normalized.includes("no");
-}
-
 export async function getPartySplitForRoll(
   db: D1Database,
   key: GameVoteKeyFilter
@@ -122,9 +114,9 @@ export async function getPartySplitForRoll(
   for (const row of results ?? []) {
     const party = normalizeParty(row.party);
     const entry = byParty.get(party) ?? { party, yeas: 0, nays: 0 };
-    if (isYeaPosition(row.position)) {
+    if (isYeaVotePosition(row.position)) {
       entry.yeas += row.count;
-    } else if (isNayPosition(row.position)) {
+    } else if (isNayVotePosition(row.position)) {
       entry.nays += row.count;
     }
     byParty.set(party, entry);

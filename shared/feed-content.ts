@@ -7,6 +7,8 @@ const PROVIDING_FOR_CONSIDERATION_PATTERN =
 
 const RULE_WAIVER_PATTERN = /^Waiving a requirement of clause .+ of rule .+/i
 
+const NULLIFICATION_PATTERN = /^Providing that (.+?) shall have no force or effect\.?$/i
+
 const PROCEDURAL_VOTE_QUESTION_PATTERN =
   /cloture|motion to (recommit|table|proceed|discharge)|previous question|point of order|adjourn/i
 
@@ -128,6 +130,14 @@ export function formatBillDocket(type: string, number: number, congress: number)
   return `${formatShortBillId(type, number)} · ${congress}th Congress`
 }
 
+export function extractUnderlyingBillIdFromTitle(title: string): string | null {
+  const match = title.match(PROVIDING_FOR_CONSIDERATION_PATTERN)
+  if (!match) return null
+
+  const [, billType, billNumber] = match
+  return normalizeBillRef(billType, billNumber)
+}
+
 export function trimDisplayTitle(title: string): string {
   return title.replace(BOILERPLATE_TITLE_SUFFIX, '').trim()
 }
@@ -167,6 +177,12 @@ export function proceduralHeadline(title: string): string | null {
     return 'Fast-tracks floor consideration (rule waiver)'
   }
 
+  const nullification = title.match(NULLIFICATION_PATTERN)
+  if (nullification) {
+    const subject = truncateAtWordBoundary(normalizeResolutionRefs(nullification[1].trim()), 80)
+    return `Nullifies ${subject}`
+  }
+
   const match = title.match(PROVIDING_FOR_CONSIDERATION_PATTERN)
   if (!match) return null
 
@@ -184,6 +200,12 @@ function normalizeBillRef(typeRaw: string, number: string): string {
   if (compact === 'S' || compact === 'S.') return `S. ${number}`
   if (compact.startsWith('S') && compact.includes('RES')) return `S.Res. ${number}`
   return `${typeRaw.trim()} ${number}`
+}
+
+function normalizeResolutionRefs(subject: string): string {
+  return subject
+    .replace(/\bHouse Resolution (\d+)\b/gi, 'H.Res. $1')
+    .replace(/\bSenate Resolution (\d+)\b/gi, 'S.Res. $1')
 }
 
 function capitalizeFirst(text: string): string {
@@ -216,6 +238,13 @@ export function voteIndicatesPassage(result: string): boolean {
 
 export function voteIndicatesFailure(result: string): boolean {
   return voteResultIndicatesFailure(normalizeVoteResult(result))
+}
+
+export function voteResultClass(result: string): string {
+  const normalized = normalizeVoteResult(result)
+  if (voteResultIndicatesFailure(normalized)) return 'text-fail'
+  if (voteResultIndicatesPassage(normalized)) return 'text-pass'
+  return 'text-faint'
 }
 
 export function getGameCorrectAnswer(result: string): 'passed' | 'failed' | null {

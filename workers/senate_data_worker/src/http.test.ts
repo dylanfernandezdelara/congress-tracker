@@ -23,8 +23,16 @@ function createMockEnv(overrides: Record<string, unknown> = {}) {
     CONGRESS_API_KEY: "test-key",
     OPENROUTER_API_KEY: "test-or",
     ALLOWED_ORIGIN: "*",
+    DEV_OPEN_PIPELINE: "1",
     ...overrides,
   };
+}
+
+function pipelineRequest(path: string, init?: RequestInit): Request {
+  return new Request(`https://worker.example.com${path}`, {
+    method: "POST",
+    ...init,
+  });
 }
 
 describe("HTTP API", () => {
@@ -151,15 +159,15 @@ describe("HTTP API", () => {
 
   it("rejects write pipelines in production when no admin token is set", async () => {
     const response = await handlePublicFetch(
-      new Request("https://worker.example.com/__pipeline/run/member-votes"),
-      createMockEnv({ ALLOWED_ORIGIN: "https://congress.example" }) as any
+      pipelineRequest("/__pipeline/run/member-votes"),
+      createMockEnv({ ALLOWED_ORIGIN: "https://congress.example", DEV_OPEN_PIPELINE: undefined }) as any
     );
     expect(response.status).toBe(401);
   });
 
-  it("allows write pipelines in local dev mode (ALLOWED_ORIGIN=*)", async () => {
+  it("allows write pipelines in local dev mode (DEV_OPEN_PIPELINE=1)", async () => {
     const response = await handlePublicFetch(
-      new Request("https://worker.example.com/__pipeline/run/member-votes"),
+      pipelineRequest("/__pipeline/run/member-votes"),
       createMockEnv() as any
     );
     expect(response.status).toBe(200);
@@ -169,30 +177,41 @@ describe("HTTP API", () => {
 
   it("requires bill identifiers for digest refresh", async () => {
     const response = await handlePublicFetch(
-      new Request("https://worker.example.com/__pipeline/run/digest-refresh"),
+      pipelineRequest("/__pipeline/run/digest-refresh"),
       createMockEnv() as any
     );
     expect(response.status).toBe(500);
     const body = await response.json();
-    expect(body).toMatchObject({ ok: false });
+    expect(body).toMatchObject({ ok: false, error: "pipeline_failed" });
   });
 
-  it("requires a matching token when PIPELINE_ADMIN_TOKEN is set", async () => {
+  it("requires a matching Bearer token when PIPELINE_ADMIN_TOKEN is set", async () => {
     const env = createMockEnv({
       ALLOWED_ORIGIN: "https://congress.example",
+      DEV_OPEN_PIPELINE: undefined,
       PIPELINE_ADMIN_TOKEN: "s3cret",
     });
     const denied = await handlePublicFetch(
-      new Request("https://worker.example.com/__pipeline/run/member-votes"),
+      pipelineRequest("/__pipeline/run/member-votes"),
       env as any
     );
     expect(denied.status).toBe(401);
 
     const allowed = await handlePublicFetch(
-      new Request("https://worker.example.com/__pipeline/run/member-votes?token=s3cret"),
+      pipelineRequest("/__pipeline/run/member-votes", {
+        headers: { Authorization: "Bearer s3cret" },
+      }),
       env as any
     );
     expect(allowed.status).toBe(200);
+  });
+
+  it("rejects GET requests to admin pipeline routes", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/__pipeline/run/member-votes"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(405);
   });
 
   it("returns 404 for unknown routes when no asset binding is present", async () => {

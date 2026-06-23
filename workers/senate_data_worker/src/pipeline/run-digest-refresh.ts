@@ -79,7 +79,7 @@ export async function runDigestRefreshPipeline(
       skipped += 1;
       failures.push({
         bill: key,
-        reason: err instanceof Error ? err.message : "unknown_error",
+        reason: "upstream_error",
       });
     }
   }

@@ -24,7 +24,36 @@ import {
   buildJsonResponse,
   cacheHealth,
   cacheLatest,
+  cacheNoStore,
 } from "./responses";
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.byteLength !== bBytes.byteLength) return false;
+  if (typeof crypto.subtle?.timingSafeEqual === "function") {
+    return crypto.subtle.timingSafeEqual(aBytes, bBytes);
+  }
+  let mismatch = 0;
+  for (let i = 0; i < aBytes.byteLength; i += 1) {
+    mismatch |= aBytes[i]! ^ bBytes[i]!;
+  }
+  return mismatch === 0;
+}
+
+function authorizePipeline(request: Request, env: Env): boolean {
+  const token = env.PIPELINE_ADMIN_TOKEN?.trim();
+  if (token) {
+    const auth = request.headers.get("Authorization");
+    const bearer = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+    if (!bearer) return false;
+    return timingSafeEqual(bearer, token);
+  }
+  // No admin token configured: only allow write pipelines when explicitly opted
+  // in for local dev (DEV_OPEN_PIPELINE=1). Never infer dev mode from CORS origin.
+  return env.DEV_OPEN_PIPELINE?.trim() === "1";
+}
 
 function healthResponse(env: Env, json: (body: unknown, init?: ResponseInit) => Response): Response {
   return json(
@@ -36,22 +65,6 @@ function healthResponse(env: Env, json: (body: unknown, init?: ResponseInit) => 
     },
     { status: 200, headers: { "Cache-Control": cacheHealth } }
   );
-}
-
-function authorizePipeline(request: Request, env: Env): boolean {
-  const token = env.PIPELINE_ADMIN_TOKEN?.trim();
-  if (token) {
-    const url = new URL(request.url);
-    const queryToken = url.searchParams.get("token");
-    const auth = request.headers.get("Authorization");
-    const bearer = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
-    return queryToken === token || bearer === token;
-  }
-  // No admin token configured: only allow these write pipelines in explicit
-  // local/dev mode (ALLOWED_ORIGIN="*"). Production sets a specific origin (or
-  // leaves it unset), so it fails closed instead of exposing the routes — they
-  // hit upstream APIs and write to the shared production D1.
-  return env.ALLOWED_ORIGIN?.trim() === "*";
 }
 
 function parseChamber(value: string | null): Chamber | null {
@@ -92,9 +105,8 @@ async function handleStatsJson<T>(
       status: 200,
       headers: { "Cache-Control": cacheLatest },
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : errorMessage;
-    return json({ error: "stats_error", message }, { status: 500 });
+  } catch {
+    return json({ error: "stats_error", message: errorMessage }, { status: 500 });
   }
 }
 
@@ -104,24 +116,24 @@ async function handlePipelineRoute<T extends object>(
   json: (body: unknown, init?: ResponseInit) => Response,
   run: () => Promise<T>
 ): Promise<Response> {
-  if (request.method !== "GET") {
-    return json({ error: "method_not_allowed" }, { status: 405 });
+  const adminHeaders = { "Cache-Control": cacheNoStore };
+  if (request.method !== "POST") {
+    return json({ error: "method_not_allowed" }, { status: 405, headers: adminHeaders });
   }
   if (!authorizePipeline(request, env)) {
-    return json({ error: "unauthorized" }, { status: 401 });
+    return json({ error: "unauthorized" }, { status: 401, headers: adminHeaders });
   }
   try {
     const result = await run();
-    return json({ ok: true, ...result });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "pipeline failed";
-    return json({ ok: false, error: message }, { status: 500 });
+    return json({ ok: true, ...result }, { headers: adminHeaders });
+  } catch {
+    return json({ ok: false, error: "pipeline_failed" }, { status: 500, headers: adminHeaders });
   }
 }
 
 /**
  * Public read API: /health, /feed/latest.json, /stats/*.
- * Admin: /__pipeline/run/*
+ * Admin: POST /__pipeline/run/*
  */
 export async function handlePublicFetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -175,9 +187,8 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
         status: 200,
         headers: { "Cache-Control": cacheLatest },
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "feed unavailable";
-      return json({ error: "feed_error", message }, { status: 500 });
+    } catch {
+      return json({ error: "feed_error", message: "feed unavailable" }, { status: 500 });
     }
   }
 
@@ -189,9 +200,8 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
         status: 200,
         headers: { "Cache-Control": cacheLatest },
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "game rounds unavailable";
-      return json({ error: "game_error", message }, { status: 500 });
+    } catch {
+      return json({ error: "game_error", message: "game rounds unavailable" }, { status: 500 });
     }
   }
 
@@ -209,9 +219,8 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
         status: 200,
         headers: { "Cache-Control": cacheLatest },
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "game reveal unavailable";
-      return json({ error: "game_error", message }, { status: 500 });
+    } catch {
+      return json({ error: "game_error", message: "game reveal unavailable" }, { status: 500 });
     }
   }
 

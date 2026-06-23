@@ -1,15 +1,10 @@
 import type { Chamber, DefectorEntry } from "../types";
 import { getMembersByIds } from "../d1/members";
 import { selectMemberVotesForSession } from "../d1/member-votes";
-
-const YEA_POSITIONS = new Set(["Yea", "Aye", "Yes"]);
-const NAY_POSITIONS = new Set(["Nay", "No"]);
+import { normalizeVotePosition } from "../../../../shared/vote-positions";
 
 function normalizePosition(position: string): "yea" | "nay" | "other" {
-  const trimmed = position.trim();
-  if (YEA_POSITIONS.has(trimmed)) return "yea";
-  if (NAY_POSITIONS.has(trimmed)) return "nay";
-  return "other";
+  return normalizeVotePosition(position);
 }
 
 /**
