@@ -1,7 +1,7 @@
 import {
-  DIGEST_BULLET_MAX_WORDS,
-  DIGEST_LEAD_MAX_WORDS,
-  DIGEST_MAX_BULLETS,
+  FEED_BULLET_MAX_WORDS,
+  FEED_COLLAPSED_MAX_BULLETS,
+  FEED_LEAD_MAX_WORDS,
 } from "../../../../shared/feed-content";
 
 export function buildDigestPrompt(params: {
@@ -11,10 +11,6 @@ export function buildDigestPrompt(params: {
   rawSummary: string;
   acronyms: string[];
 }): string {
-  const leadTargetWords = Math.min(25, DIGEST_LEAD_MAX_WORDS);
-  const bulletTargetWords = Math.min(12, DIGEST_BULLET_MAX_WORDS);
-  const bulletCount = Math.min(4, DIGEST_MAX_BULLETS);
-
   return `You rewrite U.S. congressional bill summaries for everyday readers who do not know congressional jargon.
 
 BILL: ${params.billLabel}
@@ -28,8 +24,8 @@ ${params.rawSummary}
 Return ONLY valid JSON:
 {
   "headline": "8-12 words, no jargon",
-  "what_it_does": "Exactly one short sentence, max ${leadTargetWords} words, grade 7-8 reading level",
-  "key_points": ["2-${bulletCount} bullets, max ${bulletTargetWords} words each, highlight the most important changes"],
+  "what_it_does": "Exactly one short sentence, max ${FEED_LEAD_MAX_WORDS} words, grade 7-8 reading level",
+  "key_points": ["2-${FEED_COLLAPSED_MAX_BULLETS} bullets, max ${FEED_BULLET_MAX_WORDS} words each, highlight the most important changes"],
   "terms_explained": [{ "term": "ACRONYM", "plain": "short plain definition" }]
 }
 

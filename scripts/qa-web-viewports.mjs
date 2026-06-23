@@ -128,9 +128,7 @@ async function auditPage(page) {
       if (rowRect.bottom <= 0 || rowRect.top >= viewportHeight) {
         issues.push('feed row not visible in viewport')
       }
-      // The collapsed row height is intentionally content-driven now that the
-      // full summary is shown, so we no longer assert an absolute max height —
-      // the line-clamp guard below catches the truncation regressions we care about.
+      // The collapsed row height is content-driven; mobile summary height is capped by word limits.
     }
 
     if (topic) {
@@ -167,8 +165,14 @@ async function auditPage(page) {
     if (summary) {
       collectHorizontalClipping(summary.getBoundingClientRect(), 'feed summary')
 
-      // The feed must show the summary in full on every viewport, so guard against
-      // any line-clamp creeping back onto the teaser or the bullet list.
+      // Collapsed summaries are capped at ~25 words + a few bullets — guard mobile height.
+      if (viewportWidth < 640) {
+        const summaryRect = summary.getBoundingClientRect()
+        if (summaryRect.height > viewportHeight * 0.45) {
+          issues.push('feed summary taller than 45% of viewport on mobile')
+        }
+      }
+
       const clampTargets = [
         ['feed teaser', summary.querySelector('.feed-row-teaser')],
         ['feed summary bullets', summary.querySelector('.feed-row-summary-bullets')],
