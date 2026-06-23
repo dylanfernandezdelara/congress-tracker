@@ -2,6 +2,7 @@ import { type Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { computeDefectors } from "../analytics/defectors";
 import { buildPortfolioMovers } from "../d1/disclosures";
+import { getFeedPipelineRun, getLatestPassageVoteDate } from "../d1/pipeline-state";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedPipeline } from "../pipeline/run-feed";
@@ -55,13 +56,27 @@ function authorizePipeline(request: Request, env: Env): boolean {
   return env.DEV_OPEN_PIPELINE?.trim() === "1";
 }
 
-function healthResponse(env: Env, json: (body: unknown, init?: ResponseInit) => Response): Response {
+async function healthResponse(
+  env: Env,
+  json: (body: unknown, init?: ResponseInit) => Response
+): Promise<Response> {
+  const [latestPassageVoteDate, lastFeedIngest] = await Promise.all([
+    getLatestPassageVoteDate(env.DB),
+    getFeedPipelineRun(env.DB),
+  ]);
+
   return json(
     {
       status: "ok",
       timestamp: new Date().toISOString(),
       congress: env.CONGRESS,
       session: env.SESSION,
+      data: {
+        latest_passage_vote_date: latestPassageVoteDate,
+        last_feed_ingest: lastFeedIngest,
+        daily_cron_utc: "0 10 * * *",
+        admin_feed_ingest: "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
+      },
     },
     { status: 200, headers: { "Cache-Control": cacheHealth } }
   );
@@ -148,7 +163,9 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
   }
 
   if (pathname === "/__pipeline/run/feed") {
-    return handlePipelineRoute(request, env, json, () => runFeedPipeline(env));
+    return handlePipelineRoute(request, env, json, () =>
+      runFeedPipeline(env, { trigger: "admin" })
+    );
   }
 
   if (pathname === "/__pipeline/run/digest-refresh") {

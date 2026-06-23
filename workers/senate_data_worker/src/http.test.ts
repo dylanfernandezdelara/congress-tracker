@@ -43,7 +43,15 @@ describe("HTTP API", () => {
     );
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toMatchObject({ status: "ok", congress: "119" });
+    expect(body).toMatchObject({
+      status: "ok",
+      congress: "119",
+      data: {
+        daily_cron_utc: "0 10 * * *",
+        admin_feed_ingest:
+          "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
+      },
+    });
   });
 
   it("returns empty feed page", async () => {

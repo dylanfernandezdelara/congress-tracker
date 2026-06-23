@@ -78,6 +78,9 @@ votes and writes digests for bills missing one. GitHub Actions runs a backup ing
 (same value as `wrangler secret put PIPELINE_ADMIN_TOKEN`). Optionally set a `WORKER_URL`
 repository variable if the workers.dev hostname changes.
 
+See [`docs/PRODUCTION_DATA_INGEST.md`](docs/PRODUCTION_DATA_INGEST.md) for freshness checks,
+manual admin ingest (`./scripts/trigger-production-ingest.sh`), and troubleshooting.
+
 Because the app and API share an origin, the production build calls the API with
 relative URLs — no `VITE_API_URL` needed. Set `VITE_API_URL` only if you host
 the frontend separately.

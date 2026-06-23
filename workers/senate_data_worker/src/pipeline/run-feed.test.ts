@@ -46,6 +46,10 @@ vi.mock("../sources/senate-votes", () => ({
   ingestSenatePassageVotes: (...args: unknown[]) => mockIngestSenatePassageVotes(...args),
 }));
 
+vi.mock("../d1/pipeline-state", () => ({
+  recordFeedPipelineRun: vi.fn(async () => {}),
+}));
+
 import { runFeedPipeline } from "./run-feed";
 
 function createEnv(): Env {

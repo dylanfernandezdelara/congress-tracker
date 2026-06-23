@@ -6,6 +6,7 @@ import {
 import type { Env } from "../config";
 import { congressNumber } from "../config";
 import { getDigest, upsertDigest } from "../d1/digests";
+import { recordFeedPipelineRun } from "../d1/pipeline-state";
 import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
 import { billLabel } from "./bill-label";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
@@ -22,7 +23,11 @@ export interface RunFeedResult {
   digestsSkipped: number;
 }
 
-export async function runFeedPipeline(env: Env): Promise<RunFeedResult> {
+export async function runFeedPipeline(
+  env: Env,
+  options: { trigger?: "scheduled" | "admin" } = {}
+): Promise<RunFeedResult> {
+  const trigger = options.trigger ?? "admin";
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
   const congress = congressNumber(env);
   const knownVoteKeys = await selectExistingVoteKeys(env.DB, lookback, congress);
@@ -92,11 +97,15 @@ export async function runFeedPipeline(env: Env): Promise<RunFeedResult> {
     newRewrites += 1;
   }
 
-  return {
+  const result: RunFeedResult = {
     votesUpserted: newVotes.length,
     votesSkipped: houseResult.skipped + senateResult.skipped,
     billsSelected: bills.length,
     digestsWritten,
     digestsSkipped,
   };
+
+  await recordFeedPipelineRun(env.DB, trigger, result);
+
+  return result;
 }

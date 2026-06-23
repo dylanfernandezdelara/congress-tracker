@@ -56,7 +56,12 @@ describe("worker", () => {
     );
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ status: "ok", congress: "119", session: "2" });
+    expect(body).toMatchObject({
+      status: "ok",
+      congress: "119",
+      session: "2",
+      data: { daily_cron_utc: "0 10 * * *" },
+    });
   });
 
   it("serves feed endpoint", async () => {
