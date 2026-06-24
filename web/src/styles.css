@@ -1482,14 +1482,22 @@
     }
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 900px) {
     .chamber-wedge-wrap {
-      aspect-ratio: 280 / 118;
+      width: min(100%, 11.5rem);
+      margin-inline: auto;
     }
+  }
 
+  @media (max-width: 640px) {
     .chamber-card {
       padding: 0.625rem 0.75rem;
       gap: 0.4rem;
+    }
+
+    .president-control-body {
+      min-height: 4.5rem;
+      padding: 0.15rem 0 0.2rem;
     }
   }
 
