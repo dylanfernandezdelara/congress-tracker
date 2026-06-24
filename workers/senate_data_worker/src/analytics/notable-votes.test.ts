@@ -5,6 +5,7 @@ import { resetSchemaFlag } from "../d1/schema";
 function createMockDb(options: {
   votes: Array<Record<string, unknown>>;
   memberVotes?: Array<Record<string, unknown>>;
+  realRoster?: { house: number; senate: number };
 }) {
   const stmt = (sql: string) => ({
     bind: (...bindArgs: unknown[]) => ({
@@ -16,7 +17,13 @@ function createMockDb(options: {
           return { results: options.memberVotes ?? [] };
         }
         if (sql.includes("FROM members") && sql.includes("GROUP BY chamber")) {
-          return { results: [] };
+          const roster = options.realRoster ?? { house: 0, senate: 0 };
+          return {
+            results: [
+              { chamber: "House", seats: roster.house },
+              { chamber: "Senate", seats: roster.senate },
+            ],
+          };
         }
         return { results: [] };
       },
@@ -241,5 +248,57 @@ describe("buildNotableVotes", () => {
     expect(notable).toHaveLength(1);
     expect(notable[0]?.why_it_matters).toContain("Failed in the House");
     expect(notable[0]?.why_it_matters).not.toContain("Passed");
+  });
+
+  it("marks member_votes_available false when only local sample votes exist on a real roster", async () => {
+    resetSchemaFlag();
+    const db = createMockDb({
+      realRoster: { house: 435, senate: 100 },
+      votes: [
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 11,
+          bill_type: "hr",
+          bill_number: 1,
+          yeas: 220,
+          nays: 215,
+          margin: 5,
+          vote_date: "2026-06-02",
+          result: "Passed",
+          question: "On Passage of the Bill",
+          headline: "Close House vote",
+          bill_title: "Major policy bill",
+          digest_lead: null,
+          raw_summary: null,
+        },
+      ],
+      memberVotes: [
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 11,
+          party: "D",
+          position: "Nay",
+          bioguide_id: "LOCAL:H001",
+        },
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 11,
+          party: "R",
+          position: "Yea",
+          bioguide_id: "LOCAL:H002",
+        },
+      ],
+    });
+
+    const { notable } = await buildNotableVotes(db, 119, 2, 1);
+    expect(notable).toHaveLength(1);
+    expect(notable[0]?.member_votes_available).toBe(false);
+    expect(notable[0]?.defectors).toEqual([]);
   });
 });
