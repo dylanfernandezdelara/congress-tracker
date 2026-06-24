@@ -69,14 +69,15 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                     {policyArea}
                   </span>
                 ) : null}
-                <time className="feed-row-date" dateTime={item.latest_passage_date}>
-                  {formatVoteDate(item.latest_passage_date)}
-                </time>
+                <span className="feed-row-date-wrap">
+                  <time className="feed-row-date" dateTime={item.latest_passage_date}>
+                    {formatVoteDate(item.latest_passage_date)}
+                  </time>
+                  <span className="feed-row-chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </span>
               </div>
-
-              <span className="feed-row-chevron" aria-hidden="true">
-                ›
-              </span>
             </div>
 
             <h2 id={topicId} data-feed-topic className="feed-row-topic">

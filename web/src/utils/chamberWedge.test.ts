@@ -21,7 +21,7 @@ describe('chamberWedge', () => {
     expect(segments[2]?.party).toBe('R')
   })
 
-  it('enlarges independent sliver below the minimum sweep', () => {
+  it('marks small caucus wedges as visually enlarged', () => {
     const segments = buildVisualWedgeSegments(
       [
         { party: 'D', seats: 214 },
@@ -31,6 +31,7 @@ describe('chamberWedge', () => {
       435
     )
     const independent = segments.find((segment) => segment.party === 'I')
+    expect(independent?.visuallyEnlarged).toBe(true)
     expect(independent?.sweep).toBeGreaterThanOrEqual(MIN_WEDGE_SWEEP * 0.99)
   })
 

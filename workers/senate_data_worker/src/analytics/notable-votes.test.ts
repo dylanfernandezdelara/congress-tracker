@@ -7,7 +7,7 @@ function createMockDb(options: {
   memberVotes?: Array<Record<string, unknown>>;
 }) {
   const stmt = (sql: string) => ({
-    bind: () => ({
+    bind: (...bindArgs: unknown[]) => ({
       all: async () => {
         if (sql.includes("FROM votes v")) {
           return { results: options.votes };
@@ -20,7 +20,21 @@ function createMockDb(options: {
         }
         return { results: [] };
       },
-      first: async () => null,
+      first: async () => {
+        if (sql.includes("SELECT COUNT(*)")) {
+          const [chamber, congress, session, rollNumber] = bindArgs;
+          const count =
+            options.memberVotes?.filter(
+              (row) =>
+                row.chamber === chamber &&
+                row.congress === congress &&
+                row.session === session &&
+                row.roll_number === rollNumber
+            ).length ?? 0;
+          return { count };
+        }
+        return null;
+      },
       run: async () => ({ success: true }),
     }),
     run: async () => ({ success: true }),
@@ -118,6 +132,7 @@ describe("buildNotableVotes", () => {
     expect(notable.length).toBeGreaterThan(0);
     expect(notable[0]?.chamber).toBe("House");
     expect(notable[0]?.why_it_matters).toContain("just 5 votes");
+    expect(notable[0]?.member_votes_available).toBe(true);
   });
 
   it("filters procedural resolutions unless truly significant", async () => {

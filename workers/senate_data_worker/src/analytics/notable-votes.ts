@@ -374,6 +374,8 @@ export async function buildNotableVotes(
       session: vote.session,
       roll_number: vote.roll_number,
     });
+    const member_votes_available =
+      (memberVotesByRoll.get(rollKey(vote)) ?? []).length > 0;
 
     const seen = new Set<string>();
     const defectors = rollDefectors
@@ -420,6 +422,7 @@ export async function buildNotableVotes(
       significance_score,
       why_it_matters,
       defectors,
+      member_votes_available,
     };
     })
   );

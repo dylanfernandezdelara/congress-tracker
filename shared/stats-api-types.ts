@@ -77,6 +77,8 @@ export interface NotableVoteEntry {
   significance_score: number
   why_it_matters: string
   defectors: NotableVoteDefector[]
+  /** False when per-member roll-call positions have not been ingested yet. */
+  member_votes_available: boolean
 }
 
 export interface NotableVotesResponse {

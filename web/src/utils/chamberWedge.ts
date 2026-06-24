@@ -3,7 +3,7 @@ import type { PartyCode } from '@congress-tracker/shared/party'
 import { normalizePartyCode } from '@congress-tracker/shared/party'
 
 /** Min arc width (radians) — thin slivers are enlarged for readability. */
-export const MIN_WEDGE_SWEEP = 0.07
+export const MIN_WEDGE_SWEEP = 0.12
 
 export type WedgeSegment = {
   party: PartyCode
@@ -12,6 +12,8 @@ export type WedgeSegment = {
   start: number
   end: number
   mid: number
+  /** True when arc was widened above true seat proportion (small caucuses). */
+  visuallyEnlarged: boolean
 }
 
 const PARTY_WEDGE_ORDER: PartyCode[] = ['D', 'I', 'R', 'Other']
@@ -78,6 +80,7 @@ export function buildVisualWedgeSegments(
       start,
       end,
       mid,
+      visuallyEnlarged: segment.proportional < minSweep,
     }
   })
 }

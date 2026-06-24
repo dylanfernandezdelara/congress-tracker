@@ -29,18 +29,18 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
           <ul
             className="chamber-seat-legend"
             aria-label={`${chamber} party seat counts`}
-            style={{ ['--legend-cols' as string]: sortedSeats.length }}
           >
             {sortedSeats.map((entry) => (
-              <li key={entry.party}>
+              <li key={entry.party} className="chamber-legend-item">
                 <span
-                  className={`chamber-party-pill ${partyCssClass(entry.party)}`}
+                  className={`chamber-legend-dot ${partyCssClass(entry.party)}`}
+                  aria-hidden="true"
+                />
+                <span
+                  className="chamber-legend-text"
                   title={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                 >
-                  <span className="chamber-party-pill-label">
-                    {partyDisplayName(entry.party)}
-                  </span>
-                  <span className="chamber-party-pill-count">{entry.seats.toLocaleString()}</span>
+                  {partyDisplayName(entry.party)} {entry.seats.toLocaleString()}
                 </span>
               </li>
             ))}
@@ -66,7 +66,7 @@ export function ChamberCompositionOverview({
 }: ChamberCompositionOverviewProps) {
   if (error) {
     return (
-      <section className="home-enrichment" aria-label="Federal control">
+      <section className="home-enrichment" aria-label="Federal Control">
         <p className="home-enrichment-error text-sm text-secondary">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
@@ -79,7 +79,7 @@ export function ChamberCompositionOverview({
 
   if (loading && !composition) {
     return (
-      <section className="home-enrichment" aria-label="Federal control">
+      <section className="home-enrichment" aria-label="Federal Control">
         <div className="chamber-overview-skeleton" aria-hidden="true" />
       </section>
     )
@@ -88,9 +88,9 @@ export function ChamberCompositionOverview({
   if (!composition) return null
 
   return (
-    <section className="home-enrichment" aria-label="Federal control">
+    <section className="home-enrichment" aria-label="Federal Control">
       <div className="home-enrichment-header">
-        <h2 className="home-enrichment-title">Federal control</h2>
+        <h2 className="home-enrichment-title">Federal Control</h2>
       </div>
       <div className="chamber-overview-grid">
         <ChamberCard chamber="House" composition={composition.house} />
