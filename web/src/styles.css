@@ -1504,18 +1504,6 @@
     margin-top: 0;
   }
 
-  .chamber-election-badge {
-    margin: 0;
-    padding: 0.35rem 0.55rem;
-    border-radius: 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    line-height: 1.25;
-    color: hsl(var(--twc-primary));
-    background: hsl(var(--twc-surface-subtle));
-    border: 1px solid hsl(var(--twc-border));
-  }
-
   .chamber-hemicycle-wrap {
     width: 100%;
     aspect-ratio: 360 / 168;
@@ -1539,87 +1527,6 @@
   .chamber-hemicycle-empty {
     font-size: 0.75rem;
     color: hsl(var(--twc-faint));
-  }
-
-  .chamber-amphitheater-wrap {
-    width: 100%;
-    min-height: 7.5rem;
-  }
-
-  .chamber-amphitheater {
-    display: block;
-    width: 100%;
-    height: auto;
-    min-height: 7.5rem;
-  }
-
-  .chamber-amphitheater--empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 7.5rem;
-    border-radius: 0.625rem;
-  }
-
-  .chamber-amphitheater-empty {
-    font-size: 0.75rem;
-    color: hsl(var(--twc-faint));
-  }
-
-  .chamber-seat-cell {
-    stroke: hsl(var(--twc-card));
-    stroke-width: 0.12;
-  }
-
-  .chamber-seat-cell.party-r,
-  .chamber-seat-dot.party-r {
-    fill: #c62828;
-  }
-
-  .chamber-seat-cell.party-d,
-  .chamber-seat-dot.party-d {
-    fill: #1565c0;
-  }
-
-  .chamber-seat-cell.party-i,
-  .chamber-seat-dot.party-i {
-    fill: #7b1fa2;
-  }
-
-  .chamber-seat-cell.party-other,
-  .chamber-seat-dot.party-other {
-    fill: #757575;
-  }
-
-  [data-theme='dark'] .chamber-seat-cell.party-r,
-  [data-theme='dark'] .chamber-seat-dot.party-r {
-    fill: #ef5350;
-  }
-
-  [data-theme='dark'] .chamber-seat-cell.party-d,
-  [data-theme='dark'] .chamber-seat-dot.party-d {
-    fill: #42a5f5;
-  }
-
-  [data-theme='dark'] .chamber-seat-cell.party-i,
-  [data-theme='dark'] .chamber-seat-dot.party-i {
-    fill: #ab47bc;
-  }
-
-  .chamber-diagram-3d-wrap {
-    width: 100%;
-    height: 6rem;
-    border-radius: 0.625rem;
-    overflow: hidden;
-    background: transparent;
-    margin: 0;
-    pointer-events: none;
-  }
-
-  .chamber-diagram-3d {
-    width: 100% !important;
-    height: 6rem !important;
-    display: block;
   }
 
   .chamber-sample-badge {
@@ -1705,10 +1612,6 @@
   .chamber-party-pill-count {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-  }
-
-  .chamber-party-pill-ballot {
-    display: none;
   }
 
   .chamber-overview-skeleton,

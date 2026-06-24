@@ -2,47 +2,20 @@ import { describe, expect, it } from 'vitest'
 
 import {
   expandPartyCountsToSeats,
-  layoutAmphitheaterSeats2D,
-  layoutHemicycleDots,
-  layoutHorseshoeSeats,
+  partyCounts,
   resolveSeatParties,
+  seatArcAriaLabel,
 } from './chamberSeatLayout'
 
 describe('chamberSeatLayout', () => {
-  it('assigns Democrats to the left arc and Republicans to the right', () => {
-    const cells = layoutHorseshoeSeats('Senate', [
-      { party: 'D', seats: 45 },
-      { party: 'R', seats: 53 },
-      { party: 'I', seats: 2 },
-    ])
-
-    expect(cells).toHaveLength(100)
-    expect(cells.filter((cell) => cell.party === 'D')).toHaveLength(45)
-    expect(cells.filter((cell) => cell.party === 'R')).toHaveLength(53)
-    expect(cells.filter((cell) => cell.party === 'I')).toHaveLength(2)
-    const dOnLeft = cells.filter((cell) => cell.party === 'D' && cell.angle >= Math.PI / 2).length
-    const rOnRight = cells.filter((cell) => cell.party === 'R' && cell.angle <= Math.PI / 2).length
-    expect(dOnLeft).toBeGreaterThan(40)
-    expect(rOnRight).toBeGreaterThan(48)
-  })
-
-  it('assigns every seat without dropping overflow independents', () => {
-    const cells = layoutHorseshoeSeats('House', [
-      { party: 'D', seats: 215 },
-      { party: 'R', seats: 205 },
-      { party: 'I', seats: 15 },
-    ])
-    expect(cells).toHaveLength(435)
-    expect(cells.filter((cell) => cell.party === 'I')).toHaveLength(15)
-  })
-
-  it('lays out one cell per seat in a hemicycle', () => {
-    const cells = layoutHorseshoeSeats('Senate', [
-      { party: 'D', seats: 1 },
-      { party: 'R', seats: 2 },
-    ])
-    expect(cells).toHaveLength(3)
-    expect(cells.every((cell) => typeof cell.x === 'number' && typeof cell.z === 'number')).toBe(true)
+  it('aggregates party seat totals', () => {
+    expect(
+      partyCounts([
+        { party: 'R', seats: 53 },
+        { party: 'D', seats: 45 },
+        { party: 'I', seats: 2 },
+      ])
+    ).toEqual({ D: 45, R: 53, I: 2, Other: 0 })
   })
 
   it('expands aggregate counts into one party code per seat', () => {
@@ -68,23 +41,12 @@ describe('chamberSeatLayout', () => {
     ).toEqual(roster)
   })
 
-  it('returns hemicycle dots sized for mobile-friendly SVG viewports', () => {
-    const dots = layoutHemicycleDots('Senate', [
-      { party: 'D', seats: 45 },
+  it('builds accessible labels for aggregate and per-member modes', () => {
+    const seats = [
       { party: 'R', seats: 53 },
-      { party: 'I', seats: 2 },
-    ])
-    expect(dots).toHaveLength(100)
-    expect(dots.every((dot) => dot.r > 0 && dot.x > 0 && dot.y > 0)).toBe(true)
-  })
-
-  it('lays out isometric amphitheater seats with party-colored chairs', () => {
-    const cells = layoutAmphitheaterSeats2D('Senate', [
-      { party: 'D', seats: 45 },
-      { party: 'R', seats: 53 },
-      { party: 'I', seats: 2 },
-    ])
-    expect(cells).toHaveLength(100)
-    expect(cells.every((cell) => cell.size > 0)).toBe(true)
+      { party: 'D', seats: 47 },
+    ]
+    expect(seatArcAriaLabel('Senate', seats, 100)).toContain('party totals')
+    expect(seatArcAriaLabel('Senate', seats, 100, { perMember: true })).toContain('member party')
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildChamberHemicycle, hemicycleSeatsTo3D } from './chamberHemicycle'
+import { buildChamberHemicycle, buildHemicycleSeatData } from './chamberHemicycle'
 
 describe('chamberHemicycle', () => {
   it('assigns Democrats to the left and Republicans to the right', () => {
@@ -17,14 +17,13 @@ describe('chamberHemicycle', () => {
     expect(rOnRight).toBeGreaterThan(48)
   })
 
-  it('maps hemicycle seats into compact 3D coordinates', () => {
-    const built = buildChamberHemicycle('Senate', [
+  it('builds react seat data with one entry per idx', () => {
+    const { data } = buildHemicycleSeatData('Senate', [
       { party: 'D', seats: 45 },
       { party: 'R', seats: 53 },
       { party: 'I', seats: 2 },
     ])
-    const cells = hemicycleSeatsTo3D('Senate', built.seats)
-    expect(cells).toHaveLength(100)
-    expect(cells.every((cell) => cell.radius > 0)).toBe(true)
+    expect(data).toHaveLength(100)
+    expect(new Set(data.map((entry) => entry.idx)).size).toBe(100)
   })
 })

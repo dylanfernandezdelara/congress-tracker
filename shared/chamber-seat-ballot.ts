@@ -1,5 +1,6 @@
 /** Whether an individual seat is on the ballot in the current Congress cycle. */
 
+import { isSenateClass2State } from './senate-class'
 import type { StatsChamber } from './stats-api-types'
 
 /** Proportional fallback when exact senator class is unavailable. */
@@ -47,12 +48,18 @@ export function approximateSenateBallotFlags(
 export function buildSeatOnBallotFlags(
   chamber: StatsChamber,
   seatParties: string[],
-  seatsUpForElection: number
+  seatsUpForElection: number,
+  memberStates?: (string | null)[]
 ): boolean[] {
-  // House: every seat is on the ballot each cycle, but pulsing all tiles is noisy
-  // and reads like a bug. Reserve pulse for Senate subsets only.
   if (chamber === 'House') {
-    return seatParties.map(() => false)
+    return seatParties.map(() => true)
+  }
+
+  if (memberStates && memberStates.length === seatParties.length) {
+    const hasStateData = memberStates.some((state) => Boolean(state?.trim()))
+    if (hasStateData) {
+      return memberStates.map((state) => isSenateClass2State(state))
+    }
   }
 
   const cappedTarget = Math.min(seatParties.length, seatsUpForElection)

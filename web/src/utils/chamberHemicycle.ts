@@ -2,6 +2,7 @@ import { Hemicycle } from '@hemicycle/core'
 
 import type { PartySeatCount } from '../api/types'
 import { partySeatColor } from './chamberPartyColors'
+import { partyCounts } from './chamberSeatLayout'
 
 export type ChamberKind = 'House' | 'Senate'
 
@@ -43,15 +44,6 @@ export type ChamberHemicycleSeat = {
   party: string
   color: string
   layout: HemicycleSeatLayout
-}
-
-function partyCounts(seats: PartySeatCount[]): Record<string, number> {
-  const counts: Record<string, number> = { D: 0, R: 0, I: 0, Other: 0 }
-  for (const entry of seats) {
-    if (entry.party in counts) counts[entry.party] += entry.seats
-    else counts.Other += entry.seats
-  }
-  return counts
 }
 
 /** Assign D → left arc, R → right arc, I/Other → center — sorted by hemicycle x. */
@@ -126,28 +118,33 @@ export function buildChamberHemicycle(
   }
 }
 
-export type Seat3DCell = {
+export type HemicycleSeatDatum = {
+  idx: number
   party: string
-  x: number
-  y: number
-  z: number
-  radius: number
+  seatConfig: {
+    shape: 'circle'
+    radius: number
+    color: string
+  }
 }
 
-/** Map hemicycle SVG coords to a compact 3D scene (opening faces the camera). */
-export function hemicycleSeatsTo3D(
+export function buildHemicycleSeatData(
   chamber: ChamberKind,
-  hemicycleSeats: ChamberHemicycleSeat[]
-): Seat3DCell[] {
-  const { seatRadius } = CONFIG[chamber]
-  const unit = 0.011
-  const tierLift = chamber === 'House' ? 0.018 : 0.028
-
-  return hemicycleSeats.map(({ party, layout }) => ({
-    party,
-    x: layout.x * unit,
-    y: layout.rowIndex * tierLift,
-    z: layout.y * unit,
-    radius: seatRadius * unit * (chamber === 'Senate' ? 1.35 : 0.95),
-  }))
+  seats: PartySeatCount[],
+  seatParties?: string[] | null,
+  theme: 'light' | 'dark' = 'light'
+): { config: HemicycleVisualConfig; data: HemicycleSeatDatum[] } {
+  const built = buildChamberHemicycle(chamber, seats, seatParties, theme)
+  return {
+    config: built.config,
+    data: built.seats.map((seat) => ({
+      idx: seat.idx,
+      party: seat.party,
+      seatConfig: {
+        shape: 'circle' as const,
+        radius: built.config.seatRadius,
+        color: seat.color,
+      },
+    })),
+  }
 }

@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 
 import type { PartySeatCount } from '../api/types'
 import { useDocumentTheme } from '../hooks/useDocumentTheme'
-import { buildChamberHemicycle, getChamberHemicycleConfig } from '../utils/chamberHemicycle'
+import { buildHemicycleSeatData, getChamberHemicycleConfig } from '../utils/chamberHemicycle'
 import { seatArcAriaLabel } from '../utils/chamberSeatLayout'
 
 type ChamberSeatHemicycleProps = {
@@ -27,19 +27,8 @@ export function ChamberSeatHemicycle({
     if (total <= 0) {
       return { config: getChamberHemicycleConfig(chamber), hemicycleData: [] }
     }
-    const built = buildChamberHemicycle(chamber, seats, seatParties, theme)
-    return {
-      config: built.config,
-      hemicycleData: built.seats.map((seat) => ({
-        idx: seat.idx,
-        party: seat.party,
-        seatConfig: {
-          shape: 'circle' as const,
-          radius: built.config.seatRadius,
-          color: seat.color,
-        },
-      })),
-    }
+    const built = buildHemicycleSeatData(chamber, seats, seatParties, theme)
+    return { config: built.config, hemicycleData: built.data }
   }, [chamber, seats, seatParties, theme, total])
 
   if (total === 0) {

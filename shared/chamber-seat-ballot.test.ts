@@ -7,9 +7,24 @@ import {
 } from './chamber-seat-ballot'
 
 describe('chamber-seat-ballot', () => {
-  it('does not pulse House tiles — full chamber election is noted in copy instead', () => {
+  it('marks every House seat on the ballot', () => {
     const flags = buildSeatOnBallotFlags('House', ['D', 'R', 'R'], 435)
-    expect(flags).toEqual([false, false, false])
+    expect(flags).toEqual([true, true, true])
+  })
+
+  it('uses Class II states when member states are available', () => {
+    const flags = buildSeatOnBallotFlags(
+      'Senate',
+      ['R', 'D'],
+      33,
+      ['TX', 'CA']
+    )
+    expect(flags).toEqual([true, false])
+  })
+
+  it('falls back when member states are all missing', () => {
+    const flags = buildSeatOnBallotFlags('Senate', ['R', 'D', 'I'], 33, [null, null, null])
+    expect(flags.filter(Boolean)).toHaveLength(3)
   })
 
   it('approximates Senate ballot totals when class is unavailable', () => {

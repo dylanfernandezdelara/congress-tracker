@@ -1,4 +1,4 @@
-import { buildSeatOnBallotFlags, countBallotSeatsByParty } from "../../../../shared/chamber-seat-ballot";
+import { buildSeatOnBallotFlags } from "../../../../shared/chamber-seat-ballot";
 import { seatsUpForElection } from "../../../../shared/chamber-election";
 import { chamberControlLabel, normalizePartyCode } from "../../../../shared/party";
 import { HOUSE_ROSTER_MIN, SENATE_ROSTER_MIN } from "../constants";
@@ -10,6 +10,11 @@ interface MemberPartyRow {
   chamber: string;
   party: string | null;
   seats: number;
+}
+
+interface MemberSeatRow {
+  party: string;
+  state: string | null;
 }
 
 interface RollVoteCountRow {
@@ -91,17 +96,17 @@ function aggregatePartyRows(rows: MemberPartyRow[]): Map<string, number> {
   return partyMap;
 }
 
-async function listRollMemberPartyCodes(
+async function listRollMemberSeats(
   db: D1Database,
   roll: RollVoteCountRow,
   excludeLocalSample: boolean
-): Promise<string[]> {
+): Promise<MemberSeatRow[]> {
   const localFilter = excludeLocalSample
     ? " AND m.bioguide_id NOT LIKE 'LOCAL:%' AND m.bioguide_id NOT LIKE 'LIS:%'"
     : "";
   const { results } = await db
     .prepare(
-      `SELECT m.party
+      `SELECT m.party, m.state
        FROM member_votes mv
        JOIN members m ON m.bioguide_id = mv.bioguide_id
        WHERE mv.chamber = ?
@@ -111,8 +116,11 @@ async function listRollMemberPartyCodes(
        ORDER BY m.state, m.district IS NULL, m.district, m.name`
     )
     .bind(roll.chamber, roll.congress, roll.session, roll.roll_number)
-    .all<{ party: string | null }>();
-  return (results ?? []).map((row) => normalizePartyCode(row.party));
+    .all<{ party: string | null; state: string | null }>();
+  return (results ?? []).map((row) => ({
+    party: normalizePartyCode(row.party),
+    state: row.state,
+  }));
 }
 
 function seatPartiesMatchPartyMap(
@@ -132,24 +140,27 @@ function seatPartiesMatchPartyMap(
   return true;
 }
 
-async function listMemberPartyCodes(
+async function listMemberSeats(
   db: D1Database,
   chamber: string,
   excludeLocalSample: boolean
-): Promise<string[]> {
+): Promise<MemberSeatRow[]> {
   const localFilter = excludeLocalSample
     ? " AND bioguide_id NOT LIKE 'LOCAL:%' AND bioguide_id NOT LIKE 'LIS:%'"
     : "";
   const { results } = await db
     .prepare(
-      `SELECT party
+      `SELECT party, state
        FROM members
        WHERE chamber = ?${localFilter}
        ORDER BY state, district IS NULL, district, name`
     )
     .bind(chamber)
-    .all<{ party: string | null }>();
-  return (results ?? []).map((row) => normalizePartyCode(row.party));
+    .all<{ party: string | null; state: string | null }>();
+  return (results ?? []).map((row) => ({
+    party: normalizePartyCode(row.party),
+    state: row.state,
+  }));
 }
 
 async function countMembersByParty(
@@ -223,19 +234,25 @@ function rosterMinForChamber(chamber: string): number {
 function compositionSeatFlags(
   chamber: "House" | "Senate",
   congress: number,
-  seatParties: string[] | undefined,
+  memberSeats: MemberSeatRow[] | undefined,
   partyMap: Map<string, number>
 ): { seatParties?: string[]; seatOnBallot?: boolean[] } {
-  if (!seatParties || !seatPartiesMatchPartyMap(seatParties, partyMap)) {
+  if (!memberSeats || memberSeats.length === 0) {
+    return {};
+  }
+  const seatParties = memberSeats.map((row) => row.party);
+  if (!seatPartiesMatchPartyMap(seatParties, partyMap)) {
     return {};
   }
   const election = seatsUpForElection(chamber, congress);
+  const memberStates = memberSeats.map((row) => row.state);
   return {
     seatParties,
     seatOnBallot: buildSeatOnBallotFlags(
       chamber,
       seatParties,
-      election.seats_up_for_election
+      election.seats_up_for_election,
+      memberStates
     ),
   };
 }
@@ -254,8 +271,8 @@ async function buildChamberCompositionForChamber(
     const partyMap = await countRollRosterByParty(db, largestRoll, excludeLocalSample);
     const rosterTotal = [...partyMap.values()].reduce((sum, count) => sum + count, 0);
     if (rosterTotal >= rosterMin) {
-      const seatParties = await listRollMemberPartyCodes(db, largestRoll, excludeLocalSample);
-      const seatFlags = compositionSeatFlags(chamber, congress, seatParties, partyMap);
+      const memberSeats = await listRollMemberSeats(db, largestRoll, excludeLocalSample);
+      const seatFlags = compositionSeatFlags(chamber, congress, memberSeats, partyMap);
       return toComposition(partyMap, chamber, congress, seatFlags);
     }
   }
@@ -267,8 +284,8 @@ async function buildChamberCompositionForChamber(
   }
 
   const isSample = total < rosterMin;
-  const seatParties = await listMemberPartyCodes(db, chamber, excludeLocalSample);
-  const seatFlags = compositionSeatFlags(chamber, congress, seatParties, memberPartyMap);
+  const memberSeats = await listMemberSeats(db, chamber, excludeLocalSample);
+  const seatFlags = compositionSeatFlags(chamber, congress, memberSeats, memberPartyMap);
   return toComposition(memberPartyMap, chamber, congress, {
     isSample,
     ...seatFlags,
