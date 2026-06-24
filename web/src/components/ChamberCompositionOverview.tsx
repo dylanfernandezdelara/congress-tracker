@@ -4,7 +4,7 @@ import { partyCssClass, partyDisplayName } from '@congress-tracker/shared/party'
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
 import { seatArcAriaLabel } from '../utils/chamberSeatLayout'
 import { useChamberDiagramMode } from '../hooks/useChamberDiagramMode'
-import { ChamberSeatAmphitheater2D } from './ChamberSeatAmphitheater2D'
+import { ChamberSeatHemicycle } from './ChamberSeatHemicycle'
 
 const ChamberSeatDiagram3D = lazy(async () => {
   const mod = await import('./ChamberSeatDiagram3D')
@@ -33,12 +33,12 @@ function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
   }
 
   if (composition.total === 0) {
-    return <ChamberSeatAmphitheater2D {...seatProps} seats={[]} total={0} />
+    return <ChamberSeatHemicycle {...seatProps} seats={[]} total={0} />
   }
 
   if (mode === '3d') {
     return (
-      <Suspense fallback={<ChamberSeatAmphitheater2D {...seatProps} />}>
+      <Suspense fallback={<ChamberSeatHemicycle {...seatProps} />}>
         <ChamberSeatDiagram3D
           chamber={chamber}
           seats={composition.seats}
@@ -49,7 +49,7 @@ function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
     )
   }
 
-  return <ChamberSeatAmphitheater2D {...seatProps} />
+  return <ChamberSeatHemicycle {...seatProps} />
 }
 
 type ChamberCardProps = {

@@ -129,7 +129,7 @@ describe('Home', () => {
     expect(screen.getAllByText('Republican control').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByLabelText('House party seat counts')).toBeInTheDocument()
     expect(screen.getByLabelText('Senate party seat counts')).toBeInTheDocument()
-    expect(container.querySelectorAll('.chamber-amphitheater, .chamber-diagram-3d').length).toBeGreaterThanOrEqual(2)
+    expect(container.querySelectorAll('.chamber-hemicycle, .chamber-diagram-3d').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText(/on the November 2026 ballot/i)).not.toBeInTheDocument()
     expect(within(screen.getByLabelText('House party seat counts')).getByText('220')).toBeInTheDocument()
     expect(within(screen.getByLabelText('Senate party seat counts')).getByText('53')).toBeInTheDocument()

@@ -1459,16 +1459,16 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .chamber-amphitheater-wrap {
-      min-height: 9rem;
+    .chamber-hemicycle-wrap {
+      min-height: 6.5rem;
     }
 
     .chamber-diagram-3d-wrap {
-      height: 9rem;
+      height: 6.5rem;
     }
 
     .chamber-diagram-3d {
-      height: 9rem !important;
+      height: 6.5rem !important;
     }
 
     .chamber-card {
@@ -1522,6 +1522,34 @@
     color: hsl(var(--twc-primary));
     background: hsl(var(--twc-surface-subtle));
     border: 1px solid hsl(var(--twc-border));
+  }
+
+  .chamber-hemicycle-wrap {
+    width: 100%;
+    min-height: 6rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .chamber-hemicycle {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 6.25rem;
+  }
+
+  .chamber-hemicycle--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 6rem;
+    border-radius: 0.625rem;
+  }
+
+  .chamber-hemicycle-empty {
+    font-size: 0.75rem;
+    color: hsl(var(--twc-faint));
   }
 
   .chamber-amphitheater-wrap {
@@ -1591,7 +1619,7 @@
 
   .chamber-diagram-3d-wrap {
     width: 100%;
-    height: 7.5rem;
+    height: 6rem;
     border-radius: 0.625rem;
     overflow: hidden;
     background: transparent;
@@ -1601,7 +1629,7 @@
 
   .chamber-diagram-3d {
     width: 100% !important;
-    height: 7.5rem !important;
+    height: 6rem !important;
     display: block;
   }
 
