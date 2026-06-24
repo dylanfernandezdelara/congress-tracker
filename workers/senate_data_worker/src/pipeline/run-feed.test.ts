@@ -13,6 +13,7 @@ const mockFetchBillSummaryBundle = vi.fn();
 const mockRewriteSummary = vi.fn();
 const mockIngestHousePassageVotes = vi.fn();
 const mockIngestSenatePassageVotes = vi.fn();
+const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 
 vi.mock("../d1/digests", () => ({
   getDigest: (...args: Parameters<typeof mockGetDigest>) => mockGetDigest(...args),
@@ -44,6 +45,10 @@ vi.mock("../sources/house-votes", () => ({
 
 vi.mock("../sources/senate-votes", () => ({
   ingestSenatePassageVotes: (...args: unknown[]) => mockIngestSenatePassageVotes(...args),
+}));
+
+vi.mock("./ensure-member-roster", () => ({
+  ensureMemberRoster: () => mockEnsureMemberRoster(),
 }));
 
 import { runFeedPipeline } from "./run-feed";
@@ -84,6 +89,7 @@ const tombstoneDigest: DigestRow = {
 describe("runFeedPipeline digest retry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEnsureMemberRoster.mockResolvedValue(false);
     mockSelectExistingVoteKeys.mockResolvedValue(new Set());
     mockIngestHousePassageVotes.mockResolvedValue({ votes: [], skipped: 0 });
     mockIngestSenatePassageVotes.mockResolvedValue({ votes: [], skipped: 0 });
@@ -107,6 +113,7 @@ describe("runFeedPipeline digest retry", () => {
 
     const result = await runFeedPipeline(createEnv());
 
+    expect(mockEnsureMemberRoster).toHaveBeenCalledOnce();
     expect(result.digestsSkipped).toBe(1);
     expect(result.digestsWritten).toBe(0);
     expect(mockFetchBillSummaryBundle).not.toHaveBeenCalled();
@@ -133,6 +140,16 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsSkipped).toBe(0);
     expect(result.digestsWritten).toBe(1);
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
+    expect(mockUpsertDigest).toHaveBeenCalledOnce();
+  });
+
+  it("continues when member roster sync fails", async () => {
+    mockGetDigest.mockResolvedValue(null);
+    mockEnsureMemberRoster.mockRejectedValue(new Error("roster unavailable"));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsWritten).toBe(1);
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
 
