@@ -1,6 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import { handlePublicFetch } from "./http/router";
 
+vi.mock("./pipeline/run-members-roster", () => ({
+  runMembersRosterPipeline: vi.fn(async () => ({
+    congress: 119,
+    membersUpserted: 535,
+    house: 435,
+    senate: 100,
+  })),
+}));
+
+vi.mock("./pipeline/run-member-votes", () => ({
+  runMemberVotesPipeline: vi.fn(async () => ({
+    rollsProcessed: 0,
+    rollsSkipped: 0,
+    rollsRemaining: 0,
+    membersUpserted: 0,
+    votesUpserted: 0,
+  })),
+}));
+
 function createMockDb(): D1Database {
   const runResult = { success: true, meta: { duration: 0 } };
   const stmt = () => ({
@@ -156,6 +175,32 @@ describe("HTTP API", () => {
     expect(body).toMatchObject({ chamber: "House", defectors: [] });
   });
 
+  it("requires roll call params for vote defectors", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/vote-defectors.json?chamber=House"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("returns empty vote defectors for a roll call", async () => {
+    const response = await handlePublicFetch(
+      new Request(
+        "https://worker.example.com/feed/vote-defectors.json?chamber=House&congress=119&session=2&roll_number=9001"
+      ),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      chamber: "House",
+      congress: 119,
+      session: 2,
+      roll_number: 9001,
+      defectors: [],
+    });
+  });
+
   it("returns empty game rounds", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/game/rounds.json"),
@@ -198,6 +243,16 @@ describe("HTTP API", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({ ok: true, rollsRemaining: 0 });
+  });
+
+  it("allows members-roster pipeline in local dev mode", async () => {
+    const response = await handlePublicFetch(
+      pipelineRequest("/__pipeline/run/members-roster"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: true, congress: 119, membersUpserted: 535 });
   });
 
   it("requires bill identifiers for digest refresh", async () => {

@@ -1,6 +1,6 @@
 import { type Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
-import { computeDefectors } from "../analytics/defectors";
+import { computeDefectors, computeRollDefectors } from "../analytics/defectors";
 import { buildPortfolioMovers } from "../d1/disclosures";
 import {
   getFeedPipelineFailure,
@@ -12,6 +12,7 @@ import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
+import { runMembersRosterPipeline } from "../pipeline/run-members-roster";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
 import {
   FEED_DEFAULT_PAGE_SIZE,
@@ -24,13 +25,16 @@ import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildGameReveal, buildGameRounds, parseGameLimit } from "../storage/game";
 import { buildPulseStats } from "../storage/pulse-stats";
+import { buildNotableVotes } from "../analytics/notable-votes";
 import { buildSessionStats } from "../storage/session-stats";
 import type {
   Chamber,
   DefectorsResponse,
+  NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
   SessionStatsResponse,
+  VoteDefectorsResponse,
 } from "../types";
 import {
   buildCorsHeaders,
@@ -177,6 +181,12 @@ function parseFeedOffset(url: URL, limit: number): number {
   return Math.min(offset, maxOffset);
 }
 
+function parseRollNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 async function handleStatsJson<T>(
   json: (body: unknown, init?: ResponseInit) => Response,
   load: () => Promise<T>,
@@ -217,7 +227,11 @@ async function handlePipelineRoute<T extends object>(
  * Public read API: /health, /feed/latest.json, /stats/*.
  * Admin: POST /__pipeline/run/*
  */
-export async function handlePublicFetch(request: Request, env: Env): Promise<Response> {
+export async function handlePublicFetch(
+  request: Request,
+  env: Env,
+  ctx?: Pick<ExecutionContext, "waitUntil">
+): Promise<Response> {
   const url = new URL(request.url);
   const { pathname } = url;
   const corsHeaders = buildCorsHeaders(env);
@@ -250,6 +264,10 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     return handlePipelineRoute(request, env, json, () => runMemberVotesPipeline(env));
   }
 
+  if (pathname === "/__pipeline/run/members-roster") {
+    return handlePipelineRoute(request, env, json, () => runMembersRosterPipeline(env));
+  }
+
   if (pathname === "/__pipeline/run/disclosures") {
     return handlePipelineRoute(request, env, json, () => runDisclosuresPipeline(env));
   }
@@ -277,6 +295,44 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
       });
     } catch {
       return json({ error: "feed_error", message: "feed unavailable" }, { status: 500 });
+    }
+  }
+
+  if (pathname === "/feed/vote-defectors.json") {
+    const chamber = parseChamber(url.searchParams.get("chamber"));
+    const rollCongress = Number.parseInt(url.searchParams.get("congress") ?? "", 10);
+    const rollSession = Number.parseInt(url.searchParams.get("session") ?? "", 10);
+    const rollNumber = parseRollNumber(url.searchParams.get("roll_number"));
+    if (!chamber || !Number.isFinite(rollCongress) || !Number.isFinite(rollSession) || rollNumber === null) {
+      return json(
+        {
+          error: "bad_request",
+          message: "chamber, congress, session, and roll_number are required",
+        },
+        { status: 400 }
+      );
+    }
+    try {
+      const defectors = await computeRollDefectors(env.DB, {
+        chamber,
+        congress: rollCongress,
+        session: rollSession,
+        roll_number: rollNumber,
+      });
+      const body: VoteDefectorsResponse = {
+        chamber,
+        congress: rollCongress,
+        session: rollSession,
+        roll_number: rollNumber,
+        defectors,
+        as_of: new Date().toISOString(),
+      };
+      return json(body, {
+        status: 200,
+        headers: { "Cache-Control": cacheLatest },
+      });
+    } catch {
+      return json({ error: "feed_error", message: "vote defectors unavailable" }, { status: 500 });
     }
   }
 
@@ -338,6 +394,33 @@ export async function handlePublicFetch(request: Request, env: Env): Promise<Res
     );
   }
 
+  if (pathname === "/stats/notable.json") {
+    const limit = parseStatsLimit(url);
+    return handleStatsJson(
+      json,
+      async (): Promise<NotableVotesResponse> => {
+        const { notable, detection_method } = await buildNotableVotes(
+          env.DB,
+          congress,
+          session,
+          Math.min(limit, 3),
+          {
+            env,
+            waitUntil: ctx?.waitUntil.bind(ctx),
+          }
+        );
+        return {
+          congress,
+          session,
+          notable,
+          detection_method,
+          as_of: asOf,
+        };
+      },
+      "notable votes unavailable"
+    );
+  }
+
   if (pathname === "/stats/defectors.json") {
     const chamber = parseChamber(url.searchParams.get("chamber"));
     if (!chamber) {
@@ -384,6 +467,10 @@ function isApiPath(pathname: string): boolean {
 }
 
 /** HTTP entry for the unified worker. */
-export async function handleFetch(request: Request, env: Env): Promise<Response> {
-  return handlePublicFetch(request, env);
+export async function handleFetch(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext
+): Promise<Response> {
+  return handlePublicFetch(request, env, ctx);
 }

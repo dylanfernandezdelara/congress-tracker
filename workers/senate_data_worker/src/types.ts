@@ -38,6 +38,9 @@ export interface FeedBill {
 
 export interface FeedPassageVote {
   chamber: Chamber;
+  congress?: number;
+  session?: number;
+  roll_number?: number;
   question: string;
   result: string;
   yeas: number;
@@ -69,12 +72,19 @@ export type {
   DateRange,
   DefectorEntry,
   DefectorsResponse,
+  VoteDefectorEntry,
+  VoteDefectorsResponse,
   PortfolioEntry,
   PortfolioMovers,
   PortfoliosResponse,
   PolicyHeatEntry,
   PulseStatsResponse,
+  NotableVoteEntry,
+  NotableVotesResponse,
+  PartySeatCount,
+  ChamberComposition,
   SessionStatsResponse,
+  StatsChamber,
   ThisWeekSummary,
 } from "../../../shared/stats-api-types";
 

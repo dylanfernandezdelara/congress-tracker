@@ -7,8 +7,8 @@ import { handleFetch } from "./http/router";
 import { runFeedPipeline } from "./pipeline/run-feed";
 
 export default {
-  fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
-    return handleFetch(request, env);
+  fetch(request: Request, env: Env, ctx?: ExecutionContext) {
+    return handleFetch(request, env, ctx);
   },
   scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(

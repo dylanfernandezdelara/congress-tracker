@@ -152,6 +152,9 @@ export async function selectRecentVotedBills(
 
 export interface VoteRow {
   chamber: string;
+  congress: number;
+  session: number;
+  roll_number: number;
   question: string;
   result: string;
   yeas: number;
@@ -168,7 +171,7 @@ export async function getPassageVotesForBill(
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT chamber, question, result, yeas, nays, vote_date
+      `SELECT chamber, congress, session, roll_number, question, result, yeas, nays, vote_date
        FROM votes
        WHERE bill_congress = ? AND bill_type = ? AND bill_number = ? AND is_passage = 1
        ORDER BY vote_date DESC`

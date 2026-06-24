@@ -1,6 +1,8 @@
-import type { Chamber, DefectorEntry } from "../types";
-import { getMembersByIds } from "../d1/members";
-import { selectMemberVotesForSession } from "../d1/member-votes";
+import type { Chamber, DefectorEntry, VoteDefectorEntry } from "../types";
+import { isRealBioguideId } from "../../../../shared/member-id";
+import { normalizePartyCode } from "../../../../shared/party";
+import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
+import { selectMemberVotesForRoll, type RollCallKey, selectMemberVotesForSession } from "../d1/member-votes";
 import { normalizeVotePosition } from "../../../../shared/vote-positions";
 
 function normalizePosition(position: string): "yea" | "nay" | "other" {
@@ -17,11 +19,13 @@ function partyMajoritiesForRoll(
   const tallies = new Map<string, { yea: number; nay: number }>();
   for (const { party, position } of positions) {
     if (!party) continue;
+    const partyKey = normalizePartyCode(party);
+    if (partyKey === "Other") continue;
     const norm = normalizePosition(position);
     if (norm === "other") continue;
-    const tally = tallies.get(party) ?? { yea: 0, nay: 0 };
+    const tally = tallies.get(partyKey) ?? { yea: 0, nay: 0 };
     tally[norm] += 1;
-    tallies.set(party, tally);
+    tallies.set(partyKey, tally);
   }
 
   const majorities = new Map<string, "yea" | "nay" | null>();
@@ -52,7 +56,14 @@ export async function computeDefectors(
   const rows = await selectMemberVotesForSession(db, congress, session, chamber);
   if (rows.length === 0) return [];
 
-  const uniqueIds = [...new Set(rows.map((row) => row.bioguide_id))];
+  const excludeLocalSample = await hasRealMemberRoster(db);
+  const uniqueIds = [
+    ...new Set(
+      rows
+        .map((row) => row.bioguide_id)
+        .filter((id) => !excludeLocalSample || isRealBioguideId(id))
+    ),
+  ];
   const memberRows = await getMembersByIds(db, uniqueIds);
   const members = new Map<string, { party: string | null; state: string | null; name: string }>();
   for (const [bioguideId, record] of memberRows) {
@@ -92,9 +103,11 @@ export async function computeDefectors(
     );
 
     for (const row of rollRows) {
+      if (excludeLocalSample && !isRealBioguideId(row.bioguide_id)) continue;
       const member = members.get(row.bioguide_id);
       if (!member?.party) continue;
-      const partySide = partyMajorities.get(member.party) ?? null;
+      const partyKey = normalizePartyCode(member.party);
+      const partySide = partyMajorities.get(partyKey) ?? null;
       const memberSide = normalizePosition(row.position);
       if (partySide === null || memberSide === "other" || memberSide === partySide) continue;
 
@@ -134,4 +147,63 @@ export async function computeDefectors(
   return defectors
     .sort((a, b) => b.deciding_score - a.deciding_score || b.cross_vote_count - a.cross_vote_count)
     .slice(0, limit);
+}
+
+export async function computeRollDefectors(
+  db: D1Database,
+  roll: RollCallKey
+): Promise<VoteDefectorEntry[]> {
+  const rows = await selectMemberVotesForRoll(db, roll);
+  if (rows.length === 0) return [];
+
+  const excludeLocalSample = await hasRealMemberRoster(db);
+  const filteredRows = excludeLocalSample
+    ? rows.filter((row) => isRealBioguideId(row.bioguide_id))
+    : rows;
+  if (filteredRows.length === 0) return [];
+
+  const uniqueIds = [...new Set(filteredRows.map((row) => row.bioguide_id))];
+  const memberRows = await getMembersByIds(db, uniqueIds);
+  const members = new Map<string, { party: string | null; state: string | null; name: string }>();
+  for (const [bioguideId, record] of memberRows) {
+    members.set(bioguideId, {
+      party: record.party,
+      state: record.state,
+      name: record.name,
+    });
+  }
+  for (const bioguideId of uniqueIds) {
+    if (!members.has(bioguideId)) {
+      members.set(bioguideId, { party: null, state: null, name: bioguideId });
+    }
+  }
+
+  const partyMajorities = partyMajoritiesForRoll(
+    filteredRows.map((row) => ({
+      party: members.get(row.bioguide_id)?.party ?? null,
+      position: row.position,
+    }))
+  );
+
+  const defectors: VoteDefectorEntry[] = [];
+  for (const row of filteredRows) {
+    const member = members.get(row.bioguide_id);
+    if (!member?.party) continue;
+    const partyKey = normalizePartyCode(member.party);
+    const partyLine = partyMajorities.get(partyKey) ?? null;
+    const memberSide = normalizePosition(row.position);
+    if (partyLine === null || memberSide === "other" || memberSide === partyLine) continue;
+
+    defectors.push({
+      bioguide_id: row.bioguide_id,
+      name: member.name,
+      party: member.party,
+      state: member.state ?? "?",
+      position: memberSide,
+      party_line: partyLine,
+      congress_gov_url: congressGovMemberUrl(row.bioguide_id),
+    });
+  }
+
+  return defectors.sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -56,6 +56,9 @@ export async function buildFeedPage(
       raw_summary_text: digestRow?.raw_summary_text ?? null,
       passage_votes: votes.map((v) => ({
         chamber: v.chamber as Chamber,
+        congress: v.congress,
+        session: v.session,
+        roll_number: v.roll_number,
         question: v.question,
         result: v.result,
         yeas: v.yeas,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDefectors } from "../analytics/defectors";
+import { computeDefectors, computeRollDefectors } from "../analytics/defectors";
 import { resetSchemaFlag } from "../d1/schema";
 
 function createTestDb(): D1Database {
@@ -63,6 +63,9 @@ function createTestDb(): D1Database {
             .filter((row): row is object => row !== undefined);
           return { results };
         }
+        if (sql.includes("FROM members") && sql.includes("GROUP BY chamber")) {
+          return { results: [] };
+        }
         return { results: [] };
       },
       first: async () => {
@@ -97,5 +100,65 @@ describe("computeDefectors", () => {
     expect(defectors[0].name).toBe("Alice");
     expect(defectors[0].cross_vote_count).toBe(1);
     expect(defectors[0].deciding_score).toBeGreaterThan(0);
+  });
+});
+
+function createRollTestDb(): D1Database {
+  const stmt = (sql: string) => ({
+    bind: (...args: unknown[]) => ({
+      all: async () => {
+        if (sql.includes("FROM member_votes") && sql.includes("roll_number = ?")) {
+          return {
+            results: [
+              { bioguide_id: "A001", position: "Nay" },
+              { bioguide_id: "A002", position: "Yea" },
+              { bioguide_id: "A003", position: "Yea" },
+            ],
+          };
+        }
+        if (sql.includes("FROM members WHERE bioguide_id IN")) {
+          const members: Record<string, object> = {
+            A001: { bioguide_id: "A001", name: "Alice", chamber: "Senate", party: "D", state: "MA", district: null },
+            A002: { bioguide_id: "A002", name: "Bob", chamber: "Senate", party: "D", state: "NY", district: null },
+            A003: { bioguide_id: "A003", name: "Dana", chamber: "Senate", party: "D", state: "IL", district: null },
+          };
+          const results = args
+            .map((id) => members[id as string])
+            .filter((row): row is object => row !== undefined);
+          return { results };
+        }
+        if (sql.includes("FROM members") && sql.includes("GROUP BY chamber")) {
+          return { results: [] };
+        }
+        return { results: [] };
+      },
+      first: async () => null,
+      run: async () => ({ success: true }),
+    }),
+    run: async () => ({ success: true }),
+  });
+
+  return {
+    prepare: (sql: string) => stmt(sql),
+  } as unknown as D1Database;
+}
+
+describe("computeRollDefectors", () => {
+  it("returns members who voted against their party on one roll", async () => {
+    resetSchemaFlag();
+    const db = createRollTestDb();
+    const defectors = await computeRollDefectors(db, {
+      chamber: "Senate",
+      congress: 119,
+      session: 2,
+      roll_number: 1,
+    });
+
+    expect(defectors).toHaveLength(1);
+    expect(defectors[0]).toMatchObject({
+      name: "Alice",
+      position: "nay",
+      party_line: "yea",
+    });
   });
 });

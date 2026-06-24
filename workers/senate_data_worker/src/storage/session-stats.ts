@@ -1,5 +1,6 @@
 import type { ChamberStats, DateRange } from "../types";
 import { ensureSchema } from "../d1/schema";
+import { buildChamberComposition, emptyChamberComposition } from "./chamber-composition";
 
 interface ChamberAggRow {
   chamber: string;
@@ -50,27 +51,36 @@ export async function buildSessionStats(
   db: D1Database,
   congress: number,
   session: number
-): Promise<{ house: ChamberStats; senate: ChamberStats }> {
+): Promise<{
+  house: ChamberStats;
+  senate: ChamberStats;
+  composition: Awaited<ReturnType<typeof buildChamberComposition>>;
+}> {
   await ensureSchema(db);
-  const { results } = await db
-    .prepare(
-      `SELECT chamber,
-              COUNT(*) AS passage_vote_count,
-              COUNT(DISTINCT bill_type || '-' || CAST(bill_number AS TEXT)) AS unique_bills_passed,
-              AVG(ABS(yeas - nays)) AS avg_margin,
-              MIN(ABS(yeas - nays)) AS closest_margin,
-              MIN(vote_date) AS first_date,
-              MAX(vote_date) AS last_date
-       FROM votes
-       WHERE congress = ? AND session = ? AND is_passage = 1
-       GROUP BY chamber`
-    )
-    .bind(congress, session)
-    .all<ChamberAggRow>();
+  const [{ results }, compositionResult] = await Promise.all([
+    db
+      .prepare(
+        `SELECT chamber,
+                COUNT(*) AS passage_vote_count,
+                COUNT(DISTINCT bill_type || '-' || CAST(bill_number AS TEXT)) AS unique_bills_passed,
+                AVG(ABS(yeas - nays)) AS avg_margin,
+                MIN(ABS(yeas - nays)) AS closest_margin,
+                MIN(vote_date) AS first_date,
+                MAX(vote_date) AS last_date
+         FROM votes
+         WHERE congress = ? AND session = ? AND is_passage = 1
+         GROUP BY chamber`
+      )
+      .bind(congress, session)
+      .all<ChamberAggRow>(),
+    buildChamberComposition(db, congress, session).catch(() => emptyChamberComposition(congress)),
+  ]);
+  const composition = compositionResult;
 
   const byChamber = new Map((results ?? []).map((r) => [r.chamber, r]));
   return {
     house: rowToStats(byChamber.get("House")),
     senate: rowToStats(byChamber.get("Senate")),
+    composition,
   };
 }

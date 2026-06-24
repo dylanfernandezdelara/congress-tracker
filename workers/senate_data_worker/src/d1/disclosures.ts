@@ -1,4 +1,5 @@
 import type { Chamber, PortfolioEntry, PortfolioMovers } from "../types";
+import { hasRealMemberRoster } from "./members";
 import { ensureSchema } from "./schema";
 
 const DISCLAIMER =
@@ -105,14 +106,23 @@ export async function buildPortfolioMovers(
   }));
 
   const sorted = [...entries].sort((a, b) => b.session_return_pct - a.session_return_pct);
-  const gainers = sorted.filter((e) => e.session_return_pct > 0).slice(0, limit);
-  const losers = [...sorted]
+  const realRoster = await hasRealMemberRoster(db);
+  const visibleEntries = realRoster
+    ? entries.filter((entry) => !entry.bioguide_id.startsWith("LOCAL:"))
+    : entries;
+
+  const gainers = [...visibleEntries]
+    .filter((e) => e.session_return_pct > 0)
+    .sort((a, b) => b.session_return_pct - a.session_return_pct)
+    .slice(0, limit);
+  const losers = [...visibleEntries]
     .filter((e) => e.session_return_pct < 0)
     .sort((a, b) => a.session_return_pct - b.session_return_pct)
     .slice(0, limit);
 
   const hasSampleOnly =
-    entries.length > 0 && entries.every((entry) => entry.bioguide_id.startsWith("LOCAL:"));
+    visibleEntries.length > 0 &&
+    visibleEntries.every((entry) => entry.bioguide_id.startsWith("LOCAL:"));
 
   return {
     gainers,

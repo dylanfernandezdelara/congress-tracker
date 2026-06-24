@@ -68,6 +68,17 @@ const SCHEMA_STATEMENTS = [
   value_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
 )`,
+  `CREATE TABLE IF NOT EXISTS notable_vote_blurbs (
+  chamber TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  roll_number INTEGER NOT NULL,
+  why_it_matters TEXT NOT NULL,
+  detection_method TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (chamber, congress, session, roll_number)
+)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_passage_date ON votes (is_passage, vote_date)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_bill ON votes (bill_congress, bill_type, bill_number)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_congress_session ON votes (congress, session, chamber)`,
