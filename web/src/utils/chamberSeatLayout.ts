@@ -193,7 +193,7 @@ export function layoutHorseshoeSeats(
 
 /**
  * When we have a real member roster, keep hemicycle positions but paint each
- * seat with that member's party (so cross-aisle seats show correctly).
+ * dot with that member's party. Layout is illustrative, not geographic.
  */
 function applyRosterPartiesToLayout(cells: SeatCell[], rosterParties: string[]): SeatCell[] {
   const sorted = [...cells].sort((a, b) => {
@@ -212,8 +212,6 @@ export function layoutHemicycleDots(
   seatParties?: string[] | null
 ): HemicycleDot[] {
   const { width, height } = VIEWBOX_BY_CHAMBER[chamber]
-  const centerX = width / 2
-  const centerY = height + 4
   const cells = layoutHorseshoeSeats(chamber, seats, seatParties)
   const total = cells.length
   const maxRow = Math.max(...cells.map((cell) => cell.rowIndex), 0) + 1
@@ -226,13 +224,10 @@ export function layoutHemicycleDots(
     const rowFactor = 1 - cell.rowIndex * 0.035
     const densityFactor = total > 200 ? 0.88 : total > 80 ? 0.94 : 1
     const r = baseRadius * rowFactor * rowScale * densityFactor
-    const faceDeg = (Math.atan2(centerY - y, centerX - x) * 180) / Math.PI
-    void faceDeg
     return { party: cell.party, x, y, r }
   })
 }
 
-/** @deprecated Use layoutHemicycleDots — kept for tests and 3D path. */
 export function layoutHemicycleSeatsFromCounts(
   chamber: 'House' | 'Senate',
   seats: PartySeatCount[],
@@ -256,10 +251,14 @@ export function chamberArcViewBox(chamber: 'House' | 'Senate') {
 export function seatArcAriaLabel(
   chamber: string,
   seats: PartySeatCount[],
-  total: number
+  total: number,
+  options?: { perMember?: boolean }
 ): string {
   const breakdown = seats.map((entry) => `${entry.party} ${entry.seats}`).join(', ')
-  return `${chamber} seating diagram: ${total} seats, each colored by member party (${breakdown})`
+  if (options?.perMember) {
+    return `${chamber} illustrative seating diagram: ${total} seats, each dot colored by member party (${breakdown})`
+  }
+  return `${chamber} illustrative seating diagram: ${total} seats colored by party totals (${breakdown})`
 }
 
 export function groupSeatsByParty(cells: SeatCell[]): Map<string, SeatCell[]> {

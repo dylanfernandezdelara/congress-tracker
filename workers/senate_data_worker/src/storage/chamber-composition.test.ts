@@ -7,6 +7,7 @@ type MockRow = { chamber: string; party: string | null; seats: number };
 function createMockDb(options: {
   members?: MockRow[];
   memberParties?: Array<{ chamber: string; party: string | null }>;
+  rollMemberParties?: Array<{ chamber: string; party: string | null }>;
   rollCounts?: Array<{
     chamber: string;
     congress: number;
@@ -16,11 +17,17 @@ function createMockDb(options: {
   }>;
   rollRoster?: MockRow[];
 }) {
-  const { members = [], memberParties = [], rollCounts = [], rollRoster = [] } = options;
+  const { members = [], memberParties = [], rollMemberParties = [], rollCounts = [], rollRoster = [] } = options;
 
   const stmt = (sql: string) => ({
     bind: (...args: unknown[]) => ({
       all: async () => {
+        if (sql.includes("FROM member_votes mv") && sql.includes("JOIN members") && sql.includes("SELECT m.party")) {
+          const chamber = args[0] as string;
+          return {
+            results: rollMemberParties.filter((row) => row.chamber === chamber),
+          };
+        }
         if (sql.includes("FROM member_votes mv") && sql.includes("JOIN members")) {
           return { results: rollRoster };
         }
@@ -131,6 +138,47 @@ describe("buildChamberComposition", () => {
     const result = await buildChamberComposition(db, 119, 2);
     expect(result.senate.seat_parties).toEqual(["D", "D", "R"]);
     expect(result.senate.is_sample).toBe(true);
+  });
+
+  it("includes per-member seat parties from the roll roster when histograms match", async () => {
+    resetSchemaFlag();
+    const db = createMockDb({
+      rollCounts: [{ chamber: "Senate", congress: 119, session: 2, roll_number: 7, vote_count: 100 }],
+      rollRoster: [
+        { chamber: "Senate", party: "R", seats: 53 },
+        { chamber: "Senate", party: "D", seats: 45 },
+        { chamber: "Senate", party: "I", seats: 2 },
+      ],
+      rollMemberParties: [
+        ...Array.from({ length: 53 }, () => ({ chamber: "Senate", party: "R" })),
+        ...Array.from({ length: 45 }, () => ({ chamber: "Senate", party: "D" })),
+        ...Array.from({ length: 2 }, () => ({ chamber: "Senate", party: "I" })),
+      ],
+    });
+
+    const result = await buildChamberComposition(db, 119, 2);
+    expect(result.senate.seat_parties).toHaveLength(100);
+    expect(result.senate.seat_parties?.filter((party) => party === "R")).toHaveLength(53);
+  });
+
+  it("omits seat parties when roll roster and member party histograms disagree", async () => {
+    resetSchemaFlag();
+    const db = createMockDb({
+      rollCounts: [{ chamber: "Senate", congress: 119, session: 2, roll_number: 7, vote_count: 100 }],
+      rollRoster: [
+        { chamber: "Senate", party: "R", seats: 53 },
+        { chamber: "Senate", party: "D", seats: 45 },
+        { chamber: "Senate", party: "I", seats: 2 },
+      ],
+      rollMemberParties: [
+        ...Array.from({ length: 52 }, () => ({ chamber: "Senate", party: "R" })),
+        ...Array.from({ length: 45 }, () => ({ chamber: "Senate", party: "D" })),
+        ...Array.from({ length: 3 }, () => ({ chamber: "Senate", party: "I" })),
+      ],
+    });
+
+    const result = await buildChamberComposition(db, 119, 2);
+    expect(result.senate.seat_parties).toBeUndefined();
   });
 
   it("returns empty composition when no members exist", async () => {

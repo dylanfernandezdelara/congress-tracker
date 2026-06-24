@@ -1530,14 +1530,24 @@
     overflow: visible;
   }
 
+  @media (max-width: 640px) {
+    .chamber-seat-arc-wrap.chamber-seat-arc--house {
+      aspect-ratio: 400 / 148;
+      min-height: 5.5rem;
+    }
+
+    .chamber-seat-arc-wrap.chamber-seat-arc--senate {
+      aspect-ratio: 320 / 112;
+      min-height: 4.75rem;
+    }
+  }
+
   .chamber-seat-arc-wrap.chamber-seat-arc--house {
     aspect-ratio: 400 / 148;
-    min-height: 5rem;
   }
 
   .chamber-seat-arc-wrap.chamber-seat-arc--senate {
     aspect-ratio: 320 / 112;
-    min-height: 4.25rem;
   }
 
   .chamber-diagram-3d-wrap {

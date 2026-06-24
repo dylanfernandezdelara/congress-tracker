@@ -25,6 +25,7 @@ export function ChamberSeatArc2D({ chamber, seats, total, seatParties }: Chamber
 
   const viewBox = chamberArcViewBox(chamber)
   const dots = layoutHemicycleDots(chamber, seats, seatParties)
+  const hasMemberSeatParties = Boolean(seatParties) && seatParties!.length === total
   const chamberClass =
     chamber === 'House' ? 'chamber-seat-arc--house' : 'chamber-seat-arc--senate'
 
@@ -34,7 +35,7 @@ export function ChamberSeatArc2D({ chamber, seats, total, seatParties }: Chamber
         className={`chamber-seat-arc ${chamberClass}`}
         viewBox={`0 0 ${viewBox.width} ${viewBox.height}`}
         role="img"
-        aria-label={seatArcAriaLabel(chamber, seats, total)}
+        aria-label={seatArcAriaLabel(chamber, seats, total, { perMember: hasMemberSeatParties })}
         preserveAspectRatio="xMidYMax meet"
       >
         {dots.map((dot, index) => (

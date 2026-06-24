@@ -19,7 +19,12 @@ type ChamberSeatViewProps = {
 
 function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
   const mode = useChamberDiagramMode()
-  const ariaLabel = seatArcAriaLabel(chamber, composition.seats, composition.total)
+  const hasMemberSeatParties =
+    Boolean(composition.seat_parties) &&
+    composition.seat_parties!.length === composition.total
+  const ariaLabel = seatArcAriaLabel(chamber, composition.seats, composition.total, {
+    perMember: hasMemberSeatParties,
+  })
 
   const seatProps = {
     chamber,
@@ -131,16 +136,21 @@ export function ChamberCompositionOverview({
   if (!composition) return null
 
   const hasSampleData = composition.house.is_sample || composition.senate.is_sample
+  const hasMemberSeatParties =
+    (composition.house.seat_parties?.length ?? 0) === composition.house.total &&
+    (composition.senate.seat_parties?.length ?? 0) === composition.senate.total
+
+  const subtitle = hasSampleData
+    ? 'Illustrative hemicycle — one dot per seat, colored by member party (local sample roster).'
+    : hasMemberSeatParties
+      ? 'Illustrative hemicycle — one dot per member, colored by party. The Senate assigns desks; the House has no fixed seating chart.'
+      : 'Illustrative hemicycle — one dot per seat, colored by party totals. The Senate assigns desks; the House has no fixed seating chart.'
 
   return (
     <section className="home-enrichment" aria-label="Chamber control">
       <div className="home-enrichment-header">
         <h2 className="home-enrichment-title">Chamber control</h2>
-        <p className="home-enrichment-subtitle">
-          {hasSampleData
-            ? 'Each dot is one seat, colored by member party (local sample roster)'
-            : 'Each dot is one seat, colored by member party. Senate has assigned desks; the House does not publish a fixed seating chart.'}
-        </p>
+        <p className="home-enrichment-subtitle">{subtitle}</p>
       </div>
       <div className="chamber-overview-grid">
         <ChamberCard chamber="House" composition={composition.house} />
