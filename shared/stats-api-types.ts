@@ -16,11 +16,70 @@ export interface ChamberStats {
   coverage_days: number
 }
 
+export interface PartySeatCount {
+  party: string
+  seats: number
+}
+
+export interface ChamberComposition {
+  seats: PartySeatCount[]
+  total: number
+  majority_party: string | null
+  control_label: string
+  /** True when roster counts are partial or local sample data — not a full chamber. */
+  is_sample?: boolean
+  /** Seats on the ballot in the next federal election during this Congress. */
+  seats_up_for_election: number
+  /** Year of that election (November). */
+  election_year: number
+}
+
 export interface SessionStatsResponse {
   congress: number
   session: number
   house: ChamberStats
   senate: ChamberStats
+  composition: {
+    house: ChamberComposition
+    senate: ChamberComposition
+  }
+  as_of: string
+}
+
+export type NotableVoteCrossVoteLabel = 'rare' | 'occasional' | 'frequent'
+
+export interface NotableVoteDefector {
+  bioguide_id: string
+  name: string
+  party: string
+  state: string
+  photo_url: string
+  cross_vote_count: number
+  cross_vote_label: NotableVoteCrossVoteLabel
+}
+
+export interface NotableVoteEntry {
+  chamber: StatsChamber
+  congress: number
+  session: number
+  roll_number: number
+  bill_type: string
+  bill_number: number
+  yeas: number
+  nays: number
+  margin: number
+  vote_date: string
+  headline: string | null
+  significance_score: number
+  why_it_matters: string
+  defectors: NotableVoteDefector[]
+}
+
+export interface NotableVotesResponse {
+  congress: number
+  session: number
+  notable: NotableVoteEntry[]
+  detection_method: 'heuristic' | 'llm'
   as_of: string
 }
 
@@ -86,6 +145,26 @@ export interface DefectorsResponse {
   congress: number
   session: number
   defectors: DefectorEntry[]
+  as_of: string
+}
+
+/** Member who voted against their party on a single roll call. */
+export interface VoteDefectorEntry {
+  bioguide_id: string
+  name: string
+  party: string
+  state: string
+  position: 'yea' | 'nay'
+  party_line: 'yea' | 'nay'
+  congress_gov_url: string
+}
+
+export interface VoteDefectorsResponse {
+  chamber: StatsChamber
+  congress: number
+  session: number
+  roll_number: number
+  defectors: VoteDefectorEntry[]
   as_of: string
 }
 
