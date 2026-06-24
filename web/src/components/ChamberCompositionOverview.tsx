@@ -1,23 +1,9 @@
 import { partyCssClass, partyDisplayName } from '@congress-tracker/shared/party'
 
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
-import { ChamberSeatHemicycle } from './ChamberSeatHemicycle'
-
-type ChamberSeatViewProps = {
-  chamber: 'House' | 'Senate'
-  composition: ChamberComposition
-}
-
-function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
-  return (
-    <ChamberSeatHemicycle
-      chamber={chamber}
-      seats={composition.seats}
-      total={composition.total}
-      seatParties={composition.seat_parties}
-    />
-  )
-}
+import { sortPartySeatCounts } from '../utils/chamberWedge'
+import { ChamberPartyWedge } from './ChamberPartyWedge'
+import { PresidentControlCard } from './PresidentControlCard'
 
 type ChamberCardProps = {
   chamber: 'House' | 'Senate'
@@ -25,24 +11,32 @@ type ChamberCardProps = {
 }
 
 function ChamberCard({ chamber, composition }: ChamberCardProps) {
+  const sortedSeats = sortPartySeatCounts(composition.seats)
+
   return (
     <article className="chamber-card">
       <header className="chamber-card-header">
-        <h3 className="chamber-card-title">{chamber}</h3>
-        <p className="chamber-card-control">
-          {composition.control_label}
+        <h3 className="chamber-card-title">
+          {chamber}
           {composition.is_sample ? (
             <span className="chamber-sample-badge"> · Sample roster</span>
           ) : null}
-        </p>
+        </h3>
       </header>
-      <ChamberSeatView chamber={chamber} composition={composition} />
+      <ChamberPartyWedge chamber={chamber} seats={composition.seats} total={composition.total} />
       {composition.total > 0 ? (
         <footer className="chamber-card-footer">
-          <ul className="chamber-seat-legend" aria-label={`${chamber} party seat counts`}>
-            {composition.seats.map((entry) => (
+          <ul
+            className="chamber-seat-legend"
+            aria-label={`${chamber} party seat counts`}
+            style={{ ['--legend-cols' as string]: sortedSeats.length }}
+          >
+            {sortedSeats.map((entry) => (
               <li key={entry.party}>
-                <span className={`chamber-party-pill ${partyCssClass(entry.party)}`}>
+                <span
+                  className={`chamber-party-pill ${partyCssClass(entry.party)}`}
+                  title={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
+                >
                   <span className="chamber-party-pill-label">
                     {partyDisplayName(entry.party)}
                   </span>
@@ -72,7 +66,7 @@ export function ChamberCompositionOverview({
 }: ChamberCompositionOverviewProps) {
   if (error) {
     return (
-      <section className="home-enrichment" aria-label="Chamber control">
+      <section className="home-enrichment" aria-label="Federal control">
         <p className="home-enrichment-error text-sm text-secondary">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
@@ -85,7 +79,7 @@ export function ChamberCompositionOverview({
 
   if (loading && !composition) {
     return (
-      <section className="home-enrichment" aria-label="Chamber control">
+      <section className="home-enrichment" aria-label="Federal control">
         <div className="chamber-overview-skeleton" aria-hidden="true" />
       </section>
     )
@@ -94,13 +88,14 @@ export function ChamberCompositionOverview({
   if (!composition) return null
 
   return (
-    <section className="home-enrichment" aria-label="Chamber control">
+    <section className="home-enrichment" aria-label="Federal control">
       <div className="home-enrichment-header">
-        <h2 className="home-enrichment-title">Chamber control</h2>
+        <h2 className="home-enrichment-title">Federal control</h2>
       </div>
       <div className="chamber-overview-grid">
         <ChamberCard chamber="House" composition={composition.house} />
         <ChamberCard chamber="Senate" composition={composition.senate} />
+        <PresidentControlCard />
       </div>
     </section>
   )

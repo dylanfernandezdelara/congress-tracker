@@ -1450,17 +1450,19 @@
 
   .chamber-overview-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 900px) {
     .chamber-overview-grid {
       grid-template-columns: minmax(0, 1fr);
     }
+  }
 
-    .chamber-hemicycle-wrap {
-      aspect-ratio: 360 / 168;
+  @media (max-width: 640px) {
+    .chamber-wedge-wrap {
+      aspect-ratio: 280 / 118;
     }
 
     .chamber-card {
@@ -1491,12 +1493,6 @@
     font-weight: 600;
   }
 
-  .chamber-card-control {
-    margin: 0;
-    font-size: 0.8125rem;
-    color: hsl(var(--twc-secondary));
-  }
-
   .chamber-card-footer {
     display: flex;
     flex-direction: column;
@@ -1504,19 +1500,23 @@
     margin-top: 0;
   }
 
-  .chamber-hemicycle-wrap {
+  .chamber-wedge-wrap {
     width: 100%;
-    aspect-ratio: 360 / 168;
+    aspect-ratio: 280 / 118;
+    display: flex;
+    justify-content: center;
     overflow: visible;
   }
 
-  .chamber-hemicycle {
+  .chamber-wedge {
     display: block;
     width: 100%;
     height: 100%;
+    max-width: 17.5rem;
+    margin-inline: auto;
   }
 
-  .chamber-hemicycle--empty {
+  .chamber-wedge--empty {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1524,9 +1524,47 @@
     border-radius: 0.625rem;
   }
 
-  .chamber-hemicycle-empty {
+  .chamber-wedge-empty {
     font-size: 0.75rem;
     color: hsl(var(--twc-faint));
+  }
+
+  .president-control-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.875rem;
+    padding: 0.25rem 0 0.35rem;
+    min-height: 6.5rem;
+  }
+
+  .president-control-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .president-control-name {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .president-control-term {
+    margin: 0;
+    font-size: 0.75rem;
+    color: hsl(var(--twc-secondary));
+    line-height: 1.2;
+  }
+
+  .president-party-pill {
+    width: fit-content;
+  }
+
+  .president-seat-icon {
+    flex-shrink: 0;
   }
 
   .chamber-sample-badge {
@@ -1538,26 +1576,32 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
+    display: grid;
+    grid-template-columns: repeat(var(--legend-cols, 3), minmax(0, 1fr));
+    gap: 0.35rem;
+    width: 100%;
   }
 
   .chamber-seat-legend li {
-    display: inline-flex;
+    display: flex;
+    min-width: 0;
+    justify-content: center;
   }
 
   .chamber-party-pill {
     display: inline-flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 0.35rem 0.5rem;
-    padding: 0.3rem 0.65rem;
+    justify-content: center;
+    gap: 0.25rem 0.35rem;
+    padding: 0.28rem 0.45rem;
     border-radius: 9999px;
-    font-size: 0.8125rem;
+    font-size: clamp(0.625rem, 2.4vw, 0.8125rem);
     font-weight: 600;
     line-height: 1.1;
     border: 1px solid transparent;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .chamber-party-pill.party-r {
@@ -1607,6 +1651,9 @@
 
   .chamber-party-pill-label {
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .chamber-party-pill-count {
