@@ -1478,7 +1478,11 @@
 
   @media (max-width: 900px) {
     .chamber-overview-grid {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .chamber-card--president {
+      grid-column: 1 / -1;
     }
   }
 
@@ -1496,6 +1500,13 @@
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
+  }
+
+  .chamber-card-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.45rem;
   }
 
   .chamber-card-title {
@@ -1579,8 +1590,14 @@
 
   @media (max-width: 900px) {
     .chamber-wedge-wrap {
-      width: min(100%, 11.5rem);
-      margin-inline: auto;
+      width: 100%;
+      margin-inline: 0;
+    }
+
+    .chamber-seat-legend {
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
     }
 
     .president-control-body {
@@ -1628,16 +1645,35 @@
 
   .chamber-legend-text {
     font-size: 0.6875rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.2;
-    color: hsl(var(--twc-secondary));
     white-space: nowrap;
+  }
+
+  .chamber-legend-text.party-r {
+    color: hsl(var(--twc-party-r));
+  }
+
+  .chamber-legend-text.party-d {
+    color: hsl(var(--twc-party-d));
+  }
+
+  .chamber-legend-text.party-i {
+    color: hsl(var(--twc-party-i));
+  }
+
+  .chamber-legend-text.party-other {
+    color: hsl(var(--twc-party-other));
   }
 
   @media (min-width: 1024px) {
     .chamber-legend-text {
       font-size: 0.75rem;
     }
+  }
+
+  .chamber-control-pill {
+    width: fit-content;
   }
 
   .chamber-party-pill {
