@@ -1,4 +1,4 @@
-import { partyCssClass, partyDisplayName } from '@congress-tracker/shared/party'
+import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
 
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
 import { sortPartySeatCounts } from '../utils/chamberWedge'
@@ -12,16 +12,30 @@ type ChamberCardProps = {
 
 function ChamberCard({ chamber, composition }: ChamberCardProps) {
   const sortedSeats = sortPartySeatCounts(composition.seats)
+  const controlPartyClass = composition.majority_party
+    ? partyCssClass(composition.majority_party)
+    : null
 
   return (
     <article className="chamber-card">
       <header className="chamber-card-header">
-        <h3 className="chamber-card-title">
-          {chamber}
-          {composition.is_sample ? (
-            <span className="chamber-sample-badge"> · Sample roster</span>
+        <div className="chamber-card-title-row">
+          <h3 className="chamber-card-title">
+            {chamber}
+            {composition.is_sample ? (
+              <span className="chamber-sample-badge"> · Sample roster</span>
+            ) : null}
+          </h3>
+          {composition.majority_party ? (
+            <span
+              className={`chamber-party-pill ${controlPartyClass} chamber-control-pill`}
+            >
+              <span className="chamber-party-pill-label">
+                {partyDisplayName(composition.majority_party)} Controlled
+              </span>
+            </span>
           ) : null}
-        </h3>
+        </div>
       </header>
       <ChamberPartyWedge chamber={chamber} seats={composition.seats} total={composition.total} />
       {composition.total > 0 ? (
@@ -33,14 +47,11 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
             {sortedSeats.map((entry) => (
               <li key={entry.party} className="chamber-legend-item">
                 <span
-                  className={`chamber-legend-dot ${partyCssClass(entry.party)}`}
-                  aria-hidden="true"
-                />
-                <span
-                  className="chamber-legend-text"
+                  className={`chamber-legend-text ${partyCssClass(entry.party)}`}
+                  aria-label={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                   title={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                 >
-                  {partyDisplayName(entry.party)} {entry.seats.toLocaleString()}
+                  {partyShortLabel(entry.party)}: {entry.seats.toLocaleString()}
                 </span>
               </li>
             ))}
