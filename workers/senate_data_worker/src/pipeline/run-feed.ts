@@ -13,6 +13,7 @@ import {
 import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
 import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
 import { billLabel } from "./bill-label";
+import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestHousePassageVotes } from "../sources/house-votes";
 import { ingestSenatePassageVotes } from "../sources/senate-votes";
@@ -34,6 +35,19 @@ export async function runFeedPipeline(
   const trigger = options.trigger ?? "admin";
 
   try {
+    try {
+      await ensureMemberRoster(env);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        JSON.stringify({
+          event: "member_roster_sync_failed",
+          trigger,
+          error: message,
+        })
+      );
+    }
+
     const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
     const congress = congressNumber(env);
     const knownVoteKeys = await selectExistingVoteKeys(env.DB, lookback, congress);

@@ -12,6 +12,7 @@ import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
+import { ensureMemberRoster } from "../pipeline/ensure-member-roster";
 import { runMembersRosterPipeline } from "../pipeline/run-members-roster";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
 import {
@@ -376,6 +377,18 @@ export async function handlePublicFetch(
     return handleStatsJson(
       json,
       async (): Promise<SessionStatsResponse> => {
+        try {
+          await ensureMemberRoster(env);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            JSON.stringify({
+              event: "member_roster_sync_failed",
+              trigger: "session_stats",
+              error: message,
+            })
+          );
+        }
         const stats = await buildSessionStats(env.DB, congress, session);
         return { congress, session, ...stats, as_of: asOf };
       },
