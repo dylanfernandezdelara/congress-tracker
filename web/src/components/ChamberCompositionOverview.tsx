@@ -1,55 +1,50 @@
-import { lazy, Suspense } from 'react'
+import { countBallotSeatsByParty, buildSeatOnBallotFlags } from '@congress-tracker/shared/chamber-seat-ballot'
 import { seatsUpElectionLabel } from '@congress-tracker/shared/chamber-election'
 import { partyCssClass, partyDisplayName } from '@congress-tracker/shared/party'
 
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
-import { seatArcAriaLabel } from '../utils/chamberSeatLayout'
-import { useChamberDiagramMode } from '../hooks/useChamberDiagramMode'
-import { ChamberSeatArc2D } from './ChamberSeatArc2D'
-
-const ChamberSeatDiagram3D = lazy(async () => {
-  const mod = await import('./ChamberSeatDiagram3D')
-  return { default: mod.ChamberSeatDiagram3D }
-})
+import { expandPartyCountsToSeats } from '../utils/chamberSeatLayout'
+import { ChamberSeatGrid } from './ChamberSeatGrid'
 
 type ChamberSeatViewProps = {
   chamber: 'House' | 'Senate'
   composition: ChamberComposition
 }
 
-function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
-  const mode = useChamberDiagramMode()
-  const hasMemberSeatParties =
-    Boolean(composition.seat_parties) &&
-    composition.seat_parties!.length === composition.total
-  const ariaLabel = seatArcAriaLabel(chamber, composition.seats, composition.total, {
-    perMember: hasMemberSeatParties,
-  })
+function resolveSeatOnBallot(
+  chamber: 'House' | 'Senate',
+  composition: ChamberComposition
+): boolean[] | null {
+  if (composition.seat_on_ballot && composition.seat_on_ballot.length === composition.total) {
+    return composition.seat_on_ballot
+  }
 
-  const seatProps = {
+  const seatParties =
+    composition.seat_parties && composition.seat_parties.length === composition.total
+      ? composition.seat_parties
+      : expandPartyCountsToSeats(composition.seats)
+
+  if (seatParties.length === 0) return null
+
+  return buildSeatOnBallotFlags(
     chamber,
-    seats: composition.seats,
-    total: composition.total,
-    seatParties: composition.seat_parties,
-  }
+    seatParties,
+    composition.seats_up_for_election
+  )
+}
 
-  if (composition.total === 0) {
-    return <ChamberSeatArc2D {...seatProps} seats={[]} total={0} />
-  }
-
-  if (mode === '2d') {
-    return <ChamberSeatArc2D {...seatProps} />
-  }
+function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
+  const seatOnBallot = resolveSeatOnBallot(chamber, composition)
 
   return (
-    <Suspense fallback={<ChamberSeatArc2D {...seatProps} />}>
-      <ChamberSeatDiagram3D
-        chamber={chamber}
-        seats={composition.seats}
-        seatParties={composition.seat_parties}
-        ariaLabel={ariaLabel}
-      />
-    </Suspense>
+    <ChamberSeatGrid
+      chamber={chamber}
+      seats={composition.seats}
+      total={composition.total}
+      seatParties={composition.seat_parties}
+      seatOnBallot={seatOnBallot}
+      electionYear={composition.election_year}
+    />
   )
 }
 
@@ -60,9 +55,21 @@ type ChamberCardProps = {
 
 function ChamberCard({ chamber, composition }: ChamberCardProps) {
   const electionLabel =
-    composition.seats_up_for_election > 0
-      ? seatsUpElectionLabel(chamber, composition.seats_up_for_election, composition.election_year)
-      : null
+    composition.is_sample
+      ? `${composition.total.toLocaleString()} sample ${chamber === 'House' ? 'seats' : 'seats'} in local roster`
+      : composition.seats_up_for_election > 0
+        ? seatsUpElectionLabel(chamber, composition.seats_up_for_election, composition.election_year)
+        : null
+
+  const seatParties =
+    composition.seat_parties && composition.seat_parties.length === composition.total
+      ? composition.seat_parties
+      : expandPartyCountsToSeats(composition.seats)
+  const seatOnBallot = resolveSeatOnBallot(chamber, composition)
+  const ballotByParty =
+    seatOnBallot && seatParties.length === seatOnBallot.length
+      ? countBallotSeatsByParty(seatParties, seatOnBallot)
+      : new Map<string, number>()
 
   return (
     <article className="chamber-card">
@@ -82,16 +89,24 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
             <p className="chamber-election-badge">{electionLabel}</p>
           ) : null}
           <ul className="chamber-seat-legend" aria-label={`${chamber} party seat counts`}>
-            {composition.seats.map((entry) => (
-              <li key={entry.party}>
-                <span className={`chamber-party-pill ${partyCssClass(entry.party)}`}>
-                  <span className="chamber-party-pill-label">
-                    {partyDisplayName(entry.party)}
+            {composition.seats.map((entry) => {
+              const onBallot = ballotByParty.get(entry.party) ?? 0
+              return (
+                <li key={entry.party}>
+                  <span className={`chamber-party-pill ${partyCssClass(entry.party)}`}>
+                    <span className="chamber-party-pill-label">
+                      {partyDisplayName(entry.party)}
+                    </span>
+                    <span className="chamber-party-pill-count">{entry.seats.toLocaleString()}</span>
+                    {onBallot > 0 ? (
+                      <span className="chamber-party-pill-ballot">
+                        {onBallot.toLocaleString()} on {composition.election_year} ballot
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="chamber-party-pill-count">{entry.seats.toLocaleString()}</span>
-                </span>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         </footer>
       ) : null}
@@ -136,15 +151,10 @@ export function ChamberCompositionOverview({
   if (!composition) return null
 
   const hasSampleData = composition.house.is_sample || composition.senate.is_sample
-  const hasMemberSeatParties =
-    (composition.house.seat_parties?.length ?? 0) === composition.house.total &&
-    (composition.senate.seat_parties?.length ?? 0) === composition.senate.total
 
   const subtitle = hasSampleData
-    ? 'Illustrative hemicycle — one dot per seat, colored by member party (local sample roster).'
-    : hasMemberSeatParties
-      ? 'Illustrative hemicycle — one dot per member, colored by party. The Senate assigns desks; the House has no fixed seating chart.'
-      : 'Illustrative hemicycle — one dot per seat, colored by party totals. The Senate assigns desks; the House has no fixed seating chart.'
+    ? 'Party blocks sized by seat count — pulsing tiles are on this year’s ballot (sample roster).'
+    : 'Party blocks sized by seat count — pulsing tiles are on this year’s ballot. Wider block = more seats.'
 
   return (
     <section className="home-enrichment" aria-label="Chamber control">

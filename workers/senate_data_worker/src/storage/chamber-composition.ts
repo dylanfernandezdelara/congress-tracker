@@ -1,3 +1,4 @@
+import { buildSeatOnBallotFlags, countBallotSeatsByParty } from "../../../../shared/chamber-seat-ballot";
 import { seatsUpForElection } from "../../../../shared/chamber-election";
 import { chamberControlLabel, normalizePartyCode } from "../../../../shared/party";
 import { HOUSE_ROSTER_MIN, SENATE_ROSTER_MIN } from "../constants";
@@ -38,7 +39,7 @@ function toComposition(
   partyMap: Map<string, number> | undefined,
   chamber: "House" | "Senate",
   congress: number,
-  options?: { isSample?: boolean; seatParties?: string[] }
+  options?: { isSample?: boolean; seatParties?: string[]; seatOnBallot?: boolean[] }
 ): ChamberComposition {
   const election = seatsUpForElection(chamber, congress);
 
@@ -64,6 +65,10 @@ function toComposition(
     options?.seatParties && options.seatParties.length === total
       ? options.seatParties
       : undefined;
+  const seatOnBallot =
+    options?.seatOnBallot && options.seatOnBallot.length === total
+      ? options.seatOnBallot
+      : undefined;
 
   return {
     seats,
@@ -71,6 +76,7 @@ function toComposition(
     majority_party: majorityParty,
     control_label: chamberControlLabel(majorityParty, total),
     ...(seatParties ? { seat_parties: seatParties } : {}),
+    ...(seatOnBallot ? { seat_on_ballot: seatOnBallot } : {}),
     ...election,
     ...(options?.isSample ? { is_sample: true } : {}),
   };
@@ -214,6 +220,26 @@ function rosterMinForChamber(chamber: string): number {
   return chamber === "House" ? HOUSE_ROSTER_MIN : SENATE_ROSTER_MIN;
 }
 
+function compositionSeatFlags(
+  chamber: "House" | "Senate",
+  congress: number,
+  seatParties: string[] | undefined,
+  partyMap: Map<string, number>
+): { seatParties?: string[]; seatOnBallot?: boolean[] } {
+  if (!seatParties || !seatPartiesMatchPartyMap(seatParties, partyMap)) {
+    return {};
+  }
+  const election = seatsUpForElection(chamber, congress);
+  return {
+    seatParties,
+    seatOnBallot: buildSeatOnBallotFlags(
+      chamber,
+      seatParties,
+      election.seats_up_for_election
+    ),
+  };
+}
+
 async function buildChamberCompositionForChamber(
   db: D1Database,
   congress: number,
@@ -229,11 +255,8 @@ async function buildChamberCompositionForChamber(
     const rosterTotal = [...partyMap.values()].reduce((sum, count) => sum + count, 0);
     if (rosterTotal >= rosterMin) {
       const seatParties = await listRollMemberPartyCodes(db, largestRoll, excludeLocalSample);
-      return toComposition(partyMap, chamber, congress, {
-        seatParties: seatPartiesMatchPartyMap(seatParties, partyMap)
-          ? seatParties
-          : undefined,
-      });
+      const seatFlags = compositionSeatFlags(chamber, congress, seatParties, partyMap);
+      return toComposition(partyMap, chamber, congress, seatFlags);
     }
   }
 
@@ -245,11 +268,10 @@ async function buildChamberCompositionForChamber(
 
   const isSample = total < rosterMin;
   const seatParties = await listMemberPartyCodes(db, chamber, excludeLocalSample);
+  const seatFlags = compositionSeatFlags(chamber, congress, seatParties, memberPartyMap);
   return toComposition(memberPartyMap, chamber, congress, {
     isSample,
-    seatParties: seatPartiesMatchPartyMap(seatParties, memberPartyMap)
-      ? seatParties
-      : undefined,
+    ...seatFlags,
   });
 }
 

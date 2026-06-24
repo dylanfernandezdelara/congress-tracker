@@ -137,6 +137,7 @@ describe("buildChamberComposition", () => {
 
     const result = await buildChamberComposition(db, 119, 2);
     expect(result.senate.seat_parties).toEqual(["D", "D", "R"]);
+    expect(result.senate.seat_on_ballot).toEqual([true, true, true]);
     expect(result.senate.is_sample).toBe(true);
   });
 
