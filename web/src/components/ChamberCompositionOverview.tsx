@@ -52,6 +52,7 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
                 />
                 <span
                   className={`chamber-legend-text ${partyCssClass(entry.party)}`}
+                  aria-label={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                   title={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                 >
                   {partyShortLabel(entry.party)} {entry.seats.toLocaleString()}
