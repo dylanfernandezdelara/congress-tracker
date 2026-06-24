@@ -31,7 +31,7 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
               className={`chamber-party-pill ${controlPartyClass} chamber-control-pill`}
             >
               <span className="chamber-party-pill-label">
-                {partyDisplayName(composition.majority_party)}
+                {partyDisplayName(composition.majority_party)} Controlled
               </span>
             </span>
           ) : null}
