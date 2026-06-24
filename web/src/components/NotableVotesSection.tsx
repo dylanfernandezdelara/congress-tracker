@@ -84,15 +84,11 @@ function NotableVoteDefectors({ entry }: { entry: NotableVoteEntry }) {
     )
   }
 
-  if (entry.member_votes_available === true) {
-    return (
-      <p className="notable-vote-defectors-empty">
-        No members broke with their party on this {entry.chamber} vote.
-      </p>
-    )
-  }
-
-  return null
+  return (
+    <p className="notable-vote-defectors-empty">
+      No members broke with their party on this {entry.chamber} vote.
+    </p>
+  )
 }
 
 function NotableVoteCard({ entry }: { entry: NotableVoteEntry }) {

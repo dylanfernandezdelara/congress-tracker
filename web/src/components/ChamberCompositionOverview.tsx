@@ -1,4 +1,4 @@
-import { partyCssClass, partyDisplayName, partyLegendLabel } from '@congress-tracker/shared/party'
+import { partyCssClass, partyDisplayName } from '@congress-tracker/shared/party'
 
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
 import { sortPartySeatCounts } from '../utils/chamberWedge'
@@ -29,18 +29,18 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
           <ul
             className="chamber-seat-legend"
             aria-label={`${chamber} party seat counts`}
-            style={{ ['--legend-cols' as string]: sortedSeats.length }}
           >
             {sortedSeats.map((entry) => (
-              <li key={entry.party}>
+              <li key={entry.party} className="chamber-legend-item">
                 <span
-                  className={`chamber-party-pill ${partyCssClass(entry.party)}`}
+                  className={`chamber-legend-dot ${partyCssClass(entry.party)}`}
+                  aria-hidden="true"
+                />
+                <span
+                  className="chamber-legend-text"
                   title={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                 >
-                  <span className="chamber-party-pill-label">
-                    {partyLegendLabel(entry.party)}
-                  </span>
-                  <span className="chamber-party-pill-count">{entry.seats.toLocaleString()}</span>
+                  {partyDisplayName(entry.party)} {entry.seats.toLocaleString()}
                 </span>
               </li>
             ))}

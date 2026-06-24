@@ -16,7 +16,6 @@ import { normalizeVotePosition } from "../../../../shared/vote-positions";
 import type { Env } from "../config";
 import { ensureSchema } from "../d1/schema";
 import { hasRealMemberRoster } from "../d1/members";
-import { countMemberVotesForRoll } from "../d1/member-votes";
 import { computeRollDefectors } from "./defectors";
 import { partyMajoritiesForRoll } from "./roll-party-stats";
 import { synthesizeNotableVoteBlurb } from "../synthesis/notable-vote";
@@ -376,7 +375,7 @@ export async function buildNotableVotes(
       roll_number: vote.roll_number,
     });
     const member_votes_available =
-      (await countMemberVotesForRoll(db, roll)) > 0;
+      (memberVotesByRoll.get(rollKey(vote)) ?? []).length > 0;
 
     const seen = new Set<string>();
     const defectors = rollDefectors
