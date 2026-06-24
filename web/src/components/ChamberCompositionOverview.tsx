@@ -47,15 +47,11 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
             {sortedSeats.map((entry) => (
               <li key={entry.party} className="chamber-legend-item">
                 <span
-                  className={`chamber-legend-dot ${partyCssClass(entry.party)}`}
-                  aria-hidden="true"
-                />
-                <span
                   className={`chamber-legend-text ${partyCssClass(entry.party)}`}
                   aria-label={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                   title={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                 >
-                  {partyShortLabel(entry.party)} {entry.seats.toLocaleString()}
+                  {partyShortLabel(entry.party)}: {entry.seats.toLocaleString()}
                 </span>
               </li>
             ))}
