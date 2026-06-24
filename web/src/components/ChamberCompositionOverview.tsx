@@ -1,15 +1,7 @@
-import { lazy, Suspense } from 'react'
 import { partyCssClass, partyDisplayName } from '@congress-tracker/shared/party'
 
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
-import { seatArcAriaLabel } from '../utils/chamberSeatLayout'
-import { useChamberDiagramMode } from '../hooks/useChamberDiagramMode'
 import { ChamberSeatHemicycle } from './ChamberSeatHemicycle'
-
-const ChamberSeatDiagram3D = lazy(async () => {
-  const mod = await import('./ChamberSeatDiagram3D')
-  return { default: mod.ChamberSeatDiagram3D }
-})
 
 type ChamberSeatViewProps = {
   chamber: 'House' | 'Senate'
@@ -17,39 +9,14 @@ type ChamberSeatViewProps = {
 }
 
 function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
-  const mode = useChamberDiagramMode()
-  const hasMemberSeatParties =
-    Boolean(composition.seat_parties) &&
-    composition.seat_parties!.length === composition.total
-  const ariaLabel = seatArcAriaLabel(chamber, composition.seats, composition.total, {
-    perMember: hasMemberSeatParties,
-  })
-
-  const seatProps = {
-    chamber,
-    seats: composition.seats,
-    total: composition.total,
-    seatParties: composition.seat_parties,
-  }
-
-  if (composition.total === 0) {
-    return <ChamberSeatHemicycle {...seatProps} seats={[]} total={0} />
-  }
-
-  if (mode === '3d') {
-    return (
-      <Suspense fallback={<ChamberSeatHemicycle {...seatProps} />}>
-        <ChamberSeatDiagram3D
-          chamber={chamber}
-          seats={composition.seats}
-          seatParties={composition.seat_parties}
-          ariaLabel={ariaLabel}
-        />
-      </Suspense>
-    )
-  }
-
-  return <ChamberSeatHemicycle {...seatProps} />
+  return (
+    <ChamberSeatHemicycle
+      chamber={chamber}
+      seats={composition.seats}
+      total={composition.total}
+      seatParties={composition.seat_parties}
+    />
+  )
 }
 
 type ChamberCardProps = {

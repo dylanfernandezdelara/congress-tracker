@@ -72,7 +72,9 @@ export function ChamberSeatHemicycle({
           className: `chamber-hemicycle ${chamberClass}`,
           role: 'img',
           'aria-label': ariaLabel,
-          preserveAspectRatio: 'xMidYMax meet',
+          width: '100%',
+          height: '100%',
+          preserveAspectRatio: 'xMidYMid meet',
         }}
       />
     </div>

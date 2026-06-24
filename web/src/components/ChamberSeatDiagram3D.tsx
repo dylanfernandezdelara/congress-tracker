@@ -108,7 +108,7 @@ export function ChamberSeatDiagram3D({
         frameloop="demand"
         gl={{ antialias: true, alpha: true, powerPreference: 'low-power' }}
       >
-        <Bounds fit clip observe margin={1.08}>
+        <Bounds fit observe margin={1.35}>
           <ChamberScene chamber={chamber} seats={seats} seatParties={seatParties} />
         </Bounds>
       </Canvas>
