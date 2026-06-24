@@ -17,6 +17,7 @@ import type { Env } from "../config";
 import { ensureSchema } from "../d1/schema";
 import { hasRealMemberRoster } from "../d1/members";
 import { computeRollDefectors } from "./defectors";
+import { partyMajoritiesForRoll } from "./roll-party-stats";
 import { synthesizeNotableVoteBlurb } from "../synthesis/notable-vote";
 import type { NotableVotePromptContext } from "../synthesis/notable-vote-prompt";
 import {
@@ -83,31 +84,6 @@ export interface BuildNotableVotesResult {
 
 function rollKey(vote: Pick<CandidateRow, "chamber" | "congress" | "session" | "roll_number">): string {
   return `${vote.chamber}:${vote.congress}:${vote.session}:${vote.roll_number}`;
-}
-
-function partyMajoritiesForRoll(
-  positions: MemberPartyPositionRow[]
-): Map<string, "yea" | "nay" | null> {
-  const tallies = new Map<string, { yea: number; nay: number }>();
-  for (const { party, position } of positions) {
-    const code = normalizePartyCode(party);
-    if (code === "Other") continue;
-    const norm = normalizeVotePosition(position);
-    if (norm === "other") continue;
-    const tally = tallies.get(code) ?? { yea: 0, nay: 0 };
-    tally[norm] += 1;
-    tallies.set(code, tally);
-  }
-
-  const majorities = new Map<string, "yea" | "nay" | null>();
-  for (const [party, tally] of tallies) {
-    if (tally.yea === 0 && tally.nay === 0) {
-      majorities.set(party, null);
-    } else {
-      majorities.set(party, tally.yea >= tally.nay ? "yea" : "nay");
-    }
-  }
-  return majorities;
 }
 
 async function fetchCandidates(
@@ -361,9 +337,9 @@ export async function buildNotableVotes(
 
   const top = scored.slice(0, limit);
   let usedLlm = false;
-  const notable: NotableVoteEntry[] = [];
 
-  for (const { vote, stats, significance_score } of top) {
+  const notable = await Promise.all(
+    top.map(async ({ vote, stats, significance_score }) => {
     const roll = {
       chamber: vote.chamber,
       congress: vote.congress,
@@ -429,7 +405,7 @@ export async function buildNotableVotes(
       )
       .slice(0, 3);
 
-    notable.push({
+    return {
       chamber: vote.chamber as Chamber,
       congress: vote.congress,
       session: vote.session,
@@ -444,8 +420,9 @@ export async function buildNotableVotes(
       significance_score,
       why_it_matters,
       defectors,
-    });
-  }
+    };
+    })
+  );
 
   return {
     notable,

@@ -19,7 +19,16 @@ export default defineConfig({
     // Same-origin API in dev (see web/src/api/config.ts). Worker must run on :8787.
     proxy: {
       '/feed': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/stats': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/stats': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+        bypass(req) {
+          const path = req.url ?? ''
+          // SPA route /stats — only proxy JSON API paths (e.g. /stats/session.json).
+          if (/^\/stats\/[^?]+\.json(\?|$)/.test(path)) return undefined
+          return '/index.html'
+        },
+      },
       '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
       '/debug': { target: 'http://127.0.0.1:8787', changeOrigin: true },
       '/game': { target: 'http://127.0.0.1:8787', changeOrigin: true },

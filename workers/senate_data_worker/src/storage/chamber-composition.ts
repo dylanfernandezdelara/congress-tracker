@@ -2,7 +2,7 @@ import { seatsUpForElection } from "../../../../shared/chamber-election";
 import { chamberControlLabel, normalizePartyCode } from "../../../../shared/party";
 import { HOUSE_ROSTER_MIN, SENATE_ROSTER_MIN } from "../constants";
 import type { ChamberComposition, PartySeatCount } from "../types";
-import { countRealMembersByChamber } from "../d1/members";
+import { countRealMembersByChamber, hasRealMemberRoster } from "../d1/members";
 import { ensureSchema } from "../d1/schema";
 
 interface MemberPartyRow {
@@ -181,9 +181,7 @@ export async function buildChamberComposition(
   session: number
 ): Promise<{ house: ChamberComposition; senate: ChamberComposition }> {
   await ensureSchema(db);
-  const realCounts = await countRealMembersByChamber(db);
-  const excludeLocalSample =
-    realCounts.house >= HOUSE_ROSTER_MIN || realCounts.senate >= SENATE_ROSTER_MIN;
+  const excludeLocalSample = await hasRealMemberRoster(db);
   const [house, senate] = await Promise.all([
     buildChamberCompositionForChamber(db, congress, session, "House", excludeLocalSample),
     buildChamberCompositionForChamber(db, congress, session, "Senate", excludeLocalSample),

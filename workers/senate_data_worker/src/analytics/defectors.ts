@@ -4,39 +4,10 @@ import { normalizePartyCode } from "../../../../shared/party";
 import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
 import { selectMemberVotesForRoll, type RollCallKey, selectMemberVotesForSession } from "../d1/member-votes";
 import { normalizeVotePosition } from "../../../../shared/vote-positions";
+import { partyMajoritiesForRoll } from "./roll-party-stats";
 
 function normalizePosition(position: string): "yea" | "nay" | "other" {
   return normalizeVotePosition(position);
-}
-
-/**
- * Majority side (yea/nay) for each party on a single roll. Computed once per
- * roll so the per-member defection check is O(members) rather than O(members²).
- */
-function partyMajoritiesForRoll(
-  positions: Array<{ party: string | null; position: string }>
-): Map<string, "yea" | "nay" | null> {
-  const tallies = new Map<string, { yea: number; nay: number }>();
-  for (const { party, position } of positions) {
-    if (!party) continue;
-    const partyKey = normalizePartyCode(party);
-    if (partyKey === "Other") continue;
-    const norm = normalizePosition(position);
-    if (norm === "other") continue;
-    const tally = tallies.get(partyKey) ?? { yea: 0, nay: 0 };
-    tally[norm] += 1;
-    tallies.set(partyKey, tally);
-  }
-
-  const majorities = new Map<string, "yea" | "nay" | null>();
-  for (const [party, tally] of tallies) {
-    if (tally.yea === 0 && tally.nay === 0) {
-      majorities.set(party, null);
-    } else {
-      majorities.set(party, tally.yea >= tally.nay ? "yea" : "nay");
-    }
-  }
-  return majorities;
 }
 
 function congressGovMemberUrl(bioguideId: string): string {
