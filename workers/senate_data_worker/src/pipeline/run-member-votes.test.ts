@@ -5,6 +5,8 @@ import type { RollCallKey } from "../d1/member-votes";
 const {
   selectPassageRollCalls,
   countMemberVotesForRoll,
+  countLisMemberVotesForRoll,
+  deleteMemberVotesForRoll,
   upsertMemberVotesBatch,
   upsertMembersBatch,
   fetchHouseMemberVotes,
@@ -12,6 +14,8 @@ const {
 } = vi.hoisted(() => ({
   selectPassageRollCalls: vi.fn(),
   countMemberVotesForRoll: vi.fn(),
+  countLisMemberVotesForRoll: vi.fn(async () => 0),
+  deleteMemberVotesForRoll: vi.fn(async () => {}),
   upsertMemberVotesBatch: vi.fn(async () => {}),
   upsertMembersBatch: vi.fn(async () => {}),
   fetchHouseMemberVotes: vi.fn(),
@@ -22,9 +26,23 @@ vi.mock("../d1/schema", () => ({ ensureSchema: vi.fn(async () => {}) }));
 vi.mock("../d1/member-votes", () => ({
   selectPassageRollCalls,
   countMemberVotesForRoll,
+  countLisMemberVotesForRoll,
+  deleteMemberVotesForRoll,
   upsertMemberVotesBatch,
 }));
-vi.mock("../d1/members", () => ({ upsertMembersBatch }));
+vi.mock("../d1/members", () => ({
+  upsertMembersBatch,
+  hasRealMemberRoster: vi.fn(async () => true),
+  buildSenateBioguideLookup: vi.fn(async () => new Map()),
+}));
+vi.mock("./run-members-roster", () => ({
+  runMembersRosterPipeline: vi.fn(async () => ({
+    congress: 119,
+    membersUpserted: 535,
+    house: 435,
+    senate: 100,
+  })),
+}));
 vi.mock("../sources/house-member-votes", () => ({ fetchHouseMemberVotes }));
 vi.mock("../sources/senate-member-votes", () => ({ fetchSenateMemberVotes }));
 
@@ -94,6 +112,18 @@ describe("runMemberVotesPipeline", () => {
     expect(result.rollsProcessed).toBe(1);
     expect(result.rollsSkipped).toBe(1);
     expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-ingests Senate rolls that still have unresolved LIS member ids", async () => {
+    selectPassageRollCalls.mockResolvedValue([{ chamber: "Senate", congress: 119, session: 2, roll_number: 1 }]);
+    countMemberVotesForRoll.mockResolvedValue(100);
+    countLisMemberVotesForRoll.mockResolvedValue(5);
+    fetchSenateMemberVotes.mockImplementation(fakeFetch(["S000001"]));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(deleteMemberVotesForRoll).toHaveBeenCalledTimes(1);
+    expect(result.rollsProcessed).toBe(1);
   });
 
   it("caps rolls per invocation and reports the remainder", async () => {

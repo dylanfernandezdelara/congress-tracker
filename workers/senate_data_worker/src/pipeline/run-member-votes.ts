@@ -1,15 +1,22 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { MEMBER_VOTES_MAX_ROLLS_PER_RUN } from "../constants";
-import { upsertMembersBatch } from "../d1/members";
+import {
+  upsertMembersBatch,
+  buildSenateBioguideLookup,
+  hasRealMemberRoster,
+} from "../d1/members";
 import {
   countMemberVotesForRoll,
+  countLisMemberVotesForRoll,
+  deleteMemberVotesForRoll,
   selectPassageRollCalls,
   upsertMemberVotesBatch,
 } from "../d1/member-votes";
 import { ensureSchema } from "../d1/schema";
 import { fetchHouseMemberVotes } from "../sources/house-member-votes";
 import { fetchSenateMemberVotes } from "../sources/senate-member-votes";
+import { runMembersRosterPipeline } from "./run-members-roster";
 import type { MemberRecord } from "../types";
 
 export interface RunMemberVotesResult {
@@ -25,11 +32,20 @@ export interface RunMemberVotesResult {
  * (one atomic D1 batch per roll) and capped at
  * MEMBER_VOTES_MAX_ROLLS_PER_RUN rolls per invocation to stay under the Worker
  * subrequest limit. Re-invoke until `rollsRemaining` is 0.
+ *
+ * Syncs the Congress.gov member roster first when the D1 members table lacks a
+ * full real roster (needed for Senate LIS → bioguide resolution and photos).
  */
 export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesResult> {
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   await ensureSchema(env.DB);
+
+  if (!(await hasRealMemberRoster(env.DB)) && env.CONGRESS_API_KEY?.trim()) {
+    await runMembersRosterPipeline(env);
+  }
+
+  const senateBioguideLookup = await buildSenateBioguideLookup(env.DB);
   const rolls = await selectPassageRollCalls(env.DB, congress, session);
 
   let rollsProcessed = 0;
@@ -45,15 +61,22 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
     const roll = rolls[index];
 
     const existing = await countMemberVotesForRoll(env.DB, roll);
-    if (existing > 0) {
+    const lisUnresolved =
+      existing > 0 ? await countLisMemberVotesForRoll(env.DB, roll) : 0;
+    if (existing > 0 && lisUnresolved === 0) {
       rollsSkipped += 1;
       continue;
+    }
+    if (lisUnresolved > 0) {
+      await deleteMemberVotesForRoll(env.DB, roll);
     }
 
     const fetched =
       roll.chamber === "House"
         ? await fetchHouseMemberVotes(env, roll.congress, roll.session, roll.roll_number)
-        : await fetchSenateMemberVotes(env, roll.congress, roll.session, roll.roll_number);
+        : await fetchSenateMemberVotes(env, roll.congress, roll.session, roll.roll_number, {
+            senateBioguideLookup,
+          });
 
     if (fetched.votes.length === 0) {
       rollsSkipped += 1;

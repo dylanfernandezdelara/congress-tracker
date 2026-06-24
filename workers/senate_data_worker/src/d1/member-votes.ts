@@ -92,6 +92,33 @@ export async function countMemberVotesForRoll(
   return row?.count ?? 0;
 }
 
+export async function countLisMemberVotesForRoll(
+  db: D1Database,
+  roll: RollCallKey
+): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM member_votes
+       WHERE chamber = ? AND congress = ? AND session = ? AND roll_number = ?
+         AND bioguide_id LIKE 'LIS:%'`
+    )
+    .bind(roll.chamber, roll.congress, roll.session, roll.roll_number)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+export async function deleteMemberVotesForRoll(db: D1Database, roll: RollCallKey): Promise<void> {
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `DELETE FROM member_votes
+       WHERE chamber = ? AND congress = ? AND session = ? AND roll_number = ?`
+    )
+    .bind(roll.chamber, roll.congress, roll.session, roll.roll_number)
+    .run();
+}
+
 export interface MemberVoteWithRoll {
   bioguide_id: string;
   position: string;
@@ -105,6 +132,27 @@ export interface MemberVoteWithRoll {
   bill_number: number;
   bill_congress: number;
   vote_date: string;
+}
+
+export interface MemberVotePositionRow {
+  bioguide_id: string;
+  position: string;
+}
+
+export async function selectMemberVotesForRoll(
+  db: D1Database,
+  roll: RollCallKey
+): Promise<MemberVotePositionRow[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT bioguide_id, position
+       FROM member_votes
+       WHERE chamber = ? AND congress = ? AND session = ? AND roll_number = ?`
+    )
+    .bind(roll.chamber, roll.congress, roll.session, roll.roll_number)
+    .all<MemberVotePositionRow>();
+  return results ?? [];
 }
 
 export async function selectMemberVotesForSession(

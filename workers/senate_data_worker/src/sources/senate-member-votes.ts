@@ -1,10 +1,23 @@
 import { congressNumber, sessionNumber } from "../config";
 import type { Env } from "../config";
 import type { MemberRecord, MemberVoteRecord } from "../types";
+import { senateMemberLookupKey } from "../../../../shared/member-id";
+import { normalizePartyCode } from "../../../../shared/party";
 import { fetchText } from "./http";
 import { getTag } from "./senate-xml";
 
-function memberId(lisMemberId: string): string {
+function resolveSenateBioguideId(
+  lastName: string,
+  state: string,
+  party: string,
+  lisMemberId: string,
+  lookup?: Map<string, string>
+): string {
+  const partyCode = normalizePartyCode(party);
+  if (partyCode === "Other") return lisMemberId ? `LIS:${lisMemberId}` : "";
+  const key = senateMemberLookupKey(lastName, state, partyCode);
+  const bioguide = lookup?.get(key);
+  if (bioguide) return bioguide;
   return lisMemberId ? `LIS:${lisMemberId}` : "";
 }
 
@@ -12,7 +25,8 @@ export function parseSenateMemberVoteXml(
   xml: string,
   congress: number,
   session: number,
-  rollNumber: number
+  rollNumber: number,
+  options?: { senateBioguideLookup?: Map<string, string> }
 ): { members: MemberRecord[]; votes: MemberVoteRecord[] } {
   const members: MemberRecord[] = [];
   const votes: MemberVoteRecord[] = [];
@@ -20,16 +34,16 @@ export function parseSenateMemberVoteXml(
 
   for (const block of blocks) {
     const lisId = getTag(block, "lis_member_id");
-    const id = memberId(lisId);
-    if (!id) continue;
-
     const first = getTag(block, "first_name");
     const last = getTag(block, "last_name");
     const full = getTag(block, "member_full") || [first, last].filter(Boolean).join(" ");
     const party = getTag(block, "party");
     const state = getTag(block, "state");
     const position = getTag(block, "vote_cast");
-    if (!position) continue;
+    if (!position || !last) continue;
+
+    const id = resolveSenateBioguideId(last, state, party, lisId, options?.senateBioguideLookup);
+    if (!id) continue;
 
     members.push({
       bioguideId: id,
@@ -56,12 +70,13 @@ export async function fetchSenateMemberVotes(
   env: Env,
   congress: number,
   session: number,
-  rollNumber: number
+  rollNumber: number,
+  options?: { senateBioguideLookup?: Map<string, string> }
 ): Promise<{ members: MemberRecord[]; votes: MemberVoteRecord[] }> {
   const padded = String(rollNumber).padStart(5, "0");
   const url = `https://www.senate.gov/legislative/LIS/roll_call_votes/vote${congress}${session}/vote_${congress}_${session}_${padded}.xml`;
   const xml = await fetchText(url);
-  return parseSenateMemberVoteXml(xml, congress, session, rollNumber);
+  return parseSenateMemberVoteXml(xml, congress, session, rollNumber, options);
 }
 
 export async function fetchSenateMemberVotesForEnv(

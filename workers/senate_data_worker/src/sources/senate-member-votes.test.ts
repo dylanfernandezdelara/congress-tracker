@@ -34,4 +34,14 @@ describe("parseSenateMemberVoteXml", () => {
     expect(votes[0].position).toBe("Yea");
     expect(members[1].party).toBe("R");
   });
+
+  it("resolves LIS ids to bioguide ids when roster lookup is provided", () => {
+    const lookup = new Map<string, string>([["smith|MA|D", "S000001"]]);
+    const { members, votes } = parseSenateMemberVoteXml(SAMPLE_SENATE_MEMBER_XML, 119, 2, 1, {
+      senateBioguideLookup: lookup,
+    });
+    expect(members[0].bioguideId).toBe("S000001");
+    expect(votes[0].bioguideId).toBe("S000001");
+    expect(members[1].bioguideId).toBe("LIS:S002");
+  });
 });

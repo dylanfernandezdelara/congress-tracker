@@ -44,6 +44,20 @@ async function readPipelineState<T>(db: D1Database, key: string): Promise<T | nu
   }
 }
 
+const SENATE_BIOGUIDE_LOOKUP_KEY = "senate_bioguide_lookup";
+
+export async function storeSenateBioguideLookup(
+  db: D1Database,
+  lookup: Record<string, string>
+): Promise<void> {
+  await upsertPipelineState(db, SENATE_BIOGUIDE_LOOKUP_KEY, lookup, new Date().toISOString());
+}
+
+export async function readSenateBioguideLookup(db: D1Database): Promise<Map<string, string>> {
+  const stored = await readPipelineState<Record<string, string>>(db, SENATE_BIOGUIDE_LOOKUP_KEY);
+  return new Map(Object.entries(stored ?? {}));
+}
+
 export async function recordFeedPipelineSuccess(
   db: D1Database,
   trigger: FeedPipelineTrigger,

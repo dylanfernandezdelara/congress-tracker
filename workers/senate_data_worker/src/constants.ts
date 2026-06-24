@@ -17,6 +17,10 @@ export const GAME_POOL_SIZE = 200;
  */
 export const MEMBER_VOTES_MAX_ROLLS_PER_RUN = 150;
 
+/** Minimum seated members to treat a chamber roster as complete (real Congress data). */
+export const HOUSE_ROSTER_MIN = 400;
+export const SENATE_ROSTER_MIN = 95;
+
 /**
  * New passage votes to ingest per /__pipeline/run/session-backfill invocation.
  * House backfill fetches one detail URL per new roll; cap per run to stay under
