@@ -22,13 +22,18 @@ export type HemicycleDot = {
 }
 
 const ROWS_BY_CHAMBER: Record<'House' | 'Senate', number> = {
-  House: 16,
-  Senate: 9,
+  House: 14,
+  Senate: 7,
 }
 
 const VIEWBOX_BY_CHAMBER: Record<'House' | 'Senate', { width: number; height: number }> = {
-  House: { width: 400, height: 148 },
-  Senate: { width: 320, height: 112 },
+  House: { width: 420, height: 200 },
+  Senate: { width: 420, height: 200 },
+}
+
+const SEAT_SIZE_BY_CHAMBER: Record<'House' | 'Senate', number> = {
+  House: 2.8,
+  Senate: 5.2,
 }
 
 function distributeToRows(total: number, rowCount: number): number[] {
@@ -82,12 +87,12 @@ function generateHemicyclePositions(chamber: 'House' | 'Senate', total: number):
     const count = seatsPerRow[row] ?? 0
     if (count === 0) continue
 
-    const rowRadius = (row + 1) / rowCount
+    const rowRadius = 0.72 + ((row + 1) / rowCount) * 0.28
     for (let col = 0; col < count; col += 1) {
       const t = count === 1 ? 0.5 : col / (count - 1)
       const angle = Math.PI * (1 - t)
       const rx = rowRadius * 0.98
-      const rz = rowRadius * 0.92
+      const rz = rowRadius * 0.94
       positions.push({
         x: rx * Math.cos(angle),
         y: row * 0.052 + 0.02,
@@ -204,6 +209,26 @@ function applyRosterPartiesToLayout(cells: SeatCell[], rosterParties: string[]):
     ...cell,
     party: rosterParties[index] ?? cell.party,
   }))
+}
+
+export function layoutAmphitheaterSeats2D(
+  chamber: 'House' | 'Senate',
+  seats: PartySeatCount[],
+  seatParties?: string[] | null
+): Array<{ party: string; x: number; y: number; faceDeg: number; size: number }> {
+  const { width, height } = VIEWBOX_BY_CHAMBER[chamber]
+  const centerX = width / 2
+  const centerY = height * 0.92
+  const baseSize = SEAT_SIZE_BY_CHAMBER[chamber]
+  const cells = layoutHorseshoeSeats(chamber, seats, seatParties)
+
+  return cells.map((cell) => {
+    const x = (cell.x + 1) * (width / 2)
+    const y = centerY + cell.z * (height * 0.82)
+    const faceDeg = (Math.atan2(centerY - y, centerX - x) * 180) / Math.PI
+    const rowFactor = 1 - cell.rowIndex * 0.025
+    return { party: cell.party, x, y, faceDeg, size: baseSize * rowFactor }
+  })
 }
 
 export function layoutHemicycleDots(

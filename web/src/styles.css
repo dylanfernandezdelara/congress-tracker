@@ -1459,17 +1459,16 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .chamber-seat-grid-wrap.chamber-seat-grid--house .chamber-party-blocks {
-      min-height: 8.5rem;
+    .chamber-amphitheater-wrap {
+      min-height: 9rem;
     }
 
-    .chamber-seat-grid-wrap.chamber-seat-grid--senate .chamber-party-blocks {
-      min-height: 6.5rem;
+    .chamber-diagram-3d-wrap {
+      height: 9rem;
     }
 
-    .chamber-party-block-grid {
-      grid-template-columns: repeat(auto-fill, minmax(9px, 1fr));
-      gap: 2px;
+    .chamber-diagram-3d {
+      height: 9rem !important;
     }
 
     .chamber-card {
@@ -1525,194 +1524,85 @@
     border: 1px solid hsl(var(--twc-border));
   }
 
-  .chamber-seat-grid-wrap {
+  .chamber-amphitheater-wrap {
     width: 100%;
+    min-height: 7.5rem;
   }
 
-  .chamber-party-blocks {
-    display: flex;
-    gap: 3px;
-    width: 100%;
-    min-height: 5.5rem;
-    align-items: stretch;
-  }
-
-  .chamber-seat-grid-wrap.chamber-seat-grid--house .chamber-party-blocks {
-    min-height: 6.75rem;
-  }
-
-  .chamber-seat-grid-wrap.chamber-seat-grid--senate .chamber-party-blocks {
-    min-height: 5.25rem;
-  }
-
-  .chamber-party-block {
-    display: flex;
-    min-width: 0;
-  }
-
-  .chamber-party-block-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(7px, 1fr));
-    grid-auto-rows: 1fr;
-    gap: 2px;
-    width: 100%;
-    height: 100%;
-  }
-
-  .chamber-seat-tile {
+  .chamber-amphitheater {
     display: block;
     width: 100%;
-    min-height: 6px;
-    aspect-ratio: 1;
-    border-radius: 2px;
-    border: 1px solid transparent;
+    height: auto;
+    min-height: 7.5rem;
   }
 
-  .chamber-seat-tile.party-r {
-    background: hsl(0 72% 88%);
-    border-color: hsl(0 42% 76% / 0.55);
-  }
-
-  .chamber-seat-tile.party-d {
-    background: hsl(217 72% 88%);
-    border-color: hsl(217 42% 76% / 0.55);
-  }
-
-  .chamber-seat-tile.party-i {
-    background: hsl(270 52% 88%);
-    border-color: hsl(270 32% 76% / 0.55);
-  }
-
-  .chamber-seat-tile.party-other {
-    background: hsl(var(--twc-surface-subtle));
-    border-color: hsl(var(--twc-border-muted));
-  }
-
-  .chamber-seat-tile--ballot {
-    animation: chamber-ballot-pulse 2.1s ease-in-out infinite;
-    box-shadow: 0 0 0 1px hsl(var(--twc-primary) / 0.35);
-  }
-
-  @keyframes chamber-ballot-pulse {
-    0%,
-    100% {
-      filter: brightness(1);
-      opacity: 1;
-    }
-    50% {
-      filter: brightness(1.18);
-      opacity: 0.82;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .chamber-seat-tile--ballot {
-      animation: none;
-      outline: 2px solid hsl(var(--twc-primary) / 0.55);
-      outline-offset: -1px;
-    }
-  }
-
-  [data-theme='dark'] .chamber-seat-tile.party-r {
-    background: hsl(0 32% 22%);
-    border-color: hsl(0 28% 34%);
-  }
-
-  [data-theme='dark'] .chamber-seat-tile.party-d {
-    background: hsl(217 32% 22%);
-    border-color: hsl(217 28% 34%);
-  }
-
-  [data-theme='dark'] .chamber-seat-tile.party-i {
-    background: hsl(270 28% 24%);
-    border-color: hsl(270 24% 34%);
-  }
-
-  .chamber-ballot-key {
-    margin: 0.35rem 0 0;
-    font-size: 0.75rem;
-    color: hsl(var(--twc-secondary));
-    line-height: 1.3;
-  }
-
-  .chamber-seat-grid--empty {
+  .chamber-amphitheater--empty {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 4.5rem;
+    min-height: 7.5rem;
     border-radius: 0.625rem;
-    background: transparent;
   }
 
-  .chamber-seat-grid-empty {
-    font-size: 0.75rem;
-    color: hsl(var(--twc-faint));
-  }
-
-  .chamber-diagram-3d-wrap {
-    width: 100%;
-    height: 6.25rem;
-    border-radius: 0.625rem;
-    overflow: hidden;
-    background: transparent;
-    margin: 0 0 -0.25rem;
-    pointer-events: none;
-  }
-
-  .chamber-diagram-3d {
-    width: 100% !important;
-    height: 6.25rem !important;
-    display: block;
-  }
-
-  .chamber-seat-arc {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-
-  .chamber-seat-arc--empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 4.5rem;
-    border-radius: 0.625rem;
-    background: transparent;
-  }
-
-  .chamber-seat-arc-empty {
+  .chamber-amphitheater-empty {
     font-size: 0.75rem;
     color: hsl(var(--twc-faint));
   }
 
   .chamber-seat-cell {
     stroke: hsl(var(--twc-card));
-    stroke-width: 0.15;
+    stroke-width: 0.12;
   }
 
-  .chamber-seat-dot {
-    stroke: hsl(var(--twc-card));
-    stroke-width: 0.35;
+  .chamber-seat-cell.party-r,
+  .chamber-seat-dot.party-r {
+    fill: #c62828;
   }
 
-  .chamber-seat-dot.party-r,
-  .chamber-seat-cell.party-r {
-    fill: hsl(var(--twc-party-r));
+  .chamber-seat-cell.party-d,
+  .chamber-seat-dot.party-d {
+    fill: #1565c0;
   }
 
-  .chamber-seat-dot.party-d,
-  .chamber-seat-cell.party-d {
-    fill: hsl(var(--twc-party-d));
+  .chamber-seat-cell.party-i,
+  .chamber-seat-dot.party-i {
+    fill: #7b1fa2;
   }
 
-  .chamber-seat-dot.party-i,
-  .chamber-seat-cell.party-i {
-    fill: hsl(var(--twc-party-i));
+  .chamber-seat-cell.party-other,
+  .chamber-seat-dot.party-other {
+    fill: #757575;
   }
 
-  .chamber-seat-dot.party-other,
-  .chamber-seat-cell.party-other {
-    fill: hsl(var(--twc-party-other));
+  [data-theme='dark'] .chamber-seat-cell.party-r,
+  [data-theme='dark'] .chamber-seat-dot.party-r {
+    fill: #ef5350;
+  }
+
+  [data-theme='dark'] .chamber-seat-cell.party-d,
+  [data-theme='dark'] .chamber-seat-dot.party-d {
+    fill: #42a5f5;
+  }
+
+  [data-theme='dark'] .chamber-seat-cell.party-i,
+  [data-theme='dark'] .chamber-seat-dot.party-i {
+    fill: #ab47bc;
+  }
+
+  .chamber-diagram-3d-wrap {
+    width: 100%;
+    height: 7.5rem;
+    border-radius: 0.625rem;
+    overflow: hidden;
+    background: transparent;
+    margin: 0;
+    pointer-events: none;
+  }
+
+  .chamber-diagram-3d {
+    width: 100% !important;
+    height: 7.5rem !important;
+    display: block;
   }
 
   .chamber-sample-badge {
@@ -1801,9 +1691,7 @@
   }
 
   .chamber-party-pill-ballot {
-    font-size: 0.75rem;
-    font-weight: 500;
-    opacity: 0.9;
+    display: none;
   }
 
   .chamber-overview-skeleton,

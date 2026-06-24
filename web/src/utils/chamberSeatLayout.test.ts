@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   expandPartyCountsToSeats,
+  layoutAmphitheaterSeats2D,
   layoutHemicycleDots,
   layoutHorseshoeSeats,
   resolveSeatParties,
@@ -75,5 +76,15 @@ describe('chamberSeatLayout', () => {
     ])
     expect(dots).toHaveLength(100)
     expect(dots.every((dot) => dot.r > 0 && dot.x > 0 && dot.y > 0)).toBe(true)
+  })
+
+  it('lays out isometric amphitheater seats with party-colored chairs', () => {
+    const cells = layoutAmphitheaterSeats2D('Senate', [
+      { party: 'D', seats: 45 },
+      { party: 'R', seats: 53 },
+      { party: 'I', seats: 2 },
+    ])
+    expect(cells).toHaveLength(100)
+    expect(cells.every((cell) => cell.size > 0)).toBe(true)
   })
 })
