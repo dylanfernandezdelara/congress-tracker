@@ -1749,6 +1749,10 @@
     border-color: hsl(var(--twc-border-muted));
   }
 
+  .chamber-party-pill.chamber-control-pill {
+    border-radius: 0.25rem;
+  }
+
   [data-theme='dark'] .chamber-party-pill.party-r {
     color: hsl(0 58% 78%);
     background-color: hsl(0 32% 16%);
