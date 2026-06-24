@@ -10,6 +10,7 @@ import {
   isProceduralFeedItem,
 } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
+import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
 
 type FeedRowProps = {
@@ -46,41 +47,39 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           onClick={onToggle}
         >
           <div className="feed-row-main">
-            <div className="feed-row-meta-row">
-              <span id={badgeId} className={`feed-row-badge feed-row-badge--${meta.kind}`}>
-                {meta.outcomeLabel}
-              </span>
-              {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
-              {meta.margin && (meta.kind === 'passed' || meta.kind === 'failed') ? (
-                <span id={marginId} className="feed-row-chip feed-row-chip--margin">
-                  {meta.margin}
+            <div className="feed-row-header">
+              <div className="feed-row-meta-row">
+                <span id={badgeId} className={`feed-row-badge feed-row-badge--${meta.kind}`}>
+                  {meta.outcomeLabel}
                 </span>
-              ) : null}
-              <span className="feed-row-chip feed-row-chip--bill">{meta.billId}</span>
-              <time
-                className="feed-row-date"
-                dateTime={item.latest_passage_date}
-              >
-                {formatVoteDate(item.latest_passage_date)}
-              </time>
+                {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
+                {meta.margin && (meta.kind === 'passed' || meta.kind === 'failed') ? (
+                  <span id={marginId} className="feed-row-chip feed-row-chip--margin">
+                    {meta.margin}
+                  </span>
+                ) : null}
+                <BillIdChip type={item.bill.type} number={item.bill.number} />
+                {policyArea && !isProceduralFeedItem(item) ? (
+                  <span
+                    id={policyAreaId}
+                    data-feed-policy-area
+                    className={`feed-row-policy-area ${policyAreaChipClass(policyArea)}`}
+                    style={policyAreaChipStyle(policyArea)}
+                  >
+                    {policyArea}
+                  </span>
+                ) : null}
+                <time className="feed-row-date" dateTime={item.latest_passage_date}>
+                  {formatVoteDate(item.latest_passage_date)}
+                </time>
+              </div>
+
+              <span className="feed-row-chevron" aria-hidden="true">
+                ›
+              </span>
             </div>
 
-            {policyArea && !isProceduralFeedItem(item) ? (
-              <span
-                id={policyAreaId}
-                data-feed-policy-area
-                className={`feed-row-policy-area ${policyAreaChipClass(policyArea)}`}
-                style={policyAreaChipStyle(policyArea)}
-              >
-                {policyArea}
-              </span>
-            ) : null}
-
-            <h2
-              id={topicId}
-              data-feed-topic
-              className="feed-row-topic"
-            >
+            <h2 id={topicId} data-feed-topic className="feed-row-topic">
               {topic}
             </h2>
 
@@ -107,10 +106,6 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               ) : null}
             </div>
           </div>
-
-          <span className="feed-row-chevron" aria-hidden="true">
-            ›
-          </span>
         </button>
 
         <div

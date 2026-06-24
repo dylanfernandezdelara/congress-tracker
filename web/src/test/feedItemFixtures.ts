@@ -14,6 +14,9 @@ export function makeFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
     passage_votes: [
       {
         chamber: 'Senate',
+        congress: 119,
+        session: 2,
+        roll_number: 9002,
         question: 'On Passage of the Bill',
         result: 'Passed',
         yeas: 52,

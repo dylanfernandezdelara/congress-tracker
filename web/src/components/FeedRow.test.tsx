@@ -11,10 +11,11 @@ ${'This bill provides support to Ukraine and allied countries through security a
 
 describe('FeedRow', () => {
   it('shows topic, policy area, digest lead, and bullets without expanding', () => {
-    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
     expect(screen.getByText('Defense')).toBeInTheDocument()
+    expect(container.querySelector('.feed-row-meta-row')).toContainElement(screen.getByText('Defense'))
     expect(screen.getByText('Passed')).toBeInTheDocument()
     expect(
       screen.getByText('It does something important in plain language.'),
@@ -23,6 +24,16 @@ describe('FeedRow', () => {
     expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
     const hiddenEvent = document.querySelector('.feed-row-event[hidden]')
     expect(hiddenEvent?.textContent).toContain('52–47 in the Senate')
+  })
+
+  it('explains Senate bill prefix with an accessible tooltip', () => {
+    const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+
+    const chip = container.querySelector('.feed-row-chip--bill')
+    expect(chip).toHaveAttribute('aria-label', 'Senate bill 2')
+    const prefix = container.querySelector('abbr.feed-row-bill-prefix')
+    expect(prefix).toHaveAttribute('title', 'Senate bill')
+    expect(prefix?.textContent).toBe('S.')
   })
 
   it('includes outcome and margin in the toggle accessible name', () => {

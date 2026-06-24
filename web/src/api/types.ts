@@ -29,6 +29,9 @@ export interface FeedBill {
 
 export interface FeedPassageVote {
   chamber: 'House' | 'Senate'
+  congress?: number
+  session?: number
+  roll_number?: number
   question: string
   result: string
   yeas: number
@@ -54,12 +57,16 @@ export interface FeedPageResponse {
 }
 
 export type {
+  ChamberComposition,
   ChamberPulse,
   ChamberStats,
   CloseVoteEntry,
   DateRange,
   DefectorEntry,
   DefectorsResponse,
+  NotableVoteEntry,
+  NotableVotesResponse,
+  PartySeatCount,
   PortfolioEntry,
   PortfolioMovers,
   PortfoliosResponse,
@@ -68,4 +75,6 @@ export type {
   SessionStatsResponse,
   StatsChamber,
   ThisWeekSummary,
+  VoteDefectorEntry,
+  VoteDefectorsResponse,
 } from '../../../shared/stats-api-types'

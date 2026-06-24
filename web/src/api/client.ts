@@ -6,9 +6,11 @@ import type {
   FeedPageResponse,
   GameRevealResponse,
   GameRoundsResponse,
+  NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
   SessionStatsResponse,
+  VoteDefectorsResponse,
 } from './types'
 
 export interface HealthResponse {
@@ -51,6 +53,11 @@ export async function fetchSessionStats(): Promise<SessionStatsResponse> {
   return fetchJson<SessionStatsResponse>('/stats/session.json')
 }
 
+export async function fetchNotableVotes(limit = 3): Promise<NotableVotesResponse> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  return fetchJson<NotableVotesResponse>(`/stats/notable.json?${params}`)
+}
+
 export async function fetchPulseStats(): Promise<PulseStatsResponse> {
   return fetchJson<PulseStatsResponse>('/stats/pulse.json')
 }
@@ -61,6 +68,21 @@ export async function fetchDefectors(chamber: 'House' | 'Senate'): Promise<Defec
 
 export async function fetchPortfolioStats(chamber: 'House' | 'Senate'): Promise<PortfoliosResponse> {
   return fetchJson<PortfoliosResponse>(`/stats/portfolios.json?chamber=${chamber}&limit=5`)
+}
+
+export async function fetchVoteDefectors(params: {
+  chamber: 'House' | 'Senate'
+  congress: number
+  session: number
+  rollNumber: number
+}): Promise<VoteDefectorsResponse> {
+  const search = new URLSearchParams({
+    chamber: params.chamber,
+    congress: String(params.congress),
+    session: String(params.session),
+    roll_number: String(params.rollNumber),
+  })
+  return fetchJson<VoteDefectorsResponse>(`/feed/vote-defectors.json?${search}`)
 }
 
 export async function fetchGameRounds(limit = 20): Promise<GameRoundsResponse> {

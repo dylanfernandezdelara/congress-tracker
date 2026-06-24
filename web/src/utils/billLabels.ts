@@ -1,7 +1,9 @@
 export {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
+  formatBillIdParts,
   formatShortBillId,
+  getBillTypeTooltip,
   proceduralHeadline,
   summaryBodyText,
   trimDisplayTitle,
