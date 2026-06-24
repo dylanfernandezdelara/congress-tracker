@@ -1506,7 +1506,7 @@
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 0.35rem;
   }
 
@@ -1591,13 +1591,6 @@
   }
 
   @media (max-width: 900px) {
-    .chamber-card-title-row {
-      flex-direction: column;
-      align-items: flex-start;
-      justify-content: flex-start;
-      gap: 0.25rem;
-    }
-
     .chamber-wedge-wrap {
       width: 100%;
       max-height: 4.25rem;
@@ -1615,12 +1608,6 @@
 
     .chamber-legend-text {
       font-size: 0.625rem;
-    }
-
-    .chamber-control-pill {
-      margin-left: 0;
-      padding: 0.15rem 0.3rem;
-      font-size: 0.5625rem;
     }
 
     .president-control-body {
@@ -1698,7 +1685,25 @@
     width: fit-content;
     flex-shrink: 1;
     min-width: 0;
-    margin-left: auto;
+  }
+
+  @media (max-width: 900px) {
+    .chamber-card-title-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+
+    .chamber-control-pill {
+      align-self: flex-start;
+      margin-left: 0;
+      margin-right: auto;
+    }
+
+    .chamber-party-pill.chamber-control-pill {
+      padding: 0.15rem 0.3rem;
+      font-size: 0.5625rem;
+    }
   }
 
   .chamber-party-pill {
