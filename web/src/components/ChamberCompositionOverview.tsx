@@ -67,9 +67,11 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
       : expandPartyCountsToSeats(composition.seats)
   const seatOnBallot = resolveSeatOnBallot(chamber, composition)
   const ballotByParty =
-    seatOnBallot && seatParties.length === seatOnBallot.length
-      ? countBallotSeatsByParty(seatParties, seatOnBallot)
-      : new Map<string, number>()
+    chamber === 'House' && !composition.is_sample
+      ? new Map(composition.seats.map((entry) => [entry.party, entry.seats]))
+      : seatOnBallot && seatParties.length === seatOnBallot.length
+        ? countBallotSeatsByParty(seatParties, seatOnBallot)
+        : new Map<string, number>()
 
   return (
     <article className="chamber-card">
@@ -153,8 +155,8 @@ export function ChamberCompositionOverview({
   const hasSampleData = composition.house.is_sample || composition.senate.is_sample
 
   const subtitle = hasSampleData
-    ? 'Party blocks sized by seat count — pulsing tiles are on this year’s ballot (sample roster).'
-    : 'Party blocks sized by seat count — pulsing tiles are on this year’s ballot. Wider block = more seats.'
+    ? 'Party blocks sized by seat count — pulsing tiles mark Senate seats on this year’s ballot (sample roster).'
+    : 'Party blocks sized by seat count — pulsing tiles mark Senate seats on this year’s ballot. The full House is elected every two years.'
 
   return (
     <section className="home-enrichment" aria-label="Chamber control">

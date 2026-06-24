@@ -49,8 +49,10 @@ export function buildSeatOnBallotFlags(
   seatParties: string[],
   seatsUpForElection: number
 ): boolean[] {
+  // House: every seat is on the ballot each cycle, but pulsing all tiles is noisy
+  // and reads like a bug. Reserve pulse for Senate subsets only.
   if (chamber === 'House') {
-    return seatParties.map(() => true)
+    return seatParties.map(() => false)
   }
 
   const cappedTarget = Math.min(seatParties.length, seatsUpForElection)

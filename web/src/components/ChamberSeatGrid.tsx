@@ -68,11 +68,15 @@ export function ChamberSeatGrid({
           </div>
         ))}
       </div>
-      {ballotTotal > 0 ? (
+      {ballotTotal > 0 && chamber === 'Senate' ? (
         <p className="chamber-ballot-key">
-          {chamber === 'House'
-            ? `All tiles pulse — every House seat is on the ${electionYear} ballot`
-            : `Pulsing tiles (~${ballotTotal}) show the ${electionYear} Senate seats up by party share`}
+          Pulsing tiles (~{ballotTotal}) show the {electionYear} Senate seats up by party share
+        </p>
+      ) : null}
+      {chamber === 'House' && total > 0 ? (
+        <p className="chamber-ballot-key chamber-ballot-key--house">
+          Unlike the Senate, the full House runs every two years — every seat above is on the
+          November {electionYear} ballot
         </p>
       ) : null}
     </div>

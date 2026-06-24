@@ -7,9 +7,9 @@ import {
 } from './chamber-seat-ballot'
 
 describe('chamber-seat-ballot', () => {
-  it('marks every House seat on the ballot', () => {
+  it('does not pulse House tiles — full chamber election is noted in copy instead', () => {
     const flags = buildSeatOnBallotFlags('House', ['D', 'R', 'R'], 435)
-    expect(flags).toEqual([true, true, true])
+    expect(flags).toEqual([false, false, false])
   })
 
   it('approximates Senate ballot totals when class is unavailable', () => {

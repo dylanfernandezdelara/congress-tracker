@@ -62,6 +62,9 @@ export function seatsUpElectionLabel(
   seats: number,
   year: number
 ): string {
-  const noun = chamber === 'House' ? 'House seats' : 'Senate seats'
-  return `${seats.toLocaleString()} ${noun} on the ballot in ${year}`
+  if (chamber === 'House') {
+    return `Full House election — all ${seats.toLocaleString()} seats on the November ${year} ballot`
+  }
+  const noun = 'Senate seats'
+  return `${seats.toLocaleString()} ${noun} on the November ${year} ballot`
 }
