@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 
+const NARROW_BREAKPOINT = 640
+
 export type ChamberDiagramMode = '3d' | '2d'
 
 function detectWebGL(): boolean {
@@ -15,8 +17,9 @@ function detectWebGL(): boolean {
 function resolveMode(): ChamberDiagramMode {
   if (typeof window === 'undefined') return '2d'
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const narrow = window.innerWidth <= NARROW_BREAKPOINT
   const webgl = detectWebGL()
-  return prefersReduced || !webgl ? '2d' : '3d'
+  return prefersReduced || narrow || !webgl ? '2d' : '3d'
 }
 
 export function useChamberDiagramMode(): ChamberDiagramMode {

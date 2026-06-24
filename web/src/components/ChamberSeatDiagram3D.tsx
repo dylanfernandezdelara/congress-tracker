@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import { BoxGeometry, InstancedMesh, Object3D } from 'three'
 
 import type { PartySeatCount } from '../api/types'
+import { useDocumentTheme } from '../hooks/useDocumentTheme'
 import { partySeatColor } from '../utils/chamberPartyColors'
 import {
   groupSeatsByParty,
@@ -102,6 +103,7 @@ type ChamberSceneProps = {
 }
 
 function ChamberScene({ chamber, seats, seatParties }: ChamberSceneProps) {
+  const theme = useDocumentTheme()
   const cells = useMemo(
     () => layoutHorseshoeSeats(chamber, seats, seatParties),
     [chamber, seats, seatParties]
@@ -118,7 +120,7 @@ function ChamberScene({ chamber, seats, seatParties }: ChamberSceneProps) {
         <InstancedChairParts
           key={party}
           cells={partyCells}
-          color={partySeatColor(party)}
+          color={partySeatColor(party, theme)}
           scale={scale}
         />
       ))}

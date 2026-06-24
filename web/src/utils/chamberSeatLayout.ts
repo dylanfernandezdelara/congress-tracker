@@ -281,7 +281,7 @@ export function seatArcAriaLabel(
 ): string {
   const breakdown = seats.map((entry) => `${entry.party} ${entry.seats}`).join(', ')
   if (options?.perMember) {
-    return `${chamber} illustrative seating diagram: ${total} seats, each dot colored by member party (${breakdown})`
+    return `${chamber} illustrative seating diagram: ${total} seats, each seat colored by member party (${breakdown})`
   }
   return `${chamber} illustrative seating diagram: ${total} seats colored by party totals (${breakdown})`
 }
