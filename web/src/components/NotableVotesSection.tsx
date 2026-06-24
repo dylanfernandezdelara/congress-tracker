@@ -54,6 +54,47 @@ function DefectorAvatar({
   )
 }
 
+function NotableVoteDefectors({ entry }: { entry: NotableVoteEntry }) {
+  if (entry.defectors.length > 0) {
+    return (
+      <ul className="notable-vote-defectors">
+        {entry.defectors.map((defector) => (
+          <li key={defector.bioguide_id} className="notable-vote-defector">
+            <DefectorAvatar name={defector.name} photoUrl={defector.photo_url} />
+            <span className="notable-vote-defector-copy">
+              <span className="notable-vote-defector-name">{defector.name}</span>
+              <span className={`notable-vote-defector-party ${partyCssClass(defector.party)}`}>
+                {partyShortLabel(defector.party)}-{defector.state}
+              </span>
+              <span className="notable-vote-defector-hint">
+                {crossVoteHint(defector.cross_vote_label)}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  if (entry.member_votes_available === false) {
+    return (
+      <p className="notable-vote-defectors-empty">
+        Per-member vote breakdown is not available for this roll call yet.
+      </p>
+    )
+  }
+
+  if (entry.member_votes_available === true) {
+    return (
+      <p className="notable-vote-defectors-empty">
+        No members broke with their party on this {entry.chamber} vote.
+      </p>
+    )
+  }
+
+  return null
+}
+
 function NotableVoteCard({ entry }: { entry: NotableVoteEntry }) {
   const billLabel = formatBillDocket(entry.bill_type, entry.bill_number, entry.congress)
   const title = entry.headline ?? `${billLabel} passage vote`
@@ -63,26 +104,9 @@ function NotableVoteCard({ entry }: { entry: NotableVoteEntry }) {
       <h3 className="notable-vote-title">{title}</h3>
       <p className="notable-vote-why">{entry.why_it_matters}</p>
       <p className="notable-vote-meta">
-        {entry.chamber} · {billLabel} · {formatVoteDate(entry.vote_date)}
+        {entry.chamber} · {formatVoteDate(entry.vote_date)}
       </p>
-      {entry.defectors.length > 0 ? (
-        <ul className="notable-vote-defectors">
-          {entry.defectors.map((defector) => (
-            <li key={defector.bioguide_id} className="notable-vote-defector">
-              <DefectorAvatar name={defector.name} photoUrl={defector.photo_url} />
-              <span className="notable-vote-defector-copy">
-                <span className="notable-vote-defector-name">{defector.name}</span>
-                <span className={`notable-vote-defector-party ${partyCssClass(defector.party)}`}>
-                  {partyShortLabel(defector.party)}-{defector.state}
-                </span>
-                <span className="notable-vote-defector-hint">
-                  {crossVoteHint(defector.cross_vote_label)}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <NotableVoteDefectors entry={entry} />
     </article>
   )
 }
@@ -120,7 +144,6 @@ export function NotableVotesSection({
     <section className="home-enrichment" aria-label="Notable votes">
       <div className="home-enrichment-header">
         <h2 className="home-enrichment-title">Notable votes</h2>
-        <p className="home-enrichment-subtitle">Politically significant passage roll calls</p>
       </div>
       <div className="notable-votes-list">
         {notable.map((entry) => (

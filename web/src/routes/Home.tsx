@@ -6,8 +6,7 @@ import { ChamberCompositionOverview } from '../components/ChamberCompositionOver
 import { FeedRow } from '../components/FeedRow'
 import { NotableVotesSection } from '../components/NotableVotesSection'
 import {
-  FEED_DESKTOP_PAGE_SIZE,
-  FEED_MOBILE_PAGE_SIZE,
+  FEED_PAGE_SIZE,
   MOBILE_MEDIA_QUERY,
 } from '../constants/feed'
 import { useAsyncData } from '../hooks/useAsyncData'
@@ -78,7 +77,7 @@ export default function Home() {
   const [page, setPage] = useState(0)
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null)
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
-  const pageSize = isMobile ? FEED_MOBILE_PAGE_SIZE : FEED_DESKTOP_PAGE_SIZE
+  const pageSize = FEED_PAGE_SIZE
   const offset = page * pageSize
 
   const reload = () => {
@@ -172,7 +171,6 @@ export default function Home() {
         <section id="feed-top" className="space-y-5">
           <div className="home-feed-header">
             <h2 className="home-feed-title">Chronological timeline</h2>
-            <p className="home-feed-subtitle">Passage votes, newest first</p>
           </div>
 
           {isPageTransition ? <FeedSkeleton /> : null}
@@ -195,16 +193,14 @@ export default function Home() {
             </ul>
           ) : null}
 
-          {isMobile ? (
-            <FeedPagination
-              page={page}
-              pageCount={pageCount}
-              hasMore={hasMore}
-              isLoading={feed.isLoading}
-              onPrevious={() => goToPage(page - 1)}
-              onNext={() => goToPage(page + 1)}
-            />
-          ) : null}
+          <FeedPagination
+            page={page}
+            pageCount={pageCount}
+            hasMore={hasMore}
+            isLoading={feed.isLoading}
+            onPrevious={() => goToPage(page - 1)}
+            onNext={() => goToPage(page + 1)}
+          />
         </section>
       ) : null}
     </main>

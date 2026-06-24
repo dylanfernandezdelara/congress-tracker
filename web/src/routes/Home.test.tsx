@@ -102,6 +102,7 @@ vi.mock('../api/client', () => ({
         significance_score: 42,
         why_it_matters: 'Bipartisan coalition carried the vote',
         defectors: [],
+        member_votes_available: false,
       },
     ],
   }),
@@ -125,8 +126,8 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { level: 2, name: 'Plain headline for readers' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Federal control' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Federal control' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Federal Control' })).toBeInTheDocument()
     expect(screen.queryByText('Republican control')).not.toBeInTheDocument()
     expect(screen.getByLabelText('House party seat counts')).toBeInTheDocument()
     expect(screen.getByLabelText('Senate party seat counts')).toBeInTheDocument()

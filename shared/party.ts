@@ -4,12 +4,12 @@ export type PartyCode = 'R' | 'D' | 'I' | 'Other'
 
 const PARTY_META: Record<
   PartyCode,
-  { display: string; short: string; cssClass: string }
+  { display: string; short: string; legend: string; cssClass: string }
 > = {
-  R: { display: 'Republican', short: 'R', cssClass: 'party-r' },
-  D: { display: 'Democrat', short: 'D', cssClass: 'party-d' },
-  I: { display: 'Independent', short: 'I', cssClass: 'party-i' },
-  Other: { display: 'Other', short: 'Other', cssClass: 'party-other' },
+  R: { display: 'Republican', short: 'R', legend: 'Rep', cssClass: 'party-r' },
+  D: { display: 'Democrat', short: 'D', legend: 'Dem', cssClass: 'party-d' },
+  I: { display: 'Independent', short: 'I', legend: 'Ind', cssClass: 'party-i' },
+  Other: { display: 'Other', short: 'Other', legend: 'Other', cssClass: 'party-other' },
 }
 
 export function normalizePartyCode(party: string | null | undefined): PartyCode {
@@ -31,6 +31,12 @@ export function partyDisplayName(code: string): string {
 export function partyShortLabel(code: string): string {
   const key = normalizePartyCode(code)
   return PARTY_META[key].short
+}
+
+/** Compact label for single-row wedge legends (Dem / Rep / Ind). */
+export function partyLegendLabel(code: string): string {
+  const key = normalizePartyCode(code)
+  return PARTY_META[key].legend
 }
 
 export function chamberControlLabel(majorityParty: string | null, total: number): string {

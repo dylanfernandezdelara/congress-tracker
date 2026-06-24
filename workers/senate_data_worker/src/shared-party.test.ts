@@ -3,6 +3,7 @@ import {
   chamberControlLabel,
   normalizePartyCode,
   partyDisplayName,
+  partyLegendLabel,
 } from "../../../shared/party";
 
 describe("party helpers", () => {
@@ -18,5 +19,6 @@ describe("party helpers", () => {
     expect(chamberControlLabel(null, 100)).toBe("No clear majority");
     expect(chamberControlLabel(null, 0)).toBe("No membership data");
     expect(partyDisplayName("D")).toBe("Democrat");
+    expect(partyLegendLabel("I")).toBe("Ind");
   });
 });

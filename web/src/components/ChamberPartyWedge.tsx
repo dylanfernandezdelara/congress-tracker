@@ -20,6 +20,12 @@ function wedgeCountLabelColor(theme: 'light' | 'dark'): string {
   return theme === 'dark' ? '#141414' : '#ffffff'
 }
 
+function wedgeCountFontSize(segment: { seats: number; visuallyEnlarged: boolean }): number {
+  if (segment.visuallyEnlarged) return 12
+  if (segment.seats > 99) return 11
+  return 13
+}
+
 type ChamberPartyWedgeProps = {
   chamber: 'House' | 'Senate'
   seats: PartySeatCount[]
@@ -64,7 +70,7 @@ export function ChamberPartyWedge({ chamber, seats, total }: ChamberPartyWedgePr
           const labelR = (INNER_R + OUTER_R) / 2
           const lx = CX + labelR * Math.cos(segment.mid)
           const ly = CY + labelR * Math.sin(segment.mid)
-          const fontSize = segment.seats > 99 ? 11 : segment.seats < 10 ? 10 : 13
+          const fontSize = wedgeCountFontSize(segment)
           return (
             <text
               key={`${segment.party}-count`}

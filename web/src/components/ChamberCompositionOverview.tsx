@@ -1,4 +1,4 @@
-import { partyCssClass, partyDisplayName } from '@congress-tracker/shared/party'
+import { partyCssClass, partyDisplayName, partyLegendLabel } from '@congress-tracker/shared/party'
 
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
 import { sortPartySeatCounts } from '../utils/chamberWedge'
@@ -38,7 +38,7 @@ function ChamberCard({ chamber, composition }: ChamberCardProps) {
                   title={`${partyDisplayName(entry.party)} ${entry.seats.toLocaleString()}`}
                 >
                   <span className="chamber-party-pill-label">
-                    {partyDisplayName(entry.party)}
+                    {partyLegendLabel(entry.party)}
                   </span>
                   <span className="chamber-party-pill-count">{entry.seats.toLocaleString()}</span>
                 </span>
@@ -66,7 +66,7 @@ export function ChamberCompositionOverview({
 }: ChamberCompositionOverviewProps) {
   if (error) {
     return (
-      <section className="home-enrichment" aria-label="Federal control">
+      <section className="home-enrichment" aria-label="Federal Control">
         <p className="home-enrichment-error text-sm text-secondary">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
@@ -79,7 +79,7 @@ export function ChamberCompositionOverview({
 
   if (loading && !composition) {
     return (
-      <section className="home-enrichment" aria-label="Federal control">
+      <section className="home-enrichment" aria-label="Federal Control">
         <div className="chamber-overview-skeleton" aria-hidden="true" />
       </section>
     )
@@ -88,9 +88,9 @@ export function ChamberCompositionOverview({
   if (!composition) return null
 
   return (
-    <section className="home-enrichment" aria-label="Federal control">
+    <section className="home-enrichment" aria-label="Federal Control">
       <div className="home-enrichment-header">
-        <h2 className="home-enrichment-title">Federal control</h2>
+        <h2 className="home-enrichment-title">Federal Control</h2>
       </div>
       <div className="chamber-overview-grid">
         <ChamberCard chamber="House" composition={composition.house} />

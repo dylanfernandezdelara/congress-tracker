@@ -1,8 +1,5 @@
 /** Matches `@media (max-width: 639px)` in styles.css. */
 export const MOBILE_MEDIA_QUERY = '(max-width: 639px)'
 
-/** Bills per page on mobile — keeps the feed from feeling like infinite scroll. */
-export const FEED_MOBILE_PAGE_SIZE = 5
-
-/** Desktop loads the full recent feed in one request. */
-export const FEED_DESKTOP_PAGE_SIZE = 50
+/** Bills per page in the chronological timeline (mobile + desktop). */
+export const FEED_PAGE_SIZE = 5
