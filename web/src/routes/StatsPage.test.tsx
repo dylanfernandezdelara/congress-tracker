@@ -26,6 +26,24 @@ vi.mock('../api/client', () => ({
       date_range: { first: '2026-06-05', last: '2026-06-05' },
       coverage_days: 1,
     },
+    composition: {
+      house: {
+        seats: [{ party: 'R', seats: 220 }, { party: 'D', seats: 215 }],
+        total: 435,
+        majority_party: 'R',
+        control_label: 'Republican control',
+        seats_up_for_election: 435,
+        election_year: 2026,
+      },
+      senate: {
+        seats: [{ party: 'R', seats: 53 }, { party: 'D', seats: 47 }],
+        total: 100,
+        majority_party: 'R',
+        control_label: 'Republican control',
+        seats_up_for_election: 33,
+        election_year: 2026,
+      },
+    },
   }),
   fetchPulseStats: vi.fn().mockResolvedValue({
     congress: 119,

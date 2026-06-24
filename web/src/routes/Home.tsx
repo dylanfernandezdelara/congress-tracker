@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 
-import { fetchFeed } from '../api/client'
-import type { FeedItem, FeedPageResponse } from '../api/types'
+import { fetchFeed, fetchNotableVotes, fetchSessionStats } from '../api/client'
+import type { FeedItem, FeedPageResponse, NotableVotesResponse, SessionStatsResponse } from '../api/types'
+import { ChamberCompositionOverview } from '../components/ChamberCompositionOverview'
 import { FeedRow } from '../components/FeedRow'
+import { NotableVotesSection } from '../components/NotableVotesSection'
 import {
   FEED_DESKTOP_PAGE_SIZE,
   FEED_MOBILE_PAGE_SIZE,
@@ -98,6 +100,18 @@ export default function Home() {
     mapError: () => "Couldn't load the feed.",
   })
 
+  const sessionStats = useAsyncData<SessionStatsResponse>({
+    deps: [retryKey],
+    load: fetchSessionStats,
+    mapError: () => "Couldn't load chamber control.",
+  })
+
+  const notableVotes = useAsyncData<NotableVotesResponse>({
+    deps: [retryKey],
+    load: () => fetchNotableVotes(3),
+    mapError: () => "Couldn't load notable votes.",
+  })
+
   const items = feed.data?.items ?? []
   const total = feed.data?.total ?? 0
   const hasMore = feed.data?.has_more ?? false
@@ -125,6 +139,20 @@ export default function Home() {
 
   return (
     <main className="feed-main space-y-5">
+      <ChamberCompositionOverview
+        composition={sessionStats.data?.composition ?? null}
+        loading={sessionStats.isLoading}
+        error={sessionStats.error}
+        onRetry={reload}
+      />
+
+      <NotableVotesSection
+        notable={notableVotes.data?.notable ?? null}
+        loading={notableVotes.isLoading}
+        error={notableVotes.error}
+        onRetry={reload}
+      />
+
       {isInitialLoad ? <FeedSkeleton /> : null}
 
       {feed.error ? (
@@ -142,6 +170,11 @@ export default function Home() {
 
       {showFeed ? (
         <section id="feed-top" className="space-y-5">
+          <div className="home-feed-header">
+            <h2 className="home-feed-title">Chronological timeline</h2>
+            <p className="home-feed-subtitle">Passage votes, newest first</p>
+          </div>
+
           {isPageTransition ? <FeedSkeleton /> : null}
 
           {!isPageTransition ? (

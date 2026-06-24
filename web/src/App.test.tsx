@@ -25,6 +25,52 @@ vi.mock('./api/client', () => ({
     offset: 0,
     has_more: false,
   }),
+  fetchSessionStats: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    as_of: '2026-06-14T00:00:00.000Z',
+    house: {
+      passage_vote_count: 0,
+      unique_bills_passed: 0,
+      avg_margin: 0,
+      closest_margin: 0,
+      date_range: { first: null, last: null },
+      coverage_days: 0,
+    },
+    senate: {
+      passage_vote_count: 0,
+      unique_bills_passed: 0,
+      avg_margin: 0,
+      closest_margin: 0,
+      date_range: { first: null, last: null },
+      coverage_days: 0,
+    },
+    composition: {
+      house: {
+        seats: [],
+        total: 0,
+        majority_party: null,
+        control_label: 'No data',
+        seats_up_for_election: 435,
+        election_year: 2026,
+      },
+      senate: {
+        seats: [],
+        total: 0,
+        majority_party: null,
+        control_label: 'No data',
+        seats_up_for_election: 33,
+        election_year: 2026,
+      },
+    },
+  }),
+  fetchNotableVotes: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    detection_method: 'heuristic',
+    as_of: '2026-06-14T00:00:00.000Z',
+    notable: [],
+  }),
 }))
 
 describe('App routing', () => {

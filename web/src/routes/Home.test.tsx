@@ -36,6 +36,75 @@ vi.mock('../api/client', () => ({
     offset: 0,
     has_more: false,
   }),
+  fetchSessionStats: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    as_of: '2026-06-14T00:00:00.000Z',
+    house: {
+      passage_vote_count: 2,
+      unique_bills_passed: 2,
+      avg_margin: 12,
+      closest_margin: 5,
+      date_range: { first: '2026-06-01', last: '2026-06-05' },
+      coverage_days: 5,
+    },
+    senate: {
+      passage_vote_count: 1,
+      unique_bills_passed: 1,
+      avg_margin: 5,
+      closest_margin: 5,
+      date_range: { first: '2026-06-05', last: '2026-06-05' },
+      coverage_days: 1,
+    },
+    composition: {
+      house: {
+        seats: [
+          { party: 'R', seats: 220 },
+          { party: 'D', seats: 215 },
+        ],
+        total: 435,
+        majority_party: 'R',
+        control_label: 'Republican control',
+        seats_up_for_election: 435,
+        election_year: 2026,
+      },
+      senate: {
+        seats: [
+          { party: 'R', seats: 53 },
+          { party: 'D', seats: 47 },
+        ],
+        total: 100,
+        majority_party: 'R',
+        control_label: 'Republican control',
+        seats_up_for_election: 33,
+        election_year: 2026,
+      },
+    },
+  }),
+  fetchNotableVotes: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    detection_method: 'heuristic',
+    as_of: '2026-06-14T00:00:00.000Z',
+    notable: [
+      {
+        chamber: 'Senate',
+        congress: 119,
+        session: 2,
+        roll_number: 9002,
+        bill_type: 's',
+        bill_number: 47,
+        yeas: 68,
+        nays: 32,
+        margin: 36,
+        vote_date: '2026-06-05',
+        headline: 'Notable vote headline for sidebar',
+        significance_score: 42,
+        why_it_matters: 'Bipartisan coalition carried the vote',
+        defectors: [],
+      },
+    ],
+  }),
 }))
 
 function renderFeed() {
@@ -55,7 +124,13 @@ describe('Home', () => {
     const { container } = renderFeed()
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
-    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Plain headline for readers' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Chamber control' })).toBeInTheDocument()
+    expect(screen.getAllByText('Republican control').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('435 House seats on the ballot in 2026')).toBeInTheDocument()
+    expect(screen.getByText('33 Senate seats on the ballot in 2026')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Members in Congress')).not.toBeInTheDocument()
 
     const feedList = container.querySelector('.feed-list')
