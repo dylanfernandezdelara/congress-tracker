@@ -45,7 +45,7 @@ export async function fetchJson<T>(path: string): Promise<T> {
 
   let response: Response
   try {
-    response = await fetch(url)
+    response = await fetch(url, import.meta.env.DEV ? { cache: 'no-store' } : undefined)
   } catch {
     throw new Error(NETWORK_ERROR_MESSAGE)
   }

@@ -122,22 +122,71 @@ VALUES
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"House passes a federal spending oversight bill (local sample)","what_it_does":"Adds reporting requirements for large federal contracts and creates a public dashboard for tracking agency spending.","key_points":["Requires agencies to publish contract performance data","Stands up a public spending dashboard","Adds penalties for repeated reporting failures"],"terms_explained":[{"term":"Federal contract","plain":"An agreement where the government pays a company to provide goods or services."},{"term":"Oversight","plain":"Monitoring done to make sure money and programs are used as intended."}]}',
    '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z');
+SQL
 
-INSERT OR REPLACE INTO members (bioguide_id, name, chamber, party, state, district, updated_at) VALUES
-  ('LOCAL:H001', 'Rep. Sample Crossover (local)', 'House', 'D', 'CA', 12, '${D_RECENT}T00:00:00.000Z'),
-  ('LOCAL:H002', 'Rep. Sample Loyal (local)', 'House', 'D', 'NY', 10, '${D_RECENT}T00:00:00.000Z'),
-  ('LOCAL:S001', 'Sen. Sample Crossover (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
-  ('LOCAL:S002', 'Sen. Sample Loyal (local)', 'Senate', 'R', 'TX', NULL, '${D_MID}T00:00:00.000Z'),
-  ('LOCAL:H003', 'Rep. Portfolio Gainer (local)', 'House', 'D', 'CA', NULL, '${D_RECENT}T00:00:00.000Z'),
-  ('LOCAL:H004', 'Rep. Portfolio Loser (local)', 'House', 'R', 'SC', NULL, '${D_RECENT}T00:00:00.000Z');
+generate_roster_sql() {
+  python3 <<PY
+updated = "${D_RECENT}T00:00:00.000Z"
+mid = "${D_MID}T00:00:00.000Z"
 
-INSERT OR REPLACE INTO member_votes (chamber, congress, session, roll_number, bioguide_id, position) VALUES
-  ('House', 119, 2, 9001, 'LOCAL:H001', 'Nay'),
-  ('House', 119, 2, 9001, 'LOCAL:H002', 'Yea'),
-  ('House', 119, 2, 9003, 'LOCAL:H001', 'Nay'),
-  ('House', 119, 2, 9003, 'LOCAL:H002', 'Yea'),
-  ('Senate', 119, 2, 9002, 'LOCAL:S001', 'Nay'),
-  ('Senate', 119, 2, 9002, 'LOCAL:S002', 'Yea');
+spotlight_members = [
+    ("LOCAL:H001", "Rep. Sample Crossover (local)", "House", "D", "CA", 12, updated),
+    ("LOCAL:H002", "Rep. Sample Loyal (local)", "House", "D", "NY", 10, updated),
+    ("LOCAL:H003", "Rep. Portfolio Gainer (local)", "House", "D", "CA", "NULL", updated),
+    ("LOCAL:H004", "Rep. Portfolio Loser (local)", "House", "R", "SC", "NULL", updated),
+    ("LOCAL:S001", "Sen. Sample Crossover (local)", "Senate", "R", "TX", "NULL", mid),
+    ("LOCAL:S002", "Sen. Sample Loyal (local)", "Senate", "R", "TX", "NULL", mid),
+]
+
+def party_sequence(counts):
+    for party, count in counts:
+        for _ in range(count):
+            yield party
+
+# Spotlight house: 3D + 1R already; fill to 435 with 119th-like split.
+house_rest = list(party_sequence([("R", 219), ("D", 210), ("I", 2)]))
+senate_rest = list(party_sequence([("R", 51), ("D", 45), ("I", 2)]))
+
+member_rows = []
+vote_rows = []
+
+for bid, name, chamber, party, state, district, ts in spotlight_members:
+    member_rows.append(
+        f"  ('{bid}', '{name}', '{chamber}', '{party}', '{state}', {district}, '{ts}')"
+    )
+
+for idx, party in enumerate(house_rest, start=1):
+    bid = f"LOCAL:HR{idx:04d}"
+    member_rows.append(
+        f"  ('{bid}', 'Rep. Sample {idx} (local)', 'House', '{party}', 'TX', {idx % 50 + 1}, '{updated}')"
+    )
+    vote_rows.append(f"  ('House', 119, 2, 9001, '{bid}', 'Yea')")
+
+for idx, party in enumerate(senate_rest, start=1):
+    bid = f"LOCAL:SR{idx:03d}"
+    member_rows.append(
+        f"  ('{bid}', 'Sen. Sample {idx} (local)', 'Senate', '{party}', 'TX', NULL, '{updated}')"
+    )
+    vote_rows.append(f"  ('Senate', 119, 2, 9002, '{bid}', 'Yea')")
+
+for bid, _, chamber, _, _, _, _ in spotlight_members:
+    if chamber == "House":
+        roll = 9001 if bid in ("LOCAL:H001", "LOCAL:H002") else 9003
+        position = "Nay" if bid == "LOCAL:H001" else "Yea"
+        vote_rows.append(f"  ('House', 119, 2, {roll}, '{bid}', '{position}')")
+    else:
+        position = "Nay" if bid == "LOCAL:S001" else "Yea"
+        vote_rows.append(f"  ('Senate', 119, 2, 9002, '{bid}', '{position}')")
+
+print("INSERT OR REPLACE INTO members (bioguide_id, name, chamber, party, state, district, updated_at) VALUES")
+print(",\n".join(member_rows) + ";")
+print("")
+print("INSERT OR REPLACE INTO member_votes (chamber, congress, session, roll_number, bioguide_id, position) VALUES")
+print(",\n".join(vote_rows) + ";")
+PY
+}
+
+read -r -d '' SEED_TAIL <<SQL || true
 
 INSERT INTO financial_transactions (bioguide_id, ticker, asset_description, transaction_type, amount_min, amount_max, transaction_date, filed_date) VALUES
   ('LOCAL:H003', 'NVDA', 'NVDA common stock', 'purchase', 50000, 100000, '${D_RECENT}', '${D_RECENT}'),
@@ -152,12 +201,18 @@ SQL
 
 if [[ "${SEED_PRINT_SQL:-}" == "1" ]]; then
   printf '%s\n' "${SEED_SQL}"
+  generate_roster_sql
+  printf '%s\n' "${SEED_TAIL}"
   exit 0
 fi
 
 SEED_FILE="$(mktemp -t seed-local-feed.XXXXXX.sql)"
 trap 'rm -f "${SEED_FILE}"' EXIT
-printf '%s\n' "${SEED_SQL}" >"${SEED_FILE}"
+{
+  printf '%s\n' "${SEED_SQL}"
+  generate_roster_sql
+  printf '%s\n' "${SEED_TAIL}"
+} >"${SEED_FILE}"
 
 echo "Seeding local D1 (${DB_NAME}) with sample passage votes, digests, and sidebar stats..."
 # Run from the worker dir so --local resolves the same .wrangler/state store

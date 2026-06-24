@@ -216,6 +216,38 @@ const MOCK_SESSION_STATS = {
     date_range: { first: '2026-06-05', last: '2026-06-05' },
     coverage_days: 1,
   },
+  composition: {
+    house: {
+      seats: [
+        { party: 'R', seats: 220 },
+        { party: 'D', seats: 215 },
+      ],
+      total: 435,
+      majority_party: 'R',
+      control_label: 'Republican control',
+      seats_up_for_election: 435,
+      election_year: 2026,
+    },
+    senate: {
+      seats: [
+        { party: 'R', seats: 53 },
+        { party: 'D', seats: 47 },
+      ],
+      total: 100,
+      majority_party: 'R',
+      control_label: 'Republican control',
+      seats_up_for_election: 33,
+      election_year: 2026,
+    },
+  },
+}
+
+const MOCK_NOTABLE_VOTES = {
+  congress: 119,
+  session: 2,
+  detection_method: 'heuristic',
+  as_of: '2026-06-14T00:00:00.000Z',
+  notable: [],
 }
 
 const MOCK_PULSE_STATS = {
@@ -288,6 +320,14 @@ async function main() {
           })
         })
 
+        await page.route('**/stats/notable.json**', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(MOCK_NOTABLE_VOTES),
+          })
+        })
+
         await page.route('**/stats/pulse.json', async (route) => {
           await route.fulfill({
             status: 200,
@@ -322,6 +362,7 @@ async function main() {
 
         await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
         await page.getByText('Plain headline for readers').waitFor({ timeout: 10_000 })
+        await page.locator('#feed-top').scrollIntoViewIfNeeded()
 
         const audit = await auditPage(page)
         if (audit.theme !== theme) {

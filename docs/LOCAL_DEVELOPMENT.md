@@ -23,6 +23,11 @@ npm run dev:web      # http://127.0.0.1:5173  (React feed UI)
 Open `http://127.0.0.1:5173` — the feed shows the seeded sample bills
 immediately, no API keys required.
 
+The Vite dev server proxies `/feed`, `/stats`, `/health`, `/debug`, and `/game`
+to the worker on `:8787`, so the UI uses same-origin API URLs (matching
+production). **Both dev servers must be running** — if only `dev:web` is up,
+chamber/notable/feed requests fail with connection errors.
+
 ## What Cursor Cloud does for you (and the local equivalent)
 
 | Concern | Cursor Cloud | Local equivalent |
@@ -64,10 +69,20 @@ OPENROUTER_API_KEY=...    # https://openrouter.ai/keys
 # OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 ```
 
+For admin pipeline routes (`POST /__pipeline/run/*`), local dev needs
+`DEV_OPEN_PIPELINE=1` in `.dev.vars` (included in the example file). **Restart
+`npm run dev:worker` after any `.dev.vars` change** — wrangler hot-reloads code
+but not secrets/vars. On startup you should see `env.DEV_OPEN_PIPELINE` in the
+bindings list; if it is missing, the worker is still running with old env.
+If you set `PIPELINE_ADMIN_TOKEN` instead, omit `DEV_OPEN_PIPELINE` and pass
+`Authorization: Bearer <token>` on each POST.
+
 Then, with the worker running:
 
 ```bash
 curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed
+curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/members-roster
+curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/member-votes
 ```
 
 This mirrors what the daily cron does in production. Senate votes come from a
@@ -76,11 +91,10 @@ public XML endpoint (no key); House votes and CRS summaries need
 
 ## Local architecture notes
 
-- **Two origins in dev.** The web app on `:5173` calls the worker API on
-  `:8787` cross-origin. The worker allows this because `.dev.vars` sets
-  `ALLOWED_ORIGIN=*`. In production/preview the worker serves both the app and
-  the API from one origin, so no CORS is involved. Override the API target with
-  `VITE_API_URL` if your worker runs on a different port.
+- **Same-origin API in dev.** Vite proxies `/feed`, `/stats`, `/health`,
+  `/debug`, and `/game` to the worker on `:8787`, matching production/preview
+  (one origin serves UI + API). Set `VITE_API_URL` only if you bypass the proxy
+  (e.g. worker on a non-default port).
 - **Cron does not fire locally.** `wrangler dev` does not run the
   `0 10 * * *` schedule; trigger ingestion manually with the curl above, or use
   `npm run seed`.

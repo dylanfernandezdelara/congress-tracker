@@ -5,17 +5,14 @@
  * priority order, supporting local development and environment configuration.
  */
 
-/** Default fallback API URL for local development */
-const DEFAULT_API_URL = 'http://localhost:8787';
-
 /**
  * Resolves the API base URL using the following priority order:
  *
  * 1. `import.meta.env.VITE_API_URL` - Explicit override (set in .env or build)
- * 2. Production builds - same-origin (empty string -> relative requests). The
- *    Worker serves both the app and the API, so the deployed/preview origin is
- *    always correct without baking a hostname into the bundle.
- * 3. `http://localhost:8787` - Default fallback for local development
+ * 2. Same-origin (empty string -> relative requests). In production the Worker
+ *    serves both the app and the API. In local dev, Vite proxies `/feed`,
+ *    `/stats`, `/health`, `/debug`, and `/game` to the worker on :8787
+ *    (see `web/vite.config.ts`).
  *
  * The returned URL will NOT have a trailing slash.
  *
@@ -33,11 +30,7 @@ export function getApiBaseUrl(): string {
     return normalizeUrl(envUrl);
   }
 
-  if (import.meta.env.PROD) {
-    return '';
-  }
-
-  return DEFAULT_API_URL;
+  return '';
 }
 
 /**
