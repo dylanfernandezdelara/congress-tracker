@@ -28,6 +28,8 @@ export interface ChamberComposition {
   control_label: string
   /** True when roster counts are partial or local sample data — not a full chamber. */
   is_sample?: boolean
+  /** One normalized party code per member seat (House/Senate roster order). */
+  seat_parties?: string[]
   /** Seats on the ballot in the next federal election during this Congress. */
   seats_up_for_election: number
   /** Year of that election (November). */

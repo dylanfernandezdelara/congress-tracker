@@ -1461,12 +1461,15 @@
 
     .chamber-diagram-3d-wrap,
     .chamber-diagram-3d {
-      height: 5.75rem;
+      height: 7.5rem;
     }
 
-    .chamber-seat-arc {
-      min-height: 2.75rem;
-      max-height: 3.25rem;
+    .chamber-seat-arc--house {
+      min-height: 5.5rem;
+    }
+
+    .chamber-seat-arc--senate {
+      min-height: 4.75rem;
     }
 
     .chamber-card {
@@ -1527,6 +1530,16 @@
     overflow: visible;
   }
 
+  .chamber-seat-arc-wrap.chamber-seat-arc--house {
+    aspect-ratio: 400 / 148;
+    min-height: 5rem;
+  }
+
+  .chamber-seat-arc-wrap.chamber-seat-arc--senate {
+    aspect-ratio: 320 / 112;
+    min-height: 4.25rem;
+  }
+
   .chamber-diagram-3d-wrap {
     width: 100%;
     height: 6.25rem;
@@ -1546,9 +1559,7 @@
   .chamber-seat-arc {
     display: block;
     width: 100%;
-    height: auto;
-    min-height: 2.75rem;
-    max-height: 3.25rem;
+    height: 100%;
   }
 
   .chamber-seat-arc--empty {
@@ -1570,18 +1581,27 @@
     stroke-width: 0.15;
   }
 
+  .chamber-seat-dot {
+    stroke: hsl(var(--twc-card));
+    stroke-width: 0.35;
+  }
+
+  .chamber-seat-dot.party-r,
   .chamber-seat-cell.party-r {
     fill: hsl(var(--twc-party-r));
   }
 
+  .chamber-seat-dot.party-d,
   .chamber-seat-cell.party-d {
     fill: hsl(var(--twc-party-d));
   }
 
+  .chamber-seat-dot.party-i,
   .chamber-seat-cell.party-i {
     fill: hsl(var(--twc-party-i));
   }
 
+  .chamber-seat-dot.party-other,
   .chamber-seat-cell.party-other {
     fill: hsl(var(--twc-party-other));
   }

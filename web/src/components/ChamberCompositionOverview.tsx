@@ -21,17 +21,29 @@ function ChamberSeatView({ chamber, composition }: ChamberSeatViewProps) {
   const mode = useChamberDiagramMode()
   const ariaLabel = seatArcAriaLabel(chamber, composition.seats, composition.total)
 
+  const seatProps = {
+    chamber,
+    seats: composition.seats,
+    total: composition.total,
+    seatParties: composition.seat_parties,
+  }
+
   if (composition.total === 0) {
-    return <ChamberSeatArc2D chamber={chamber} seats={[]} total={0} />
+    return <ChamberSeatArc2D {...seatProps} seats={[]} total={0} />
   }
 
   if (mode === '2d') {
-    return <ChamberSeatArc2D chamber={chamber} seats={composition.seats} total={composition.total} />
+    return <ChamberSeatArc2D {...seatProps} />
   }
 
   return (
-    <Suspense fallback={<ChamberSeatArc2D chamber={chamber} seats={composition.seats} total={composition.total} />}>
-      <ChamberSeatDiagram3D chamber={chamber} seats={composition.seats} ariaLabel={ariaLabel} />
+    <Suspense fallback={<ChamberSeatArc2D {...seatProps} />}>
+      <ChamberSeatDiagram3D
+        chamber={chamber}
+        seats={composition.seats}
+        seatParties={composition.seat_parties}
+        ariaLabel={ariaLabel}
+      />
     </Suspense>
   )
 }
@@ -126,8 +138,8 @@ export function ChamberCompositionOverview({
         <h2 className="home-enrichment-title">Chamber control</h2>
         <p className="home-enrichment-subtitle">
           {hasSampleData
-            ? 'Party seat counts from local sample roster'
-            : 'Current party seat counts from latest roll-call roster'}
+            ? 'Each dot is one seat, colored by member party (local sample roster)'
+            : 'Each dot is one seat, colored by member party. Senate has assigned desks; the House does not publish a fixed seating chart.'}
         </p>
       </div>
       <div className="chamber-overview-grid">

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { layoutHorseshoeSeats } from './chamberSeatLayout'
+import {
+  expandPartyCountsToSeats,
+  layoutHemicycleDots,
+  layoutHorseshoeSeats,
+  resolveSeatParties,
+} from './chamberSeatLayout'
 
 describe('chamberSeatLayout', () => {
   it('assigns Democrats to the left arc and Republicans to the right', () => {
@@ -37,5 +42,38 @@ describe('chamberSeatLayout', () => {
     ])
     expect(cells).toHaveLength(3)
     expect(cells.every((cell) => typeof cell.x === 'number' && typeof cell.z === 'number')).toBe(true)
+  })
+
+  it('expands aggregate counts into one party code per seat', () => {
+    expect(
+      expandPartyCountsToSeats([
+        { party: 'R', seats: 2 },
+        { party: 'D', seats: 1 },
+      ])
+    ).toEqual(['R', 'R', 'D'])
+  })
+
+  it('prefers roster seat parties when provided', () => {
+    const roster = ['D', 'R', 'I']
+    expect(
+      resolveSeatParties(
+        [
+          { party: 'D', seats: 1 },
+          { party: 'R', seats: 1 },
+          { party: 'I', seats: 1 },
+        ],
+        roster
+      )
+    ).toEqual(roster)
+  })
+
+  it('returns hemicycle dots sized for mobile-friendly SVG viewports', () => {
+    const dots = layoutHemicycleDots('Senate', [
+      { party: 'D', seats: 45 },
+      { party: 'R', seats: 53 },
+      { party: 'I', seats: 2 },
+    ])
+    expect(dots).toHaveLength(100)
+    expect(dots.every((dot) => dot.r > 0 && dot.x > 0 && dot.y > 0)).toBe(true)
   })
 })

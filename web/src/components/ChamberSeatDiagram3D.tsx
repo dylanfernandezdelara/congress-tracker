@@ -94,11 +94,15 @@ function InstancedChairParts({ cells, color }: InstancedChairPartsProps) {
 type ChamberSceneProps = {
   chamber: 'House' | 'Senate'
   seats: PartySeatCount[]
+  seatParties?: string[] | null
   dark: boolean
 }
 
-function ChamberScene({ chamber, seats, dark }: ChamberSceneProps) {
-  const cells = useMemo(() => layoutHorseshoeSeats(chamber, seats), [chamber, seats])
+function ChamberScene({ chamber, seats, seatParties, dark }: ChamberSceneProps) {
+  const cells = useMemo(
+    () => layoutHorseshoeSeats(chamber, seats, seatParties),
+    [chamber, seats, seatParties]
+  )
   const groups = useMemo(() => groupSeatsByParty(cells), [cells])
 
   return (
@@ -122,10 +126,16 @@ function ChamberScene({ chamber, seats, dark }: ChamberSceneProps) {
 type ChamberSeatDiagram3DProps = {
   chamber: 'House' | 'Senate'
   seats: PartySeatCount[]
+  seatParties?: string[] | null
   ariaLabel: string
 }
 
-export function ChamberSeatDiagram3D({ chamber, seats, ariaLabel }: ChamberSeatDiagram3DProps) {
+export function ChamberSeatDiagram3D({
+  chamber,
+  seats,
+  seatParties,
+  ariaLabel,
+}: ChamberSeatDiagram3DProps) {
   const theme = useDocumentTheme()
   const dark = theme === 'dark'
 
@@ -138,7 +148,7 @@ export function ChamberSeatDiagram3D({ chamber, seats, ariaLabel }: ChamberSeatD
         frameloop="demand"
         gl={{ antialias: true, alpha: true, powerPreference: 'low-power' }}
       >
-        <ChamberScene chamber={chamber} seats={seats} dark={dark} />
+        <ChamberScene chamber={chamber} seats={seats} seatParties={seatParties} dark={dark} />
       </Canvas>
     </div>
   )

@@ -38,7 +38,7 @@ function toComposition(
   partyMap: Map<string, number> | undefined,
   chamber: "House" | "Senate",
   congress: number,
-  options?: { isSample?: boolean }
+  options?: { isSample?: boolean; seatParties?: string[] }
 ): ChamberComposition {
   const election = seatsUpForElection(chamber, congress);
 
@@ -60,11 +60,17 @@ function toComposition(
   const leading = [...seats].sort((a, b) => b.seats - a.seats)[0];
   const majorityParty = leading && leading.seats > total / 2 ? leading.party : null;
 
+  const seatParties =
+    options?.seatParties && options.seatParties.length === total
+      ? options.seatParties
+      : undefined;
+
   return {
     seats,
     total,
     majority_party: majorityParty,
     control_label: chamberControlLabel(majorityParty, total),
+    ...(seatParties ? { seat_parties: seatParties } : {}),
     ...election,
     ...(options?.isSample ? { is_sample: true } : {}),
   };
@@ -77,6 +83,26 @@ function aggregatePartyRows(rows: MemberPartyRow[]): Map<string, number> {
     partyMap.set(party, (partyMap.get(party) ?? 0) + row.seats);
   }
   return partyMap;
+}
+
+async function listMemberPartyCodes(
+  db: D1Database,
+  chamber: string,
+  excludeLocalSample: boolean
+): Promise<string[]> {
+  const localFilter = excludeLocalSample
+    ? " AND bioguide_id NOT LIKE 'LOCAL:%' AND bioguide_id NOT LIKE 'LIS:%'"
+    : "";
+  const { results } = await db
+    .prepare(
+      `SELECT party
+       FROM members
+       WHERE chamber = ?${localFilter}
+       ORDER BY state, district IS NULL, district, name`
+    )
+    .bind(chamber)
+    .all<{ party: string | null }>();
+  return (results ?? []).map((row) => normalizePartyCode(row.party));
 }
 
 async function countMembersByParty(
@@ -161,7 +187,10 @@ async function buildChamberCompositionForChamber(
     const partyMap = await countRollRosterByParty(db, largestRoll, excludeLocalSample);
     const rosterTotal = [...partyMap.values()].reduce((sum, count) => sum + count, 0);
     if (rosterTotal >= rosterMin) {
-      return toComposition(partyMap, chamber, congress);
+      const seatParties = await listMemberPartyCodes(db, chamber, excludeLocalSample);
+      return toComposition(partyMap, chamber, congress, {
+        seatParties: seatParties.length === rosterTotal ? seatParties : undefined,
+      });
     }
   }
 
@@ -172,7 +201,11 @@ async function buildChamberCompositionForChamber(
   }
 
   const isSample = total < rosterMin;
-  return toComposition(memberPartyMap, chamber, congress, { isSample });
+  const seatParties = await listMemberPartyCodes(db, chamber, excludeLocalSample);
+  return toComposition(memberPartyMap, chamber, congress, {
+    isSample,
+    seatParties: seatParties.length === total ? seatParties : undefined,
+  });
 }
 
 export async function buildChamberComposition(

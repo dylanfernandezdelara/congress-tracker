@@ -14,19 +14,21 @@ export type SeatCell = {
   rowIndex: number
 }
 
+export type HemicycleDot = {
+  party: string
+  x: number
+  y: number
+  r: number
+}
+
 const ROWS_BY_CHAMBER: Record<'House' | 'Senate', number> = {
-  House: 12,
-  Senate: 8,
+  House: 16,
+  Senate: 9,
 }
 
 const VIEWBOX_BY_CHAMBER: Record<'House' | 'Senate', { width: number; height: number }> = {
-  House: { width: 320, height: 108 },
-  Senate: { width: 240, height: 82 },
-}
-
-const SEAT_SIZE_BY_CHAMBER: Record<'House' | 'Senate', number> = {
-  House: 2.4,
-  Senate: 3.6,
+  House: { width: 400, height: 148 },
+  Senate: { width: 320, height: 112 },
 }
 
 function distributeToRows(total: number, rowCount: number): number[] {
@@ -45,6 +47,28 @@ function partyCounts(seats: PartySeatCount[]): Record<string, number> {
     }
   }
   return counts
+}
+
+/** One party code per occupied seat — from roster when available, else expanded counts. */
+export function resolveSeatParties(
+  seats: PartySeatCount[],
+  seatParties?: string[] | null
+): string[] {
+  const total = seats.reduce((sum, entry) => sum + entry.seats, 0)
+  if (seatParties && seatParties.length === total) {
+    return seatParties
+  }
+  return expandPartyCountsToSeats(seats)
+}
+
+export function expandPartyCountsToSeats(seats: PartySeatCount[]): string[] {
+  const expanded: string[] = []
+  for (const entry of seats) {
+    for (let i = 0; i < entry.seats; i += 1) {
+      expanded.push(entry.party)
+    }
+  }
+  return expanded
 }
 
 type RawPosition = Omit<SeatCell, 'party'>
@@ -83,9 +107,11 @@ function generateHemicyclePositions(chamber: 'House' | 'Senate', total: number):
  */
 export function layoutHorseshoeSeats(
   chamber: 'House' | 'Senate',
-  seats: PartySeatCount[]
+  seats: PartySeatCount[],
+  seatParties?: string[] | null
 ): SeatCell[] {
-  const total = seats.reduce((sum, entry) => sum + entry.seats, 0)
+  const parties = resolveSeatParties(seats, seatParties)
+  const total = parties.length
   if (total === 0) return []
 
   const counts = partyCounts(seats)
@@ -158,17 +184,64 @@ export function layoutHorseshoeSeats(
     assigned.push({ ...pos, party })
   }
 
+  if (seatParties && seatParties.length === total) {
+    return applyRosterPartiesToLayout(assigned, parties)
+  }
+
   return assigned
 }
 
+/**
+ * When we have a real member roster, keep hemicycle positions but paint each
+ * seat with that member's party (so cross-aisle seats show correctly).
+ */
+function applyRosterPartiesToLayout(cells: SeatCell[], rosterParties: string[]): SeatCell[] {
+  const sorted = [...cells].sort((a, b) => {
+    if (a.rowIndex !== b.rowIndex) return a.rowIndex - b.rowIndex
+    return b.angle - a.angle
+  })
+  return sorted.map((cell, index) => ({
+    ...cell,
+    party: rosterParties[index] ?? cell.party,
+  }))
+}
+
+export function layoutHemicycleDots(
+  chamber: 'House' | 'Senate',
+  seats: PartySeatCount[],
+  seatParties?: string[] | null
+): HemicycleDot[] {
+  const { width, height } = VIEWBOX_BY_CHAMBER[chamber]
+  const centerX = width / 2
+  const centerY = height + 4
+  const cells = layoutHorseshoeSeats(chamber, seats, seatParties)
+  const total = cells.length
+  const maxRow = Math.max(...cells.map((cell) => cell.rowIndex), 0) + 1
+  const baseRadius = chamber === 'House' ? 2.35 : 3.1
+  const rowScale = Math.max(0.72, 1 - maxRow * 0.018)
+
+  return cells.map((cell) => {
+    const x = (cell.x + 1) * (width / 2)
+    const y = height + cell.z * (height * 0.94)
+    const rowFactor = 1 - cell.rowIndex * 0.035
+    const densityFactor = total > 200 ? 0.88 : total > 80 ? 0.94 : 1
+    const r = baseRadius * rowFactor * rowScale * densityFactor
+    const faceDeg = (Math.atan2(centerY - y, centerX - x) * 180) / Math.PI
+    void faceDeg
+    return { party: cell.party, x, y, r }
+  })
+}
+
+/** @deprecated Use layoutHemicycleDots — kept for tests and 3D path. */
 export function layoutHemicycleSeatsFromCounts(
   chamber: 'House' | 'Senate',
-  seats: PartySeatCount[]
+  seats: PartySeatCount[],
+  seatParties?: string[] | null
 ): Array<{ party: string; x: number; y: number; faceDeg: number }> {
   const { width, height } = VIEWBOX_BY_CHAMBER[chamber]
   const centerX = width / 2
   const centerY = height
-  return layoutHorseshoeSeats(chamber, seats).map((cell) => {
+  return layoutHorseshoeSeats(chamber, seats, seatParties).map((cell) => {
     const x = (cell.x + 1) * (width / 2)
     const y = height + cell.z * height
     const faceDeg = (Math.atan2(centerY - y, centerX - x) * 180) / Math.PI
@@ -180,17 +253,13 @@ export function chamberArcViewBox(chamber: 'House' | 'Senate') {
   return VIEWBOX_BY_CHAMBER[chamber]
 }
 
-export function chamberArcSeatSize(chamber: 'House' | 'Senate') {
-  return SEAT_SIZE_BY_CHAMBER[chamber]
-}
-
 export function seatArcAriaLabel(
   chamber: string,
   seats: PartySeatCount[],
   total: number
 ): string {
   const breakdown = seats.map((entry) => `${entry.party} ${entry.seats}`).join(', ')
-  return `${chamber} seat diagram: ${total} seats (${breakdown})`
+  return `${chamber} seating diagram: ${total} seats, each colored by member party (${breakdown})`
 }
 
 export function groupSeatsByParty(cells: SeatCell[]): Map<string, SeatCell[]> {

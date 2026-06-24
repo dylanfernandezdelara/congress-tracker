@@ -6,6 +6,7 @@ type MockRow = { chamber: string; party: string | null; seats: number };
 
 function createMockDb(options: {
   members?: MockRow[];
+  memberParties?: Array<{ chamber: string; party: string | null }>;
   rollCounts?: Array<{
     chamber: string;
     congress: number;
@@ -15,13 +16,25 @@ function createMockDb(options: {
   }>;
   rollRoster?: MockRow[];
 }) {
-  const { members = [], rollCounts = [], rollRoster = [] } = options;
+  const { members = [], memberParties = [], rollCounts = [], rollRoster = [] } = options;
 
   const stmt = (sql: string) => ({
     bind: (...args: unknown[]) => ({
       all: async () => {
         if (sql.includes("FROM member_votes mv") && sql.includes("JOIN members")) {
           return { results: rollRoster };
+        }
+        if (sql.includes("SELECT party") && sql.includes("FROM members") && sql.includes("ORDER BY state")) {
+          const chamber = args[0] as string;
+          const rows =
+            memberParties.length > 0
+              ? memberParties.filter((row) => row.chamber === chamber)
+              : members
+                  .filter((row) => row.chamber === chamber)
+                  .flatMap((row) =>
+                    Array.from({ length: row.seats }, () => ({ party: row.party }))
+                  );
+          return { results: rows };
         }
         if (sql.includes("FROM members") && sql.includes("WHERE chamber = ?")) {
           const chamber = args[0] as string;
@@ -104,6 +117,20 @@ describe("buildChamberComposition", () => {
     const result = await buildChamberComposition(db, 119, 2);
     expect(result.house.total).toBe(435);
     expect(result.house.is_sample).toBeUndefined();
+  });
+
+  it("includes per-member seat parties from the member table", async () => {
+    resetSchemaFlag();
+    const db = createMockDb({
+      members: [
+        { chamber: "Senate", party: "D", seats: 2 },
+        { chamber: "Senate", party: "R", seats: 1 },
+      ],
+    });
+
+    const result = await buildChamberComposition(db, 119, 2);
+    expect(result.senate.seat_parties).toEqual(["D", "D", "R"]);
+    expect(result.senate.is_sample).toBe(true);
   });
 
   it("returns empty composition when no members exist", async () => {
