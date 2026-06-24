@@ -1598,18 +1598,6 @@
       aspect-ratio: 280 / 118;
     }
 
-    .chamber-seat-legend {
-      flex-direction: row;
-      flex-wrap: nowrap;
-      justify-content: center;
-      align-items: center;
-      gap: 0.35rem 0.45rem;
-    }
-
-    .chamber-legend-text {
-      font-size: 0.625rem;
-    }
-
     .president-control-body {
       min-height: 4.5rem;
       padding: 0.15rem 0 0.2rem;
@@ -1703,6 +1691,19 @@
     .chamber-party-pill.chamber-control-pill {
       padding: 0.15rem 0.3rem;
       font-size: 0.5625rem;
+    }
+
+    .chamber-seat-legend {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      justify-content: center;
+      align-items: center;
+      gap: 0.35rem 0.45rem;
+      overflow-x: auto;
+    }
+
+    .chamber-legend-text {
+      font-size: 0.625rem;
     }
   }
 
