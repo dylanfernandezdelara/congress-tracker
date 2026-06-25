@@ -77,7 +77,7 @@ export function ChamberCompositionOverview({
 }: ChamberCompositionOverviewProps) {
   if (error) {
     return (
-      <section className="home-enrichment" aria-label="Federal Control">
+      <section className="home-enrichment federal-control" aria-label="Federal Control">
         <p className="home-enrichment-error text-sm text-secondary">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
@@ -90,7 +90,7 @@ export function ChamberCompositionOverview({
 
   if (loading && !composition) {
     return (
-      <section className="home-enrichment" aria-label="Federal Control">
+      <section className="home-enrichment federal-control" aria-label="Federal Control">
         <div className="chamber-overview-skeleton" aria-hidden="true" />
       </section>
     )
@@ -99,7 +99,7 @@ export function ChamberCompositionOverview({
   if (!composition) return null
 
   return (
-    <section className="home-enrichment" aria-label="Federal Control">
+    <section className="home-enrichment federal-control" aria-label="Federal Control">
       <div className="home-enrichment-header">
         <h2 className="home-enrichment-title">Federal Control</h2>
       </div>
