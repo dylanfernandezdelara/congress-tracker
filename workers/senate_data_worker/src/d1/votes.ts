@@ -1,6 +1,7 @@
 import type { PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { ensureSchema } from "./schema";
+import { normalizeBillType } from "../sources/bill-type";
 
 export interface ExistingVoteKeyRow {
   chamber: string;
@@ -161,16 +162,16 @@ export async function selectFeedBills(
   const { results } = await db
     .prepare(
       `WITH combined AS (
-         SELECT bill_congress, bill_type, bill_number, MAX(vote_date) AS sort_date, 0 AS executive_boost
+         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number, MAX(vote_date) AS sort_date, 0 AS executive_boost
          FROM votes
          WHERE is_passage = 1 AND vote_date >= ?
-         GROUP BY bill_congress, bill_type, bill_number
+         GROUP BY bill_congress, UPPER(bill_type), bill_number
          UNION ALL
-         SELECT b.bill_congress, b.bill_type, b.bill_number, MAX(p.posted_at) AS sort_date, 1 AS executive_boost
+         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number, MAX(p.posted_at) AS sort_date, 1 AS executive_boost
          FROM executive_post_bills b
          JOIN executive_posts p ON p.id = b.post_id
          WHERE p.posted_at >= ?
-         GROUP BY b.bill_congress, b.bill_type, b.bill_number
+         GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
        )
        SELECT bill_congress, bill_type, bill_number, MAX(sort_date) AS latest_passage_date
        FROM combined
@@ -192,16 +193,16 @@ export async function countFeedBills(
   const row = await db
     .prepare(
       `WITH combined AS (
-         SELECT bill_congress, bill_type, bill_number
+         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number
          FROM votes
          WHERE is_passage = 1 AND vote_date >= ?
-         GROUP BY bill_congress, bill_type, bill_number
+         GROUP BY bill_congress, UPPER(bill_type), bill_number
          UNION
-         SELECT b.bill_congress, b.bill_type, b.bill_number
+         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number
          FROM executive_post_bills b
          JOIN executive_posts p ON p.id = b.post_id
          WHERE p.posted_at >= ?
-         GROUP BY b.bill_congress, b.bill_type, b.bill_number
+         GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
        )
        SELECT COUNT(*) AS total FROM combined`
     )
@@ -233,10 +234,10 @@ export async function getPassageVotesForBill(
     .prepare(
       `SELECT chamber, congress, session, roll_number, question, result, yeas, nays, vote_date
        FROM votes
-       WHERE bill_congress = ? AND bill_type = ? AND bill_number = ? AND is_passage = 1
+       WHERE bill_congress = ? AND UPPER(bill_type) = ? AND bill_number = ? AND is_passage = 1
        ORDER BY vote_date DESC`
     )
-    .bind(congress, billType, billNumber)
+    .bind(congress, normalizeBillType(billType), billNumber)
     .all<VoteRow>();
   return results ?? [];
 }

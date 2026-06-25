@@ -85,9 +85,11 @@ function isSecureAmericaConfusion(postText: string, link: ExecutiveBillLink): bo
 export function applyExecutiveLinkGuardrails(
   postText: string,
   llm: ExecutiveLinkLlmResult,
-  catalog: ExecutiveCatalogBill[]
+  catalog: ExecutiveCatalogBill[],
+  congress: number
 ): ExecutiveLinkLlmResult | null {
   const filtered = llm.linked_bills.filter((link) => {
+    if (link.congress !== congress) return false;
     if (link.confidence < EXECUTIVE_LINK_MIN_CONFIDENCE) return false;
     if (!VALID_ROLES.includes(link.role)) return false;
     if (isSecureAmericaConfusion(postText, link)) return false;
@@ -95,7 +97,7 @@ export function applyExecutiveLinkGuardrails(
     return true;
   });
 
-  const explicit = extractExplicitBillRefs(postText, catalog[0]?.congress ?? 119);
+  const explicit = extractExplicitBillRefs(postText, congress);
   for (const ref of explicit) {
     const key = billRefKey(ref);
     if (!filtered.some((l) => billRefKey(l) === key)) {
@@ -132,6 +134,32 @@ export function applyExecutiveLinkGuardrails(
     informal: llm.informal ?? true,
     linked_bills: filtered,
   };
+}
+
+/** Fallback when LLM is unavailable: link only explicit H.R./S. numbers in the post. */
+export function buildExplicitRefExecutiveLink(
+  postText: string,
+  congress: number
+): ExecutiveLinkLlmResult | null {
+  const explicit = extractExplicitBillRefs(postText, congress);
+  if (explicit.length === 0) return null;
+
+  const linked_bills = explicit.map((ref, index) => ({
+    congress: ref.congress,
+    type: ref.type,
+    number: ref.number,
+    role: (index === 0 ? "primary" : "mentioned") as ExecutiveBillRole,
+    confidence: 1,
+    rationale: "Explicit bill number in post",
+  }));
+
+  const summary = postText.replace(/\s+/g, " ").trim().slice(0, 140);
+  return applyExecutiveLinkGuardrails(
+    postText,
+    { linked_bills, banner_summary: summary, informal: true },
+    [],
+    congress
+  );
 }
 
 export function buildExecutiveCatalogEntry(

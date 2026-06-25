@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyExecutiveLinkGuardrails } from "./guardrails";
+import { applyExecutiveLinkGuardrails, buildExplicitRefExecutiveLink } from "./guardrails";
 import {
   HOUSING_SAVE_CATALOG,
   HOUSING_SAVE_LLM_RESULT,
@@ -11,7 +11,8 @@ describe("applyExecutiveLinkGuardrails", () => {
     const result = applyExecutiveLinkGuardrails(
       HOUSING_SAVE_POST_TEXT,
       HOUSING_SAVE_LLM_RESULT,
-      HOUSING_SAVE_CATALOG
+      HOUSING_SAVE_CATALOG,
+      119
     );
 
     expect(result).not.toBeNull();
@@ -42,8 +43,35 @@ describe("applyExecutiveLinkGuardrails", () => {
     const result = applyExecutiveLinkGuardrails(
       HOUSING_SAVE_POST_TEXT,
       confused,
-      HOUSING_SAVE_CATALOG
+      HOUSING_SAVE_CATALOG,
+      119
     );
     expect(result).toBeNull();
+  });
+
+  it("rejects bills from the wrong congress", () => {
+    const wrongCongress = {
+      ...HOUSING_SAVE_LLM_RESULT,
+      linked_bills: [
+        {
+          congress: 118,
+          type: "HR",
+          number: 1,
+          role: "primary" as const,
+          confidence: 0.95,
+          rationale: "wrong congress",
+        },
+      ],
+    };
+    expect(
+      applyExecutiveLinkGuardrails(HOUSING_SAVE_POST_TEXT, wrongCongress, HOUSING_SAVE_CATALOG, 119)
+    ).toBeNull();
+  });
+
+  it("builds explicit-ref links when post names a bill number", () => {
+    const result = buildExplicitRefExecutiveLink("I will veto H.R. 9999 if it reaches my desk.", 119);
+    expect(result).toMatchObject({
+      linked_bills: [{ congress: 119, type: "HR", number: 9999, role: "primary" }],
+    });
   });
 });

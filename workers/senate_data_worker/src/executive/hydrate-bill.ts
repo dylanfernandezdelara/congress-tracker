@@ -32,5 +32,5 @@ export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<
     rawSummaryText: bundle.rawSummaryText,
     digest,
   });
-  return true;
+  return Boolean(bundle.title?.trim());
 }

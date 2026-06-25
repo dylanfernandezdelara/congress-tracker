@@ -65,16 +65,20 @@ export async function buildFeedPage(
       }));
 
     const related_executive_bills: RelatedExecutiveBill[] = [];
+    const relatedKeys = new Set<string>();
     for (const signal of executive_signals) {
       const links = await getExecutivePostBillsForPost(env.DB, signal.post_id);
       for (const link of links) {
         if (
           link.bill_congress === row.bill_congress &&
-          link.bill_type === row.bill_type &&
+          link.bill_type.toUpperCase() === row.bill_type.toUpperCase() &&
           link.bill_number === row.bill_number
         ) {
           continue;
         }
+        const relatedKey = `${link.bill_congress}:${link.bill_type.toUpperCase()}:${link.bill_number}`;
+        if (relatedKeys.has(relatedKey)) continue;
+        relatedKeys.add(relatedKey);
         const otherDigest = await getDigest(
           env.DB,
           link.bill_congress,

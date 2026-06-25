@@ -1,5 +1,6 @@
 import type { ExecutiveCatalogBill, ExecutiveLinkLlmResult } from "../../../../shared/executive-api-types";
 import type { Env } from "../config";
+import { congressNumber } from "../config";
 import { parseExecutiveLinkJson } from "../executive/guardrails";
 import { resolveOpenRouterModel } from "./model";
 import { buildExecutiveLinkPrompt } from "./executive-link-prompt";
@@ -19,7 +20,10 @@ export async function linkExecutivePostWithLlm(
   if (!env.OPENROUTER_API_KEY?.trim()) return null;
 
   const model = await resolveOpenRouterModel(env);
-  const prompt = buildExecutiveLinkPrompt(params);
+  const prompt = buildExecutiveLinkPrompt({
+    ...params,
+    congress: congressNumber(env),
+  });
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -38,9 +42,27 @@ export async function linkExecutivePostWithLlm(
     signal: AbortSignal.timeout(20_000),
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.warn(
+      JSON.stringify({
+        event: "executive_link_llm_failed",
+        status: res.status,
+        model,
+      })
+    );
+    return null;
+  }
+
   const data = (await res.json()) as ChatResponse;
   const content = data.choices?.[0]?.message?.content;
-  if (!content) return null;
-  return parseExecutiveLinkJson(content);
+  if (!content) {
+    console.warn(JSON.stringify({ event: "executive_link_llm_empty", model }));
+    return null;
+  }
+
+  const parsed = parseExecutiveLinkJson(content);
+  if (!parsed) {
+    console.warn(JSON.stringify({ event: "executive_link_llm_parse_failed", model }));
+  }
+  return parsed;
 }

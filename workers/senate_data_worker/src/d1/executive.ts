@@ -4,6 +4,7 @@ import type {
   ExecutiveSignal,
 } from "../../../../shared/executive-api-types";
 import { ensureSchema } from "./schema";
+import { normalizeBillType } from "../sources/bill-type";
 
 export interface ExecutivePostRow {
   id: string;
@@ -171,11 +172,11 @@ export async function getExecutivePostBillsForBill(
       `SELECT p.*, b.role, b.rationale
        FROM executive_post_bills b
        JOIN executive_posts p ON p.id = b.post_id
-       WHERE b.bill_congress = ? AND b.bill_type = ? AND b.bill_number = ?
+       WHERE b.bill_congress = ? AND UPPER(b.bill_type) = ? AND b.bill_number = ?
          AND p.posted_at >= ?
        ORDER BY p.posted_at DESC`
     )
-    .bind(congress, billType, billNumber, sinceIso)
+    .bind(congress, normalizeBillType(billType), billNumber, sinceIso)
     .all<ExecutivePostRow & { role: string; rationale: string | null }>();
   return results ?? [];
 }

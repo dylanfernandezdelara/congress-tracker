@@ -15,7 +15,7 @@ export function PageShell({ children }: PageShellProps) {
   return (
     <div className={`page-shell mx-auto min-h-screen w-full max-w-[1440px]${playRoute ? ' page-shell--play' : ''}`}>
       <SiteHeader compact={playRoute} />
-      <ExecutiveAlertBanner />
+      {!playRoute ? <ExecutiveAlertBanner /> : null}
       <div className="page-main min-w-0">{children}</div>
     </div>
   )

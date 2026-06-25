@@ -31,7 +31,6 @@ vi.mock("../executive/build-catalog", () => ({
     },
   ]),
   ensureBillInCatalog: vi.fn(async (_env, _bill, catalog) => catalog),
-  EXECUTIVE_SEED_BILLS: [{ congress: 119, type: "HR", number: 22 }],
 }));
 
 function createExecutiveMockDb() {

@@ -1,34 +1,40 @@
-import type { ExecutiveCatalogBill } from "../../../../shared/executive-api-types";
+import type { ExecutiveCatalogBill, ExecutiveLinkLlmResult } from "../../../../shared/executive-api-types";
 import { formatBillDocket } from "../../../../shared/feed-content";
 
 export function buildExecutiveLinkPrompt(params: {
   postText: string;
   postedAt: string;
   catalog: ExecutiveCatalogBill[];
+  congress: number;
 }): string {
-  const catalogLines = params.catalog
-    .map((bill) => {
-      const label = formatBillDocket(bill.type, bill.number, bill.congress);
-      return `- ${label} | title: ${bill.title ?? "N/A"} | headline: ${bill.headline ?? "N/A"} | policy: ${bill.policy_area ?? "N/A"}`;
-    })
-    .join("\n");
+  const catalogLines =
+    params.catalog.length > 0
+      ? params.catalog
+          .map((bill) => {
+            const label = formatBillDocket(bill.type, bill.number, bill.congress);
+            return `- ${label} | title: ${bill.title ?? "N/A"} | headline: ${bill.headline ?? "N/A"} | policy: ${bill.policy_area ?? "N/A"}`;
+          })
+          .join("\n")
+      : "(none indexed yet — still link any bill the post clearly references)";
 
-  return `You link a U.S. President Truth Social post to congressional bills.
+  return `You analyze U.S. presidential Truth Social posts for impact on congressional legislation.
+
+TASK: Read the post below and decide which bills from the ${params.congress}th Congress it affects — by explicit bill number, nickname, policy area, or conditional dependency (e.g. "won't sign X until Y passes").
+
+The catalog below is a partial index of bills we already track. It is NOT a closed list. When the post clearly references a bill that is missing from the catalog, still output that bill's congress, type, and number.
 
 POSTED AT: ${params.postedAt}
 POST:
 ${params.postText}
 
-CANDIDATE BILLS (prefer these when post uses nicknames or shorthand):
+TRACKED BILLS (reference only — link off-catalog bills when clearly referenced):
 ${catalogLines}
-
-You may also link any other bill from the ${params.catalog[0]?.congress ?? 119}th Congress when the post clearly references it by title, nickname, or bill number, even if it is not listed above.
 
 Return ONLY valid JSON:
 {
   "linked_bills": [
     {
-      "congress": 119,
+      "congress": ${params.congress},
       "type": "HR",
       "number": 6644,
       "role": "primary",
@@ -36,16 +42,17 @@ Return ONLY valid JSON:
       "rationale": "One short sentence"
     }
   ],
-  "banner_summary": "One sentence for a breaking-news banner",
+  "banner_summary": "One neutral sentence for a breaking-news banner",
   "informal": true
 }
 
 Rules:
-- role must be one of: primary, conditional, related, mentioned
-- Use "conditional" when signing/action on one bill depends on another bill passing
-- SAVE America Act is H.R. 22 — NOT S. 2 Secure America Act
-- At most one primary bill
-- confidence is 0-1
-- Only link bills clearly referenced in the post
-- banner_summary must be neutral and factual`;
+- congress must be ${params.congress} for every linked bill
+- type is HR, S, HRES, SRES, HJRES, or SJRES (uppercase)
+- role: primary | conditional | related | mentioned
+- Use "conditional" when action on one bill depends on another passing
+- SAVE America Act is H.R. 22 — NOT S. 2 (Secure America Act)
+- At most one primary bill; confidence 0–1
+- Link only bills clearly supported by the post text
+- banner_summary must be neutral, factual, and under 140 characters`;
 }

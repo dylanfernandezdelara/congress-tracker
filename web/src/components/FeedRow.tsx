@@ -5,6 +5,7 @@ import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedEventDisplay,
   getFeedRowMeta,
+  getFeedRowDisplayDate,
   getFeedSummaryDisplay,
   getFeedTopic,
   isProceduralFeedItem,
@@ -30,6 +31,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const topic = getFeedTopic(item)
   const summary = getFeedSummaryDisplay(item)
   const meta = getFeedRowMeta(item)
+  const displayDate = getFeedRowDisplayDate(item)
   const eventDisplay = getFeedEventDisplay(item)
   const policyArea = item.policy_area
   const showEventLine = meta.kind !== 'passed' && meta.kind !== 'failed'
@@ -73,8 +75,9 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                   </span>
                 ) : null}
                 <span className="feed-row-date-wrap">
-                  <time className="feed-row-date" dateTime={item.latest_passage_date}>
-                    {formatVoteDate(item.latest_passage_date)}
+                  <time className="feed-row-date" dateTime={displayDate.iso}>
+                    {formatVoteDate(displayDate.iso)}
+                    {displayDate.kind === 'signal' ? ' · Signal' : ''}
                   </time>
                   <span className="feed-row-chevron" aria-hidden="true">
                     ›
