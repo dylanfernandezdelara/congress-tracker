@@ -131,7 +131,7 @@ describe('Home', () => {
     expect(screen.queryByText('Republican control')).not.toBeInTheDocument()
     expect(screen.getByLabelText('House party seat counts')).toBeInTheDocument()
     expect(screen.getByLabelText('Senate party seat counts')).toBeInTheDocument()
-    expect(screen.getByText('Donald Trump')).toBeInTheDocument()
+    expect(screen.getByText('President Donald Trump')).toBeInTheDocument()
     expect(screen.getByText('Jan 20, 2025 – Jan 20, 2029')).toBeInTheDocument()
     expect(container.querySelectorAll('.chamber-wedge').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText(/on the November 2026 ballot/i)).not.toBeInTheDocument()
