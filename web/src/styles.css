@@ -1460,6 +1460,56 @@
     font-weight: 600;
   }
 
+  /* Federal Control — shared type scale (desktop defaults, mobile at ≤900px) */
+  .federal-control {
+    --fc-font-section: 1rem;
+    --fc-font-title: 0.875rem;
+    --fc-font-meta: 0.75rem;
+    --fc-font-badge: 0.6875rem;
+    /* SVG user units sized to render near --fc-font-meta on screen */
+    --fc-wedge-count: 14px;
+    --fc-wedge-count-compact: 13px;
+  }
+
+  @media (max-width: 900px) {
+    .federal-control {
+      --fc-font-section: 1.0625rem;
+      --fc-font-title: 1rem;
+      --fc-font-meta: 0.875rem;
+      --fc-font-badge: 0.75rem;
+      --fc-wedge-count: 24px;
+      --fc-wedge-count-compact: 22px;
+    }
+  }
+
+  .federal-control .home-enrichment-title {
+    font-size: var(--fc-font-section);
+  }
+
+  .federal-control .chamber-card-title,
+  .federal-control .president-control-name {
+    font-size: var(--fc-font-title);
+  }
+
+  .federal-control .chamber-legend-text,
+  .federal-control .president-control-term,
+  .federal-control .chamber-wedge-empty {
+    font-size: var(--fc-font-meta);
+  }
+
+  .federal-control .chamber-party-pill {
+    font-size: var(--fc-font-badge);
+  }
+
+  .federal-control .chamber-wedge-count {
+    font-size: var(--fc-wedge-count);
+    font-weight: 600;
+  }
+
+  .federal-control .chamber-wedge-count--compact {
+    font-size: var(--fc-wedge-count-compact);
+  }
+
   .home-enrichment-error {
     margin: 0;
   }
@@ -1512,7 +1562,6 @@
 
   .chamber-card-title {
     margin: 0;
-    font-size: 0.9375rem;
     font-weight: 600;
     flex-shrink: 0;
   }
@@ -1539,26 +1588,6 @@
     margin-inline: auto;
   }
 
-  /* SVG user units — mobile wedge is height-capped (~4.25rem), so ~24px units ≈ 14px on screen */
-  .chamber-wedge-count {
-    font-size: 20px;
-    font-weight: 600;
-  }
-
-  .chamber-wedge-count--compact {
-    font-size: 18px;
-  }
-
-  @media (max-width: 900px) {
-    .chamber-wedge-count {
-      font-size: 24px;
-    }
-
-    .chamber-wedge-count--compact {
-      font-size: 22px;
-    }
-  }
-
   .chamber-wedge--empty {
     display: flex;
     align-items: center;
@@ -1568,7 +1597,6 @@
   }
 
   .chamber-wedge-empty {
-    font-size: 0.75rem;
     color: hsl(var(--twc-faint));
   }
 
@@ -1590,14 +1618,12 @@
 
   .president-control-name {
     margin: 0;
-    font-size: 0.9375rem;
     font-weight: 600;
     line-height: 1.2;
   }
 
   .president-control-term {
     margin: 0;
-    font-size: 0.75rem;
     color: hsl(var(--twc-secondary));
     line-height: 1.2;
   }
@@ -1661,7 +1687,6 @@
   }
 
   .chamber-legend-text {
-    font-size: 0.75rem;
     font-weight: 600;
     line-height: 1.2;
     white-space: nowrap;
@@ -1681,12 +1706,6 @@
 
   .chamber-legend-text.party-other {
     color: hsl(var(--twc-party-other));
-  }
-
-  @media (min-width: 1024px) {
-    .chamber-legend-text {
-      font-size: 0.75rem;
-    }
   }
 
   .chamber-control-pill {
@@ -1710,7 +1729,6 @@
 
     .chamber-party-pill.chamber-control-pill {
       padding: 0.2rem 0.4rem;
-      font-size: 0.75rem;
     }
 
     .chamber-seat-legend {
@@ -1720,14 +1738,6 @@
       align-items: center;
       gap: 0.35rem 0.45rem;
       overflow-x: auto;
-    }
-
-    .chamber-legend-text {
-      font-size: 0.875rem;
-    }
-
-    .president-control-term {
-      font-size: 0.875rem;
     }
   }
 
@@ -1739,7 +1749,6 @@
     gap: 0.2rem 0.3rem;
     padding: 0.22rem 0.4rem;
     border-radius: 9999px;
-    font-size: clamp(0.5625rem, 1.8vw, 0.6875rem);
     font-weight: 600;
     line-height: 1.15;
     border: 1px solid transparent;
@@ -1801,13 +1810,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  @media (min-width: 1024px) {
-    .chamber-party-pill {
-      padding: 0.1875rem 0.375rem;
-      font-size: 0.625rem;
-    }
   }
 
   .chamber-party-pill-count {
