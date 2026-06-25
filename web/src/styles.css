@@ -1536,6 +1536,18 @@
     }
   }
 
+  .chamber-card--president {
+    text-align: center;
+  }
+
+  .chamber-card--president .chamber-card-header {
+    align-items: center;
+  }
+
+  .chamber-card--president .president-control-meta {
+    align-items: center;
+  }
+
   .chamber-card {
     border: 1px solid hsl(var(--twc-border));
     border-radius: 0.875rem;
