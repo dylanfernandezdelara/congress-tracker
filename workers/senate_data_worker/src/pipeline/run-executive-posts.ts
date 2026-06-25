@@ -65,8 +65,18 @@ async function processExecutiveStatus(
   let hydrated = 0;
   for (const link of guarded.linked_bills) {
     const bill = { congress: link.congress, type: link.type, number: link.number };
-    const ok = await hydrateBillFromCongress(env, bill);
-    if (ok) hydrated += 1;
+    try {
+      const ok = await hydrateBillFromCongress(env, bill);
+      if (ok) hydrated += 1;
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          event: "executive_bill_hydration_failed",
+          bill,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
+    }
     catalog = await ensureBillInCatalog(env, bill, catalog);
   }
 

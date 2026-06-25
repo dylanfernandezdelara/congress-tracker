@@ -85,7 +85,7 @@ INSERT INTO executive_post_bills (
 INSERT OR REPLACE INTO bill_digests (
   congress, bill_type, number, title, policy_area, raw_summary_text, digest_json, created_at, updated_at
 ) VALUES (
-  119, 'hr', 6644, '21st Century ROAD to Housing Act (local sample)', 'Housing',
+  119, 'HR', 6644, '21st Century ROAD to Housing Act (local sample)', 'Housing',
   'Sample CRS-style summary seeded for local development.',
   '{"headline":"Overhauls federal housing programs (local sample)","what_it_does":"Reforms federal housing finance and expands access to affordable housing.","key_points":["Updates FHA and Ginnie Mae programs","Expands rural housing assistance"],"terms_explained":[{"term":"FHA","plain":"Federal Housing Administration — insures mortgages for qualified borrowers."}]}',
   '${NOW_ISO}', '${NOW_ISO}'
