@@ -33,6 +33,14 @@ test('sanitizePreviewAlias truncates over-long branch names', () => {
   assert.equal(isValidPreviewAlias(sanitized), true)
 })
 
+test('sanitizePreviewAlias strips trailing dash after truncation', () => {
+  const long = 'cursor-' + 'a'.repeat(35) + '-tail'
+  const sanitized = sanitizePreviewAlias(long)
+  assert.equal(sanitized.length, MAX_PREVIEW_ALIAS_LEN)
+  assert.match(sanitized, /[a-z0-9]$/)
+  assert.equal(isValidPreviewAlias(sanitized), true)
+})
+
 test('resolvePreviewAlias skips main and honors PREVIEW_ALIAS override', () => {
   assert.equal(resolvePreviewAlias('main'), '')
   assert.equal(

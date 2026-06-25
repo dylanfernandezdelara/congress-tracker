@@ -16,6 +16,7 @@ export function sanitizePreviewAlias(raw) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, MAX_PREVIEW_ALIAS_LEN)
+    .replace(/-+$/g, '')
 }
 
 export function isValidPreviewAlias(alias) {
