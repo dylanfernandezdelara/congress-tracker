@@ -1,4 +1,5 @@
 import { execFileSync, execSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -55,7 +56,18 @@ function runPreviewUpload() {
     )
   }
 
-  execFileSync('wrangler', args, { cwd: workerDir, stdio: 'inherit' })
+  execFileSync(process.execPath, [wranglerEntry(workerDir), ...args], {
+    cwd: workerDir,
+    stdio: 'inherit',
+  })
+}
+
+function wranglerEntry(workerDir) {
+  const local = path.join(workerDir, 'node_modules', 'wrangler', 'bin', 'wrangler.js')
+  if (existsSync(local)) return local
+  throw new Error(
+    'wrangler not found — run npm --prefix workers/senate_data_worker ci before npm run preview',
+  )
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
