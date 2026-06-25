@@ -370,6 +370,55 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .feed-row-chip--executive {
+    border-color: hsl(var(--twc-accent) / 0.35);
+    color: hsl(var(--twc-accent));
+    background-color: hsl(var(--twc-accent) / 0.08);
+  }
+
+  .executive-alert-banner {
+    margin: 0 1rem 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid hsl(var(--twc-accent) / 0.35);
+    background: hsl(var(--twc-accent) / 0.08);
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .executive-alert-banner__label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: hsl(var(--twc-accent));
+  }
+
+  .executive-alert-banner__copy {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .executive-alert-banner__meta {
+    color: hsl(var(--twc-secondary));
+    font-size: 0.8125rem;
+  }
+
+  .executive-alert-banner__link {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: hsl(var(--twc-accent));
+    text-decoration: none;
+  }
+
+  .executive-alert-banner__disclaimer {
+    margin: 0;
+    font-size: 0.75rem;
+    color: hsl(var(--twc-faint));
+  }
+
   .feed-row-policy-area {
     max-width: 100%;
   }

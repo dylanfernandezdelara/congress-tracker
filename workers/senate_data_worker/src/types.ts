@@ -26,6 +26,10 @@ export interface IngestVotesResult {
 }
 
 import type { BillDigestContent } from "../../../shared/game-api-types";
+import type {
+  ExecutiveSignal,
+  RelatedExecutiveBill,
+} from "../../../shared/executive-api-types";
 
 export type { BillDigestContent };
 
@@ -55,6 +59,8 @@ export interface FeedItem {
   raw_summary_text: string | null;
   passage_votes: FeedPassageVote[];
   latest_passage_date: string;
+  executive_signals?: ExecutiveSignal[];
+  related_executive_bills?: RelatedExecutiveBill[];
 }
 
 export interface FeedPageResponse {

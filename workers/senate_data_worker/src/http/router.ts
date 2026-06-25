@@ -9,6 +9,7 @@ import {
   getMissingDigestCount,
 } from "../d1/pipeline-state";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
+import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
@@ -24,6 +25,7 @@ import {
 } from "../constants";
 import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
+import { buildExecutiveAlerts } from "../storage/executive";
 import { buildGameReveal, buildGameRounds, parseGameLimit } from "../storage/game";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildNotableVotes } from "../analytics/notable-votes";
@@ -273,6 +275,10 @@ export async function handlePublicFetch(
     return handlePipelineRoute(request, env, json, () => runDisclosuresPipeline(env));
   }
 
+  if (pathname === "/__pipeline/run/executive-posts") {
+    return handlePipelineRoute(request, env, json, () => runExecutivePostsPipeline(env));
+  }
+
   if (request.method !== "GET") {
     return json({ error: "method_not_allowed", message: "Only GET requests are allowed" }, { status: 405 });
   }
@@ -296,6 +302,18 @@ export async function handlePublicFetch(
       });
     } catch {
       return json({ error: "feed_error", message: "feed unavailable" }, { status: 500 });
+    }
+  }
+
+  if (pathname === "/executive/alerts.json") {
+    try {
+      const alerts = await buildExecutiveAlerts(env);
+      return json(alerts, {
+        status: 200,
+        headers: { "Cache-Control": cacheLatest },
+      });
+    } catch {
+      return json({ error: "executive_error", message: "executive alerts unavailable" }, { status: 500 });
     }
   }
 

@@ -59,6 +59,9 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                   </span>
                 ) : null}
                 <BillIdChip type={item.bill.type} number={item.bill.number} />
+                {item.executive_signals && item.executive_signals.length > 0 ? (
+                  <span className="feed-row-chip feed-row-chip--executive">Executive · Truth Social</span>
+                ) : null}
                 {policyArea && !isProceduralFeedItem(item) ? (
                   <span
                     id={policyAreaId}

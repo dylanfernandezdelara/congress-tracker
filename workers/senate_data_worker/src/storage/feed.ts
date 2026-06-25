@@ -1,13 +1,15 @@
-import { FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
+import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS, FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
 import type { Env } from "../config";
+import { getExecutivePostBillsForBill, getExecutivePostBillsForPost } from "../d1/executive";
 import { getDigest, parseStoredDigest } from "../d1/digests";
 import { ensureSchema } from "../d1/schema";
 import {
-  countRecentVotedBills,
+  countFeedBills,
   getPassageVotesForBill,
-  selectRecentVotedBills,
+  selectFeedBills,
 } from "../d1/votes";
 import { lookbackStartIso } from "../sources/congress-client";
+import type { RelatedExecutiveBill } from "../../../../shared/executive-api-types";
 import type { Chamber, FeedItem, FeedPageResponse } from "../types";
 
 export interface FeedPageOptions {
@@ -21,11 +23,12 @@ export async function buildFeedPage(
 ): Promise<FeedPageResponse> {
   await ensureSchema(env.DB);
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
+  const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
   const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
   const offset = Math.max(0, options.offset);
   const [total, bills] = await Promise.all([
-    countRecentVotedBills(env.DB, lookback),
-    selectRecentVotedBills(env.DB, lookback, cappedLimit, offset),
+    countFeedBills(env.DB, lookback, executiveSince),
+    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
   const items: FeedItem[] = [];
@@ -43,6 +46,51 @@ export async function buildFeedPage(
       row.bill_type,
       row.bill_number
     );
+    const executivePosts = await getExecutivePostBillsForBill(
+      env.DB,
+      row.bill_congress,
+      row.bill_type,
+      row.bill_number,
+      executiveSince
+    );
+    const executive_signals = executivePosts
+      .filter((post) => post.summary)
+      .map((post) => ({
+        post_id: post.id,
+        posted_at: post.posted_at,
+        summary: post.summary!,
+        source_url: post.source_url,
+        archive_url: post.archive_url,
+        informal: true as const,
+      }));
+
+    const related_executive_bills: RelatedExecutiveBill[] = [];
+    for (const signal of executive_signals) {
+      const links = await getExecutivePostBillsForPost(env.DB, signal.post_id);
+      for (const link of links) {
+        if (
+          link.bill_congress === row.bill_congress &&
+          link.bill_type === row.bill_type &&
+          link.bill_number === row.bill_number
+        ) {
+          continue;
+        }
+        const otherDigest = await getDigest(
+          env.DB,
+          link.bill_congress,
+          link.bill_type,
+          link.bill_number
+        );
+        related_executive_bills.push({
+          congress: link.bill_congress,
+          type: link.bill_type,
+          number: link.bill_number,
+          title: otherDigest?.title ?? null,
+          role: link.role as RelatedExecutiveBill["role"],
+          reason: link.rationale ?? "mentioned_in_same_post",
+        });
+      }
+    }
 
     items.push({
       bill: {
@@ -66,6 +114,8 @@ export async function buildFeedPage(
         date: v.vote_date,
       })),
       latest_passage_date: row.latest_passage_date,
+      executive_signals,
+      related_executive_bills,
     });
   }
 

@@ -103,11 +103,13 @@ Relevant code:
 - Executive signals attach only to bills **already in the feed** (recent passage votes).
 - SAVE Act (H.R. 22) gets **no bill-row banner** unless it enters feed or lookback changes.
 
-### Option A+ (recommended in discussion)
+### Option A+ (revised — dynamic bill hydration)
 
-- Same feed rules as today.
-- Add small **executive watchlist** / bill aliases for linking posts to bills **outside** the feed (e.g. H.R. 22, H.R. 6644).
-- **Site banner** can reference both; **housing row** can show “Also mentions: H.R. 22 SAVE Act” without adding April 2025 votes to the timeline.
+- Feed timeline still prioritizes **recent passage votes** (45-day lookback).
+- **Additionally:** any bill Trump links in a post gets **hydrated into D1 on demand** (Congress.gov title, summary, passage votes, digest) even if outside the lookback — e.g. H.R. 22 (April 2025).
+- Bills with **active executive signals** (e.g. last 14 days) **enter the feed/timeline** even when outside 45-day lookback, so SAVE gets its own row when he mentions it.
+- Static watchlist **deprecated** — replaced by dynamic hydration + executive-signal feed boost.
+- **Site banner** + **per-bill banners** on both primary and conditionally linked bills once hydrated.
 
 ### UI: two banner types
 
@@ -144,11 +146,64 @@ GET https://truthsocial.com/api/v1/accounts/{id}/statuses?limit=40
 
 **Spike result (2026-06-25):** Direct fetch from cloud dev environment returned **403 (Cloudflare)**. Production ingestion needs spike from Worker + fallback strategy.
 
-### Fetch tiers (try in order)
+### Alternative data sources (2026-06-25 discussion)
 
-1. Mastodon API from Worker with browser-like headers  
-2. Residential proxy or Apify actor (`truth-social-profile-posts-scraper`, etc.)  
-3. External poller → `POST /__pipeline/run/executive-posts` admin endpoint with payload  
+There is **no fully free, official, real-time Truth Social API**. These are the realistic options:
+
+| Source | Cost | Worker reachable? | Captures informal posts (e.g. housing/SAVE)? | Notes |
+|--------|------|-----------------|-----------------------------------------------|-------|
+| **Truth Social Mastodon API** (`truthsocial.com/api/v1/...`) | Free | **No** (403 Cloudflare) | Yes, primary | Canonical but blocked from cloud/Worker IPs |
+| **[trumpstruth.org](https://www.trumpstruth.org/)** archive | Free | **Yes** (HTTP 200) | **Yes** — Jun 24 housing/SAVE post indexed | Third-party archive (Defending Democracy Together); HTML only, no API; links to canonical Truth Social URLs |
+| **White House** (`whitehouse.gov/briefings-statements`) | Free | Yes (HTML) | **Unlikely / slow** for ceremony cancellations | Official but informal Truth Social statements often never appear here |
+| **GovInfo CPD** (`api.govinfo.gov`, free key) | Free | Yes (with `GOVINFO_API_KEY`) | **No** for informal; yes for formal sign/veto messages | Best for Phase 5 formal lane; repo already mentions `GOVINFO_API_KEY` in setup |
+| **Congress.gov `/actions`** (existing key) | Free | Yes | **No** for informal; yes for Presented/Signed/Vetoed | Phase 5 formal lane |
+| **RSS.app / RSSHub / Apify** | Freemium / paid | Varies | Yes | Still scrapes Truth Social behind the scenes; not truly free at scale |
+| **External home poller → admin POST** | Free | N/A (bypasses block) | Yes | DIY; needs always-on residential machine |
+
+**Recommended v1 fetch (free, Worker-native):** poll **trumpstruth.org** homepage HTML every 10 min, parse:
+
+- `truthsocial.com/@realDonaldTrump/{mastodon_id}` → stable `post_id`
+- `og:description` on `/statuses/{id}` pages (or list snippets) → post text
+- `June 24, 2026, 10:26 AM` timestamps
+
+Verified examples (housing/SAVE — Jun 24, 2026):
+
+**Primary signal post (ceremony cancelled / signing delayed):**
+
+| Field | Value |
+|-------|-------|
+| Archive | `https://www.trumpstruth.org/statuses/39514` |
+| Truth Social | `https://truthsocial.com/@realDonaldTrump/116805545512296111` |
+| Posted | June 24, 2026, 10:26 AM |
+| Text | *“Today’s Housing News Conference and Signing is hereby cancelled until such time as we pass the desperately needed SAVE AMERICA ACT, which I consider to be a National Emergency. Thank you for your attention to this matter! President DJT”* |
+
+**Earlier same-day context post (housing vs SAVE priority):**
+
+| Field | Value |
+|-------|-------|
+| Archive | `https://www.trumpstruth.org/statuses/39511` |
+| Truth Social | `https://truthsocial.com/@realDonaldTrump/116805400052068772` |
+| Posted | June 24, 2026, 9:49 AM |
+| Text | *“The Elizabeth ‘Pocahontas’ Warren centric housing bill… pales in comparison to passing THE SAVE AMERICA ACT…”* |
+
+**Expected bill links after ingest + linker:**
+
+- **H.R. 6644** (ROAD to Housing) — primary on post 39514 (`housing` / `signing cancelled` aliases)
+- **H.R. 22** (SAVE Act) — related/conditional on both posts (`SAVE America Act` alias)
+- **Not** S. 2 (Secure America Act) — negative rule
+
+**Banner copy target (post 39514):** e.g. “President cancelled housing signing ceremony until SAVE Act passes (Truth Social, Jun 24)” on H.R. 6644 row + site banner; H.R. 22 as `related_executive_bills` on housing row.
+
+**UI attribution:** “President · Truth Social” with links to **both** Truth Social (primary) and archive (secondary). Disclaimer: third-party archive, not Congress.gov.
+
+**Tradeoffs vs direct Truth Social:** minutes of indexing delay; HTML scrape fragility; dependency on a third-party site; no SLA. Acceptable for breaking-news banners if latency is ~5–15 min, not seconds.
+
+### Fetch tiers (revised — try in order)
+
+1. **trumpstruth.org HTML poll from Worker** (free, confirmed reachable from cloud)  
+2. Truth Social Mastodon API from Worker (likely 403; retry after header experiments)  
+3. External poller or Apify → `POST /__pipeline/run/executive-posts` admin endpoint  
+4. Manual seed / admin POST for known posts while automation is proven  
 
 ### Architecture
 
@@ -182,21 +237,140 @@ Web
 
 - Phrase → bill ref, e.g. `"SAVE America Act"` → H.R. 22, `"ROAD to Housing"` → H.R. 6644
 
-### Bill linking (v1: rules-first)
+### Bill linking mechanism (revised: LLM-primary + guardrails, not rules-first)
 
-**Tier 1 — deterministic**
+**User feedback (2026-06-25):** Rules-only matching is too brittle for Trump’s rhetoric (“Elizabeth Warren centric housing bill”, “SAVE America Act”, vague nicknames). We need semantic understanding, not just regex + a growing alias table.
 
-- Patterns: `H.R. 6644`, `HR 22`, titles from watchlist
-- Aliases: `SAVE America Act`, `SAVE Act`, `housing bill`, `ROAD to Housing`
-- **Negative rule:** “Secure America Act” / S. 2 ≠ SAVE Act (H.R. 22)
+**Decision:** **LLM-primary linking** with a **constrained candidate bill catalog** and **deterministic guardrails**. Still **not RAG** and **not a graph DB** at v1 scale.
 
-**Tier 2 — LLM (optional v1.1)**
+```mermaid
+flowchart TB
+  Post[New executive post] --> Catalog[Build candidate bill catalog]
+  Catalog --> LLM[OpenRouter: link + summarize]
+  LLM --> Guard[Guardrails]
+  Guard -->|pass| Links[(executive_post_bills)]
+  Guard -->|fail| Review[Store post, no auto-banner]
+  Rules[Explicit H.R. regex + negative rules] --> Guard
+  Links --> UI[Banners]
+```
 
-- OpenRouter when rules match 0 or many bills; require `confidence >= 0.8` for auto-banner
+#### Why LLM-primary?
 
-**Tier 3 — manual**
+Trump rarely cites `H.R. 6644`. He uses **marketing names, people, and policy shorthand**. Examples:
 
-- Seed known posts (Jun 24 housing posts) for UI dev while automation is proven
+| Post language | Bill | Rules alone? |
+|---------------|------|--------------|
+| “Elizabeth Warren centric housing bill” | H.R. 6644 | Needs hand-maintained alias |
+| “SAVE AMERICA ACT” | H.R. 22 | Needs alias; confusable with S. 2 |
+| “Signing cancelled until… SAVE AMERICA ACT” | 6644 primary + 22 conditional | Needs **relationship** semantics |
+| Future: “the border bill”, “Schumer’s disaster” | ??? | Alias table doesn’t scale |
+
+An LLM with **bill titles + digest headlines** in context can infer what we want: *this post is about delaying the housing bill until SAVE passes*.
+
+#### Why not RAG (yet)?
+
+- **Candidate set is small:** ~50 feed bills + ~20 watchlist ≈ 70 bills. Fits in one prompt with title, policy area, digest headline/teaser.
+- **RAG adds:** embeddings, vector storage, retrieval tuning, harder debugging.
+- **Revisit RAG** if we expand candidates to “any bill in the 119th Congress” (~thousands).
+
+#### Why not a graph DB?
+
+- Relationships we care about (`primary`, `conditional`, `related`) fit as columns on `executive_post_bills`, output by the LLM.
+- No multi-hop graph queries needed.
+
+---
+
+#### Step 1 — Candidate bill catalog (per post)
+
+1. **Feed bills** — recent passage votes (45-day lookback) + **executive-boosted bills** (linked in last N days, even if older).
+2. **Already-hydrated bills** — any bill previously pulled into D1 via executive linking (grows over time).
+3. LLM may also propose `(congress, type, number)` from post text; unverified refs trigger **dynamic hydration** (below).
+
+**Dynamic bill hydration (new):** when LLM links a bill not fully in D1:
+
+1. `GET` Congress.gov bill + summaries → upsert `bill_digests`
+2. Targeted passage-vote fetch for that bill → upsert `votes`
+3. Digest rewrite if missing (OpenRouter, same as feed pipeline)
+4. Bill becomes feed-eligible via executive-signal boost
+
+Works for **any** bill Trump mentions indirectly — SAVE Act today, another stale bill tomorrow. No manual watchlist curation required.
+
+**Feed vs DB:**
+
+| | 45-day feed only | + dynamic hydration |
+|--|------------------|---------------------|
+| H.R. 6644 | In feed | In feed |
+| H.R. 22 after Trump post | Missing | **Hydrated + appears in feed** (executive boost) |
+
+```json
+{ "congress": 119, "type": "HR", "number": 6644, "title": "...", "headline": "...", "policy_area": "Housing" }
+```
+
+This is **structured context injection**, not retrieval from a vector index.
+
+---
+
+#### Step 2 — LLM link + summarize (primary)
+
+One OpenRouter call per **new** post (same stack as [`openrouter.ts`](../workers/senate_data_worker/src/synthesis/openrouter.ts), `temperature: 0`, JSON output).
+
+**Prompt asks for:**
+
+```json
+{
+  "linked_bills": [
+    {
+      "congress": 119, "type": "HR", "number": 6644,
+      "role": "primary",
+      "confidence": 0.95,
+      "rationale": "Post cancels housing signing ceremony"
+    },
+    {
+      "congress": 119, "type": "HR", "number": 22,
+      "role": "conditional",
+      "confidence": 0.92,
+      "rationale": "Signing delayed until SAVE America Act passes"
+    }
+  ],
+  "banner_summary": "Cancelled housing signing until SAVE Act passes",
+  "informal": true
+}
+```
+
+**Roles:** `primary` | `conditional` | `related` | `mentioned` — drives UI (primary row banner vs “also mentions”).
+
+**Reuse:** Same `OPENROUTER_API_KEY` / free model selection as digest rewrite. At Trump’s post volume (~few/day), cost is negligible.
+
+---
+
+#### Step 3 — Guardrails (deterministic, not primary matcher)
+
+LLM proposes; code verifies:
+
+| Guardrail | Purpose |
+|-----------|---------|
+| **Closed world** | Discard any bill not in candidate catalog |
+| **Confidence floor** | No auto-banner if top link `confidence < 0.75` (tune in tests) |
+| **Explicit bill numbers** | If post contains `H.R. 6644`, that bill must appear in links or flag for review |
+| **Negative rules** | Block known confusions: S. 2 (Secure America) when only “SAVE America Act” appears without S. 2 context |
+| **Duplicate roles** | At most one `primary`; demote extras to `related` |
+| **Missing API key** | Degraded mode: regex + minimal aliases only; log warning |
+
+Guardrails prevent hallucinated bill numbers; they do **not** replace semantic matching.
+
+---
+
+#### Step 4 — Aliases table (optional seed only)
+
+`executive_bill_aliases` optional for **guardrail hints** and test fixtures — not the primary way bills enter the system. Dynamic hydration replaces manual watchlist curation.
+
+---
+
+#### Rules-first (superseded for v1)
+
+The earlier “Tier 1 rules / Tier 2 LLM optional” ordering is **reversed**. LLM is default; rules are safety rails.
+
+**Housing/SAVE validation:** LLM should link 39514 → 6644 (primary) + 22 (conditional) using digest context; unit tests use fixture post text + fixture catalog.
 
 ### Proposed API shapes
 
@@ -303,11 +477,11 @@ Shared types should live in `shared/` (same pattern as `stats-api-types.ts`).
 
 ## Open decisions (user to confirm next session)
 
-1. **Strict Option A vs Option A+** (watchlist for H.R. 22 linking without feed entry)?
+1. ~~**Strict Option A vs Option A+** (watchlist for H.R. 22 linking without feed entry)?~~ **Resolved:** dynamic bill hydration + executive-signal feed boost; no static watchlist.
 2. **Site banner scope:** all routes (`/`, `/play`, `/stats`) or home only?
 3. **Launch strategy:** manual seed of Jun 24 posts for UI while Phase 0 spike runs?
 4. **Vendor budget:** Apify or similar if Worker IP stays blocked?
-5. **LLM linking in v1:** rules-only first (recommended) or OpenRouter from day one?
+5. ~~**LLM linking in v1:** rules-only first (recommended) or OpenRouter from day one?~~ **Resolved:** LLM-primary linking with guardrails; rules/aliases are safety rails only.
 6. **Dismissible site banner** per session — v1 or v2?
 
 ---

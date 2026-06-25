@@ -79,6 +79,33 @@ const SCHEMA_STATEMENTS = [
   updated_at TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number)
 )`,
+  `CREATE TABLE IF NOT EXISTS executive_posts (
+  id TEXT PRIMARY KEY,
+  platform TEXT NOT NULL,
+  author TEXT NOT NULL,
+  text TEXT NOT NULL,
+  posted_at TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  archive_url TEXT,
+  summary TEXT,
+  raw_json TEXT,
+  ingested_at TEXT NOT NULL
+)`,
+  `CREATE TABLE IF NOT EXISTS executive_post_bills (
+  post_id TEXT NOT NULL,
+  bill_congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  link_method TEXT NOT NULL,
+  role TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  rationale TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (post_id, bill_congress, bill_type, bill_number),
+  FOREIGN KEY (post_id) REFERENCES executive_posts(id)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_executive_posts_posted ON executive_posts (posted_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_executive_post_bills_bill ON executive_post_bills (bill_congress, bill_type, bill_number)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_passage_date ON votes (is_passage, vote_date)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_bill ON votes (bill_congress, bill_type, bill_number)`,
   `CREATE INDEX IF NOT EXISTS idx_votes_congress_session ON votes (congress, session, chamber)`,

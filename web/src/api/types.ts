@@ -8,6 +8,7 @@ import type {
   GameRoundPrompt,
   GameRoundsResponse,
 } from '@congress-tracker/shared/game-api-types'
+import type { ExecutiveSignal, RelatedExecutiveBill } from '@congress-tracker/shared/executive-api-types'
 
 export type {
   BillDigestContent,
@@ -46,7 +47,17 @@ export interface FeedItem {
   raw_summary_text: string | null
   passage_votes: FeedPassageVote[]
   latest_passage_date: string
+  executive_signals?: ExecutiveSignal[]
+  related_executive_bills?: RelatedExecutiveBill[]
 }
+
+export type {
+  ExecutiveAlert,
+  ExecutiveAlertsResponse,
+  ExecutiveBillLink,
+  ExecutiveSignal,
+  RelatedExecutiveBill,
+} from '../../../shared/executive-api-types'
 
 export interface FeedPageResponse {
   items: FeedItem[]

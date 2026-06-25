@@ -150,6 +150,66 @@ export async function selectRecentVotedBills(
   return results ?? [];
 }
 
+export async function selectFeedBills(
+  db: D1Database,
+  voteLookbackDate: string,
+  executiveSinceIso: string,
+  limit: number,
+  offset = 0
+): Promise<BillVoteKey[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `WITH combined AS (
+         SELECT bill_congress, bill_type, bill_number, MAX(vote_date) AS sort_date, 0 AS executive_boost
+         FROM votes
+         WHERE is_passage = 1 AND vote_date >= ?
+         GROUP BY bill_congress, bill_type, bill_number
+         UNION ALL
+         SELECT b.bill_congress, b.bill_type, b.bill_number, MAX(p.posted_at) AS sort_date, 1 AS executive_boost
+         FROM executive_post_bills b
+         JOIN executive_posts p ON p.id = b.post_id
+         WHERE p.posted_at >= ?
+         GROUP BY b.bill_congress, b.bill_type, b.bill_number
+       )
+       SELECT bill_congress, bill_type, bill_number, MAX(sort_date) AS latest_passage_date
+       FROM combined
+       GROUP BY bill_congress, bill_type, bill_number
+       ORDER BY MAX(executive_boost) DESC, latest_passage_date DESC
+       LIMIT ? OFFSET ?`
+    )
+    .bind(voteLookbackDate, executiveSinceIso, limit, offset)
+    .all<BillVoteKey>();
+  return results ?? [];
+}
+
+export async function countFeedBills(
+  db: D1Database,
+  voteLookbackDate: string,
+  executiveSinceIso: string
+): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `WITH combined AS (
+         SELECT bill_congress, bill_type, bill_number
+         FROM votes
+         WHERE is_passage = 1 AND vote_date >= ?
+         GROUP BY bill_congress, bill_type, bill_number
+         UNION
+         SELECT b.bill_congress, b.bill_type, b.bill_number
+         FROM executive_post_bills b
+         JOIN executive_posts p ON p.id = b.post_id
+         WHERE p.posted_at >= ?
+         GROUP BY b.bill_congress, b.bill_type, b.bill_number
+       )
+       SELECT COUNT(*) AS total FROM combined`
+    )
+    .bind(voteLookbackDate, executiveSinceIso)
+    .first<{ total: number }>();
+  return row?.total ?? 0;
+}
+
 export interface VoteRow {
   chamber: string;
   congress: number;
