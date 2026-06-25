@@ -1538,6 +1538,14 @@
 
   .chamber-card--president {
     text-align: center;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .chamber-card--president .president-control-body {
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
   }
 
   .chamber-card--president .president-control-meta {
