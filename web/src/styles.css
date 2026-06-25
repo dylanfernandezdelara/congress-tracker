@@ -1492,12 +1492,12 @@
   }
 
   .federal-control .chamber-legend-text,
-  .federal-control .president-control-term,
   .federal-control .chamber-wedge-empty {
     font-size: var(--fc-font-meta);
   }
 
-  .federal-control .chamber-party-pill {
+  .federal-control .chamber-party-pill,
+  .federal-control .president-control-term {
     font-size: var(--fc-font-badge);
   }
 
