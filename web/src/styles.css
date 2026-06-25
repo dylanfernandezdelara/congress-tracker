@@ -1540,12 +1540,12 @@
     text-align: center;
   }
 
-  .chamber-card--president .chamber-card-header {
+  .chamber-card--president .president-control-meta {
     align-items: center;
   }
 
-  .chamber-card--president .president-control-meta {
-    align-items: center;
+  .chamber-card--president .president-control-name {
+    text-wrap: balance;
   }
 
   .chamber-card {
