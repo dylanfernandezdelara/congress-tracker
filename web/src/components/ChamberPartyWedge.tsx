@@ -20,10 +20,11 @@ function wedgeCountLabelColor(theme: 'light' | 'dark'): string {
   return theme === 'dark' ? '#141414' : '#ffffff'
 }
 
-function wedgeCountFontSize(segment: { seats: number; visuallyEnlarged: boolean }): number {
-  if (segment.visuallyEnlarged) return 15
-  if (segment.seats > 99) return 14
-  return 16
+function wedgeCountClass(segment: { seats: number; visuallyEnlarged: boolean }): string {
+  if (segment.visuallyEnlarged || segment.seats > 99) {
+    return 'chamber-wedge-count chamber-wedge-count--compact'
+  }
+  return 'chamber-wedge-count'
 }
 
 type ChamberPartyWedgeProps = {
@@ -70,17 +71,15 @@ export function ChamberPartyWedge({ chamber, seats, total }: ChamberPartyWedgePr
           const labelR = (INNER_R + OUTER_R) / 2
           const lx = CX + labelR * Math.cos(segment.mid)
           const ly = CY + labelR * Math.sin(segment.mid)
-          const fontSize = wedgeCountFontSize(segment)
           return (
             <text
               key={`${segment.party}-count`}
+              className={wedgeCountClass(segment)}
               x={lx}
               y={ly}
               textAnchor="middle"
               dominantBaseline="middle"
               fill={wedgeCountLabelColor(theme)}
-              fontSize={fontSize}
-              fontWeight={600}
             >
               {segment.seats}
             </text>

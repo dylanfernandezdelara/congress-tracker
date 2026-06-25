@@ -1539,6 +1539,26 @@
     margin-inline: auto;
   }
 
+  /* SVG user units — mobile wedge is height-capped, so counts need larger units than legend px */
+  .chamber-wedge-count {
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .chamber-wedge-count--compact {
+    font-size: 18px;
+  }
+
+  @media (max-width: 900px) {
+    .chamber-wedge-count {
+      font-size: 34px;
+    }
+
+    .chamber-wedge-count--compact {
+      font-size: 30px;
+    }
+  }
+
   .chamber-wedge--empty {
     display: flex;
     align-items: center;
