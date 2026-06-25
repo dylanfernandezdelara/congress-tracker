@@ -1641,7 +1641,7 @@
   }
 
   .chamber-legend-text {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 600;
     line-height: 1.2;
     white-space: nowrap;
@@ -1689,8 +1689,8 @@
     }
 
     .chamber-party-pill.chamber-control-pill {
-      padding: 0.15rem 0.3rem;
-      font-size: 0.5625rem;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.75rem;
     }
 
     .chamber-seat-legend {
@@ -1703,7 +1703,11 @@
     }
 
     .chamber-legend-text {
-      font-size: 0.625rem;
+      font-size: 0.875rem;
+    }
+
+    .president-control-term {
+      font-size: 0.875rem;
     }
   }
 
