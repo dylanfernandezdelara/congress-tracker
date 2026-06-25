@@ -14,6 +14,16 @@ export function PresidentControlCard() {
       className="chamber-card chamber-card--president"
       aria-label={`President ${CURRENT_PRESIDENT.name}, ${partyDisplayName(CURRENT_PRESIDENT.party)}, term ${CURRENT_PRESIDENT.termStart} to ${CURRENT_PRESIDENT.termEnd}`}
     >
+      <header className="chamber-card-header">
+        <div className="chamber-card-title-row">
+          <h3 className="chamber-card-title">President</h3>
+          <span className={`chamber-party-pill ${partyClass} chamber-control-pill`}>
+            <span className="chamber-party-pill-label">
+              {partyDisplayName(CURRENT_PRESIDENT.party)}
+            </span>
+          </span>
+        </div>
+      </header>
       <div className="president-control-body">
         <svg
           className="president-seat-icon"
@@ -27,14 +37,7 @@ export function PresidentControlCard() {
           <rect x="22" y="12" width="12" height="14" rx="2" fill={color} opacity="0.75" />
         </svg>
         <div className="president-control-meta">
-          <h3 className="chamber-card-title president-control-name">
-            President {CURRENT_PRESIDENT.name}
-          </h3>
-          <span className={`chamber-party-pill ${partyClass} president-party-pill`}>
-            <span className="chamber-party-pill-label">
-              {partyDisplayName(CURRENT_PRESIDENT.party)}
-            </span>
-          </span>
+          <p className="president-control-name">{CURRENT_PRESIDENT.name}</p>
           <p className="president-control-term">
             {CURRENT_PRESIDENT.termStart} – {CURRENT_PRESIDENT.termEnd}
           </p>

@@ -1537,23 +1537,25 @@
   }
 
   .chamber-card--president {
-    text-align: center;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .chamber-card--president .chamber-card-header {
+    align-self: stretch;
+    width: 100%;
   }
 
   .chamber-card--president .president-control-body {
+    flex: 1;
     width: fit-content;
     max-width: 100%;
     margin-inline: auto;
+    align-self: center;
   }
 
   .chamber-card--president .president-control-meta {
     align-items: center;
-  }
-
-  .chamber-card--president .president-control-name {
-    text-wrap: balance;
+    text-align: center;
   }
 
   .chamber-card {
@@ -1646,10 +1648,6 @@
     margin: 0;
     color: hsl(var(--twc-secondary));
     line-height: 1.2;
-  }
-
-  .president-party-pill {
-    width: fit-content;
   }
 
   .president-seat-icon {
