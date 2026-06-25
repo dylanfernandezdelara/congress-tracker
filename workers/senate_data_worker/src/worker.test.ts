@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./pipeline/run-feed", () => ({
   runFeedPipeline: vi.fn(),
@@ -54,6 +54,10 @@ function createScheduledContext() {
 }
 
 describe("worker", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("returns health", async () => {
     const response = await handler.fetch(
       new Request("http://127.0.0.1:8787/health"),
