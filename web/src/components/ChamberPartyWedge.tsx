@@ -21,9 +21,9 @@ function wedgeCountLabelColor(theme: 'light' | 'dark'): string {
 }
 
 function wedgeCountFontSize(segment: { seats: number; visuallyEnlarged: boolean }): number {
-  if (segment.visuallyEnlarged) return 12
-  if (segment.seats > 99) return 11
-  return 13
+  if (segment.visuallyEnlarged) return 15
+  if (segment.seats > 99) return 14
+  return 16
 }
 
 type ChamberPartyWedgeProps = {
