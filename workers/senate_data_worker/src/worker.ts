@@ -6,7 +6,7 @@ import type { Env } from "./config";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedPipeline } from "./pipeline/run-feed";
-import { FEED_PIPELINE_CRON_UTC } from "./constants";
+import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
 
 export default {
   fetch(request: Request, env: Env, ctx?: ExecutionContext) {
@@ -15,7 +15,8 @@ export default {
   scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     const cron = controller.cron ?? "";
     const isFeedCron = cron === FEED_PIPELINE_CRON_UTC || cron === "0 10 * * *";
-    const isExecutiveCron = cron === "*/15 * * * *";
+    const isExecutiveCron =
+      cron === EXECUTIVE_POSTS_CRON_UTC || cron === "*/15 * * * *";
 
     if (isExecutiveCron) {
       ctx.waitUntil(
