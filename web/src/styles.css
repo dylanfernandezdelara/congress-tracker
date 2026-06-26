@@ -406,7 +406,7 @@
     color: hsl(var(--twc-accent));
   }
 
-  .feed-row-executive-quote__context-bill {
+  .feed-row-executive-quote__bill-link {
     font-weight: 600;
   }
 
@@ -488,9 +488,8 @@
     font-size: 0.8125rem;
   }
 
-  .executive-alert-banner__bill {
+  .executive-alert-banner__bill-link {
     font-weight: 600;
-    color: hsl(var(--twc-foreground));
   }
 
   .executive-alert-banner__actions {

@@ -1,5 +1,22 @@
 import type { ExecutiveBillRole } from '@congress-tracker/shared/executive-api-types'
-import { formatBillDocket } from './billLabels'
+import { trimDisplayTitle } from '@congress-tracker/shared/feed-content'
+
+import { formatShortBillId } from './billLabels'
+
+export type BillDisplayRef = {
+  congress: number
+  type: string
+  number: number
+  title?: string | null
+  headline?: string | null
+}
+
+/** Plain-language bill label for executive context (headline → short title → bill id). */
+export function getBillColloquialName(bill: BillDisplayRef): string {
+  if (bill.headline?.trim()) return trimDisplayTitle(bill.headline)
+  if (bill.title?.trim()) return trimDisplayTitle(bill.title)
+  return formatShortBillId(bill.type, bill.number)
+}
 
 export function formatExecutiveRoleLabel(role: ExecutiveBillRole): string {
   switch (role) {
@@ -33,16 +50,4 @@ export function formatExecutiveRoleDetail(role: ExecutiveBillRole): string {
       return _exhaustive
     }
   }
-}
-
-export function formatRelatedExecutiveBillLine(bill: {
-  congress: number
-  type: string
-  number: number
-  title?: string | null
-  role: ExecutiveBillRole
-}): string {
-  const label = formatBillDocket(bill.type, bill.number, bill.congress)
-  const title = bill.title ? ` (${bill.title})` : ''
-  return `${label}${title} · ${formatExecutiveRoleLabel(bill.role)}`
 }

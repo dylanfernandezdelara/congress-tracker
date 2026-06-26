@@ -1,14 +1,15 @@
 import type { ExecutiveSignal, FeedBill, RelatedExecutiveBill } from '../api/types'
 import { CURRENT_PRESIDENT } from '../constants/president'
-import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
+import { congressGovBillUrl, formatVoteDate } from '../utils/billLabels'
 import {
   formatExecutiveRoleLabel,
-  formatRelatedExecutiveBillLine,
+  getBillColloquialName,
 } from '../utils/executiveLabels'
 
 type FeedRowExecutiveQuoteProps = {
   signal: ExecutiveSignal
   bill: FeedBill
+  billHeadline?: string | null
   relatedBills?: RelatedExecutiveBill[]
 }
 
@@ -20,12 +21,18 @@ export function getExecutiveQuoteText(signal: ExecutiveSignal): string | null {
   return summary || null
 }
 
-export function FeedRowExecutiveQuote({ signal, bill, relatedBills = [] }: FeedRowExecutiveQuoteProps) {
+export function FeedRowExecutiveQuote({
+  signal,
+  bill,
+  billHeadline = null,
+  relatedBills = [],
+}: FeedRowExecutiveQuoteProps) {
   const quoteText = getExecutiveQuoteText(signal)
   if (!quoteText) return null
 
   const postedDate = formatVoteDate(signal.posted_at.slice(0, 10))
-  const billLabel = formatBillDocket(bill.type, bill.number, bill.congress)
+  const billName = getBillColloquialName({ ...bill, headline: billHeadline })
+  const billUrl = congressGovBillUrl(bill.congress, bill.type, bill.number)
   const roleLabel = signal.role ? formatExecutiveRoleLabel(signal.role) : 'About this bill'
 
   return (
@@ -33,7 +40,15 @@ export function FeedRowExecutiveQuote({ signal, bill, relatedBills = [] }: FeedR
       <header className="feed-row-executive-quote__header">
         <p className="feed-row-executive-quote__context">
           <span className="feed-row-executive-quote__context-label">{roleLabel}</span>
-          <span className="feed-row-executive-quote__context-bill"> · {billLabel}</span>
+          <span className="feed-row-executive-quote__context-sep"> · </span>
+          <a
+            className="feed-row-executive-quote__bill-link congress-link"
+            href={billUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {billName}
+          </a>
         </p>
         {signal.rationale ? (
           <p className="feed-row-executive-quote__rationale">{signal.rationale}</p>
@@ -41,12 +56,25 @@ export function FeedRowExecutiveQuote({ signal, bill, relatedBills = [] }: FeedR
         {relatedBills.length > 0 ? (
           <p className="feed-row-executive-quote__related-note">
             Same post also mentions{' '}
-            {relatedBills.map((related, index) => (
-              <span key={`${related.congress}-${related.type}-${related.number}`}>
-                {index > 0 ? '; ' : ''}
-                {formatRelatedExecutiveBillLine(related)}
-              </span>
-            ))}
+            {relatedBills.map((related, index) => {
+              const relatedName = getBillColloquialName(related)
+              const relatedUrl = congressGovBillUrl(related.congress, related.type, related.number)
+              return (
+                <span key={`${related.congress}-${related.type}-${related.number}`}>
+                  {index > 0 ? '; ' : ''}
+                  <a
+                    className="feed-row-executive-quote__bill-link congress-link"
+                    href={relatedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {relatedName}
+                  </a>
+                  {' · '}
+                  {formatExecutiveRoleLabel(related.role)}
+                </span>
+              )
+            })}
             .
           </p>
         ) : null}

@@ -1,7 +1,8 @@
 import { useAsyncData } from '../hooks/useAsyncData'
 import { fetchExecutiveAlerts } from '../api/executive'
 import { CURRENT_PRESIDENT } from '../constants/president'
-import { formatBillDocket } from '../utils/billLabels'
+import { congressGovBillUrl } from '../utils/billLabels'
+import { getBillColloquialName } from '../utils/executiveLabels'
 
 export function ExecutiveAlertBanner() {
   const { data } = useAsyncData({
@@ -25,10 +26,18 @@ export function ExecutiveAlertBanner() {
       <p className="executive-alert-banner__copy">
         {alert.summary}
         {primaryBill ? (
-          <span className="executive-alert-banner__bill">
+          <>
             {' '}
-            · {formatBillDocket(primaryBill.type, primaryBill.number, primaryBill.congress)}
-          </span>
+            ·{' '}
+            <a
+              className="executive-alert-banner__bill-link congress-link"
+              href={congressGovBillUrl(primaryBill.congress, primaryBill.type, primaryBill.number)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {getBillColloquialName(primaryBill)}
+            </a>
+          </>
         ) : null}
         <span className="executive-alert-banner__meta">
           {' '}

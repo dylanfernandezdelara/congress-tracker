@@ -122,6 +122,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
             <FeedRowExecutiveQuote
               signal={executiveSignal}
               bill={item.bill}
+              billHeadline={item.digest?.headline ?? null}
               relatedBills={item.related_executive_bills}
             />
           </div>

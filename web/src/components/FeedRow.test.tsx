@@ -200,6 +200,12 @@ describe('FeedRow', () => {
       "Today's Housing News Conference and Signing is hereby cancelled until such time as we pass the desperately needed SAVE AMERICA ACT."
     const item = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 6644, title: 'Housing Act' },
+      digest: {
+        headline: 'Overhauls federal housing programs',
+        what_it_does: 'Housing finance reforms.',
+        key_points: [],
+        terms_explained: [],
+      },
       executive_signals: [
         {
           post_id: '116805545512296111',
@@ -228,10 +234,15 @@ describe('FeedRow', () => {
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText(/About this bill/)).toBeInTheDocument()
-    expect(screen.getByText(/H\.R\. 6644/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Overhauls federal housing programs' })).toHaveAttribute(
+      'href',
+      congressGovBillUrl(119, 'HR', 6644),
+    )
     expect(screen.getByText(/Post cancels housing signing ceremony/)).toBeInTheDocument()
-    expect(screen.getByText(/Same post also mentions/)).toBeInTheDocument()
-    expect(screen.getByText(/Must pass first/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'SAVE Act' })).toHaveAttribute(
+      'href',
+      congressGovBillUrl(119, 'HR', 22),
+    )
     expect(screen.getByText(/Donald Trump · Truth Social/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View post' })).toHaveAttribute(
       'href',
