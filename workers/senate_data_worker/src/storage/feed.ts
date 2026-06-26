@@ -1,6 +1,6 @@
 import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS, FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
 import type { Env } from "../config";
-import { getExecutivePostBillsForBill, getExecutivePostBillsForPost } from "../d1/executive";
+import { getExecutivePostBillsForBill, getExecutivePostBillsForPost, toExecutiveSignal } from "../d1/executive";
 import { getDigest, parseStoredDigest } from "../d1/digests";
 import { ensureSchema } from "../d1/schema";
 import {
@@ -55,14 +55,7 @@ export async function buildFeedPage(
     );
     const executive_signals = executivePosts
       .filter((post) => post.summary)
-      .map((post) => ({
-        post_id: post.id,
-        posted_at: post.posted_at,
-        summary: post.summary!,
-        source_url: post.source_url,
-        archive_url: post.archive_url,
-        informal: true as const,
-      }));
+      .map((post) => toExecutiveSignal(post));
 
     const related_executive_bills: RelatedExecutiveBill[] = [];
     const relatedKeys = new Set<string>();

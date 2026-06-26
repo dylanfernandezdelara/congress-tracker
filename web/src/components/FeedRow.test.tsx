@@ -194,4 +194,31 @@ describe('FeedRow', () => {
     expect(screen.getByText('Procedural')).toBeInTheDocument()
     expect(eventLine?.textContent).toContain('agreed 218–210')
   })
+
+  it('shows a direct Truth Social quote when the bill has an executive signal', () => {
+    const quote =
+      "Today's Housing News Conference and Signing is hereby cancelled until such time as we pass the desperately needed SAVE AMERICA ACT."
+    const item = makeFeedItem({
+      executive_signals: [
+        {
+          post_id: '116805545512296111',
+          posted_at: '2026-06-24T14:26:00.000Z',
+          summary: 'Cancelled housing signing until SAVE Act passes',
+          quote,
+          source_url: 'https://truthsocial.com/@realDonaldTrump/116805545512296111',
+          archive_url: 'https://www.trumpstruth.org/statuses/39514',
+          informal: true,
+        },
+      ],
+    })
+
+    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+
+    expect(screen.getByText(new RegExp(quote.slice(0, 40)))).toBeInTheDocument()
+    expect(screen.getByText(/Donald Trump · Truth Social/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View post' })).toHaveAttribute(
+      'href',
+      'https://truthsocial.com/@realDonaldTrump/116805545512296111',
+    )
+  })
 })

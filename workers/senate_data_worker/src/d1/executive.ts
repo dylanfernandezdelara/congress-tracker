@@ -204,6 +204,7 @@ export function toExecutiveSignal(row: ExecutivePostRow): ExecutiveSignal {
     post_id: row.id,
     posted_at: row.posted_at,
     summary: row.summary ?? row.text.slice(0, 160),
+    quote: row.text,
     source_url: row.source_url,
     archive_url: row.archive_url,
     informal: true,

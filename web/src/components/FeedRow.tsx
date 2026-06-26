@@ -13,6 +13,7 @@ import {
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
+import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
 type FeedRowProps = {
   item: FeedItem
@@ -35,6 +36,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const eventDisplay = getFeedEventDisplay(item)
   const policyArea = item.policy_area
   const showEventLine = meta.kind !== 'passed' && meta.kind !== 'failed'
+  const executiveSignal = item.executive_signals?.[0]
 
   return (
     <li className={`feed-row feed-row--${meta.kind}${isExpanded ? ' is-expanded' : ''}`}>
@@ -89,6 +91,8 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
             <h2 id={topicId} data-feed-topic className="feed-row-topic">
               {topic}
             </h2>
+
+            {executiveSignal ? <FeedRowExecutiveQuote signal={executiveSignal} clamp /> : null}
 
             <p
               id={eventId}

@@ -16,7 +16,10 @@ export interface ExecutiveBillLink extends ExecutiveBillRef {
 export interface ExecutiveSignal {
   post_id: string;
   posted_at: string;
+  /** LLM banner line for site alerts; not a substitute for the post quote. */
   summary: string;
+  /** Verbatim Truth Social post text. */
+  quote: string;
   source_url: string;
   archive_url?: string | null;
   informal: boolean;

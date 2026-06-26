@@ -5,6 +5,7 @@ import type { FeedItem, FeedPassageVote, VoteDefectorEntry } from '../api/types'
 import { congressGovBillUrl, formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { isProceduralFeedItem } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
+import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
 type FeedRowDetailProps = {
   item: FeedItem
@@ -154,30 +155,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
       <ul className="feed-row-executive-list">
         {signals.map((signal) => (
           <li key={signal.post_id} className="feed-row-executive-item">
-            <p className="feed-row-executive-summary">{signal.summary}</p>
-            <p className="feed-row-executive-meta text-sm text-faint">
-              Truth Social · {formatVoteDate(signal.posted_at.slice(0, 10))}
-            </p>
-            <div className="feed-row-executive-links">
-              <a
-                href={signal.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="congress-link text-sm"
-              >
-                View post ↗
-              </a>
-              {signal.archive_url ? (
-                <a
-                  href={signal.archive_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="congress-link text-sm"
-                >
-                  Archive ↗
-                </a>
-              ) : null}
-            </div>
+            <FeedRowExecutiveQuote signal={signal} />
           </li>
         ))}
       </ul>
