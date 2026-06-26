@@ -7,7 +7,7 @@ import {
   toExecutiveBillLink,
   toExecutiveSignal,
 } from "../d1/executive";
-import { getDigest } from "../d1/digests";
+import { getDigest, parseStoredDigest } from "../d1/digests";
 import { lookbackStartIso } from "../sources/congress-client";
 
 export async function buildExecutiveAlerts(
@@ -24,7 +24,10 @@ export async function buildExecutiveAlerts(
     const linked_bills = [];
     for (const row of billRows) {
       const digest = await getDigest(env.DB, row.bill_congress, row.bill_type, row.bill_number);
-      linked_bills.push(toExecutiveBillLink(row, digest?.title ?? null));
+      const parsed = parseStoredDigest(digest?.digest_json ?? null);
+      linked_bills.push(
+        toExecutiveBillLink(row, digest?.title ?? null, parsed?.headline ?? null)
+      );
     }
     alerts.push({
       ...toExecutiveSignal(post),

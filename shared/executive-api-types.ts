@@ -5,6 +5,8 @@ export interface ExecutiveBillRef {
   type: string;
   number: number;
   title?: string | null;
+  /** Plain-English digest headline when available. */
+  headline?: string | null;
 }
 
 export interface ExecutiveBillLink extends ExecutiveBillRef {

@@ -83,11 +83,13 @@ export async function buildFeedPage(
           link.bill_type,
           link.bill_number
         );
+        const otherParsed = parseStoredDigest(otherDigest?.digest_json ?? null);
         related_executive_bills.push({
           congress: link.bill_congress,
           type: link.bill_type,
           number: link.bill_number,
           title: otherDigest?.title ?? null,
+          headline: otherParsed?.headline ?? null,
           role: link.role as RelatedExecutiveBill["role"],
           reason: link.rationale ?? "mentioned_in_same_post",
         });

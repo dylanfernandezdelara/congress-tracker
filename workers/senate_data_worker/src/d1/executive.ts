@@ -231,13 +231,15 @@ function resolveExecutiveQuoteText(row: ExecutivePostRow): string {
 
 export function toExecutiveBillLink(
   row: ExecutivePostBillRow,
-  title: string | null
+  title: string | null,
+  headline: string | null = null
 ): ExecutiveBillLink {
   return {
     congress: row.bill_congress,
     type: row.bill_type,
     number: row.bill_number,
     title,
+    headline,
     role: row.role as ExecutiveBillRole,
     confidence: row.confidence,
     rationale: row.rationale ?? undefined,
