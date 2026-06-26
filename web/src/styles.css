@@ -376,6 +376,10 @@
     background-color: hsl(var(--twc-accent) / 0.08);
   }
 
+  .feed-row-executive-quote-wrap {
+    padding: 0 1rem 0.25rem;
+  }
+
   .feed-row-executive-quote {
     margin: 0.5rem 0 0;
     padding: 0.65rem 0.75rem;
@@ -393,10 +397,8 @@
   }
 
   .feed-row-executive-quote--clamp .feed-row-executive-quote__text {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
     overflow: hidden;
+    max-height: calc(1.45em * 3.2);
   }
 
   .feed-row-executive-quote__footer {

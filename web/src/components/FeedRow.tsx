@@ -92,8 +92,6 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               {topic}
             </h2>
 
-            {executiveSignal ? <FeedRowExecutiveQuote signal={executiveSignal} clamp /> : null}
-
             <p
               id={eventId}
               className={`feed-row-event${meta.kind === 'none' ? ' feed-row-event--muted' : ''}`}
@@ -118,6 +116,12 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
             </div>
           </div>
         </button>
+
+        {executiveSignal && !isExpanded ? (
+          <div className="feed-row-executive-quote-wrap">
+            <FeedRowExecutiveQuote signal={executiveSignal} clamp />
+          </div>
+        ) : null}
 
         <div
           id={detailId}

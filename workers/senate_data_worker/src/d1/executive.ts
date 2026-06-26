@@ -200,15 +200,33 @@ export async function selectExecutiveBoostedBills(
 }
 
 export function toExecutiveSignal(row: ExecutivePostRow): ExecutiveSignal {
+  const quote = resolveExecutiveQuoteText(row);
   return {
     post_id: row.id,
     posted_at: row.posted_at,
-    summary: row.summary ?? row.text.slice(0, 160),
-    quote: row.text,
+    summary: row.summary ?? quote.slice(0, 160),
+    quote,
     source_url: row.source_url,
     archive_url: row.archive_url,
     informal: true,
   };
+}
+
+function resolveExecutiveQuoteText(row: ExecutivePostRow): string {
+  const text = row.text?.trim();
+  if (text) return text;
+
+  if (row.raw_json) {
+    try {
+      const parsed = JSON.parse(row.raw_json) as { text?: string };
+      const fromJson = parsed.text?.trim();
+      if (fromJson) return fromJson;
+    } catch {
+      /* ignore malformed raw_json */
+    }
+  }
+
+  return row.summary?.trim() ?? "";
 }
 
 export function toExecutiveBillLink(
