@@ -170,7 +170,7 @@ export async function selectFeedBills(
          SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number, MAX(p.posted_at) AS sort_date, 1 AS executive_boost
          FROM executive_post_bills b
          JOIN executive_posts p ON p.id = b.post_id
-         WHERE p.posted_at >= ?
+         WHERE p.posted_at >= ? AND b.is_primary = 1
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
        )
        SELECT bill_congress, bill_type, bill_number, MAX(sort_date) AS latest_passage_date
@@ -201,7 +201,7 @@ export async function countFeedBills(
          SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number
          FROM executive_post_bills b
          JOIN executive_posts p ON p.id = b.post_id
-         WHERE p.posted_at >= ?
+         WHERE p.posted_at >= ? AND b.is_primary = 1
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
        )
        SELECT COUNT(*) AS total FROM combined`

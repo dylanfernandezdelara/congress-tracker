@@ -4,8 +4,6 @@ import { formatVoteDate } from '../utils/billLabels'
 
 type FeedRowExecutiveQuoteProps = {
   signal: ExecutiveSignal
-  /** Collapsed row clamps long posts; expanded detail shows the full quote. */
-  clamp?: boolean
 }
 
 /** Prefer verbatim post text; fall back to stored summary only when quote is missing. */
@@ -16,17 +14,14 @@ export function getExecutiveQuoteText(signal: ExecutiveSignal): string | null {
   return summary || null
 }
 
-export function FeedRowExecutiveQuote({ signal, clamp = false }: FeedRowExecutiveQuoteProps) {
+export function FeedRowExecutiveQuote({ signal }: FeedRowExecutiveQuoteProps) {
   const quoteText = getExecutiveQuoteText(signal)
   if (!quoteText) return null
 
   const postedDate = formatVoteDate(signal.posted_at.slice(0, 10))
 
   return (
-    <blockquote
-      className={`feed-row-executive-quote${clamp ? ' feed-row-executive-quote--clamp' : ''}`}
-      cite={signal.source_url}
-    >
+    <blockquote className="feed-row-executive-quote" cite={signal.source_url}>
       <p className="feed-row-executive-quote__text">&ldquo;{quoteText}&rdquo;</p>
       <footer className="feed-row-executive-quote__footer">
         <cite className="feed-row-executive-quote__attribution">

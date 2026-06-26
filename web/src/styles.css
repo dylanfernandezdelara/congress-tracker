@@ -394,11 +394,7 @@
     line-height: 1.45;
     color: hsl(var(--twc-foreground));
     font-style: italic;
-  }
-
-  .feed-row-executive-quote--clamp .feed-row-executive-quote__text {
-    overflow: hidden;
-    max-height: calc(1.45em * 3.2);
+    overflow-wrap: anywhere;
   }
 
   .feed-row-executive-quote__footer {

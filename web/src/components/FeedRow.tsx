@@ -63,7 +63,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                   </span>
                 ) : null}
                 <BillIdChip type={item.bill.type} number={item.bill.number} />
-                {item.executive_signals && item.executive_signals.length > 0 ? (
+                {executiveSignal ? (
                   <span className="feed-row-chip feed-row-chip--executive">Executive · Truth Social</span>
                 ) : null}
                 {policyArea && !isProceduralFeedItem(item) ? (
@@ -79,7 +79,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                 <span className="feed-row-date-wrap">
                   <time className="feed-row-date" dateTime={displayDate.iso}>
                     {formatVoteDate(displayDate.iso)}
-                    {displayDate.kind === 'signal' ? ' · Signal' : ''}
+                    {displayDate.kind === 'signal' ? ' · Trump post' : ''}
                   </time>
                   <span className="feed-row-chevron" aria-hidden="true">
                     ›
@@ -119,7 +119,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
 
         {executiveSignal && !isExpanded ? (
           <div className="feed-row-executive-quote-wrap">
-            <FeedRowExecutiveQuote signal={executiveSignal} clamp />
+            <FeedRowExecutiveQuote signal={executiveSignal} />
           </div>
         ) : null}
 
