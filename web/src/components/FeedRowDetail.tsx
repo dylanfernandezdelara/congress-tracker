@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { fetchVoteDefectors } from '../api/client'
 import type { FeedItem, FeedPassageVote, VoteDefectorEntry } from '../api/types'
 import { congressGovBillUrl, formatBillDocket, formatVoteDate } from '../utils/billLabels'
+import { formatExecutiveRoleDetail } from '../utils/executiveLabels'
 import { isProceduralFeedItem } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
@@ -155,7 +156,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
       <ul className="feed-row-executive-list">
         {signals.map((signal) => (
           <li key={signal.post_id} className="feed-row-executive-item">
-            <FeedRowExecutiveQuote signal={signal} />
+            <FeedRowExecutiveQuote signal={signal} bill={item.bill} />
           </li>
         ))}
       </ul>
@@ -174,7 +175,11 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
                   {formatBillDocket(bill.type, bill.number, bill.congress)}
                   {bill.title ? ` — ${bill.title}` : ''}
                 </a>
-                <span className="text-sm text-faint"> · {bill.role}</span>
+                <span className="text-sm text-faint">
+                  {' '}
+                  · {formatExecutiveRoleDetail(bill.role)}
+                  {bill.reason && bill.reason !== 'mentioned_in_same_post' ? ` — ${bill.reason}` : ''}
+                </span>
               </li>
             ))}
           </ul>

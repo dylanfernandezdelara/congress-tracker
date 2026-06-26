@@ -23,6 +23,10 @@ export interface ExecutiveSignal {
   source_url: string;
   archive_url?: string | null;
   informal: boolean;
+  /** How the feed row's bill is linked to this post (feed items only). */
+  role?: ExecutiveBillRole;
+  /** Short explanation of why this bill was linked (feed items only). */
+  rationale?: string;
 }
 
 export interface RelatedExecutiveBill extends ExecutiveBillRef {

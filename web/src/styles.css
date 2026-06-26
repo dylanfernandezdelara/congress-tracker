@@ -388,6 +388,40 @@
     background: hsl(var(--twc-accent) / 0.06);
   }
 
+  .feed-row-executive-quote__header {
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .feed-row-executive-quote__context {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .feed-row-executive-quote__context-label {
+    font-weight: 700;
+    color: hsl(var(--twc-accent));
+  }
+
+  .feed-row-executive-quote__context-bill {
+    font-weight: 600;
+  }
+
+  .feed-row-executive-quote__rationale,
+  .feed-row-executive-quote__related-note {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-executive-quote__related-note {
+    font-style: normal;
+  }
+
   .feed-row-executive-quote__text {
     margin: 0;
     font-size: 0.875rem;

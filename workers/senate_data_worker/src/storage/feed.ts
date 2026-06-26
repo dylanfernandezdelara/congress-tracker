@@ -10,6 +10,7 @@ import {
 } from "../d1/votes";
 import { lookbackStartIso } from "../sources/congress-client";
 import type { RelatedExecutiveBill } from "../../../../shared/executive-api-types";
+import type { ExecutiveBillRole } from "../../../../shared/executive-api-types";
 import type { Chamber, FeedItem, FeedPageResponse } from "../types";
 
 export interface FeedPageOptions {
@@ -55,7 +56,11 @@ export async function buildFeedPage(
     );
     const executive_signals = executivePosts
       .filter((post) => post.summary && post.role === "primary")
-      .map((post) => toExecutiveSignal(post));
+      .map((post) => ({
+        ...toExecutiveSignal(post),
+        role: post.role as ExecutiveBillRole,
+        rationale: post.rationale ?? undefined,
+      }));
 
     const related_executive_bills: RelatedExecutiveBill[] = [];
     const relatedKeys = new Set<string>();

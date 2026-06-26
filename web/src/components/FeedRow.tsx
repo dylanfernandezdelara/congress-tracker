@@ -119,7 +119,11 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
 
         {executiveSignal && !isExpanded ? (
           <div className="feed-row-executive-quote-wrap">
-            <FeedRowExecutiveQuote signal={executiveSignal} />
+            <FeedRowExecutiveQuote
+              signal={executiveSignal}
+              bill={item.bill}
+              relatedBills={item.related_executive_bills}
+            />
           </div>
         ) : null}
 

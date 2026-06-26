@@ -199,6 +199,7 @@ describe('FeedRow', () => {
     const quote =
       "Today's Housing News Conference and Signing is hereby cancelled until such time as we pass the desperately needed SAVE AMERICA ACT."
     const item = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 6644, title: 'Housing Act' },
       executive_signals: [
         {
           post_id: '116805545512296111',
@@ -208,13 +209,29 @@ describe('FeedRow', () => {
           source_url: 'https://truthsocial.com/@realDonaldTrump/116805545512296111',
           archive_url: 'https://www.trumpstruth.org/statuses/39514',
           informal: true,
+          role: 'primary',
+          rationale: 'Post cancels housing signing ceremony',
+        },
+      ],
+      related_executive_bills: [
+        {
+          congress: 119,
+          type: 'HR',
+          number: 22,
+          title: 'SAVE Act',
+          role: 'conditional',
+          reason: 'Signing delayed until SAVE America Act passes',
         },
       ],
     })
 
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
-    expect(screen.getByText(new RegExp(quote.slice(0, 40)))).toBeInTheDocument()
+    expect(screen.getByText(/About this bill/)).toBeInTheDocument()
+    expect(screen.getByText(/H\.R\. 6644/)).toBeInTheDocument()
+    expect(screen.getByText(/Post cancels housing signing ceremony/)).toBeInTheDocument()
+    expect(screen.getByText(/Same post also mentions/)).toBeInTheDocument()
+    expect(screen.getByText(/Must pass first/)).toBeInTheDocument()
     expect(screen.getByText(/Donald Trump · Truth Social/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View post' })).toHaveAttribute(
       'href',
