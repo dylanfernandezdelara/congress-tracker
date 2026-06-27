@@ -52,8 +52,6 @@ export interface FeedItem {
 }
 
 export type {
-  ExecutiveAlert,
-  ExecutiveAlertsResponse,
   ExecutiveBillLink,
   ExecutiveSignal,
   RelatedExecutiveBill,
