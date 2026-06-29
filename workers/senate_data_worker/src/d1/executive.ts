@@ -126,7 +126,7 @@ export async function replaceExecutivePostBills(
       insertStmt.bind(
         postId,
         link.billCongress,
-        link.billType,
+        normalizeBillType(link.billType),
         link.billNumber,
         link.linkMethod,
         link.role,
