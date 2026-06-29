@@ -6,6 +6,14 @@ import type {
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
 
+const EXECUTIVE_POST_PUBLIC_COLUMNS =
+  "id, platform, author, text, posted_at, source_url, archive_url, summary, ingested_at";
+
+const EXECUTIVE_POST_PUBLIC_COLUMNS_QUALIFIED =
+  "p.id, p.platform, p.author, p.text, p.posted_at, p.source_url, p.archive_url, p.summary, p.ingested_at";
+
+const EXECUTIVE_POST_ALL_COLUMNS = `${EXECUTIVE_POST_PUBLIC_COLUMNS}, raw_json`;
+
 export interface ExecutivePostRow {
   id: string;
   platform: string;
@@ -49,7 +57,7 @@ export async function getExecutivePost(
 ): Promise<ExecutivePostRow | null> {
   await ensureSchema(db);
   return db
-    .prepare(`SELECT * FROM executive_posts WHERE id = ?`)
+    .prepare(`SELECT ${EXECUTIVE_POST_ALL_COLUMNS} FROM executive_posts WHERE id = ?`)
     .bind(id)
     .first<ExecutivePostRow>();
 }
@@ -105,16 +113,17 @@ export async function replaceExecutivePostBills(
   }>
 ): Promise<void> {
   await ensureSchema(db);
-  await db.prepare(`DELETE FROM executive_post_bills WHERE post_id = ?`).bind(postId).run();
-  for (const link of links) {
-    await db
-      .prepare(
-        `INSERT INTO executive_post_bills (
-          post_id, bill_congress, bill_type, bill_number,
-          link_method, role, confidence, rationale, is_primary
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
+  const deleteStmt = db.prepare(`DELETE FROM executive_post_bills WHERE post_id = ?`).bind(postId);
+  const insertStmt = db.prepare(
+    `INSERT INTO executive_post_bills (
+      post_id, bill_congress, bill_type, bill_number,
+      link_method, role, confidence, rationale, is_primary
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const batch = [
+    deleteStmt,
+    ...links.map((link) =>
+      insertStmt.bind(
         postId,
         link.billCongress,
         link.billType,
@@ -125,8 +134,9 @@ export async function replaceExecutivePostBills(
         link.rationale,
         link.isPrimary ? 1 : 0
       )
-      .run();
-  }
+    ),
+  ];
+  await db.batch(batch);
 }
 
 export async function listRecentExecutiveAlerts(
@@ -137,7 +147,8 @@ export async function listRecentExecutiveAlerts(
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT * FROM executive_posts
+      `SELECT ${EXECUTIVE_POST_PUBLIC_COLUMNS}
+       FROM executive_posts
        WHERE posted_at >= ?
        ORDER BY posted_at DESC
        LIMIT ?`
@@ -169,7 +180,7 @@ export async function getExecutivePostBillsForBill(
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT p.*, b.role, b.rationale
+      `SELECT ${EXECUTIVE_POST_PUBLIC_COLUMNS_QUALIFIED}, b.role, b.rationale
        FROM executive_post_bills b
        JOIN executive_posts p ON p.id = b.post_id
        WHERE b.bill_congress = ? AND UPPER(b.bill_type) = ? AND b.bill_number = ?

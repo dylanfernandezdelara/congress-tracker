@@ -112,6 +112,16 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_member_votes_roll ON member_votes (chamber, congress, session, roll_number)`,
   `CREATE INDEX IF NOT EXISTS idx_members_chamber ON members (chamber)`,
   `CREATE INDEX IF NOT EXISTS idx_financial_bioguide ON financial_transactions (bioguide_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_financial_tx_dedup ON financial_transactions (
+    bioguide_id,
+    COALESCE(ticker, ''),
+    transaction_type,
+    transaction_date,
+    filed_date,
+    COALESCE(amount_min, -1),
+    COALESCE(amount_max, -1)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_member_votes_bioguide ON member_votes (bioguide_id)`,
 ];
 
 let schemaApplied = false;

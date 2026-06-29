@@ -74,8 +74,9 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
   `CLOUDFLARE_ACCOUNT_ID` already set. Step 4 of the ship checklist runs
   `npm run preview` and pastes the printed URL — do not wait for the user to ask.
 - For a stable per-branch URL: `cd workers/senate_data_worker && npx wrangler versions upload --preview-alias <name>`.
-- Previews never receive production traffic (`versions upload` ≠ `deploy`), but
-  they reuse production bindings (incl. the D1 database).
+- Previews never receive production traffic (`versions upload` ≠ `deploy`), and use a
+  separate preview D1 database (`preview_database_id`). Pipeline writes are blocked
+  on preview hostnames.
 - Full details and safety notes: `docs/PREVIEW_DEPLOYMENTS.md`.
 
 ## API

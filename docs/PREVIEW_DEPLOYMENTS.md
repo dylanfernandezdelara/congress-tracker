@@ -108,21 +108,16 @@ No GitHub Actions deploy workflow is required.
 
 - **Production is never affected by a preview.** `versions upload` does not shift
   traffic; only `versions deploy` / `wrangler deploy` do.
-- **Preview versions reuse production bindings and secrets**, including the D1
-  database. Treat the preview as having production data access.
-- The admin ingestion route `/__pipeline/run/feed` writes to D1. It is reachable
-  on preview URLs too. Production already has `PIPELINE_ADMIN_TOKEN` set via
-  `wrangler secret put PIPELINE_ADMIN_TOKEN`, so the endpoint requires a token
-  and cannot be triggered without it. Preview versions inherit production
-  secrets; set the same secret (or a separate preview-only token) if you need
-  to call the route from a preview URL.
-- Additional admin routes (`session-backfill`, `member-votes`) also write to the
-  shared D1 binding. Run them after deploy if you want sidebar member spotlights
-  on a preview (cron still runs feed only). See `AGENTS.md` for the backfill
-  sequence.
+- **Preview versions use a separate D1 database** (`preview_database_id` in
+  `wrangler.toml`, currently `congress-tracker-preview`). Production data is not
+  read or mutated by preview URLs. Preview DB starts empty; run `npm run seed`
+  locally or trigger ingestion against the preview Worker if you need sample data.
+- **Pipeline writes are disabled on preview hostnames** (`/__pipeline/run/*`
+  returns `401 preview_pipeline_writes_disabled`), even when a bearer token is
+  supplied. Use production or local dev (`DEV_OPEN_PIPELINE=1`) for admin writes.
 - `/__pipeline/run/disclosures` is local-dev only (`ENABLE_SAMPLE_DISCLOSURES=1`
   and `ALLOWED_ORIGIN=*` in `.dev.vars`). Do not enable on production or preview
-  Workers — preview D1 is the same database as production.
+  Workers.
 - Preview URLs are public on `workers.dev`. To restrict them, use
   [Cloudflare Access on preview URLs](https://developers.cloudflare.com/workers/configuration/previews/#manage-access-to-preview-urls).
 - Cron triggers only fire on the deployed production version, not on preview

@@ -286,6 +286,27 @@ describe("HTTP API", () => {
     expect(allowed.status).toBe(200);
   });
 
+  it("rejects pipeline writes on preview worker hostnames", async () => {
+    const env = createMockEnv({
+      ALLOWED_ORIGIN: "https://congress.example",
+      DEV_OPEN_PIPELINE: undefined,
+      PIPELINE_ADMIN_TOKEN: "s3cret",
+    });
+    const response = await handlePublicFetch(
+      new Request(
+        "https://abc123-congress-tracker-api.foo.workers.dev/__pipeline/run/member-votes",
+        {
+          method: "POST",
+          headers: { Authorization: "Bearer s3cret" },
+        }
+      ),
+      env as any
+    );
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body).toMatchObject({ error: "preview_pipeline_writes_disabled" });
+  });
+
   it("rejects GET requests to admin pipeline routes", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/__pipeline/run/member-votes"),

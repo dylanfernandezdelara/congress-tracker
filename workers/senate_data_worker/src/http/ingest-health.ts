@@ -7,6 +7,17 @@ import type {
   IngestMonitorPayload,
   IngestMonitorStatus,
 } from "../../../../shared/ingest-api-types";
+import { sanitizePipelineErrorPublic } from "./pipeline-error";
+
+function sanitizeFailureRecord(
+  record: FeedPipelineFailureRecord | null
+): FeedPipelineFailureRecord | null {
+  if (!record) return null;
+  return {
+    ...record,
+    error: sanitizePipelineErrorPublic(record.error),
+  };
+}
 
 type ScheduledPipelineSuccess = FeedPipelineRunRecord | ExecutivePipelineRunRecord;
 
@@ -31,9 +42,10 @@ export function evaluateIngestMonitorStatus(params: {
       Date.parse(lastScheduledFailure.failed_at) >
         Date.parse(lastScheduledSuccess.completed_at))
   ) {
+    const publicError = sanitizePipelineErrorPublic(lastScheduledFailure.error);
     return {
       status: "failed",
-      message: `Last scheduled ingest failed: ${lastScheduledFailure.error}`,
+      message: `Last scheduled ingest failed: ${publicError}`,
       last_scheduled_success: lastScheduledSuccess,
     };
   }
@@ -103,7 +115,7 @@ export function buildIngestMonitorPayload(params: {
     latest_passage_vote_date: params.latestPassageVoteDate,
     missing_digest_count: params.missingDigestCount,
     last_success: params.lastSuccess,
-    last_failure: params.lastFailure,
+    last_failure: sanitizeFailureRecord(params.lastFailure),
     last_scheduled_success:
       (evaluated.last_scheduled_success as FeedPipelineRunRecord | null) ?? null,
     admin_feed_ingest: "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
@@ -131,7 +143,7 @@ function buildExecutiveIngestMonitorPayload(params: {
     hourly_cron_utc: params.hourlyCronUtc,
     stale_after_hours: params.staleAfterHours,
     last_success: params.lastSuccess,
-    last_failure: params.lastFailure,
+    last_failure: sanitizeFailureRecord(params.lastFailure),
     last_scheduled_success:
       (evaluated.last_scheduled_success as ExecutivePipelineRunRecord | null) ?? null,
     admin_executive_ingest:

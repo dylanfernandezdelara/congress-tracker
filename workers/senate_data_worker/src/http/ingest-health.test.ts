@@ -38,11 +38,12 @@ describe("evaluateIngestMonitorStatus", () => {
       lastFailure: {
         failed_at: "2026-06-23T10:05:00.000Z",
         trigger: "scheduled",
-        error: "OpenRouter timeout",
+        error: "HTTP 403 for https://api.congress.gov/v3/bill/119/hr/1?format=json&api_key=secret",
       },
     });
     expect(result.status).toBe("failed");
-    expect(result.message).toContain("OpenRouter timeout");
+    expect(result.message).not.toContain("secret");
+    expect(result.message).toContain("api.congress.gov");
   });
 
   it("marks stale when scheduled success is too old", () => {

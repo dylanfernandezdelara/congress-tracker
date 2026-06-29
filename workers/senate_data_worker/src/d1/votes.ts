@@ -93,7 +93,7 @@ export async function upsertVote(db: D1Database, vote: PassageVote): Promise<voi
       vote.session,
       vote.rollNumber,
       vote.bill.congress,
-      vote.bill.type,
+      normalizeBillType(vote.bill.type),
       vote.bill.number,
       vote.question,
       vote.result,

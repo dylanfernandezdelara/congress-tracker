@@ -35,9 +35,9 @@ SESSION = "2"
 binding = "DB"
 database_name = "congress-tracker"
 database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"
-preview_database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"
+preview_database_id = "da5dbbc1-8111-4aa9-a49e-5e03022e44cc"
 
 # Note: previews are served via per-version "preview URLs" (see preview_urls
 # above and .github/workflows/preview.yml), not a separate named environment.
-# Preview versions reuse the bindings/secrets defined above, including this D1
-# database, so treat preview traffic as having production data access.
+# Preview versions use preview_database_id (congress-tracker-preview), a separate
+# D1 database from production. Pipeline writes are blocked on preview hostnames.

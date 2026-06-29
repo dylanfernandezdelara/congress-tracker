@@ -28,7 +28,8 @@ export async function insertFinancialTransaction(
     .prepare(
       `INSERT INTO financial_transactions
         (bioguide_id, ticker, asset_description, transaction_type, amount_min, amount_max, transaction_date, filed_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT DO NOTHING`
     )
     .bind(
       tx.bioguideId,

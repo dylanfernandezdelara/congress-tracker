@@ -55,7 +55,12 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.d1Binding, worker.d1Binding)
   assert.equal(root.d1DatabaseName, worker.d1DatabaseName)
   assert.equal(root.d1DatabaseId, worker.d1DatabaseId)
-  assert.equal(root.d1PreviewDatabaseId, worker.d1PreviewDatabaseId)
+  assert.equal(root.d1PreviewDatabaseId, worker.d1PreviewDatabaseId);
+})
+
+test('preview D1 database is isolated from production', () => {
+  const root = parseWranglerConfig(rootConfigPath)
+  assert.notEqual(root.d1DatabaseId, root.d1PreviewDatabaseId)
 })
 
 test('wrangler.toml entrypoints differ by design between root and worker configs', () => {

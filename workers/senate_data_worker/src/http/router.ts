@@ -43,6 +43,7 @@ import type {
   SessionStatsResponse,
   VoteDefectorsResponse,
 } from "../types";
+import { authorizePipeline } from "./pipeline-auth";
 import {
   buildCorsHeaders,
   buildJsonResponse,
@@ -50,34 +51,6 @@ import {
   cacheLatest,
   cacheNoStore,
 } from "./responses";
-
-function timingSafeEqual(a: string, b: string): boolean {
-  const enc = new TextEncoder();
-  const aBytes = enc.encode(a);
-  const bBytes = enc.encode(b);
-  if (aBytes.byteLength !== bBytes.byteLength) return false;
-  if (typeof crypto.subtle?.timingSafeEqual === "function") {
-    return crypto.subtle.timingSafeEqual(aBytes, bBytes);
-  }
-  let mismatch = 0;
-  for (let i = 0; i < aBytes.byteLength; i += 1) {
-    mismatch |= aBytes[i]! ^ bBytes[i]!;
-  }
-  return mismatch === 0;
-}
-
-function authorizePipeline(request: Request, env: Env): boolean {
-  const token = env.PIPELINE_ADMIN_TOKEN?.trim();
-  if (token) {
-    const auth = request.headers.get("Authorization");
-    const bearer = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-    if (!bearer) return false;
-    return timingSafeEqual(bearer, token);
-  }
-  // No admin token configured: only allow write pipelines when explicitly opted
-  // in for local dev (DEV_OPEN_PIPELINE=1). Never infer dev mode from CORS origin.
-  return env.DEV_OPEN_PIPELINE?.trim() === "1";
-}
 
 async function loadIngestMonitor(env: Env) {
   const [
@@ -230,7 +203,12 @@ async function handlePipelineRoute<T extends object>(
     return json({ error: "method_not_allowed" }, { status: 405, headers: adminHeaders });
   }
   if (!authorizePipeline(request, env)) {
-    return json({ error: "unauthorized" }, { status: 401, headers: adminHeaders });
+    const hostname = new URL(request.url).hostname;
+    const error =
+      hostname.includes("-congress-tracker-api.") && env.DEV_OPEN_PIPELINE?.trim() !== "1"
+        ? "preview_pipeline_writes_disabled"
+        : "unauthorized";
+    return json({ error }, { status: 401, headers: adminHeaders });
   }
   try {
     const result = await run();

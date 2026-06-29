@@ -43,14 +43,21 @@ function createExecutiveMockDb() {
   const links: Array<Record<string, unknown>> = [];
 
   const runResult = { success: true, meta: { duration: 0 } };
-  const stmt = (sql: string) => ({
-    sql,
-    binds: [] as unknown[],
-    bind(...args: unknown[]) {
-      this.binds = args;
-      return this;
-    },
-    async all<T>() {
+  const stmt = (sql: string) => {
+    const statement = {
+      sql,
+      binds: [] as unknown[],
+      bind(...args: unknown[]) {
+        return {
+          ...statement,
+          binds: args,
+          bind: statement.bind,
+          all: statement.all,
+          first: statement.first,
+          run: statement.run,
+        };
+      },
+      async all<T>() {
       if (sql.includes("FROM executive_posts WHERE id = ?")) {
         const id = this.binds[0] as string;
         const row = posts.get(id);
@@ -136,12 +143,19 @@ function createExecutiveMockDb() {
       }
       return runResult;
     },
-  });
+  };
+  return statement;
+  };
 
   return {
     db: {
       exec: vi.fn(async () => {}),
       prepare: vi.fn((sql: string) => stmt(sql)),
+      batch: vi.fn(async (statements: Array<{ run: () => Promise<unknown> }>) => {
+        for (const statement of statements) {
+          await statement.run();
+        }
+      }),
     } as unknown as D1Database,
     posts,
     links,
