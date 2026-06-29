@@ -43,7 +43,7 @@ function runPreviewUpload() {
   }).trim()
 
   const alias = resolvePreviewAlias(branch)
-  const args = ['versions', 'upload', '--config', 'wrangler.toml']
+  const args = ['versions', 'upload', '--config', 'wrangler.toml', '--env', 'preview']
 
   if (alias && isValidPreviewAlias(alias)) {
     args.push('--preview-alias', alias)

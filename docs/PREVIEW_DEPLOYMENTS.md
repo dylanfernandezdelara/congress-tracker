@@ -108,10 +108,10 @@ No GitHub Actions deploy workflow is required.
 
 - **Production is never affected by a preview.** `versions upload` does not shift
   traffic; only `versions deploy` / `wrangler deploy` do.
-- **Preview versions use a separate D1 database** (`preview_database_id` in
-  `wrangler.toml`, currently `congress-tracker-preview`). Production data is not
-  read or mutated by preview URLs. Preview DB starts empty; run `npm run seed`
-  against the preview D1 binding locally if you need sample data there.
+- **Preview versions use a separate D1 database** via the `[env.preview]` Wrangler
+  environment (`congress-tracker-preview`; uploaded with `--env preview`). Production
+  data is not read or mutated by preview URLs. Preview DB starts empty; run
+  `npm run seed` against the preview D1 binding locally if you need sample data there.
 - **Pipeline writes are disabled on preview hostnames** (`/__pipeline/run/*`
   returns `401 preview_pipeline_writes_disabled`), even when a bearer token is
   supplied. Use production or local dev (`DEV_OPEN_PIPELINE=1`) for admin writes.

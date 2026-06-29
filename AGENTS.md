@@ -74,9 +74,10 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
   `CLOUDFLARE_ACCOUNT_ID` already set. Step 4 of the ship checklist runs
   `npm run preview` and pastes the printed URL — do not wait for the user to ask.
 - For a stable per-branch URL: `cd workers/senate_data_worker && npx wrangler versions upload --preview-alias <name>`.
-- Previews never receive production traffic (`versions upload` ≠ `deploy`), and use a
-  separate preview D1 database (`preview_database_id`). Pipeline writes are blocked
-  on preview hostnames.
+- Previews never receive production traffic (`versions upload` ≠ `deploy`). Deployed
+  previews use the `[env.preview]` D1 database (`congress-tracker-preview`); local
+  `wrangler dev` uses `preview_database_id`. Pipeline writes are blocked on preview
+  hostnames.
 - Full details and safety notes: `docs/PREVIEW_DEPLOYMENTS.md`.
 
 ## API
@@ -96,9 +97,10 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin)
 - `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 
-**Sidebar data backfill (production/preview):** Cron runs feed only. After deploy, run
-`session-backfill` then `member-votes` against the target Worker before expecting left-rail
-member spotlights. Local offline: `npm run seed` populates sample sidebar data.
+**Sidebar data backfill (production):** Cron runs feed only. After deploy, run
+`session-backfill` then `member-votes` against the **production** Worker before
+expecting left-rail member spotlights. Preview Workers block admin writes and use
+a separate empty D1; local offline: `npm run seed` populates sample sidebar data.
 
 **Daily ingest (production):** Cloudflare cron runs `runFeedPipeline` at **10:00 UTC** (see
 `[triggers]` in `workers/senate_data_worker/wrangler.toml`). `wrangler deploy` applies that

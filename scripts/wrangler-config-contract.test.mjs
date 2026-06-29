@@ -25,6 +25,9 @@ function parseWranglerConfig(filePath) {
   const d1Match = content.match(
     /\[\[d1_databases\]\][\s\S]*?^binding\s*=\s*"([^"]+)"[\s\S]*?^database_name\s*=\s*"([^"]+)"[\s\S]*?^database_id\s*=\s*"([^"]+)"[\s\S]*?^preview_database_id\s*=\s*"([^"]+)"/m,
   )
+  const previewEnvD1Match = content.match(
+    /\[\[env\.preview\.d1_databases\]\][\s\S]*?^binding\s*=\s*"([^"]+)"[\s\S]*?^database_name\s*=\s*"([^"]+)"[\s\S]*?^database_id\s*=\s*"([^"]+)"/m,
+  )
 
   return {
     name: getTopLevelString('name'),
@@ -39,6 +42,9 @@ function parseWranglerConfig(filePath) {
     d1DatabaseName: d1Match?.[2],
     d1DatabaseId: d1Match?.[3],
     d1PreviewDatabaseId: d1Match?.[4],
+    previewEnvD1Binding: previewEnvD1Match?.[1],
+    previewEnvD1DatabaseName: previewEnvD1Match?.[2],
+    previewEnvD1DatabaseId: previewEnvD1Match?.[3],
   }
 }
 
@@ -55,12 +61,16 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.d1Binding, worker.d1Binding)
   assert.equal(root.d1DatabaseName, worker.d1DatabaseName)
   assert.equal(root.d1DatabaseId, worker.d1DatabaseId)
-  assert.equal(root.d1PreviewDatabaseId, worker.d1PreviewDatabaseId);
+  assert.equal(root.d1PreviewDatabaseId, worker.d1PreviewDatabaseId)
+  assert.equal(root.previewEnvD1Binding, worker.previewEnvD1Binding)
+  assert.equal(root.previewEnvD1DatabaseId, worker.previewEnvD1DatabaseId)
 })
 
 test('preview D1 database is isolated from production', () => {
   const root = parseWranglerConfig(rootConfigPath)
   assert.notEqual(root.d1DatabaseId, root.d1PreviewDatabaseId)
+  assert.notEqual(root.d1DatabaseId, root.previewEnvD1DatabaseId)
+  assert.equal(root.previewEnvD1DatabaseId, root.d1PreviewDatabaseId)
 })
 
 test('wrangler.toml entrypoints differ by design between root and worker configs', () => {

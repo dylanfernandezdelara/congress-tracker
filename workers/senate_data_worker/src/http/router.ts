@@ -43,7 +43,7 @@ import type {
   SessionStatsResponse,
   VoteDefectorsResponse,
 } from "../types";
-import { authorizePipeline } from "./pipeline-auth";
+import { authorizePipeline, isPreviewWorkerHost } from "./pipeline-auth";
 import {
   buildCorsHeaders,
   buildJsonResponse,
@@ -205,7 +205,7 @@ async function handlePipelineRoute<T extends object>(
   if (!authorizePipeline(request, env)) {
     const hostname = new URL(request.url).hostname;
     const error =
-      hostname.includes("-congress-tracker-api.") && env.DEV_OPEN_PIPELINE?.trim() !== "1"
+      isPreviewWorkerHost(hostname) && env.DEV_OPEN_PIPELINE?.trim() !== "1"
         ? "preview_pipeline_writes_disabled"
         : "unauthorized";
     return json({ error }, { status: 401, headers: adminHeaders });
