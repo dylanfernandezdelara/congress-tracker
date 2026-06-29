@@ -51,7 +51,7 @@ per-branch alias with:
 ```bash
 npm run build:web
 cd workers/senate_data_worker
-npx wrangler versions upload --preview-alias my-branch
+npx wrangler versions upload --env preview --preview-alias my-branch
 # -> https://my-branch-congress-tracker-api.<subdomain>.workers.dev
 ```
 

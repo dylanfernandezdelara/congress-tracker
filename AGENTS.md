@@ -73,7 +73,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - A Cursor Cloud agent runs with `wrangler` + `CLOUDFLARE_API_TOKEN` /
   `CLOUDFLARE_ACCOUNT_ID` already set. Step 4 of the ship checklist runs
   `npm run preview` and pastes the printed URL — do not wait for the user to ask.
-- For a stable per-branch URL: `cd workers/senate_data_worker && npx wrangler versions upload --preview-alias <name>`.
+- For a stable per-branch URL: `cd workers/senate_data_worker && npx wrangler versions upload --env preview --preview-alias <name>`.
 - Previews never receive production traffic (`versions upload` ≠ `deploy`). Deployed
   previews use the `[env.preview]` D1 database (`congress-tracker-preview`); local
   `wrangler dev` uses `preview_database_id`. Pipeline writes are blocked on preview
