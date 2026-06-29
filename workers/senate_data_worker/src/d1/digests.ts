@@ -1,5 +1,6 @@
 import type { BillDigestContent } from "../../../../shared/game-api-types";
 import { ensureSchema } from "./schema";
+import { normalizeBillType } from "../sources/bill-type";
 
 export type { BillDigestContent };
 
@@ -54,7 +55,7 @@ export async function upsertDigest(
     )
     .bind(
       params.congress,
-      params.billType,
+      normalizeBillType(params.billType),
       params.number,
       params.title,
       params.policyArea,
@@ -76,8 +77,32 @@ export async function getDigest(
   return db
     .prepare(
       `SELECT congress, bill_type, number, title, policy_area, raw_summary_text, digest_json
-       FROM bill_digests WHERE congress = ? AND bill_type = ? AND number = ?`
+       FROM bill_digests
+       WHERE congress = ? AND UPPER(bill_type) = ? AND number = ?`
     )
-    .bind(congress, billType, number)
+    .bind(congress, normalizeBillType(billType), number)
     .first<DigestRow>();
+}
+
+export async function selectDigestBillRefs(
+  db: D1Database,
+  congress: number,
+  limit = 250
+): Promise<Array<{ congress: number; type: string; number: number }>> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT congress, bill_type, number
+       FROM bill_digests
+       WHERE congress = ?
+       ORDER BY updated_at DESC
+       LIMIT ?`
+    )
+    .bind(congress, limit)
+    .all<{ congress: number; bill_type: string; number: number }>();
+  return (results ?? []).map((row) => ({
+    congress: row.congress,
+    type: normalizeBillType(row.bill_type),
+    number: row.number,
+  }));
 }

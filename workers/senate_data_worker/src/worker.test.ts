@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./pipeline/run-feed", () => ({
   runFeedPipeline: vi.fn(),
 }));
 
+vi.mock("./pipeline/run-executive-posts", () => ({
+  runExecutivePostsPipeline: vi.fn(),
+}));
+
+import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedPipeline } from "./pipeline/run-feed";
 import handler from "./worker";
 
@@ -49,6 +54,10 @@ function createScheduledContext() {
 }
 
 describe("worker", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("returns health", async () => {
     const response = await handler.fetch(
       new Request("http://127.0.0.1:8787/health"),
@@ -117,5 +126,31 @@ describe("worker", () => {
     );
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('"stack":'));
     errorLog.mockRestore();
+  });
+
+  it("runs executive posts pipeline on hourly cron", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.mocked(runExecutivePostsPipeline).mockResolvedValue({
+      fetched: 5,
+      ingested: 1,
+      linked: 1,
+      hydrated: 2,
+      skipped: 4,
+    });
+
+    const { ctx, awaitScheduled } = createScheduledContext();
+    handler.scheduled(
+      { cron: "0 * * * *", scheduledTime: 1_234 } as ScheduledController,
+      createMockEnv() as any,
+      ctx,
+    );
+    await awaitScheduled();
+
+    expect(runExecutivePostsPipeline).toHaveBeenCalled();
+    expect(runFeedPipeline).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"executive_posts_pipeline_complete"'),
+    );
+    log.mockRestore();
   });
 });

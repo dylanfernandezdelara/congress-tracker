@@ -370,6 +370,143 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .feed-row-chip--executive {
+    border-color: hsl(var(--twc-accent) / 0.35);
+    color: hsl(var(--twc-accent));
+    background-color: hsl(var(--twc-accent) / 0.08);
+  }
+
+  .feed-row-executive-quote-wrap {
+    padding: 0 1rem 0.25rem;
+  }
+
+  .feed-row-executive-quote {
+    margin: 0.5rem 0 0;
+    padding: 0.65rem 0.75rem;
+    border-left: 3px solid hsl(var(--twc-accent) / 0.55);
+    border-radius: 0 0.5rem 0.5rem 0;
+    background: hsl(var(--twc-accent) / 0.06);
+  }
+
+  .feed-row-executive-quote__header {
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .feed-row-executive-quote__context {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .feed-row-executive-quote__context-label {
+    font-weight: 700;
+    color: hsl(var(--twc-accent));
+  }
+
+  .feed-row-executive-quote__bill-link {
+    font-weight: 600;
+  }
+
+  .feed-row-executive-quote__rationale,
+  .feed-row-executive-quote__related-note {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-executive-quote__related-note {
+    font-style: normal;
+  }
+
+  .feed-row-executive-quote__text {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: hsl(var(--twc-foreground));
+    font-style: italic;
+    overflow-wrap: anywhere;
+  }
+
+  .feed-row-executive-quote__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    align-items: baseline;
+    margin-top: 0.45rem;
+    font-size: 0.75rem;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-executive-quote__attribution {
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  .feed-row-executive-quote__links a {
+    font-weight: 600;
+    color: hsl(var(--twc-accent));
+    text-decoration: none;
+  }
+
+  .feed-row-executive-quote__links a:hover,
+  .feed-row-executive-quote__links a:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .feed-row-detail-section--executive {
+    border-top: 1px solid hsl(var(--twc-border));
+    padding-top: 1rem;
+  }
+
+  .feed-row-executive-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .feed-row-executive-summary {
+    margin: 0 0 0.25rem;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .feed-row-executive-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.35rem;
+  }
+
+  .feed-row-executive-related {
+    margin-top: 0.75rem;
+  }
+
+  .feed-row-executive-related-label {
+    margin: 0 0 0.35rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-executive-related-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .feed-row-executive-disclaimer {
+    margin: 0.75rem 0 0;
+  }
+
   .feed-row-policy-area {
     max-width: 100%;
   }

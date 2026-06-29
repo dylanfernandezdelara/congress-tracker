@@ -39,6 +39,16 @@ export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
   )
 }
 
+export function getFeedRowDisplayDate(item: FeedItem): { iso: string; kind: 'vote' | 'signal' } {
+  const vote = getPrimaryPassageVote(item)
+  if (vote) return { iso: vote.date, kind: 'vote' }
+  const signal = item.executive_signals?.[0]
+  if (signal) {
+    return { iso: signal.posted_at.slice(0, 10), kind: 'signal' }
+  }
+  return { iso: item.latest_passage_date, kind: 'vote' }
+}
+
 export function isProceduralFeedItem(item: FeedItem): boolean {
   const vote = getPrimaryPassageVote(item)
   if (!vote) return false

@@ -3,12 +3,15 @@ import { congressNumber, sessionNumber } from "../config";
 import { computeDefectors, computeRollDefectors } from "../analytics/defectors";
 import { buildPortfolioMovers } from "../d1/disclosures";
 import {
+  getExecutivePostsPipelineFailure,
+  getExecutivePostsPipelineSuccess,
   getFeedPipelineFailure,
   getFeedPipelineSuccess,
   getLatestPassageVoteDate,
   getMissingDigestCount,
 } from "../d1/pipeline-state";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
+import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedPipeline } from "../pipeline/run-feed";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
@@ -21,9 +24,12 @@ import {
   FEED_MAX_PAGE_SIZE,
   FEED_PIPELINE_CRON_UTC,
   FEED_PIPELINE_STALE_HOURS,
+  EXECUTIVE_PIPELINE_STALE_HOURS,
+  EXECUTIVE_POSTS_CRON_UTC,
 } from "../constants";
 import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
+import { buildExecutiveAlerts } from "../storage/executive";
 import { buildGameReveal, buildGameRounds, parseGameLimit } from "../storage/game";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildNotableVotes } from "../analytics/notable-votes";
@@ -79,11 +85,15 @@ async function loadIngestMonitor(env: Env) {
     missingDigestCount,
     lastSuccess,
     lastFailure,
+    executiveLastSuccess,
+    executiveLastFailure,
   ] = await Promise.all([
     getLatestPassageVoteDate(env),
     getMissingDigestCount(env),
     getFeedPipelineSuccess(env.DB),
     getFeedPipelineFailure(env.DB),
+    getExecutivePostsPipelineSuccess(env.DB),
+    getExecutivePostsPipelineFailure(env.DB),
   ]);
 
   return buildIngestMonitorPayload({
@@ -94,6 +104,12 @@ async function loadIngestMonitor(env: Env) {
     missingDigestCount,
     lastSuccess,
     lastFailure,
+    executive: {
+      staleAfterHours: EXECUTIVE_PIPELINE_STALE_HOURS,
+      hourlyCronUtc: EXECUTIVE_POSTS_CRON_UTC,
+      lastSuccess: executiveLastSuccess,
+      lastFailure: executiveLastFailure,
+    },
   });
 }
 
@@ -273,6 +289,12 @@ export async function handlePublicFetch(
     return handlePipelineRoute(request, env, json, () => runDisclosuresPipeline(env));
   }
 
+  if (pathname === "/__pipeline/run/executive-posts") {
+    return handlePipelineRoute(request, env, json, () =>
+      runExecutivePostsPipeline(env, { trigger: "admin" })
+    );
+  }
+
   if (request.method !== "GET") {
     return json({ error: "method_not_allowed", message: "Only GET requests are allowed" }, { status: 405 });
   }
@@ -296,6 +318,18 @@ export async function handlePublicFetch(
       });
     } catch {
       return json({ error: "feed_error", message: "feed unavailable" }, { status: 500 });
+    }
+  }
+
+  if (pathname === "/executive/alerts.json") {
+    try {
+      const alerts = await buildExecutiveAlerts(env);
+      return json(alerts, {
+        status: 200,
+        headers: { "Cache-Control": cacheLatest },
+      });
+    } catch {
+      return json({ error: "executive_error", message: "executive alerts unavailable" }, { status: 500 });
     }
   }
 
@@ -473,7 +507,7 @@ export async function handlePublicFetch(
   return notFound(pathname);
 }
 
-const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/game/", "/stats/", "/__pipeline/"];
+const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/game/", "/stats/", "/executive/", "/__pipeline/"];
 
 function isApiPath(pathname: string): boolean {
   return API_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));

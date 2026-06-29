@@ -1,6 +1,7 @@
 import { ensureSchema } from "./schema";
 import { congressNumber, type Env } from "../config";
 import type {
+  ExecutivePipelineRunRecord,
   FeedPipelineFailureRecord,
   FeedPipelineRunRecord,
   FeedPipelineTrigger,
@@ -8,6 +9,8 @@ import type {
 
 const FEED_PIPELINE_LAST_SUCCESS_KEY = "feed_pipeline_last_success";
 const FEED_PIPELINE_LAST_FAILURE_KEY = "feed_pipeline_last_failure";
+const EXECUTIVE_POSTS_LAST_SUCCESS_KEY = "executive_posts_pipeline_last_success";
+const EXECUTIVE_POSTS_LAST_FAILURE_KEY = "executive_posts_pipeline_last_failure";
 
 type FeedPipelineRunInput = Omit<FeedPipelineRunRecord, "completed_at" | "trigger">;
 
@@ -96,6 +99,48 @@ export async function getFeedPipelineFailure(
   db: D1Database
 ): Promise<FeedPipelineFailureRecord | null> {
   return readPipelineState<FeedPipelineFailureRecord>(db, FEED_PIPELINE_LAST_FAILURE_KEY);
+}
+
+type ExecutivePipelineRunInput = Omit<ExecutivePipelineRunRecord, "completed_at" | "trigger">;
+
+export async function recordExecutivePostsPipelineSuccess(
+  db: D1Database,
+  trigger: FeedPipelineTrigger,
+  result: ExecutivePipelineRunInput
+): Promise<void> {
+  const completedAt = new Date().toISOString();
+  const record: ExecutivePipelineRunRecord = {
+    completed_at: completedAt,
+    trigger,
+    ...result,
+  };
+  await upsertPipelineState(db, EXECUTIVE_POSTS_LAST_SUCCESS_KEY, record, completedAt);
+}
+
+export async function recordExecutivePostsPipelineFailure(
+  db: D1Database,
+  trigger: FeedPipelineTrigger,
+  error: string
+): Promise<void> {
+  const failedAt = new Date().toISOString();
+  const record: FeedPipelineFailureRecord = {
+    failed_at: failedAt,
+    trigger,
+    error,
+  };
+  await upsertPipelineState(db, EXECUTIVE_POSTS_LAST_FAILURE_KEY, record, failedAt);
+}
+
+export async function getExecutivePostsPipelineSuccess(
+  db: D1Database
+): Promise<ExecutivePipelineRunRecord | null> {
+  return readPipelineState<ExecutivePipelineRunRecord>(db, EXECUTIVE_POSTS_LAST_SUCCESS_KEY);
+}
+
+export async function getExecutivePostsPipelineFailure(
+  db: D1Database
+): Promise<FeedPipelineFailureRecord | null> {
+  return readPipelineState<FeedPipelineFailureRecord>(db, EXECUTIVE_POSTS_LAST_FAILURE_KEY);
 }
 
 export async function getLatestPassageVoteDate(env: Env): Promise<string | null> {

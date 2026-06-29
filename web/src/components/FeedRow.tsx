@@ -5,6 +5,7 @@ import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedEventDisplay,
   getFeedRowMeta,
+  getFeedRowDisplayDate,
   getFeedSummaryDisplay,
   getFeedTopic,
   isProceduralFeedItem,
@@ -12,6 +13,7 @@ import {
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
+import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
 type FeedRowProps = {
   item: FeedItem
@@ -30,9 +32,11 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const topic = getFeedTopic(item)
   const summary = getFeedSummaryDisplay(item)
   const meta = getFeedRowMeta(item)
+  const displayDate = getFeedRowDisplayDate(item)
   const eventDisplay = getFeedEventDisplay(item)
   const policyArea = item.policy_area
   const showEventLine = meta.kind !== 'passed' && meta.kind !== 'failed'
+  const executiveSignal = item.executive_signals?.[0]
 
   return (
     <li className={`feed-row feed-row--${meta.kind}${isExpanded ? ' is-expanded' : ''}`}>
@@ -59,6 +63,9 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                   </span>
                 ) : null}
                 <BillIdChip type={item.bill.type} number={item.bill.number} />
+                {executiveSignal ? (
+                  <span className="feed-row-chip feed-row-chip--executive">Executive · Truth Social</span>
+                ) : null}
                 {policyArea && !isProceduralFeedItem(item) ? (
                   <span
                     id={policyAreaId}
@@ -70,8 +77,9 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                   </span>
                 ) : null}
                 <span className="feed-row-date-wrap">
-                  <time className="feed-row-date" dateTime={item.latest_passage_date}>
-                    {formatVoteDate(item.latest_passage_date)}
+                  <time className="feed-row-date" dateTime={displayDate.iso}>
+                    {formatVoteDate(displayDate.iso)}
+                    {displayDate.kind === 'signal' ? ' · Trump post' : ''}
                   </time>
                   <span className="feed-row-chevron" aria-hidden="true">
                     ›
@@ -108,6 +116,17 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
             </div>
           </div>
         </button>
+
+        {executiveSignal && !isExpanded ? (
+          <div className="feed-row-executive-quote-wrap">
+            <FeedRowExecutiveQuote
+              signal={executiveSignal}
+              bill={item.bill}
+              billHeadline={item.digest?.headline ?? null}
+              relatedBills={item.related_executive_bills}
+            />
+          </div>
+        ) : null}
 
         <div
           id={detailId}

@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import { fetchVoteDefectors } from '../api/client'
 import type { FeedItem, FeedPassageVote, VoteDefectorEntry } from '../api/types'
 import { congressGovBillUrl, formatVoteDate } from '../utils/billLabels'
+import { formatExecutiveRoleDetail, getBillColloquialName } from '../utils/executiveLabels'
 import { isProceduralFeedItem } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
+import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
 type FeedRowDetailProps = {
   item: FeedItem
@@ -143,6 +145,56 @@ function PassageVoteDetails({
   )
 }
 
+function ExecutiveContextSection({ item }: { item: FeedItem }) {
+  const signals = item.executive_signals ?? []
+  const related = item.related_executive_bills ?? []
+  if (signals.length === 0) return null
+
+  return (
+    <section className="feed-row-detail-section feed-row-detail-section--executive">
+      <h3 className="feed-row-detail-heading">Executive context</h3>
+      <ul className="feed-row-executive-list">
+        {signals.map((signal) => (
+          <li key={signal.post_id} className="feed-row-executive-item">
+            <FeedRowExecutiveQuote
+              signal={signal}
+              bill={item.bill}
+              billHeadline={item.digest?.headline ?? null}
+            />
+          </li>
+        ))}
+      </ul>
+      {related.length > 0 ? (
+        <div className="feed-row-executive-related">
+          <p className="feed-row-executive-related-label">Also mentions</p>
+          <ul className="feed-row-executive-related-list">
+            {related.map((bill) => (
+              <li key={`${bill.congress}-${bill.type}-${bill.number}`}>
+                <a
+                  href={congressGovBillUrl(bill.congress, bill.type, bill.number)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="congress-link text-sm"
+                >
+                  {getBillColloquialName(bill)}
+                </a>
+                <span className="text-sm text-faint">
+                  {' '}
+                  · {formatExecutiveRoleDetail(bill.role)}
+                  {bill.reason && bill.reason !== 'mentioned_in_same_post' ? ` — ${bill.reason}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <p className="feed-row-executive-disclaimer text-sm text-faint">
+        Informal presidential statement — not recorded on Congress.gov.
+      </p>
+    </section>
+  )
+}
+
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
@@ -221,6 +273,8 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
           </span>
         </div>
       ) : null}
+
+      <ExecutiveContextSection item={item} />
 
       <section className="feed-row-detail-section">
         <h3 className="feed-row-detail-heading">Vote history</h3>

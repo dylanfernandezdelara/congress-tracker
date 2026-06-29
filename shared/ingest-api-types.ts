@@ -31,4 +31,26 @@ export interface IngestMonitorPayload {
   last_failure: FeedPipelineFailureRecord | null;
   last_scheduled_success: FeedPipelineRunRecord | null;
   admin_feed_ingest: string;
+  executive?: ExecutiveIngestMonitorPayload;
+}
+
+export interface ExecutivePipelineRunRecord {
+  completed_at: string;
+  trigger: FeedPipelineTrigger;
+  fetched: number;
+  ingested: number;
+  linked: number;
+  hydrated: number;
+  skipped: number;
+}
+
+export interface ExecutiveIngestMonitorPayload {
+  status: IngestMonitorStatus;
+  message: string;
+  hourly_cron_utc: string;
+  stale_after_hours: number;
+  last_success: ExecutivePipelineRunRecord | null;
+  last_failure: FeedPipelineFailureRecord | null;
+  last_scheduled_success: ExecutivePipelineRunRecord | null;
+  admin_executive_ingest: string;
 }

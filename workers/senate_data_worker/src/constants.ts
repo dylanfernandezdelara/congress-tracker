@@ -3,6 +3,12 @@ export const FEED_MAX_BILLS = 50;
 export const FEED_DEFAULT_PAGE_SIZE = 50;
 export const FEED_MAX_PAGE_SIZE = 50;
 export const VOTE_LOOKBACK_DAYS = 45;
+/** Bills with executive signals stay feed-visible for this many days. */
+export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
+/** Homepage statuses fetched per executive ingest run. */
+export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
+/** Minimum LLM confidence to auto-link a bill. */
+export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
 export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
 export const GAME_DEFAULT_LIMIT = 20;
@@ -33,5 +39,11 @@ export const USER_AGENT = "congress-tracker/0.1";
 /** Daily feed ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml. */
 export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
 
+/** Executive Truth Social ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml. */
+export const EXECUTIVE_POSTS_CRON_UTC = "0 * * * *";
+
 /** Alert if no successful scheduled ingest within this many hours after cron. */
 export const FEED_PIPELINE_STALE_HOURS = 26;
+
+/** Alert if no successful scheduled executive ingest within this many hours. */
+export const EXECUTIVE_PIPELINE_STALE_HOURS = 2;
