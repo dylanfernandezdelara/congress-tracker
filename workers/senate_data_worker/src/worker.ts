@@ -20,7 +20,7 @@ export default {
 
     if (isExecutiveCron) {
       ctx.waitUntil(
-        runExecutivePostsPipeline(env)
+        runExecutivePostsPipeline(env, { trigger: "scheduled" })
           .then((result) => {
             console.log(
               JSON.stringify({

@@ -44,3 +44,6 @@ export const EXECUTIVE_POSTS_CRON_UTC = "0 * * * *";
 
 /** Alert if no successful scheduled ingest within this many hours after cron. */
 export const FEED_PIPELINE_STALE_HOURS = 26;
+
+/** Alert if no successful scheduled executive ingest within this many hours. */
+export const EXECUTIVE_PIPELINE_STALE_HOURS = 2;

@@ -9,6 +9,11 @@ import {
 } from "../d1/executive";
 import { getDigest } from "../d1/digests";
 import {
+  recordExecutivePostsPipelineFailure,
+  recordExecutivePostsPipelineSuccess,
+} from "../d1/pipeline-state";
+import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
+import {
   buildExecutiveCandidateCatalog,
   ensureBillInCatalog,
 } from "../executive/build-catalog";
@@ -44,6 +49,36 @@ export type ExecutiveLinkFn = (
   }
 ) => Promise<ExecutiveLinkLlmResult | null>;
 
+interface StoredExecutiveRaw extends ParsedTrumpTruthStatus {
+  linkAttemptedAt?: string;
+}
+
+function readLinkAttemptedAt(rawJson: string | null): string | null {
+  if (!rawJson) return null;
+  try {
+    const parsed = JSON.parse(rawJson) as StoredExecutiveRaw;
+    return parsed.linkAttemptedAt ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function buildExecutiveRawJson(
+  status: ParsedTrumpTruthStatus,
+  linkAttemptedAt?: string
+): string {
+  if (linkAttemptedAt) {
+    return JSON.stringify({ ...status, linkAttemptedAt });
+  }
+  return JSON.stringify(status);
+}
+
+function shouldSkipExecutiveStatus(existing: Awaited<ReturnType<typeof getExecutivePost>>): boolean {
+  if (!existing) return false;
+  if (existing.summary) return true;
+  return readLinkAttemptedAt(existing.raw_json) !== null;
+}
+
 async function verifyExecutiveBillLink(
   env: Env,
   link: ExecutiveBillLink
@@ -78,7 +113,7 @@ async function processExecutiveStatus(
   linkFn: ExecutiveLinkFn
 ): Promise<{ ingested: boolean; linked: boolean; hydrated: number }> {
   const existing = await getExecutivePost(env.DB, status.id);
-  if (existing?.summary) {
+  if (shouldSkipExecutiveStatus(existing)) {
     return { ingested: false, linked: false, hydrated: 0 };
   }
 
@@ -102,7 +137,7 @@ async function processExecutiveStatus(
       sourceUrl: status.sourceUrl,
       archiveUrl: status.archiveUrl,
       summary: null,
-      rawJson: JSON.stringify(status),
+      rawJson: buildExecutiveRawJson(status, new Date().toISOString()),
     });
     return { ingested: true, linked: false, hydrated: 0 };
   }
@@ -129,7 +164,7 @@ async function processExecutiveStatus(
       sourceUrl: status.sourceUrl,
       archiveUrl: status.archiveUrl,
       summary: null,
-      rawJson: JSON.stringify(status),
+      rawJson: buildExecutiveRawJson(status, new Date().toISOString()),
     });
     return { ingested: true, linked: false, hydrated };
   }
@@ -143,7 +178,7 @@ async function processExecutiveStatus(
     sourceUrl: status.sourceUrl,
     archiveUrl: status.archiveUrl,
     summary: guarded.banner_summary,
-    rawJson: JSON.stringify(status),
+    rawJson: buildExecutiveRawJson(status),
   });
 
   await replaceExecutivePostBills(
@@ -171,35 +206,50 @@ export async function runExecutivePostsPipeline(
     linkFn?: ExecutiveLinkFn;
     statuses?: ParsedTrumpTruthStatus[];
     limit?: number;
+    trigger?: FeedPipelineTrigger;
   } = {}
 ): Promise<RunExecutivePostsResult> {
+  const trigger = options.trigger ?? "admin";
   const linkFn = options.linkFn ?? linkExecutivePostWithLlm;
   const limit = options.limit ?? EXECUTIVE_POSTS_FETCH_LIMIT;
-  const statuses =
-    options.statuses ??
-    (await fetchTrumpTruthRecentStatuses(limit, options.fetchImpl ?? fetch));
-  const catalog = await buildExecutiveCandidateCatalog(env);
 
-  let ingested = 0;
-  let linked = 0;
-  let hydrated = 0;
-  let skipped = 0;
+  try {
+    const statuses =
+      options.statuses ??
+      (await fetchTrumpTruthRecentStatuses(limit, options.fetchImpl ?? fetch));
+    let catalog = await buildExecutiveCandidateCatalog(env);
 
-  for (const status of statuses) {
-    const result = await processExecutiveStatus(env, status, catalog, linkFn);
-    if (result.ingested) ingested += 1;
-    else skipped += 1;
-    if (result.linked) linked += 1;
-    hydrated += result.hydrated;
+    let ingested = 0;
+    let linked = 0;
+    let hydrated = 0;
+    let skipped = 0;
+
+    for (const status of statuses) {
+      const result = await processExecutiveStatus(env, status, catalog, linkFn);
+      if (result.ingested) ingested += 1;
+      else skipped += 1;
+      if (result.linked) linked += 1;
+      if (result.hydrated > 0) {
+        hydrated += result.hydrated;
+        catalog = await buildExecutiveCandidateCatalog(env);
+      }
+    }
+
+    const pipelineResult = {
+      fetched: statuses.length,
+      ingested,
+      linked,
+      hydrated,
+      skipped,
+    };
+
+    await recordExecutivePostsPipelineSuccess(env.DB, trigger, pipelineResult);
+    return pipelineResult;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    await recordExecutivePostsPipelineFailure(env.DB, trigger, message);
+    throw err;
   }
-
-  return {
-    fetched: statuses.length,
-    ingested,
-    linked,
-    hydrated,
-    skipped,
-  };
 }
 
 export async function ingestExecutivePostManual(

@@ -55,7 +55,7 @@ export async function buildFeedPage(
       executiveSince
     );
     const executive_signals = executivePosts
-      .filter((post) => post.summary && post.role === "primary")
+      .filter((post) => post.summary)
       .map((post) => ({
         ...toExecutiveSignal(post),
         role: post.role as ExecutiveBillRole,

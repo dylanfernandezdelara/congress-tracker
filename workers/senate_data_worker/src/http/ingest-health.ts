@@ -1,16 +1,25 @@
 import type {
+  ExecutiveIngestMonitorPayload,
+  ExecutivePipelineRunRecord,
   FeedPipelineFailureRecord,
   FeedPipelineRunRecord,
+  FeedPipelineTrigger,
   IngestMonitorPayload,
   IngestMonitorStatus,
 } from "../../../../shared/ingest-api-types";
 
+type ScheduledPipelineSuccess = FeedPipelineRunRecord | ExecutivePipelineRunRecord;
+
 export function evaluateIngestMonitorStatus(params: {
   now: Date;
   staleAfterHours: number;
-  lastSuccess: FeedPipelineRunRecord | null;
+  lastSuccess: ScheduledPipelineSuccess | null;
   lastFailure: FeedPipelineFailureRecord | null;
-}): Pick<IngestMonitorPayload, "status" | "message" | "last_scheduled_success"> {
+}): {
+  status: IngestMonitorStatus;
+  message: string;
+  last_scheduled_success: ScheduledPipelineSuccess | null;
+} {
   const lastScheduledSuccess =
     params.lastSuccess?.trigger === "scheduled" ? params.lastSuccess : null;
   const lastScheduledFailure =
@@ -62,6 +71,12 @@ export function buildIngestMonitorPayload(params: {
   missingDigestCount: number;
   lastSuccess: FeedPipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
+  executive?: {
+    staleAfterHours: number;
+    hourlyCronUtc: string;
+    lastSuccess: ExecutivePipelineRunRecord | null;
+    lastFailure: FeedPipelineFailureRecord | null;
+  };
 }): IngestMonitorPayload {
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
@@ -69,6 +84,16 @@ export function buildIngestMonitorPayload(params: {
     lastSuccess: params.lastSuccess,
     lastFailure: params.lastFailure,
   });
+
+  const executive = params.executive
+    ? buildExecutiveIngestMonitorPayload({
+        now: params.now,
+        staleAfterHours: params.executive.staleAfterHours,
+        hourlyCronUtc: params.executive.hourlyCronUtc,
+        lastSuccess: params.executive.lastSuccess,
+        lastFailure: params.executive.lastFailure,
+      })
+    : undefined;
 
   return {
     status: evaluated.status,
@@ -79,8 +104,38 @@ export function buildIngestMonitorPayload(params: {
     missing_digest_count: params.missingDigestCount,
     last_success: params.lastSuccess,
     last_failure: params.lastFailure,
-    last_scheduled_success: evaluated.last_scheduled_success,
+    last_scheduled_success:
+      (evaluated.last_scheduled_success as FeedPipelineRunRecord | null) ?? null,
     admin_feed_ingest: "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
+    executive,
+  };
+}
+
+function buildExecutiveIngestMonitorPayload(params: {
+  now: Date;
+  staleAfterHours: number;
+  hourlyCronUtc: string;
+  lastSuccess: ExecutivePipelineRunRecord | null;
+  lastFailure: FeedPipelineFailureRecord | null;
+}): ExecutiveIngestMonitorPayload {
+  const evaluated = evaluateIngestMonitorStatus({
+    now: params.now,
+    staleAfterHours: params.staleAfterHours,
+    lastSuccess: params.lastSuccess,
+    lastFailure: params.lastFailure,
+  });
+
+  return {
+    status: evaluated.status,
+    message: evaluated.message,
+    hourly_cron_utc: params.hourlyCronUtc,
+    stale_after_hours: params.staleAfterHours,
+    last_success: params.lastSuccess,
+    last_failure: params.lastFailure,
+    last_scheduled_success:
+      (evaluated.last_scheduled_success as ExecutivePipelineRunRecord | null) ?? null,
+    admin_executive_ingest:
+      "POST /__pipeline/run/executive-posts (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
   };
 }
 

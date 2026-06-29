@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseTrumpTruthStatusPage } from "./trumpstruth";
+import {
+  parseTrumpTruthDate,
+  parseTrumpTruthStatusPage,
+} from "./trumpstruth";
 import { HOUSING_SAVE_STATUS_PAGE_HTML } from "../fixtures/executive-housing-save";
 
 describe("parseTrumpTruthStatusPage", () => {
@@ -16,5 +19,12 @@ describe("parseTrumpTruthStatusPage", () => {
     expect(parsed!.sourceUrl).toBe(
       "https://truthsocial.com/@realDonaldTrump/116805545512296111"
     );
+  });
+});
+
+describe("parseTrumpTruthDate", () => {
+  it("parses archive timestamps with multiple commas as US Eastern", () => {
+    const iso = parseTrumpTruthDate("June 24, 2026, 10:26 AM");
+    expect(iso).toBe("2026-06-24T14:26:00.000Z");
   });
 });

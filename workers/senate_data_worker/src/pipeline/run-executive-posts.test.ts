@@ -11,6 +11,11 @@ vi.mock("../executive/hydrate-bill", () => ({
   hydrateBillFromCongress: vi.fn(async () => true),
 }));
 
+vi.mock("../d1/pipeline-state", () => ({
+  recordExecutivePostsPipelineSuccess: vi.fn(async () => {}),
+  recordExecutivePostsPipelineFailure: vi.fn(async () => {}),
+}));
+
 vi.mock("../executive/build-catalog", () => ({
   buildExecutiveCandidateCatalog: vi.fn(async () => [
     {
@@ -65,6 +70,11 @@ function createExecutiveMockDb() {
       return { results: [] as T[] };
     },
     async first<T>() {
+      if (sql.includes("FROM executive_posts WHERE id = ?")) {
+        const id = this.binds[0] as string;
+        const row = posts.get(id);
+        return (row ?? null) as T | null;
+      }
       return null as T | null;
     },
     async run() {
@@ -178,5 +188,31 @@ describe("runExecutivePostsPipeline", () => {
 
     expect(saveLink).toMatchObject({ role: "conditional", bill_number: 22 });
     expect(housingLink).toMatchObject({ role: "primary", bill_number: 6644 });
+  });
+
+  it("does not retry LLM linking after a failed attempt", async () => {
+    const { db, posts } = createExecutiveMockDb();
+    const env = {
+      DB: db,
+      CONGRESS: "119",
+      SESSION: "2",
+      CONGRESS_API_KEY: "test",
+      OPENROUTER_API_KEY: "test",
+    };
+    const linkFn = vi.fn(async () => null);
+    const status = {
+      id: "retry-test-post",
+      text: "Generic post with no bill references.",
+      postedAt: "2026-06-24T14:26:00.000Z",
+      sourceUrl: "https://truthsocial.com/@realDonaldTrump/retry-test-post",
+      archiveUrl: "https://www.trumpstruth.org/statuses/retry-test",
+    };
+
+    await runExecutivePostsPipeline(env as any, { statuses: [status], linkFn });
+    expect(linkFn).toHaveBeenCalledTimes(1);
+
+    await runExecutivePostsPipeline(env as any, { statuses: [status], linkFn });
+    expect(linkFn).toHaveBeenCalledTimes(1);
+    expect(posts.get("retry-test-post")?.summary).toBeNull();
   });
 });

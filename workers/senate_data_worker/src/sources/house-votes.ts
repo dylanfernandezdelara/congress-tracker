@@ -1,8 +1,9 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
-import type { IngestVotesResult, PassageVote } from "../types";
+import type { BillRef, IngestVotesResult, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { parseHouseLegislation } from "./bill-ref";
+import { normalizeBillType } from "./bill-type";
 import { fetchJson } from "./http";
 import { isPassageVote } from "./passage";
 
@@ -158,4 +159,76 @@ export async function ingestHousePassageVotes(
   }
 
   return { votes: out, skipped, truncated: truncated || undefined };
+}
+
+function billMatches(a: BillRef, b: BillRef): boolean {
+  return (
+    a.congress === b.congress &&
+    normalizeBillType(a.type) === normalizeBillType(b.type) &&
+    a.number === b.number
+  );
+}
+
+/** Scan House roll calls until matching passage votes for one bill are found. */
+export async function ingestHousePassageVotesForBill(
+  env: Env,
+  targetBill: BillRef,
+  knownKeys: ReadonlySet<string> = new Set(),
+  maxPages = 50
+): Promise<PassageVote[]> {
+  const apiKey = env.CONGRESS_API_KEY;
+  const congress = congressNumber(env);
+  const session = sessionNumber(env);
+  const out: PassageVote[] = [];
+  let pages = 0;
+  let nextUrl: string | null =
+    `https://api.congress.gov/v3/house-vote/${congress}/${session}?format=json&limit=50&api_key=${apiKey}`;
+
+  while (nextUrl && pages < maxPages) {
+    pages += 1;
+    const data: HouseVoteListResponse = await fetchJson<HouseVoteListResponse>(nextUrl);
+    const items = data.houseRollCallVotes ?? [];
+
+    for (const item of items) {
+      if (!item.legislationNumber || !item.legislationType) continue;
+
+      const key = voteKey({
+        chamber: "House",
+        congress,
+        session,
+        rollNumber: item.rollCallNumber,
+      });
+      if (knownKeys.has(key)) continue;
+
+      const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
+      const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
+      const detail = detailRes.houseRollCallVote;
+      if (!detail?.voteQuestion || !isPassageVote(detail.voteQuestion)) continue;
+
+      const bill = parseHouseLegislation(
+        detail.legislationType ?? item.legislationType,
+        detail.legislationNumber ?? item.legislationNumber,
+        congress
+      );
+      if (!bill || !billMatches(bill, targetBill)) continue;
+
+      const { yeas, nays } = sumTally(detail.votePartyTotal);
+      out.push({
+        chamber: "House",
+        congress,
+        session,
+        rollNumber: detail.rollCallNumber,
+        bill,
+        question: detail.voteQuestion.trim(),
+        result: detail.result,
+        yeas,
+        nays,
+        voteDate: voteDateFromIso(detail.startDate),
+      });
+    }
+
+    nextUrl = nextPageUrl(data.pagination?.next, apiKey);
+  }
+
+  return out;
 }

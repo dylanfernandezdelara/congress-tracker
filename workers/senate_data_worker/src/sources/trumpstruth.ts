@@ -11,6 +11,10 @@ const OG_DESCRIPTION = /property="og:description"\s+content="([^"]+)"/i;
 const POSTED_AT =
   /(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4},\s+\d{1,2}:\d{2}\s+[AP]M/i;
 
+/** trumpstruth.org archive timestamps are US Eastern. */
+const TRUMPTRUTH_EASTERN_OFFSET = "-04:00";
+export const TRUMPTRUTH_FETCH_TIMEOUT_MS = 15_000;
+
 function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&#x2019;/g, "'")
@@ -34,7 +38,9 @@ export function parseTrumpTruthStatusPage(html: string, archiveUrl: string): Par
   if (!text.trim()) return null;
 
   const dateMatch = html.match(POSTED_AT);
-  const postedAt = dateMatch ? parseTrumpTruthDate(dateMatch[0]) : new Date().toISOString();
+  const postedAt = dateMatch
+    ? parseTrumpTruthDate(dateMatch[0])
+    : parseTrumpTruthDateFallback();
 
   return {
     id,
@@ -45,10 +51,19 @@ export function parseTrumpTruthStatusPage(html: string, archiveUrl: string): Par
   };
 }
 
+function parseTrumpTruthDateFallback(): string {
+  console.warn(JSON.stringify({ event: "trumpstruth_date_missing" }));
+  return new Date().toISOString();
+}
+
 export function parseTrumpTruthDate(raw: string): string {
-  const parsed = new Date(raw.replace(",", ""));
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
-  return parsed.toISOString();
+  const normalized = raw.replace(/,/g, "").trim();
+  const eastern = new Date(`${normalized} ${TRUMPTRUTH_EASTERN_OFFSET}`);
+  if (Number.isNaN(eastern.getTime())) {
+    console.warn(JSON.stringify({ event: "trumpstruth_date_parse_failed", raw }));
+    return parseTrumpTruthDateFallback();
+  }
+  return eastern.toISOString();
 }
 
 export interface TrumpTruthListing {
@@ -85,26 +100,29 @@ function stripTags(html: string): string {
   return decodeHtmlEntities(html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
 }
 
+async function fetchTrumpTruthHtml(url: string, fetchImpl: typeof fetch): Promise<string | null> {
+  const response = await fetchImpl(url, {
+    headers: { Accept: "text/html", "User-Agent": "congress-tracker/0.1" },
+    signal: AbortSignal.timeout(TRUMPTRUTH_FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) return null;
+  return response.text();
+}
+
 export async function fetchTrumpTruthRecentStatuses(
   limit: number,
   fetchImpl: typeof fetch = fetch
 ): Promise<ParsedTrumpTruthStatus[]> {
-  const homeRes = await fetchImpl("https://www.trumpstruth.org/", {
-    headers: { Accept: "text/html", "User-Agent": "congress-tracker/0.1" },
-  });
-  if (!homeRes.ok) {
-    throw new Error(`trumpstruth_home_${homeRes.status}`);
+  const homeHtml = await fetchTrumpTruthHtml("https://www.trumpstruth.org/", fetchImpl);
+  if (!homeHtml) {
+    throw new Error("trumpstruth_home_fetch_failed");
   }
-  const homeHtml = await homeRes.text();
   const listings = parseTrumpTruthHomeListings(homeHtml).slice(0, limit);
   const statuses: ParsedTrumpTruthStatus[] = [];
 
   for (const listing of listings) {
-    const pageRes = await fetchImpl(listing.archiveUrl, {
-      headers: { Accept: "text/html", "User-Agent": "congress-tracker/0.1" },
-    });
-    if (!pageRes.ok) continue;
-    const pageHtml = await pageRes.text();
+    const pageHtml = await fetchTrumpTruthHtml(listing.archiveUrl, fetchImpl);
+    if (!pageHtml) continue;
     const parsed = parseTrumpTruthStatusPage(pageHtml, listing.archiveUrl);
     if (parsed) statuses.push(parsed);
   }

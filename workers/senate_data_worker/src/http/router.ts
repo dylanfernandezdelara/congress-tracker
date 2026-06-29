@@ -3,6 +3,8 @@ import { congressNumber, sessionNumber } from "../config";
 import { computeDefectors, computeRollDefectors } from "../analytics/defectors";
 import { buildPortfolioMovers } from "../d1/disclosures";
 import {
+  getExecutivePostsPipelineFailure,
+  getExecutivePostsPipelineSuccess,
   getFeedPipelineFailure,
   getFeedPipelineSuccess,
   getLatestPassageVoteDate,
@@ -22,6 +24,8 @@ import {
   FEED_MAX_PAGE_SIZE,
   FEED_PIPELINE_CRON_UTC,
   FEED_PIPELINE_STALE_HOURS,
+  EXECUTIVE_PIPELINE_STALE_HOURS,
+  EXECUTIVE_POSTS_CRON_UTC,
 } from "../constants";
 import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
@@ -81,11 +85,15 @@ async function loadIngestMonitor(env: Env) {
     missingDigestCount,
     lastSuccess,
     lastFailure,
+    executiveLastSuccess,
+    executiveLastFailure,
   ] = await Promise.all([
     getLatestPassageVoteDate(env),
     getMissingDigestCount(env),
     getFeedPipelineSuccess(env.DB),
     getFeedPipelineFailure(env.DB),
+    getExecutivePostsPipelineSuccess(env.DB),
+    getExecutivePostsPipelineFailure(env.DB),
   ]);
 
   return buildIngestMonitorPayload({
@@ -96,6 +104,12 @@ async function loadIngestMonitor(env: Env) {
     missingDigestCount,
     lastSuccess,
     lastFailure,
+    executive: {
+      staleAfterHours: EXECUTIVE_PIPELINE_STALE_HOURS,
+      hourlyCronUtc: EXECUTIVE_POSTS_CRON_UTC,
+      lastSuccess: executiveLastSuccess,
+      lastFailure: executiveLastFailure,
+    },
   });
 }
 
@@ -276,7 +290,9 @@ export async function handlePublicFetch(
   }
 
   if (pathname === "/__pipeline/run/executive-posts") {
-    return handlePipelineRoute(request, env, json, () => runExecutivePostsPipeline(env));
+    return handlePipelineRoute(request, env, json, () =>
+      runExecutivePostsPipeline(env, { trigger: "admin" })
+    );
   }
 
   if (request.method !== "GET") {
@@ -491,7 +507,7 @@ export async function handlePublicFetch(
   return notFound(pathname);
 }
 
-const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/game/", "/stats/", "/__pipeline/"];
+const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/game/", "/stats/", "/executive/", "/__pipeline/"];
 
 function isApiPath(pathname: string): boolean {
   return API_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
