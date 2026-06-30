@@ -2,8 +2,7 @@ import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { SESSION_BACKFILL_MAX_NEW_VOTES } from "../constants";
 import { selectExistingVoteKeysForSession, upsertVote } from "../d1/votes";
-import { ingestHousePassageVotes } from "../sources/house-votes";
-import { ingestSenatePassageVotes } from "../sources/senate-votes";
+import { ingestPassageVotesByChamber } from "./ingest-chambers";
 
 export interface RunSessionBackfillResult {
   votesUpserted: number;
@@ -16,10 +15,12 @@ export async function runSessionBackfillPipeline(env: Env): Promise<RunSessionBa
   const session = sessionNumber(env);
   const knownVoteKeys = await selectExistingVoteKeysForSession(env.DB, congress, session);
 
-  const [houseResult, senateResult] = await Promise.all([
-    ingestHousePassageVotes(env, null, knownVoteKeys, SESSION_BACKFILL_MAX_NEW_VOTES),
-    ingestSenatePassageVotes(env, null, knownVoteKeys),
-  ]);
+  const { house: houseResult, senate: senateResult } = await ingestPassageVotesByChamber(
+    env,
+    null,
+    knownVoteKeys,
+    { houseMaxNewVotes: SESSION_BACKFILL_MAX_NEW_VOTES }
+  );
 
   const newVotes = [...houseResult.votes, ...senateResult.votes];
   for (const vote of newVotes) {

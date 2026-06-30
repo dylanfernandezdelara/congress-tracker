@@ -15,8 +15,7 @@ import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d
 import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
-import { ingestHousePassageVotes } from "../sources/house-votes";
-import { ingestSenatePassageVotes } from "../sources/senate-votes";
+import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
 
@@ -52,10 +51,18 @@ export async function runFeedPipeline(
     const congress = congressNumber(env);
     const knownVoteKeys = await selectExistingVoteKeys(env.DB, lookback, congress);
 
-    const [houseResult, senateResult] = await Promise.all([
-      ingestHousePassageVotes(env, lookback, knownVoteKeys),
-      ingestSenatePassageVotes(env, lookback, knownVoteKeys),
-    ]);
+    const { house: houseResult, senate: senateResult, chamberWarnings } =
+      await ingestPassageVotesByChamber(env, lookback, knownVoteKeys);
+
+    if (chamberWarnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_chamber_ingest",
+          trigger,
+          warnings: chamberWarnings,
+        })
+      );
+    }
 
     const newVotes = [...houseResult.votes, ...senateResult.votes];
     for (const vote of newVotes) {

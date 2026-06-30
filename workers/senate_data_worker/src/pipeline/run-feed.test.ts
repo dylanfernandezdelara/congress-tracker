@@ -11,8 +11,7 @@ const mockSelectExistingVoteKeys = vi.fn();
 const mockUpsertVote = vi.fn();
 const mockFetchBillSummaryBundle = vi.fn();
 const mockRewriteSummary = vi.fn();
-const mockIngestHousePassageVotes = vi.fn();
-const mockIngestSenatePassageVotes = vi.fn();
+const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 
 vi.mock("../d1/digests", () => ({
@@ -39,12 +38,8 @@ vi.mock("../synthesis/model", () => ({
   resolveOpenRouterModel: vi.fn(async () => "nvidia/nemotron-3-ultra-550b-a55b:free"),
 }));
 
-vi.mock("../sources/house-votes", () => ({
-  ingestHousePassageVotes: (...args: unknown[]) => mockIngestHousePassageVotes(...args),
-}));
-
-vi.mock("../sources/senate-votes", () => ({
-  ingestSenatePassageVotes: (...args: unknown[]) => mockIngestSenatePassageVotes(...args),
+vi.mock("./ingest-chambers", () => ({
+  ingestPassageVotesByChamber: (...args: unknown[]) => mockIngestPassageVotesByChamber(...args),
 }));
 
 vi.mock("./ensure-member-roster", () => ({
@@ -91,8 +86,11 @@ describe("runFeedPipeline digest retry", () => {
     vi.clearAllMocks();
     mockEnsureMemberRoster.mockResolvedValue(false);
     mockSelectExistingVoteKeys.mockResolvedValue(new Set());
-    mockIngestHousePassageVotes.mockResolvedValue({ votes: [], skipped: 0 });
-    mockIngestSenatePassageVotes.mockResolvedValue({ votes: [], skipped: 0 });
+    mockIngestPassageVotesByChamber.mockResolvedValue({
+      house: { votes: [], skipped: 0 },
+      senate: { votes: [], skipped: 0 },
+      chamberWarnings: [],
+    });
     mockSelectRecentVotedBills.mockResolvedValue([billRow]);
     mockFetchBillSummaryBundle.mockResolvedValue({
       title: "Test Bill",

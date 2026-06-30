@@ -5,7 +5,7 @@ import { USER_AGENT } from "../constants";
  * an error message or log line. Some upstreams (Congress.gov) take the key as a
  * query param, so the raw URL must never be echoed back to clients.
  */
-function redactUrl(url: string): string {
+export function redactUrl(url: string): string {
   try {
     const parsed = new URL(url);
     return `${parsed.origin}${parsed.pathname}`;

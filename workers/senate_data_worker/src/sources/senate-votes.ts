@@ -3,9 +3,86 @@ import { congressNumber, sessionNumber } from "../config";
 import type { IngestVotesResult, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { parseSenateIssue } from "./bill-ref";
-import { fetchText } from "./http";
+import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
+import { ensureSchema } from "../d1/schema";
+
+const SENATE_VOTE_MENU_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function senateVoteMenuCacheKey(congress: number, session: number): string {
+  return `senate_vote_menu_cache_${congress}_${session}`;
+}
+
+async function readSenateVoteMenuCache(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<string | null> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(`SELECT value_json FROM pipeline_state WHERE key = ?1`)
+    .bind(senateVoteMenuCacheKey(congress, session))
+    .first<{ value_json: string }>();
+  if (!row?.value_json) return null;
+  try {
+    const parsed = JSON.parse(row.value_json) as { fetched_at: string; xml: string };
+    if (!parsed.xml || !parsed.fetched_at) return null;
+    const ageMs = Date.now() - Date.parse(parsed.fetched_at);
+    if (ageMs > SENATE_VOTE_MENU_CACHE_MAX_AGE_MS) return null;
+    return parsed.xml;
+  } catch {
+    return null;
+  }
+}
+
+async function writeSenateVoteMenuCache(
+  db: D1Database,
+  congress: number,
+  session: number,
+  xml: string
+): Promise<void> {
+  await ensureSchema(db);
+  const fetchedAt = new Date().toISOString();
+  await db
+    .prepare(
+      `INSERT INTO pipeline_state (key, value_json, updated_at)
+       VALUES (?1, ?2, ?3)
+       ON CONFLICT(key) DO UPDATE SET
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at`
+    )
+    .bind(
+      senateVoteMenuCacheKey(congress, session),
+      JSON.stringify({ fetched_at: fetchedAt, xml }),
+      fetchedAt
+    )
+    .run();
+}
+
+async function fetchSenateVoteMenuXml(env: Env, congress: number, session: number): Promise<string> {
+  const url = `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${congress}_${session}.xml`;
+  try {
+    const xml = await fetchSenateLegislativeText(url);
+    await writeSenateVoteMenuCache(env.DB, congress, session, xml);
+    return xml;
+  } catch (err: unknown) {
+    const cached = await readSenateVoteMenuCache(env.DB, congress, session);
+    if (cached) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        JSON.stringify({
+          event: "senate_vote_menu_cache_fallback",
+          congress,
+          session,
+          error: message,
+        })
+      );
+      return cached;
+    }
+    throw err;
+  }
+}
 
 const MONTHS: Record<string, string> = {
   Jan: "01",
@@ -79,8 +156,7 @@ export async function ingestSenatePassageVotes(
 ): Promise<IngestVotesResult> {
   const congress = congressNumber(env);
   const session = sessionNumber(env);
-  const url = `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${congress}_${session}.xml`;
-  const xml = await fetchText(url);
+  const xml = await fetchSenateVoteMenuXml(env, congress, session);
   const all = parseSenateVoteMenuXml(xml, congress, session);
 
   const votes: PassageVote[] = [];
