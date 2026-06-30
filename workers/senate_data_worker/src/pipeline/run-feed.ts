@@ -5,7 +5,7 @@ import {
 } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { getDigest, upsertDigest } from "../d1/digests";
+import { getDigest, upsertDigest, parseStoredDigest } from "../d1/digests";
 import {
   recordFeedPipelineFailure,
   recordFeedPipelineSuccess,
@@ -25,6 +25,8 @@ export interface RunFeedResult {
   billsSelected: number;
   digestsWritten: number;
   digestsSkipped: number;
+  digestsRewritten: number;
+  chamberWarnings: string[];
 }
 
 export async function runFeedPipeline(
@@ -74,6 +76,7 @@ export async function runFeedPipeline(
 
     let digestsWritten = 0;
     let digestsSkipped = 0;
+    let digestsRewritten = 0;
     let newRewrites = 0;
 
     for (const row of bills) {
@@ -83,12 +86,10 @@ export async function runFeedPipeline(
         row.bill_type,
         row.bill_number
       );
-      if (existing?.digest_json != null) {
+      if (parseStoredDigest(existing?.digest_json ?? null) !== null) {
         digestsSkipped += 1;
         continue;
       }
-
-      if (newRewrites >= DIGEST_MAX_NEW_REWRITES) continue;
 
       const bundle = await fetchBillSummaryBundle(env, {
         congress: row.bill_congress,
@@ -97,7 +98,8 @@ export async function runFeedPipeline(
       });
 
       let digest = null;
-      if (bundle.rawSummaryText) {
+      const canRewrite = newRewrites < DIGEST_MAX_NEW_REWRITES;
+      if (canRewrite && bundle.rawSummaryText) {
         digest = await rewriteSummary(
           env,
           {
@@ -110,18 +112,28 @@ export async function runFeedPipeline(
         );
       }
 
-      await upsertDigest(env.DB, {
-        congress: row.bill_congress,
-        billType: row.bill_type,
-        number: row.bill_number,
-        title: bundle.title,
-        policyArea: bundle.policyArea,
-        rawSummaryText: bundle.rawSummaryText,
-        digest,
-      });
+      const needsMetadata =
+        !existing?.raw_summary_text ||
+        existing.title !== bundle.title ||
+        digest !== null;
 
-      digestsWritten += 1;
-      newRewrites += 1;
+      if (needsMetadata || canRewrite) {
+        await upsertDigest(env.DB, {
+          congress: row.bill_congress,
+          billType: row.bill_type,
+          number: row.bill_number,
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+          digest,
+        });
+        digestsWritten += 1;
+      }
+
+      if (digest !== null) {
+        digestsRewritten += 1;
+        newRewrites += 1;
+      }
     }
 
     const result: RunFeedResult = {
@@ -130,10 +142,19 @@ export async function runFeedPipeline(
       billsSelected: bills.length,
       digestsWritten,
       digestsSkipped,
+      digestsRewritten,
+      chamberWarnings,
     };
 
     try {
-      await recordFeedPipelineSuccess(env.DB, trigger, result);
+      await recordFeedPipelineSuccess(env.DB, trigger, {
+        votesUpserted: result.votesUpserted,
+        votesSkipped: result.votesSkipped,
+        billsSelected: result.billsSelected,
+        digestsWritten: result.digestsWritten,
+        digestsSkipped: result.digestsSkipped,
+        ...(chamberWarnings.length > 0 ? { chamber_warnings: chamberWarnings } : {}),
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(

@@ -23,6 +23,7 @@ export interface IngestVotesResult {
   votes: PassageVote[];
   skipped: number;
   truncated?: boolean;
+  warnings?: string[];
 }
 
 import type { BillDigestContent } from "../../../shared/game-api-types";

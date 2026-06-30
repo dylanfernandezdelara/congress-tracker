@@ -10,6 +10,7 @@ export interface FeedPipelineRunRecord {
   billsSelected: number;
   digestsWritten: number;
   digestsSkipped: number;
+  chamber_warnings?: string[];
 }
 
 export interface FeedPipelineFailureRecord {

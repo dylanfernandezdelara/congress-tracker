@@ -14,10 +14,14 @@ const mockRewriteSummary = vi.fn();
 const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 
-vi.mock("../d1/digests", () => ({
-  getDigest: (...args: Parameters<typeof mockGetDigest>) => mockGetDigest(...args),
-  upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
-}));
+vi.mock("../d1/digests", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/digests")>();
+  return {
+    ...actual,
+    getDigest: (...args: Parameters<typeof mockGetDigest>) => mockGetDigest(...args),
+    upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
+  };
+});
 
 vi.mock("../d1/votes", () => ({
   selectExistingVoteKeys: (...args: unknown[]) => mockSelectExistingVoteKeys(...args),
@@ -72,7 +76,7 @@ const completeDigest: DigestRow = {
   title: "Complete Bill",
   policy_area: "Defense",
   raw_summary_text: "Raw summary",
-  digest_json: JSON.stringify({ headline: "Done" }),
+  digest_json: JSON.stringify({ headline: "Done", what_it_does: "Complete summary" }),
 };
 
 const tombstoneDigest: DigestRow = {
@@ -106,8 +110,29 @@ describe("runFeedPipeline digest retry", () => {
     mockUpsertDigest.mockResolvedValue(undefined);
   });
 
+  it("retries rows with invalid digest_json that fails parseStoredDigest", async () => {
+    mockGetDigest.mockResolvedValue({
+      ...completeDigest,
+      digest_json: JSON.stringify({ headline: "Done" }),
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsSkipped).toBe(0);
+    expect(result.digestsWritten).toBe(1);
+    expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
+  });
+
   it("skips bills with a complete digest", async () => {
-    mockGetDigest.mockResolvedValue(completeDigest);
+    mockGetDigest.mockResolvedValue({
+      ...completeDigest,
+      digest_json: JSON.stringify({
+        headline: "Done",
+        what_it_does: "Already complete",
+        key_points: [],
+        terms_explained: [],
+      }),
+    });
 
     const result = await runFeedPipeline(createEnv());
 
@@ -151,7 +176,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
 
-  it("respects DIGEST_MAX_NEW_REWRITES for retries and new bills", async () => {
+  it("respects DIGEST_MAX_NEW_REWRITES for LLM rewrites while still storing metadata", async () => {
     const bills = Array.from({ length: 25 }, (_, i) => ({
       bill_congress: 119,
       bill_type: "HR",
@@ -163,7 +188,9 @@ describe("runFeedPipeline digest retry", () => {
 
     const result = await runFeedPipeline(createEnv());
 
-    expect(result.digestsWritten).toBe(20);
-    expect(mockUpsertDigest).toHaveBeenCalledTimes(20);
+    expect(result.digestsRewritten).toBe(20);
+    expect(result.digestsWritten).toBe(25);
+    expect(mockUpsertDigest).toHaveBeenCalledTimes(25);
+    expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
   });
 });

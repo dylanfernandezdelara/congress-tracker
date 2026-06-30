@@ -6,6 +6,7 @@ import {
   formatFeedEventLine,
   getFeedEventDisplay,
   getFeedEventLine,
+  getFeedRowDisplayDate,
   getFeedRowMeta,
   getFeedSummary,
   getFeedSummaryDisplay,
@@ -13,6 +14,36 @@ import {
   getPrimaryPassageVote,
   isProceduralFeedItem,
 } from './feedRowLabels'
+
+describe('getFeedRowDisplayDate', () => {
+  it('uses latest_passage_date for executive-linked bills with old passage votes', () => {
+    const item = makeFeedItem({
+      latest_passage_date: '2026-06-24',
+      executive_signals: [
+        {
+          post_id: 'post-1',
+          posted_at: '2026-06-24T14:26:00.000Z',
+          summary: 'Executive post',
+          quote: 'Quote text',
+          source_url: 'https://example.com/post',
+          informal: false,
+        },
+      ],
+      passage_votes: [
+        {
+          chamber: 'House',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          yeas: 220,
+          nays: 210,
+          date: '2026-04-10',
+        },
+      ],
+    })
+
+    expect(getFeedRowDisplayDate(item)).toEqual({ iso: '2026-06-24', kind: 'signal' })
+  })
+})
 
 describe('getFeedEventLine', () => {
   it('formats substantive pass event lines', () => {

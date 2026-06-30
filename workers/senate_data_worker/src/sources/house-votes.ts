@@ -36,6 +36,7 @@ interface HouseVoteDetail {
   result: string;
   startDate: string;
   voteQuestion?: string;
+  voteTitle?: string;
   votePartyTotal?: PartyTotal[];
 }
 
@@ -119,27 +120,32 @@ export async function ingestHousePassageVotes(
       const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
       const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
       const detail = detailRes.houseRollCallVote;
-      if (!detail?.voteQuestion || !isPassageVote(detail.voteQuestion)) continue;
+      const questionText = detail?.voteQuestion ?? "";
+      const titleText = detail?.voteTitle ?? "";
+      if (!isPassageVote(questionText) && !isPassageVote(titleText)) continue;
 
       const bill = parseHouseLegislation(
-        detail.legislationType ?? item.legislationType,
-        detail.legislationNumber ?? item.legislationNumber,
+        detail!.legislationType ?? item.legislationType,
+        detail!.legislationNumber ?? item.legislationNumber,
         congress
       );
       if (!bill) continue;
 
-      const { yeas, nays } = sumTally(detail.votePartyTotal);
+      const { yeas, nays } = sumTally(detail!.votePartyTotal);
+      const displayQuestion = isPassageVote(titleText)
+        ? titleText.split(";")[0]!.trim()
+        : questionText.trim();
       out.push({
         chamber: "House",
         congress,
         session,
-        rollNumber: detail.rollCallNumber,
+        rollNumber: detail!.rollCallNumber,
         bill,
-        question: detail.voteQuestion.trim(),
-        result: detail.result,
+        question: displayQuestion.replace(/\s+/g, " ").trim(),
+        result: detail!.result,
         yeas,
         nays,
-        voteDate: voteDateFromIso(detail.startDate),
+        voteDate: voteDateFromIso(detail!.startDate),
       });
 
       if (maxNewVotes !== undefined && out.length >= maxNewVotes) {
@@ -203,27 +209,32 @@ export async function ingestHousePassageVotesForBill(
       const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
       const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
       const detail = detailRes.houseRollCallVote;
-      if (!detail?.voteQuestion || !isPassageVote(detail.voteQuestion)) continue;
+      const questionText = detail?.voteQuestion ?? "";
+      const titleText = detail?.voteTitle ?? "";
+      if (!isPassageVote(questionText) && !isPassageVote(titleText)) continue;
 
       const bill = parseHouseLegislation(
-        detail.legislationType ?? item.legislationType,
-        detail.legislationNumber ?? item.legislationNumber,
+        detail!.legislationType ?? item.legislationType,
+        detail!.legislationNumber ?? item.legislationNumber,
         congress
       );
       if (!bill || !billMatches(bill, targetBill)) continue;
 
-      const { yeas, nays } = sumTally(detail.votePartyTotal);
+      const { yeas, nays } = sumTally(detail!.votePartyTotal);
+      const displayQuestion = isPassageVote(titleText)
+        ? titleText.split(";")[0]!.trim()
+        : questionText.trim();
       out.push({
         chamber: "House",
         congress,
         session,
-        rollNumber: detail.rollCallNumber,
+        rollNumber: detail!.rollCallNumber,
         bill,
-        question: detail.voteQuestion.trim(),
-        result: detail.result,
+        question: displayQuestion.replace(/\s+/g, " ").trim(),
+        result: detail!.result,
         yeas,
         nays,
-        voteDate: voteDateFromIso(detail.startDate),
+        voteDate: voteDateFromIso(detail!.startDate),
       });
     }
 

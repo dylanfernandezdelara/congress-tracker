@@ -6,6 +6,7 @@ import {
   getExecutivePostsPipelineFailure,
   getExecutivePostsPipelineSuccess,
   getFeedPipelineFailure,
+  getFeedPipelineScheduledSuccess,
   getFeedPipelineSuccess,
   getLatestPassageVoteDate,
   getMissingDigestCount,
@@ -57,6 +58,7 @@ async function loadIngestMonitor(env: Env) {
     latestPassageVoteDate,
     missingDigestCount,
     lastSuccess,
+    lastScheduledSuccess,
     lastFailure,
     executiveLastSuccess,
     executiveLastFailure,
@@ -64,6 +66,7 @@ async function loadIngestMonitor(env: Env) {
     getLatestPassageVoteDate(env),
     getMissingDigestCount(env),
     getFeedPipelineSuccess(env.DB),
+    getFeedPipelineScheduledSuccess(env.DB),
     getFeedPipelineFailure(env.DB),
     getExecutivePostsPipelineSuccess(env.DB),
     getExecutivePostsPipelineFailure(env.DB),
@@ -76,6 +79,7 @@ async function loadIngestMonitor(env: Env) {
     latestPassageVoteDate,
     missingDigestCount,
     lastSuccess,
+    lastScheduledSuccess,
     lastFailure,
     executive: {
       staleAfterHours: EXECUTIVE_PIPELINE_STALE_HOURS,
@@ -102,7 +106,10 @@ async function healthResponse(
   return json(
     {
       status:
-        ingest && (ingest.status === "failed" || ingest.status === "stale")
+        ingest &&
+        (ingest.status === "failed" ||
+          ingest.status === "stale" ||
+          ingest.status === "unknown")
           ? "degraded"
           : "ok",
       timestamp: new Date().toISOString(),

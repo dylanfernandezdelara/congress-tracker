@@ -63,9 +63,15 @@ describe("worker", () => {
       new Request("http://127.0.0.1:8787/health"),
       createMockEnv() as any
     );
-    const body = await response.json();
+    const body = (await response.json()) as {
+      status: string;
+      congress: string;
+      session: string;
+      data?: { ingest?: { status: string } };
+    };
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ status: "ok", congress: "119", session: "2" });
+    expect(body).toMatchObject({ status: "degraded", congress: "119", session: "2" });
+    expect(body.data?.ingest?.status).toBe("unknown");
   });
 
   it("serves feed endpoint", async () => {
@@ -91,6 +97,8 @@ describe("worker", () => {
       billsSelected: 3,
       digestsWritten: 1,
       digestsSkipped: 2,
+      digestsRewritten: 1,
+      chamberWarnings: [],
     });
 
     const { ctx, awaitScheduled } = createScheduledContext();

@@ -8,6 +8,7 @@ import type {
 } from "../../../../shared/ingest-api-types";
 
 const FEED_PIPELINE_LAST_SUCCESS_KEY = "feed_pipeline_last_success";
+const FEED_PIPELINE_LAST_SCHEDULED_SUCCESS_KEY = "feed_pipeline_last_scheduled_success";
 const FEED_PIPELINE_LAST_FAILURE_KEY = "feed_pipeline_last_failure";
 const EXECUTIVE_POSTS_LAST_SUCCESS_KEY = "executive_posts_pipeline_last_success";
 const EXECUTIVE_POSTS_LAST_FAILURE_KEY = "executive_posts_pipeline_last_failure";
@@ -73,6 +74,9 @@ export async function recordFeedPipelineSuccess(
     ...result,
   };
   await upsertPipelineState(db, FEED_PIPELINE_LAST_SUCCESS_KEY, record, completedAt);
+  if (trigger === "scheduled") {
+    await upsertPipelineState(db, FEED_PIPELINE_LAST_SCHEDULED_SUCCESS_KEY, record, completedAt);
+  }
 }
 
 export async function recordFeedPipelineFailure(
@@ -93,6 +97,12 @@ export async function getFeedPipelineSuccess(
   db: D1Database
 ): Promise<FeedPipelineRunRecord | null> {
   return readPipelineState<FeedPipelineRunRecord>(db, FEED_PIPELINE_LAST_SUCCESS_KEY);
+}
+
+export async function getFeedPipelineScheduledSuccess(
+  db: D1Database
+): Promise<FeedPipelineRunRecord | null> {
+  return readPipelineState<FeedPipelineRunRecord>(db, FEED_PIPELINE_LAST_SCHEDULED_SUCCESS_KEY);
 }
 
 export async function getFeedPipelineFailure(

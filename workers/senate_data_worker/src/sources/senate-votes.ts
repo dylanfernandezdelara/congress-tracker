@@ -60,16 +60,33 @@ async function writeSenateVoteMenuCache(
     .run();
 }
 
-async function fetchSenateVoteMenuXml(env: Env, congress: number, session: number): Promise<string> {
+async function fetchSenateVoteMenuXml(
+  env: Env,
+  congress: number,
+  session: number
+): Promise<{ xml: string; warnings: string[] }> {
   const url = `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${congress}_${session}.xml`;
   try {
     const xml = await fetchSenateLegislativeText(url);
-    await writeSenateVoteMenuCache(env.DB, congress, session, xml);
-    return xml;
+    try {
+      await writeSenateVoteMenuCache(env.DB, congress, session, xml);
+    } catch (writeErr: unknown) {
+      const message = writeErr instanceof Error ? writeErr.message : String(writeErr);
+      console.warn(
+        JSON.stringify({
+          event: "senate_vote_menu_cache_write_failed",
+          congress,
+          session,
+          error: message,
+        })
+      );
+    }
+    return { xml, warnings: [] };
   } catch (err: unknown) {
     const cached = await readSenateVoteMenuCache(env.DB, congress, session);
     if (cached) {
       const message = err instanceof Error ? err.message : String(err);
+      const warning = `Senate vote menu served from D1 cache after live fetch failed: ${message}`;
       console.warn(
         JSON.stringify({
           event: "senate_vote_menu_cache_fallback",
@@ -78,7 +95,7 @@ async function fetchSenateVoteMenuXml(env: Env, congress: number, session: numbe
           error: message,
         })
       );
-      return cached;
+      return { xml: cached, warnings: [warning] };
     }
     throw err;
   }
@@ -156,7 +173,7 @@ export async function ingestSenatePassageVotes(
 ): Promise<IngestVotesResult> {
   const congress = congressNumber(env);
   const session = sessionNumber(env);
-  const xml = await fetchSenateVoteMenuXml(env, congress, session);
+  const { xml, warnings } = await fetchSenateVoteMenuXml(env, congress, session);
   const all = parseSenateVoteMenuXml(xml, congress, session);
 
   const votes: PassageVote[] = [];
@@ -170,5 +187,5 @@ export async function ingestSenatePassageVotes(
     votes.push(vote);
   }
 
-  return { votes, skipped };
+  return { votes, skipped, warnings: warnings.length > 0 ? warnings : undefined };
 }

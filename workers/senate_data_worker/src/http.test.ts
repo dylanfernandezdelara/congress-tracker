@@ -66,7 +66,7 @@ describe("HTTP API", () => {
       congress: string;
       data?: { ingest?: { status: string; daily_cron_utc: string } };
     };
-    expect(body).toMatchObject({ status: "ok", congress: "119" });
+    expect(body).toMatchObject({ status: "degraded", congress: "119" });
     expect(body.data?.ingest).toMatchObject({
       status: "unknown",
       daily_cron_utc: "0 10 * * *",

@@ -82,6 +82,7 @@ export function buildIngestMonitorPayload(params: {
   latestPassageVoteDate: string | null;
   missingDigestCount: number;
   lastSuccess: FeedPipelineRunRecord | null;
+  lastScheduledSuccess?: FeedPipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
   executive?: {
     staleAfterHours: number;
@@ -90,12 +91,22 @@ export function buildIngestMonitorPayload(params: {
     lastFailure: FeedPipelineFailureRecord | null;
   };
 }): IngestMonitorPayload {
+  const scheduledSuccess = params.lastScheduledSuccess ?? params.lastSuccess;
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
-    lastSuccess: params.lastSuccess,
+    lastSuccess: scheduledSuccess,
     lastFailure: params.lastFailure,
   });
+
+  let message = evaluated.message;
+  const warnings = scheduledSuccess?.chamber_warnings ?? [];
+  if (warnings.length > 0 && evaluated.status === "ok") {
+    message = `${message} Partial chamber ingest: ${warnings.join("; ")}`;
+  }
+  if (params.missingDigestCount > 0 && evaluated.status === "ok") {
+    message = `${message} ${params.missingDigestCount} bill(s) missing digests.`;
+  }
 
   const executive = params.executive
     ? buildExecutiveIngestMonitorPayload({
@@ -109,7 +120,7 @@ export function buildIngestMonitorPayload(params: {
 
   return {
     status: evaluated.status,
-    message: evaluated.message,
+    message,
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,
     latest_passage_vote_date: params.latestPassageVoteDate,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getFeedPipelineFailure,
+  getFeedPipelineScheduledSuccess,
   getFeedPipelineSuccess,
   recordFeedPipelineFailure,
   recordFeedPipelineSuccess,
@@ -48,6 +49,31 @@ function createMockDb() {
 describe("pipeline-state", () => {
   beforeEach(() => {
     resetSchemaFlag();
+  });
+
+  it("records scheduled success in a dedicated key", async () => {
+    const { db, store } = createMockDb();
+    await recordFeedPipelineSuccess(db, "scheduled", {
+      votesUpserted: 2,
+      votesSkipped: 5,
+      billsSelected: 7,
+      digestsWritten: 3,
+      digestsSkipped: 4,
+    });
+    await recordFeedPipelineSuccess(db, "admin", {
+      votesUpserted: 1,
+      votesSkipped: 0,
+      billsSelected: 1,
+      digestsWritten: 1,
+      digestsSkipped: 0,
+    });
+
+    const latest = await getFeedPipelineSuccess(db);
+    const scheduled = await getFeedPipelineScheduledSuccess(db);
+    expect(latest?.trigger).toBe("admin");
+    expect(scheduled?.trigger).toBe("scheduled");
+    expect(scheduled?.votesUpserted).toBe(2);
+    expect(store.size).toBeGreaterThanOrEqual(2);
   });
 
   it("records and reads successful feed pipeline runs", async () => {

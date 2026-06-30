@@ -176,7 +176,7 @@ export async function selectFeedBills(
        SELECT bill_congress, bill_type, bill_number, MAX(sort_date) AS latest_passage_date
        FROM combined
        GROUP BY bill_congress, bill_type, bill_number
-       ORDER BY MAX(executive_boost) DESC, latest_passage_date DESC
+       ORDER BY latest_passage_date DESC
        LIMIT ? OFFSET ?`
     )
     .bind(voteLookbackDate, executiveSinceIso, limit, offset)

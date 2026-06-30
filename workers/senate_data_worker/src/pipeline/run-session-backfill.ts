@@ -15,12 +15,21 @@ export async function runSessionBackfillPipeline(env: Env): Promise<RunSessionBa
   const session = sessionNumber(env);
   const knownVoteKeys = await selectExistingVoteKeysForSession(env.DB, congress, session);
 
-  const { house: houseResult, senate: senateResult } = await ingestPassageVotesByChamber(
+  const { house: houseResult, senate: senateResult, chamberWarnings } = await ingestPassageVotesByChamber(
     env,
     null,
     knownVoteKeys,
     { houseMaxNewVotes: SESSION_BACKFILL_MAX_NEW_VOTES }
   );
+
+  if (chamberWarnings.length > 0) {
+    console.warn(
+      JSON.stringify({
+        event: "session_backfill_partial_chamber_ingest",
+        warnings: chamberWarnings,
+      })
+    );
+  }
 
   const newVotes = [...houseResult.votes, ...senateResult.votes];
   for (const vote of newVotes) {

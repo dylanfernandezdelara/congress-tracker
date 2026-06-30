@@ -52,5 +52,10 @@ export async function ingestPassageVotesByChamber(
     return { house, senate: { votes: [], skipped: 0 }, chamberWarnings };
   }
 
-  return { house, senate: senateSettled.value, chamberWarnings };
+  const senate = senateSettled.value;
+  if (senate.warnings?.length) {
+    chamberWarnings.push(...senate.warnings);
+  }
+
+  return { house, senate, chamberWarnings };
 }
