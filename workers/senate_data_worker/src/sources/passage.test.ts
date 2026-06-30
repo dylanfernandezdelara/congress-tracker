@@ -16,5 +16,6 @@ describe("isPassageVote", () => {
     expect(isPassageVote("On the Cloture Motion")).toBe(false);
     expect(isPassageVote("On the Motion to Proceed")).toBe(false);
     expect(isPassageVote("Motion to Proceed to H.R. 6644")).toBe(false);
+    expect(isPassageVote("On Motion to Agree to the Table")).toBe(false);
   });
 });

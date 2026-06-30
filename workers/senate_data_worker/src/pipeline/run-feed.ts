@@ -97,9 +97,34 @@ export async function runFeedPipeline(
         number: row.bill_number,
       });
 
-      let digest = null;
+      const metadataChanged =
+        !existing?.raw_summary_text ||
+        existing.title !== bundle.title ||
+        existing.policy_area !== bundle.policyArea;
+
       const canRewrite = newRewrites < DIGEST_MAX_NEW_REWRITES;
-      if (canRewrite && bundle.rawSummaryText) {
+
+      if (!canRewrite) {
+        if (metadataChanged) {
+          await upsertDigest(env.DB, {
+            congress: row.bill_congress,
+            billType: row.bill_type,
+            number: row.bill_number,
+            title: bundle.title,
+            policyArea: bundle.policyArea,
+            rawSummaryText: bundle.rawSummaryText,
+            digest: null,
+            preserveDigestJson: existing?.digest_json ?? null,
+          });
+          digestsWritten += 1;
+        } else {
+          digestsSkipped += 1;
+        }
+        continue;
+      }
+
+      let digest = null;
+      if (bundle.rawSummaryText) {
         digest = await rewriteSummary(
           env,
           {
@@ -112,23 +137,22 @@ export async function runFeedPipeline(
         );
       }
 
-      const needsMetadata =
-        !existing?.raw_summary_text ||
-        existing.title !== bundle.title ||
-        digest !== null;
-
-      if (needsMetadata || canRewrite) {
-        await upsertDigest(env.DB, {
-          congress: row.bill_congress,
-          billType: row.bill_type,
-          number: row.bill_number,
-          title: bundle.title,
-          policyArea: bundle.policyArea,
-          rawSummaryText: bundle.rawSummaryText,
-          digest,
-        });
-        digestsWritten += 1;
+      if (digest === null && !metadataChanged) {
+        digestsSkipped += 1;
+        continue;
       }
+
+      await upsertDigest(env.DB, {
+        congress: row.bill_congress,
+        billType: row.bill_type,
+        number: row.bill_number,
+        title: bundle.title,
+        policyArea: bundle.policyArea,
+        rawSummaryText: bundle.rawSummaryText,
+        digest,
+        preserveDigestJson: digest === null ? existing?.digest_json ?? null : null,
+      });
+      digestsWritten += 1;
 
       if (digest !== null) {
         digestsRewritten += 1;

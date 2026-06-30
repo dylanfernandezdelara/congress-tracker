@@ -35,11 +35,15 @@ export async function upsertDigest(
     policyArea: string | null;
     rawSummaryText: string | null;
     digest: BillDigestContent | null;
+    /** When digest is null, keep this JSON instead of tombstoning the row. */
+    preserveDigestJson?: string | null;
   }
 ): Promise<void> {
   await ensureSchema(db);
   const now = new Date().toISOString();
-  const digestJson = params.digest ? JSON.stringify(params.digest) : null;
+  const digestJson = params.digest
+    ? JSON.stringify(params.digest)
+    : (params.preserveDigestJson ?? null);
   await db
     .prepare(
       `INSERT INTO bill_digests (
