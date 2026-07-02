@@ -9,6 +9,7 @@ import { isLocalSampleMemberId, isRealBioguideId } from "../../../../shared/memb
 import {
   isProceduralBillType,
   isProceduralNotableVote,
+  notableVotesLookbackStartIso,
 } from "../../../../shared/notable-votes";
 import { normalizePartyCode } from "../../../../shared/party";
 import type { NotableVoteCrossVoteLabel } from "../../../../shared/stats-api-types";
@@ -75,6 +76,8 @@ const EMPTY_BREAK_STATS: RollBreakStats = {
 export interface BuildNotableVotesOptions {
   env?: Env;
   waitUntil?: (promise: Promise<unknown>) => void;
+  /** UTC anchor for recency filtering (defaults to now). */
+  asOf?: Date;
 }
 
 export interface BuildNotableVotesResult {
@@ -100,6 +103,7 @@ async function fetchCandidates(
   db: D1Database,
   congress: number,
   session: number,
+  lookbackStart: string,
   limit: number
 ): Promise<CandidateRow[]> {
   const { results } = await db
@@ -115,10 +119,11 @@ async function fetchCandidates(
        LEFT JOIN bill_digests d
          ON d.congress = v.bill_congress AND d.bill_type = v.bill_type AND d.number = v.bill_number
        WHERE v.congress = ? AND v.session = ? AND v.is_passage = 1
+         AND v.vote_date >= ?
        ORDER BY v.vote_date DESC
        LIMIT ?`
     )
-    .bind(congress, session, limit)
+    .bind(congress, session, lookbackStart, limit)
     .all<CandidateRow>();
 
   return results ?? [];
@@ -317,8 +322,9 @@ export async function buildNotableVotes(
   options?: BuildNotableVotesOptions
 ): Promise<BuildNotableVotesResult> {
   await ensureSchema(db);
+  const lookbackStart = notableVotesLookbackStartIso(options?.asOf ?? new Date());
   const [candidates, memberVotesByRoll] = await Promise.all([
-    fetchCandidates(db, congress, session, 60),
+    fetchCandidates(db, congress, session, lookbackStart, 60),
     fetchSessionMemberVotesByRoll(db, congress, session),
   ]);
   const crossVoteCounts = buildCrossVoteCounts(memberVotesByRoll);

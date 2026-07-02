@@ -93,4 +93,11 @@ describe('NotableVotesSection', () => {
       screen.getByText('Per-member vote breakdown is not available for this roll call yet.'),
     ).toBeInTheDocument()
   })
+
+  it('renders nothing when there are no notable votes', () => {
+    const { container } = render(<NotableVotesSection notable={[]} />)
+
+    expect(screen.queryByRole('region', { name: 'Notable votes' })).not.toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
+  })
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildNotableVotes } from "./notable-votes";
 import { resetSchemaFlag } from "../d1/schema";
 
@@ -11,7 +11,23 @@ function createMockDb(options: {
     bind: (...bindArgs: unknown[]) => ({
       all: async () => {
         if (sql.includes("FROM votes v")) {
-          return { results: options.votes };
+          const congress = bindArgs[0];
+          const session = bindArgs[1];
+          const lookbackStart = bindArgs[2];
+          const limit = bindArgs[3];
+          let results = options.votes.filter(
+            (row) =>
+              row.congress === congress &&
+              row.session === session &&
+              (lookbackStart == null || String(row.vote_date) >= String(lookbackStart))
+          );
+          results = [...results].sort((a, b) =>
+            String(b.vote_date).localeCompare(String(a.vote_date))
+          );
+          if (typeof limit === "number") {
+            results = results.slice(0, limit);
+          }
+          return { results };
         }
         if (sql.includes("FROM member_votes")) {
           return { results: options.memberVotes ?? [] };
@@ -54,6 +70,15 @@ function createMockDb(options: {
 }
 
 describe("buildNotableVotes", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-15T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("ranks close votes with party-line breaks higher", async () => {
     resetSchemaFlag();
     const db = createMockDb({
@@ -68,7 +93,7 @@ describe("buildNotableVotes", () => {
           yeas: 68,
           nays: 32,
           margin: 36,
-          vote_date: "2026-06-01",
+          vote_date: "2026-06-03",
           result: "Passed",
           question: "On Passage of the Bill",
           headline: "Routine bill headline",
@@ -86,7 +111,7 @@ describe("buildNotableVotes", () => {
           yeas: 220,
           nays: 215,
           margin: 5,
-          vote_date: "2026-06-02",
+          vote_date: "2026-06-04",
           result: "Passed",
           question: "On Passage of the Bill",
           headline: "Close House vote",
@@ -265,7 +290,7 @@ describe("buildNotableVotes", () => {
           yeas: 220,
           nays: 215,
           margin: 5,
-          vote_date: "2026-06-02",
+          vote_date: "2026-06-04",
           result: "Passed",
           question: "On Passage of the Bill",
           headline: "Close House vote",
@@ -300,5 +325,130 @@ describe("buildNotableVotes", () => {
     expect(notable).toHaveLength(1);
     expect(notable[0]?.member_votes_available).toBe(false);
     expect(notable[0]?.defectors).toEqual([]);
+  });
+
+  it("excludes notable votes outside the 14-day lookback", async () => {
+    resetSchemaFlag();
+    const db = createMockDb({
+      votes: [
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 30,
+          bill_type: "hr",
+          bill_number: 100,
+          yeas: 220,
+          nays: 215,
+          margin: 5,
+          vote_date: "2026-06-14",
+          result: "Passed",
+          question: "On Passage of the Bill",
+          headline: "Recent close vote",
+          bill_title: "Recent Act",
+          digest_lead: null,
+          raw_summary: null,
+        },
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 10,
+          bill_type: "hr",
+          bill_number: 50,
+          yeas: 220,
+          nays: 219,
+          margin: 1,
+          vote_date: "2026-05-20",
+          result: "Passed",
+          question: "On Passage of the Bill",
+          headline: "Older razor-thin vote",
+          bill_title: "Older Act",
+          digest_lead: null,
+          raw_summary: null,
+        },
+      ],
+    });
+
+    const { notable } = await buildNotableVotes(db, 119, 2, 3);
+    expect(notable).toHaveLength(1);
+    expect(notable[0]?.vote_date).toBe("2026-06-14");
+  });
+
+  it("returns empty when no votes fall within the lookback window", async () => {
+    resetSchemaFlag();
+    const db = createMockDb({
+      votes: [
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 10,
+          bill_type: "hr",
+          bill_number: 50,
+          yeas: 220,
+          nays: 219,
+          margin: 1,
+          vote_date: "2026-05-01",
+          result: "Passed",
+          question: "On Passage of the Bill",
+          headline: "Old close vote",
+          bill_title: "Old Act",
+          digest_lead: null,
+          raw_summary: null,
+        },
+      ],
+    });
+
+    const { notable } = await buildNotableVotes(db, 119, 2, 3);
+    expect(notable).toEqual([]);
+  });
+
+  it("includes votes on the first day of the 14-day window and excludes the day before", async () => {
+    resetSchemaFlag();
+    const db = createMockDb({
+      votes: [
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 40,
+          bill_type: "hr",
+          bill_number: 40,
+          yeas: 220,
+          nays: 215,
+          margin: 5,
+          vote_date: "2026-06-02",
+          result: "Passed",
+          question: "On Passage of the Bill",
+          headline: "Window start vote",
+          bill_title: "Window Act",
+          digest_lead: null,
+          raw_summary: null,
+        },
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 41,
+          bill_type: "hr",
+          bill_number: 41,
+          yeas: 220,
+          nays: 219,
+          margin: 1,
+          vote_date: "2026-06-01",
+          result: "Passed",
+          question: "On Passage of the Bill",
+          headline: "Day before window",
+          bill_title: "Too old",
+          digest_lead: null,
+          raw_summary: null,
+        },
+      ],
+    });
+
+    const { notable } = await buildNotableVotes(db, 119, 2, 3);
+    expect(notable).toHaveLength(1);
+    expect(notable[0]?.vote_date).toBe("2026-06-02");
   });
 });

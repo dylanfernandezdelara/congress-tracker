@@ -1,6 +1,19 @@
 import { proceduralHeadline } from './feed-content'
 
+/** Notable-votes section only considers passage votes on or after this lookback window. */
+export const NOTABLE_VOTES_LOOKBACK_DAYS = 14
+
 const PROCEDURAL_BILL_TYPES = new Set(['HRES', 'HCONRES', 'SRES', 'SCONRES'])
+
+/** Inclusive UTC start date (YYYY-MM-DD) for notable-vote recency filtering. */
+export function notableVotesLookbackStartIso(
+  asOf: Date = new Date(),
+  days: number = NOTABLE_VOTES_LOOKBACK_DAYS,
+): string {
+  const d = new Date(asOf)
+  d.setUTCDate(d.getUTCDate() - (days - 1))
+  return d.toISOString().slice(0, 10)
+}
 
 const PROCEDURAL_TITLE_MAX_MARGIN = 3
 const PROCEDURAL_TITLE_MIN_CROSS_PARTY = 5
