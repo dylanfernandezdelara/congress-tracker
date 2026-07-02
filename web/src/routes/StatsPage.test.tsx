@@ -90,6 +90,11 @@ describe('StatsPage', () => {
       </MemoryRouter>,
     )
 
+    expect(await screen.findByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Federal Control' })).toBeInTheDocument()
+    expect(screen.getByLabelText('House party seat counts')).toBeInTheDocument()
+    expect(screen.getByLabelText('Senate party seat counts')).toBeInTheDocument()
+    expect(screen.getByText('Donald Trump')).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
     expect(await screen.findByLabelText('Legislative pulse')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Feed' })).toBeInTheDocument()

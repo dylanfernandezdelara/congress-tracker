@@ -1,3 +1,4 @@
+import { ChamberCompositionOverview } from '../components/ChamberCompositionOverview'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { RightRail } from '../components/RightRail'
 import { useStatsData } from '../hooks/useStatsData'
@@ -7,6 +8,12 @@ export default function StatsPage() {
 
   return (
     <main className="stats-page">
+      <ChamberCompositionOverview
+        composition={session.data?.composition ?? null}
+        loading={session.isLoading}
+        error={session.error}
+      />
+
       <section aria-label="Members in Congress">
         <LeftSidebar
           session={session.data}

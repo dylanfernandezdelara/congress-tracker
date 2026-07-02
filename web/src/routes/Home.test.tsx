@@ -36,51 +36,6 @@ vi.mock('../api/client', () => ({
     offset: 0,
     has_more: false,
   }),
-  fetchSessionStats: vi.fn().mockResolvedValue({
-    congress: 119,
-    session: 2,
-    as_of: '2026-06-14T00:00:00.000Z',
-    house: {
-      passage_vote_count: 2,
-      unique_bills_passed: 2,
-      avg_margin: 12,
-      closest_margin: 5,
-      date_range: { first: '2026-06-01', last: '2026-06-05' },
-      coverage_days: 5,
-    },
-    senate: {
-      passage_vote_count: 1,
-      unique_bills_passed: 1,
-      avg_margin: 5,
-      closest_margin: 5,
-      date_range: { first: '2026-06-05', last: '2026-06-05' },
-      coverage_days: 1,
-    },
-    composition: {
-      house: {
-        seats: [
-          { party: 'R', seats: 220 },
-          { party: 'D', seats: 215 },
-        ],
-        total: 435,
-        majority_party: 'R',
-        control_label: 'Republican control',
-        seats_up_for_election: 435,
-        election_year: 2026,
-      },
-      senate: {
-        seats: [
-          { party: 'R', seats: 53 },
-          { party: 'D', seats: 47 },
-        ],
-        total: 100,
-        majority_party: 'R',
-        control_label: 'Republican control',
-        seats_up_for_election: 33,
-        election_year: 2026,
-      },
-    },
-  }),
   fetchNotableVotes: vi.fn().mockResolvedValue({
     congress: 119,
     session: 2,
@@ -126,19 +81,7 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { level: 2, name: 'Plain headline for readers' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Federal Control' })).toBeInTheDocument()
-    expect(screen.queryByText('Republican control')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('House party seat counts')).toBeInTheDocument()
-    expect(screen.getByLabelText('Senate party seat counts')).toBeInTheDocument()
-    expect(screen.getByText('Donald Trump')).toBeInTheDocument()
-    expect(screen.getByText('Jan 20, 2025 – Jan 20, 2029')).toBeInTheDocument()
-    expect(container.querySelectorAll('.chamber-wedge').length).toBeGreaterThanOrEqual(2)
-    expect(screen.queryByText(/on the November 2026 ballot/i)).not.toBeInTheDocument()
-    expect(within(screen.getByLabelText('House party seat counts')).getByText(/^R: 220$/)).toBeInTheDocument()
-    expect(within(screen.getByLabelText('Senate party seat counts')).getByText(/^R: 53$/)).toBeInTheDocument()
-    expect(screen.getAllByText('Republican Controlled')).toHaveLength(2)
-    expect(screen.getByText('Republican')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Federal Control' })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Members in Congress')).not.toBeInTheDocument()

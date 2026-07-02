@@ -988,6 +988,10 @@
       gap: 2rem;
       align-items: start;
     }
+
+    .stats-page > .federal-control {
+      grid-column: 1 / -1;
+    }
   }
 
   .page-main {

@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import { fetchFeed, fetchNotableVotes, fetchSessionStats } from '../api/client'
-import type { FeedItem, FeedPageResponse, NotableVotesResponse, SessionStatsResponse } from '../api/types'
-import { ChamberCompositionOverview } from '../components/ChamberCompositionOverview'
+import { fetchFeed, fetchNotableVotes } from '../api/client'
+import type { FeedItem, FeedPageResponse, NotableVotesResponse } from '../api/types'
 import { FeedRow } from '../components/FeedRow'
 import { NotableVotesSection } from '../components/NotableVotesSection'
 import {
@@ -99,12 +98,6 @@ export default function Home() {
     mapError: () => "Couldn't load the feed.",
   })
 
-  const sessionStats = useAsyncData<SessionStatsResponse>({
-    deps: [retryKey],
-    load: fetchSessionStats,
-    mapError: () => "Couldn't load chamber control.",
-  })
-
   const notableVotes = useAsyncData<NotableVotesResponse>({
     deps: [retryKey],
     load: () => fetchNotableVotes(3),
@@ -138,13 +131,6 @@ export default function Home() {
 
   return (
     <main className="feed-main space-y-5">
-      <ChamberCompositionOverview
-        composition={sessionStats.data?.composition ?? null}
-        loading={sessionStats.isLoading}
-        error={sessionStats.error}
-        onRetry={reload}
-      />
-
       <NotableVotesSection
         notable={notableVotes.data?.notable ?? null}
         loading={notableVotes.isLoading}
