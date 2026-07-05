@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
-  FEED_SUMMARY_PENDING,
   formatFeedEventLine,
   getFeedEventDisplay,
   getFeedEventLine,
@@ -252,11 +251,11 @@ describe('getFeedSummary', () => {
 
     expect(getFeedSummary(item)).toEqual({
       text: 'Plain-language implications from the digest. Fallback point',
-      pending: false,
+      failed: false,
     })
   })
 
-  it('falls back to Summary pending when digest is missing even if CRS text exists', () => {
+  it('shows a loud failure when digest is missing even if CRS text exists', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text:
@@ -264,8 +263,8 @@ describe('getFeedSummary', () => {
     })
 
     expect(getFeedSummary(item)).toEqual({
-      text: FEED_SUMMARY_PENDING,
-      pending: true,
+      text: 'Summary ingest failed: rewrite failed. Re-run ingest.',
+      failed: true,
     })
   })
 
@@ -282,14 +281,14 @@ describe('getFeedSummary', () => {
 
     expect(getFeedSummary(item)).toEqual({
       text: 'Requires agencies to publish contract performance data',
-      pending: false,
+      failed: false,
     })
   })
 
-  it('returns a pending placeholder when no summary sources exist', () => {
+  it('shows a loud failure when no summary sources exist', () => {
     expect(getFeedSummary(makeFeedItem({ digest: null, raw_summary_text: null }))).toEqual({
-      text: FEED_SUMMARY_PENDING,
-      pending: true,
+      text: 'Summary ingest failed: no CRS summary. Re-run ingest.',
+      failed: true,
     })
   })
 
@@ -307,7 +306,7 @@ describe('getFeedSummary', () => {
     })
 
     const summary = getFeedSummary(item)
-    expect(summary.pending).toBe(false)
+    expect(summary.failed).toBe(false)
     expect(summary.text).toBe(
       'This bill provides support to Ukraine and allied countries through security assistance. Financing and oversight requirements for federal agencies that administer foreign military aid…',
     )
@@ -407,7 +406,7 @@ describe('getFeedSummaryDisplay', () => {
     expect(getFeedSummaryDisplay(item)).toEqual({
       lead: 'Blocks federal aid for ghost students.',
       bullets: ['Targets online-only schools', 'Requires enrollment verification'],
-      pending: false,
+      failed: false,
     })
   })
 
@@ -425,12 +424,31 @@ describe('getFeedSummaryDisplay', () => {
     expect(getFeedSummaryDisplay(item).lead).toBe('This bill blocks aid for ghost students.')
   })
 
-  it('returns pending when no summary source exists', () => {
-    const item = makeFeedItem({ digest: null, raw_summary_text: null })
+  it('uses stored failure reason even when a digest is still present', () => {
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Old headline',
+        what_it_does: 'Old summary text.',
+        key_points: [],
+        terms_explained: [],
+      },
+      digest_failure_reason: 'openrouter_rewrite_failed',
+    })
+
     expect(getFeedSummaryDisplay(item)).toEqual({
-      lead: FEED_SUMMARY_PENDING,
+      lead: 'Summary ingest failed: rewrite failed. Re-run ingest.',
       bullets: [],
-      pending: true,
+      failed: true,
+    })
+  })
+
+  it('shows a loud failure when no summary source exists', () => {
+    const item = makeFeedItem({ digest: null, raw_summary_text: null })
+
+    expect(getFeedSummaryDisplay(item)).toEqual({
+      lead: 'Summary ingest failed: no CRS summary. Re-run ingest.',
+      bullets: [],
+      failed: true,
     })
   })
 })

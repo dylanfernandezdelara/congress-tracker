@@ -11,13 +11,15 @@ import {
   recordFeedPipelineSuccess,
 } from "../d1/pipeline-state";
 import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
+import type { DigestFailureReason } from "../../../../shared/digest-failure";
 import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
 import { billLabel } from "./bill-label";
+import { logDigestFailure } from "./digest-failure";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import { resolveOpenRouterModel } from "../synthesis/model";
-import { rewriteBillDigest } from "../synthesis/openrouter";
+import { rewriteSummary } from "../synthesis/openrouter";
 
 export interface RunFeedResult {
   votesUpserted: number;
@@ -27,6 +29,33 @@ export interface RunFeedResult {
   digestsSkipped: number;
   digestsRewritten: number;
   chamberWarnings: string[];
+}
+
+async function recordDigestFailure(
+  env: Env,
+  params: {
+    trigger: FeedPipelineTrigger;
+    billCongress: number;
+    billType: string;
+    billNumber: number;
+    label: string;
+    reason: DigestFailureReason;
+    title: string | null;
+    policyArea: string | null;
+    rawSummaryText: string | null;
+  }
+): Promise<void> {
+  logDigestFailure({ bill: params.label, reason: params.reason, trigger: params.trigger });
+  await upsertDigest(env.DB, {
+    congress: params.billCongress,
+    billType: params.billType,
+    number: params.billNumber,
+    title: params.title,
+    policyArea: params.policyArea,
+    rawSummaryText: params.rawSummaryText,
+    digest: null,
+    digestFailureReason: params.reason,
+  });
 }
 
 export async function runFeedPipeline(
@@ -96,46 +125,65 @@ export async function runFeedPipeline(
         type: row.bill_type,
         number: row.bill_number,
       });
-
-      const metadataChanged =
-        !existing?.raw_summary_text ||
-        existing.title !== bundle.title ||
-        existing.policy_area !== bundle.policyArea;
-
+      const label = billLabel(row.bill_type, row.bill_number, row.bill_congress);
       const canRewrite = newRewrites < DIGEST_MAX_NEW_REWRITES;
 
       if (!canRewrite) {
-        if (metadataChanged) {
-          await upsertDigest(env.DB, {
-            congress: row.bill_congress,
-            billType: row.bill_type,
-            number: row.bill_number,
-            title: bundle.title,
-            policyArea: bundle.policyArea,
-            rawSummaryText: bundle.rawSummaryText,
-            digest: null,
-            preserveDigestJson: existing?.digest_json ?? null,
-          });
-          digestsWritten += 1;
-        } else {
-          digestsSkipped += 1;
-        }
+        await recordDigestFailure(env, {
+          trigger,
+          billCongress: row.bill_congress,
+          billType: row.bill_type,
+          billNumber: row.bill_number,
+          label,
+          reason: "rewrite_budget_exhausted",
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+        });
+        digestsWritten += 1;
         continue;
       }
 
-      const digest = await rewriteBillDigest(
+      if (!bundle.rawSummaryText?.trim()) {
+        await recordDigestFailure(env, {
+          trigger,
+          billCongress: row.bill_congress,
+          billType: row.bill_type,
+          billNumber: row.bill_number,
+          label,
+          reason: "no_crs_summary",
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+        });
+        digestsWritten += 1;
+        continue;
+      }
+
+      const digest = await rewriteSummary(
         env,
         {
           title: bundle.title,
-          billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
+          billLabel: label,
           policyArea: bundle.policyArea,
-          rawSummaryText: bundle.rawSummaryText,
+          rawSummary: bundle.rawSummaryText,
         },
         model
       );
 
-      if (digest === null && !metadataChanged) {
-        digestsSkipped += 1;
+      if (digest === null) {
+        await recordDigestFailure(env, {
+          trigger,
+          billCongress: row.bill_congress,
+          billType: row.bill_type,
+          billNumber: row.bill_number,
+          label,
+          reason: "openrouter_rewrite_failed",
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+        });
+        digestsWritten += 1;
         continue;
       }
 
@@ -147,14 +195,11 @@ export async function runFeedPipeline(
         policyArea: bundle.policyArea,
         rawSummaryText: bundle.rawSummaryText,
         digest,
-        preserveDigestJson: digest === null ? existing?.digest_json ?? null : null,
+        digestFailureReason: null,
       });
       digestsWritten += 1;
-
-      if (digest !== null) {
-        digestsRewritten += 1;
-        newRewrites += 1;
-      }
+      digestsRewritten += 1;
+      newRewrites += 1;
     }
 
     const result: RunFeedResult = {

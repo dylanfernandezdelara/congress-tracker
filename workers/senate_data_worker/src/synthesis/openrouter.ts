@@ -4,7 +4,7 @@ import {
 } from "../../../../shared/feed-content";
 import type { Env } from "../config";
 import type { BillDigestContent } from "../types";
-import { buildDigestPrompt, buildTitleOnlyDigestPrompt } from "./prompt";
+import { buildDigestPrompt } from "./prompt";
 import { resolveOpenRouterModel } from "./model";
 import { extractAcronyms } from "../sources/html-clean";
 
@@ -75,39 +75,5 @@ export async function rewriteSummary(
 ): Promise<BillDigestContent | null> {
   const acronyms = extractAcronyms(params.rawSummary);
   const prompt = buildDigestPrompt({ ...params, acronyms });
-  return requestDigestFromPrompt(env, prompt, modelOverride);
-}
-
-export async function rewriteBillDigest(
-  env: Env,
-  params: {
-    title: string | null;
-    billLabel: string;
-    policyArea: string | null;
-    rawSummaryText: string | null;
-  },
-  modelOverride?: string
-): Promise<BillDigestContent | null> {
-  if (params.rawSummaryText) {
-    return rewriteSummary(
-      env,
-      {
-        title: params.title,
-        billLabel: params.billLabel,
-        policyArea: params.policyArea,
-        rawSummary: params.rawSummaryText,
-      },
-      modelOverride
-    );
-  }
-
-  const title = params.title?.trim();
-  if (!title) return null;
-
-  const prompt = buildTitleOnlyDigestPrompt({
-    title,
-    billLabel: params.billLabel,
-    policyArea: params.policyArea,
-  });
   return requestDigestFromPrompt(env, prompt, modelOverride);
 }

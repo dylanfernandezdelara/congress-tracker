@@ -45,6 +45,7 @@ export interface FeedItem {
   policy_area: string | null
   digest: BillDigestContent | null
   raw_summary_text: string | null
+  digest_failure_reason: string | null
   passage_votes: FeedPassageVote[]
   latest_passage_date: string
   executive_signals?: ExecutiveSignal[]

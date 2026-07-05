@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS bill_digests (
   policy_area TEXT,
   raw_summary_text TEXT,
   digest_json TEXT,
+  digest_failure_reason TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, number)

@@ -1,13 +1,15 @@
 import { DIGEST_REFRESH_MAX_BILLS } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { upsertDigest } from "../d1/digests";
+import { getDigest, upsertDigest } from "../d1/digests";
 import { billLabel } from "./bill-label";
+import { logDigestFailure } from "./digest-failure";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
 import { parseBillQueryList } from "../sources/parse-bill-query";
 import { resolveOpenRouterModel } from "../synthesis/model";
-import { rewriteBillDigest } from "../synthesis/openrouter";
+import { rewriteSummary } from "../synthesis/openrouter";
 import type { BillRef } from "../types";
+import type { DigestFailureReason } from "../../../../shared/digest-failure";
 
 export interface DigestRefreshFailure {
   bill: string;
@@ -41,26 +43,54 @@ export async function runDigestRefreshPipeline(
 
     try {
       const bundle = await fetchBillSummaryBundle(env, bill);
-      if (!bundle.rawSummaryText && !bundle.title?.trim()) {
+      const label = billLabel(bill.type, bill.number, bill.congress);
+
+      if (!bundle.rawSummaryText?.trim()) {
+        const reason: DigestFailureReason = "no_crs_summary";
+        logDigestFailure({ bill: label, reason, trigger: "admin" });
+        await upsertDigest(env.DB, {
+          congress: bill.congress,
+          billType: bill.type,
+          number: bill.number,
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+          digest: null,
+          digestFailureReason: reason,
+        });
         skipped += 1;
-        failures.push({ bill: key, reason: "no_summary_source" });
+        failures.push({ bill: key, reason });
         continue;
       }
 
-      const digest = await rewriteBillDigest(
+      const digest = await rewriteSummary(
         env,
         {
           title: bundle.title,
-          billLabel: billLabel(bill.type, bill.number, bill.congress),
+          billLabel: label,
           policyArea: bundle.policyArea,
-          rawSummaryText: bundle.rawSummaryText,
+          rawSummary: bundle.rawSummaryText,
         },
         model
       );
 
       if (!digest) {
+        const reason: DigestFailureReason = "openrouter_rewrite_failed";
+        logDigestFailure({ bill: label, reason, trigger: "admin" });
+        const existing = await getDigest(env.DB, bill.congress, bill.type, bill.number);
+        await upsertDigest(env.DB, {
+          congress: bill.congress,
+          billType: bill.type,
+          number: bill.number,
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+          digest: null,
+          digestFailureReason: reason,
+          preserveDigestJson: existing?.digest_json ?? null,
+        });
         skipped += 1;
-        failures.push({ bill: key, reason: "openrouter_rewrite_failed" });
+        failures.push({ bill: key, reason });
         continue;
       }
 
@@ -72,6 +102,7 @@ export async function runDigestRefreshPipeline(
         policyArea: bundle.policyArea,
         rawSummaryText: bundle.rawSummaryText,
         digest,
+        digestFailureReason: null,
       });
 
       refreshed += 1;

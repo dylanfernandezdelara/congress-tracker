@@ -10,7 +10,7 @@ const mockSelectRecentVotedBills = vi.fn();
 const mockSelectExistingVoteKeys = vi.fn();
 const mockUpsertVote = vi.fn();
 const mockFetchBillSummaryBundle = vi.fn();
-const mockRewriteBillDigest = vi.fn();
+const mockRewriteSummary = vi.fn();
 const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 
@@ -35,7 +35,7 @@ vi.mock("../sources/congress-client", () => ({
 }));
 
 vi.mock("../synthesis/openrouter", () => ({
-  rewriteBillDigest: (...args: unknown[]) => mockRewriteBillDigest(...args),
+  rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
 }));
 
 vi.mock("../synthesis/model", () => ({
@@ -77,12 +77,14 @@ const completeDigest: DigestRow = {
   policy_area: "Defense",
   raw_summary_text: "Raw summary",
   digest_json: JSON.stringify({ headline: "Done", what_it_does: "Complete summary" }),
+  digest_failure_reason: null,
 };
 
 const tombstoneDigest: DigestRow = {
   ...completeDigest,
-  raw_summary_text: null,
+  raw_summary_text: "CRS summary text",
   digest_json: null,
+  digest_failure_reason: "openrouter_rewrite_failed",
 };
 
 describe("runFeedPipeline digest retry", () => {
@@ -101,7 +103,7 @@ describe("runFeedPipeline digest retry", () => {
       policyArea: "Defense",
       rawSummaryText: "CRS summary text",
     });
-    mockRewriteBillDigest.mockResolvedValue({
+    mockRewriteSummary.mockResolvedValue({
       headline: "Rewritten headline",
       what_it_does: "Does things",
       key_points: ["one"],
@@ -151,7 +153,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsSkipped).toBe(0);
     expect(result.digestsWritten).toBe(1);
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
-    expect(mockRewriteBillDigest).toHaveBeenCalledOnce();
+    expect(mockRewriteSummary).toHaveBeenCalledOnce();
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
 
@@ -164,6 +166,24 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsWritten).toBe(1);
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
+  });
+
+  it("records a loud failure when CRS text is missing", async () => {
+    mockGetDigest.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "Providing for consideration of H.R. 8800",
+      policyArea: null,
+      rawSummaryText: null,
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsWritten).toBe(1);
+    expect(mockRewriteSummary).not.toHaveBeenCalled();
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ digestFailureReason: "no_crs_summary", digest: null })
+    );
   });
 
   it("continues when member roster sync fails", async () => {
@@ -191,6 +211,6 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsRewritten).toBe(20);
     expect(result.digestsWritten).toBe(25);
     expect(mockUpsertDigest).toHaveBeenCalledTimes(25);
-    expect(mockRewriteBillDigest).toHaveBeenCalledTimes(20);
+    expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
   });
 });

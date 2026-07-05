@@ -1,3 +1,4 @@
+import type { DigestFailureReason } from "../../../../shared/digest-failure";
 import type { BillDigestContent } from "../../../../shared/game-api-types";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
@@ -23,6 +24,7 @@ export interface DigestRow {
   policy_area: string | null;
   raw_summary_text: string | null;
   digest_json: string | null;
+  digest_failure_reason: string | null;
 }
 
 export async function upsertDigest(
@@ -35,6 +37,7 @@ export async function upsertDigest(
     policyArea: string | null;
     rawSummaryText: string | null;
     digest: BillDigestContent | null;
+    digestFailureReason?: DigestFailureReason | null;
     /** When digest is null, keep this JSON instead of tombstoning the row. */
     preserveDigestJson?: string | null;
   }
@@ -44,17 +47,19 @@ export async function upsertDigest(
   const digestJson = params.digest
     ? JSON.stringify(params.digest)
     : (params.preserveDigestJson ?? null);
+  const digestFailureReason = params.digest ? null : (params.digestFailureReason ?? null);
   await db
     .prepare(
       `INSERT INTO bill_digests (
         congress, bill_type, number, title, policy_area,
-        raw_summary_text, digest_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        raw_summary_text, digest_json, digest_failure_reason, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(congress, bill_type, number) DO UPDATE SET
         title = excluded.title,
         policy_area = excluded.policy_area,
         raw_summary_text = excluded.raw_summary_text,
         digest_json = excluded.digest_json,
+        digest_failure_reason = excluded.digest_failure_reason,
         updated_at = excluded.updated_at`
     )
     .bind(
@@ -65,6 +70,7 @@ export async function upsertDigest(
       params.policyArea,
       params.rawSummaryText,
       digestJson,
+      digestFailureReason,
       now,
       now
     )
@@ -80,7 +86,7 @@ export async function getDigest(
   await ensureSchema(db);
   return db
     .prepare(
-      `SELECT congress, bill_type, number, title, policy_area, raw_summary_text, digest_json
+      `SELECT congress, bill_type, number, title, policy_area, raw_summary_text, digest_json, digest_failure_reason
        FROM bill_digests
        WHERE congress = ? AND UPPER(bill_type) = ? AND number = ?`
     )

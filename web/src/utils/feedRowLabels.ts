@@ -1,5 +1,9 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
 import {
+  formatDigestFailureMessage,
+  inferDigestFailureReason,
+} from '@congress-tracker/shared/digest-failure'
+import {
   buildFeedSummaryParts,
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
@@ -10,17 +14,15 @@ import {
   voteIndicatesFailure,
 } from '@congress-tracker/shared/feed-content'
 
-export const FEED_SUMMARY_PENDING = 'Summary pending'
-
 export interface FeedSummary {
   text: string
-  pending: boolean
+  failed: boolean
 }
 
 export interface FeedSummaryDisplay {
   lead: string
   bullets: string[]
-  pending: boolean
+  failed: boolean
 }
 
 export type FeedStatusKind = 'passed' | 'failed' | 'procedural' | 'none'
@@ -83,6 +85,9 @@ function collapseSummaryText(text: string): string {
 }
 
 function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
+  const failure = getDigestFailureDisplay(item)
+  if (failure) return failure
+
   const parts = buildFeedSummaryParts({
     whatItDoes: item.digest?.what_it_does,
     keyPoints: item.digest?.key_points,
@@ -93,27 +98,42 @@ function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
   return {
     lead: parts.lead,
     bullets: parts.bullets,
-    pending: false,
+    failed: false,
+  }
+}
+
+function getDigestFailureDisplay(item: FeedItem): FeedSummaryDisplay | null {
+  const reason = inferDigestFailureReason(item)
+  if (!reason) return null
+  return {
+    lead: formatDigestFailureMessage(reason),
+    bullets: [],
+    failed: true,
   }
 }
 
 export function getFeedSummary(item: FeedItem): FeedSummary {
   const parts = getFeedSummaryParts(item)
-  if (!parts) {
-    return { text: FEED_SUMMARY_PENDING, pending: true }
+  if (parts) {
+    const combined = collapseSummaryText([parts.lead, ...parts.bullets].join(' '))
+    return { text: combined, failed: parts.failed }
   }
 
-  const combined = collapseSummaryText([parts.lead, ...parts.bullets].join(' '))
-  return { text: combined, pending: false }
+  return {
+    text: formatDigestFailureMessage('openrouter_rewrite_failed'),
+    failed: true,
+  }
 }
 
 export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
   const parts = getFeedSummaryParts(item)
-  if (!parts) {
-    return { lead: FEED_SUMMARY_PENDING, bullets: [], pending: true }
-  }
+  if (parts) return parts
 
-  return parts
+  return {
+    lead: formatDigestFailureMessage('openrouter_rewrite_failed'),
+    bullets: [],
+    failed: true,
+  }
 }
 
 function getProceduralEventSuffix(item: FeedItem): string {

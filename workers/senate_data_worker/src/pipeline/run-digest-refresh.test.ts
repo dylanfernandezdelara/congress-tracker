@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseDigestRefreshRequest, runDigestRefreshPipeline } from "./run-digest-refresh";
 
 const mockFetchBillSummaryBundle = vi.fn();
-const mockRewriteBillDigest = vi.fn();
+const mockRewriteSummary = vi.fn();
 const mockUpsertDigest = vi.fn();
 const mockResolveOpenRouterModel = vi.fn();
 
@@ -11,7 +11,7 @@ vi.mock("../sources/congress-client", () => ({
 }));
 
 vi.mock("../synthesis/openrouter", () => ({
-  rewriteBillDigest: (...args: unknown[]) => mockRewriteBillDigest(...args),
+  rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
 }));
 
 vi.mock("../d1/digests", () => ({
@@ -61,7 +61,7 @@ describe("runDigestRefreshPipeline", () => {
       policyArea: "Education",
       rawSummaryText: "Official CRS summary text.",
     });
-    mockRewriteBillDigest.mockResolvedValue({
+    mockRewriteSummary.mockResolvedValue({
       headline: "Sample headline",
       what_it_does: "Blocks federal aid for ghost students.",
       key_points: ["Requires campus verification"],
@@ -82,31 +82,14 @@ describe("runDigestRefreshPipeline", () => {
       skipped: 0,
       failures: [],
     });
-    expect(mockRewriteBillDigest).toHaveBeenCalledOnce();
+    expect(mockRewriteSummary).toHaveBeenCalledOnce();
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
 
-  it("records failures when no CRS text or title is available", async () => {
+  it("records and persists failures when CRS text is missing", async () => {
     mockFetchBillSummaryBundle.mockResolvedValue({
-      title: null,
+      title: "Providing for consideration of H.R. 8800",
       policyArea: null,
-      rawSummaryText: null,
-    });
-
-    const result = await runDigestRefreshPipeline(createEnv(), [
-      { congress: 119, type: "S", number: 2 },
-    ]);
-
-    expect(result.refreshed).toBe(0);
-    expect(result.skipped).toBe(1);
-    expect(result.failures[0]).toMatchObject({ bill: "S2", reason: "no_summary_source" });
-    expect(mockRewriteBillDigest).not.toHaveBeenCalled();
-  });
-
-  it("rewrites from title when CRS text is missing", async () => {
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "Providing for consideration of the bill (H.R. 8800) to authorize appropriations.",
-      policyArea: "Congress",
       rawSummaryText: null,
     });
 
@@ -114,8 +97,13 @@ describe("runDigestRefreshPipeline", () => {
       { congress: 119, type: "HRES", number: 1398 },
     ]);
 
-    expect(result.refreshed).toBe(1);
-    expect(mockRewriteBillDigest).toHaveBeenCalledOnce();
-    expect(mockUpsertDigest).toHaveBeenCalledOnce();
+    expect(result.refreshed).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(result.failures[0]).toMatchObject({ bill: "HRES1398", reason: "no_crs_summary" });
+    expect(mockRewriteSummary).not.toHaveBeenCalled();
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ digestFailureReason: "no_crs_summary", digest: null })
+    );
   });
 });

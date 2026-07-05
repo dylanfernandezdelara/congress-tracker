@@ -23,6 +23,7 @@ const SCHEMA_STATEMENTS = [
   policy_area TEXT,
   raw_summary_text TEXT,
   digest_json TEXT,
+  digest_failure_reason TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, number)
@@ -137,12 +138,23 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_member_votes_bioguide ON member_votes (bioguide_id)`,
 ];
 
+const MIGRATION_STATEMENTS = [
+  `ALTER TABLE bill_digests ADD COLUMN digest_failure_reason TEXT`,
+];
+
 let schemaApplied = false;
 
 export async function ensureSchema(db: D1Database): Promise<void> {
   if (schemaApplied) return;
   for (const sql of SCHEMA_STATEMENTS) {
     await db.prepare(sql).run();
+  }
+  for (const sql of MIGRATION_STATEMENTS) {
+    try {
+      await db.prepare(sql).run();
+    } catch {
+      // Column already exists on deployed databases.
+    }
   }
   schemaApplied = true;
 }

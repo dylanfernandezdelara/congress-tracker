@@ -106,6 +106,7 @@ export async function buildFeedPage(
       policy_area: digestRow?.policy_area ?? null,
       digest: parseStoredDigest(digestRow?.digest_json ?? null),
       raw_summary_text: digestRow?.raw_summary_text ?? null,
+      digest_failure_reason: digestRow?.digest_failure_reason ?? null,
       passage_votes: votes.map((v) => ({
         chamber: v.chamber as Chamber,
         congress: v.congress,

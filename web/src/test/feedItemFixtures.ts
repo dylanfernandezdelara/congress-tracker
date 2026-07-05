@@ -11,6 +11,7 @@ export function makeFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
       terms_explained: [],
     },
     raw_summary_text: 'Official CRS summary text.',
+    digest_failure_reason: null,
     passage_votes: [
       {
         chamber: 'Senate',

@@ -105,7 +105,7 @@ describe('FeedRow', () => {
     expect(onToggle).toHaveBeenCalledTimes(1)
   })
 
-  it('shows Summary pending when collapsed without a digest (not raw CRS)', () => {
+  it('shows a loud failure when collapsed without a digest (not raw CRS)', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text: longCrsSummary,
@@ -113,13 +113,15 @@ describe('FeedRow', () => {
 
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
-    expect(screen.getByText('Summary pending')).toBeInTheDocument()
+    expect(
+      screen.getByText('Summary ingest failed: rewrite failed. Re-run ingest.'),
+    ).toBeInTheDocument()
     const teaser = document.querySelector('.feed-row-teaser')
     expect(teaser?.textContent).not.toContain('Ukraine Support Act')
     expect(teaser?.textContent?.match(/financing, and oversight\./g)?.length ?? 0).toBe(0)
   })
 
-  it('shows Summary pending when no digest or CRS text is available', () => {
+  it('shows a loud failure when no digest or CRS text is available', () => {
     render(
       <FeedRow
         item={makeFeedItem({ digest: null, raw_summary_text: null })}
@@ -128,7 +130,9 @@ describe('FeedRow', () => {
       />,
     )
 
-    expect(screen.getByText('Summary pending')).toBeInTheDocument()
+    expect(
+      screen.getByText('Summary ingest failed: no CRS summary. Re-run ingest.'),
+    ).toBeInTheDocument()
   })
 
   it('does not show CRS summary text when expanded', () => {

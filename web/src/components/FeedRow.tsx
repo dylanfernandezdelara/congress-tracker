@@ -103,7 +103,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
             <div
               id={summaryId}
               data-feed-summary
-              className={`feed-row-summary${summary.pending ? ' feed-row-summary--pending' : ''}`}
+              className={`feed-row-summary${summary.failed ? ' feed-row-summary--failed' : ''}`}
             >
               <p className="feed-row-teaser">{summary.lead}</p>
               {summary.bullets.length > 0 ? (
