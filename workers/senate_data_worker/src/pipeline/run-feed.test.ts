@@ -10,7 +10,7 @@ const mockSelectRecentVotedBills = vi.fn();
 const mockSelectExistingVoteKeys = vi.fn();
 const mockUpsertVote = vi.fn();
 const mockFetchBillSummaryBundle = vi.fn();
-const mockRewriteSummary = vi.fn();
+const mockRewriteBillDigest = vi.fn();
 const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 
@@ -35,7 +35,7 @@ vi.mock("../sources/congress-client", () => ({
 }));
 
 vi.mock("../synthesis/openrouter", () => ({
-  rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
+  rewriteBillDigest: (...args: unknown[]) => mockRewriteBillDigest(...args),
 }));
 
 vi.mock("../synthesis/model", () => ({
@@ -101,7 +101,7 @@ describe("runFeedPipeline digest retry", () => {
       policyArea: "Defense",
       rawSummaryText: "CRS summary text",
     });
-    mockRewriteSummary.mockResolvedValue({
+    mockRewriteBillDigest.mockResolvedValue({
       headline: "Rewritten headline",
       what_it_does: "Does things",
       key_points: ["one"],
@@ -151,7 +151,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsSkipped).toBe(0);
     expect(result.digestsWritten).toBe(1);
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
-    expect(mockRewriteSummary).toHaveBeenCalledOnce();
+    expect(mockRewriteBillDigest).toHaveBeenCalledOnce();
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
 
@@ -191,6 +191,6 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsRewritten).toBe(20);
     expect(result.digestsWritten).toBe(25);
     expect(mockUpsertDigest).toHaveBeenCalledTimes(25);
-    expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
+    expect(mockRewriteBillDigest).toHaveBeenCalledTimes(20);
   });
 });

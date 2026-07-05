@@ -6,7 +6,7 @@ import { billLabel } from "./bill-label";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
 import { parseBillQueryList } from "../sources/parse-bill-query";
 import { resolveOpenRouterModel } from "../synthesis/model";
-import { rewriteSummary } from "../synthesis/openrouter";
+import { rewriteBillDigest } from "../synthesis/openrouter";
 import type { BillRef } from "../types";
 
 export interface DigestRefreshFailure {
@@ -41,19 +41,19 @@ export async function runDigestRefreshPipeline(
 
     try {
       const bundle = await fetchBillSummaryBundle(env, bill);
-      if (!bundle.rawSummaryText) {
+      if (!bundle.rawSummaryText && !bundle.title?.trim()) {
         skipped += 1;
-        failures.push({ bill: key, reason: "no_crs_summary" });
+        failures.push({ bill: key, reason: "no_summary_source" });
         continue;
       }
 
-      const digest = await rewriteSummary(
+      const digest = await rewriteBillDigest(
         env,
         {
           title: bundle.title,
           billLabel: billLabel(bill.type, bill.number, bill.congress),
           policyArea: bundle.policyArea,
-          rawSummary: bundle.rawSummaryText,
+          rawSummaryText: bundle.rawSummaryText,
         },
         model
       );

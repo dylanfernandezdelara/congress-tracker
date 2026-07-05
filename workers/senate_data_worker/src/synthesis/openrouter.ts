@@ -4,7 +4,7 @@ import {
 } from "../../../../shared/feed-content";
 import type { Env } from "../config";
 import type { BillDigestContent } from "../types";
-import { buildDigestPrompt } from "./prompt";
+import { buildDigestPrompt, buildTitleOnlyDigestPrompt } from "./prompt";
 import { resolveOpenRouterModel } from "./model";
 import { extractAcronyms } from "../sources/html-clean";
 
@@ -33,19 +33,12 @@ export function parseDigestJson(text: string): BillDigestContent | null {
   }
 }
 
-export async function rewriteSummary(
+async function requestDigestFromPrompt(
   env: Env,
-  params: {
-    title: string | null;
-    billLabel: string;
-    policyArea: string | null;
-    rawSummary: string;
-  },
+  prompt: string,
   modelOverride?: string
 ): Promise<BillDigestContent | null> {
   const model = modelOverride ?? (await resolveOpenRouterModel(env));
-  const acronyms = extractAcronyms(params.rawSummary);
-  const prompt = buildDigestPrompt({ ...params, acronyms });
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -68,4 +61,53 @@ export async function rewriteSummary(
   const content = data.choices?.[0]?.message?.content;
   if (!content) return null;
   return parseDigestJson(content);
+}
+
+export async function rewriteSummary(
+  env: Env,
+  params: {
+    title: string | null;
+    billLabel: string;
+    policyArea: string | null;
+    rawSummary: string;
+  },
+  modelOverride?: string
+): Promise<BillDigestContent | null> {
+  const acronyms = extractAcronyms(params.rawSummary);
+  const prompt = buildDigestPrompt({ ...params, acronyms });
+  return requestDigestFromPrompt(env, prompt, modelOverride);
+}
+
+export async function rewriteBillDigest(
+  env: Env,
+  params: {
+    title: string | null;
+    billLabel: string;
+    policyArea: string | null;
+    rawSummaryText: string | null;
+  },
+  modelOverride?: string
+): Promise<BillDigestContent | null> {
+  if (params.rawSummaryText) {
+    return rewriteSummary(
+      env,
+      {
+        title: params.title,
+        billLabel: params.billLabel,
+        policyArea: params.policyArea,
+        rawSummary: params.rawSummaryText,
+      },
+      modelOverride
+    );
+  }
+
+  const title = params.title?.trim();
+  if (!title) return null;
+
+  const prompt = buildTitleOnlyDigestPrompt({
+    title,
+    billLabel: params.billLabel,
+    policyArea: params.policyArea,
+  });
+  return requestDigestFromPrompt(env, prompt, modelOverride);
 }

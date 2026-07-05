@@ -17,7 +17,7 @@ import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import { resolveOpenRouterModel } from "../synthesis/model";
-import { rewriteSummary } from "../synthesis/openrouter";
+import { rewriteBillDigest } from "../synthesis/openrouter";
 
 export interface RunFeedResult {
   votesUpserted: number;
@@ -123,19 +123,16 @@ export async function runFeedPipeline(
         continue;
       }
 
-      let digest = null;
-      if (bundle.rawSummaryText) {
-        digest = await rewriteSummary(
-          env,
-          {
-            title: bundle.title,
-            billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
-            policyArea: bundle.policyArea,
-            rawSummary: bundle.rawSummaryText,
-          },
-          model
-        );
-      }
+      const digest = await rewriteBillDigest(
+        env,
+        {
+          title: bundle.title,
+          billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+        },
+        model
+      );
 
       if (digest === null && !metadataChanged) {
         digestsSkipped += 1;
