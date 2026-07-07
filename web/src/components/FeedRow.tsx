@@ -53,7 +53,10 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           <div className="feed-row-main">
             <div className="feed-row-header">
               <div className="feed-row-meta-row">
-                <span id={badgeId} className={`feed-row-badge feed-row-badge--${meta.kind}`}>
+                <span
+                  id={badgeId}
+                  className={`feed-row-badge feed-row-badge--${meta.kind}${meta.kind === 'passed' ? ' text-pass' : meta.kind === 'failed' ? ' text-fail' : ''}`}
+                >
                   {meta.outcomeLabel}
                 </span>
                 {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}

@@ -17,6 +17,7 @@ describe('FeedRow', () => {
     expect(screen.getByText('Defense')).toBeInTheDocument()
     expect(container.querySelector('.feed-row-meta-row')).toContainElement(screen.getByText('Defense'))
     expect(screen.getByText('Passed')).toBeInTheDocument()
+    expect(screen.getByText('Passed')).toHaveClass('text-pass')
     expect(
       screen.getByText('It does something important in plain language.'),
     ).toBeInTheDocument()
@@ -61,6 +62,7 @@ describe('FeedRow', () => {
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Failed')).toHaveClass('text-fail')
     expect(screen.getByRole('button', { name: /198–230/ })).toBeInTheDocument()
   })
 
