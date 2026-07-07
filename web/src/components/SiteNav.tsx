@@ -21,9 +21,6 @@ export function SiteNav({ id, navRef, onNavigate }: SiteNavProps) {
       <NavLink to="/" end className={linkClass} onClick={onNavigate}>
         Feed
       </NavLink>
-      <NavLink to="/play" className={linkClass} onClick={onNavigate}>
-        Play
-      </NavLink>
       <NavLink to="/stats" className={linkClass} onClick={onNavigate}>
         Stats
       </NavLink>

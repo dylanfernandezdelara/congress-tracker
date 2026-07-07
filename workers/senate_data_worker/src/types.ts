@@ -26,7 +26,7 @@ export interface IngestVotesResult {
   warnings?: string[];
 }
 
-import type { BillDigestContent } from "../../../shared/game-api-types";
+import type { BillDigestContent } from "../../../shared/digest-api-types";
 import type {
   ExecutiveSignal,
   RelatedExecutiveBill,

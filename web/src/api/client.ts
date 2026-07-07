@@ -4,8 +4,6 @@ import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
   FeedPageResponse,
-  GameRevealResponse,
-  GameRoundsResponse,
   NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
@@ -83,14 +81,4 @@ export async function fetchVoteDefectors(params: {
     roll_number: String(params.rollNumber),
   })
   return fetchJson<VoteDefectorsResponse>(`/feed/vote-defectors.json?${search}`)
-}
-
-export async function fetchGameRounds(limit = 20): Promise<GameRoundsResponse> {
-  const params = new URLSearchParams({ limit: String(limit) })
-  return fetchJson<GameRoundsResponse>(`/game/rounds.json?${params}`)
-}
-
-export async function fetchGameReveal(id: string): Promise<GameRevealResponse> {
-  const params = new URLSearchParams({ id })
-  return fetchJson<GameRevealResponse>(`/game/reveal.json?${params}`)
 }

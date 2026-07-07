@@ -1,25 +1,7 @@
-import type {
-  BillDigestContent,
-  GameBillRef,
-  GamePartySplit,
-  GamePassageVote,
-  GameRevealResponse,
-  GameRound,
-  GameRoundPrompt,
-  GameRoundsResponse,
-} from '@congress-tracker/shared/game-api-types'
+import type { BillDigestContent } from '@congress-tracker/shared/digest-api-types'
 import type { ExecutiveSignal, RelatedExecutiveBill } from '@congress-tracker/shared/executive-api-types'
 
-export type {
-  BillDigestContent,
-  GameBillRef,
-  GamePartySplit,
-  GamePassageVote,
-  GameRevealResponse,
-  GameRound,
-  GameRoundPrompt,
-  GameRoundsResponse,
-}
+export type { BillDigestContent }
 
 export interface FeedBill {
   congress: number

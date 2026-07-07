@@ -1,5 +1,3 @@
-import type { BillDigestContent } from './game-api-types'
-
 const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
 
 const PROVIDING_FOR_CONSIDERATION_PATTERN =
@@ -12,9 +10,6 @@ const NULLIFICATION_PATTERN = /^Providing that (.+?) shall have no force or effe
 const PROCEDURAL_VOTE_QUESTION_PATTERN =
   /cloture|motion to (recommit|table|proceed|discharge)|previous question|point of order|adjourn/i
 
-const OUTCOME_LEAK_PATTERN =
-  /\b(passed|failed|agreed to|rejected|defeated|not agreed)\b/i
-
 const TYPE_LABELS: Record<string, string> = {
   HR: 'H.R.',
   S: 'S.',
@@ -26,8 +21,6 @@ const TYPE_LABELS: Record<string, string> = {
   SJRES: 'S.J.Res.',
 }
 
-const GAME_SNIPPET_MAX_CHARS = 180
-
 // Feed collapsed card: glanceable plain-English digest (matches OpenRouter prompt targets).
 export const FEED_LEAD_MAX_WORDS = 25
 export const FEED_BULLET_MAX_WORDS = 12
@@ -37,11 +30,6 @@ export const FEED_COLLAPSED_MAX_BULLETS = 4
 export const DIGEST_LEAD_MAX_WORDS = 60
 export const DIGEST_BULLET_MAX_WORDS = 40
 export const DIGEST_MAX_BULLETS = 8
-
-// Compact caps for the blind-game surfaces (prompt + reveal).
-export const GAME_LEAD_MAX_WORDS = FEED_LEAD_MAX_WORDS
-export const GAME_BULLET_MAX_WORDS = FEED_BULLET_MAX_WORDS
-export const GAME_MAX_BULLETS = FEED_COLLAPSED_MAX_BULLETS
 
 export function truncateWords(text: string, maxWords: number): string {
   const words = text.trim().split(/\s+/).filter(Boolean)
@@ -292,90 +280,11 @@ export function voteResultClass(result: string): string {
   return 'text-faint'
 }
 
-export function getGameCorrectAnswer(result: string): 'passed' | 'failed' | null {
-  if (voteIndicatesFailure(result)) return 'failed'
-  if (voteIndicatesPassage(result)) return 'passed'
-  return null
-}
-
 export function isProceduralVoteQuestion(question: string): boolean {
   return PROCEDURAL_VOTE_QUESTION_PATTERN.test(question)
 }
 
-export function isProceduralGameVote(title: string | null, question: string): boolean {
+export function isProceduralVote(title: string | null, question: string): boolean {
   if (title && proceduralHeadline(title) !== null) return true
   return isProceduralVoteQuestion(question)
-}
-
-export interface GamePromptInput {
-  title: string | null
-  question: string
-  digest: BillDigestContent | null
-  rawSummaryText: string | null
-}
-
-export interface GamePrompt {
-  headline: string
-  snippet: string
-}
-
-function pickSummarySource(input: GamePromptInput): string | null {
-  const whatItDoes = input.digest?.what_it_does?.trim()
-  if (whatItDoes) return normalizeDigestLead(whatItDoes, GAME_LEAD_MAX_WORDS)
-
-  const rawSummary = input.rawSummaryText?.trim()
-  if (rawSummary) {
-    const body = summaryBodyText(rawSummary)
-    if (body) return body
-  }
-
-  const firstKeyPoint = input.digest?.key_points?.find((point) => point.trim().length > 0)
-  if (firstKeyPoint) return normalizeDigestLead(firstKeyPoint, GAME_LEAD_MAX_WORDS)
-
-  return null
-}
-
-function buildHeadline(input: GamePromptInput): string {
-  if (input.digest?.headline) {
-    return trimDisplayTitle(input.digest.headline)
-  }
-
-  const title = input.title ?? ''
-  const procedural = proceduralHeadline(title)
-  if (procedural) return procedural
-
-  if (input.title) {
-    return trimDisplayTitle(input.title)
-  }
-
-  return 'Untitled legislation'
-}
-
-function textLeaksOutcome(text: string): boolean {
-  return OUTCOME_LEAK_PATTERN.test(text)
-}
-
-export function buildGamePrompt(input: GamePromptInput): GamePrompt | null {
-  if (isProceduralGameVote(input.title, input.question)) return null
-
-  const summarySource = pickSummarySource(input)
-  if (!summarySource) return null
-
-  const headline = buildHeadline(input)
-  const snippet = truncateAtWordBoundary(summarySource, GAME_SNIPPET_MAX_CHARS)
-
-  if (!snippet || textLeaksOutcome(headline) || textLeaksOutcome(snippet)) {
-    return null
-  }
-
-  return { headline, snippet }
-}
-
-export function shuffleInPlace<T>(items: T[], random: () => number = Math.random): void {
-  for (let index = items.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1))
-    const temp = items[index]
-    items[index] = items[swapIndex]
-    items[swapIndex] = temp
-  }
 }

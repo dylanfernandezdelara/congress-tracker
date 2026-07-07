@@ -1,4 +1,4 @@
-import type { BillDigestContent } from "../../../../shared/game-api-types";
+import type { BillDigestContent } from "../../../../shared/digest-api-types";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
 

@@ -31,7 +31,6 @@ import {
 import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
-import { buildGameReveal, buildGameRounds, parseGameLimit } from "../storage/game";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildNotableVotes } from "../analytics/notable-votes";
 import { buildSessionStats } from "../storage/session-stats";
@@ -356,38 +355,6 @@ export async function handlePublicFetch(
     }
   }
 
-  if (pathname === "/game/rounds.json") {
-    try {
-      const limit = parseGameLimit(url.searchParams.get("limit"));
-      const rounds = await buildGameRounds(env.DB, { limit });
-      return json(rounds, {
-        status: 200,
-        headers: { "Cache-Control": cacheLatest },
-      });
-    } catch {
-      return json({ error: "game_error", message: "game rounds unavailable" }, { status: 500 });
-    }
-  }
-
-  if (pathname === "/game/reveal.json") {
-    const roundId = url.searchParams.get("id")?.trim();
-    if (!roundId) {
-      return json({ error: "bad_request", message: "id is required" }, { status: 400 });
-    }
-    try {
-      const reveal = await buildGameReveal(env.DB, roundId);
-      if (!reveal) {
-        return json({ error: "not_found", message: "Round not found" }, { status: 404 });
-      }
-      return json(reveal, {
-        status: 200,
-        headers: { "Cache-Control": cacheLatest },
-      });
-    } catch {
-      return json({ error: "game_error", message: "game reveal unavailable" }, { status: 500 });
-    }
-  }
-
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const asOf = new Date().toISOString();
@@ -492,7 +459,7 @@ export async function handlePublicFetch(
   return notFound(pathname);
 }
 
-const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/game/", "/stats/", "/executive/", "/__pipeline/"];
+const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/stats/", "/executive/", "/__pipeline/"];
 
 function isApiPath(pathname: string): boolean {
   return API_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
