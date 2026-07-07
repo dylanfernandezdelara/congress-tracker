@@ -11,11 +11,3 @@ export function normalizeVotePosition(position: string): 'yea' | 'nay' | 'other'
   if (normalized.includes('nay') || normalized.includes('no')) return 'nay'
   return 'other'
 }
-
-export function isYeaVotePosition(position: string): boolean {
-  return normalizeVotePosition(position) === 'yea'
-}
-
-export function isNayVotePosition(position: string): boolean {
-  return normalizeVotePosition(position) === 'nay'
-}
