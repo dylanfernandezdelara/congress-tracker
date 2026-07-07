@@ -320,11 +320,15 @@
   }
 
   .feed-row-badge.text-fail {
-    color: hsl(var(--twc-fail));
+    color: hsl(0 74% 32%);
   }
 
   [data-theme='dark'] .feed-row-badge.text-pass {
     color: hsl(var(--twc-pass));
+  }
+
+  [data-theme='dark'] .feed-row-badge.text-fail {
+    color: hsl(var(--twc-fail));
   }
 
   .feed-row-badge--procedural,
