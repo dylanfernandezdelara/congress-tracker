@@ -121,6 +121,10 @@
     color: hsl(var(--twc-faint));
   }
 
+  .text-pass {
+    color: hsl(var(--twc-pass));
+  }
+
   .text-fail {
     color: hsl(var(--twc-fail));
   }
@@ -303,24 +307,14 @@
 
   .feed-row-badge--passed {
     font-weight: 700;
-    color: hsl(152 69% 28%);
-    background-color: hsl(152 55% 92%);
+    color: hsl(var(--twc-pass));
+    background-color: hsl(var(--twc-pass) / 0.12);
   }
 
   .feed-row-badge--failed {
     font-weight: 700;
-    color: hsl(0 74% 32%);
-    background-color: hsl(0 55% 94%);
-  }
-
-  [data-theme='dark'] .feed-row-badge--passed {
-    color: hsl(var(--twc-pass));
-    background-color: hsl(var(--twc-pass) / 0.14);
-  }
-
-  [data-theme='dark'] .feed-row-badge--failed {
     color: hsl(var(--twc-fail));
-    background-color: hsl(var(--twc-fail) / 0.14);
+    background-color: hsl(var(--twc-fail) / 0.12);
   }
 
   .feed-row-badge--procedural,

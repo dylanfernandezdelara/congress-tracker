@@ -72,7 +72,9 @@ export function GameRevealPanel({ reveal, guess, wasCorrect }: GameRevealPanelPr
       </p>
 
       <div className="game-reveal-meta">
-        <span className={`feed-row-badge feed-row-badge--${reveal.correct === 'passed' ? 'passed' : 'failed'}`}>
+        <span
+          className={`feed-row-badge feed-row-badge--${reveal.correct === 'passed' ? 'passed' : 'failed'} ${reveal.correct === 'passed' ? 'text-pass' : 'text-fail'}`}
+        >
           {outcomeLabel}
         </span>
         <span className="feed-row-chip">{reveal.vote.chamber}</span>
