@@ -1,5 +1,5 @@
 import type { ChamberPulse, PulseStatsResponse } from '../api/types'
-import { formatBillDocket } from '../utils/billLabels'
+import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
 
 type RightRailProps = {
   pulse: PulseStatsResponse | null
@@ -26,11 +26,11 @@ function ChamberPulseSection({ title, data }: { title: string; data: ChamberPuls
             {data.close_votes.map((v) => (
               <li key={`${v.chamber}-${v.roll_number}-${v.vote_date}`}>
                 <span className="font-medium text-foreground">
-                  {formatBillDocket(v.bill_type, v.bill_number, v.congress)}
+                  {formatShortBillId(v.bill_type, v.bill_number)}
                 </span>
                 <span className="text-faint">
                   {' '}
-                  · {v.yeas}–{v.nays} ({v.margin}) · {v.vote_date}
+                  · {v.yeas}–{v.nays} ({v.margin}) · {formatVoteDate(v.vote_date)}
                 </span>
               </li>
             ))}
@@ -93,7 +93,9 @@ export function RightRail({ pulse, loading, error, onRetry }: RightRailProps) {
 
   return (
     <div className="sidebar-panel space-y-6">
-      <p className="text-[11px] text-faint">Legislative pulse</p>
+      <p className="sidebar-chamber-title text-[11px] font-semibold uppercase tracking-widest text-faint">
+        Legislative pulse
+      </p>
       <ChamberPulseSection title="House" data={pulse.house} />
       <div className="border-t border-border" />
       <ChamberPulseSection title="Senate" data={pulse.senate} />

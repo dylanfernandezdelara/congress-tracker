@@ -1046,7 +1046,7 @@
   .sidebar-disclaimer {
     margin-top: 0.5rem;
     padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid hsl(var(--twc-border));
   }
 
   .member-spotlight-list {
@@ -1072,7 +1072,7 @@
     font-size: 0.875rem;
     font-weight: 600;
     line-height: 1.3;
-    color: var(--foreground);
+    color: hsl(var(--twc-foreground));
     text-decoration: none;
   }
 
@@ -1081,20 +1081,20 @@
     font-weight: 500;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--faint);
+    color: hsl(var(--twc-faint));
   }
 
   .member-spotlight-hook {
     margin: 0;
     font-size: 0.75rem;
     line-height: 1.45;
-    color: var(--secondary);
+    color: hsl(var(--twc-secondary));
   }
 
   .member-spotlight-empty {
     margin: 0.75rem 0 0;
     font-size: 0.75rem;
-    color: var(--faint);
+    color: hsl(var(--twc-faint));
   }
 
   .sidebar-widget + .sidebar-widget {
