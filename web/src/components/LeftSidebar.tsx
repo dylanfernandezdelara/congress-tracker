@@ -4,7 +4,7 @@ import type {
   PortfolioMovers,
   SessionStatsResponse,
 } from '../api/types'
-import { formatBillDocket } from '../utils/billLabels'
+import { formatBillDocket, formatCoverageDate } from '../utils/billLabels'
 
 type LeftSidebarProps = {
   session: SessionStatsResponse | null
@@ -180,8 +180,7 @@ function ChamberSection({
       ) : null}
       {!loading && spotlights.length === 0 && !defectorsError && !portfoliosError ? (
         <p className="member-spotlight-empty">
-          No member highlights in stored data yet. Locally run <code className="text-xs">npm run seed</code>;
-          in preview or production run the session-backfill and member-votes admin pipelines.
+          No member highlights yet. Check back after the next data refresh.
         </p>
       ) : null}
       {spotlights.length > 0 ? (
@@ -209,7 +208,7 @@ export function LeftSidebar({
 }: LeftSidebarProps) {
   const coverage =
     session && session.house.date_range.last
-      ? `${session.congress}th Congress, ${session.session}${ordinal(session.session)} session · through ${session.house.date_range.last}`
+      ? `${session.congress}th Congress, ${session.session}${ordinal(session.session)} session · through ${formatCoverageDate(session.house.date_range.last)}`
       : null
 
   const disclaimer = portfolios?.house.disclaimer ?? portfolios?.senate.disclaimer
