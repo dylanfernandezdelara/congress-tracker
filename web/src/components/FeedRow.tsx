@@ -79,16 +79,16 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                     {policyArea}
                   </span>
                 ) : null}
-                <span className="feed-row-date-wrap">
-                  <time className="feed-row-date" dateTime={displayDate.iso}>
-                    {formatVoteDate(displayDate.iso)}
-                    {displayDate.kind === 'signal' ? ' · Trump post' : ''}
-                  </time>
-                  <span className="feed-row-chevron" aria-hidden="true">
-                    ›
-                  </span>
-                </span>
               </div>
+              <span className="feed-row-date-wrap">
+                <time className="feed-row-date" dateTime={displayDate.iso}>
+                  {formatVoteDate(displayDate.iso)}
+                  {displayDate.kind === 'signal' ? ' · Trump post' : ''}
+                </time>
+                <span className="feed-row-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </span>
             </div>
 
             <h2 id={topicId} data-feed-topic className="feed-row-topic">
