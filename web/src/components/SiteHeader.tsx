@@ -4,11 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { PixelFlagIcon } from './PixelFlagIcon'
 import { SiteNav } from './SiteNav'
 
-type SiteHeaderProps = {
-  compact?: boolean
-}
-
-export function SiteHeader({ compact = false }: SiteHeaderProps) {
+export function SiteHeader() {
   const menuId = useId()
   const { pathname } = useLocation()
   const toggleRef = useRef<HTMLButtonElement>(null)
@@ -71,9 +67,7 @@ export function SiteHeader({ compact = false }: SiteHeaderProps) {
   }, [menuOpen])
 
   return (
-    <header
-      className={`site-header${compact ? ' site-header--compact' : ''}${menuOpen ? ' site-header--menu-open' : ''}`}
-    >
+    <header className={`site-header${menuOpen ? ' site-header--menu-open' : ''}`}>
       <div className="site-header-inner">
         <div className="site-header-brand">
           <PixelFlagIcon />

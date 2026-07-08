@@ -478,7 +478,7 @@ Shared types should live in `shared/` (same pattern as `stats-api-types.ts`).
 ## Open decisions (user to confirm next session)
 
 1. ~~**Strict Option A vs Option A+** (watchlist for H.R. 22 linking without feed entry)?~~ **Resolved:** dynamic bill hydration + executive-signal feed boost; no static watchlist.
-2. **Site banner scope:** all routes (`/`, `/play`, `/stats`) or home only?
+2. **Site banner scope:** all routes (`/`, `/stats`) or home only?
 3. **Launch strategy:** manual seed of Jun 24 posts for UI while Phase 0 spike runs?
 4. **Vendor budget:** Apify or similar if Worker IP stays blocked?
 5. ~~**LLM linking in v1:** rules-only first (recommended) or OpenRouter from day one?~~ **Resolved:** LLM-primary linking with guardrails; rules/aliases are safety rails only.

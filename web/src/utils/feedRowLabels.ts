@@ -4,7 +4,7 @@ import {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatShortBillId,
-  isProceduralGameVote,
+  isProceduralVote,
   proceduralHeadline,
   trimDisplayTitle,
   voteIndicatesFailure,
@@ -59,7 +59,7 @@ export function getFeedRowDisplayDate(item: FeedItem): { iso: string; kind: 'vot
 export function isProceduralFeedItem(item: FeedItem): boolean {
   const vote = getPrimaryPassageVote(item)
   if (!vote) return false
-  return isProceduralGameVote(item.bill.title, vote.question)
+  return isProceduralVote(item.bill.title, vote.question)
 }
 
 export function getFeedTopic(item: FeedItem): string {

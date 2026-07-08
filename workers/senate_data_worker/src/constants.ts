@@ -11,9 +11,6 @@ export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
 export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
-export const GAME_DEFAULT_LIMIT = 20;
-export const GAME_MAX_LIMIT = 50;
-export const GAME_POOL_SIZE = 200;
 
 /**
  * Roll-call votes to backfill per /__pipeline/run/member-votes invocation.

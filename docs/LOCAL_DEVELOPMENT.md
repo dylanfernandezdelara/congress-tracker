@@ -23,7 +23,7 @@ npm run dev:web      # http://127.0.0.1:5173  (React feed UI)
 Open `http://127.0.0.1:5173` — the feed shows the seeded sample bills
 immediately, no API keys required.
 
-The Vite dev server proxies `/feed`, `/stats`, `/health`, `/debug`, and `/game`
+The Vite dev server proxies `/feed`, `/stats`, `/health`, and `/debug`
 to the worker on `:8787`, so the UI uses same-origin API URLs (matching
 production). **Both dev servers must be running** — if only `dev:web` is up,
 chamber/notable/feed requests fail with connection errors.
@@ -91,8 +91,8 @@ public XML endpoint (no key); House votes and CRS summaries need
 
 ## Local architecture notes
 
-- **Same-origin API in dev.** Vite proxies `/feed`, `/stats`, `/health`,
-  `/debug`, and `/game` to the worker on `:8787`, matching production/preview
+- **Same-origin API in dev.** Vite proxies `/feed`, `/stats`, `/health`, and
+  `/debug` to the worker on `:8787`, matching production/preview
   (one origin serves UI + API). Set `VITE_API_URL` only if you bypass the proxy
   (e.g. worker on a non-default port).
 - **Cron does not fire locally.** `wrangler dev` does not run the
