@@ -13,10 +13,11 @@ Light-mode-only **letterpress poster** aesthetic inspired by [jzhao.xyz](https:/
 
 ## Typography
 
-Two families only:
+**One family only: Inter** — headlines, body, UI, docket lines, and any code/meta flourishes.
 
-- **DM Serif Display** — headlines
-- **Bricolage Grotesque** — body, UI, docket lines (use `tabular-nums` for vote tallies)
+- Load weights 400 / 500 / 600 / 700 (roman + italic) via Google Fonts in `web/index.html`
+- Use `tabular-nums` for vote tallies
+- Do not introduce a second typeface (no serif display, no monospace companion). Tailwind `font-serif` / `font-mono` are aliased to Inter.
 
 ## Layout
 
@@ -26,7 +27,7 @@ Two families only:
 
 ## Components
 
-- **Feed card** — docket line, serif headline, plain summary, passage vote lines, optional policy tag
+- **Feed card** — docket line, Inter headline, plain summary, passage vote lines, optional policy tag
 - **Flip card** — front = digestible view + congress.gov link; back = official CRS summary
 - **Reduced motion** — cross-fade swap instead of 3D flip
 

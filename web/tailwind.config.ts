@@ -28,7 +28,10 @@ const config: Config = {
         },
       },
       fontFamily: {
+        // One family only — serif/mono aliases map to Inter so utility classes cannot introduce a second typeface.
         sans: ['var(--font-family)'],
+        serif: ['var(--font-family)'],
+        mono: ['var(--font-family)'],
       },
     },
   },

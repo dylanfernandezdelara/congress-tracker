@@ -2,7 +2,7 @@
 
 Prompts for Composer 2.5 agents to redesign Congress Tracker in the style of [jzhao.xyz](https://jzhao.xyz) (Quartz v4 hypertext garden). Run in order; each agent should read `web/src/styles.css`, `web/src/components/`, and this file before editing.
 
-Reference aesthetic: warm cream page (`#f5eedd`), navy headings, slate links, terracotta accents, flat square surfaces, monospace code flourishes, `#tag` chips, ornamental `* * *` dividers. No paper dot-grid, no card shadows.
+Reference aesthetic: warm cream page (`#f5eedd`), navy headings, slate links, terracotta accents, flat square surfaces, Inter-only type (no second family), `#tag` chips, ornamental `* * *` dividers. No paper dot-grid, no card shadows.
 
 ---
 
@@ -17,7 +17,7 @@ You are redesigning Congress Tracker to match jzhao.xyz / Quartz v4 hypertext ga
 Read docs/DESIGN_AGENT_PROMPTS.md and inspect https://jzhao.xyz for inspiration.
 
 Tasks:
-1. Replace Google Fonts import with: DM Serif Display (headings), Bricolage Grotesque (body), JetBrains Mono (code/meta).
+1. Keep a single Google Fonts import: Inter only (weights 400/500/600/700, roman + italic). Do not add a second typeface.
 2. Update CSS variables to Quartz palette:
    - background/light: #f5eedd
    - foreground/darkgray: #2d4673
@@ -49,9 +49,9 @@ Read the token work in web/src/styles.css (garden-* classes).
 
 Tasks:
 1. Widen max container to ~680px readable column (jzhao article width feel).
-2. Replace header-band/dossier kicker with garden-meta styling; add a monospace code-block welcome flourish:
+2. Replace header-band/dossier kicker with garden-meta styling; add a welcome flourish in Inter (same family as body):
    <pre class="garden-welcome"><code>Welcome!</code></pre>
-3. Use DM Serif at font-weight 400 for h1 (not semibold).
+3. Use Inter at font-weight 400 for h1 (not semibold). Do not introduce a serif or mono companion font.
 4. Intro copy: line-height 1.6rem, text-wrap pretty, max-width prose.
 5. Add garden-divider ornamental hr between header and feed.
 6. Footer: low-opacity meta line ("Flip cards for official CRS summaries ↗").
@@ -93,7 +93,7 @@ Visually QA Congress Tracker after the jzhao garden redesign.
 2. Use Cursor browser to capture screenshots at 390px and 1280px viewport.
 3. Checklist:
    - Flat cream background (no dot grid)
-   - Serif h1, readable body line-height
+   - Inter-only typography (h1 and body same family), readable body line-height
    - Terracotta tags with # prefix
    - Links slate → terracotta on hover
    - Ornamental * * * divider visible

@@ -29,7 +29,8 @@
     --twc-party-d: 217 75% 45%;
     --twc-party-i: 270 35% 50%;
     --twc-party-other: 0 0% 55%;
-    --font-family: 'Inter', system-ui, sans-serif;
+    /* Single typeface for the whole app — do not add a second family. */
+    --font-family: 'Inter', sans-serif;
   }
 
   [data-theme='dark'] {
@@ -72,6 +73,11 @@
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv11', 'ss01';
     font-variant-numeric: tabular-nums;
+  }
+
+  /* SVG text does not always inherit from html; keep the single family. */
+  svg text {
+    font-family: var(--font-family);
   }
 
   html,
