@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 export const WORKER_NAME = 'congress-tracker-api'
-export const MAX_PREVIEW_ALIAS_LEN = 63 - 1 - WORKER_NAME.length
+/** Preview uploads target the `[env.preview]` Worker name (`${WORKER_NAME}-preview`). */
+export const PREVIEW_WORKER_NAME = `${WORKER_NAME}-preview`
+export const MAX_PREVIEW_ALIAS_LEN = 63 - 1 - PREVIEW_WORKER_NAME.length
 
 const PREVIEW_ALIAS_RE = /^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 
@@ -49,7 +51,7 @@ function runPreviewUpload() {
     args.push('--preview-alias', alias)
     console.log(`Preview alias: ${alias}`)
     console.log(
-      `Stable preview URL pattern: https://${alias}-${WORKER_NAME}.<subdomain>.workers.dev`,
+      `Stable preview URL pattern: https://${alias}-${PREVIEW_WORKER_NAME}.<subdomain>.workers.dev`,
     )
   } else if (branch && branch !== 'main') {
     console.warn(
