@@ -3,7 +3,7 @@ import { seatsUpForElection } from "../../../../shared/chamber-election";
 import { chamberControlLabel, normalizePartyCode } from "../../../../shared/party";
 import { HOUSE_ROSTER_MIN, SENATE_ROSTER_MIN } from "../constants";
 import type { ChamberComposition, PartySeatCount } from "../types";
-import { countRealMembersByChamber, hasRealMemberRoster } from "../d1/members";
+import { hasRealMemberRoster } from "../d1/members";
 import { ensureSchema } from "../d1/schema";
 
 interface MemberPartyRow {
@@ -27,7 +27,10 @@ interface RollVoteCountRow {
 
 const PARTY_ORDER = ["R", "D", "I", "Other"];
 
-/** Minimum seats to treat a roll as a full chamber roster snapshot. */
+/** SQL fragment excluding offline seed / LIS-only member ids. */
+function excludeSampleMemberSql(column = "bioguide_id"): string {
+  return ` AND ${column} NOT LIKE 'LOCAL:%' AND ${column} NOT LIKE 'LIS:%'`;
+}
 
 function sortSeats(seats: PartySeatCount[]): PartySeatCount[] {
   return [...seats].sort((a, b) => {
@@ -101,9 +104,7 @@ async function listRollMemberSeats(
   roll: RollVoteCountRow,
   excludeLocalSample: boolean
 ): Promise<MemberSeatRow[]> {
-  const localFilter = excludeLocalSample
-    ? " AND m.bioguide_id NOT LIKE 'LOCAL:%' AND m.bioguide_id NOT LIKE 'LIS:%'"
-    : "";
+  const localFilter = excludeLocalSample ? excludeSampleMemberSql("m.bioguide_id") : "";
   const { results } = await db
     .prepare(
       `SELECT m.party, m.state
@@ -145,9 +146,7 @@ async function listMemberSeats(
   chamber: string,
   excludeLocalSample: boolean
 ): Promise<MemberSeatRow[]> {
-  const localFilter = excludeLocalSample
-    ? " AND bioguide_id NOT LIKE 'LOCAL:%' AND bioguide_id NOT LIKE 'LIS:%'"
-    : "";
+  const localFilter = excludeLocalSample ? excludeSampleMemberSql() : "";
   const { results } = await db
     .prepare(
       `SELECT party, state
@@ -168,9 +167,7 @@ async function countMembersByParty(
   chamber: string,
   excludeLocalSample: boolean
 ): Promise<Map<string, number>> {
-  const localFilter = excludeLocalSample
-    ? " AND bioguide_id NOT LIKE 'LOCAL:%' AND bioguide_id NOT LIKE 'LIS:%'"
-    : "";
+  const localFilter = excludeLocalSample ? excludeSampleMemberSql() : "";
   const { results } = await db
     .prepare(
       `SELECT chamber, party, COUNT(*) AS seats
@@ -208,9 +205,7 @@ async function countRollRosterByParty(
   roll: RollVoteCountRow,
   excludeLocalSample: boolean
 ): Promise<Map<string, number>> {
-  const localFilter = excludeLocalSample
-    ? " AND m.bioguide_id NOT LIKE 'LOCAL:%' AND m.bioguide_id NOT LIKE 'LIS:%'"
-    : "";
+  const localFilter = excludeLocalSample ? excludeSampleMemberSql("m.bioguide_id") : "";
   const { results } = await db
     .prepare(
       `SELECT mv.chamber, m.party, COUNT(*) AS seats

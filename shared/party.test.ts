@@ -3,7 +3,7 @@ import {
   chamberControlLabel,
   normalizePartyCode,
   partyDisplayName,
-} from "../../../shared/party";
+} from "./party";
 
 describe("party helpers", () => {
   it("normalizes common party strings", () => {

@@ -4,7 +4,7 @@ import {
   normalizeDigestLead,
   proceduralHeadline,
   voteIndicatesFailure,
-} from "../../../shared/feed-content";
+} from "./feed-content";
 
 describe("feed-content helpers", () => {
   it("classifies vote results", () => {

@@ -16,15 +16,9 @@ export default function StatsPage() {
 
       <section aria-label="Members in Congress">
         <LeftSidebar
-          session={session.data}
-          defectors={defectors.data}
-          portfolios={portfolios.data}
-          sessionLoading={session.isLoading}
-          defectorsLoading={defectors.isLoading}
-          portfoliosLoading={portfolios.isLoading}
-          sessionError={session.error}
-          defectorsError={defectors.error}
-          portfoliosError={portfolios.error}
+          session={session}
+          defectors={defectors}
+          portfolios={portfolios}
           onRetry={reload}
         />
       </section>

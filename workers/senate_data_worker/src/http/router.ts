@@ -52,6 +52,16 @@ import {
   cacheNoStore,
 } from "./responses";
 
+type JsonFn = (body: unknown, init?: ResponseInit) => Response;
+
+type RouteContext = {
+  request: Request;
+  env: Env;
+  url: URL;
+  json: JsonFn;
+  ctx?: Pick<ExecutionContext, "waitUntil">;
+};
+
 async function loadIngestMonitor(env: Env) {
   const [
     latestPassageVoteDate,
@@ -89,10 +99,7 @@ async function loadIngestMonitor(env: Env) {
   });
 }
 
-async function healthResponse(
-  env: Env,
-  json: (body: unknown, init?: ResponseInit) => Response
-): Promise<Response> {
+async function healthResponse(env: Env, json: JsonFn): Promise<Response> {
   let ingest: Awaited<ReturnType<typeof loadIngestMonitor>> | undefined;
   let dataError: string | undefined;
 
@@ -123,10 +130,7 @@ async function healthResponse(
   );
 }
 
-async function ingestMonitorResponse(
-  env: Env,
-  json: (body: unknown, init?: ResponseInit) => Response
-): Promise<Response> {
+async function ingestMonitorResponse(env: Env, json: JsonFn): Promise<Response> {
   try {
     const ingest = await loadIngestMonitor(env);
     return json(
@@ -184,7 +188,7 @@ function parseRollNumber(value: string | null): number | null {
 }
 
 async function handleStatsJson<T>(
-  json: (body: unknown, init?: ResponseInit) => Response,
+  json: JsonFn,
   load: () => Promise<T>,
   errorMessage: string
 ): Promise<Response> {
@@ -201,7 +205,7 @@ async function handleStatsJson<T>(
 async function handlePipelineRoute<T extends object>(
   request: Request,
   env: Env,
-  json: (body: unknown, init?: ResponseInit) => Response,
+  json: JsonFn,
   run: () => Promise<T>
 ): Promise<Response> {
   const adminHeaders = { "Cache-Control": cacheNoStore };
@@ -224,74 +228,24 @@ async function handlePipelineRoute<T extends object>(
   }
 }
 
-/**
- * Public read API: /health, /feed/latest.json, /stats/*.
- * Admin: POST /__pipeline/run/*
- */
-export async function handlePublicFetch(
-  request: Request,
-  env: Env,
-  ctx?: Pick<ExecutionContext, "waitUntil">
-): Promise<Response> {
-  const url = new URL(request.url);
-  const { pathname } = url;
-  const corsHeaders = buildCorsHeaders(env);
-  const json = (body: unknown, init?: ResponseInit) => buildJsonResponse(body, corsHeaders, init);
-  const notFound = (path: string) =>
-    json({ error: "not_found", message: "Resource not found", path }, { status: 404 });
+const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = {
+  "/__pipeline/run/feed": ({ env }) => runFeedPipeline(env, { trigger: "admin" }),
+  "/__pipeline/run/digest-refresh": ({ env, url }) => {
+    const bills = parseDigestRefreshRequest(url, env);
+    return runDigestRefreshPipeline(env, bills);
+  },
+  "/__pipeline/run/session-backfill": ({ env }) => runSessionBackfillPipeline(env),
+  "/__pipeline/run/member-votes": ({ env }) => runMemberVotesPipeline(env),
+  "/__pipeline/run/members-roster": ({ env }) => runMembersRosterPipeline(env),
+  "/__pipeline/run/disclosures": ({ env }) => runDisclosuresPipeline(env),
+  "/__pipeline/run/executive-posts": ({ env }) =>
+    runExecutivePostsPipeline(env, { trigger: "admin" }),
+};
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  if (pathname === "/__pipeline/run/feed") {
-    return handlePipelineRoute(request, env, json, () =>
-      runFeedPipeline(env, { trigger: "admin" })
-    );
-  }
-
-  if (pathname === "/__pipeline/run/digest-refresh") {
-    return handlePipelineRoute(request, env, json, async () => {
-      const bills = parseDigestRefreshRequest(url, env);
-      return runDigestRefreshPipeline(env, bills);
-    });
-  }
-
-  if (pathname === "/__pipeline/run/session-backfill") {
-    return handlePipelineRoute(request, env, json, () => runSessionBackfillPipeline(env));
-  }
-
-  if (pathname === "/__pipeline/run/member-votes") {
-    return handlePipelineRoute(request, env, json, () => runMemberVotesPipeline(env));
-  }
-
-  if (pathname === "/__pipeline/run/members-roster") {
-    return handlePipelineRoute(request, env, json, () => runMembersRosterPipeline(env));
-  }
-
-  if (pathname === "/__pipeline/run/disclosures") {
-    return handlePipelineRoute(request, env, json, () => runDisclosuresPipeline(env));
-  }
-
-  if (pathname === "/__pipeline/run/executive-posts") {
-    return handlePipelineRoute(request, env, json, () =>
-      runExecutivePostsPipeline(env, { trigger: "admin" })
-    );
-  }
-
-  if (request.method !== "GET") {
-    return json({ error: "method_not_allowed", message: "Only GET requests are allowed" }, { status: 405 });
-  }
-
-  if (pathname === "/health") {
-    return healthResponse(env, json);
-  }
-
-  if (pathname === "/debug/ingest.json") {
-    return ingestMonitorResponse(env, json);
-  }
-
-  if (pathname === "/feed/latest.json") {
+const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
+  "/health": ({ env, json }) => healthResponse(env, json),
+  "/debug/ingest.json": ({ env, json }) => ingestMonitorResponse(env, json),
+  "/feed/latest.json": async ({ env, url, json }) => {
     try {
       const limit = parseFeedLimit(url);
       const offset = parseFeedOffset(url, limit);
@@ -303,9 +257,8 @@ export async function handlePublicFetch(
     } catch {
       return json({ error: "feed_error", message: "feed unavailable" }, { status: 500 });
     }
-  }
-
-  if (pathname === "/executive/alerts.json") {
+  },
+  "/executive/alerts.json": async ({ env, json }) => {
     try {
       const alerts = await buildExecutiveAlerts(env);
       return json(alerts, {
@@ -315,9 +268,8 @@ export async function handlePublicFetch(
     } catch {
       return json({ error: "executive_error", message: "executive alerts unavailable" }, { status: 500 });
     }
-  }
-
-  if (pathname === "/feed/vote-defectors.json") {
+  },
+  "/feed/vote-defectors.json": async ({ env, url, json }) => {
     const chamber = parseChamber(url.searchParams.get("chamber"));
     const rollCongress = Number.parseInt(url.searchParams.get("congress") ?? "", 10);
     const rollSession = Number.parseInt(url.searchParams.get("session") ?? "", 10);
@@ -353,13 +305,11 @@ export async function handlePublicFetch(
     } catch {
       return json({ error: "feed_error", message: "vote defectors unavailable" }, { status: 500 });
     }
-  }
-
-  const congress = congressNumber(env);
-  const session = sessionNumber(env);
-  const asOf = new Date().toISOString();
-
-  if (pathname === "/stats/session.json") {
+  },
+  "/stats/session.json": ({ env, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
     return handleStatsJson(
       json,
       async (): Promise<SessionStatsResponse> => {
@@ -380,9 +330,11 @@ export async function handlePublicFetch(
       },
       "session stats unavailable"
     );
-  }
-
-  if (pathname === "/stats/pulse.json") {
+  },
+  "/stats/pulse.json": ({ env, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
     return handleStatsJson(
       json,
       async (): Promise<PulseStatsResponse> => {
@@ -391,9 +343,11 @@ export async function handlePublicFetch(
       },
       "pulse stats unavailable"
     );
-  }
-
-  if (pathname === "/stats/notable.json") {
+  },
+  "/stats/notable.json": ({ env, url, json, ctx }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
     const limit = parseStatsLimit(url);
     return handleStatsJson(
       json,
@@ -418,12 +372,16 @@ export async function handlePublicFetch(
       },
       "notable votes unavailable"
     );
-  }
-
-  if (pathname === "/stats/defectors.json") {
+  },
+  "/stats/defectors.json": ({ env, url, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
     const chamber = parseChamber(url.searchParams.get("chamber"));
     if (!chamber) {
-      return json({ error: "bad_request", message: "chamber must be House or Senate" }, { status: 400 });
+      return Promise.resolve(
+        json({ error: "bad_request", message: "chamber must be House or Senate" }, { status: 400 })
+      );
     }
     const limit = parseStatsLimit(url);
     return handleStatsJson(
@@ -434,12 +392,16 @@ export async function handlePublicFetch(
       },
       "defectors unavailable"
     );
-  }
-
-  if (pathname === "/stats/portfolios.json") {
+  },
+  "/stats/portfolios.json": ({ env, url, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
     const chamber = parseChamber(url.searchParams.get("chamber"));
     if (!chamber) {
-      return json({ error: "bad_request", message: "chamber must be House or Senate" }, { status: 400 });
+      return Promise.resolve(
+        json({ error: "bad_request", message: "chamber must be House or Senate" }, { status: 400 })
+      );
     }
     const limit = parseStatsLimit(url);
     return handleStatsJson(
@@ -450,6 +412,42 @@ export async function handlePublicFetch(
       },
       "portfolio stats unavailable"
     );
+  },
+};
+
+/**
+ * Public read API: /health, /feed/latest.json, /stats/*.
+ * Admin: POST /__pipeline/run/*
+ */
+export async function handlePublicFetch(
+  request: Request,
+  env: Env,
+  ctx?: Pick<ExecutionContext, "waitUntil">
+): Promise<Response> {
+  const url = new URL(request.url);
+  const { pathname } = url;
+  const corsHeaders = buildCorsHeaders(env);
+  const json: JsonFn = (body, init) => buildJsonResponse(body, corsHeaders, init);
+  const notFound = (path: string) =>
+    json({ error: "not_found", message: "Resource not found", path }, { status: 404 });
+  const routeCtx: RouteContext = { request, env, url, json, ctx };
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const pipeline = PIPELINE_ROUTES[pathname];
+  if (pipeline) {
+    return handlePipelineRoute(request, env, json, () => pipeline(routeCtx));
+  }
+
+  if (request.method !== "GET") {
+    return json({ error: "method_not_allowed", message: "Only GET requests are allowed" }, { status: 405 });
+  }
+
+  const getRoute = GET_ROUTES[pathname];
+  if (getRoute) {
+    return getRoute(routeCtx);
   }
 
   if (env.ASSETS && !isApiPath(pathname)) {

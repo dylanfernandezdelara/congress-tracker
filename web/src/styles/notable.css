@@ -1,0 +1,130 @@
+@layer components {
+  .chamber-overview-skeleton,
+  .notable-votes-skeleton {
+    min-height: 5.5rem;
+    border-radius: 0.875rem;
+    background: hsl(var(--twc-skeleton));
+  }
+
+  .notable-votes-list {
+    display: grid;
+    gap: 0.625rem;
+  }
+
+  .notable-vote-card {
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 0.875rem;
+    background: hsl(var(--twc-card));
+    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .notable-vote-meta {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: hsl(var(--twc-faint));
+  }
+
+  .notable-vote-title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .notable-vote-why {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .notable-vote-defectors-empty {
+    margin: 0.35rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: hsl(var(--twc-faint));
+  }
+
+  .notable-vote-defectors {
+    list-style: none;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .notable-vote-defector {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .notable-defector-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: hsl(var(--twc-skeleton));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .notable-defector-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .notable-defector-avatar-fallback {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .notable-vote-defector-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+  }
+
+  .notable-vote-defector-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .notable-vote-defector-party {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .notable-vote-defector-hint {
+    font-size: 0.6875rem;
+    color: hsl(var(--twc-faint));
+  }
+
+  .home-feed-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .home-feed-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+}
