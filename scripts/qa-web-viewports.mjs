@@ -4,14 +4,14 @@
  *
  * Run with the dev server up: npm run dev:web
  * Usage: npm run qa:web
- * Env: QA_WEB_URL (default http://localhost:5173), QA_WEB_OUT_DIR (default artifacts/qa-viewports)
+ * Env: QA_WEB_URL (default http://127.0.0.1:5173), QA_WEB_OUT_DIR (default artifacts/qa-viewports)
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const baseUrl = process.env.QA_WEB_URL ?? 'http://localhost:5173'
+const baseUrl = process.env.QA_WEB_URL ?? 'http://127.0.0.1:5173'
 const outDir = path.resolve(rootDir, process.env.QA_WEB_OUT_DIR ?? 'artifacts/qa-viewports')
 
 const VIEWPORTS = [

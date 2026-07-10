@@ -50,3 +50,21 @@ test('AGENTS.md keeps ship checklist in Cursor, not GitHub Actions', () => {
   assert.doesNotMatch(ci, /viewport-qa:/)
   assert.doesNotMatch(ci, /qa:web/)
 })
+
+test('dev:web forwards Vite CLI flags through nested npm', () => {
+  // Without the trailing `--`, `npm run dev:web -- --host …` becomes
+  // `vite 127.0.0.1 5173` (positional junk) instead of `vite --host …`.
+  assert.equal(packageJson.scripts['dev:web'], 'npm --prefix web run dev --')
+})
+
+test('Vite binds 127.0.0.1:5173 with strictPort (docs/agent healthchecks)', () => {
+  const viteConfig = fs.readFileSync(path.join(rootDir, 'web', 'vite.config.ts'), 'utf8')
+  assert.match(viteConfig, /host:\s*'127\.0\.0\.1'/)
+  assert.match(viteConfig, /port:\s*5173/)
+  assert.match(viteConfig, /strictPort:\s*true/)
+})
+
+test('qa:web defaults to IPv4 loopback URL', () => {
+  const qa = fs.readFileSync(qaScript, 'utf8')
+  assert.match(qa, /QA_WEB_URL \?\? 'http:\/\/127\.0\.0\.1:5173'/)
+})
