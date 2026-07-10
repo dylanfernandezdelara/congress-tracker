@@ -6,7 +6,7 @@
     "seed": "./scripts/seed-local-feed.sh",
     "seed:executive": "./scripts/seed-executive-signal.sh",
     "dev:worker": "npm --prefix workers/senate_data_worker run dev",
-    "dev:web": "npm --prefix web run dev",
+    "dev:web": "npm --prefix web run dev --",
     "build:web": "npm --prefix web run build",
     "preview": "npm run build:web && node scripts/preview-upload.mjs",
     "qa:web": "node scripts/qa-web-viewports.mjs",

@@ -13,6 +13,12 @@ export default defineConfig({
     },
   },
   server: {
+    // Bind IPv4 loopback explicitly. Default `localhost` resolves to ::1-only on
+    // many Linux/Cloud hosts, so docs/agents curling http://127.0.0.1:5173 fail
+    // even though Vite printed "ready".
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
     fs: {
       allow: [repoRoot],
     },
