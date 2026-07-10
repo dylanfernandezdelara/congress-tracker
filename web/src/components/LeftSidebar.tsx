@@ -4,18 +4,13 @@ import type {
   PortfolioMovers,
   SessionStatsResponse,
 } from '../api/types'
+import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import { formatBillDocket, formatCoverageDate } from '../utils/billLabels'
 
 type LeftSidebarProps = {
-  session: SessionStatsResponse | null
-  defectors: { house: DefectorEntry[]; senate: DefectorEntry[] } | null
-  portfolios: { house: PortfolioMovers; senate: PortfolioMovers } | null
-  sessionLoading: boolean
-  defectorsLoading: boolean
-  portfoliosLoading: boolean
-  sessionError: string | null
-  defectorsError: string | null
-  portfoliosError: string | null
+  session: UseAsyncDataResult<SessionStatsResponse>
+  defectors: UseAsyncDataResult<{ house: DefectorEntry[]; senate: DefectorEntry[] }>
+  portfolios: UseAsyncDataResult<{ house: PortfolioMovers; senate: PortfolioMovers }>
   onRetry?: () => void
 }
 
@@ -194,58 +189,47 @@ function ChamberSection({
   )
 }
 
-export function LeftSidebar({
-  session,
-  defectors,
-  portfolios,
-  sessionLoading,
-  defectorsLoading,
-  portfoliosLoading,
-  sessionError,
-  defectorsError,
-  portfoliosError,
-  onRetry,
-}: LeftSidebarProps) {
+export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSidebarProps) {
   const coverage =
-    session && session.house.date_range.last
-      ? `${session.congress}th Congress, ${session.session}${ordinal(session.session)} session · through ${formatCoverageDate(session.house.date_range.last)}`
+    session.data && session.data.house.date_range.last
+      ? `${session.data.congress}th Congress, ${session.data.session}${ordinal(session.data.session)} session · through ${formatCoverageDate(session.data.house.date_range.last)}`
       : null
 
-  const disclaimer = portfolios?.house.disclaimer ?? portfolios?.senate.disclaimer
+  const disclaimer = portfolios.data?.house.disclaimer ?? portfolios.data?.senate.disclaimer
 
   return (
     <div className="sidebar-panel space-y-5">
-      {coverage && !sessionLoading ? (
+      {coverage && !session.isLoading ? (
         <p className="sidebar-coverage text-[11px] leading-snug text-faint">{coverage}</p>
       ) : null}
-      {sessionError && onRetry ? (
+      {session.error && onRetry ? (
         <button type="button" className="ghost-button text-xs" onClick={onRetry}>
           Retry sidebar
         </button>
       ) : null}
-      {!sessionError && (defectorsError || portfoliosError) && onRetry ? (
+      {!session.error && (defectors.error || portfolios.error) && onRetry ? (
         <button type="button" className="ghost-button text-xs" onClick={onRetry}>
           Retry member data
         </button>
       ) : null}
       <ChamberSection
         title="House"
-        defectors={defectors?.house ?? []}
-        portfolios={portfolios?.house}
-        defectorsLoading={defectorsLoading}
-        portfoliosLoading={portfoliosLoading}
-        defectorsError={defectorsError}
-        portfoliosError={portfoliosError}
+        defectors={defectors.data?.house ?? []}
+        portfolios={portfolios.data?.house}
+        defectorsLoading={defectors.isLoading}
+        portfoliosLoading={portfolios.isLoading}
+        defectorsError={defectors.error}
+        portfoliosError={portfolios.error}
       />
       <div className="border-t border-border" />
       <ChamberSection
         title="Senate"
-        defectors={defectors?.senate ?? []}
-        portfolios={portfolios?.senate}
-        defectorsLoading={defectorsLoading}
-        portfoliosLoading={portfoliosLoading}
-        defectorsError={defectorsError}
-        portfoliosError={portfoliosError}
+        defectors={defectors.data?.senate ?? []}
+        portfolios={portfolios.data?.senate}
+        defectorsLoading={defectors.isLoading}
+        portfoliosLoading={portfolios.isLoading}
+        defectorsError={defectors.error}
+        portfoliosError={portfolios.error}
       />
       {disclaimer ? <p className="sidebar-disclaimer text-[11px] leading-snug text-faint">{disclaimer}</p> : null}
     </div>

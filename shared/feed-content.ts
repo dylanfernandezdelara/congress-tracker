@@ -1,290 +1,35 @@
-const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
+/**
+ * Barrel for feed/digest/bill/vote display helpers.
+ * Prefer importing from the focused modules (`digest-format`, `bill-id`,
+ * `procedural-titles`, `vote-result`) when adding new call sites.
+ */
+export {
+  DIGEST_BULLET_MAX_WORDS,
+  DIGEST_LEAD_MAX_WORDS,
+  DIGEST_MAX_BULLETS,
+  FEED_BULLET_MAX_WORDS,
+  FEED_COLLAPSED_MAX_BULLETS,
+  FEED_LEAD_MAX_WORDS,
+  buildFeedSummaryParts,
+  formatCollapsedDigestBullets,
+  formatCollapsedDigestLead,
+  normalizeDigestBullets,
+  normalizeDigestLead,
+  truncateAtWordBoundary,
+} from './digest-format'
 
-const PROVIDING_FOR_CONSIDERATION_PATTERN =
-  /^Providing for consideration of the (?:bill|joint resolution|resolution) \(?(H\.?\s?R\.?|H\. ?Res\.?|S\.|S\. ?Res\.?)\s?(\d+)\)?,? (?:to |which )?(.+)$/i
+export {
+  formatBillDocket,
+  formatBillIdParts,
+  formatShortBillId,
+  stripLocalSampleLabel,
+  trimDisplayTitle,
+} from './bill-id'
 
-const RULE_WAIVER_PATTERN = /^Waiving a requirement of clause .+ of rule .+/i
+export {
+  extractUnderlyingBillIdFromTitle,
+  isProceduralVote,
+  proceduralHeadline,
+} from './procedural-titles'
 
-const NULLIFICATION_PATTERN = /^Providing that (.+?) shall have no force or effect\.?$/i
-
-const PROCEDURAL_VOTE_QUESTION_PATTERN =
-  /cloture|motion to (recommit|table|proceed|discharge)|previous question|point of order|adjourn/i
-
-const TYPE_LABELS: Record<string, string> = {
-  HR: 'H.R.',
-  S: 'S.',
-  HRES: 'H.Res.',
-  SRES: 'S.Res.',
-  HCONRES: 'H.Con.Res.',
-  SCONRES: 'S.Con.Res.',
-  HJRES: 'H.J.Res.',
-  SJRES: 'S.J.Res.',
-}
-
-// Feed collapsed card: glanceable plain-English digest (matches OpenRouter prompt targets).
-export const FEED_LEAD_MAX_WORDS = 25
-export const FEED_BULLET_MAX_WORDS = 12
-export const FEED_COLLAPSED_MAX_BULLETS = 4
-
-// Ingest caps: generous safety bounds for pathological model output at storage time.
-export const DIGEST_LEAD_MAX_WORDS = 60
-export const DIGEST_BULLET_MAX_WORDS = 40
-export const DIGEST_MAX_BULLETS = 8
-
-export function truncateWords(text: string, maxWords: number): string {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  if (words.length <= maxWords) return words.join(' ')
-  return `${words.slice(0, maxWords).join(' ')}…`
-}
-
-function protectAbbreviations(text: string): string {
-  return text
-    .replace(/\bU\.S\.C\./gi, 'U§S§C§')
-    .replace(/\bU\.S\./gi, 'U§S§')
-    .replace(/\bU\.K\./gi, 'U§K§')
-    .replace(/\bSec\.\s+\d+/gi, (match) => match.replace(/\./g, '§'))
-    .replace(/\bNo\.\s+\d+/gi, (match) => match.replace(/\./g, '§'))
-    .replace(/\bH\.R\.\s*\d+/gi, (match) => match.replace(/\./g, '§'))
-    .replace(/\bS\.\s*\d+/gi, (match) => match.replace(/\./g, '§'))
-    .replace(/\$(\d+)\.(\d+)/g, (_, whole, fraction) => `$${whole}§${fraction}`)
-}
-
-function restoreAbbreviations(text: string): string {
-  return text.replace(/§/g, '.')
-}
-
-export function firstSentence(text: string): string {
-  const collapsed = collapseWhitespace(text)
-  if (!collapsed) return collapsed
-
-  const protectedText = protectAbbreviations(collapsed)
-  const boundary = protectedText.search(/[.!?](?:\s|$)/)
-  if (boundary === -1) return collapsed
-
-  const first = protectedText.slice(0, boundary + 1).trim()
-  return restoreAbbreviations(first)
-}
-
-export function normalizeDigestLead(
-  text: string,
-  maxWords: number = DIGEST_LEAD_MAX_WORDS,
-): string {
-  return truncateWords(firstSentence(text), maxWords)
-}
-
-/** Collapsed feed card: one short sentence capped at FEED_LEAD_MAX_WORDS. */
-export function formatCollapsedDigestLead(text: string): string {
-  return truncateWords(firstSentence(text.trim()), FEED_LEAD_MAX_WORDS)
-}
-
-/** Collapsed feed card: capped bullets for glanceable mobile layout. */
-export function formatCollapsedDigestBullets(points: string[]): string[] {
-  return normalizeDigestBullets(points, {
-    maxWords: FEED_BULLET_MAX_WORDS,
-    maxBullets: FEED_COLLAPSED_MAX_BULLETS,
-  })
-}
-
-export function normalizeDigestBullets(
-  points: string[],
-  options: { maxWords?: number; maxBullets?: number } = {},
-): string[] {
-  const { maxWords = DIGEST_BULLET_MAX_WORDS, maxBullets = DIGEST_MAX_BULLETS } = options
-  return points
-    .map((point) => truncateWords(point.trim(), maxWords))
-    .filter((point) => point.length > 0)
-    .slice(0, maxBullets)
-}
-
-export interface FeedSummaryParts {
-  lead: string
-  bullets: string[]
-}
-
-export function buildFeedSummaryParts(input: {
-  whatItDoes: string | null | undefined
-  keyPoints: string[] | null | undefined
-}): FeedSummaryParts | null {
-  const whatItDoes = input.whatItDoes?.trim()
-
-  if (whatItDoes) {
-    return {
-      lead: formatCollapsedDigestLead(whatItDoes),
-      bullets: formatCollapsedDigestBullets(input.keyPoints ?? []),
-    }
-  }
-
-  // No OpenRouter digest yet — do not dump raw CRS on the collapsed card.
-  const firstKeyPoint = input.keyPoints?.find((point) => point.trim().length > 0)
-  if (firstKeyPoint) {
-    return {
-      lead: formatCollapsedDigestLead(firstKeyPoint),
-      bullets: [],
-    }
-  }
-
-  return null
-}
-
-export function formatShortBillId(type: string, number: number): string {
-  const label = TYPE_LABELS[type.toUpperCase()] ?? type
-  return `${label} ${number}`
-}
-
-const BILL_TYPE_TOOLTIPS: Record<string, string> = {
-  HR: 'House bill',
-  S: 'Senate bill',
-}
-
-export function getBillTypeTooltip(type: string): string | undefined {
-  return BILL_TYPE_TOOLTIPS[type.toUpperCase()]
-}
-
-export function formatBillIdParts(
-  type: string,
-  number: number,
-): { prefix: string; number: number; tooltip?: string } {
-  const prefix = TYPE_LABELS[type.toUpperCase()] ?? type
-  return {
-    prefix,
-    number,
-    tooltip: getBillTypeTooltip(type),
-  }
-}
-
-export function formatBillDocket(type: string, number: number, congress: number): string {
-  return `${formatShortBillId(type, number)} · ${congress}th Congress`
-}
-
-export function extractUnderlyingBillIdFromTitle(title: string): string | null {
-  const match = title.match(PROVIDING_FOR_CONSIDERATION_PATTERN)
-  if (!match) return null
-
-  const [, billType, billNumber] = match
-  return normalizeBillRef(billType, billNumber)
-}
-
-const LOCAL_SAMPLE_LABEL = /\s*\(local sample\)\s*/gi
-
-/** Strip offline seed marker from titles/headlines when real data is shown. */
-export function stripLocalSampleLabel(text: string): string {
-  return text.replace(LOCAL_SAMPLE_LABEL, ' ').replace(/\s+/g, ' ').trim()
-}
-
-export function trimDisplayTitle(title: string): string {
-  return stripLocalSampleLabel(title.replace(BOILERPLATE_TITLE_SUFFIX, '').trim())
-}
-
-export function truncateAtWordBoundary(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  const slice = text.slice(0, maxLength)
-  const lastSpace = slice.lastIndexOf(' ')
-  if (lastSpace <= 0) return `${slice.trimEnd()}…`
-  return `${slice.slice(0, lastSpace).trimEnd()}…`
-}
-
-function collapseWhitespace(text: string): string {
-  return text.replace(/\s+/g, ' ').trim()
-}
-
-export function summaryBodyText(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed) return trimmed
-
-  const newlineIndex = trimmed.indexOf('\n')
-  if (newlineIndex === -1) return collapseWhitespace(trimmed)
-
-  const firstLine = trimmed.slice(0, newlineIndex).trim()
-  const remainder = trimmed.slice(newlineIndex + 1).trim()
-  const endsWithSentencePunctuation = /[.!?]$/.test(firstLine)
-
-  if (!endsWithSentencePunctuation && remainder.length > 0) {
-    return collapseWhitespace(remainder)
-  }
-
-  return collapseWhitespace(trimmed)
-}
-
-export function proceduralHeadline(title: string): string | null {
-  if (RULE_WAIVER_PATTERN.test(title)) {
-    return 'Fast-tracks floor consideration (rule waiver)'
-  }
-
-  const nullification = title.match(NULLIFICATION_PATTERN)
-  if (nullification) {
-    const subject = truncateAtWordBoundary(normalizeResolutionRefs(nullification[1].trim()), 80)
-    return `Nullifies ${subject}`
-  }
-
-  const match = title.match(PROVIDING_FOR_CONSIDERATION_PATTERN)
-  if (!match) return null
-
-  const [, billType, billNumber, subjectRaw] = match
-  const billId = normalizeBillRef(billType, billNumber)
-  const subject = truncateAtWordBoundary(capitalizeFirst(trimDisplayTitle(subjectRaw.trim())), 80)
-
-  return `Sets up House debate on ${billId}: ${subject}`
-}
-
-function normalizeBillRef(typeRaw: string, number: string): string {
-  const compact = typeRaw.replace(/\s+/g, '').toUpperCase()
-  if (compact === 'HR' || compact === 'H.R') return `H.R. ${number}`
-  if (compact.startsWith('H') && compact.includes('RES')) return `H.Res. ${number}`
-  if (compact === 'S' || compact === 'S.') return `S. ${number}`
-  if (compact.startsWith('S') && compact.includes('RES')) return `S.Res. ${number}`
-  return `${typeRaw.trim()} ${number}`
-}
-
-function normalizeResolutionRefs(subject: string): string {
-  return subject
-    .replace(/\bHouse Resolution (\d+)\b/gi, 'H.Res. $1')
-    .replace(/\bSenate Resolution (\d+)\b/gi, 'S.Res. $1')
-}
-
-function capitalizeFirst(text: string): string {
-  if (!text) return text
-  return text.charAt(0).toUpperCase() + text.slice(1)
-}
-
-function normalizeVoteResult(result: string): string {
-  return result.toLowerCase()
-}
-
-function voteResultIndicatesFailure(normalized: string): boolean {
-  return (
-    normalized.includes('fail') ||
-    normalized.includes('reject') ||
-    normalized.includes('defeat') ||
-    normalized.includes('disagreed') ||
-    normalized.includes('not agreed')
-  )
-}
-
-function voteResultIndicatesPassage(normalized: string): boolean {
-  if (voteResultIndicatesFailure(normalized)) return false
-  return normalized.includes('pass') || normalized.includes('agreed')
-}
-
-export function voteIndicatesPassage(result: string): boolean {
-  return voteResultIndicatesPassage(normalizeVoteResult(result))
-}
-
-export function voteIndicatesFailure(result: string): boolean {
-  return voteResultIndicatesFailure(normalizeVoteResult(result))
-}
-
-export function voteResultClass(result: string): string {
-  const normalized = normalizeVoteResult(result)
-  if (voteResultIndicatesFailure(normalized)) return 'text-fail'
-  if (voteResultIndicatesPassage(normalized)) return 'text-pass'
-  return 'text-faint'
-}
-
-export function isProceduralVoteQuestion(question: string): boolean {
-  return PROCEDURAL_VOTE_QUESTION_PATTERN.test(question)
-}
-
-export function isProceduralVote(title: string | null, question: string): boolean {
-  if (title && proceduralHeadline(title) !== null) return true
-  return isProceduralVoteQuestion(question)
-}
+export { voteIndicatesFailure } from './vote-result'

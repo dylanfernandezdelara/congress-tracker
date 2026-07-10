@@ -1,15 +1,7 @@
 export {
-  extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatBillIdParts,
   formatShortBillId,
-  getBillTypeTooltip,
-  proceduralHeadline,
-  summaryBodyText,
-  trimDisplayTitle,
-  truncateAtWordBoundary,
-  voteIndicatesFailure,
-  voteResultClass,
 } from '@congress-tracker/shared/feed-content'
 
 export function congressGovBillUrl(congress: number, type: string, number: number): string {

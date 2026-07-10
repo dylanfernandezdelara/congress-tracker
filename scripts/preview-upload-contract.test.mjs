@@ -8,14 +8,14 @@ import {
   sanitizePreviewAlias,
 } from './preview-upload.mjs'
 
-test('preview alias max length fits worker DNS label budget', () => {
-  assert.equal(MAX_PREVIEW_ALIAS_LEN, 42)
+test('preview alias max length fits preview worker DNS label budget', () => {
+  assert.equal(MAX_PREVIEW_ALIAS_LEN, 34)
 })
 
 test('sanitizePreviewAlias normalizes branch names', () => {
   assert.equal(
     sanitizePreviewAlias('cursor/mobile-federal-control-text-0444'),
-    'cursor-mobile-federal-control-text-0444',
+    'cursor-mobile-federal-control-text',
   )
   assert.equal(sanitizePreviewAlias('feature/2-redesign'), 'feature-2-redesign')
 })
@@ -23,7 +23,7 @@ test('sanitizePreviewAlias normalizes branch names', () => {
 test('isValidPreviewAlias rejects leading digits and empty strings', () => {
   assert.equal(isValidPreviewAlias(''), false)
   assert.equal(isValidPreviewAlias('2-redesign'), false)
-  assert.equal(isValidPreviewAlias('cursor-mobile-federal-control-text-0444'), true)
+  assert.equal(isValidPreviewAlias('cursor-mobile-federal-control-text'), true)
 })
 
 test('sanitizePreviewAlias truncates over-long branch names', () => {

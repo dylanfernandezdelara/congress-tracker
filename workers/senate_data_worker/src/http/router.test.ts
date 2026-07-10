@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { handlePublicFetch } from "./http/router";
+import { handlePublicFetch } from "./router";
 
-vi.mock("./pipeline/run-members-roster", () => ({
+vi.mock("../pipeline/run-members-roster", () => ({
   runMembersRosterPipeline: vi.fn(async () => ({
     congress: 119,
     membersUpserted: 535,
@@ -10,7 +10,7 @@ vi.mock("./pipeline/run-members-roster", () => ({
   })),
 }));
 
-vi.mock("./pipeline/run-member-votes", () => ({
+vi.mock("../pipeline/run-member-votes", () => ({
   runMemberVotesPipeline: vi.fn(async () => ({
     rollsProcessed: 0,
     rollsSkipped: 0,

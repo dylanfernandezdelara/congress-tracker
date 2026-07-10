@@ -1,0 +1,115 @@
+@layer base {
+  :root {
+    color-scheme: light;
+    --twc-background: 0 0% 98%;
+    --twc-foreground: 0 0% 9%;
+    --twc-secondary: 0 0% 38%;
+    --twc-faint: 0 0% 56%;
+    --twc-card: 0 0% 100%;
+    --twc-border: 0 0% 0% / 0.08;
+    --twc-border-hover: 0 0% 0% / 0.16;
+    --twc-border-muted: 0 0% 0% / 0.1;
+    --twc-surface-subtle: 0 0% 0% / 0.08;
+    --twc-skeleton: 0 0% 0% / 0.05;
+    --twc-link-decoration: 0 0% 0% / 0.2;
+    --twc-ghost-border: 0 0% 0% / 0.1;
+    --twc-ghost-border-hover: 0 0% 0% / 0.2;
+    --twc-glow: 0 0% 0% / 0.03;
+    --twc-row-hover: 0 0% 0% / 0.035;
+    --twc-row-active: 0 0% 0% / 0.05;
+    --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.08);
+    --twc-accent: 24 85% 50%;
+    --twc-pass: 151 55% 36%;
+    --twc-fail: 0 65% 48%;
+    --twc-party-r: 0 72% 45%;
+    --twc-party-d: 217 75% 45%;
+    --twc-party-i: 270 35% 50%;
+    --twc-party-other: 0 0% 55%;
+    /* Single typeface for the whole app — do not add a second family. */
+    --font-family: 'Inter', sans-serif;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+    --twc-background: 0 0% 4%;
+    --twc-foreground: 0 0% 93%;
+    --twc-secondary: 0 0% 63%;
+    --twc-faint: 0 0% 45%;
+    --twc-card: 0 0% 7%;
+    --twc-border: 0 0% 100% / 0.08;
+    --twc-border-hover: 0 0% 100% / 0.18;
+    --twc-border-muted: 0 0% 100% / 0.1;
+    --twc-surface-subtle: 0 0% 100% / 0.08;
+    --twc-skeleton: 0 0% 100% / 0.04;
+    --twc-link-decoration: 0 0% 100% / 0.2;
+    --twc-ghost-border: 0 0% 100% / 0.1;
+    --twc-ghost-border-hover: 0 0% 100% / 0.2;
+    --twc-glow: 0 0% 100% / 0.04;
+    --twc-row-hover: 0 0% 100% / 0.04;
+    --twc-row-active: 0 0% 100% / 0.06;
+    --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.35);
+    --twc-accent: 24 90% 58%;
+    --twc-pass: 151 45% 55%;
+    --twc-fail: 0 65% 60%;
+    --twc-party-r: 0 70% 58%;
+    --twc-party-d: 217 70% 62%;
+    --twc-party-i: 270 35% 62%;
+    --twc-party-other: 0 0% 62%;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-family);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* SVG text does not always inherit from html; keep the single family. */
+  svg text {
+    font-family: var(--font-family);
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    margin: 0;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  body {
+    color: hsl(var(--twc-foreground));
+    background-color: hsl(var(--twc-background));
+    background-image: radial-gradient(
+      ellipse 120% 600px at 50% 0%,
+      hsl(var(--twc-glow)),
+      transparent
+    );
+  }
+
+  ::selection {
+    background-color: hsl(var(--twc-accent) / 0.25);
+    color: hsl(var(--twc-foreground));
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+}

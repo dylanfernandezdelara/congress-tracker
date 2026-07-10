@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bioguidePhotoUrl, memberInitials } from "../../../shared/member-photo";
+import { bioguidePhotoUrl, memberInitials } from "./member-photo";
 
 describe("member photo helpers", () => {
   it("builds bioguide photo urls for valid ids", () => {

@@ -3,12 +3,10 @@ import { useId } from 'react'
 import type { FeedItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import {
-  getFeedEventDisplay,
-  getFeedRowMeta,
   getFeedRowDisplayDate,
+  getFeedRowView,
   getFeedSummaryDisplay,
   getFeedTopic,
-  isProceduralFeedItem,
 } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 import { BillIdChip } from './BillIdChip'
@@ -31,10 +29,10 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const detailId = useId()
   const topic = getFeedTopic(item)
   const summary = getFeedSummaryDisplay(item)
-  const meta = getFeedRowMeta(item)
+  const { meta, eventDisplay } = getFeedRowView(item)
   const displayDate = getFeedRowDisplayDate(item)
-  const eventDisplay = getFeedEventDisplay(item)
   const policyArea = item.policy_area
+  const isProcedural = meta.kind === 'procedural'
   const showEventLine = meta.kind !== 'passed' && meta.kind !== 'failed'
   const executiveSignal = item.executive_signals?.[0]
 
@@ -46,7 +44,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProceduralFeedItem(item) ? ` ${policyAreaId}` : ''}${meta.margin && (meta.kind === 'passed' || meta.kind === 'failed') ? ` ${marginId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${meta.margin && (meta.kind === 'passed' || meta.kind === 'failed') ? ` ${marginId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={summaryId}
           onClick={onToggle}
         >
@@ -69,7 +67,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                 {executiveSignal ? (
                   <span className="feed-row-chip feed-row-chip--executive">Executive · Truth Social</span>
                 ) : null}
-                {policyArea && !isProceduralFeedItem(item) ? (
+                {policyArea && !isProcedural ? (
                   <span
                     id={policyAreaId}
                     data-feed-policy-area

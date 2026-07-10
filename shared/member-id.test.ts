@@ -4,7 +4,7 @@ import {
   isLocalSampleMemberId,
   isRealBioguideId,
   senateMemberLookupKey,
-} from "../../../shared/member-id";
+} from "./member-id";
 
 describe("member id helpers", () => {
   it("detects local sample and LIS ids", () => {

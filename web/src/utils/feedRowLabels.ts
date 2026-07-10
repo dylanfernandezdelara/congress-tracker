@@ -12,11 +12,6 @@ import {
 
 export const FEED_SUMMARY_PENDING = 'Summary pending'
 
-export interface FeedSummary {
-  text: string
-  pending: boolean
-}
-
 export interface FeedSummaryDisplay {
   lead: string
   bullets: string[]
@@ -25,10 +20,17 @@ export interface FeedSummaryDisplay {
 
 export type FeedStatusKind = 'passed' | 'failed' | 'procedural' | 'none'
 
-export interface FeedEventLine {
-  outcome: string
+export interface FeedRowMeta {
   kind: FeedStatusKind
-  detail: string
+  outcomeLabel: string
+  chamber: string | null
+  margin: string | null
+  billId: string
+}
+
+type FeedRowView = {
+  meta: FeedRowMeta
+  eventDisplay: string
 }
 
 export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
@@ -78,10 +80,6 @@ export function getFeedTopic(item: FeedItem): string {
   return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
 }
 
-function collapseSummaryText(text: string): string {
-  return text.replace(/\s+/g, ' ').trim()
-}
-
 function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
   const parts = buildFeedSummaryParts({
     whatItDoes: item.digest?.what_it_does,
@@ -95,16 +93,6 @@ function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
     bullets: parts.bullets,
     pending: false,
   }
-}
-
-export function getFeedSummary(item: FeedItem): FeedSummary {
-  const parts = getFeedSummaryParts(item)
-  if (!parts) {
-    return { text: FEED_SUMMARY_PENDING, pending: true }
-  }
-
-  const combined = collapseSummaryText([parts.lead, ...parts.bullets].join(' '))
-  return { text: combined, pending: false }
 }
 
 export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
@@ -132,92 +120,54 @@ function getProceduralEventSuffix(item: FeedItem): string {
   return `procedural vote on ${shortBillId}`
 }
 
-function getSubstantiveOutcomeLabel(result: string): 'Passed' | 'Failed' {
-  return voteIndicatesFailure(result) ? 'Failed' : 'Passed'
-}
-
-export function getFeedEventLine(item: FeedItem): FeedEventLine {
-  const vote = getPrimaryPassageVote(item)
-  const billId = formatShortBillId(item.bill.type, item.bill.number)
-
-  if (!vote) {
-    return { outcome: 'No vote recorded', kind: 'none', detail: '' }
-  }
-
-  if (isProceduralFeedItem(item)) {
-    const verb = voteIndicatesFailure(vote.result) ? 'rejected' : 'agreed'
-    return {
-      outcome: 'Procedural',
-      kind: 'procedural',
-      detail: `${vote.chamber} ${verb} ${vote.yeas}–${vote.nays} · ${getProceduralEventSuffix(item)}`,
-    }
-  }
-
-  const outcome = getSubstantiveOutcomeLabel(vote.result)
-  return {
-    outcome,
-    kind: outcome === 'Failed' ? 'failed' : 'passed',
-    detail: `${vote.chamber} · ${vote.yeas}–${vote.nays} · ${billId}`,
-  }
-}
-
-export function formatFeedEventLine(line: FeedEventLine): string {
-  return line.detail ? `${line.outcome} · ${line.detail}` : line.outcome
-}
-
-export function getFeedStatusKind(item: FeedItem): FeedStatusKind {
-  return getFeedEventLine(item).kind
-}
-
-export interface FeedRowMeta {
-  kind: FeedStatusKind
-  outcomeLabel: string
-  chamber: string | null
-  margin: string | null
-  billId: string
-}
-
-export function getFeedRowMeta(item: FeedItem): FeedRowMeta {
+/** Single derivation for collapsed-card meta + event copy. */
+export function getFeedRowView(item: FeedItem): FeedRowView {
   const vote = getPrimaryPassageVote(item)
   const billId = formatShortBillId(item.bill.type, item.bill.number)
 
   if (!vote) {
     return {
-      kind: 'none',
-      outcomeLabel: 'No vote',
-      chamber: null,
-      margin: null,
-      billId,
+      meta: {
+        kind: 'none',
+        outcomeLabel: 'No vote',
+        chamber: null,
+        margin: null,
+        billId,
+      },
+      eventDisplay: 'No vote recorded',
     }
   }
 
   const margin = `${vote.yeas}–${vote.nays}`
+  const procedural = isProceduralFeedItem(item)
 
-  if (isProceduralFeedItem(item)) {
+  if (procedural) {
+    const verb = voteIndicatesFailure(vote.result) ? 'rejected' : 'agreed'
     return {
-      kind: 'procedural',
-      outcomeLabel: 'Procedural',
-      chamber: vote.chamber,
-      margin,
-      billId,
+      meta: {
+        kind: 'procedural',
+        outcomeLabel: 'Procedural',
+        chamber: vote.chamber,
+        margin,
+        billId,
+      },
+      eventDisplay: `${vote.chamber} ${verb} ${vote.yeas}–${vote.nays} · ${getProceduralEventSuffix(item)}`,
     }
   }
 
   const failed = voteIndicatesFailure(vote.result)
-  return {
-    kind: failed ? 'failed' : 'passed',
-    outcomeLabel: failed ? 'Failed' : 'Passed',
-    chamber: vote.chamber,
-    margin,
-    billId,
-  }
-}
+  const outcomeLabel = failed ? 'Failed' : 'Passed'
+  const kind: FeedStatusKind = failed ? 'failed' : 'passed'
 
-/** De-duplicated event copy for the collapsed card (badge/chips already carry outcome + bill). */
-export function getFeedEventDisplay(item: FeedItem): string {
-  const meta = getFeedRowMeta(item)
-  if (meta.kind === 'none') return 'No vote recorded'
-  if (meta.kind === 'procedural') return getFeedEventLine(item).detail
-  if (meta.chamber && meta.margin) return `${meta.margin} in the ${meta.chamber}`
-  return meta.margin ?? ''
+  return {
+    meta: {
+      kind,
+      outcomeLabel,
+      chamber: vote.chamber,
+      margin,
+      billId,
+    },
+    // Badge/chips already carry outcome + bill; keep the chamber margin line.
+    eventDisplay: `${margin} in the ${vote.chamber}`,
+  }
 }
