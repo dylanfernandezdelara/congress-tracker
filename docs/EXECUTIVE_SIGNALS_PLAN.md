@@ -443,7 +443,7 @@ Shared types should live in `shared/` (same pattern as `stats-api-types.ts`).
 - [ ] Seed D1 with fixture posts + links
 - [ ] `GET /executive/alerts.json` returns expected alerts
 - [ ] Feed enrichment attaches signals to H.R. 6644 item
-- [ ] Follow `workers/senate_data_worker/src/http.test.ts` patterns
+- [ ] Follow `workers/senate_data_worker/src/http/router.test.ts` patterns
 
 ### Phase 3 — Live poll (staging)
 

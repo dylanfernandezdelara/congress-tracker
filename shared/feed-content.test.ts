@@ -3,6 +3,7 @@ import {
   buildFeedSummaryParts,
   normalizeDigestLead,
   proceduralHeadline,
+  trimDisplayTitle,
   voteIndicatesFailure,
 } from "./feed-content";
 
@@ -16,6 +17,33 @@ describe("feed-content helpers", () => {
       "Providing that section 11 of House Resolution 1224 shall have no force or effect.";
 
     expect(proceduralHeadline(title)).toBe("Nullifies section 11 of H.Res. 1224");
+  });
+
+  it("rewrites providing-for-consideration rule resolutions", () => {
+    const title =
+      "Providing for consideration of the bill (H.R. 2913) to authorize support for Ukraine, and for other purposes.";
+
+    expect(proceduralHeadline(title)).toBe(
+      "Sets up House debate on H.R. 2913: Authorize support for Ukraine",
+    );
+  });
+
+  it("rewrites rule-waiver resolutions", () => {
+    const title =
+      "Waiving a requirement of clause 6(a) of rule XIII with respect to consideration of certain resolutions reported from the Committee on Rules.";
+
+    expect(proceduralHeadline(title)).toBe("Fast-tracks floor consideration (rule waiver)");
+  });
+
+  it("returns null for non-matching titles", () => {
+    expect(proceduralHeadline("A regular bill title about infrastructure.")).toBeNull();
+  });
+
+  it("removes the boilerplate title suffix", () => {
+    expect(trimDisplayTitle("Authorize support for Ukraine, and for other purposes.")).toBe(
+      "Authorize support for Ukraine",
+    );
+    expect(trimDisplayTitle("Sample bill and for other purposes.")).toBe("Sample bill");
   });
 
   it("normalizes digest leads at ingest and builds collapsed feed summaries", () => {

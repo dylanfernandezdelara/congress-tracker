@@ -22,7 +22,7 @@ export function formatShortBillId(type: string, number: number): string {
   return `${label} ${number}`
 }
 
-export function getBillTypeTooltip(type: string): string | undefined {
+function getBillTypeTooltip(type: string): string | undefined {
   return BILL_TYPE_TOOLTIPS[type.toUpperCase()]
 }
 

@@ -3,12 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   FEED_SUMMARY_PENDING,
-  formatFeedEventLine,
   getFeedEventDisplay,
-  getFeedEventLine,
   getFeedRowDisplayDate,
   getFeedRowMeta,
-  getFeedSummary,
+  getFeedRowView,
   getFeedSummaryDisplay,
   getFeedTopic,
   getPrimaryPassageVote,
@@ -45,8 +43,8 @@ describe('getFeedRowDisplayDate', () => {
   })
 })
 
-describe('getFeedEventLine', () => {
-  it('formats substantive pass event lines', () => {
+describe('getFeedRowView', () => {
+  it('returns meta and de-duplicated event copy for a substantive pass', () => {
     const item = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 2913, title: 'Authorize support for Ukraine' },
       digest: null,
@@ -63,16 +61,19 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    const line = getFeedEventLine(item)
-    expect(line).toEqual({
-      outcome: 'Passed',
-      kind: 'passed',
-      detail: 'Senate · 52–47 · H.R. 2913',
+    expect(getFeedRowView(item)).toEqual({
+      meta: {
+        kind: 'passed',
+        outcomeLabel: 'Passed',
+        chamber: 'Senate',
+        margin: '52–47',
+        billId: 'H.R. 2913',
+      },
+      eventDisplay: '52–47 in the Senate',
     })
-    expect(formatFeedEventLine(line)).toBe('Passed · Senate · 52–47 · H.R. 2913')
   })
 
-  it('formats substantive fail event lines', () => {
+  it('returns meta and de-duplicated event copy for a substantive fail', () => {
     const item = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 8428, title: 'Rural hospital funding' },
       digest: null,
@@ -89,16 +90,19 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    const line = getFeedEventLine(item)
-    expect(line).toEqual({
-      outcome: 'Failed',
-      kind: 'failed',
-      detail: 'House · 198–230 · H.R. 8428',
+    expect(getFeedRowView(item)).toEqual({
+      meta: {
+        kind: 'failed',
+        outcomeLabel: 'Failed',
+        chamber: 'House',
+        margin: '198–230',
+        billId: 'H.R. 8428',
+      },
+      eventDisplay: '198–230 in the House',
     })
-    expect(formatFeedEventLine(line)).toBe('Failed · House · 198–230 · H.R. 8428')
   })
 
-  it('formats procedural agreed event lines with framing B', () => {
+  it('formats procedural agreed event copy with framing B', () => {
     const item = makeFeedItem({
       bill: {
         congress: 119,
@@ -119,15 +123,13 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    const line = getFeedEventLine(item)
-    expect(line.outcome).toBe('Procedural')
-    expect(line.kind).toBe('procedural')
-    expect(formatFeedEventLine(line)).toBe(
-      'Procedural · House agreed 218–210 · debate rule for H.R. 2913',
-    )
+    const view = getFeedRowView(item)
+    expect(view.meta.kind).toBe('procedural')
+    expect(view.meta.outcomeLabel).toBe('Procedural')
+    expect(view.eventDisplay).toBe('House agreed 218–210 · debate rule for H.R. 2913')
   })
 
-  it('formats procedural rejected event lines with framing B', () => {
+  it('formats procedural rejected event copy with framing B', () => {
     const item = makeFeedItem({
       bill: {
         congress: 119,
@@ -148,10 +150,9 @@ describe('getFeedEventLine', () => {
       ],
     })
 
-    const line = getFeedEventLine(item)
-    expect(line.outcome).toBe('Procedural')
-    expect(line.kind).toBe('procedural')
-    expect(formatFeedEventLine(line)).toBe('Procedural · House rejected 198–230 · rule for H.R. 456')
+    const view = getFeedRowView(item)
+    expect(view.meta.kind).toBe('procedural')
+    expect(view.eventDisplay).toBe('House rejected 198–230 · rule for H.R. 456')
   })
 
   it('classifies cloture votes as procedural via question pattern', () => {
@@ -177,13 +178,9 @@ describe('getFeedEventLine', () => {
     })
 
     expect(isProceduralFeedItem(item)).toBe(true)
-
-    const line = getFeedEventLine(item)
-    expect(line.outcome).toBe('Procedural')
-    expect(line.kind).toBe('procedural')
-    expect(formatFeedEventLine(line)).toBe(
-      'Procedural · Senate agreed 60–40 · procedural vote on S. 2282',
-    )
+    const view = getFeedRowView(item)
+    expect(view.meta.kind).toBe('procedural')
+    expect(view.eventDisplay).toBe('Senate agreed 60–40 · procedural vote on S. 2282')
   })
 })
 
@@ -238,7 +235,7 @@ describe('getPrimaryPassageVote', () => {
   })
 })
 
-describe('getFeedSummary', () => {
+describe('getFeedSummaryDisplay', () => {
   it('prefers digest what_it_does over CRS text', () => {
     const item = makeFeedItem({
       digest: {
@@ -250,8 +247,9 @@ describe('getFeedSummary', () => {
       raw_summary_text: 'Official CRS summary text.',
     })
 
-    expect(getFeedSummary(item)).toEqual({
-      text: 'Plain-language implications from the digest. Fallback point',
+    expect(getFeedSummaryDisplay(item)).toEqual({
+      lead: 'Plain-language implications from the digest.',
+      bullets: ['Fallback point'],
       pending: false,
     })
   })
@@ -263,8 +261,9 @@ describe('getFeedSummary', () => {
         'No Aid for Ghost Students Act\n\nThis bill blocks federal aid for students enrolled at institutions with no physical campus.',
     })
 
-    expect(getFeedSummary(item)).toEqual({
-      text: FEED_SUMMARY_PENDING,
+    expect(getFeedSummaryDisplay(item)).toEqual({
+      lead: FEED_SUMMARY_PENDING,
+      bullets: [],
       pending: true,
     })
   })
@@ -280,20 +279,22 @@ describe('getFeedSummary', () => {
       raw_summary_text: null,
     })
 
-    expect(getFeedSummary(item)).toEqual({
-      text: 'Requires agencies to publish contract performance data',
+    expect(getFeedSummaryDisplay(item)).toEqual({
+      lead: 'Requires agencies to publish contract performance data',
+      bullets: [],
       pending: false,
     })
   })
 
   it('returns a pending placeholder when no summary sources exist', () => {
-    expect(getFeedSummary(makeFeedItem({ digest: null, raw_summary_text: null }))).toEqual({
-      text: FEED_SUMMARY_PENDING,
+    expect(getFeedSummaryDisplay(makeFeedItem({ digest: null, raw_summary_text: null }))).toEqual({
+      lead: FEED_SUMMARY_PENDING,
+      bullets: [],
       pending: true,
     })
   })
 
-  it('caps combined summary text to collapsed feed word limits', () => {
+  it('caps lead and bullets to collapsed feed word limits', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
@@ -306,11 +307,45 @@ describe('getFeedSummary', () => {
       },
     })
 
-    const summary = getFeedSummary(item)
+    const summary = getFeedSummaryDisplay(item)
     expect(summary.pending).toBe(false)
-    expect(summary.text).toBe(
-      'This bill provides support to Ukraine and allied countries through security assistance. Financing and oversight requirements for federal agencies that administer foreign military aid…',
+    expect(summary.lead).toBe(
+      'This bill provides support to Ukraine and allied countries through security assistance.',
     )
+    expect(summary.bullets).toEqual([
+      'Financing and oversight requirements for federal agencies that administer foreign military aid…',
+    ])
+  })
+
+  it('returns a lead sentence and bullet points from the digest', () => {
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Headline',
+        what_it_does: 'Blocks federal aid for ghost students.',
+        key_points: ['Targets online-only schools', 'Requires enrollment verification'],
+        terms_explained: [],
+      },
+    })
+
+    expect(getFeedSummaryDisplay(item)).toEqual({
+      lead: 'Blocks federal aid for ghost students.',
+      bullets: ['Targets online-only schools', 'Requires enrollment verification'],
+      pending: false,
+    })
+  })
+
+  it('keeps only the first sentence for long digest text', () => {
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Headline',
+        what_it_does:
+          'This bill blocks aid for ghost students. It also creates new reporting rules and audit requirements for schools.',
+        key_points: ['Requires annual audits'],
+        terms_explained: [],
+      },
+    })
+
+    expect(getFeedSummaryDisplay(item).lead).toBe('This bill blocks aid for ghost students.')
   })
 })
 
@@ -390,47 +425,5 @@ describe('getFeedEventDisplay', () => {
     expect(getFeedEventDisplay(item)).toBe(
       'House agreed 218–210 · debate rule for H.R. 2913',
     )
-  })
-})
-
-describe('getFeedSummaryDisplay', () => {
-  it('returns a lead sentence and bullet points from the digest', () => {
-    const item = makeFeedItem({
-      digest: {
-        headline: 'Headline',
-        what_it_does: 'Blocks federal aid for ghost students.',
-        key_points: ['Targets online-only schools', 'Requires enrollment verification'],
-        terms_explained: [],
-      },
-    })
-
-    expect(getFeedSummaryDisplay(item)).toEqual({
-      lead: 'Blocks federal aid for ghost students.',
-      bullets: ['Targets online-only schools', 'Requires enrollment verification'],
-      pending: false,
-    })
-  })
-
-  it('keeps only the first sentence for long digest text', () => {
-    const item = makeFeedItem({
-      digest: {
-        headline: 'Headline',
-        what_it_does:
-          'This bill blocks aid for ghost students. It also creates new reporting rules and audit requirements for schools.',
-        key_points: ['Requires annual audits'],
-        terms_explained: [],
-      },
-    })
-
-    expect(getFeedSummaryDisplay(item).lead).toBe('This bill blocks aid for ghost students.')
-  })
-
-  it('returns pending when no summary source exists', () => {
-    const item = makeFeedItem({ digest: null, raw_summary_text: null })
-    expect(getFeedSummaryDisplay(item)).toEqual({
-      lead: FEED_SUMMARY_PENDING,
-      bullets: [],
-      pending: true,
-    })
   })
 })

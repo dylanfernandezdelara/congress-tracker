@@ -14,9 +14,8 @@ export default {
   },
   scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     const cron = controller.cron ?? "";
-    const isFeedCron = cron === FEED_PIPELINE_CRON_UTC || cron === "0 10 * * *";
-    const isExecutiveCron =
-      cron === EXECUTIVE_POSTS_CRON_UTC || cron === "*/15 * * * *";
+    const isFeedCron = cron === FEED_PIPELINE_CRON_UTC;
+    const isExecutiveCron = cron === EXECUTIVE_POSTS_CRON_UTC;
 
     if (isExecutiveCron) {
       ctx.waitUntil(

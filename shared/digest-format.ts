@@ -34,7 +34,7 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
-export function firstSentence(text: string): string {
+function firstSentence(text: string): string {
   const collapsed = collapseWhitespace(text)
   if (!collapsed) return collapsed
 
@@ -113,22 +113,4 @@ export function truncateAtWordBoundary(text: string, maxLength: number): string 
   const lastSpace = slice.lastIndexOf(' ')
   if (lastSpace <= 0) return `${slice.trimEnd()}…`
   return `${slice.slice(0, lastSpace).trimEnd()}…`
-}
-
-export function summaryBodyText(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed) return trimmed
-
-  const newlineIndex = trimmed.indexOf('\n')
-  if (newlineIndex === -1) return collapseWhitespace(trimmed)
-
-  const firstLine = trimmed.slice(0, newlineIndex).trim()
-  const remainder = trimmed.slice(newlineIndex + 1).trim()
-  const endsWithSentencePunctuation = /[.!?]$/.test(firstLine)
-
-  if (!endsWithSentencePunctuation && remainder.length > 0) {
-    return collapseWhitespace(remainder)
-  }
-
-  return collapseWhitespace(trimmed)
 }

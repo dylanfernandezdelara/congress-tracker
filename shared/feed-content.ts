@@ -11,22 +11,17 @@ export {
   FEED_COLLAPSED_MAX_BULLETS,
   FEED_LEAD_MAX_WORDS,
   buildFeedSummaryParts,
-  firstSentence,
   formatCollapsedDigestBullets,
   formatCollapsedDigestLead,
   normalizeDigestBullets,
   normalizeDigestLead,
-  summaryBodyText,
   truncateAtWordBoundary,
-  truncateWords,
-  type FeedSummaryParts,
 } from './digest-format'
 
 export {
   formatBillDocket,
   formatBillIdParts,
   formatShortBillId,
-  getBillTypeTooltip,
   stripLocalSampleLabel,
   trimDisplayTitle,
 } from './bill-id'
@@ -34,13 +29,7 @@ export {
 export {
   extractUnderlyingBillIdFromTitle,
   isProceduralVote,
-  isProceduralVoteQuestion,
   proceduralHeadline,
 } from './procedural-titles'
 
-export {
-  voteIndicatesFailure,
-  voteIndicatesPassage,
-  voteResultKind,
-  type VoteResultKind,
-} from './vote-result'
+export { voteIndicatesFailure } from './vote-result'
