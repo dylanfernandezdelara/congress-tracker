@@ -3,9 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   FEED_SUMMARY_PENDING,
-  getFeedEventDisplay,
   getFeedRowDisplayDate,
-  getFeedRowMeta,
   getFeedRowView,
   getFeedSummaryDisplay,
   getFeedTopic,
@@ -349,13 +347,13 @@ describe('getFeedSummaryDisplay', () => {
   })
 })
 
-describe('getFeedRowMeta', () => {
+describe('getFeedRowMeta via getFeedRowView', () => {
   it('extracts structured meta for a substantive pass', () => {
     const item = makeFeedItem({
       bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
     })
 
-    expect(getFeedRowMeta(item)).toEqual({
+    expect(getFeedRowView(item).meta).toEqual({
       kind: 'passed',
       outcomeLabel: 'Passed',
       chamber: 'Senate',
@@ -385,7 +383,7 @@ describe('getFeedRowMeta', () => {
       ],
     })
 
-    expect(getFeedRowMeta(item)).toEqual({
+    expect(getFeedRowView(item).meta).toEqual({
       kind: 'procedural',
       outcomeLabel: 'Procedural',
       chamber: 'House',
@@ -395,10 +393,10 @@ describe('getFeedRowMeta', () => {
   })
 })
 
-describe('getFeedEventDisplay', () => {
+describe('getFeedEventDisplay via getFeedRowView', () => {
   it('shows de-duplicated vote copy for substantive rows', () => {
     const item = makeFeedItem()
-    expect(getFeedEventDisplay(item)).toBe('52–47 in the Senate')
+    expect(getFeedRowView(item).eventDisplay).toBe('52–47 in the Senate')
   })
 
   it('shows full procedural detail without repeating the badge label', () => {
@@ -422,7 +420,7 @@ describe('getFeedEventDisplay', () => {
       ],
     })
 
-    expect(getFeedEventDisplay(item)).toBe(
+    expect(getFeedRowView(item).eventDisplay).toBe(
       'House agreed 218–210 · debate rule for H.R. 2913',
     )
   })

@@ -60,7 +60,7 @@ export function proceduralHeadline(title: string): string | null {
   return `Sets up House debate on ${billId}: ${subject}`
 }
 
-export function isProceduralVoteQuestion(question: string): boolean {
+function isProceduralVoteQuestion(question: string): boolean {
   return PROCEDURAL_VOTE_QUESTION_PATTERN.test(question)
 }
 

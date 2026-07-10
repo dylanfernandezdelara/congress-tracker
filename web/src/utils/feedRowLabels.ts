@@ -121,7 +121,7 @@ function getProceduralEventSuffix(item: FeedItem): string {
 }
 
 /** Single derivation for collapsed-card meta + event copy. */
-function deriveFeedRowView(item: FeedItem): FeedRowView {
+export function getFeedRowView(item: FeedItem): FeedRowView {
   const vote = getPrimaryPassageVote(item)
   const billId = formatShortBillId(item.bill.type, item.bill.number)
 
@@ -170,18 +170,4 @@ function deriveFeedRowView(item: FeedItem): FeedRowView {
     // Badge/chips already carry outcome + bill; keep the chamber margin line.
     eventDisplay: `${margin} in the ${vote.chamber}`,
   }
-}
-
-/** One call for collapsed-card meta + de-duplicated event copy. */
-export function getFeedRowView(item: FeedItem): FeedRowView {
-  return deriveFeedRowView(item)
-}
-
-export function getFeedRowMeta(item: FeedItem): FeedRowMeta {
-  return deriveFeedRowView(item).meta
-}
-
-/** De-duplicated event copy for the collapsed card (badge/chips already carry outcome + bill). */
-export function getFeedEventDisplay(item: FeedItem): string {
-  return deriveFeedRowView(item).eventDisplay
 }
