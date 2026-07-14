@@ -206,7 +206,7 @@ describe('getBillLifecycleStages', () => {
       state: 'current',
       date: '2026-06-29',
     })
-    expect(stages[4]?.detail).toBe('Day 4 of 10 — becomes law 2026-07-10 if unsigned')
+    expect(stages[4]?.detail).toBe('Day 4 of 10 — becomes law 2026-07-11 if unsigned')
   })
 
   it('derives stages from votes alone when lifecycle is null', () => {

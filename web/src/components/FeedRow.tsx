@@ -31,6 +31,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const topicId = useId()
   const policyAreaId = useId()
   const marginId = useId()
+  const deskChipId = useId()
   const eventId = useId()
   const summaryId = useId()
   const detailId = useId()
@@ -62,7 +63,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={summaryId}
           onClick={onToggle}
         >
@@ -82,7 +83,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
                   </span>
                 ) : null}
                 {meta.presidentDeskChip ? (
-                  <span className="feed-row-chip feed-row-chip--president-desk">
+                  <span id={deskChipId} className="feed-row-chip feed-row-chip--president-desk">
                     {meta.presidentDeskChip}
                   </span>
                 ) : null}

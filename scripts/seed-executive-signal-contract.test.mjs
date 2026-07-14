@@ -37,7 +37,14 @@ test('executive seed --remote requires CONFIRM_PRODUCTION_SEED=1', () => {
     execFileSync('bash', [seedScript, '--remote'], {
       cwd: rootDir,
       encoding: 'utf8',
-      env: { ...process.env, CONFIRM_PRODUCTION_SEED: undefined },
+      // Strip Cloudflare credentials so a guard regression can never reach the
+      // real remote D1 from a test run.
+      env: {
+        ...process.env,
+        CONFIRM_PRODUCTION_SEED: undefined,
+        CLOUDFLARE_API_TOKEN: '',
+        CLOUDFLARE_ACCOUNT_ID: '',
+      },
     })
   } catch (err) {
     threw = true

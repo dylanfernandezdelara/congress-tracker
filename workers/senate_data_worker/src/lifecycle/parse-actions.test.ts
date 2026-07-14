@@ -38,11 +38,11 @@ describe("parseLifecycleActions", () => {
     });
   });
 
-  it("parses veto and pocket veto codes", () => {
+  it("parses veto (31000) and pocket veto (30000) codes per the LOC table", () => {
     expect(
       parseLifecycleActions([
         {
-          actionCode: "30000",
+          actionCode: "31000",
           actionDate: "2026-05-01",
           text: "Vetoed by President.",
         },
@@ -52,7 +52,7 @@ describe("parseLifecycleActions", () => {
     expect(
       parseLifecycleActions([
         {
-          actionCode: "31000",
+          actionCode: "30000",
           actionDate: "2026-05-01",
           text: "Pocket vetoed by President.",
         },
@@ -61,6 +61,54 @@ describe("parseLifecycleActions", () => {
       vetoed_date: "2026-05-01",
       law_kind: "pocket_vetoed",
     });
+  });
+
+  it("keeps law_unsigned when generic Became Public Law (36000) accompanies 38000", () => {
+    const result = parseLifecycleActions([
+      {
+        actionCode: "28000",
+        actionDate: "2026-06-29",
+        text: "Presented to President.",
+        type: "President",
+      },
+      {
+        actionCode: "38000",
+        actionDate: "2026-07-11",
+        text: "Public Law unsigned by President.",
+        type: "President",
+      },
+      {
+        actionCode: "36000",
+        actionDate: "2026-07-11",
+        text: "Became Public Law No: 119-101.",
+        type: "President",
+      },
+    ]);
+
+    expect(result).toMatchObject({
+      became_law_date: "2026-07-11",
+      law_kind: "law_unsigned",
+      public_law: "119-101",
+      signed_date: null,
+    });
+  });
+
+  it("treats enactment over veto (39000) as became-law rather than vetoed", () => {
+    const result = parseLifecycleActions([
+      {
+        actionCode: "31000",
+        actionDate: "2026-05-01",
+        text: "Vetoed by President.",
+      },
+      {
+        actionCode: "39000",
+        actionDate: "2026-05-20",
+        text: "Public Law enacted over veto.",
+      },
+    ]);
+
+    expect(result.became_law_date).toBe("2026-05-20");
+    expect(result.law_kind).toBe("law_unsigned");
   });
 
   it("parses 38000 became-law-without-signature", () => {

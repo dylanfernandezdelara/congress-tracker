@@ -116,7 +116,9 @@ function formatDeadlineDetail(dayOfTen: number | null, deadlineDate: string | nu
   if (!deadlineDate) {
     return `${dayPart} — becomes law if unsigned`
   }
-  return `${dayPart} — becomes law ${deadlineDate} if unsigned`
+  // The ten-day window expires at the end of the deadline day, so the bill is
+  // law starting the following day — the same date shown on the outcome stage.
+  return `${dayPart} — becomes law ${addUtcDays(deadlineDate, 1)} if unsigned`
 }
 
 function unsignedDetail(lifecycle: BillLifecycle): string {

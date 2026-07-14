@@ -19,13 +19,13 @@ export interface ParsedLifecycleMilestones {
 }
 
 const PUBLIC_LAW_RE = /Became Public Law No:\s*([\d-]+)/i;
-const SIGNED_TEXT_RE = /signed by president/i;
-const BECAME_LAW_SIGNING_RE = /became public law/i;
+// Lookbehind excludes "unsigned by President" (e.g. the 38000 action text).
+const SIGNED_TEXT_RE = /(?<!un)signed by president/i;
+const BECAME_LAW_TEXT_RE = /became public law/i;
 const VETOED_TEXT_RE = /vetoed/i;
 const POCKET_VETO_RE = /pocket/i;
 const PRESENTED_TEXT_RE = /Presented to President/i;
-const LAW_UNSIGNED_TEXT_RE =
-  /became public law.*unsigned|without.*signature|Became Public Law No:/i;
+const LAW_UNSIGNED_TEXT_RE = /became public law.*unsigned|without.*signature/i;
 
 function actionDate(action: CongressAction): string | null {
   const raw = action.actionDate?.trim();
@@ -66,7 +66,6 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
   let public_law: string | null = null;
   let pocket = false;
   let law_unsigned = false;
-  let saw_signing_law = false;
 
   const sorted = [...actions].sort((a, b) => {
     const da = actionDate(a) ?? "";
@@ -91,53 +90,55 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
       presented_date = pickLatestDate(presented_date, date);
     }
 
+    // LOC action codes: 29000 "Signed by President", 37000 "Public Law signed
+    // by President". 36000 "Became Public Law" is generic (every enacted bill
+    // carries it) and is NOT evidence of a signature.
     const isSigned =
       code === "29000" ||
-      code === "36000" ||
-      (SIGNED_TEXT_RE.test(text) && BECAME_LAW_SIGNING_RE.test(text)) ||
+      code === "37000" ||
       (SIGNED_TEXT_RE.test(text) && !VETOED_TEXT_RE.test(text));
     if (isSigned && date) {
       signed_date = pickLatestDate(signed_date, date);
-      if (BECAME_LAW_SIGNING_RE.test(text) || code === "36000") {
-        became_law_date = pickLatestDate(became_law_date, date);
-        saw_signing_law = true;
-      }
+    }
+
+    const isBecameLaw =
+      code === "36000" ||
+      code === "37000" ||
+      code === "38000" ||
+      code === "39000" ||
+      BECAME_LAW_TEXT_RE.test(text);
+    if (isBecameLaw && date) {
+      became_law_date = pickLatestDate(became_law_date, date);
       const pl = extractPublicLaw(text);
       if (pl) public_law = pl;
     }
 
+    // LOC action codes: 30000 "Pocket vetoed by President", 31000 "Vetoed by President".
     const isVetoed = code === "30000" || code === "31000" || VETOED_TEXT_RE.test(text);
     if (isVetoed && date) {
       vetoed_date = pickLatestDate(vetoed_date, date);
-      if (POCKET_VETO_RE.test(text) || code === "31000") {
+      if (code === "30000" || POCKET_VETO_RE.test(text)) {
         pocket = true;
       }
     }
 
-    const isLawUnsignedCode = code === "38000";
-    const isLawUnsignedText =
-      /became public law.*unsigned|without.*signature/i.test(text) ||
-      (PUBLIC_LAW_RE.test(text) && !SIGNED_TEXT_RE.test(text) && !saw_signing_law);
-    if ((isLawUnsignedCode || isLawUnsignedText) && date) {
-      became_law_date = pickLatestDate(became_law_date, date);
+    // 38000 "Public Law unsigned by President" (Article I §7 ten-day lapse).
+    if ((code === "38000" || LAW_UNSIGNED_TEXT_RE.test(text)) && date) {
       law_unsigned = true;
-      const pl = extractPublicLaw(text);
-      if (pl) public_law = pl;
-    } else if (LAW_UNSIGNED_TEXT_RE.test(text) && !SIGNED_TEXT_RE.test(text) && date) {
-      const pl = extractPublicLaw(text);
-      if (pl) public_law = pl;
     }
   }
 
   let law_kind: BillLawKind | null = null;
-  if (vetoed_date) {
+  if (vetoed_date && !became_law_date) {
     law_kind = pocket ? "pocket_vetoed" : "vetoed";
+  } else if (law_unsigned && became_law_date) {
+    law_kind = "law_unsigned";
   } else if (signed_date) {
     law_kind = "signed";
-  } else if (became_law_date && law_unsigned) {
+  } else if (became_law_date) {
     law_kind = "law_unsigned";
-  } else if (became_law_date && !signed_date) {
-    law_kind = "law_unsigned";
+  } else if (vetoed_date) {
+    law_kind = pocket ? "pocket_vetoed" : "vetoed";
   }
 
   return {
