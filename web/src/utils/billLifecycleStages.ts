@@ -208,8 +208,16 @@ function markCurrent(stages: BillLifecycleStage[]): BillLifecycleStage[] {
 export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResult {
   const lifecycle = item.lifecycle
   const terminalStatus = deriveTerminalStatus(lifecycle)
-  const house = chamberPassage(item.passage_votes, 'House')
-  const senate = chamberPassage(item.passage_votes, 'Senate')
+  let house = chamberPassage(item.passage_votes, 'House')
+  let senate = chamberPassage(item.passage_votes, 'Senate')
+
+  // A bill presented to the President has necessarily passed both chambers;
+  // a chamber vote may simply predate the ingest lookback window.
+  const reachedPresident = Boolean(lifecycle?.presented_date) || terminalStatus !== null
+  if (reachedPresident) {
+    if (house.state === 'pending') house = { ...house, state: 'done' }
+    if (senate.state === 'pending') senate = { ...senate, state: 'done' }
+  }
 
   const introducedDate = lifecycle?.introduced_date ?? null
   const introducedDone =

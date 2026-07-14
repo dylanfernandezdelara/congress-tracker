@@ -227,6 +227,24 @@ describe('getBillLifecycleStages', () => {
     expect(stages[3]?.label).toBe('To President')
   })
 
+  it('infers both chambers passed when the bill reached the President despite missing votes', () => {
+    // Only a House vote is in the lookback window, but the bill became law,
+    // so the Senate stage must render as done rather than pending.
+    const item = makeFeedItem({
+      passage_votes: [hr6644Votes[0]!],
+      lifecycle: makeLifecycle({
+        introduced_date: '2025-12-11',
+        presented_date: '2026-06-29',
+        became_law_date: '2026-07-11',
+        law_kind: 'law_unsigned',
+      }),
+    })
+
+    const { stages } = getBillLifecycleStages(item)
+    expect(stages.find((s) => s.key === 'senate')?.state).toBe('done')
+    expect(stages.find((s) => s.key === 'house')?.state).toBe('done')
+  })
+
   it('handles a House-only bill with Senate still pending', () => {
     const item = makeFeedItem({
       passage_votes: [hr6644Votes[0]!],
