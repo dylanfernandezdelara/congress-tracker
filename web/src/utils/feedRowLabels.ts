@@ -10,6 +10,11 @@ import {
   voteIndicatesFailure,
 } from '@congress-tracker/shared/feed-content'
 
+import {
+  deriveTerminalStatus,
+  type BillTerminalStatus,
+} from './billLifecycleStages'
+
 export const FEED_SUMMARY_PENDING = 'Summary pending'
 
 export interface FeedSummaryDisplay {
@@ -18,7 +23,14 @@ export interface FeedSummaryDisplay {
   pending: boolean
 }
 
-export type FeedStatusKind = 'passed' | 'failed' | 'procedural' | 'none'
+export type FeedStatusKind =
+  | 'passed'
+  | 'failed'
+  | 'procedural'
+  | 'none'
+  | 'law'
+  | 'law_unsigned'
+  | 'vetoed'
 
 export interface FeedRowMeta {
   kind: FeedStatusKind
@@ -26,11 +38,45 @@ export interface FeedRowMeta {
   chamber: string | null
   margin: string | null
   billId: string
+  /** Compact chip for bills awaiting signature, e.g. "President's desk · day 4/10". */
+  presidentDeskChip: string | null
 }
 
 type FeedRowView = {
   meta: FeedRowMeta
   eventDisplay: string
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected value: ${String(value)}`)
+}
+
+function lifecycleBadge(
+  status: Exclude<BillTerminalStatus, null | 'pending_signature'>,
+): Pick<FeedRowMeta, 'kind' | 'outcomeLabel'> {
+  switch (status) {
+    case 'became_law_unsigned':
+      return { kind: 'law_unsigned', outcomeLabel: 'Law — unsigned' }
+    case 'became_law_signed':
+    case 'became_law':
+      return { kind: 'law', outcomeLabel: 'Law' }
+    case 'enacted_over_veto':
+      return { kind: 'law', outcomeLabel: 'Law — veto overridden' }
+    case 'vetoed':
+    case 'pocket_vetoed':
+      return { kind: 'vetoed', outcomeLabel: 'Vetoed' }
+    default:
+      return assertNever(status)
+  }
+}
+
+function presidentDeskChipLabel(item: FeedItem): string | null {
+  const day = item.lifecycle?.derived.day_of_ten
+  // day 0 = presented today; the ten-day count starts the following day.
+  if (day === null || day === undefined || day === 0) {
+    return "President's desk"
+  }
+  return `President's desk · day ${day}/10`
 }
 
 export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
@@ -124,8 +170,29 @@ function getProceduralEventSuffix(item: FeedItem): string {
 export function getFeedRowView(item: FeedItem): FeedRowView {
   const vote = getPrimaryPassageVote(item)
   const billId = formatShortBillId(item.bill.type, item.bill.number)
+  const terminalStatus = deriveTerminalStatus(item.lifecycle)
 
   if (!vote) {
+    if (
+      terminalStatus &&
+      terminalStatus !== 'pending_signature'
+    ) {
+      const badge = lifecycleBadge(terminalStatus)
+      return {
+        meta: {
+          ...badge,
+          chamber: null,
+          margin: null,
+          billId,
+          presidentDeskChip: null,
+        },
+        eventDisplay:
+          terminalStatus === 'became_law_unsigned'
+            ? "Became law without the President's signature"
+            : 'No vote recorded',
+      }
+    }
+
     return {
       meta: {
         kind: 'none',
@@ -133,6 +200,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
         chamber: null,
         margin: null,
         billId,
+        presidentDeskChip: null,
       },
       eventDisplay: 'No vote recorded',
     }
@@ -150,14 +218,34 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
         chamber: vote.chamber,
         margin,
         billId,
+        presidentDeskChip: null,
       },
       eventDisplay: `${vote.chamber} ${verb} ${vote.yeas}–${vote.nays} · ${getProceduralEventSuffix(item)}`,
+    }
+  }
+
+  if (terminalStatus && terminalStatus !== 'pending_signature') {
+    const badge = lifecycleBadge(terminalStatus)
+    return {
+      meta: {
+        ...badge,
+        chamber: vote.chamber,
+        margin,
+        billId,
+        presidentDeskChip: null,
+      },
+      eventDisplay:
+        terminalStatus === 'became_law_unsigned'
+          ? "Became law without the President's signature"
+          : `${margin} in the ${vote.chamber}`,
     }
   }
 
   const failed = voteIndicatesFailure(vote.result)
   const outcomeLabel = failed ? 'Failed' : 'Passed'
   const kind: FeedStatusKind = failed ? 'failed' : 'passed'
+  const deskChip =
+    terminalStatus === 'pending_signature' && !failed ? presidentDeskChipLabel(item) : null
 
   return {
     meta: {
@@ -166,6 +254,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
       chamber: vote.chamber,
       margin,
       billId,
+      presidentDeskChip: deskChip,
     },
     // Badge/chips already carry outcome + bill; keep the chamber margin line.
     eventDisplay: `${margin} in the ${vote.chamber}`,

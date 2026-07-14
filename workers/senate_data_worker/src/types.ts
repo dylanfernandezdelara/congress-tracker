@@ -31,8 +31,9 @@ import type {
   ExecutiveSignal,
   RelatedExecutiveBill,
 } from "../../../shared/executive-api-types";
+import type { BillLifecycle } from "../../../shared/lifecycle-api-types";
 
-export type { BillDigestContent };
+export type { BillDigestContent, BillLifecycle };
 
 export interface FeedBill {
   congress: number;
@@ -60,6 +61,7 @@ export interface FeedItem {
   raw_summary_text: string | null;
   passage_votes: FeedPassageVote[];
   latest_passage_date: string;
+  lifecycle: BillLifecycle | null;
   executive_signals?: ExecutiveSignal[];
   related_executive_bills?: RelatedExecutiveBill[];
 }

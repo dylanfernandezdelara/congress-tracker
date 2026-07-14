@@ -19,11 +19,19 @@ type FeedRowProps = {
   onToggle: () => void
 }
 
+function badgeTextClass(kind: string): string {
+  if (kind === 'passed') return ' text-pass'
+  if (kind === 'failed' || kind === 'vetoed') return ' text-fail'
+  if (kind === 'law' || kind === 'law_unsigned') return ' text-law'
+  return ''
+}
+
 export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const badgeId = useId()
   const topicId = useId()
   const policyAreaId = useId()
   const marginId = useId()
+  const deskChipId = useId()
   const eventId = useId()
   const summaryId = useId()
   const detailId = useId()
@@ -33,7 +41,18 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const displayDate = getFeedRowDisplayDate(item)
   const policyArea = item.policy_area
   const isProcedural = meta.kind === 'procedural'
-  const showEventLine = meta.kind !== 'passed' && meta.kind !== 'failed'
+  const showMarginChip =
+    Boolean(meta.margin) &&
+    (meta.kind === 'passed' ||
+      meta.kind === 'failed' ||
+      meta.kind === 'law' ||
+      meta.kind === 'law_unsigned' ||
+      meta.kind === 'vetoed')
+  const showEventLine =
+    meta.kind !== 'passed' &&
+    meta.kind !== 'failed' &&
+    meta.kind !== 'law' &&
+    meta.kind !== 'vetoed'
   const executiveSignal = item.executive_signals?.[0]
 
   return (
@@ -44,7 +63,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${meta.margin && (meta.kind === 'passed' || meta.kind === 'failed') ? ` ${marginId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={summaryId}
           onClick={onToggle}
         >
@@ -53,14 +72,19 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               <div className="feed-row-meta-row">
                 <span
                   id={badgeId}
-                  className={`feed-row-badge feed-row-badge--${meta.kind}${meta.kind === 'passed' ? ' text-pass' : meta.kind === 'failed' ? ' text-fail' : ''}`}
+                  className={`feed-row-badge feed-row-badge--${meta.kind}${badgeTextClass(meta.kind)}`}
                 >
                   {meta.outcomeLabel}
                 </span>
                 {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
-                {meta.margin && (meta.kind === 'passed' || meta.kind === 'failed') ? (
+                {showMarginChip ? (
                   <span id={marginId} className="feed-row-chip feed-row-chip--margin">
                     {meta.margin}
+                  </span>
+                ) : null}
+                {meta.presidentDeskChip ? (
+                  <span id={deskChipId} className="feed-row-chip feed-row-chip--president-desk">
+                    {meta.presidentDeskChip}
                   </span>
                 ) : null}
                 <BillIdChip type={item.bill.type} number={item.bill.number} />
@@ -103,7 +127,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
 
             <p
               id={eventId}
-              className={`feed-row-event${meta.kind === 'none' ? ' feed-row-event--muted' : ''}`}
+              className={`feed-row-event${meta.kind === 'none' ? ' feed-row-event--muted' : ''}${meta.kind === 'law_unsigned' ? ' feed-row-event--law' : ''}`}
               hidden={!showEventLine}
             >
               {eventDisplay}

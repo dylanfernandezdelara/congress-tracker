@@ -16,6 +16,7 @@ import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
+import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
 
@@ -27,6 +28,9 @@ export interface RunFeedResult {
   digestsSkipped: number;
   digestsRewritten: number;
   chamberWarnings: string[];
+  lifecycleRefreshed: number;
+  lifecycleSkipped: number;
+  lifecycleWarnings: string[];
 }
 
 export async function runFeedPipeline(
@@ -160,6 +164,21 @@ export async function runFeedPipeline(
       }
     }
 
+    const lifecycleResult = await refreshBillLifecycles(env, bills, trigger);
+    const lifecycleRefreshed = lifecycleResult.refreshed;
+    const lifecycleSkipped = lifecycleResult.skipped;
+    const lifecycleWarnings = lifecycleResult.warnings;
+
+    if (lifecycleWarnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_lifecycle_refresh",
+          trigger,
+          warnings: lifecycleWarnings,
+        })
+      );
+    }
+
     const result: RunFeedResult = {
       votesUpserted: newVotes.length,
       votesSkipped: houseResult.skipped + senateResult.skipped,
@@ -168,6 +187,9 @@ export async function runFeedPipeline(
       digestsSkipped,
       digestsRewritten,
       chamberWarnings,
+      lifecycleRefreshed,
+      lifecycleSkipped,
+      lifecycleWarnings,
     };
 
     try {
@@ -178,6 +200,11 @@ export async function runFeedPipeline(
         digestsWritten: result.digestsWritten,
         digestsSkipped: result.digestsSkipped,
         ...(chamberWarnings.length > 0 ? { chamber_warnings: chamberWarnings } : {}),
+        lifecycleRefreshed: result.lifecycleRefreshed,
+        lifecycleSkipped: result.lifecycleSkipped,
+        ...(lifecycleWarnings.length > 0
+          ? { lifecycle_warnings: lifecycleWarnings }
+          : {}),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

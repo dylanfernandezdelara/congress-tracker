@@ -11,6 +11,9 @@ export interface FeedPipelineRunRecord {
   digestsWritten: number;
   digestsSkipped: number;
   chamber_warnings?: string[];
+  lifecycleRefreshed?: number;
+  lifecycleSkipped?: number;
+  lifecycle_warnings?: string[];
 }
 
 export interface FeedPipelineFailureRecord {

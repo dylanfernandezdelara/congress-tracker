@@ -15,6 +15,10 @@
     color: hsl(var(--twc-fail));
   }
 
+  .text-law {
+    color: hsl(var(--twc-law));
+  }
+
   .policy-chip {
     --policy-chip-fg: hsl(var(--policy-h, 0) 48% 34%);
     --policy-chip-bg: hsl(var(--policy-h, 0) 72% 93%);

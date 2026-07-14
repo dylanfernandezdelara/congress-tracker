@@ -1,5 +1,9 @@
 import type { Env } from "../config";
-import { congressNumber } from "../config";
+import {
+  parseLifecycleActions,
+  type CongressAction,
+  type ParsedLifecycleMilestones,
+} from "../lifecycle/parse-actions";
 import type { BillRef } from "../types";
 import { stripHtmlToText } from "./html-clean";
 import { fetchJson } from "./http";
@@ -16,16 +20,27 @@ interface BillSummariesResponse {
 interface BillDetail {
   title?: string;
   policyArea?: { name?: string };
+  introducedDate?: string;
 }
 
 interface BillDetailResponse {
   bill?: BillDetail;
 }
 
+interface BillActionsResponse {
+  actions?: CongressAction[];
+}
+
 export interface BillSummaryBundle {
   title: string | null;
   policyArea: string | null;
   rawSummaryText: string | null;
+  introducedDate: string | null;
+}
+
+export interface BillLifecycleSource {
+  introducedDate: string | null;
+  milestones: ParsedLifecycleMilestones;
 }
 
 function billPathSegment(type: string): string {
@@ -39,13 +54,17 @@ function billPathSegment(type: string): string {
   return t;
 }
 
+function billApiBase(bill: BillRef): string {
+  const seg = billPathSegment(bill.type);
+  return `https://api.congress.gov/v3/bill/${bill.congress}/${seg}/${bill.number}`;
+}
+
 export async function fetchBillSummaryBundle(
   env: Env,
   bill: BillRef
 ): Promise<BillSummaryBundle> {
   const apiKey = env.CONGRESS_API_KEY;
-  const seg = billPathSegment(bill.type);
-  const base = `https://api.congress.gov/v3/bill/${bill.congress}/${seg}/${bill.number}`;
+  const base = billApiBase(bill);
 
   const [detailRes, summariesRes] = await Promise.all([
     fetchJson<BillDetailResponse>(`${base}?format=json&api_key=${apiKey}`),
@@ -61,6 +80,31 @@ export async function fetchBillSummaryBundle(
     title: detailRes.bill?.title ?? null,
     policyArea: detailRes.bill?.policyArea?.name ?? null,
     rawSummaryText: latest?.text ? stripHtmlToText(latest.text) : null,
+    introducedDate: detailRes.bill?.introducedDate?.slice(0, 10) ?? null,
+  };
+}
+
+/**
+ * Fetch bill actions + introducedDate for lifecycle tracking.
+ * One actions page (limit=250) is enough for presidential milestones.
+ */
+export async function fetchBillLifecycleSource(
+  env: Env,
+  bill: BillRef
+): Promise<BillLifecycleSource> {
+  const apiKey = env.CONGRESS_API_KEY;
+  const base = billApiBase(bill);
+
+  const [detailRes, actionsRes] = await Promise.all([
+    fetchJson<BillDetailResponse>(`${base}?format=json&api_key=${apiKey}`),
+    fetchJson<BillActionsResponse>(
+      `${base}/actions?format=json&limit=250&api_key=${apiKey}`
+    ),
+  ]);
+
+  return {
+    introducedDate: detailRes.bill?.introducedDate?.slice(0, 10) ?? null,
+    milestones: parseLifecycleActions(actionsRes.actions ?? []),
   };
 }
 

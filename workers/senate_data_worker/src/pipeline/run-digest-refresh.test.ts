@@ -60,6 +60,7 @@ describe("runDigestRefreshPipeline", () => {
       title: "Sample Act",
       policyArea: "Education",
       rawSummaryText: "Official CRS summary text.",
+      introducedDate: "2025-01-01",
     });
     mockRewriteSummary.mockResolvedValue({
       headline: "Sample headline",
@@ -91,6 +92,7 @@ describe("runDigestRefreshPipeline", () => {
       title: "Sample Act",
       policyArea: null,
       rawSummaryText: null,
+      introducedDate: null,
     });
 
     const result = await runDigestRefreshPipeline(createEnv(), [
