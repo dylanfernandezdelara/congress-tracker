@@ -107,7 +107,9 @@ function unsignedLawDate(lifecycle: BillLifecycle): string | null {
 }
 
 function formatDeadlineDetail(dayOfTen: number | null, becomesLawOn: string | null): string {
-  const dayPart = dayOfTen === null ? 'Day — of 10' : `Day ${dayOfTen} of 10`
+  // Day 0 = presented today; the ten-day count starts the following day.
+  const dayPart =
+    dayOfTen === null ? 'Day — of 10' : dayOfTen === 0 ? 'Presented' : `Day ${dayOfTen} of 10`
   if (!becomesLawOn) {
     return `${dayPart} — becomes law if unsigned`
   }
