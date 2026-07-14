@@ -6,6 +6,8 @@ import type { FeedItem, FeedPassageVote } from '../api/types'
 export type BillTerminalStatus =
   | 'became_law_unsigned'
   | 'became_law_signed'
+  | 'became_law'
+  | 'enacted_over_veto'
   | 'vetoed'
   | 'pocket_vetoed'
   | 'pending_signature'
@@ -37,18 +39,14 @@ function assertNever(value: never): never {
   throw new Error(`Unexpected value: ${String(value)}`)
 }
 
-function addUtcDays(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T12:00:00.000Z`)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 function mapLawKind(kind: BillLawKind): Exclude<BillTerminalStatus, null> {
   switch (kind) {
     case 'signed':
       return 'became_law_signed'
     case 'law_unsigned':
       return 'became_law_unsigned'
+    case 'enacted_over_veto':
+      return 'enacted_over_veto'
     case 'vetoed':
       return 'vetoed'
     case 'pocket_vetoed':
@@ -67,7 +65,8 @@ export function deriveTerminalStatus(lifecycle: BillLifecycle | null | undefined
   }
 
   if (lifecycle.became_law_date) {
-    return lifecycle.signed_date ? 'became_law_signed' : 'became_law_unsigned'
+    // Enacted, but the manner (signed vs ten-day lapse) is not asserted upstream.
+    return lifecycle.signed_date ? 'became_law_signed' : 'became_law'
   }
 
   if (lifecycle.signed_date) return 'became_law_signed'
@@ -104,21 +103,15 @@ function chamberPassage(
 }
 
 function unsignedLawDate(lifecycle: BillLifecycle): string | null {
-  if (lifecycle.became_law_date) return lifecycle.became_law_date
-  if (lifecycle.derived.deadline_date) {
-    return addUtcDays(lifecycle.derived.deadline_date, 1)
-  }
-  return null
+  return lifecycle.became_law_date ?? lifecycle.derived.becomes_law_on
 }
 
-function formatDeadlineDetail(dayOfTen: number | null, deadlineDate: string | null): string {
+function formatDeadlineDetail(dayOfTen: number | null, becomesLawOn: string | null): string {
   const dayPart = dayOfTen === null ? 'Day — of 10' : `Day ${dayOfTen} of 10`
-  if (!deadlineDate) {
+  if (!becomesLawOn) {
     return `${dayPart} — becomes law if unsigned`
   }
-  // The ten-day window expires at the end of the deadline day, so the bill is
-  // law starting the following day — the same date shown on the outcome stage.
-  return `${dayPart} — becomes law ${addUtcDays(deadlineDate, 1)} if unsigned`
+  return `${dayPart} — becomes law ${becomesLawOn} if unsigned`
 }
 
 function unsignedDetail(lifecycle: BillLifecycle): string {
@@ -143,22 +136,36 @@ function outcomeStage(
   }
 
   switch (terminalStatus) {
-    case 'became_law_unsigned': {
-      const lc = lifecycle!
+    case 'became_law_unsigned':
       return {
         key: 'outcome',
         label: 'Became law — unsigned',
-        date: unsignedLawDate(lc),
+        date: lifecycle ? unsignedLawDate(lifecycle) : null,
         state: 'done',
-        detail: unsignedDetail(lc),
+        detail: lifecycle ? unsignedDetail(lifecycle) : undefined,
       }
-    }
     case 'became_law_signed':
       return {
         key: 'outcome',
         label: 'Signed into law',
         date: lifecycle?.became_law_date ?? lifecycle?.signed_date ?? null,
         state: 'done',
+      }
+    case 'became_law':
+      return {
+        key: 'outcome',
+        label: 'Became law',
+        date: lifecycle?.became_law_date ?? null,
+        state: 'done',
+        detail: lifecycle?.public_law ? `Public Law ${lifecycle.public_law}` : undefined,
+      }
+    case 'enacted_over_veto':
+      return {
+        key: 'outcome',
+        label: 'Enacted over veto',
+        date: lifecycle?.became_law_date ?? null,
+        state: 'done',
+        detail: "Congress overrode the President's veto",
       }
     case 'vetoed':
       return {
@@ -182,7 +189,7 @@ function outcomeStage(
         state: 'current',
         detail: formatDeadlineDetail(
           lifecycle?.derived.day_of_ten ?? null,
-          lifecycle?.derived.deadline_date ?? null,
+          lifecycle?.derived.becomes_law_on ?? null,
         ),
       }
     default:
@@ -232,22 +239,9 @@ export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResul
     terminalStatus !== null
 
   const presentedDate = lifecycle?.presented_date ?? null
-  const bothChambersPassed = house.state === 'done' && senate.state === 'done'
-  const pastPresident =
-    terminalStatus === 'became_law_unsigned' ||
-    terminalStatus === 'became_law_signed' ||
-    terminalStatus === 'vetoed' ||
-    terminalStatus === 'pocket_vetoed' ||
-    terminalStatus === 'pending_signature'
-
-  let toPresidentState: BillLifecycleStageState = 'pending'
-  if (presentedDate || pastPresident) {
-    toPresidentState = 'done'
-  } else if (bothChambersPassed) {
-    toPresidentState = 'pending'
-  } else if (house.state === 'failed' || senate.state === 'failed') {
-    toPresidentState = 'pending'
-  }
+  // Any terminal status implies the bill reached the President's desk.
+  const toPresidentState: BillLifecycleStageState =
+    presentedDate || terminalStatus !== null ? 'done' : 'pending'
 
   const stages: BillLifecycleStage[] = [
     {

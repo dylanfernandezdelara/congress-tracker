@@ -125,7 +125,7 @@ describe('getFeedRowView', () => {
         public_law: 'Public Law 119-42',
         latest_action_date: '2026-07-11',
         latest_action_text: 'Became Public Law without signature.',
-        derived: { status: null, day_of_ten: null, deadline_date: null },
+        derived: { status: null, day_of_ten: null, deadline_date: null, becomes_law_on: null },
       },
     })
 
@@ -168,6 +168,7 @@ describe('getFeedRowView', () => {
           status: 'pending_signature',
           day_of_ten: 4,
           deadline_date: '2026-07-10',
+          becomes_law_on: '2026-07-11',
         },
       },
     })

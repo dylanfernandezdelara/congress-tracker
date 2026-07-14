@@ -44,7 +44,13 @@ function billKey(congress: number, billType: string, billNumber: number): string
 }
 
 function parseLawKind(value: string | null): BillLawKind | null {
-  if (value === "signed" || value === "law_unsigned" || value === "vetoed" || value === "pocket_vetoed") {
+  if (
+    value === "signed" ||
+    value === "law_unsigned" ||
+    value === "enacted_over_veto" ||
+    value === "vetoed" ||
+    value === "pocket_vetoed"
+  ) {
     return value;
   }
   return null;
@@ -64,15 +70,15 @@ export async function upsertLifecycle(
         law_kind, public_law, latest_action_date, latest_action_text, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(congress, bill_type, bill_number) DO UPDATE SET
-        introduced_date = excluded.introduced_date,
-        presented_date = excluded.presented_date,
-        signed_date = excluded.signed_date,
-        vetoed_date = excluded.vetoed_date,
-        became_law_date = excluded.became_law_date,
-        law_kind = excluded.law_kind,
-        public_law = excluded.public_law,
-        latest_action_date = excluded.latest_action_date,
-        latest_action_text = excluded.latest_action_text,
+        introduced_date = COALESCE(excluded.introduced_date, bill_lifecycle.introduced_date),
+        presented_date = COALESCE(excluded.presented_date, bill_lifecycle.presented_date),
+        signed_date = COALESCE(excluded.signed_date, bill_lifecycle.signed_date),
+        vetoed_date = COALESCE(excluded.vetoed_date, bill_lifecycle.vetoed_date),
+        became_law_date = COALESCE(excluded.became_law_date, bill_lifecycle.became_law_date),
+        law_kind = COALESCE(excluded.law_kind, bill_lifecycle.law_kind),
+        public_law = COALESCE(excluded.public_law, bill_lifecycle.public_law),
+        latest_action_date = COALESCE(excluded.latest_action_date, bill_lifecycle.latest_action_date),
+        latest_action_text = COALESCE(excluded.latest_action_text, bill_lifecycle.latest_action_text),
         updated_at = excluded.updated_at`
     )
     .bind(

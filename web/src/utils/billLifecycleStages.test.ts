@@ -21,6 +21,7 @@ function makeLifecycle(overrides: Partial<BillLifecycle> = {}): BillLifecycle {
       status: null,
       day_of_ten: null,
       deadline_date: null,
+      becomes_law_on: null,
       ...derivedOverrides,
     },
   }
@@ -57,7 +58,7 @@ describe('deriveTerminalStatus', () => {
       deriveTerminalStatus(
         makeLifecycle({
           law_kind: 'signed',
-          derived: { status: 'pending_signature', day_of_ten: 3, deadline_date: '2026-07-10' },
+          derived: { status: 'pending_signature', day_of_ten: 3, deadline_date: '2026-07-10', becomes_law_on: '2026-07-11' },
         }),
       ),
     ).toBe('became_law_signed')
@@ -72,6 +73,7 @@ describe('deriveTerminalStatus', () => {
             status: 'law_unsigned_derived',
             day_of_ten: null,
             deadline_date: '2026-07-10',
+            becomes_law_on: '2026-07-11',
           },
         }),
       ),
@@ -102,7 +104,7 @@ describe('getBillLifecycleStages', () => {
         public_law: 'Public Law 119-42',
         latest_action_date: '2026-07-11',
         latest_action_text: 'Became Public Law without signature.',
-        derived: { status: null, day_of_ten: null, deadline_date: null },
+        derived: { status: null, day_of_ten: null, deadline_date: null, becomes_law_on: null },
       }),
     })
 
@@ -129,6 +131,7 @@ describe('getBillLifecycleStages', () => {
           status: 'law_unsigned_derived',
           day_of_ten: null,
           deadline_date: '2026-07-10',
+          becomes_law_on: '2026-07-11',
         },
       }),
     })
@@ -194,6 +197,7 @@ describe('getBillLifecycleStages', () => {
           status: 'pending_signature',
           day_of_ten: 4,
           deadline_date: '2026-07-10',
+          becomes_law_on: '2026-07-11',
         },
       }),
     })

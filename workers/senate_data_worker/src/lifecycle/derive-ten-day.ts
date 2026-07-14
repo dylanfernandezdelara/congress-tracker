@@ -60,6 +60,7 @@ export function deriveTenDayRule(input: DeriveTenDayInput): BillLifecycleDerived
     status: null,
     day_of_ten: null,
     deadline_date: null,
+    becomes_law_on: null,
   };
 
   if (!input.presentedDate) return empty;
@@ -69,12 +70,15 @@ export function deriveTenDayRule(input: DeriveTenDayInput): BillLifecycleDerived
   const today = toYmd(input.now ?? new Date());
   const deadline = tenDayDeadlineDate(presented);
   const elapsed = nonSundayDaysElapsed(presented, today);
+  // The window expires at the end of the deadline day; the bill is law the next day.
+  const becomesLawOn = addUtcDays(deadline, 1);
 
   if (elapsed > 10) {
     return {
       status: "law_unsigned_derived",
       day_of_ten: null,
       deadline_date: deadline,
+      becomes_law_on: becomesLawOn,
     };
   }
 
@@ -82,5 +86,6 @@ export function deriveTenDayRule(input: DeriveTenDayInput): BillLifecycleDerived
     status: "pending_signature",
     day_of_ten: elapsed,
     deadline_date: deadline,
+    becomes_law_on: becomesLawOn,
   };
 }

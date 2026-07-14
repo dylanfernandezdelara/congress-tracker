@@ -1,4 +1,9 @@
-export type BillLawKind = "signed" | "law_unsigned" | "vetoed" | "pocket_vetoed";
+export type BillLawKind =
+  | "signed"
+  | "law_unsigned"
+  | "enacted_over_veto"
+  | "vetoed"
+  | "pocket_vetoed";
 
 export type BillLifecycleDerivedStatus = "pending_signature" | "law_unsigned_derived";
 
@@ -8,6 +13,8 @@ export interface BillLifecycleDerived {
   day_of_ten: number | null;
   /** Date the 10-day window (excl Sundays) lapses. */
   deadline_date: string | null;
+  /** Date the bill is law if unsigned: the day after the window lapses. */
+  becomes_law_on: string | null;
 }
 
 export interface BillLifecycle {

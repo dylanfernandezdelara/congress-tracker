@@ -26,6 +26,7 @@ const VETOED_TEXT_RE = /vetoed/i;
 const POCKET_VETO_RE = /pocket/i;
 const PRESENTED_TEXT_RE = /Presented to President/i;
 const LAW_UNSIGNED_TEXT_RE = /became public law.*unsigned|without.*signature/i;
+const OVER_VETO_TEXT_RE = /enacted over veto|over.*veto/i;
 
 function actionDate(action: CongressAction): string | null {
   const raw = action.actionDate?.trim();
@@ -66,6 +67,7 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
   let public_law: string | null = null;
   let pocket = false;
   let law_unsigned = false;
+  let enacted_over_veto = false;
 
   const sorted = [...actions].sort((a, b) => {
     const da = actionDate(a) ?? "";
@@ -113,6 +115,11 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
       if (pl) public_law = pl;
     }
 
+    // 39000 "Public Law enacted over veto" / veto-override text.
+    if ((code === "39000" || OVER_VETO_TEXT_RE.test(text)) && date) {
+      enacted_over_veto = true;
+    }
+
     // LOC action codes: 30000 "Pocket vetoed by President", 31000 "Vetoed by President".
     const isVetoed = code === "30000" || code === "31000" || VETOED_TEXT_RE.test(text);
     if (isVetoed && date) {
@@ -129,16 +136,24 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
   }
 
   let law_kind: BillLawKind | null = null;
-  if (vetoed_date && !became_law_date) {
-    law_kind = pocket ? "pocket_vetoed" : "vetoed";
-  } else if (law_unsigned && became_law_date) {
-    law_kind = "law_unsigned";
-  } else if (signed_date) {
-    law_kind = "signed";
-  } else if (became_law_date) {
-    law_kind = "law_unsigned";
+  if (became_law_date) {
+    if (enacted_over_veto) {
+      law_kind = "enacted_over_veto";
+    } else if (law_unsigned) {
+      law_kind = "law_unsigned";
+    } else if (signed_date) {
+      law_kind = "signed";
+    } else {
+      // Enacted with no explicit signature or ten-day-lapse evidence; the
+      // overwhelmingly common path is a signed law whose 29000/37000 action
+      // is absent from the page, but we cannot assert it, so leave kind null
+      // and let the UI show a generic "Law" outcome.
+      law_kind = null;
+    }
   } else if (vetoed_date) {
     law_kind = pocket ? "pocket_vetoed" : "vetoed";
+  } else if (signed_date) {
+    law_kind = "signed";
   }
 
   return {
@@ -153,14 +168,16 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
   };
 }
 
-/** True when formal congress.gov outcome is terminal (no further refresh needed). */
+/**
+ * True when formal congress.gov outcome is terminal (no further refresh needed).
+ * A bare veto is NOT terminal: Congress may still override it (LOC 32000/34000/39000),
+ * so vetoed bills keep refreshing until they leave the feed window.
+ */
 export function isTerminalLifecycle(params: {
   law_kind: BillLawKind | null;
   signed_date: string | null;
   vetoed_date: string | null;
   became_law_date: string | null;
 }): boolean {
-  if (params.law_kind != null) return true;
-  if (params.signed_date || params.vetoed_date || params.became_law_date) return true;
-  return false;
+  return Boolean(params.became_law_date || params.signed_date);
 }

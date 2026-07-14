@@ -58,7 +58,10 @@ function lifecycleBadge(
     case 'became_law_unsigned':
       return { kind: 'law_unsigned', outcomeLabel: 'Law — unsigned' }
     case 'became_law_signed':
+    case 'became_law':
       return { kind: 'law', outcomeLabel: 'Law' }
+    case 'enacted_over_veto':
+      return { kind: 'law', outcomeLabel: 'Law — veto overridden' }
     case 'vetoed':
     case 'pocket_vetoed':
       return { kind: 'vetoed', outcomeLabel: 'Vetoed' }
@@ -69,7 +72,8 @@ function lifecycleBadge(
 
 function presidentDeskChipLabel(item: FeedItem): string | null {
   const day = item.lifecycle?.derived.day_of_ten
-  if (day === null || day === undefined) {
+  // day 0 = presented today; the ten-day count starts the following day.
+  if (day === null || day === undefined || day === 0) {
     return "President's desk"
   }
   return `President's desk · day ${day}/10`

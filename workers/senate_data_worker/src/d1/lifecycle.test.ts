@@ -133,6 +133,53 @@ describe("d1/lifecycle", () => {
     });
   });
 
+  it("upsert preserves stored milestones when a refresh returns sparse data", async () => {
+    // A 200 response with an empty/partial actions list must not wipe
+    // previously stored milestone dates; every milestone column coalesces.
+    const sqls: string[] = [];
+    const db = {
+      prepare: (sql: string) => {
+        sqls.push(sql);
+        return {
+          bind: () => ({ run: async () => ({ success: true }) }),
+          run: async () => ({ success: true }),
+        };
+      },
+    } as unknown as D1Database;
+
+    await upsertLifecycle(db, {
+      congress: 119,
+      billType: "HR",
+      billNumber: 6644,
+      introducedDate: null,
+      presentedDate: null,
+      signedDate: null,
+      vetoedDate: null,
+      becameLawDate: null,
+      lawKind: null,
+      publicLaw: null,
+      latestActionDate: null,
+      latestActionText: null,
+    });
+
+    const upsertSql = sqls.find((s) => s.includes("INSERT INTO bill_lifecycle")) ?? "";
+    for (const column of [
+      "introduced_date",
+      "presented_date",
+      "signed_date",
+      "vetoed_date",
+      "became_law_date",
+      "law_kind",
+      "public_law",
+      "latest_action_date",
+      "latest_action_text",
+    ]) {
+      expect(upsertSql).toContain(
+        `${column} = COALESCE(excluded.${column}, bill_lifecycle.${column})`
+      );
+    }
+  });
+
   it("bulk-reads lifecycles for a set of bills", async () => {
     const { db } = createMockDb();
 

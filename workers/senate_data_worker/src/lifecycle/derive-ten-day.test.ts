@@ -36,6 +36,7 @@ describe("ten-day rule arithmetic (HR 6644)", () => {
       status: "pending_signature",
       day_of_ten: 10,
       deadline_date: "2026-07-10",
+      becomes_law_on: "2026-07-11",
     });
 
     expect(
@@ -50,6 +51,7 @@ describe("ten-day rule arithmetic (HR 6644)", () => {
       status: "pending_signature",
       day_of_ten: 4,
       deadline_date: "2026-07-10",
+      becomes_law_on: "2026-07-11",
     });
   });
 
@@ -66,6 +68,7 @@ describe("ten-day rule arithmetic (HR 6644)", () => {
       status: "law_unsigned_derived",
       day_of_ten: null,
       deadline_date: "2026-07-10",
+      becomes_law_on: "2026-07-11",
     });
 
     expect(
@@ -114,6 +117,7 @@ describe("ten-day rule arithmetic (HR 6644)", () => {
       status: null,
       day_of_ten: null,
       deadline_date: null,
+      becomes_law_on: null,
     });
   });
 });

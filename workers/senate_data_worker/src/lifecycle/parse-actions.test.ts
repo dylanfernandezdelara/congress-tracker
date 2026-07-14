@@ -93,7 +93,7 @@ describe("parseLifecycleActions", () => {
     });
   });
 
-  it("treats enactment over veto (39000) as became-law rather than vetoed", () => {
+  it("treats enactment over veto (39000) as enacted_over_veto", () => {
     const result = parseLifecycleActions([
       {
         actionCode: "31000",
@@ -108,7 +108,8 @@ describe("parseLifecycleActions", () => {
     ]);
 
     expect(result.became_law_date).toBe("2026-05-20");
-    expect(result.law_kind).toBe("law_unsigned");
+    expect(result.vetoed_date).toBe("2026-05-01");
+    expect(result.law_kind).toBe("enacted_over_veto");
   });
 
   it("parses 38000 became-law-without-signature", () => {
@@ -164,7 +165,7 @@ describe("parseLifecycleActions", () => {
     });
   });
 
-  it("treats plain Became Public Law text without signing as law_unsigned", () => {
+  it("leaves law_kind null for plain Became Public Law text with no signature or lapse evidence", () => {
     const result = parseLifecycleActions([
       {
         actionCode: null,
@@ -175,7 +176,7 @@ describe("parseLifecycleActions", () => {
 
     expect(result).toMatchObject({
       became_law_date: "2026-07-11",
-      law_kind: "law_unsigned",
+      law_kind: null,
       public_law: "119-88",
       signed_date: null,
     });
@@ -224,7 +225,18 @@ describe("parseLifecycleActions", () => {
 });
 
 describe("isTerminalLifecycle", () => {
-  it("is terminal for signed, vetoed, or became-law rows", () => {
+  it("is NOT terminal for a bare veto (Congress may still override)", () => {
+    expect(
+      isTerminalLifecycle({
+        law_kind: "vetoed",
+        signed_date: null,
+        vetoed_date: "2026-05-01",
+        became_law_date: null,
+      })
+    ).toBe(false);
+  });
+
+  it("is terminal for signed or became-law rows", () => {
     expect(
       isTerminalLifecycle({
         law_kind: "signed",

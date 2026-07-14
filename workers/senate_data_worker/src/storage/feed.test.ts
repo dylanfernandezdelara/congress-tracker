@@ -135,6 +135,7 @@ describe("buildFeedPage lifecycle attachment", () => {
         status: "pending_signature",
         day_of_ten: 4,
         deadline_date: "2026-07-10",
+        becomes_law_on: "2026-07-11",
       },
     });
   });
@@ -150,6 +151,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       status: "law_unsigned_derived",
       day_of_ten: null,
       deadline_date: "2026-07-10",
+      becomes_law_on: "2026-07-11",
     });
   });
 
