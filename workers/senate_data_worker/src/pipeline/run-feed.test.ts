@@ -10,9 +10,12 @@ const mockSelectRecentVotedBills = vi.fn();
 const mockSelectExistingVoteKeys = vi.fn();
 const mockUpsertVote = vi.fn();
 const mockFetchBillSummaryBundle = vi.fn();
+const mockFetchBillLifecycleSource = vi.fn();
 const mockRewriteSummary = vi.fn();
 const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
+const mockGetLifecyclesForBills = vi.fn();
+const mockUpsertLifecycle = vi.fn();
 
 vi.mock("../d1/digests", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/digests")>();
@@ -29,8 +32,18 @@ vi.mock("../d1/votes", () => ({
   selectRecentVotedBills: (...args: unknown[]) => mockSelectRecentVotedBills(...args),
 }));
 
+vi.mock("../d1/lifecycle", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/lifecycle")>();
+  return {
+    ...actual,
+    getLifecyclesForBills: (...args: unknown[]) => mockGetLifecyclesForBills(...args),
+    upsertLifecycle: (...args: unknown[]) => mockUpsertLifecycle(...args),
+  };
+});
+
 vi.mock("../sources/congress-client", () => ({
   fetchBillSummaryBundle: (...args: unknown[]) => mockFetchBillSummaryBundle(...args),
+  fetchBillLifecycleSource: (...args: unknown[]) => mockFetchBillLifecycleSource(...args),
   lookbackStartIso: (days: number) => `2026-01-01-${days}`,
 }));
 
@@ -100,7 +113,23 @@ describe("runFeedPipeline digest retry", () => {
       title: "Test Bill",
       policyArea: "Defense",
       rawSummaryText: "CRS summary text",
+      introducedDate: "2025-01-01",
     });
+    mockFetchBillLifecycleSource.mockResolvedValue({
+      introducedDate: "2025-01-01",
+      milestones: {
+        presented_date: null,
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: "2025-01-01",
+        latest_action_text: "Introduced in House",
+      },
+    });
+    mockGetLifecyclesForBills.mockResolvedValue(new Map());
+    mockUpsertLifecycle.mockResolvedValue(undefined);
     mockRewriteSummary.mockResolvedValue({
       headline: "Rewritten headline",
       what_it_does: "Does things",
@@ -192,5 +221,49 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsWritten).toBe(25);
     expect(mockUpsertDigest).toHaveBeenCalledTimes(25);
     expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
+  });
+
+  it("refreshes lifecycle for feed bills and skips terminal rows", async () => {
+    mockGetDigest.mockResolvedValue(completeDigest);
+    mockGetLifecyclesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:1",
+          {
+            congress: 119,
+            bill_type: "HR",
+            bill_number: 1,
+            introduced_date: "2025-01-01",
+            presented_date: "2026-01-01",
+            signed_date: "2026-01-10",
+            vetoed_date: null,
+            became_law_date: "2026-01-10",
+            law_kind: "signed",
+            public_law: "119-1",
+            latest_action_date: "2026-01-10",
+            latest_action_text: "Became Public Law No: 119-1.",
+            updated_at: "2026-01-10T00:00:00.000Z",
+          },
+        ],
+      ])
+    );
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.lifecycleSkipped).toBe(1);
+    expect(result.lifecycleRefreshed).toBe(0);
+    expect(mockFetchBillLifecycleSource).not.toHaveBeenCalled();
+    expect(mockUpsertLifecycle).not.toHaveBeenCalled();
+  });
+
+  it("upserts lifecycle when non-terminal and continues on fetch errors", async () => {
+    mockGetDigest.mockResolvedValue(completeDigest);
+    mockFetchBillLifecycleSource.mockRejectedValue(new Error("congress.gov down"));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.lifecycleRefreshed).toBe(0);
+    expect(result.lifecycleWarnings).toHaveLength(1);
+    expect(result.lifecycleWarnings[0]).toContain("congress.gov down");
   });
 });

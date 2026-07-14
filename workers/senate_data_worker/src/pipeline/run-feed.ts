@@ -1,11 +1,17 @@
 import {
   DIGEST_MAX_NEW_REWRITES,
   FEED_MAX_BILLS,
+  LIFECYCLE_MAX_REFRESHES_PER_RUN,
   VOTE_LOOKBACK_DAYS,
 } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
 import { getDigest, upsertDigest, parseStoredDigest } from "../d1/digests";
+import {
+  getLifecyclesForBills,
+  lifecycleMapKey,
+  upsertLifecycle,
+} from "../d1/lifecycle";
 import {
   recordFeedPipelineFailure,
   recordFeedPipelineSuccess,
@@ -14,7 +20,12 @@ import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
 import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
 import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
-import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
+import { isTerminalLifecycle } from "../lifecycle/parse-actions";
+import {
+  fetchBillLifecycleSource,
+  fetchBillSummaryBundle,
+  lookbackStartIso,
+} from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
@@ -27,6 +38,9 @@ export interface RunFeedResult {
   digestsSkipped: number;
   digestsRewritten: number;
   chamberWarnings: string[];
+  lifecycleRefreshed: number;
+  lifecycleSkipped: number;
+  lifecycleWarnings: string[];
 }
 
 export async function runFeedPipeline(
@@ -160,6 +174,87 @@ export async function runFeedPipeline(
       }
     }
 
+    let lifecycleRefreshed = 0;
+    let lifecycleSkipped = 0;
+    const lifecycleWarnings: string[] = [];
+
+    const existingLifecycles = await getLifecyclesForBills(
+      env.DB,
+      bills.map((row) => ({
+        congress: row.bill_congress,
+        billType: row.bill_type,
+        billNumber: row.bill_number,
+      }))
+    );
+
+    for (const row of bills) {
+      const key = lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number);
+      const stored = existingLifecycles.get(key);
+      if (
+        stored &&
+        isTerminalLifecycle({
+          law_kind: stored.law_kind,
+          signed_date: stored.signed_date,
+          vetoed_date: stored.vetoed_date,
+          became_law_date: stored.became_law_date,
+        })
+      ) {
+        lifecycleSkipped += 1;
+        continue;
+      }
+
+      if (lifecycleRefreshed >= LIFECYCLE_MAX_REFRESHES_PER_RUN) {
+        lifecycleSkipped += 1;
+        continue;
+      }
+
+      try {
+        const source = await fetchBillLifecycleSource(env, {
+          congress: row.bill_congress,
+          type: row.bill_type,
+          number: row.bill_number,
+        });
+        const m = source.milestones;
+        await upsertLifecycle(env.DB, {
+          congress: row.bill_congress,
+          billType: row.bill_type,
+          billNumber: row.bill_number,
+          introducedDate: source.introducedDate,
+          presentedDate: m.presented_date,
+          signedDate: m.signed_date,
+          vetoedDate: m.vetoed_date,
+          becameLawDate: m.became_law_date,
+          lawKind: m.law_kind,
+          publicLaw: m.public_law,
+          latestActionDate: m.latest_action_date,
+          latestActionText: m.latest_action_text,
+        });
+        lifecycleRefreshed += 1;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        const label = billLabel(row.bill_type, row.bill_number, row.bill_congress);
+        lifecycleWarnings.push(`${label}: ${message}`);
+        console.warn(
+          JSON.stringify({
+            event: "lifecycle_refresh_failed",
+            trigger,
+            bill: label,
+            error: message,
+          })
+        );
+      }
+    }
+
+    if (lifecycleWarnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_lifecycle_refresh",
+          trigger,
+          warnings: lifecycleWarnings,
+        })
+      );
+    }
+
     const result: RunFeedResult = {
       votesUpserted: newVotes.length,
       votesSkipped: houseResult.skipped + senateResult.skipped,
@@ -168,6 +263,9 @@ export async function runFeedPipeline(
       digestsSkipped,
       digestsRewritten,
       chamberWarnings,
+      lifecycleRefreshed,
+      lifecycleSkipped,
+      lifecycleWarnings,
     };
 
     try {
@@ -178,6 +276,11 @@ export async function runFeedPipeline(
         digestsWritten: result.digestsWritten,
         digestsSkipped: result.digestsSkipped,
         ...(chamberWarnings.length > 0 ? { chamber_warnings: chamberWarnings } : {}),
+        lifecycleRefreshed: result.lifecycleRefreshed,
+        lifecycleSkipped: result.lifecycleSkipped,
+        ...(lifecycleWarnings.length > 0
+          ? { lifecycle_warnings: lifecycleWarnings }
+          : {}),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

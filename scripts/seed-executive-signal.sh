@@ -3,7 +3,8 @@
 #
 # Usage:
 #   npm run seed:executive              # local D1 only
-#   npm run seed:executive -- --remote  # production/preview D1 (shared binding)
+#   CONFIRM_PRODUCTION_SEED=1 npm run seed:executive -- --remote
+#     # writes sample data to the PRODUCTION D1 database (congress-tracker)
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -102,6 +103,13 @@ trap 'rm -f "${SEED_FILE}"' EXIT
 printf '%s\n' "${SEED_SQL}" >"${SEED_FILE}"
 
 if [[ "${TARGET}" == "remote" ]]; then
+  if [[ "${CONFIRM_PRODUCTION_SEED:-}" != "1" ]]; then
+    echo "ERROR: Refusing to seed the PRODUCTION D1 database '${DB_NAME}'." >&2
+    echo "Re-run with CONFIRM_PRODUCTION_SEED=1 if you really intend to write sample data to production." >&2
+    exit 1
+  fi
+  echo "WARNING: Seeding PRODUCTION D1 database '${DB_NAME}' (--remote)." >&2
+  echo "This writes sample executive-signal data into the live production database." >&2
   echo "Seeding executive alert into remote D1 (${DB_NAME})..."
   ( cd "${WORKER_DIR}" && npx wrangler d1 execute "${DB_NAME}" --remote --file "${SEED_FILE}" )
 else

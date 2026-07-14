@@ -79,6 +79,22 @@ const SCHEMA_STATEMENTS = [
   updated_at TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number)
 )`,
+  `CREATE TABLE IF NOT EXISTS bill_lifecycle (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  introduced_date TEXT,
+  presented_date TEXT,
+  signed_date TEXT,
+  vetoed_date TEXT,
+  became_law_date TEXT,
+  law_kind TEXT,
+  public_law TEXT,
+  latest_action_date TEXT,
+  latest_action_text TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number)
+)`,
   `CREATE TABLE IF NOT EXISTS executive_posts (
   id TEXT PRIMARY KEY,
   platform TEXT NOT NULL,

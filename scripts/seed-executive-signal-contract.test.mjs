@@ -23,14 +23,35 @@ test('executive seed script exists and is executable', () => {
 })
 
 test('executive seed SQL includes housing SAVE post and bill links', () => {
-  const sql = execFileSync('bash', [seedScript], {
-    cwd: rootDir,
-    encoding: 'utf8',
-    env: { ...process.env, SEED_PRINT_SQL: '1' },
-  })
+  const sql = printSql()
   assert.match(sql, /CREATE TABLE IF NOT EXISTS executive_posts/)
   assert.match(sql, /116805545512296111/)
   assert.match(sql, /Cancelled housing signing until SAVE Act passes/)
   assert.match(sql, /119, 'HR', 6644/)
   assert.match(sql, /119, 'HR', 22/)
+})
+
+test('executive seed --remote requires CONFIRM_PRODUCTION_SEED=1', () => {
+  let threw = false
+  try {
+    execFileSync('bash', [seedScript, '--remote'], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      env: { ...process.env, CONFIRM_PRODUCTION_SEED: undefined },
+    })
+  } catch (err) {
+    threw = true
+    const error = /** @type {{ status?: number, stderr?: string }} */ (err)
+    assert.equal(error.status, 1)
+    assert.match(String(error.stderr ?? ''), /PRODUCTION D1 database 'congress-tracker'/)
+    assert.match(String(error.stderr ?? ''), /CONFIRM_PRODUCTION_SEED=1/)
+  }
+  assert.ok(threw, 'expected --remote without confirm to exit non-zero')
+})
+
+test('executive seed script documents production confirm for --remote', () => {
+  const source = fs.readFileSync(seedScript, 'utf8')
+  assert.match(source, /CONFIRM_PRODUCTION_SEED/)
+  assert.match(source, /PRODUCTION D1 database/)
+  assert.doesNotMatch(source, /shared binding/)
 })

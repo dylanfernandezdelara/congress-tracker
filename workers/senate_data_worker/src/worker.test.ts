@@ -99,6 +99,9 @@ describe("worker", () => {
       digestsSkipped: 2,
       digestsRewritten: 1,
       chamberWarnings: [],
+      lifecycleRefreshed: 0,
+      lifecycleSkipped: 0,
+      lifecycleWarnings: [],
     });
 
     const { ctx, awaitScheduled } = createScheduledContext();

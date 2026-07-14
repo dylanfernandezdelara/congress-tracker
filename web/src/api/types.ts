@@ -1,7 +1,8 @@
 import type { BillDigestContent } from '@congress-tracker/shared/digest-api-types'
 import type { ExecutiveSignal, RelatedExecutiveBill } from '@congress-tracker/shared/executive-api-types'
+import type { BillLifecycle } from '@congress-tracker/shared/lifecycle-api-types'
 
-export type { BillDigestContent }
+export type { BillDigestContent, BillLifecycle }
 
 export interface FeedBill {
   congress: number
@@ -29,6 +30,7 @@ export interface FeedItem {
   raw_summary_text: string | null
   passage_votes: FeedPassageVote[]
   latest_passage_date: string
+  lifecycle: BillLifecycle | null
   executive_signals?: ExecutiveSignal[]
   related_executive_bills?: RelatedExecutiveBill[]
 }

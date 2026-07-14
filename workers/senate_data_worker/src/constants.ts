@@ -11,6 +11,8 @@ export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
 export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
+/** Congress.gov lifecycle refreshes (actions + detail) per feed pipeline run. */
+export const LIFECYCLE_MAX_REFRESHES_PER_RUN = 40;
 
 /**
  * Roll-call votes to backfill per /__pipeline/run/member-votes invocation.

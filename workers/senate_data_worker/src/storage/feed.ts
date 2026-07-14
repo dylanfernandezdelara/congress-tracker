@@ -2,12 +2,17 @@ import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS, FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } fr
 import type { Env } from "../config";
 import { getExecutivePostBillsForBill, getExecutivePostBillsForPost, toExecutiveSignal } from "../d1/executive";
 import { getDigest, parseStoredDigest } from "../d1/digests";
+import {
+  getLifecyclesForBills,
+  lifecycleMapKey,
+} from "../d1/lifecycle";
 import { ensureSchema } from "../d1/schema";
 import {
   countFeedBills,
   getPassageVotesForBill,
   selectFeedBills,
 } from "../d1/votes";
+import { lifecycleRowToApi } from "../lifecycle/to-api";
 import { lookbackStartIso } from "../sources/congress-client";
 import type { RelatedExecutiveBill } from "../../../../shared/executive-api-types";
 import type { ExecutiveBillRole } from "../../../../shared/executive-api-types";
@@ -16,6 +21,8 @@ import type { Chamber, FeedItem, FeedPageResponse } from "../types";
 export interface FeedPageOptions {
   limit: number;
   offset: number;
+  /** Injectable clock for ten-day derivation tests. */
+  now?: Date | string;
 }
 
 export async function buildFeedPage(
@@ -27,11 +34,22 @@ export async function buildFeedPage(
   const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
   const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
   const offset = Math.max(0, options.offset);
+  const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
     countFeedBills(env.DB, lookback, executiveSince),
     selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
+
+  const lifecycles = await getLifecyclesForBills(
+    env.DB,
+    bills.map((row) => ({
+      congress: row.bill_congress,
+      billType: row.bill_type,
+      billNumber: row.bill_number,
+    }))
+  );
+
   const items: FeedItem[] = [];
 
   for (const row of bills) {
@@ -96,6 +114,10 @@ export async function buildFeedPage(
       }
     }
 
+    const lifecycleRow = lifecycles.get(
+      lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number)
+    );
+
     items.push({
       bill: {
         congress: row.bill_congress,
@@ -118,6 +140,7 @@ export async function buildFeedPage(
         date: v.vote_date,
       })),
       latest_passage_date: row.latest_passage_date,
+      lifecycle: lifecycleRow ? lifecycleRowToApi(lifecycleRow, now) : null,
       executive_signals,
       related_executive_bills,
     });
