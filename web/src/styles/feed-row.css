@@ -34,8 +34,14 @@
     border-left: 3px solid hsl(var(--twc-pass));
   }
 
-  .feed-row--failed {
+  .feed-row--failed,
+  .feed-row--vetoed {
     border-left: 3px solid hsl(var(--twc-fail));
+  }
+
+  .feed-row--law,
+  .feed-row--law_unsigned {
+    border-left: 3px solid hsl(var(--twc-law));
   }
 
   .feed-row--procedural {
@@ -129,9 +135,20 @@
     background-color: hsl(var(--twc-pass) / 0.12);
   }
 
-  .feed-row-badge--failed {
+  .feed-row-badge--failed,
+  .feed-row-badge--vetoed {
     font-weight: 700;
     background-color: hsl(var(--twc-fail) / 0.12);
+  }
+
+  .feed-row-badge--law,
+  .feed-row-badge--law_unsigned {
+    font-weight: 700;
+    background-color: hsl(var(--twc-law) / 0.14);
+  }
+
+  .feed-row-badge--law_unsigned {
+    letter-spacing: 0.03em;
   }
 
   .feed-row-badge.text-pass {
@@ -142,12 +159,20 @@
     color: hsl(0 74% 32%);
   }
 
+  .feed-row-badge.text-law {
+    color: hsl(36 72% 30%);
+  }
+
   [data-theme='dark'] .feed-row-badge.text-pass {
     color: hsl(var(--twc-pass));
   }
 
   [data-theme='dark'] .feed-row-badge.text-fail {
     color: hsl(var(--twc-fail));
+  }
+
+  [data-theme='dark'] .feed-row-badge.text-law {
+    color: hsl(var(--twc-law));
   }
 
   .feed-row-badge--procedural,
@@ -202,6 +227,12 @@
     border-color: hsl(var(--twc-accent) / 0.35);
     color: hsl(var(--twc-accent));
     background-color: hsl(var(--twc-accent) / 0.08);
+  }
+
+  .feed-row-chip--president-desk {
+    border-color: hsl(var(--twc-law) / 0.4);
+    color: hsl(var(--twc-law));
+    background-color: hsl(var(--twc-law) / 0.1);
   }
 
   .feed-row-executive-quote-wrap {
@@ -363,6 +394,11 @@
   .feed-row-event--muted {
     color: hsl(var(--twc-faint));
     font-weight: 400;
+  }
+
+  .feed-row-event--law {
+    color: hsl(var(--twc-law));
+    font-weight: 600;
   }
 
   .feed-row-teaser {
@@ -563,6 +599,190 @@
     border: 1px solid hsl(var(--twc-border));
     background-color: hsl(var(--twc-skeleton));
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Bill lifecycle pipeline stepper */
+  .bill-pipeline {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .bill-pipeline-steps {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.75rem 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bill-pipeline-step {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto auto;
+    justify-items: start;
+    gap: 0.35rem;
+    flex: 1 1 5.25rem;
+    min-width: 4.5rem;
+    max-width: 100%;
+    padding-right: 0.5rem;
+  }
+
+  .bill-pipeline-connector {
+    position: absolute;
+    top: 0.3125rem;
+    left: 0.625rem;
+    width: calc(100% - 0.375rem);
+    height: 1px;
+    background-color: hsl(var(--twc-border-muted));
+    pointer-events: none;
+  }
+
+  .bill-pipeline-step:last-child .bill-pipeline-connector {
+    display: none;
+  }
+
+  .bill-pipeline-marker {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    border: 1.5px solid hsl(var(--twc-border-muted));
+    background-color: hsl(var(--twc-card));
+    flex-shrink: 0;
+  }
+
+  .bill-pipeline-step--done .bill-pipeline-marker {
+    border-color: hsl(var(--twc-pass));
+    background-color: hsl(var(--twc-pass));
+  }
+
+  .bill-pipeline-step--current .bill-pipeline-marker {
+    border-color: hsl(var(--twc-law));
+    background-color: hsl(var(--twc-card));
+    box-shadow: 0 0 0 3px hsl(var(--twc-law) / 0.22);
+    animation: bill-pipeline-pulse 1.6s ease-in-out infinite;
+  }
+
+  .bill-pipeline-step--failed .bill-pipeline-marker {
+    border-color: hsl(var(--twc-fail));
+    background-color: hsl(var(--twc-fail));
+  }
+
+  .bill-pipeline-step--pending .bill-pipeline-marker {
+    border-color: hsl(var(--twc-faint) / 0.55);
+    background-color: transparent;
+  }
+
+  .bill-pipeline-step--done .bill-pipeline-connector {
+    background-color: hsl(var(--twc-pass) / 0.55);
+  }
+
+  .bill-pipeline-step--failed .bill-pipeline-connector {
+    background-color: hsl(var(--twc-fail) / 0.45);
+  }
+
+  .bill-pipeline-copy {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .bill-pipeline-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: hsl(var(--twc-foreground));
+    overflow-wrap: anywhere;
+  }
+
+  .bill-pipeline-step--pending .bill-pipeline-label {
+    color: hsl(var(--twc-faint));
+    font-weight: 500;
+  }
+
+  .bill-pipeline-step--current .bill-pipeline-label {
+    color: hsl(var(--twc-law));
+  }
+
+  .bill-pipeline-step--failed .bill-pipeline-label {
+    color: hsl(var(--twc-fail));
+  }
+
+  .bill-pipeline-date {
+    font-size: 0.625rem;
+    line-height: 1.3;
+    color: hsl(var(--twc-secondary));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bill-pipeline-date--empty {
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-pipeline-detail {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: hsl(var(--twc-law));
+    font-weight: 500;
+  }
+
+  @keyframes bill-pipeline-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 2px hsl(var(--twc-law) / 0.18);
+    }
+    50% {
+      box-shadow: 0 0 0 4px hsl(var(--twc-law) / 0.28);
+    }
+  }
+
+  @media (max-width: 479px) {
+    .bill-pipeline-steps {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+
+    .bill-pipeline-step {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-rows: auto;
+      column-gap: 0.625rem;
+      align-items: start;
+      flex: none;
+      width: 100%;
+      max-width: none;
+      min-width: 0;
+      padding: 0.3rem 0;
+      padding-right: 0;
+    }
+
+    .bill-pipeline-connector {
+      top: 0.625rem;
+      left: 0.25rem;
+      width: 1px;
+      height: calc(100% + 0.3rem);
+    }
+
+    .bill-pipeline-step:last-child .bill-pipeline-connector {
+      display: none;
+    }
+
+    .bill-pipeline-marker {
+      margin-top: 0.15rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bill-pipeline-step--current .bill-pipeline-marker {
+      animation: none;
+    }
   }
 
 }

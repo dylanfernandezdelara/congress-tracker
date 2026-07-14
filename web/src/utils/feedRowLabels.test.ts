@@ -66,6 +66,7 @@ describe('getFeedRowView', () => {
         chamber: 'Senate',
         margin: '52–47',
         billId: 'H.R. 2913',
+        presidentDeskChip: null,
       },
       eventDisplay: '52–47 in the Senate',
     })
@@ -95,8 +96,89 @@ describe('getFeedRowView', () => {
         chamber: 'House',
         margin: '198–230',
         billId: 'H.R. 8428',
+        presidentDeskChip: null,
       },
       eventDisplay: '198–230 in the House',
+    })
+  })
+
+  it('supersedes Passed with LAW — UNSIGNED for unsigned enactment', () => {
+    const item = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 6644, title: 'Housing Act' },
+      passage_votes: [
+        {
+          chamber: 'Senate',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          yeas: 85,
+          nays: 5,
+          date: '2026-06-24',
+        },
+      ],
+      lifecycle: {
+        introduced_date: '2025-12-11',
+        presented_date: '2026-06-29',
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: '2026-07-11',
+        law_kind: 'law_unsigned',
+        public_law: 'Public Law 119-42',
+        latest_action_date: '2026-07-11',
+        latest_action_text: 'Became Public Law without signature.',
+        derived: { status: null, day_of_ten: null, deadline_date: null },
+      },
+    })
+
+    expect(getFeedRowView(item)).toEqual({
+      meta: {
+        kind: 'law_unsigned',
+        outcomeLabel: 'Law — unsigned',
+        chamber: 'Senate',
+        margin: '85–5',
+        billId: 'H.R. 6644',
+        presidentDeskChip: null,
+      },
+      eventDisplay: "Became law without the President's signature",
+    })
+  })
+
+  it('keeps Passed and adds a President desk chip while pending signature', () => {
+    const item = makeFeedItem({
+      passage_votes: [
+        {
+          chamber: 'Senate',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          yeas: 85,
+          nays: 5,
+          date: '2026-06-24',
+        },
+      ],
+      lifecycle: {
+        introduced_date: '2025-12-11',
+        presented_date: '2026-06-29',
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: '2026-06-29',
+        latest_action_text: 'Presented to President.',
+        derived: {
+          status: 'pending_signature',
+          day_of_ten: 4,
+          deadline_date: '2026-07-10',
+        },
+      },
+    })
+
+    expect(getFeedRowView(item).meta).toEqual({
+      kind: 'passed',
+      outcomeLabel: 'Passed',
+      chamber: 'Senate',
+      margin: '85–5',
+      billId: 'S. 2',
+      presidentDeskChip: "President's desk · day 4/10",
     })
   })
 
@@ -359,6 +441,7 @@ describe('getFeedRowMeta via getFeedRowView', () => {
       chamber: 'Senate',
       margin: '52–47',
       billId: 'S. 2',
+      presidentDeskChip: null,
     })
   })
 
@@ -389,6 +472,7 @@ describe('getFeedRowMeta via getFeedRowView', () => {
       chamber: 'House',
       margin: '218–210',
       billId: 'H.Res. 512',
+      presidentDeskChip: null,
     })
   })
 })

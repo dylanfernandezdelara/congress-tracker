@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react'
 import { fetchVoteDefectors } from '../api/client'
 import type { FeedItem, FeedPassageVote, VoteDefectorEntry } from '../api/types'
 import { congressGovBillUrl, formatVoteDate } from '../utils/billLabels'
+import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { formatExecutiveRoleDetail, getBillColloquialName } from '../utils/executiveLabels'
 import { isProceduralFeedItem } from '../utils/feedRowLabels'
 import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
+import { BillPipeline } from './BillPipeline'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
 type FeedRowDetailProps = {
@@ -198,6 +200,11 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
+  const { stages, terminalStatus } = getBillLifecycleStages(item)
+  const pipelineDetail =
+    terminalStatus === 'became_law_unsigned' || terminalStatus === 'pending_signature'
+      ? (stages.find((stage) => stage.key === 'outcome')?.detail ?? null)
+      : null
   const [defectorsByRoll, setDefectorsByRoll] = useState<Map<string, RollDefectorsState>>(
     () => new Map(),
   )
@@ -263,6 +270,8 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
 
   return (
     <div className="feed-row-detail">
+      <BillPipeline stages={stages} detail={pipelineDetail} />
+
       {isProcedural ? (
         <div className="feed-row-detail-chips flex flex-wrap gap-2">
           <span

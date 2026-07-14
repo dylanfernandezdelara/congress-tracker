@@ -197,6 +197,70 @@ describe('FeedRow', () => {
     expect(eventLine?.textContent).toContain('agreed 218–210')
   })
 
+  it('shows LAW — UNSIGNED badge and event line for unsigned enactment', () => {
+    const item = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 6644, title: 'Housing Act' },
+      passage_votes: [
+        {
+          chamber: 'Senate',
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          yeas: 85,
+          nays: 5,
+          date: '2026-06-24',
+        },
+      ],
+      latest_passage_date: '2026-06-24',
+      lifecycle: {
+        introduced_date: '2025-12-11',
+        presented_date: '2026-06-29',
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: '2026-07-11',
+        law_kind: 'law_unsigned',
+        public_law: 'Public Law 119-42',
+        latest_action_date: '2026-07-11',
+        latest_action_text: 'Became Public Law without signature.',
+        derived: { status: null, day_of_ten: null, deadline_date: null },
+      },
+    })
+
+    const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+
+    const badge = screen.getByText('Law — unsigned')
+    expect(badge).toHaveClass('feed-row-badge--law_unsigned')
+    expect(badge).toHaveClass('text-law')
+    const eventLine = container.querySelector('.feed-row-event')
+    expect(eventLine).not.toHaveAttribute('hidden')
+    expect(eventLine?.textContent).toBe("Became law without the President's signature")
+  })
+
+  it('shows a President desk chip while pending signature', () => {
+    const item = makeFeedItem({
+      lifecycle: {
+        introduced_date: '2025-12-11',
+        presented_date: '2026-06-29',
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: '2026-06-29',
+        latest_action_text: 'Presented to President.',
+        derived: {
+          status: 'pending_signature',
+          day_of_ten: 4,
+          deadline_date: '2026-07-10',
+        },
+      },
+    })
+
+    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+
+    expect(screen.getByText('Passed')).toBeInTheDocument()
+    expect(screen.getByText("President's desk · day 4/10")).toBeInTheDocument()
+  })
+
   it('shows a direct Truth Social quote when the bill has an executive signal', () => {
     const quote =
       "Today's Housing News Conference and Signing is hereby cancelled until such time as we pass the desperately needed SAVE AMERICA ACT."

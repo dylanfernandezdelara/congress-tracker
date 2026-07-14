@@ -25,6 +25,7 @@ export function makeFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
       },
     ],
     latest_passage_date: '2026-06-05',
+    lifecycle: null,
     ...overrides,
   }
 }
