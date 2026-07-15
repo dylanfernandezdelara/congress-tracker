@@ -69,6 +69,10 @@ describe('getFeedRowView', () => {
         presidentDeskChip: null,
       },
       eventDisplay: '52–47 in the Senate',
+      badgeToneClass: ' text-pass',
+      showMarginChip: true,
+      showEventLine: false,
+      eventToneClass: '',
     })
   })
 
@@ -99,6 +103,10 @@ describe('getFeedRowView', () => {
         presidentDeskChip: null,
       },
       eventDisplay: '198–230 in the House',
+      badgeToneClass: ' text-fail',
+      showMarginChip: true,
+      showEventLine: false,
+      eventToneClass: '',
     })
   })
 
@@ -139,6 +147,10 @@ describe('getFeedRowView', () => {
         presidentDeskChip: null,
       },
       eventDisplay: "Became law without the President's signature",
+      badgeToneClass: ' text-law',
+      showMarginChip: true,
+      showEventLine: true,
+      eventToneClass: ' feed-row-event--law',
     })
   })
 
@@ -181,6 +193,33 @@ describe('getFeedRowView', () => {
       billId: 'S. 2',
       presidentDeskChip: "President's desk · day 4/10",
     })
+  })
+
+  it('hides the margin chip on procedural rows (tally is in the event line)', () => {
+    const item = makeFeedItem({
+      bill: {
+        congress: 119,
+        type: 'HR',
+        number: 1,
+        title:
+          'Providing for consideration of the bill (H.R. 2913) to authorize support for Ukraine, and for other purposes.',
+      },
+      passage_votes: [
+        {
+          chamber: 'House',
+          question: 'On Agreeing to the Resolution',
+          result: 'Agreed to',
+          yeas: 218,
+          nays: 210,
+          date: '2026-06-04',
+        },
+      ],
+    })
+
+    const view = getFeedRowView(item)
+    expect(view.meta.kind).toBe('procedural')
+    expect(view.showMarginChip).toBe(false)
+    expect(view.showEventLine).toBe(true)
   })
 
   it('formats procedural agreed event copy with framing B', () => {

@@ -75,7 +75,13 @@ export async function upsertLifecycle(
         signed_date = COALESCE(excluded.signed_date, bill_lifecycle.signed_date),
         vetoed_date = COALESCE(excluded.vetoed_date, bill_lifecycle.vetoed_date),
         became_law_date = COALESCE(excluded.became_law_date, bill_lifecycle.became_law_date),
-        law_kind = COALESCE(excluded.law_kind, bill_lifecycle.law_kind),
+        -- Categorical outcome: replace when the refresh asserts enactment or a
+        -- kind; never COALESCE so a prior "vetoed" cannot stick after override.
+        law_kind = CASE
+          WHEN excluded.became_law_date IS NOT NULL OR excluded.law_kind IS NOT NULL
+          THEN excluded.law_kind
+          ELSE bill_lifecycle.law_kind
+        END,
         public_law = COALESCE(excluded.public_law, bill_lifecycle.public_law),
         latest_action_date = COALESCE(excluded.latest_action_date, bill_lifecycle.latest_action_date),
         latest_action_text = COALESCE(excluded.latest_action_text, bill_lifecycle.latest_action_text),

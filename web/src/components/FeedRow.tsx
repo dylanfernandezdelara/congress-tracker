@@ -19,13 +19,6 @@ type FeedRowProps = {
   onToggle: () => void
 }
 
-function badgeTextClass(kind: string): string {
-  if (kind === 'passed') return ' text-pass'
-  if (kind === 'failed' || kind === 'vetoed') return ' text-fail'
-  if (kind === 'law' || kind === 'law_unsigned') return ' text-law'
-  return ''
-}
-
 export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const badgeId = useId()
   const topicId = useId()
@@ -37,22 +30,11 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const detailId = useId()
   const topic = getFeedTopic(item)
   const summary = getFeedSummaryDisplay(item)
-  const { meta, eventDisplay } = getFeedRowView(item)
+  const { meta, eventDisplay, badgeToneClass, showMarginChip, showEventLine, eventToneClass } =
+    getFeedRowView(item)
   const displayDate = getFeedRowDisplayDate(item)
   const policyArea = item.policy_area
   const isProcedural = meta.kind === 'procedural'
-  const showMarginChip =
-    Boolean(meta.margin) &&
-    (meta.kind === 'passed' ||
-      meta.kind === 'failed' ||
-      meta.kind === 'law' ||
-      meta.kind === 'law_unsigned' ||
-      meta.kind === 'vetoed')
-  const showEventLine =
-    meta.kind !== 'passed' &&
-    meta.kind !== 'failed' &&
-    meta.kind !== 'law' &&
-    meta.kind !== 'vetoed'
   const executiveSignal = item.executive_signals?.[0]
 
   return (
@@ -72,7 +54,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               <div className="feed-row-meta-row">
                 <span
                   id={badgeId}
-                  className={`feed-row-badge feed-row-badge--${meta.kind}${badgeTextClass(meta.kind)}`}
+                  className={`feed-row-badge feed-row-badge--${meta.kind}${badgeToneClass}`}
                 >
                   {meta.outcomeLabel}
                 </span>
@@ -127,7 +109,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
 
             <p
               id={eventId}
-              className={`feed-row-event${meta.kind === 'none' ? ' feed-row-event--muted' : ''}${meta.kind === 'law_unsigned' ? ' feed-row-event--law' : ''}`}
+              className={`feed-row-event${eventToneClass}`}
               hidden={!showEventLine}
             >
               {eventDisplay}

@@ -11,8 +11,12 @@ export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
 export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
-/** Congress.gov lifecycle refreshes (actions + detail) per feed pipeline run. */
-export const LIFECYCLE_MAX_REFRESHES_PER_RUN = 40;
+/**
+ * Congress.gov lifecycle refreshes (actions + detail) per feed pipeline run.
+ * Must cover the full feed window so older desk/unsigned bills are not starved
+ * by newer non-terminal passage votes that re-consume the budget every run.
+ */
+export const LIFECYCLE_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 
 /**
  * Roll-call votes to backfill per /__pipeline/run/member-votes invocation.

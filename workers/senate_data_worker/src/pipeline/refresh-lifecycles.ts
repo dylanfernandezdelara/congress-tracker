@@ -4,6 +4,7 @@ import {
   getLifecyclesForBills,
   lifecycleMapKey,
   upsertLifecycle,
+  type LifecycleRow,
 } from "../d1/lifecycle";
 import { isTerminalLifecycle } from "../lifecycle/parse-actions";
 import { fetchBillLifecycleSource } from "../sources/congress-client";
@@ -21,10 +22,18 @@ export interface RefreshLifecyclesResult {
   warnings: string[];
 }
 
+/** Lower number = refresh sooner when the per-run cap binds. */
+export function lifecycleRefreshPriority(stored: LifecycleRow | undefined): number {
+  if (!stored) return 0;
+  if (stored.presented_date || stored.vetoed_date) return 1;
+  return 2;
+}
+
 /**
  * Refresh congress.gov lifecycle milestones for the given feed bills.
- * Terminal rows (signed / became law) are skipped; per-bill failures are
- * collected as warnings and never fail the caller.
+ * Terminal rows (became law) are skipped. Candidates are ordered so missing
+ * and presidential-tracking rows win when the refresh cap binds. Per-bill
+ * failures are collected as warnings and never fail the caller.
  */
 export async function refreshBillLifecycles(
   env: Env,
@@ -44,9 +53,15 @@ export async function refreshBillLifecycles(
     }))
   );
 
-  for (const row of bills) {
-    const key = lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number);
-    const stored = existing.get(key);
+  const ranked = bills
+    .map((row, index) => {
+      const key = lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number);
+      const stored = existing.get(key);
+      return { row, index, stored, priority: lifecycleRefreshPriority(stored) };
+    })
+    .sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+  for (const { row, stored } of ranked) {
     if (
       stored &&
       isTerminalLifecycle({
@@ -54,6 +69,7 @@ export async function refreshBillLifecycles(
         signed_date: stored.signed_date,
         vetoed_date: stored.vetoed_date,
         became_law_date: stored.became_law_date,
+        public_law: stored.public_law,
       })
     ) {
       skipped += 1;
