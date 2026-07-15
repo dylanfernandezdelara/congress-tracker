@@ -69,6 +69,10 @@ describe('getFeedRowView', () => {
         presidentDeskChip: null,
       },
       eventDisplay: '52–47 in the Senate',
+      badgeToneClass: ' text-pass',
+      showMarginChip: true,
+      showEventLine: false,
+      eventToneClass: '',
     })
   })
 
@@ -99,6 +103,10 @@ describe('getFeedRowView', () => {
         presidentDeskChip: null,
       },
       eventDisplay: '198–230 in the House',
+      badgeToneClass: ' text-fail',
+      showMarginChip: true,
+      showEventLine: false,
+      eventToneClass: '',
     })
   })
 
@@ -139,6 +147,10 @@ describe('getFeedRowView', () => {
         presidentDeskChip: null,
       },
       eventDisplay: "Became law without the President's signature",
+      badgeToneClass: ' text-law',
+      showMarginChip: true,
+      showEventLine: true,
+      eventToneClass: ' feed-row-event--law',
     })
   })
 

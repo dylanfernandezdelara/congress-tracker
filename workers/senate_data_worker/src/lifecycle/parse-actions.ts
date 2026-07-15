@@ -26,6 +26,8 @@ const VETOED_TEXT_RE = /vetoed/i;
 const POCKET_VETO_RE = /pocket/i;
 const PRESENTED_TEXT_RE = /Presented to President/i;
 const LAW_UNSIGNED_TEXT_RE = /became public law.*unsigned|without.*signature/i;
+/** Live congress.gov path before formal 38000/36000 (e.g. H.R. 6644). */
+const ARCHIVIST_UNSIGNED_RE = /sent to archivist.*unsigned|archivist of the united states unsigned/i;
 const OVER_VETO_TEXT_RE = /enacted over veto|over.*veto/i;
 
 function actionDate(action: CongressAction): string | null {
@@ -130,8 +132,15 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
     }
 
     // 38000 "Public Law unsigned by President" (Article I §7 ten-day lapse).
-    if ((code === "38000" || LAW_UNSIGNED_TEXT_RE.test(text)) && date) {
+    // Also "Sent to Archivist … unsigned" (often coded E30000) which appears
+    // before formal Became Public Law / 38000 on some bills.
+    const isArchivistUnsigned =
+      code === "E30000" || ARCHIVIST_UNSIGNED_RE.test(text);
+    if ((code === "38000" || LAW_UNSIGNED_TEXT_RE.test(text) || isArchivistUnsigned) && date) {
       law_unsigned = true;
+      if (isArchivistUnsigned) {
+        became_law_date = pickLatestDate(became_law_date, date);
+      }
     }
   }
 
@@ -170,8 +179,9 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
 
 /**
  * True when formal congress.gov outcome is terminal (no further refresh needed).
- * A bare veto is NOT terminal: Congress may still override it (LOC 32000/34000/39000),
- * so vetoed bills keep refreshing until they leave the feed window.
+ * Require `became_law_date` so a bare `signed_date` keeps refreshing until
+ * public-law / enactment fields land. A bare veto is NOT terminal: Congress may
+ * still override it (LOC 32000/34000/39000).
  */
 export function isTerminalLifecycle(params: {
   law_kind: BillLawKind | null;
@@ -179,5 +189,5 @@ export function isTerminalLifecycle(params: {
   vetoed_date: string | null;
   became_law_date: string | null;
 }): boolean {
-  return Boolean(params.became_law_date || params.signed_date);
+  return Boolean(params.became_law_date);
 }

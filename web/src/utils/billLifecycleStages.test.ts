@@ -83,6 +83,18 @@ describe('deriveTerminalStatus', () => {
   it('returns null when lifecycle is null', () => {
     expect(deriveTerminalStatus(null)).toBeNull()
   })
+
+  it('lets became_law_date beat a stale vetoed law_kind', () => {
+    expect(
+      deriveTerminalStatus(
+        makeLifecycle({
+          law_kind: 'vetoed',
+          vetoed_date: '2026-05-01',
+          became_law_date: '2026-05-20',
+        }),
+      ),
+    ).toBe('became_law')
+  })
 })
 
 describe('getBillLifecycleStages', () => {
@@ -286,5 +298,28 @@ describe('getBillLifecycleStages', () => {
       date: '2026-06-04',
     })
     expect(stages.find((s) => s.key === 'senate')?.state).toBe('current')
+  })
+
+  it('upgrades a lookback-only failed chamber to done once the bill reached the President', () => {
+    const item = makeFeedItem({
+      passage_votes: [
+        {
+          chamber: 'House',
+          question: 'On Passage of the Bill',
+          result: 'Failed',
+          yeas: 198,
+          nays: 230,
+          date: '2026-01-04',
+        },
+      ],
+      lifecycle: makeLifecycle({
+        introduced_date: '2025-12-11',
+        presented_date: '2026-06-29',
+      }),
+    })
+
+    const { stages } = getBillLifecycleStages(item)
+    expect(stages.find((s) => s.key === 'house')?.state).toBe('done')
+    expect(stages.find((s) => s.key === 'senate')?.state).toBe('done')
   })
 })

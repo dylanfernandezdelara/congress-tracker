@@ -137,6 +137,30 @@ describe("parseLifecycleActions", () => {
     });
   });
 
+  it("treats Archivist-unsigned (E30000) as law_unsigned enactment", () => {
+    const result = parseLifecycleActions([
+      {
+        actionCode: "28000",
+        actionDate: "2026-06-29",
+        text: "Presented to President.",
+        type: "President",
+      },
+      {
+        actionCode: "E30000",
+        actionDate: "2026-07-11",
+        text: "Sent to Archivist of the United States unsigned.",
+        type: "President",
+      },
+    ]);
+
+    expect(result).toMatchObject({
+      presented_date: "2026-06-29",
+      became_law_date: "2026-07-11",
+      law_kind: "law_unsigned",
+      signed_date: null,
+    });
+  });
+
   it("falls back to text when actionCode is null", () => {
     const result = parseLifecycleActions([
       {
@@ -236,7 +260,7 @@ describe("isTerminalLifecycle", () => {
     ).toBe(false);
   });
 
-  it("is terminal for signed or became-law rows", () => {
+  it("is NOT terminal for bare signed_date (keep refreshing until public law lands)", () => {
     expect(
       isTerminalLifecycle({
         law_kind: "signed",
@@ -244,13 +268,24 @@ describe("isTerminalLifecycle", () => {
         vetoed_date: null,
         became_law_date: null,
       })
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("is terminal only when became_law_date is set", () => {
     expect(
       isTerminalLifecycle({
         law_kind: null,
         signed_date: null,
         vetoed_date: null,
         became_law_date: "2026-07-11",
+      })
+    ).toBe(true);
+    expect(
+      isTerminalLifecycle({
+        law_kind: "signed",
+        signed_date: "2026-07-02",
+        vetoed_date: null,
+        became_law_date: "2026-07-02",
       })
     ).toBe(true);
     expect(

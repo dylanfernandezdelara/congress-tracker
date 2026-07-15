@@ -135,7 +135,8 @@ describe("d1/lifecycle", () => {
 
   it("upsert preserves stored milestones when a refresh returns sparse data", async () => {
     // A 200 response with an empty/partial actions list must not wipe
-    // previously stored milestone dates; every milestone column coalesces.
+    // previously stored milestone dates; date/text columns coalesce.
+    // law_kind uses CASE so a prior veto cannot stick after enactment.
     const sqls: string[] = [];
     const db = {
       prepare: (sql: string) => {
@@ -169,7 +170,6 @@ describe("d1/lifecycle", () => {
       "signed_date",
       "vetoed_date",
       "became_law_date",
-      "law_kind",
       "public_law",
       "latest_action_date",
       "latest_action_text",
@@ -178,6 +178,10 @@ describe("d1/lifecycle", () => {
         `${column} = COALESCE(excluded.${column}, bill_lifecycle.${column})`
       );
     }
+    expect(upsertSql).toContain(
+      "WHEN excluded.became_law_date IS NOT NULL OR excluded.law_kind IS NOT NULL"
+    );
+    expect(upsertSql).toContain("THEN excluded.law_kind");
   });
 
   it("bulk-reads lifecycles for a set of bills", async () => {

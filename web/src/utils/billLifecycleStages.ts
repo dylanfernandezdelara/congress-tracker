@@ -56,12 +56,35 @@ function mapLawKind(kind: BillLawKind): Exclude<BillTerminalStatus, null> {
   }
 }
 
+/** Shared copy for unsigned enactment (collapsed card + pipeline detail). */
+export const UNSIGNED_LAW_EVENT =
+  "Became law without the President's signature"
+
+export const UNSIGNED_LAW_DETAIL =
+  "Enacted without the President's signature (10-day rule)"
+
+/** Day 0 = presented today; the ten-day count starts the following day. */
+export function formatTenDayProgress(dayOfTen: number | null | undefined): string {
+  if (dayOfTen === null || dayOfTen === undefined) return 'Day — of 10'
+  if (dayOfTen === 0) return 'Presented'
+  return `Day ${dayOfTen} of 10`
+}
+
 /** Formal congress.gov fields win; derived ten-day status is the fallback. */
 export function deriveTerminalStatus(lifecycle: BillLifecycle | null | undefined): BillTerminalStatus {
   if (!lifecycle) return null
 
   if (lifecycle.law_kind) {
-    return mapLawKind(lifecycle.law_kind)
+    const mapped = mapLawKind(lifecycle.law_kind)
+    // A formal enactment date beats a stale veto kind left by an older upsert.
+    if (
+      lifecycle.became_law_date &&
+      (mapped === 'vetoed' || mapped === 'pocket_vetoed')
+    ) {
+      // fall through to became_law_date handling
+    } else {
+      return mapped
+    }
   }
 
   if (lifecycle.became_law_date) {
@@ -107,9 +130,7 @@ function unsignedLawDate(lifecycle: BillLifecycle): string | null {
 }
 
 function formatDeadlineDetail(dayOfTen: number | null, becomesLawOn: string | null): string {
-  // Day 0 = presented today; the ten-day count starts the following day.
-  const dayPart =
-    dayOfTen === null ? 'Day — of 10' : dayOfTen === 0 ? 'Presented' : `Day ${dayOfTen} of 10`
+  const dayPart = formatTenDayProgress(dayOfTen)
   if (!becomesLawOn) {
     return `${dayPart} — becomes law if unsigned`
   }
@@ -117,11 +138,10 @@ function formatDeadlineDetail(dayOfTen: number | null, becomesLawOn: string | nu
 }
 
 function unsignedDetail(lifecycle: BillLifecycle): string {
-  const base = "Enacted without the President's signature (10-day rule)"
   if (lifecycle.public_law) {
-    return `${base} · ${lifecycle.public_law}`
+    return `${UNSIGNED_LAW_DETAIL} · ${lifecycle.public_law}`
   }
-  return base
+  return UNSIGNED_LAW_DETAIL
 }
 
 function outcomeStage(
@@ -223,11 +243,16 @@ export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResul
   let senate = chamberPassage(item.passage_votes, 'Senate')
 
   // A bill presented to the President has necessarily passed both chambers;
-  // a chamber vote may simply predate the ingest lookback window.
+  // a chamber vote may simply predate the ingest lookback window (including a
+  // lookback-only failed vote that would otherwise leave the stage red).
   const reachedPresident = Boolean(lifecycle?.presented_date) || terminalStatus !== null
   if (reachedPresident) {
-    if (house.state === 'pending') house = { ...house, state: 'done' }
-    if (senate.state === 'pending') senate = { ...senate, state: 'done' }
+    if (house.state === 'pending' || house.state === 'failed') {
+      house = { ...house, state: 'done' }
+    }
+    if (senate.state === 'pending' || senate.state === 'failed') {
+      senate = { ...senate, state: 'done' }
+    }
   }
 
   const introducedDate = lifecycle?.introduced_date ?? null
