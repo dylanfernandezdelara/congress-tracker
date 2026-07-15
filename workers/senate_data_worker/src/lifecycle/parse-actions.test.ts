@@ -271,7 +271,7 @@ describe("isTerminalLifecycle", () => {
     ).toBe(false);
   });
 
-  it("is terminal only when became_law_date is set", () => {
+  it("is terminal when became_law_date is set (and public_law for unsigned)", () => {
     expect(
       isTerminalLifecycle({
         law_kind: null,
@@ -286,6 +286,24 @@ describe("isTerminalLifecycle", () => {
         signed_date: "2026-07-02",
         vetoed_date: null,
         became_law_date: "2026-07-02",
+      })
+    ).toBe(true);
+    expect(
+      isTerminalLifecycle({
+        law_kind: "law_unsigned",
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: "2026-07-11",
+        public_law: null,
+      })
+    ).toBe(false);
+    expect(
+      isTerminalLifecycle({
+        law_kind: "law_unsigned",
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: "2026-07-11",
+        public_law: "119-42",
       })
     ).toBe(true);
     expect(

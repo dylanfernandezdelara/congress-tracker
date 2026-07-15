@@ -180,14 +180,19 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
 /**
  * True when formal congress.gov outcome is terminal (no further refresh needed).
  * Require `became_law_date` so a bare `signed_date` keeps refreshing until
- * public-law / enactment fields land. A bare veto is NOT terminal: Congress may
- * still override it (LOC 32000/34000/39000).
+ * public-law / enactment fields land. Archivist-unsigned often precedes the
+ * formal Public Law number, so unsigned rows also keep refreshing until
+ * `public_law` is present. A bare veto is NOT terminal: Congress may still
+ * override it (LOC 32000/34000/39000).
  */
 export function isTerminalLifecycle(params: {
   law_kind: BillLawKind | null;
   signed_date: string | null;
   vetoed_date: string | null;
   became_law_date: string | null;
+  public_law?: string | null;
 }): boolean {
-  return Boolean(params.became_law_date);
+  if (!params.became_law_date) return false;
+  if (params.law_kind === "law_unsigned" && !params.public_law) return false;
+  return true;
 }

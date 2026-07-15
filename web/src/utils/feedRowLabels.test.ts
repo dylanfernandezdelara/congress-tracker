@@ -195,6 +195,33 @@ describe('getFeedRowView', () => {
     })
   })
 
+  it('hides the margin chip on procedural rows (tally is in the event line)', () => {
+    const item = makeFeedItem({
+      bill: {
+        congress: 119,
+        type: 'HR',
+        number: 1,
+        title:
+          'Providing for consideration of the bill (H.R. 2913) to authorize support for Ukraine, and for other purposes.',
+      },
+      passage_votes: [
+        {
+          chamber: 'House',
+          question: 'On Agreeing to the Resolution',
+          result: 'Agreed to',
+          yeas: 218,
+          nays: 210,
+          date: '2026-06-04',
+        },
+      ],
+    })
+
+    const view = getFeedRowView(item)
+    expect(view.meta.kind).toBe('procedural')
+    expect(view.showMarginChip).toBe(false)
+    expect(view.showEventLine).toBe(true)
+  })
+
   it('formats procedural agreed event copy with framing B', () => {
     const item = makeFeedItem({
       bill: {

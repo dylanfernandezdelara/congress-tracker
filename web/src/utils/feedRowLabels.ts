@@ -95,7 +95,8 @@ function presentationFlags(kind: FeedStatusKind, margin: string | null): {
     case 'law_unsigned':
       return { showMarginChip: Boolean(margin), showEventLine: true }
     case 'procedural':
-      return { showMarginChip: Boolean(margin), showEventLine: true }
+      // Event line already includes the tally; avoid a redundant margin chip.
+      return { showMarginChip: false, showEventLine: true }
     case 'none':
       return { showMarginChip: false, showEventLine: true }
     default:

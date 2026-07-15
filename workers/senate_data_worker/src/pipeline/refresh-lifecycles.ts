@@ -69,6 +69,7 @@ export async function refreshBillLifecycles(
         signed_date: stored.signed_date,
         vetoed_date: stored.vetoed_date,
         became_law_date: stored.became_law_date,
+        public_law: stored.public_law,
       })
     ) {
       skipped += 1;
