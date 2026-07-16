@@ -5,12 +5,13 @@ import type {
   SessionStatsResponse,
 } from '../api/types'
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
+import type { ChamberPair } from '../hooks/useStatsData'
 import { formatBillDocket, formatCoverageDate } from '../utils/billLabels'
 
 type LeftSidebarProps = {
   session: UseAsyncDataResult<SessionStatsResponse>
-  defectors: UseAsyncDataResult<{ house: DefectorEntry[]; senate: DefectorEntry[] }>
-  portfolios: UseAsyncDataResult<{ house: PortfolioMovers; senate: PortfolioMovers }>
+  defectors: UseAsyncDataResult<ChamberPair<DefectorEntry[]>>
+  portfolios: UseAsyncDataResult<ChamberPair<PortfolioMovers>>
   onRetry?: () => void
 }
 
@@ -168,10 +169,10 @@ function ChamberSection({
         <p className="member-spotlight-empty">Loading members…</p>
       ) : null}
       {defectorsError ? (
-        <p className="member-spotlight-empty text-fail">Defectors unavailable: {defectorsError}</p>
+        <p className="member-spotlight-empty text-fail">{defectorsError}</p>
       ) : null}
       {portfoliosError ? (
-        <p className="member-spotlight-empty text-fail">Portfolio data unavailable: {portfoliosError}</p>
+        <p className="member-spotlight-empty text-fail">{portfoliosError}</p>
       ) : null}
       {!loading && spotlights.length === 0 && !defectorsError && !portfoliosError ? (
         <p className="member-spotlight-empty">
@@ -196,6 +197,14 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
       : null
 
   const disclaimer = portfolios.data?.house.disclaimer ?? portfolios.data?.senate.disclaimer
+  const hasMemberDataError = Boolean(
+    defectors.error ||
+      portfolios.error ||
+      defectors.data?.houseError ||
+      defectors.data?.senateError ||
+      portfolios.data?.houseError ||
+      portfolios.data?.senateError,
+  )
 
   return (
     <div className="sidebar-panel space-y-5">
@@ -207,7 +216,7 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
           Retry sidebar
         </button>
       ) : null}
-      {!session.error && (defectors.error || portfolios.error) && onRetry ? (
+      {!session.error && hasMemberDataError && onRetry ? (
         <button type="button" className="ghost-button text-xs" onClick={onRetry}>
           Retry member data
         </button>
@@ -218,8 +227,8 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         portfolios={portfolios.data?.house}
         defectorsLoading={defectors.isLoading}
         portfoliosLoading={portfolios.isLoading}
-        defectorsError={defectors.error}
-        portfoliosError={portfolios.error}
+        defectorsError={defectors.error ?? defectors.data?.houseError ?? null}
+        portfoliosError={portfolios.error ?? portfolios.data?.houseError ?? null}
       />
       <div className="border-t border-border" />
       <ChamberSection
@@ -228,8 +237,8 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         portfolios={portfolios.data?.senate}
         defectorsLoading={defectors.isLoading}
         portfoliosLoading={portfolios.isLoading}
-        defectorsError={defectors.error}
-        portfoliosError={portfolios.error}
+        defectorsError={defectors.error ?? defectors.data?.senateError ?? null}
+        portfoliosError={portfolios.error ?? portfolios.data?.senateError ?? null}
       />
       {disclaimer ? <p className="sidebar-disclaimer text-[11px] leading-snug text-faint">{disclaimer}</p> : null}
     </div>

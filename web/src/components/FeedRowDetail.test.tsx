@@ -18,6 +18,7 @@ describe('FeedRowDetail', () => {
       session: 2,
       roll_number: 9002,
       as_of: '2026-06-05T00:00:00.000Z',
+      member_votes_available: true,
       defectors: [
         {
           bioguide_id: 'LOCAL:S001',
@@ -46,6 +47,7 @@ describe('FeedRowDetail', () => {
       session: 2,
       roll_number: 9002,
       as_of: '2026-06-05T00:00:00.000Z',
+      member_votes_available: true,
       defectors: [],
     })
 
@@ -53,6 +55,26 @@ describe('FeedRowDetail', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/No members broke with their party/)).toBeInTheDocument()
+    })
+  })
+
+  it('shows unavailable copy when member votes were not ingested', async () => {
+    vi.mocked(fetchVoteDefectors).mockResolvedValue({
+      chamber: 'Senate',
+      congress: 119,
+      session: 2,
+      roll_number: 9002,
+      as_of: '2026-06-05T00:00:00.000Z',
+      member_votes_available: false,
+      defectors: [],
+    })
+
+    render(<FeedRowDetail item={makeFeedItem()} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Per-member vote breakdown is not available for this roll call yet/),
+      ).toBeInTheDocument()
     })
   })
 

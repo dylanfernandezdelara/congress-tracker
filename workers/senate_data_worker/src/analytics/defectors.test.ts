@@ -147,15 +147,16 @@ describe("computeRollDefectors", () => {
   it("returns members who voted against their party on one roll", async () => {
     resetSchemaFlag();
     const db = createRollTestDb();
-    const defectors = await computeRollDefectors(db, {
+    const result = await computeRollDefectors(db, {
       chamber: "Senate",
       congress: 119,
       session: 2,
       roll_number: 1,
     });
 
-    expect(defectors).toHaveLength(1);
-    expect(defectors[0]).toMatchObject({
+    expect(result.member_votes_available).toBe(true);
+    expect(result.defectors).toHaveLength(1);
+    expect(result.defectors[0]).toMatchObject({
       name: "Alice",
       position: "nay",
       party_line: "yea",

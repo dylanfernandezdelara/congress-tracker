@@ -89,16 +89,6 @@ function rollKey(vote: Pick<CandidateRow, "chamber" | "congress" | "session" | "
   return `${vote.chamber}:${vote.congress}:${vote.session}:${vote.roll_number}`;
 }
 
-/** Match computeRollDefectors roster filtering — sample-only rows are not usable when a real roster exists. */
-function rollHasUsableMemberVotes(
-  rows: SessionMemberVoteRow[],
-  excludeLocalSample: boolean
-): boolean {
-  if (rows.length === 0) return false;
-  if (!excludeLocalSample) return true;
-  return rows.some((row) => isRealBioguideId(row.bioguide_id));
-}
-
 async function fetchCandidates(
   db: D1Database,
   congress: number,
@@ -384,19 +374,16 @@ export async function buildNotableVotes(
       }
     }
 
-    const rollDefectors = await computeRollDefectors(db, {
+    const rollResult = await computeRollDefectors(db, {
       chamber: vote.chamber as Chamber,
       congress: vote.congress,
       session: vote.session,
       roll_number: vote.roll_number,
     });
-    const member_votes_available = rollHasUsableMemberVotes(
-      memberVotesByRoll.get(rollKey(vote)) ?? [],
-      excludeLocalSample
-    );
+    const member_votes_available = rollResult.member_votes_available;
 
     const seen = new Set<string>();
-    const defectors = rollDefectors
+    const defectors = rollResult.defectors
       .filter((defector) => !excludeLocalSample || !isLocalSampleMemberId(defector.bioguide_id))
       .filter((defector) => isRealBioguideId(defector.bioguide_id))
       .filter((defector) => {

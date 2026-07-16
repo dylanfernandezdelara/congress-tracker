@@ -4,12 +4,8 @@ import { fetchFeed, fetchNotableVotes } from '../api/client'
 import type { FeedItem, FeedPageResponse, NotableVotesResponse } from '../api/types'
 import { FeedRow } from '../components/FeedRow'
 import { NotableVotesSection } from '../components/NotableVotesSection'
-import {
-  FEED_PAGE_SIZE,
-  MOBILE_MEDIA_QUERY,
-} from '../constants/feed'
+import { FEED_PAGE_SIZE } from '../constants/feed'
 import { useAsyncData } from '../hooks/useAsyncData'
-import { useMediaQuery } from '../hooks/useMediaQuery'
 
 const LOOKBACK_DAYS = 45
 
@@ -75,7 +71,6 @@ export default function Home() {
   const [retryKey, setRetryKey] = useState(0)
   const [page, setPage] = useState(0)
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null)
-  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY)
   const pageSize = FEED_PAGE_SIZE
   const offset = page * pageSize
 
@@ -83,10 +78,6 @@ export default function Home() {
     setPage(0)
     setRetryKey((k) => k + 1)
   }
-
-  useEffect(() => {
-    setPage(0)
-  }, [isMobile])
 
   useEffect(() => {
     setExpandedRowKey(null)

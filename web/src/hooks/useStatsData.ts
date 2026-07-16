@@ -14,10 +14,18 @@ import type {
 } from '../api/types'
 import { useAsyncData } from './useAsyncData'
 
+export type ChamberPair<T> = {
+  house: T
+  senate: T
+  houseError: string | null
+  senateError: string | null
+}
+
 async function bothChambers<T>(
   load: (chamber: 'House' | 'Senate') => Promise<T>,
   empty: T,
-): Promise<{ house: T; senate: T }> {
+  chamberErrorMessage: string,
+): Promise<ChamberPair<T>> {
   const [houseResult, senateResult] = await Promise.allSettled([
     load('House'),
     load('Senate'),
@@ -28,6 +36,8 @@ async function bothChambers<T>(
   return {
     house: houseResult.status === 'fulfilled' ? houseResult.value : empty,
     senate: senateResult.status === 'fulfilled' ? senateResult.value : empty,
+    houseError: houseResult.status === 'rejected' ? chamberErrorMessage : null,
+    senateError: senateResult.status === 'rejected' ? chamberErrorMessage : null,
   }
 }
 
@@ -48,24 +58,29 @@ export function useStatsData() {
     mapError: () => "Couldn't load legislative pulse.",
   })
 
-  const defectors = useAsyncData<{ house: DefectorEntry[]; senate: DefectorEntry[] }>({
+  const defectors = useAsyncData<ChamberPair<DefectorEntry[]>>({
     deps: [retryKey],
     load: () =>
       bothChambers<DefectorEntry[]>(
         async (chamber) => (await fetchDefectors(chamber)).defectors,
         [],
+        'Defectors unavailable',
       ),
     mapError: () => "Couldn't load defectors.",
   })
 
-  const portfolios = useAsyncData<{ house: PortfolioMovers; senate: PortfolioMovers }>({
+  const portfolios = useAsyncData<ChamberPair<PortfolioMovers>>({
     deps: [retryKey],
     load: () =>
-      bothChambers<PortfolioMovers>(fetchPortfolioStats, {
-        gainers: [],
-        losers: [],
-        disclaimer: 'Estimates from public disclosures.',
-      }),
+      bothChambers<PortfolioMovers>(
+        fetchPortfolioStats,
+        {
+          gainers: [],
+          losers: [],
+          disclaimer: 'Estimates from public disclosures.',
+        },
+        'Portfolio data unavailable',
+      ),
     mapError: () => "Couldn't load portfolio stats.",
   })
 

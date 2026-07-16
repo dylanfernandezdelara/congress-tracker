@@ -2,6 +2,10 @@ import { useState } from 'react'
 
 import type { NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
+import {
+  MEMBER_VOTES_UNAVAILABLE,
+  noPartyDefectorsMessage,
+} from '../constants/memberVotesCopy'
 import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { memberInitials } from '../utils/memberPhoto'
 
@@ -77,17 +81,11 @@ function NotableVoteDefectors({ entry }: { entry: NotableVoteEntry }) {
   }
 
   if (entry.member_votes_available === false) {
-    return (
-      <p className="notable-vote-defectors-empty">
-        Per-member vote breakdown is not available for this roll call yet.
-      </p>
-    )
+    return <p className="notable-vote-defectors-empty">{MEMBER_VOTES_UNAVAILABLE}</p>
   }
 
   return (
-    <p className="notable-vote-defectors-empty">
-      No members broke with their party on this {entry.chamber} vote.
-    </p>
+    <p className="notable-vote-defectors-empty">{noPartyDefectorsMessage(entry.chamber)}</p>
   )
 }
 

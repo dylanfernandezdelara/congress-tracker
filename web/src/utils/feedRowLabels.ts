@@ -15,6 +15,7 @@ import {
   UNSIGNED_LAW_EVENT,
   type BillTerminalStatus,
 } from './billLifecycleStages'
+import { TERMINAL_STATUS_PRESENTATION } from './terminalStatusPresentation'
 
 export const FEED_SUMMARY_PENDING = 'Summary pending'
 
@@ -54,88 +55,76 @@ export type FeedRowView = {
   eventToneClass: string
 }
 
-function assertNever(value: never): never {
-  throw new Error(`Unexpected value: ${String(value)}`)
-}
-
-function badgeToneClass(kind: FeedStatusKind): string {
-  switch (kind) {
-    case 'passed':
-      return ' text-pass'
-    case 'failed':
-    case 'vetoed':
-      return ' text-fail'
-    case 'law':
-    case 'law_unsigned':
-      return ' text-law'
-    case 'procedural':
-    case 'none':
-      return ''
-    default:
-      return assertNever(kind)
-  }
-}
-
-function eventToneClass(kind: FeedStatusKind): string {
-  if (kind === 'none') return ' feed-row-event--muted'
-  if (kind === 'law_unsigned') return ' feed-row-event--law'
-  return ''
-}
-
-function presentationFlags(kind: FeedStatusKind, margin: string | null): {
-  showMarginChip: boolean
+type FeedKindUi = {
+  badgeToneClass: string
+  eventToneClass: string
+  /** When true, show margin chip only if margin text is present. */
+  showMarginWhenPresent: boolean
   showEventLine: boolean
-} {
-  switch (kind) {
-    case 'passed':
-    case 'failed':
-    case 'law':
-    case 'vetoed':
-      return { showMarginChip: Boolean(margin), showEventLine: false }
-    case 'law_unsigned':
-      return { showMarginChip: Boolean(margin), showEventLine: true }
-    case 'procedural':
-      // Event line already includes the tally; avoid a redundant margin chip.
-      return { showMarginChip: false, showEventLine: true }
-    case 'none':
-      return { showMarginChip: false, showEventLine: true }
-    default:
-      return assertNever(kind)
-  }
 }
 
-function withPresentation(
-  meta: FeedRowMeta,
-  eventDisplay: string,
-): FeedRowView {
-  const flags = presentationFlags(meta.kind, meta.margin)
+const FEED_KIND_UI: Record<FeedStatusKind, FeedKindUi> = {
+  passed: {
+    badgeToneClass: ' text-pass',
+    eventToneClass: '',
+    showMarginWhenPresent: true,
+    showEventLine: false,
+  },
+  failed: {
+    badgeToneClass: ' text-fail',
+    eventToneClass: '',
+    showMarginWhenPresent: true,
+    showEventLine: false,
+  },
+  vetoed: {
+    badgeToneClass: ' text-fail',
+    eventToneClass: '',
+    showMarginWhenPresent: true,
+    showEventLine: false,
+  },
+  law: {
+    badgeToneClass: ' text-law',
+    eventToneClass: '',
+    showMarginWhenPresent: true,
+    showEventLine: false,
+  },
+  law_unsigned: {
+    badgeToneClass: ' text-law',
+    eventToneClass: ' feed-row-event--law',
+    showMarginWhenPresent: true,
+    showEventLine: true,
+  },
+  procedural: {
+    badgeToneClass: '',
+    eventToneClass: '',
+    showMarginWhenPresent: false,
+    showEventLine: true,
+  },
+  none: {
+    badgeToneClass: '',
+    eventToneClass: ' feed-row-event--muted',
+    showMarginWhenPresent: false,
+    showEventLine: true,
+  },
+}
+
+function withPresentation(meta: FeedRowMeta, eventDisplay: string): FeedRowView {
+  const ui = FEED_KIND_UI[meta.kind]
   return {
     meta,
     eventDisplay,
-    badgeToneClass: badgeToneClass(meta.kind),
-    showMarginChip: flags.showMarginChip,
-    showEventLine: flags.showEventLine,
-    eventToneClass: eventToneClass(meta.kind),
+    badgeToneClass: ui.badgeToneClass,
+    showMarginChip: ui.showMarginWhenPresent && Boolean(meta.margin),
+    showEventLine: ui.showEventLine,
+    eventToneClass: ui.eventToneClass,
   }
 }
 
 function lifecycleBadge(
   status: Exclude<BillTerminalStatus, null | 'pending_signature'>,
 ): Pick<FeedRowMeta, 'kind' | 'outcomeLabel'> {
-  switch (status) {
-    case 'became_law_unsigned':
-      return { kind: 'law_unsigned', outcomeLabel: 'Law — unsigned' }
-    case 'became_law_signed':
-    case 'became_law':
-      return { kind: 'law', outcomeLabel: 'Law' }
-    case 'enacted_over_veto':
-      return { kind: 'law', outcomeLabel: 'Law — veto overridden' }
-    case 'vetoed':
-    case 'pocket_vetoed':
-      return { kind: 'vetoed', outcomeLabel: 'Vetoed' }
-    default:
-      return assertNever(status)
-  }
+  const presentation = TERMINAL_STATUS_PRESENTATION[status]
+  return { kind: presentation.feedKind, outcomeLabel: presentation.chipLabel }
 }
 
 function presidentDeskChipLabel(item: FeedItem): string | null {
