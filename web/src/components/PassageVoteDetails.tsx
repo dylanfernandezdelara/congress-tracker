@@ -45,10 +45,6 @@ function PartyDefectorsList({
     return <p className="feed-row-defectors-empty text-sm text-faint">{MEMBER_VOTES_ERROR}</p>
   }
 
-  if (!state.memberVotesAvailable) {
-    return <p className="feed-row-defectors-empty text-sm text-faint">{MEMBER_VOTES_UNAVAILABLE}</p>
-  }
-
   if (state.defectors.length === 0) {
     return (
       <p className="feed-row-defectors-empty text-sm text-faint">

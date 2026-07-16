@@ -6,7 +6,7 @@ import type { FeedPassageVote, VoteDefectorEntry } from '../api/types'
 export type RollDefectorsState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; defectors: VoteDefectorEntry[]; memberVotesAvailable: boolean }
+  | { status: 'ready'; defectors: VoteDefectorEntry[] }
   | { status: 'unavailable' }
   | { status: 'error' }
 
@@ -81,11 +81,14 @@ export function useRollDefectors(
           if (cancelled) return
           setDefectorsByRoll((current) => {
             const next = new Map(current)
-            next.set(key, {
-              status: 'ready',
-              defectors: response.defectors,
-              memberVotesAvailable: response.member_votes_available,
-            })
+            if (!response.member_votes_available) {
+              next.set(key, { status: 'unavailable' })
+            } else {
+              next.set(key, {
+                status: 'ready',
+                defectors: response.defectors,
+              })
+            }
             return next
           })
         } catch {

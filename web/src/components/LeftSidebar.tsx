@@ -197,6 +197,14 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
       : null
 
   const disclaimer = portfolios.data?.house.disclaimer ?? portfolios.data?.senate.disclaimer
+  const hasMemberDataError = Boolean(
+    defectors.error ||
+      portfolios.error ||
+      defectors.data?.houseError ||
+      defectors.data?.senateError ||
+      portfolios.data?.houseError ||
+      portfolios.data?.senateError,
+  )
 
   return (
     <div className="sidebar-panel space-y-5">
@@ -208,7 +216,7 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
           Retry sidebar
         </button>
       ) : null}
-      {!session.error && (defectors.error || portfolios.error) && onRetry ? (
+      {!session.error && hasMemberDataError && onRetry ? (
         <button type="button" className="ghost-button text-xs" onClick={onRetry}>
           Retry member data
         </button>

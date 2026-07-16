@@ -59,6 +59,10 @@ export function FeedRowExecutiveQuote({
             {relatedBills.map((related, index) => {
               const relatedName = getBillColloquialName(related)
               const relatedUrl = congressGovBillUrl(related.congress, related.type, related.number)
+              const reasonNote =
+                related.reason && related.reason !== 'mentioned_in_same_post'
+                  ? ` — ${related.reason}`
+                  : ''
               return (
                 <span key={`${related.congress}-${related.type}-${related.number}`}>
                   {index > 0 ? '; ' : ''}
@@ -72,6 +76,7 @@ export function FeedRowExecutiveQuote({
                   </a>
                   {' · '}
                   {formatExecutiveRoleLabel(related.role)}
+                  {reasonNote}
                 </span>
               )
             })}
