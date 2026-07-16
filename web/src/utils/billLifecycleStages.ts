@@ -2,6 +2,8 @@ import { voteIndicatesFailure } from '@congress-tracker/shared/feed-content'
 import type { BillLawKind, BillLifecycle } from '@congress-tracker/shared/lifecycle-api-types'
 
 import type { FeedItem, FeedPassageVote } from '../api/types'
+import { assertNever } from './assertNever'
+import { TERMINAL_STATUS_PRESENTATION } from './terminalStatusPresentation'
 
 export type BillTerminalStatus =
   | 'became_law_unsigned'
@@ -33,10 +35,6 @@ export interface BillLifecycleStage {
 export interface BillLifecycleStagesResult {
   terminalStatus: BillTerminalStatus
   stages: BillLifecycleStage[]
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unexpected value: ${String(value)}`)
 }
 
 function mapLawKind(kind: BillLawKind): Exclude<BillTerminalStatus, null> {
@@ -157,62 +155,56 @@ function outcomeStage(
     }
   }
 
+  if (terminalStatus === 'pending_signature') {
+    return {
+      key: 'outcome',
+      label: "On the President's desk",
+      date: lifecycle?.presented_date ?? null,
+      state: 'current',
+      detail: formatDeadlineDetail(
+        lifecycle?.derived.day_of_ten ?? null,
+        lifecycle?.derived.becomes_law_on ?? null,
+      ),
+    }
+  }
+
+  const presentation = TERMINAL_STATUS_PRESENTATION[terminalStatus]
+  const base: BillLifecycleStage = {
+    key: 'outcome',
+    label: presentation.pipelineLabel,
+    date: null,
+    state: presentation.feedKind === 'vetoed' ? 'failed' : 'done',
+  }
+
   switch (terminalStatus) {
     case 'became_law_unsigned':
       return {
-        key: 'outcome',
-        label: 'Became law — unsigned',
+        ...base,
         date: lifecycle ? unsignedLawDate(lifecycle) : null,
-        state: 'done',
         detail: lifecycle ? unsignedDetail(lifecycle) : undefined,
       }
     case 'became_law_signed':
       return {
-        key: 'outcome',
-        label: 'Signed into law',
+        ...base,
         date: lifecycle?.became_law_date ?? lifecycle?.signed_date ?? null,
-        state: 'done',
       }
     case 'became_law':
       return {
-        key: 'outcome',
-        label: 'Became law',
+        ...base,
         date: lifecycle?.became_law_date ?? null,
-        state: 'done',
         detail: lifecycle?.public_law ? `Public Law ${lifecycle.public_law}` : undefined,
       }
     case 'enacted_over_veto':
       return {
-        key: 'outcome',
-        label: 'Enacted over veto',
+        ...base,
         date: lifecycle?.became_law_date ?? null,
-        state: 'done',
         detail: "Congress overrode the President's veto",
       }
     case 'vetoed':
-      return {
-        key: 'outcome',
-        label: 'Vetoed',
-        date: lifecycle?.vetoed_date ?? null,
-        state: 'failed',
-      }
     case 'pocket_vetoed':
       return {
-        key: 'outcome',
-        label: 'Pocket vetoed',
+        ...base,
         date: lifecycle?.vetoed_date ?? null,
-        state: 'failed',
-      }
-    case 'pending_signature':
-      return {
-        key: 'outcome',
-        label: "On the President's desk",
-        date: lifecycle?.presented_date ?? null,
-        state: 'current',
-        detail: formatDeadlineDetail(
-          lifecycle?.derived.day_of_ten ?? null,
-          lifecycle?.derived.becomes_law_on ?? null,
-        ),
       }
     default:
       return assertNever(terminalStatus)

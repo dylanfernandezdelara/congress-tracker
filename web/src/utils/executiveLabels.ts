@@ -34,20 +34,3 @@ export function formatExecutiveRoleLabel(role: ExecutiveBillRole): string {
     }
   }
 }
-
-export function formatExecutiveRoleDetail(role: ExecutiveBillRole): string {
-  switch (role) {
-    case 'primary':
-      return 'Primary subject of the post'
-    case 'conditional':
-      return 'Action on this bill depends on this bill passing'
-    case 'related':
-      return 'Related in the same post'
-    case 'mentioned':
-      return 'Named in the same post'
-    default: {
-      const _exhaustive: never = role
-      return _exhaustive
-    }
-  }
-}

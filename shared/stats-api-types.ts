@@ -171,6 +171,8 @@ export interface VoteDefectorsResponse {
   session: number
   roll_number: number
   defectors: VoteDefectorEntry[]
+  /** False when member-level votes were never ingested (or only local samples remain). */
+  member_votes_available: boolean
   as_of: string
 }
 

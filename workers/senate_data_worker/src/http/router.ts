@@ -284,7 +284,7 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       );
     }
     try {
-      const defectors = await computeRollDefectors(env.DB, {
+      const { defectors, member_votes_available } = await computeRollDefectors(env.DB, {
         chamber,
         congress: rollCongress,
         session: rollSession,
@@ -296,6 +296,7 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
         session: rollSession,
         roll_number: rollNumber,
         defectors,
+        member_votes_available,
         as_of: new Date().toISOString(),
       };
       return json(body, {

@@ -198,6 +198,7 @@ describe("HTTP API", () => {
       session: 2,
       roll_number: 9001,
       defectors: [],
+      member_votes_available: false,
     });
   });
 

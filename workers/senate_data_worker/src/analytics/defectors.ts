@@ -120,18 +120,27 @@ export async function computeDefectors(
     .slice(0, limit);
 }
 
+export type RollDefectorsResult = {
+  defectors: VoteDefectorEntry[];
+  member_votes_available: boolean;
+};
+
 export async function computeRollDefectors(
   db: D1Database,
   roll: RollCallKey
-): Promise<VoteDefectorEntry[]> {
+): Promise<RollDefectorsResult> {
   const rows = await selectMemberVotesForRoll(db, roll);
-  if (rows.length === 0) return [];
+  if (rows.length === 0) {
+    return { defectors: [], member_votes_available: false };
+  }
 
   const excludeLocalSample = await hasRealMemberRoster(db);
   const filteredRows = excludeLocalSample
     ? rows.filter((row) => isRealBioguideId(row.bioguide_id))
     : rows;
-  if (filteredRows.length === 0) return [];
+  if (filteredRows.length === 0) {
+    return { defectors: [], member_votes_available: false };
+  }
 
   const uniqueIds = [...new Set(filteredRows.map((row) => row.bioguide_id))];
   const memberRows = await getMembersByIds(db, uniqueIds);
@@ -176,5 +185,8 @@ export async function computeRollDefectors(
     });
   }
 
-  return defectors.sort((a, b) => a.name.localeCompare(b.name));
+  return {
+    defectors: defectors.sort((a, b) => a.name.localeCompare(b.name)),
+    member_votes_available: true,
+  };
 }
