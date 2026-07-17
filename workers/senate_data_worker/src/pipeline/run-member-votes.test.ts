@@ -137,4 +137,19 @@ describe("runMemberVotesPipeline", () => {
     expect(result.rollsProcessed).toBe(MEMBER_VOTES_MAX_ROLLS_PER_RUN);
     expect(result.rollsRemaining).toBe(5);
   });
+
+  it("continues when a single roll fetch fails", async () => {
+    selectPassageRollCalls.mockResolvedValue([
+      houseRoll(1),
+      { chamber: "Senate", congress: 119, session: 2, roll_number: 1 },
+      houseRoll(2),
+    ]);
+    fetchSenateMemberVotes.mockRejectedValueOnce(new Error("HTTP 403 for https://www.senate.gov/..."));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(2);
+    expect(result.rollsSkipped).toBe(1);
+    expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(2);
+  });
 });

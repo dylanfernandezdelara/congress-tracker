@@ -16,6 +16,7 @@ const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 const mockGetLifecyclesForBills = vi.fn();
 const mockUpsertLifecycle = vi.fn();
+const mockRunMemberVotesPipeline = vi.fn();
 
 vi.mock("../d1/digests", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/digests")>();
@@ -61,6 +62,15 @@ vi.mock("./ingest-chambers", () => ({
 
 vi.mock("./ensure-member-roster", () => ({
   ensureMemberRoster: () => mockEnsureMemberRoster(),
+}));
+
+vi.mock("./run-member-votes", () => ({
+  runMemberVotesPipeline: (...args: unknown[]) => mockRunMemberVotesPipeline(...args),
+}));
+
+vi.mock("../d1/pipeline-state", () => ({
+  recordFeedPipelineSuccess: vi.fn(async () => {}),
+  recordFeedPipelineFailure: vi.fn(async () => {}),
 }));
 
 import { runFeedPipeline } from "./run-feed";
@@ -137,6 +147,13 @@ describe("runFeedPipeline digest retry", () => {
       terms_explained: [],
     });
     mockUpsertDigest.mockResolvedValue(undefined);
+    mockRunMemberVotesPipeline.mockResolvedValue({
+      rollsProcessed: 0,
+      rollsSkipped: 0,
+      rollsRemaining: 0,
+      membersUpserted: 0,
+      votesUpserted: 0,
+    });
   });
 
   it("retries rows with invalid digest_json that fails parseStoredDigest", async () => {
@@ -265,5 +282,16 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.lifecycleRefreshed).toBe(0);
     expect(result.lifecycleWarnings).toHaveLength(1);
     expect(result.lifecycleWarnings[0]).toContain("congress.gov down");
+  });
+
+  it("runs member-votes backfill after feed work and continues if it fails", async () => {
+    mockGetDigest.mockResolvedValue(completeDigest);
+    mockRunMemberVotesPipeline.mockRejectedValue(new Error("member votes down"));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(mockRunMemberVotesPipeline).toHaveBeenCalledOnce();
+    expect(result.memberVotesError).toContain("member votes down");
+    expect(result.digestsSkipped).toBe(1);
   });
 });

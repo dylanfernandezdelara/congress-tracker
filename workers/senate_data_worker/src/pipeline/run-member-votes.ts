@@ -17,7 +17,7 @@ import { ensureSchema } from "../d1/schema";
 import { fetchHouseMemberVotes } from "../sources/house-member-votes";
 import { fetchSenateMemberVotes } from "../sources/senate-member-votes";
 import { runMembersRosterPipeline } from "./run-members-roster";
-import type { MemberRecord } from "../types";
+import type { MemberRecord, MemberVoteRecord } from "../types";
 
 export interface RunMemberVotesResult {
   rollsProcessed: number;
@@ -71,12 +71,30 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
       await deleteMemberVotesForRoll(env.DB, roll);
     }
 
-    const fetched =
-      roll.chamber === "House"
-        ? await fetchHouseMemberVotes(env, roll.congress, roll.session, roll.roll_number)
-        : await fetchSenateMemberVotes(env, roll.congress, roll.session, roll.roll_number, {
-            senateBioguideLookup,
-          });
+    let fetched: { members: MemberRecord[]; votes: MemberVoteRecord[] };
+    try {
+      fetched =
+        roll.chamber === "House"
+          ? await fetchHouseMemberVotes(env, roll.congress, roll.session, roll.roll_number)
+          : await fetchSenateMemberVotes(env, roll.congress, roll.session, roll.roll_number, {
+              senateBioguideLookup,
+            });
+    } catch (err: unknown) {
+      // One chamber/source outage (e.g. Senate.gov 403) must not block the rest.
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        JSON.stringify({
+          event: "member_votes_roll_fetch_failed",
+          chamber: roll.chamber,
+          congress: roll.congress,
+          session: roll.session,
+          roll_number: roll.roll_number,
+          error: message,
+        })
+      );
+      rollsSkipped += 1;
+      continue;
+    }
 
     if (fetched.votes.length === 0) {
       rollsSkipped += 1;
