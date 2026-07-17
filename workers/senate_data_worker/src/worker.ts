@@ -5,7 +5,7 @@
 import type { Env } from "./config";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
-import { runFeedPipeline } from "./pipeline/run-feed";
+import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
 
 export default {
@@ -51,14 +51,16 @@ export default {
     }
 
     ctx.waitUntil(
-      runFeedPipeline(env, { trigger: "scheduled" })
+      runFeedWithMemberVotes(env, { trigger: "scheduled" })
         .then((result) => {
+          const { memberVotes: _memberVotes, memberVotesError: _memberVotesError, ...feed } =
+            result;
           console.log(
             JSON.stringify({
               event: "feed_pipeline_complete",
               cron: controller.cron,
               scheduledTime: controller.scheduledTime,
-              ...result,
+              ...feed,
             }),
           );
         })

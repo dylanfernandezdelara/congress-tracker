@@ -266,4 +266,5 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.lifecycleWarnings).toHaveLength(1);
     expect(result.lifecycleWarnings[0]).toContain("congress.gov down");
   });
+
 });

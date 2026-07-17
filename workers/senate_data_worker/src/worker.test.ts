@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./pipeline/run-feed", () => ({
-  runFeedPipeline: vi.fn(),
+vi.mock("./pipeline/run-feed-with-member-votes", () => ({
+  runFeedWithMemberVotes: vi.fn(),
 }));
 
 vi.mock("./pipeline/run-executive-posts", () => ({
@@ -9,7 +9,7 @@ vi.mock("./pipeline/run-executive-posts", () => ({
 }));
 
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
-import { runFeedPipeline } from "./pipeline/run-feed";
+import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import handler from "./worker";
 
 function createMockDb(): D1Database {
@@ -91,7 +91,7 @@ describe("worker", () => {
 
   it("logs feed pipeline completion on scheduled", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    vi.mocked(runFeedPipeline).mockResolvedValue({
+    vi.mocked(runFeedWithMemberVotes).mockResolvedValue({
       votesUpserted: 1,
       votesSkipped: 2,
       billsSelected: 3,
@@ -102,6 +102,14 @@ describe("worker", () => {
       lifecycleRefreshed: 0,
       lifecycleSkipped: 0,
       lifecycleWarnings: [],
+      memberVotes: {
+        rollsProcessed: 1,
+        rollsSkipped: 0,
+        rollsAttempted: 1,
+        rollsRemaining: 0,
+        membersUpserted: 2,
+        votesUpserted: 400,
+      },
     });
 
     const { ctx, awaitScheduled } = createScheduledContext();
@@ -112,17 +120,20 @@ describe("worker", () => {
     );
     await awaitScheduled();
 
-    expect(runFeedPipeline).toHaveBeenCalledWith(expect.anything(), { trigger: "scheduled" });
+    expect(runFeedWithMemberVotes).toHaveBeenCalledWith(expect.anything(), {
+      trigger: "scheduled",
+    });
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('"event":"feed_pipeline_complete"'),
     );
     expect(log).toHaveBeenCalledWith(expect.stringContaining('"votesUpserted":1'));
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining('"memberVotes"'));
     log.mockRestore();
   });
 
   it("logs feed pipeline failures on scheduled", async () => {
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.mocked(runFeedPipeline).mockRejectedValue(new Error("pipeline boom"));
+    vi.mocked(runFeedWithMemberVotes).mockRejectedValue(new Error("pipeline boom"));
 
     const { ctx, awaitScheduled } = createScheduledContext();
     handler.scheduled(
@@ -158,7 +169,7 @@ describe("worker", () => {
     await awaitScheduled();
 
     expect(runExecutivePostsPipeline).toHaveBeenCalled();
-    expect(runFeedPipeline).not.toHaveBeenCalled();
+    expect(runFeedWithMemberVotes).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('"event":"executive_posts_pipeline_complete"'),
     );

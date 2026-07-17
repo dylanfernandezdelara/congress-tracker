@@ -32,3 +32,18 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
   const text = await fetchText(url, init);
   return JSON.parse(text) as T;
 }
+
+/** Attach `api_key` to a Congress.gov URL when the upstream pagination link omits it. */
+export function appendApiKey(url: string, apiKey: string): string {
+  const parsed = new URL(url);
+  if (!parsed.searchParams.has("api_key")) {
+    parsed.searchParams.set("api_key", apiKey);
+  }
+  return parsed.toString();
+}
+
+/** Resolve Congress.gov `pagination.next` (or null) with an API key attached. */
+export function nextPageUrl(raw: string | undefined | null, apiKey: string): string | null {
+  if (!raw) return null;
+  return appendApiKey(raw, apiKey);
+}

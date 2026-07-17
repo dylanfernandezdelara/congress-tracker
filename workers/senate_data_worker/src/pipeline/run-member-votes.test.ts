@@ -122,11 +122,29 @@ describe("runMemberVotesPipeline", () => {
 
     const result = await runMemberVotesPipeline(env);
 
+    expect(fetchSenateMemberVotes).toHaveBeenCalledTimes(1);
     expect(deleteMemberVotesForRoll).toHaveBeenCalledTimes(1);
+    expect(fetchSenateMemberVotes.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteMemberVotesForRoll.mock.invocationCallOrder[0]!
+    );
     expect(result.rollsProcessed).toBe(1);
   });
 
-  it("caps rolls per invocation and reports the remainder", async () => {
+  it("does not delete LIS rows when the re-fetch fails", async () => {
+    selectPassageRollCalls.mockResolvedValue([{ chamber: "Senate", congress: 119, session: 2, roll_number: 1 }]);
+    countMemberVotesForRoll.mockResolvedValue(100);
+    countLisMemberVotesForRoll.mockResolvedValue(5);
+    fetchSenateMemberVotes.mockRejectedValueOnce(new Error("HTTP 403"));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(deleteMemberVotesForRoll).not.toHaveBeenCalled();
+    expect(result.rollsProcessed).toBe(0);
+    expect(result.rollsAttempted).toBe(1);
+    expect(result.rollsSkipped).toBe(1);
+  });
+
+  it("caps upstream fetch attempts per invocation and reports the remainder", async () => {
     const rolls = Array.from({ length: MEMBER_VOTES_MAX_ROLLS_PER_RUN + 5 }, (_, i) =>
       houseRoll(i + 1)
     );
@@ -134,7 +152,24 @@ describe("runMemberVotesPipeline", () => {
 
     const result = await runMemberVotesPipeline(env);
 
+    expect(result.rollsAttempted).toBe(MEMBER_VOTES_MAX_ROLLS_PER_RUN);
     expect(result.rollsProcessed).toBe(MEMBER_VOTES_MAX_ROLLS_PER_RUN);
     expect(result.rollsRemaining).toBe(5);
+  });
+
+  it("continues when a single roll fetch fails and charges the attempt budget", async () => {
+    selectPassageRollCalls.mockResolvedValue([
+      houseRoll(1),
+      { chamber: "Senate", congress: 119, session: 2, roll_number: 1 },
+      houseRoll(2),
+    ]);
+    fetchSenateMemberVotes.mockRejectedValueOnce(new Error("HTTP 403 for https://www.senate.gov/..."));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(2);
+    expect(result.rollsSkipped).toBe(1);
+    expect(result.rollsAttempted).toBe(3);
+    expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(2);
   });
 });
