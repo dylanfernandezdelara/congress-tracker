@@ -14,7 +14,7 @@ import {
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
-import { runFeedPipeline } from "../pipeline/run-feed";
+import { runFeedWithMemberVotes } from "../pipeline/run-feed-with-member-votes";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
 import { ensureMemberRoster } from "../pipeline/ensure-member-roster";
 import { runMembersRosterPipeline } from "../pipeline/run-members-roster";
@@ -229,7 +229,7 @@ async function handlePipelineRoute<T extends object>(
 }
 
 const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = {
-  "/__pipeline/run/feed": ({ env }) => runFeedPipeline(env, { trigger: "admin" }),
+  "/__pipeline/run/feed": ({ env }) => runFeedWithMemberVotes(env, { trigger: "admin" }),
   "/__pipeline/run/digest-refresh": ({ env, url }) => {
     const bills = parseDigestRefreshRequest(url, env);
     return runDigestRefreshPipeline(env, bills);

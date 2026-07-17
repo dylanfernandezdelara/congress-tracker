@@ -4,7 +4,7 @@ import type { BillRef, IngestVotesResult, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { parseHouseLegislation } from "./bill-ref";
 import { normalizeBillType } from "./bill-type";
-import { fetchJson } from "./http";
+import { fetchJson, nextPageUrl } from "./http";
 import { isPassageVote } from "./passage";
 
 interface HouseVoteListItem {
@@ -75,12 +75,6 @@ function newestVoteDateOnPage(items: HouseVoteListItem[]): string | null {
 function pageEntirelyBeforeLookback(items: HouseVoteListItem[], lookbackStart: string): boolean {
   const newest = newestVoteDateOnPage(items);
   return newest !== null && newest < lookbackStart;
-}
-
-function nextPageUrl(raw: string | undefined | null, apiKey: string): string | null {
-  if (!raw) return null;
-  if (raw.includes("api_key=")) return raw;
-  return raw.includes("?") ? `${raw}&api_key=${apiKey}` : `${raw}?api_key=${apiKey}`;
 }
 
 export async function ingestHousePassageVotes(

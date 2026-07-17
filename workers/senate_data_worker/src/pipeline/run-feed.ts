@@ -16,7 +16,6 @@ import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
-import { runMemberVotesPipeline, type RunMemberVotesResult } from "./run-member-votes";
 import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
@@ -32,8 +31,6 @@ export interface RunFeedResult {
   lifecycleRefreshed: number;
   lifecycleSkipped: number;
   lifecycleWarnings: string[];
-  memberVotes?: RunMemberVotesResult;
-  memberVotesError?: string;
 }
 
 export async function runFeedPipeline(
@@ -182,30 +179,6 @@ export async function runFeedPipeline(
       );
     }
 
-    // Backfill per-member roll positions so expanded feed rows can show
-    // party defectors. Best-effort: feed success must not depend on it.
-    let memberVotes: RunMemberVotesResult | undefined;
-    let memberVotesError: string | undefined;
-    try {
-      memberVotes = await runMemberVotesPipeline(env);
-      console.log(
-        JSON.stringify({
-          event: "member_votes_pipeline_complete",
-          trigger,
-          ...memberVotes,
-        })
-      );
-    } catch (err: unknown) {
-      memberVotesError = err instanceof Error ? err.message : String(err);
-      console.error(
-        JSON.stringify({
-          event: "member_votes_pipeline_failed",
-          trigger,
-          error: memberVotesError,
-        })
-      );
-    }
-
     const result: RunFeedResult = {
       votesUpserted: newVotes.length,
       votesSkipped: houseResult.skipped + senateResult.skipped,
@@ -217,8 +190,6 @@ export async function runFeedPipeline(
       lifecycleRefreshed,
       lifecycleSkipped,
       lifecycleWarnings,
-      ...(memberVotes ? { memberVotes } : {}),
-      ...(memberVotesError ? { memberVotesError } : {}),
     };
 
     try {

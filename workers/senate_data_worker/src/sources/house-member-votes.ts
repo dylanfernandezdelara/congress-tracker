@@ -1,6 +1,6 @@
 import type { Env } from "../config";
 import type { MemberRecord, MemberVoteRecord } from "../types";
-import { fetchJson } from "./http";
+import { fetchJson, nextPageUrl } from "./http";
 
 /** Congress.gov beta house-vote members item (current field names). */
 interface HouseMemberVoteItem {
@@ -30,14 +30,6 @@ interface HouseMemberVotesResponse {
 
 function memberName(first?: string, last?: string): string {
   return [first, last].filter(Boolean).join(" ").trim() || "Unknown";
-}
-
-function appendApiKey(url: string, apiKey: string): string {
-  const parsed = new URL(url);
-  if (!parsed.searchParams.has("api_key")) {
-    parsed.searchParams.set("api_key", apiKey);
-  }
-  return parsed.toString();
 }
 
 function pageItems(data: HouseMemberVotesResponse): HouseMemberVoteItem[] {
@@ -95,7 +87,7 @@ export async function fetchHouseMemberVotes(
         position,
       });
     }
-    nextUrl = data.pagination?.next ? appendApiKey(data.pagination.next, apiKey) : null;
+    nextUrl = nextPageUrl(data.pagination?.next, apiKey);
   }
 
   return { members, votes };

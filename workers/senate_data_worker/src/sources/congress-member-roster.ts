@@ -3,7 +3,7 @@ import { congressNumber } from "../config";
 import { senateMemberLookupKey } from "../../../../shared/member-id";
 import { normalizePartyCode } from "../../../../shared/party";
 import type { Chamber, MemberRecord } from "../types";
-import { fetchJson } from "./http";
+import { fetchJson, nextPageUrl } from "./http";
 
 interface CongressMemberTerm {
   chamber?: string;
@@ -144,13 +144,6 @@ export function parseCongressMemberListItem(item: CongressMemberListItem): Membe
   };
 }
 
-function appendApiKey(url: string, apiKey: string): string {
-  const parsed = new URL(url);
-  if (!parsed.searchParams.has("api_key")) {
-    parsed.searchParams.set("api_key", apiKey);
-  }
-  return parsed.toString();
-}
 
 /**
  * Fetch the current-member roster for the configured Congress from Congress.gov.
@@ -186,7 +179,7 @@ export async function fetchCongressMemberRoster(env: Env): Promise<{
         senateBioguideLookup[lookupKey] = parsed.bioguideId;
       }
     }
-    nextUrl = data.pagination?.next ? appendApiKey(data.pagination.next, apiKey) : null;
+    nextUrl = nextPageUrl(data.pagination?.next, apiKey);
   }
 
   return { members, senateBioguideLookup };

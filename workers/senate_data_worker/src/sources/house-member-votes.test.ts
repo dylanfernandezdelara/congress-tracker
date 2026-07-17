@@ -4,7 +4,10 @@ const { fetchJson } = vi.hoisted(() => ({
   fetchJson: vi.fn(),
 }));
 
-vi.mock("./http", () => ({ fetchJson }));
+vi.mock("./http", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./http")>();
+  return { ...actual, fetchJson };
+});
 
 import { fetchHouseMemberVotes } from "./house-member-votes";
 
