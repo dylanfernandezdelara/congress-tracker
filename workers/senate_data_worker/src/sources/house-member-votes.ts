@@ -70,7 +70,8 @@ export async function fetchHouseMemberVotes(
   const seen = new Set<string>();
 
   while (nextUrl) {
-    const data = await fetchJson<HouseMemberVotesResponse>(nextUrl);
+    const pageUrl = nextUrl;
+    const data: HouseMemberVotesResponse = await fetchJson<HouseMemberVotesResponse>(pageUrl);
     for (const item of pageItems(data)) {
       const bioguideId = item.bioguideID ?? item.bioguideId;
       const position = item.voteCast ?? item.votePosition;
