@@ -1,7 +1,31 @@
 import { proceduralHeadline } from './feed-content'
+import type { NotableVoteCrossVoteLabel } from './stats-api-types'
 
 /** Notable-votes section only considers passage votes on or after this lookback window. */
 export const NOTABLE_VOTES_LOOKBACK_DAYS = 14
+
+/** Bucket session cross-party vote counts into a short label for UI copy. */
+export function crossVoteLabel(count: number): NotableVoteCrossVoteLabel {
+  if (count <= 2) return 'rare'
+  if (count <= 7) return 'occasional'
+  return 'frequent'
+}
+
+/** Human-readable hint for a cross-vote frequency label. */
+export function crossVoteHint(label: NotableVoteCrossVoteLabel): string {
+  switch (label) {
+    case 'rare':
+      return 'Rare party-line break'
+    case 'occasional':
+      return 'Occasional cross-voter'
+    case 'frequent':
+      return 'Frequent cross-voter'
+    default: {
+      const _exhaustive: never = label
+      return _exhaustive
+    }
+  }
+}
 
 const PROCEDURAL_BILL_TYPES = new Set(['HRES', 'HCONRES', 'SRES', 'SCONRES'])
 

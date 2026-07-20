@@ -4,6 +4,7 @@ import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
   FeedPageResponse,
+  MemberProfileResponse,
   NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
@@ -81,4 +82,9 @@ export async function fetchVoteDefectors(params: {
     roll_number: String(params.rollNumber),
   })
   return fetchJson<VoteDefectorsResponse>(`/feed/vote-defectors.json?${search}`)
+}
+
+export async function fetchMemberProfile(bioguideId: string): Promise<MemberProfileResponse> {
+  const params = new URLSearchParams({ bioguide_id: bioguideId })
+  return fetchJson<MemberProfileResponse>(`/stats/member.json?${params}`)
 }

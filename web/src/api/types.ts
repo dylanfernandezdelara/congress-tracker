@@ -57,6 +57,8 @@ export type {
   DateRange,
   DefectorEntry,
   DefectorsResponse,
+  MemberProfileRecentCrossVote,
+  MemberProfileResponse,
   NotableVoteEntry,
   NotableVotesResponse,
   PartySeatCount,

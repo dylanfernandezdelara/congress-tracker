@@ -197,3 +197,39 @@ export interface PortfoliosResponse extends PortfolioMovers {
   session: number
   as_of: string
 }
+
+export interface MemberProfileRecentCrossVote {
+  chamber: StatsChamber
+  congress: number
+  session: number
+  roll_number: number
+  bill_type: string
+  bill_number: number
+  bill_congress: number
+  vote_date: string
+  position: 'yea' | 'nay'
+  party_line: 'yea' | 'nay'
+  margin: number
+}
+
+export interface MemberProfileResponse {
+  bioguide_id: string
+  name: string
+  chamber: StatsChamber
+  party: string
+  state: string
+  district: number | null
+  photo_url: string
+  /** Null when the id is not a real bioguide (local seed / LIS placeholder). */
+  congress_gov_url: string | null
+  congress: number
+  session: number
+  votes_cast: number
+  yea_count: number
+  nay_count: number
+  cross_vote_count: number
+  cross_vote_label: NotableVoteCrossVoteLabel
+  recent_cross_votes: MemberProfileRecentCrossVote[]
+  member_votes_available: boolean
+  as_of: string
+}

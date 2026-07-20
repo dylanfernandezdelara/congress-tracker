@@ -90,6 +90,8 @@ export type {
   PulseStatsResponse,
   NotableVoteEntry,
   NotableVotesResponse,
+  MemberProfileRecentCrossVote,
+  MemberProfileResponse,
   PartySeatCount,
   ChamberComposition,
   SessionStatsResponse,

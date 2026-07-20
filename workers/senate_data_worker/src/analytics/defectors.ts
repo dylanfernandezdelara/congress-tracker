@@ -1,5 +1,6 @@
 import type { Chamber, DefectorEntry, VoteDefectorEntry } from "../types";
 import { isRealBioguideId } from "../../../../shared/member-id";
+import { congressGovMemberUrl } from "../../../../shared/member-photo";
 import { normalizePartyCode } from "../../../../shared/party";
 import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
 import { selectMemberVotesForRoll, type RollCallKey, selectMemberVotesForSession } from "../d1/member-votes";
@@ -10,11 +11,13 @@ function normalizePosition(position: string): "yea" | "nay" | "other" {
   return normalizeVotePosition(position);
 }
 
-function congressGovMemberUrl(bioguideId: string): string {
-  if (bioguideId.startsWith("LIS:")) {
-    return "https://www.senate.gov/general/contact_information/senators_cfm.cfm";
-  }
-  return `https://www.congress.gov/member/${bioguideId.toLowerCase()}`;
+function defectorCongressGovUrl(bioguideId: string): string {
+  return (
+    congressGovMemberUrl(bioguideId) ??
+    (bioguideId.startsWith("LIS:")
+      ? "https://www.senate.gov/general/contact_information/senators_cfm.cfm"
+      : `https://www.congress.gov/member/${bioguideId.toLowerCase()}`)
+  );
 }
 
 export async function computeDefectors(
@@ -110,7 +113,7 @@ export async function computeDefectors(
       state: member.state ?? "?",
       cross_vote_count: score.crossVotes,
       deciding_score: score.decidingScore,
-      congress_gov_url: congressGovMemberUrl(bioguideId),
+      congress_gov_url: defectorCongressGovUrl(bioguideId),
       recent_example: score.recent,
     });
   }
@@ -181,7 +184,7 @@ export async function computeRollDefectors(
       state: member.state ?? "?",
       position: memberSide,
       party_line: partyLine,
-      congress_gov_url: congressGovMemberUrl(row.bioguide_id),
+      congress_gov_url: defectorCongressGovUrl(row.bioguide_id),
     });
   }
 
