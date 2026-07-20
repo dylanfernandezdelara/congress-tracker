@@ -19,6 +19,12 @@ type MemberProfileProps = {
   onClose: () => void
 }
 
+type StatsPhase =
+  | { kind: 'loading' }
+  | { kind: 'error'; message: string }
+  | { kind: 'unavailable' }
+  | { kind: 'ready'; profile: MemberProfileResponse }
+
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl: string }) {
   const [failed, setFailed] = useState(false)
   const showPhoto = Boolean(photoUrl) && !failed
@@ -50,27 +56,41 @@ function positionWord(position: 'yea' | 'nay'): string {
   return position === 'yea' ? 'Yea' : 'Nay'
 }
 
+function statsPhase(
+  profile: MemberProfileResponse | null,
+  isLoading: boolean,
+  error: string | null,
+): StatsPhase {
+  if (profile?.member_votes_available) return { kind: 'ready', profile }
+  if (isLoading && !profile) return { kind: 'loading' }
+  if (error && !profile) return { kind: 'error', message: error }
+  return { kind: 'unavailable' }
+}
+
 export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const bioguideId = seed?.bioguide_id ?? null
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const bioguideId = open ? seed?.bioguide_id ?? null : null
 
-  const enabled = open && Boolean(bioguideId)
   const {
     data: profile,
-    error: loadError,
+    error,
     isLoading,
   } = useAsyncData({
-    deps: [enabled, bioguideId],
-    validate: () => (enabled ? null : 'disabled'),
-    load: () => fetchMemberProfile(bioguideId!),
+    deps: [bioguideId],
+    enabled: Boolean(bioguideId),
+    load: () => fetchMemberProfile(bioguideId as string),
     mapError: (err) => (err instanceof Error ? err.message : 'Could not load member profile'),
   })
-  const error = enabled && loadError && loadError !== 'disabled' ? loadError : null
 
   useEffect(() => {
     if (!open) return
+
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    returnFocusRef.current = previouslyFocused
 
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -105,6 +125,8 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
     return () => {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
+      returnFocusRef.current?.focus()
+      returnFocusRef.current = null
     }
   }, [open, onClose])
 
@@ -114,13 +136,8 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const party = profile?.party ?? seed.party
   const state = profile?.state ?? seed.state
   const photoUrl = profile?.photo_url || seed.photo_url
-  const crossVoteLabelValue = profile?.cross_vote_label ?? seed.cross_vote_label
-  const congressGovUrl = profile?.congress_gov_url ?? null
-  const hint = crossVoteHint(crossVoteLabelValue)
-
-  let seatText = `${partyShortLabel(party)}-${state}`
-  if (profile) seatText = seatLabel(profile)
-  else if (isLoading) seatText = `${state} · loading seat details…`
+  const hint = crossVoteHint(profile?.cross_vote_label ?? seed.cross_vote_label)
+  const phase = statsPhase(profile, isLoading, error)
 
   return (
     <div className="member-profile-root" role="presentation">
@@ -157,46 +174,49 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
             <p className={`member-profile-party ${partyCssClass(party)}`}>
               {partyDisplayName(party)} · {partyShortLabel(party)}-{state}
             </p>
-            <p className="member-profile-seat">{seatText}</p>
+            {profile ? <p className="member-profile-seat">{seatLabel(profile)}</p> : null}
           </div>
         </div>
 
         <section className="member-profile-section" aria-label="Voting behavior">
           <h3 className="member-profile-section-title">Voting behavior</h3>
           <p className="member-profile-behavior">{hint}</p>
-          {profile?.member_votes_available ? (
+          {phase.kind === 'ready' ? (
             <dl className="member-profile-stats">
               <div>
                 <dt>Passage votes</dt>
-                <dd>{profile.votes_cast}</dd>
+                <dd>{phase.profile.votes_cast}</dd>
               </div>
               <div>
                 <dt>Yea / Nay</dt>
                 <dd>
-                  {profile.yea_count} / {profile.nay_count}
+                  {phase.profile.yea_count} / {phase.profile.nay_count}
                 </dd>
               </div>
               <div>
                 <dt>Party-line breaks</dt>
-                <dd>{profile.cross_vote_count}</dd>
+                <dd>{phase.profile.cross_vote_count}</dd>
               </div>
             </dl>
-          ) : isLoading && !profile ? (
+          ) : null}
+          {phase.kind === 'loading' ? (
             <p className="member-profile-muted">Loading session voting stats…</p>
-          ) : error && !profile ? (
-            <p className="member-profile-muted">{error}</p>
-          ) : (
+          ) : null}
+          {phase.kind === 'error' ? (
+            <p className="member-profile-muted">{phase.message}</p>
+          ) : null}
+          {phase.kind === 'unavailable' ? (
             <p className="member-profile-muted">
               Per-member vote history is not available for this session yet.
             </p>
-          )}
+          ) : null}
         </section>
 
-        {profile && profile.recent_cross_votes.length > 0 ? (
+        {phase.kind === 'ready' && phase.profile.recent_cross_votes.length > 0 ? (
           <section className="member-profile-section" aria-label="Recent party-line breaks">
             <h3 className="member-profile-section-title">Recent party-line breaks</h3>
             <ul className="member-profile-recent">
-              {profile.recent_cross_votes.map((vote) => (
+              {phase.profile.recent_cross_votes.map((vote) => (
                 <li
                   key={`${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`}
                   className="member-profile-recent-item"
@@ -214,10 +234,10 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
           </section>
         ) : null}
 
-        {congressGovUrl ? (
+        {profile?.congress_gov_url ? (
           <a
             className="member-profile-link congress-link"
-            href={congressGovUrl}
+            href={profile.congress_gov_url}
             target="_blank"
             rel="noreferrer"
           >

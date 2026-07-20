@@ -1,17 +1,16 @@
 import { bioguidePhotoUrl, congressGovMemberUrl } from "../../../../shared/member-photo";
 import { crossVoteLabel } from "../../../../shared/notable-votes";
-import { normalizePartyCode } from "../../../../shared/party";
 import type { MemberProfileRecentCrossVote, MemberProfileResponse } from "../../../../shared/stats-api-types";
 import { normalizeVotePosition } from "../../../../shared/vote-positions";
 import { getMember, getMembersByIds } from "../d1/members";
-import { selectMemberVotesForSession, type MemberVoteWithRoll } from "../d1/member-votes";
-import { partyMajoritiesForRoll } from "./roll-party-stats";
+import {
+  selectMemberVotesForBioguide,
+  selectMemberVotesForRollNumbers,
+  type MemberVoteWithRoll,
+} from "../d1/member-votes";
+import { rollCrossVotes } from "./cross-votes";
 
 const RECENT_CROSS_VOTE_LIMIT = 5;
-
-function normalizePosition(position: string): "yea" | "nay" | "other" {
-  return normalizeVotePosition(position);
-}
 
 /**
  * Build a member profile for the current session: roster identity plus
@@ -26,22 +25,20 @@ export async function buildMemberProfile(
   const member = await getMember(db, bioguideId);
   if (!member) return null;
 
-  const rows = await selectMemberVotesForSession(db, congress, session, member.chamber);
-  const memberVotes = rows.filter((row) => row.bioguide_id === bioguideId);
+  const memberVotes = await selectMemberVotesForBioguide(db, congress, session, bioguideId);
 
   let yea_count = 0;
   let nay_count = 0;
   for (const row of memberVotes) {
-    const side = normalizePosition(row.position);
+    const side = normalizeVotePosition(row.position);
     if (side === "yea") yea_count += 1;
     else if (side === "nay") nay_count += 1;
   }
 
   const { cross_vote_count, recent_cross_votes } = await computeMemberCrossVotes(
     db,
-    rows,
-    bioguideId,
-    member.party
+    member,
+    memberVotes
   );
 
   return {
@@ -68,65 +65,71 @@ export async function buildMemberProfile(
 
 async function computeMemberCrossVotes(
   db: D1Database,
-  rows: MemberVoteWithRoll[],
-  bioguideId: string,
-  memberParty: string | null
+  member: { bioguideId: string; chamber: string; party: string | null },
+  memberVotes: MemberVoteWithRoll[]
 ): Promise<{
   cross_vote_count: number;
   recent_cross_votes: MemberProfileRecentCrossVote[];
 }> {
-  if (!memberParty || rows.length === 0) {
+  if (!member.party || memberVotes.length === 0) {
     return { cross_vote_count: 0, recent_cross_votes: [] };
   }
 
-  const uniqueIds = [...new Set(rows.map((row) => row.bioguide_id))];
-  const memberRows = await getMembersByIds(db, uniqueIds);
+  const rollNumbers = [...new Set(memberVotes.map((row) => row.roll_number))];
+  const peerRows = await selectMemberVotesForRollNumbers(
+    db,
+    member.chamber,
+    memberVotes[0]!.congress,
+    memberVotes[0]!.session,
+    rollNumbers
+  );
+
+  const uniqueIds = [...new Set(peerRows.map((row) => row.bioguide_id))];
+  const roster = await getMembersByIds(db, uniqueIds);
   const parties = new Map<string, string | null>();
-  for (const [id, record] of memberRows) {
+  for (const [id, record] of roster) {
     parties.set(id, record.party);
   }
 
-  const byRoll = new Map<string, MemberVoteWithRoll[]>();
-  for (const row of rows) {
-    const key = `${row.chamber}:${row.congress}:${row.session}:${row.roll_number}`;
-    const list = byRoll.get(key) ?? [];
+  const peersByRoll = new Map<number, typeof peerRows>();
+  for (const row of peerRows) {
+    const list = peersByRoll.get(row.roll_number) ?? [];
     list.push(row);
-    byRoll.set(key, list);
+    peersByRoll.set(row.roll_number, list);
   }
 
-  const partyKey = normalizePartyCode(memberParty);
+  const memberVoteByRoll = new Map(memberVotes.map((row) => [row.roll_number, row]));
   let cross_vote_count = 0;
   const recent_cross_votes: MemberProfileRecentCrossVote[] = [];
 
-  // rows arrive newest-first; Map insertion preserves that order.
-  for (const rollRows of byRoll.values()) {
-    const target = rollRows.find((row) => row.bioguide_id === bioguideId);
-    if (!target) continue;
-
-    const partyMajorities = partyMajoritiesForRoll(
-      rollRows.map((row) => ({
+  // memberVotes arrive newest-first; walk in that order for recent examples.
+  for (const vote of memberVotes) {
+    const peers = peersByRoll.get(vote.roll_number) ?? [];
+    const crosses = rollCrossVotes(
+      peers.map((row) => ({
+        bioguideId: row.bioguide_id,
         party: parties.get(row.bioguide_id) ?? null,
         position: row.position,
       }))
     );
-    const partyLine = partyMajorities.get(partyKey) ?? null;
-    const memberSide = normalizePosition(target.position);
-    if (partyLine === null || memberSide === "other" || memberSide === partyLine) continue;
+    const mine = crosses.find((cross) => cross.bioguideId === member.bioguideId);
+    if (!mine) continue;
 
     cross_vote_count += 1;
     if (recent_cross_votes.length < RECENT_CROSS_VOTE_LIMIT) {
+      const source = memberVoteByRoll.get(vote.roll_number) ?? vote;
       recent_cross_votes.push({
-        chamber: target.chamber as MemberProfileRecentCrossVote["chamber"],
-        congress: target.congress,
-        session: target.session,
-        roll_number: target.roll_number,
-        bill_type: target.bill_type,
-        bill_number: target.bill_number,
-        bill_congress: target.bill_congress,
-        vote_date: target.vote_date,
-        position: memberSide,
-        party_line: partyLine,
-        margin: Math.abs(target.yeas - target.nays),
+        chamber: source.chamber as MemberProfileRecentCrossVote["chamber"],
+        congress: source.congress,
+        session: source.session,
+        roll_number: source.roll_number,
+        bill_type: source.bill_type,
+        bill_number: source.bill_number,
+        bill_congress: source.bill_congress,
+        vote_date: source.vote_date,
+        position: mine.position,
+        party_line: mine.partyLine,
+        margin: Math.abs(source.yeas - source.nays),
       });
     }
   }

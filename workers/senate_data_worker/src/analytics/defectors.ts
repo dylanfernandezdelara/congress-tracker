@@ -1,15 +1,9 @@
 import type { Chamber, DefectorEntry, VoteDefectorEntry } from "../types";
 import { isRealBioguideId } from "../../../../shared/member-id";
 import { congressGovMemberUrl } from "../../../../shared/member-photo";
-import { normalizePartyCode } from "../../../../shared/party";
 import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
 import { selectMemberVotesForRoll, type RollCallKey, selectMemberVotesForSession } from "../d1/member-votes";
-import { normalizeVotePosition } from "../../../../shared/vote-positions";
-import { partyMajoritiesForRoll } from "./roll-party-stats";
-
-function normalizePosition(position: string): "yea" | "nay" | "other" {
-  return normalizeVotePosition(position);
-}
+import { rollCrossVotes } from "./cross-votes";
 
 function defectorCongressGovUrl(bioguideId: string): string {
   return (
@@ -69,23 +63,21 @@ export async function computeDefectors(
   for (const rollRows of byRoll.values()) {
     const margin = Math.abs(rollRows[0].yeas - rollRows[0].nays);
     const weight = 1 / Math.max(1, margin);
-    const partyMajorities = partyMajoritiesForRoll(
-      rollRows.map((r) => ({
-        party: members.get(r.bioguide_id)?.party ?? null,
-        position: r.position,
+    const crosses = rollCrossVotes(
+      rollRows.map((row) => ({
+        bioguideId: row.bioguide_id,
+        party: members.get(row.bioguide_id)?.party ?? null,
+        position: row.position,
       }))
     );
 
-    for (const row of rollRows) {
-      if (excludeLocalSample && !isRealBioguideId(row.bioguide_id)) continue;
-      const member = members.get(row.bioguide_id);
-      if (!member?.party) continue;
-      const partyKey = normalizePartyCode(member.party);
-      const partySide = partyMajorities.get(partyKey) ?? null;
-      const memberSide = normalizePosition(row.position);
-      if (partySide === null || memberSide === "other" || memberSide === partySide) continue;
+    const rowById = new Map(rollRows.map((row) => [row.bioguide_id, row]));
+    for (const cross of crosses) {
+      if (excludeLocalSample && !isRealBioguideId(cross.bioguideId)) continue;
+      const row = rowById.get(cross.bioguideId);
+      if (!row) continue;
 
-      const current = scores.get(row.bioguide_id) ?? { crossVotes: 0, decidingScore: 0 };
+      const current = scores.get(cross.bioguideId) ?? { crossVotes: 0, decidingScore: 0 };
       current.crossVotes += 1;
       current.decidingScore += weight;
       // Rows arrive newest-first (ORDER BY vote_date DESC), so the first cross
@@ -98,7 +90,7 @@ export async function computeDefectors(
           margin,
         };
       }
-      scores.set(row.bioguide_id, current);
+      scores.set(cross.bioguideId, current);
     }
   }
 
@@ -161,30 +153,26 @@ export async function computeRollDefectors(
     }
   }
 
-  const partyMajorities = partyMajoritiesForRoll(
+  const crosses = rollCrossVotes(
     filteredRows.map((row) => ({
+      bioguideId: row.bioguide_id,
       party: members.get(row.bioguide_id)?.party ?? null,
       position: row.position,
     }))
   );
 
   const defectors: VoteDefectorEntry[] = [];
-  for (const row of filteredRows) {
-    const member = members.get(row.bioguide_id);
+  for (const cross of crosses) {
+    const member = members.get(cross.bioguideId);
     if (!member?.party) continue;
-    const partyKey = normalizePartyCode(member.party);
-    const partyLine = partyMajorities.get(partyKey) ?? null;
-    const memberSide = normalizePosition(row.position);
-    if (partyLine === null || memberSide === "other" || memberSide === partyLine) continue;
-
     defectors.push({
-      bioguide_id: row.bioguide_id,
+      bioguide_id: cross.bioguideId,
       name: member.name,
       party: member.party,
       state: member.state ?? "?",
-      position: memberSide,
-      party_line: partyLine,
-      congress_gov_url: defectorCongressGovUrl(row.bioguide_id),
+      position: cross.position,
+      party_line: cross.partyLine,
+      congress_gov_url: defectorCongressGovUrl(cross.bioguideId),
     });
   }
 

@@ -5,21 +5,36 @@ type MockRow = Record<string, unknown>;
 
 function createDb(options: {
   member?: MockRow | null;
-  sessionVotes?: MockRow[];
+  memberVotes?: MockRow[];
+  peerVotes?: MockRow[];
   roster?: MockRow[];
 }): D1Database {
-  const { member = null, sessionVotes = [], roster = [] } = options;
+  const { member = null, memberVotes = [], peerVotes = [], roster = [] } = options;
 
   return {
     exec: vi.fn(async () => {}),
     prepare: vi.fn((sql: string) => {
-      const bind = (..._args: unknown[]) => ({
+      const bind = (...args: unknown[]) => ({
         all: vi.fn(async () => {
-          if (sql.includes("FROM member_votes mv") && sql.includes("JOIN votes v")) {
-            return { results: sessionVotes };
+          if (
+            sql.includes("FROM member_votes mv") &&
+            sql.includes("JOIN votes v") &&
+            sql.includes("mv.bioguide_id = ?")
+          ) {
+            return { results: memberVotes };
+          }
+          if (
+            sql.includes("FROM member_votes") &&
+            sql.includes("roll_number IN") &&
+            !sql.includes("JOIN votes")
+          ) {
+            const rollNumbers = args.slice(3).map(Number);
+            return {
+              results: peerVotes.filter((row) => rollNumbers.includes(Number(row.roll_number))),
+            };
           }
           if (sql.includes("FROM members WHERE bioguide_id IN")) {
-            const ids = _args as string[];
+            const ids = args as string[];
             return {
               results: roster.filter((row) => ids.includes(String(row.bioguide_id))),
             };
@@ -34,7 +49,6 @@ function createDb(options: {
       return {
         bind: (...args: unknown[]) => {
           if (sql.includes("FROM members WHERE bioguide_id IN") && args.length === 1) {
-            // getMember / getMembersByIds single-id path uses IN (?)
             const id = String(args[0]);
             return {
               all: vi.fn(async () => ({
@@ -98,7 +112,7 @@ describe("buildMemberProfile", () => {
   });
 
   it("counts yea/nay and recent party-line breaks", async () => {
-    const sessionVotes = [
+    const memberVotes = [
       {
         bioguide_id: "F000466",
         position: "Yea",
@@ -113,48 +127,13 @@ describe("buildMemberProfile", () => {
         bill_congress: 119,
         vote_date: "2026-07-01",
       },
-      {
-        bioguide_id: "D000001",
-        position: "Nay",
-        chamber: "House",
-        congress: 119,
-        session: 2,
-        roll_number: 10,
-        yeas: 220,
-        nays: 210,
-        bill_type: "HR",
-        bill_number: 1,
-        bill_congress: 119,
-        vote_date: "2026-07-01",
-      },
-      {
-        bioguide_id: "R000001",
-        position: "Nay",
-        chamber: "House",
-        congress: 119,
-        session: 2,
-        roll_number: 10,
-        yeas: 220,
-        nays: 210,
-        bill_type: "HR",
-        bill_number: 1,
-        bill_congress: 119,
-        vote_date: "2026-07-01",
-      },
-      {
-        bioguide_id: "R000002",
-        position: "Nay",
-        chamber: "House",
-        congress: 119,
-        session: 2,
-        roll_number: 10,
-        yeas: 220,
-        nays: 210,
-        bill_type: "HR",
-        bill_number: 1,
-        bill_congress: 119,
-        vote_date: "2026-07-01",
-      },
+    ];
+
+    const peerVotes = [
+      { bioguide_id: "F000466", position: "Yea", roll_number: 10 },
+      { bioguide_id: "D000001", position: "Nay", roll_number: 10 },
+      { bioguide_id: "R000001", position: "Nay", roll_number: 10 },
+      { bioguide_id: "R000002", position: "Nay", roll_number: 10 },
     ];
 
     const roster = [
@@ -195,7 +174,8 @@ describe("buildMemberProfile", () => {
     const profile = await buildMemberProfile(
       createDb({
         member: roster[0],
-        sessionVotes,
+        memberVotes,
+        peerVotes,
         roster,
       }),
       119,

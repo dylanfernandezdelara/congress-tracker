@@ -59,4 +59,25 @@ describe('useAsyncData', () => {
     expect(result.current.error).toBeNull()
     expect(result.current.data).toEqual({ title: 'Rail safety package' })
   })
+
+  it('skips loading when disabled', async () => {
+    const load = vi.fn(async () => ({ ok: true }))
+
+    const { result } = renderHook(() =>
+      useAsyncData({
+        deps: [false],
+        enabled: false,
+        load,
+        mapError: () => 'unexpected',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(load).not.toHaveBeenCalled()
+    expect(result.current.data).toBeNull()
+    expect(result.current.error).toBeNull()
+  })
 })
