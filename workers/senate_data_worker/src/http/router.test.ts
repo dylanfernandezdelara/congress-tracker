@@ -165,6 +165,22 @@ describe("HTTP API", () => {
     expect(response.status).toBe(400);
   });
 
+  it("requires bioguide_id for member profile", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/member.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 404 for unknown member profile", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/member.json?bioguide_id=Z999999"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(404);
+  });
+
   it("returns empty defectors for chamber", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/stats/defectors.json?chamber=House"),

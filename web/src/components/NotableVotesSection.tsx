@@ -2,33 +2,20 @@ import { useState } from 'react'
 
 import type { NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
+import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import {
   MEMBER_VOTES_UNAVAILABLE,
   noPartyDefectorsMessage,
 } from '../constants/memberVotesCopy'
 import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { memberInitials } from '../utils/memberPhoto'
+import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 
 type NotableVotesSectionProps = {
   notable: NotableVoteEntry[] | null
   loading?: boolean
   error?: string | null
   onRetry?: () => void
-}
-
-function crossVoteHint(label: NotableVoteEntry['defectors'][number]['cross_vote_label']): string {
-  switch (label) {
-    case 'rare':
-      return 'Rare party-line break'
-    case 'occasional':
-      return 'Occasional cross-voter'
-    case 'frequent':
-      return 'Frequent cross-voter'
-    default: {
-      const _exhaustive: never = label
-      return _exhaustive
-    }
-  }
 }
 
 function DefectorAvatar({
@@ -58,22 +45,35 @@ function DefectorAvatar({
   )
 }
 
-function NotableVoteDefectors({ entry }: { entry: NotableVoteEntry }) {
+function NotableVoteDefectors({
+  entry,
+  onOpenProfile,
+}: {
+  entry: NotableVoteEntry
+  onOpenProfile: (seed: MemberProfileSeed) => void
+}) {
   if (entry.defectors.length > 0) {
     return (
       <ul className="notable-vote-defectors">
         {entry.defectors.map((defector) => (
           <li key={defector.bioguide_id} className="notable-vote-defector">
-            <DefectorAvatar name={defector.name} photoUrl={defector.photo_url} />
-            <span className="notable-vote-defector-copy">
-              <span className="notable-vote-defector-name">{defector.name}</span>
-              <span className={`notable-vote-defector-party ${partyCssClass(defector.party)}`}>
-                {partyShortLabel(defector.party)}-{defector.state}
+            <button
+              type="button"
+              className="notable-vote-defector-button"
+              onClick={() => onOpenProfile(defector)}
+              aria-label={`Open profile for ${defector.name}`}
+            >
+              <DefectorAvatar name={defector.name} photoUrl={defector.photo_url} />
+              <span className="notable-vote-defector-copy">
+                <span className="notable-vote-defector-name">{defector.name}</span>
+                <span className={`notable-vote-defector-party ${partyCssClass(defector.party)}`}>
+                  {partyShortLabel(defector.party)}-{defector.state}
+                </span>
+                <span className="notable-vote-defector-hint">
+                  {crossVoteHint(defector.cross_vote_label)}
+                </span>
               </span>
-              <span className="notable-vote-defector-hint">
-                {crossVoteHint(defector.cross_vote_label)}
-              </span>
-            </span>
+            </button>
           </li>
         ))}
       </ul>
@@ -89,7 +89,13 @@ function NotableVoteDefectors({ entry }: { entry: NotableVoteEntry }) {
   )
 }
 
-function NotableVoteCard({ entry }: { entry: NotableVoteEntry }) {
+function NotableVoteCard({
+  entry,
+  onOpenProfile,
+}: {
+  entry: NotableVoteEntry
+  onOpenProfile: (seed: MemberProfileSeed) => void
+}) {
   const billLabel = formatBillDocket(entry.bill_type, entry.bill_number, entry.congress)
   const title = entry.headline ?? `${billLabel} passage vote`
 
@@ -100,7 +106,7 @@ function NotableVoteCard({ entry }: { entry: NotableVoteEntry }) {
       <p className="notable-vote-meta">
         {entry.chamber} · {formatVoteDate(entry.vote_date)}
       </p>
-      <NotableVoteDefectors entry={entry} />
+      <NotableVoteDefectors entry={entry} onOpenProfile={onOpenProfile} />
     </article>
   )
 }
@@ -111,6 +117,8 @@ export function NotableVotesSection({
   error = null,
   onRetry,
 }: NotableVotesSectionProps) {
+  const [profileSeed, setProfileSeed] = useState<MemberProfileSeed | null>(null)
+
   if (error) {
     return (
       <section className="home-enrichment" aria-label="Notable votes">
@@ -144,9 +152,15 @@ export function NotableVotesSection({
           <NotableVoteCard
             key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
             entry={entry}
+            onOpenProfile={setProfileSeed}
           />
         ))}
       </div>
+      <MemberProfile
+        open={profileSeed !== null}
+        seed={profileSeed}
+        onClose={() => setProfileSeed(null)}
+      />
     </section>
   )
 }

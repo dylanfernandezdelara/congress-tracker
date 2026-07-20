@@ -11,6 +11,8 @@ type UseAsyncDataOptions<T> = {
   load: () => Promise<T>
   mapError: (err: unknown) => string
   validate?: () => string | null
+  /** When false, skip loading and keep data/error cleared. */
+  enabled?: boolean
 }
 
 export function useAsyncData<T>({
@@ -18,15 +20,25 @@ export function useAsyncData<T>({
   load,
   mapError,
   validate,
+  enabled = true,
 }: UseAsyncDataOptions<T>): UseAsyncDataResult<T> {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(enabled)
 
   useEffect(() => {
     let cancelled = false
 
     async function run() {
+      if (!enabled) {
+        if (!cancelled) {
+          setData(null)
+          setError(null)
+          setIsLoading(false)
+        }
+        return
+      }
+
       // Refetch keeps prior `data` until a new result arrives; gate UI on `isLoading`.
       setIsLoading(true)
       setError(null)
@@ -58,8 +70,8 @@ export function useAsyncData<T>({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- caller supplies explicit deps
-  }, deps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- caller supplies explicit deps; enabled is part of the gate
+  }, [...deps, enabled])
 
   return { data, error, isLoading }
 }

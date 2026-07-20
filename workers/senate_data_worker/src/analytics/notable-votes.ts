@@ -7,12 +7,12 @@ import {
 import { bioguidePhotoUrl } from "../../../../shared/member-photo";
 import { isLocalSampleMemberId, isRealBioguideId } from "../../../../shared/member-id";
 import {
+  crossVoteLabel,
   isProceduralBillType,
   isProceduralNotableVote,
   notableVotesLookbackStartIso,
 } from "../../../../shared/notable-votes";
 import { normalizePartyCode } from "../../../../shared/party";
-import type { NotableVoteCrossVoteLabel } from "../../../../shared/stats-api-types";
 import { normalizeVotePosition } from "../../../../shared/vote-positions";
 import type { Env } from "../config";
 import { ensureSchema } from "../d1/schema";
@@ -268,12 +268,6 @@ function buildWhyItMattersHeuristic(vote: CandidateRow, stats: RollBreakStats): 
   }
 
   return parts.join(" · ");
-}
-
-function crossVoteLabel(count: number): NotableVoteCrossVoteLabel {
-  if (count <= 2) return "rare";
-  if (count <= 7) return "occasional";
-  return "frequent";
 }
 
 function buildPromptContext(

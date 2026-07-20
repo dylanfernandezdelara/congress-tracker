@@ -177,3 +177,65 @@ export async function selectMemberVotesForSession(
     .all<MemberVoteWithRoll>();
   return results ?? [];
 }
+
+/** Passage votes for one member in a congress/session (newest first). */
+export async function selectMemberVotesForBioguide(
+  db: D1Database,
+  congress: number,
+  session: number,
+  bioguideId: string
+): Promise<MemberVoteWithRoll[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT mv.bioguide_id, mv.position, mv.chamber, mv.congress, mv.session, mv.roll_number,
+              v.yeas, v.nays, v.bill_type, v.bill_number, v.bill_congress, v.vote_date
+       FROM member_votes mv
+       JOIN votes v
+         ON v.chamber = mv.chamber AND v.congress = mv.congress
+        AND v.session = mv.session AND v.roll_number = mv.roll_number
+       WHERE mv.congress = ? AND mv.session = ? AND mv.bioguide_id = ?
+       ORDER BY v.vote_date DESC`
+    )
+    .bind(congress, session, bioguideId)
+    .all<MemberVoteWithRoll>();
+  return results ?? [];
+}
+
+export type MemberVoteRollPosition = {
+  bioguide_id: string;
+  position: string;
+  roll_number: number;
+};
+
+const ROLL_LOOKUP_CHUNK = 40;
+
+/** Peer positions on specific rolls in one chamber/congress/session. */
+export async function selectMemberVotesForRollNumbers(
+  db: D1Database,
+  chamber: string,
+  congress: number,
+  session: number,
+  rollNumbers: number[]
+): Promise<MemberVoteRollPosition[]> {
+  await ensureSchema(db);
+  const unique = [...new Set(rollNumbers)];
+  if (unique.length === 0) return [];
+
+  const out: MemberVoteRollPosition[] = [];
+  for (let i = 0; i < unique.length; i += ROLL_LOOKUP_CHUNK) {
+    const chunk = unique.slice(i, i + ROLL_LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const { results } = await db
+      .prepare(
+        `SELECT bioguide_id, position, roll_number
+         FROM member_votes
+         WHERE chamber = ? AND congress = ? AND session = ?
+           AND roll_number IN (${placeholders})`
+      )
+      .bind(chamber, congress, session, ...chunk)
+      .all<MemberVoteRollPosition>();
+    out.push(...(results ?? []));
+  }
+  return out;
+}

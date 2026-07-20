@@ -1,6 +1,7 @@
 import { type Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { computeDefectors, computeRollDefectors } from "../analytics/defectors";
+import { buildMemberProfile } from "../analytics/member-profile";
 import { buildPortfolioMovers } from "../d1/disclosures";
 import {
   getExecutivePostsPipelineFailure,
@@ -37,6 +38,7 @@ import { buildSessionStats } from "../storage/session-stats";
 import type {
   Chamber,
   DefectorsResponse,
+  MemberProfileResponse,
   NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
@@ -393,6 +395,35 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       },
       "defectors unavailable"
     );
+  },
+  "/stats/member.json": async ({ env, url, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const bioguideId = url.searchParams.get("bioguide_id")?.trim() ?? "";
+    if (!bioguideId) {
+      return json(
+        { error: "bad_request", message: "bioguide_id is required" },
+        { status: 400 }
+      );
+    }
+    try {
+      const profile = await buildMemberProfile(env.DB, congress, session, bioguideId);
+      if (!profile) {
+        return json(
+          { error: "not_found", message: "member not found" },
+          { status: 404, headers: { "Cache-Control": cacheNoStore } }
+        );
+      }
+      return json(profile satisfies MemberProfileResponse, {
+        status: 200,
+        headers: { "Cache-Control": cacheLatest },
+      });
+    } catch {
+      return json(
+        { error: "stats_error", message: "member profile unavailable" },
+        { status: 500, headers: { "Cache-Control": cacheNoStore } }
+      );
+    }
   },
   "/stats/portfolios.json": ({ env, url, json }) => {
     const congress = congressNumber(env);

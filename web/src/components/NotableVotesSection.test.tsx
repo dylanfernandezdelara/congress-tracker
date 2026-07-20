@@ -1,8 +1,31 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { NotableVoteEntry } from '../api/types'
 import { NotableVotesSection } from './NotableVotesSection'
+
+vi.mock('../api/client', () => ({
+  fetchMemberProfile: vi.fn(async () => ({
+    bioguide_id: 'A000001',
+    name: 'Jane Example',
+    chamber: 'House',
+    party: 'D',
+    state: 'CA',
+    district: 12,
+    photo_url: 'https://example.com/jane.jpg',
+    congress_gov_url: 'https://www.congress.gov/member/a000001',
+    congress: 119,
+    session: 2,
+    votes_cast: 10,
+    yea_count: 6,
+    nay_count: 4,
+    cross_vote_count: 1,
+    cross_vote_label: 'rare',
+    recent_cross_votes: [],
+    member_votes_available: true,
+    as_of: '2026-07-20T00:00:00.000Z',
+  })),
+}))
 
 function sampleEntry(overrides: Partial<NotableVoteEntry> = {}): NotableVoteEntry {
   return {
@@ -34,6 +57,10 @@ describe('NotableVotesSection', () => {
     expect(screen.queryByText(/119th Congress/i)).not.toBeInTheDocument()
   })
 
+  afterEach(() => {
+    document.body.style.overflow = ''
+  })
+
   it('shows defector avatars when cross-voters are present', () => {
     render(
       <NotableVotesSection
@@ -58,6 +85,36 @@ describe('NotableVotesSection', () => {
 
     expect(screen.getByText('Jane Example')).toBeInTheDocument()
     expect(screen.getByText('Rare party-line break')).toBeInTheDocument()
+  })
+
+  it('opens a member profile when a notable defector is clicked', async () => {
+    render(
+      <NotableVotesSection
+        notable={[
+          sampleEntry({
+            member_votes_available: true,
+            defectors: [
+              {
+                bioguide_id: 'A000001',
+                name: 'Jane Example',
+                party: 'D',
+                state: 'CA',
+                photo_url: 'https://example.com/jane.jpg',
+                cross_vote_count: 1,
+                cross_vote_label: 'rare',
+              },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile for Jane Example' }))
+
+    expect(screen.getByRole('dialog', { name: 'Jane Example' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('CA-12')).toBeInTheDocument()
+    })
   })
 
   it('states when no members broke with their party', () => {
