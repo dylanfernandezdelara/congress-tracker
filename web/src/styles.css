@@ -5,6 +5,7 @@
 @import './styles/chrome.css';
 @import './styles/chamber.css';
 @import './styles/notable.css';
+@import './styles/home.css';
 @import './styles/profile.css';
 
 @tailwind base;

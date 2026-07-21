@@ -11,18 +11,6 @@
     gap: 0.625rem;
   }
 
-  @media (min-width: 1024px) {
-    .notable-votes-list {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.875rem;
-    }
-
-    .notable-vote-card {
-      min-height: 100%;
-      padding: 1rem 1.125rem;
-    }
-  }
-
   .notable-vote-card {
     border: 1px solid hsl(var(--twc-border));
     border-radius: 0.875rem;
@@ -127,88 +115,15 @@
     color: hsl(var(--twc-faint));
   }
 
-  .home-feed-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-  }
-
-  .home-feed-title {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-
-  .home-feed-count {
-    display: none;
-    margin: 0;
-  }
-
-  .desktop-feed-intro {
-    display: none;
-  }
-
   @media (min-width: 1024px) {
-    .desktop-feed-intro {
-      display: grid;
-      grid-template-columns: 10rem minmax(0, 1fr);
-      align-items: end;
-      gap: 1.5rem;
-      padding: 1.25rem 0 1.5rem;
-      border-bottom: 1px solid hsl(var(--twc-border));
+    .notable-votes-list {
+      grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+      gap: 0.875rem;
     }
 
-    .desktop-feed-intro-eyebrow {
-      margin: 0 0 0.35rem;
-      font-size: 0.6875rem;
-      font-weight: 700;
-      line-height: 1.2;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: hsl(var(--twc-accent));
-    }
-
-    .desktop-feed-intro-copy {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 2rem;
-      min-width: 0;
-    }
-
-    .desktop-feed-intro-title {
-      flex-shrink: 0;
-      margin: 0;
-      font-size: clamp(1.75rem, 2.4vw, 2.35rem);
-      line-height: 1.08;
-      letter-spacing: -0.04em;
-    }
-
-    .desktop-feed-intro-description {
-      max-width: 30rem;
-      margin: 0;
-      font-size: 0.875rem;
-      line-height: 1.55;
-      color: hsl(var(--twc-secondary));
-      text-wrap: balance;
-    }
-
-    .home-feed-header {
-      flex-direction: row;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-
-    .home-feed-title {
-      font-size: 1.125rem;
-    }
-
-    .home-feed-count {
-      display: block;
-      font-size: 0.75rem;
-      color: hsl(var(--twc-faint));
+    .notable-vote-card {
+      min-height: 100%;
+      padding: 1rem 1.125rem;
     }
   }
 }
