@@ -102,10 +102,8 @@
     position: sticky;
     top: 0;
     z-index: 40;
-    margin-inline: calc(-1 * max(1rem, env(safe-area-inset-left, 0px)));
-    margin-top: calc(-1 * max(1.25rem, env(safe-area-inset-top, 0px)));
+    width: 100%;
     padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
-    padding-inline: max(1rem, env(safe-area-inset-left, 0px));
     padding-bottom: 0;
     border-bottom: 1px solid hsl(var(--twc-border));
     background-color: hsl(var(--twc-background) / 0.92);
@@ -117,8 +115,13 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.75rem;
+    width: 100%;
+    max-width: 1440px;
     min-height: 2.75rem;
+    margin-inline: auto;
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
     padding-bottom: 0.75rem;
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
   }
 
   .site-header-brand {
@@ -362,15 +365,14 @@
 
   @media (min-width: 640px) {
     .site-header {
-      margin-inline: calc(-1 * max(1.5rem, env(safe-area-inset-left, 0px)));
-      margin-top: calc(-1 * max(2.5rem, env(safe-area-inset-top, 0px)));
       padding-top: max(1rem, env(safe-area-inset-top, 0px));
-      padding-inline: max(1.5rem, env(safe-area-inset-left, 0px));
     }
 
     .site-header-inner {
       grid-template-columns: minmax(0, 1fr) auto auto;
+      padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
       padding-bottom: 0.75rem;
+      padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
     }
 
     .site-header-brand {
@@ -407,7 +409,7 @@
   }
 
   .page-shell {
-    padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+    padding-top: 0;
     padding-right: max(1rem, env(safe-area-inset-right, 0px));
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
     padding-left: max(1rem, env(safe-area-inset-left, 0px));
@@ -415,22 +417,15 @@
 
   @media (min-width: 640px) {
     .page-shell {
-      padding-top: max(2.5rem, env(safe-area-inset-top, 0px));
       padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
       padding-bottom: max(4rem, env(safe-area-inset-bottom, 0px));
       padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
     }
-
   }
 
   @media (min-width: 1024px) {
     .page-shell {
-      padding-top: max(3rem, env(safe-area-inset-top, 0px));
       padding-bottom: max(5rem, env(safe-area-inset-bottom, 0px));
-    }
-
-    .site-header {
-      margin-top: calc(-1 * max(3rem, env(safe-area-inset-top, 0px)));
     }
   }
 
