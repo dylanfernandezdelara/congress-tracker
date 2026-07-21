@@ -263,6 +263,16 @@
   }
 
   @media (min-width: 1024px) {
+    .page-frame {
+      --page-max-width: 1200px;
+    }
+
+    .site-header-inner {
+      min-height: 3.25rem;
+      padding-top: 0.125rem;
+      padding-bottom: 0.875rem;
+    }
+
     .stats-page {
       max-width: none;
       display: grid;
@@ -293,6 +303,7 @@
     .page-main {
       max-width: none;
       margin-inline: 0;
+      margin-top: 2rem;
     }
   }
 

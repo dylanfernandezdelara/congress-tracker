@@ -122,6 +122,18 @@ export default function Home() {
 
   return (
     <main className="feed-main space-y-5">
+      <section className="desktop-feed-intro" aria-labelledby="desktop-feed-intro-title">
+        <p className="desktop-feed-intro-eyebrow">The 119th Congress</p>
+        <div className="desktop-feed-intro-copy">
+          <h2 id="desktop-feed-intro-title" className="desktop-feed-intro-title">
+            What Congress passed
+          </h2>
+          <p className="desktop-feed-intro-description">
+            Passage votes, key provisions, and the lawmakers who crossed party lines.
+          </p>
+        </div>
+      </section>
+
       <NotableVotesSection
         notable={notableVotes.data?.notable ?? null}
         loading={notableVotes.isLoading}
@@ -148,6 +160,9 @@ export default function Home() {
         <section id="feed-top" className="space-y-5">
           <div className="home-feed-header">
             <h2 className="home-feed-title">Chronological timeline</h2>
+            <p className="home-feed-count">
+              {total} passage {total === 1 ? 'vote' : 'votes'}
+            </p>
           </div>
 
           {isPageTransition ? <FeedSkeleton /> : null}
