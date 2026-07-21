@@ -8,9 +8,9 @@ type PageShellProps = {
 
 export function PageShell({ children }: PageShellProps) {
   return (
-    <div className="page-frame min-h-screen w-full">
+    <div className="page-frame">
       <SiteHeader />
-      <div className="page-shell mx-auto w-full max-w-[1440px]">
+      <div className="page-shell">
         <div className="page-main min-w-0">{children}</div>
       </div>
     </div>
