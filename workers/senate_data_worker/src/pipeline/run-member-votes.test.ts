@@ -161,7 +161,7 @@ describe("runMemberVotesPipeline", () => {
     );
   });
 
-  it("rolls back votes when roll metadata is missing so stats stay consistent", async () => {
+  it("skips the roll before writing votes when roll metadata is missing", async () => {
     selectPassageRollCalls.mockResolvedValue([houseRoll(1)]);
     getVoteRollMeta.mockResolvedValueOnce(null);
 
@@ -169,7 +169,7 @@ describe("runMemberVotesPipeline", () => {
 
     expect(result.rollsProcessed).toBe(0);
     expect(result.rollsSkipped).toBe(1);
-    expect(deleteMemberVotesForRoll).toHaveBeenCalledWith(env.DB, houseRoll(1));
+    expect(upsertMemberVotesBatch).not.toHaveBeenCalled();
     expect(applyRollToMemberSessionStats).not.toHaveBeenCalled();
   });
 
