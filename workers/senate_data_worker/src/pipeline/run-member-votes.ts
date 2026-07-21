@@ -1,3 +1,7 @@
+import {
+  applyRollToMemberSessionStats,
+  reconcileMemberSessionStats,
+} from "../analytics/member-session-stats";
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { MEMBER_VOTES_MAX_ROLLS_PER_RUN } from "../constants";
@@ -13,6 +17,7 @@ import {
   selectPassageRollCalls,
   upsertMemberVotesBatch,
 } from "../d1/member-votes";
+import { getVoteRollMeta } from "../d1/votes";
 import { ensureSchema } from "../d1/schema";
 import { fetchHouseMemberVotes } from "../sources/house-member-votes";
 import { fetchSenateMemberVotes } from "../sources/senate-member-votes";
@@ -50,6 +55,9 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
   }
 
   const senateBioguideLookup = await buildSenateBioguideLookup(env.DB);
+  // Backfill / repair denormalized profile stats when member_votes already exist
+  // (pre-stats deploy) or a prior apply failed after the vote write.
+  await reconcileMemberSessionStats(env.DB, congress, session);
   const rolls = await selectPassageRollCalls(env.DB, congress, session);
 
   let rollsProcessed = 0;
@@ -120,6 +128,43 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
     // and it is safely retried on the next run.
     await upsertMembersBatch(env.DB, newMembers);
     await upsertMemberVotesBatch(env.DB, fetched.votes);
+
+    const rollMeta = await getVoteRollMeta(env.DB, roll);
+    if (rollMeta) {
+      const parties = new Map<string, string | null>();
+      for (const member of fetched.members) {
+        parties.set(member.bioguideId, member.party);
+      }
+      try {
+        await applyRollToMemberSessionStats(
+          env.DB,
+          rollMeta,
+          fetched.votes.map((vote) => ({
+            bioguideId: vote.bioguideId,
+            position: vote.position,
+          })),
+          parties
+        );
+      } catch (err: unknown) {
+        // Vote rows are already written; delete them so the next run retries
+        // both the roll ingest and the stats apply (skip check uses existing>0).
+        await deleteMemberVotesForRoll(env.DB, roll);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(
+          JSON.stringify({
+            event: "member_session_stats_apply_failed",
+            chamber: roll.chamber,
+            congress: roll.congress,
+            session: roll.session,
+            roll_number: roll.roll_number,
+            error: message,
+          })
+        );
+        rollsSkipped += 1;
+        continue;
+      }
+    }
+
     membersUpserted += newMembers.length;
     votesUpserted += fetched.votes.length;
     rollsProcessed += 1;

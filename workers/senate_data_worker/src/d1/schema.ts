@@ -45,6 +45,32 @@ const SCHEMA_STATEMENTS = [
   position TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number, bioguide_id)
 )`,
+  `CREATE TABLE IF NOT EXISTS member_session_stats (
+  bioguide_id TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  votes_cast INTEGER NOT NULL,
+  yea_count INTEGER NOT NULL,
+  nay_count INTEGER NOT NULL,
+  cross_vote_count INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (bioguide_id, congress, session)
+)`,
+  `CREATE TABLE IF NOT EXISTS member_cross_votes (
+  chamber TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  roll_number INTEGER NOT NULL,
+  bioguide_id TEXT NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  bill_congress INTEGER NOT NULL,
+  vote_date TEXT NOT NULL,
+  position TEXT NOT NULL,
+  party_line TEXT NOT NULL,
+  margin INTEGER NOT NULL,
+  PRIMARY KEY (chamber, congress, session, roll_number, bioguide_id)
+)`,
   `CREATE TABLE IF NOT EXISTS financial_transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   bioguide_id TEXT NOT NULL,
@@ -151,6 +177,9 @@ const SCHEMA_STATEMENTS = [
     COALESCE(amount_max, -1)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_member_votes_bioguide ON member_votes (bioguide_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_member_session_stats_session ON member_session_stats (congress, session)`,
+  `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_bioguide ON member_cross_votes (bioguide_id, congress, session, vote_date DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_roll ON member_cross_votes (chamber, congress, session, roll_number)`,
 ];
 
 let schemaApplied = false;

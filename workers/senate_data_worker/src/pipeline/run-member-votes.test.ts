@@ -11,6 +11,9 @@ const {
   upsertMembersBatch,
   fetchHouseMemberVotes,
   fetchSenateMemberVotes,
+  getVoteRollMeta,
+  applyRollToMemberSessionStats,
+  reconcileMemberSessionStats,
 } = vi.hoisted(() => ({
   selectPassageRollCalls: vi.fn(),
   countMemberVotesForRoll: vi.fn(),
@@ -20,6 +23,9 @@ const {
   upsertMembersBatch: vi.fn(async () => {}),
   fetchHouseMemberVotes: vi.fn(),
   fetchSenateMemberVotes: vi.fn(),
+  getVoteRollMeta: vi.fn(),
+  applyRollToMemberSessionStats: vi.fn(async () => {}),
+  reconcileMemberSessionStats: vi.fn(async () => false),
 }));
 
 vi.mock("../d1/schema", () => ({ ensureSchema: vi.fn(async () => {}) }));
@@ -34,6 +40,11 @@ vi.mock("../d1/members", () => ({
   upsertMembersBatch,
   hasRealMemberRoster: vi.fn(async () => true),
   buildSenateBioguideLookup: vi.fn(async () => new Map()),
+}));
+vi.mock("../d1/votes", () => ({ getVoteRollMeta }));
+vi.mock("../analytics/member-session-stats", () => ({
+  applyRollToMemberSessionStats,
+  reconcileMemberSessionStats,
 }));
 vi.mock("./run-members-roster", () => ({
   runMembersRosterPipeline: vi.fn(async () => ({
@@ -88,6 +99,20 @@ describe("runMemberVotesPipeline", () => {
     countMemberVotesForRoll.mockResolvedValue(0);
     fetchHouseMemberVotes.mockImplementation(fakeFetch(["A", "B"]));
     fetchSenateMemberVotes.mockImplementation(fakeFetch([]));
+    getVoteRollMeta.mockImplementation(async (_db: unknown, roll: RollCallKey) => ({
+      chamber: roll.chamber,
+      congress: roll.congress,
+      session: roll.session,
+      roll_number: roll.roll_number,
+      bill_type: "hr",
+      bill_number: 1,
+      bill_congress: roll.congress,
+      yeas: 220,
+      nays: 200,
+      vote_date: "2026-07-01",
+    }));
+    applyRollToMemberSessionStats.mockResolvedValue(undefined);
+    reconcileMemberSessionStats.mockResolvedValue(false);
   });
 
   it("batches writes and dedupes members across rolls", async () => {
@@ -101,6 +126,19 @@ describe("runMemberVotesPipeline", () => {
     // Members A and B appear on both rolls but are upserted once.
     expect(result.membersUpserted).toBe(2);
     expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(2);
+    expect(reconcileMemberSessionStats).toHaveBeenCalledWith(env.DB, 119, 2);
+    expect(applyRollToMemberSessionStats).toHaveBeenCalledTimes(2);
+  });
+
+  it("rolls back vote rows when session-stats apply fails so the roll can retry", async () => {
+    selectPassageRollCalls.mockResolvedValue([houseRoll(1)]);
+    applyRollToMemberSessionStats.mockRejectedValueOnce(new Error("d1 batch failed"));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(0);
+    expect(result.rollsSkipped).toBe(1);
+    expect(deleteMemberVotesForRoll).toHaveBeenCalledWith(env.DB, houseRoll(1));
   });
 
   it("skips rolls that already have member votes (idempotent re-run)", async () => {

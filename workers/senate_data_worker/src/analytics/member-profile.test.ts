@@ -1,21 +1,34 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetSchemaFlag } from "../d1/schema";
 import { buildMemberProfile } from "./member-profile";
 
 type MockRow = Record<string, unknown>;
 
 function createDb(options: {
   member?: MockRow | null;
+  stats?: MockRow | null;
+  recentCrossVotes?: MockRow[];
   memberVotes?: MockRow[];
   peerVotes?: MockRow[];
   roster?: MockRow[];
 }): D1Database {
-  const { member = null, memberVotes = [], peerVotes = [], roster = [] } = options;
+  const {
+    member = null,
+    stats = null,
+    recentCrossVotes = [],
+    memberVotes = [],
+    peerVotes = [],
+    roster = [],
+  } = options;
 
   return {
     exec: vi.fn(async () => {}),
     prepare: vi.fn((sql: string) => {
       const bind = (...args: unknown[]) => ({
         all: vi.fn(async () => {
+          if (sql.includes("FROM member_cross_votes") && sql.includes("ORDER BY vote_date DESC")) {
+            return { results: recentCrossVotes };
+          }
           if (
             sql.includes("FROM member_votes mv") &&
             sql.includes("JOIN votes v") &&
@@ -41,7 +54,12 @@ function createDb(options: {
           }
           return { results: [] };
         }),
-        first: vi.fn(async () => null),
+        first: vi.fn(async () => {
+          if (sql.includes("FROM member_session_stats")) {
+            return stats;
+          }
+          return null;
+        }),
         run: vi.fn(async () => ({ success: true, meta: { duration: 0 } })),
         bind,
       });
@@ -70,6 +88,10 @@ function createDb(options: {
 }
 
 describe("buildMemberProfile", () => {
+  beforeEach(() => {
+    resetSchemaFlag();
+  });
+
   it("returns null when the member is missing", async () => {
     const profile = await buildMemberProfile(createDb({ member: null }), 119, 2, "A000001");
     expect(profile).toBeNull();
@@ -111,7 +133,68 @@ describe("buildMemberProfile", () => {
     expect(profile?.congress_gov_url).toContain("f000466");
   });
 
-  it("counts yea/nay and recent party-line breaks", async () => {
+  it("reads precomputed session stats when available", async () => {
+    const profile = await buildMemberProfile(
+      createDb({
+        member: {
+          bioguide_id: "F000466",
+          name: "Brian Fitzpatrick",
+          chamber: "House",
+          party: "R",
+          state: "PA",
+          district: 1,
+        },
+        stats: {
+          bioguide_id: "F000466",
+          congress: 119,
+          session: 2,
+          votes_cast: 4,
+          yea_count: 3,
+          nay_count: 1,
+          cross_vote_count: 2,
+          updated_at: "2026-07-01T12:00:00.000Z",
+        },
+        recentCrossVotes: [
+          {
+            chamber: "House",
+            congress: 119,
+            session: 2,
+            roll_number: 10,
+            bill_type: "HR",
+            bill_number: 1,
+            bill_congress: 119,
+            vote_date: "2026-07-01",
+            position: "yea",
+            party_line: "nay",
+            margin: 10,
+          },
+        ],
+      }),
+      119,
+      2,
+      "F000466"
+    );
+
+    expect(profile).toMatchObject({
+      votes_cast: 4,
+      yea_count: 3,
+      nay_count: 1,
+      cross_vote_count: 2,
+      cross_vote_label: "rare",
+      member_votes_available: true,
+      as_of: "2026-07-01T12:00:00.000Z",
+    });
+    expect(profile?.recent_cross_votes).toEqual([
+      expect.objectContaining({
+        roll_number: 10,
+        position: "yea",
+        party_line: "nay",
+        margin: 10,
+      }),
+    ]);
+  });
+
+  it("falls back to a live scan when session stats are missing", async () => {
     const memberVotes = [
       {
         bioguide_id: "F000466",

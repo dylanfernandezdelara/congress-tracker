@@ -1,4 +1,5 @@
 import type { MemberVoteRecord } from "../types";
+import { deleteMemberCrossVotesForRoll } from "./member-session-stats";
 import { ensureSchema } from "./schema";
 
 export async function upsertMemberVote(db: D1Database, vote: MemberVoteRecord): Promise<void> {
@@ -110,6 +111,9 @@ export async function countLisMemberVotesForRoll(
 
 export async function deleteMemberVotesForRoll(db: D1Database, roll: RollCallKey): Promise<void> {
   await ensureSchema(db);
+  // Keep denormalized cross-vote rows from pointing at a roll we are about to
+  // rewrite; tallies are refreshed when the replacement votes are applied.
+  await deleteMemberCrossVotesForRoll(db, roll);
   await db
     .prepare(
       `DELETE FROM member_votes

@@ -223,6 +223,41 @@ export interface VoteRow {
   vote_date: string;
 }
 
+/** Bill + tally metadata for one passage roll call. */
+export interface VoteRollMeta {
+  chamber: string;
+  congress: number;
+  session: number;
+  roll_number: number;
+  bill_type: string;
+  bill_number: number;
+  bill_congress: number;
+  yeas: number;
+  nays: number;
+  vote_date: string;
+}
+
+export async function getVoteRollMeta(
+  db: D1Database,
+  roll: {
+    chamber: string;
+    congress: number;
+    session: number;
+    roll_number: number;
+  }
+): Promise<VoteRollMeta | null> {
+  await ensureSchema(db);
+  return db
+    .prepare(
+      `SELECT chamber, congress, session, roll_number,
+              bill_type, bill_number, bill_congress, yeas, nays, vote_date
+       FROM votes
+       WHERE chamber = ? AND congress = ? AND session = ? AND roll_number = ?`
+    )
+    .bind(roll.chamber, roll.congress, roll.session, roll.roll_number)
+    .first<VoteRollMeta>();
+}
+
 export async function getPassageVotesForBill(
   db: D1Database,
   congress: number,
