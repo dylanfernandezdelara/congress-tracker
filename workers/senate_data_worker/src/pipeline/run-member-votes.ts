@@ -14,9 +14,11 @@ import {
   countMemberVotesForRoll,
   countLisMemberVotesForRoll,
   deleteMemberVotesForRoll,
+  selectMemberVotesForRoll,
   selectPassageRollCalls,
   upsertMemberVotesBatch,
 } from "../d1/member-votes";
+import { refreshMemberSessionStatsForBioguides } from "../d1/member-session-stats";
 import { getVoteRollMeta } from "../d1/votes";
 import { ensureSchema } from "../d1/schema";
 import { fetchHouseMemberVotes } from "../sources/house-member-votes";
@@ -34,6 +36,17 @@ export interface RunMemberVotesResult {
   rollsRemaining: number;
   membersUpserted: number;
   votesUpserted: number;
+}
+
+async function refreshStatsForBioguides(
+  db: D1Database,
+  congress: number,
+  session: number,
+  bioguideIds: Iterable<string>
+): Promise<void> {
+  const unique = [...new Set(bioguideIds)];
+  if (unique.length === 0) return;
+  await refreshMemberSessionStatsForBioguides(db, congress, session, unique);
 }
 
 /**
@@ -55,9 +68,6 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
   }
 
   const senateBioguideLookup = await buildSenateBioguideLookup(env.DB);
-  // Backfill / repair denormalized profile stats when member_votes already exist
-  // (pre-stats deploy) or a prior apply failed after the vote write.
-  await reconcileMemberSessionStats(env.DB, congress, session);
   const rolls = await selectPassageRollCalls(env.DB, congress, session);
 
   let rollsProcessed = 0;
@@ -113,7 +123,12 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
       continue;
     }
 
+    // Capture prior voters before a LIS rewrite so their tallies can be
+    // refreshed (including orphans who disappear after bioguide resolution).
+    let previousBioguideIds: string[] = [];
     if (lisUnresolved > 0) {
+      const previous = await selectMemberVotesForRoll(env.DB, roll);
+      previousBioguideIds = previous.map((row) => row.bioguide_id);
       await deleteMemberVotesForRoll(env.DB, roll);
     }
 
@@ -129,46 +144,77 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
     await upsertMembersBatch(env.DB, newMembers);
     await upsertMemberVotesBatch(env.DB, fetched.votes);
 
+    const fetchedBioguideIds = fetched.votes.map((vote) => vote.bioguideId);
     const rollMeta = await getVoteRollMeta(env.DB, roll);
-    if (rollMeta) {
-      const parties = new Map<string, string | null>();
-      for (const member of fetched.members) {
-        parties.set(member.bioguideId, member.party);
-      }
-      try {
-        await applyRollToMemberSessionStats(
-          env.DB,
-          rollMeta,
-          fetched.votes.map((vote) => ({
-            bioguideId: vote.bioguideId,
-            position: vote.position,
-          })),
-          parties
-        );
-      } catch (err: unknown) {
-        // Vote rows are already written; delete them so the next run retries
-        // both the roll ingest and the stats apply (skip check uses existing>0).
-        await deleteMemberVotesForRoll(env.DB, roll);
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(
-          JSON.stringify({
-            event: "member_session_stats_apply_failed",
-            chamber: roll.chamber,
-            congress: roll.congress,
-            session: roll.session,
-            roll_number: roll.roll_number,
-            error: message,
-          })
-        );
-        rollsSkipped += 1;
-        continue;
-      }
+    if (!rollMeta) {
+      // Cannot materialize cross-vote bill metadata; roll back so the roll retries.
+      await deleteMemberVotesForRoll(env.DB, roll);
+      await refreshStatsForBioguides(env.DB, congress, session, [
+        ...previousBioguideIds,
+        ...fetchedBioguideIds,
+      ]);
+      console.error(
+        JSON.stringify({
+          event: "member_session_stats_missing_roll_meta",
+          chamber: roll.chamber,
+          congress: roll.congress,
+          session: roll.session,
+          roll_number: roll.roll_number,
+        })
+      );
+      rollsSkipped += 1;
+      continue;
+    }
+
+    const parties = new Map<string, string | null>();
+    for (const member of fetched.members) {
+      parties.set(member.bioguideId, member.party);
+    }
+    try {
+      await applyRollToMemberSessionStats(
+        env.DB,
+        rollMeta,
+        fetched.votes.map((vote) => ({
+          bioguideId: vote.bioguideId,
+          position: vote.position,
+        })),
+        parties
+      );
+      // Drop inflated tallies for bioguides removed by an LIS → bioguide rewrite.
+      const kept = new Set(fetchedBioguideIds);
+      const orphans = previousBioguideIds.filter((id) => !kept.has(id));
+      await refreshStatsForBioguides(env.DB, congress, session, orphans);
+    } catch (err: unknown) {
+      // Vote rows are already written; delete them so the next run retries
+      // both the roll ingest and the stats apply (skip check uses existing>0).
+      await deleteMemberVotesForRoll(env.DB, roll);
+      await refreshStatsForBioguides(env.DB, congress, session, [
+        ...previousBioguideIds,
+        ...fetchedBioguideIds,
+      ]);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        JSON.stringify({
+          event: "member_session_stats_apply_failed",
+          chamber: roll.chamber,
+          congress: roll.congress,
+          session: roll.session,
+          roll_number: roll.roll_number,
+          error: message,
+        })
+      );
+      rollsSkipped += 1;
+      continue;
     }
 
     membersUpserted += newMembers.length;
     votesUpserted += fetched.votes.length;
     rollsProcessed += 1;
   }
+
+  // Repair / backfill after ingest so a heavy rebuild cannot block new rolls.
+  // Covers pre-stats deploys and any residual drift (e.g. partial failures).
+  await reconcileMemberSessionStats(env.DB, congress, session);
 
   return {
     rollsProcessed,
