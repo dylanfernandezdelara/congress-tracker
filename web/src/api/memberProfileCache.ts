@@ -8,6 +8,10 @@ import type { MemberProfileResponse } from './types'
 const resolvedProfiles = new Map<string, MemberProfileResponse>()
 const inflightProfiles = new Map<string, Promise<MemberProfileResponse>>()
 
+/* Bumped by clearMemberProfileCache so requests that were in flight when the
+   cache was cleared cannot repopulate it after the fact. */
+let cacheGeneration = 0
+
 /** Synchronous lookup used to render already-fetched stats without a loading frame. */
 export function getCachedMemberProfile(bioguideId: string): MemberProfileResponse | null {
   return resolvedProfiles.get(bioguideId) ?? null
@@ -21,13 +25,16 @@ export function loadMemberProfile(bioguideId: string): Promise<MemberProfileResp
   const pending = inflightProfiles.get(bioguideId)
   if (pending) return pending
 
+  const generation = cacheGeneration
   const request = fetchMemberProfile(bioguideId)
     .then((profile) => {
-      resolvedProfiles.set(bioguideId, profile)
+      if (generation === cacheGeneration) resolvedProfiles.set(bioguideId, profile)
       return profile
     })
     .finally(() => {
-      inflightProfiles.delete(bioguideId)
+      /* Only remove our own entry: a clear plus a newer request for the same
+         id must not have its in-flight entry deleted by this stale settle. */
+      if (inflightProfiles.get(bioguideId) === request) inflightProfiles.delete(bioguideId)
     })
   inflightProfiles.set(bioguideId, request)
   return request
@@ -40,6 +47,7 @@ export function prefetchMemberProfile(bioguideId: string): void {
 
 /** Test-only helper to keep cached profiles from leaking between test cases. */
 export function clearMemberProfileCache(): void {
+  cacheGeneration += 1
   resolvedProfiles.clear()
   inflightProfiles.clear()
 }
