@@ -28,6 +28,10 @@
     --twc-party-other: 0 0% 55%;
     /* Single typeface for the whole app — do not add a second family. */
     --font-family: 'Inter', sans-serif;
+    /* Motion — keep all animation/transition curves on these tokens. */
+    --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+    --motion-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   [data-theme='dark'] {

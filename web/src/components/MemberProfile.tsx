@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 
-import { fetchMemberProfile } from '../api/client'
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { memberInitials } from '../utils/memberPhoto'
-import { useAsyncData } from '../hooks/useAsyncData'
+import { useAnimatedDismiss } from '../hooks/useAnimatedDismiss'
+import { useMemberProfile } from '../hooks/useMemberProfile'
 
 export type MemberProfileSeed = Pick<
   NotableVoteEntry['defectors'][number],
@@ -16,8 +16,22 @@ export type MemberProfileSeed = Pick<
 type MemberProfileProps = {
   open: boolean
   seed: MemberProfileSeed | null
+  /* Must be bumped by the parent on every selection (including re-selecting
+     the same member); a change cancels a pending animated close so the dialog
+     stays open for the new selection instead of dismissing it. */
+  selectionKey: number
+  /* Fires after the exit animation completes (immediately under reduced
+     motion); the parent should unmount/clear the seed in response. */
   onClose: () => void
 }
+
+/* Safety net in case animationend never fires (e.g. animations disabled by the
+   browser); slightly longer than the exit animation in profile.css. */
+const EXIT_ANIMATION_FALLBACK_MS = 400
+
+/* Exit animation name defined in profile.css (shared across breakpoints; the
+   desktop slide distance is a CSS custom property, not a separate keyframe). */
+const EXIT_ANIMATION_NAME = 'member-profile-sink'
 
 type StatsPhase =
   | { kind: 'loading' }
@@ -67,23 +81,24 @@ function statsPhase(
   return { kind: 'unavailable' }
 }
 
-export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
+export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfileProps) {
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const bioguideId = open ? seed?.bioguide_id ?? null : null
 
-  const {
-    data: profile,
-    error,
-    isLoading,
-  } = useAsyncData({
-    deps: [bioguideId],
-    enabled: Boolean(bioguideId),
-    load: () => fetchMemberProfile(bioguideId as string),
-    mapError: (err) => (err instanceof Error ? err.message : 'Could not load member profile'),
+  const { rootRef, panelRef, isClosing, getIsClosing, requestClose } = useAnimatedDismiss({
+    onDismissed: onClose,
+    exitAnimationName: EXIT_ANIMATION_NAME,
+    fallbackMs: EXIT_ANIMATION_FALLBACK_MS,
+    cancelKey: selectionKey,
+    restoreFocusRef: closeRef,
   })
+
+  /* Prefetched profiles render stats on the very first frame with no loading
+     flash; everything returned is scoped to the current member, so stale data
+     or errors from a previously viewed member can never leak in. */
+  const { profile, error, isPending } = useMemberProfile(bioguideId)
 
   useEffect(() => {
     if (!open) return
@@ -99,11 +114,13 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        requestClose()
         return
       }
 
-      if (event.key !== 'Tab' || !panelRef.current) return
+      /* Skip the focus trap while the exit animation runs: the root is inert,
+         so Tab should move focus out of the departing dialog, not cycle it. */
+      if (event.key !== 'Tab' || !panelRef.current || getIsClosing()) return
       const focusable = panelRef.current.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled])',
       )
@@ -128,7 +145,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
       returnFocusRef.current?.focus()
       returnFocusRef.current = null
     }
-  }, [open, onClose])
+  }, [open, requestClose, getIsClosing])
 
   if (!open || !seed) return null
 
@@ -137,15 +154,19 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const state = profile?.state ?? seed.state
   const photoUrl = profile?.photo_url || seed.photo_url
   const hint = crossVoteHint(profile?.cross_vote_label ?? seed.cross_vote_label)
-  const phase = statsPhase(profile, isLoading, error)
+  const phase = statsPhase(profile, isPending, error)
 
   return (
-    <div className="member-profile-root" role="presentation">
+    <div
+      ref={rootRef}
+      className={`member-profile-root${isClosing ? ' member-profile-root--closing' : ''}`}
+      role="presentation"
+    >
       <button
         type="button"
         className="member-profile-backdrop"
         aria-label="Close profile"
-        onClick={onClose}
+        onClick={requestClose}
       />
       <div
         ref={panelRef}
@@ -159,14 +180,14 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
             ref={closeRef}
             type="button"
             className="member-profile-close"
-            onClick={onClose}
+            onClick={requestClose}
           >
             Close
           </button>
         </div>
 
         <div className="member-profile-header">
-          <ProfileAvatar name={name} photoUrl={photoUrl} />
+          <ProfileAvatar key={seed.bioguide_id} name={name} photoUrl={photoUrl} />
           <div className="member-profile-identity">
             <h2 id={titleId} className="member-profile-name">
               {name}

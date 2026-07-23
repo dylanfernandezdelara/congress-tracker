@@ -16,6 +16,7 @@
     margin: 0;
     background: hsl(var(--twc-foreground) / 0.28);
     cursor: pointer;
+    animation: member-profile-backdrop-in 320ms ease both;
   }
 
   .member-profile-panel {
@@ -32,18 +33,61 @@
     display: flex;
     flex-direction: column;
     gap: 0.875rem;
-    animation: member-profile-rise 160ms ease-out;
+    /* Off-screen distance for the rise/sink keyframes. The bottom-docked
+       mobile sheet only needs its own height; the centered desktop panel
+       overrides this to 100vh (see the min-width block below). */
+    --member-profile-slide-distance: 100%;
+    animation: member-profile-rise 400ms var(--motion-ease-sheet) both;
+  }
+
+  @keyframes member-profile-backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes member-profile-backdrop-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
   @keyframes member-profile-rise {
     from {
-      transform: translateY(0.75rem);
-      opacity: 0.6;
+      transform: translateY(var(--member-profile-slide-distance));
     }
     to {
       transform: translateY(0);
-      opacity: 1;
     }
+  }
+
+  @keyframes member-profile-sink {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(var(--member-profile-slide-distance));
+    }
+  }
+
+  /* Animated close: MemberProfile keeps the dialog mounted with this modifier
+     until the panel's exit animation finishes, then unmounts it. */
+  .member-profile-root--closing {
+    pointer-events: none;
+  }
+
+  .member-profile-root--closing .member-profile-backdrop {
+    animation: member-profile-backdrop-out 260ms ease both;
+  }
+
+  .member-profile-root--closing .member-profile-panel {
+    animation: member-profile-sink 280ms var(--motion-ease-in) both;
   }
 
   .member-profile-toolbar {
@@ -247,21 +291,22 @@
       padding: 1.5rem;
     }
 
+    /* Same sheet motion as mobile, but the panel is vertically centered here,
+       so slide from 100vh to guarantee it starts fully off-screen regardless
+       of panel height. */
     .member-profile-panel {
       border-radius: 1rem;
       max-height: min(85vh, 36rem);
-      animation-name: member-profile-fade;
+      --member-profile-slide-distance: 100vh;
     }
+  }
 
-    @keyframes member-profile-fade {
-      from {
-        transform: translateY(0.35rem);
-        opacity: 0.5;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
+  @media (prefers-reduced-motion: reduce) {
+    .member-profile-backdrop,
+    .member-profile-panel,
+    .member-profile-root--closing .member-profile-backdrop,
+    .member-profile-root--closing .member-profile-panel {
+      animation: none;
     }
   }
 }

@@ -422,7 +422,9 @@
     width: 0.75rem;
     height: 0.75rem;
     color: hsl(var(--twc-faint));
-    transition: transform 0.2s ease;
+    transition:
+      transform 0.25s var(--motion-ease-out),
+      color 0.15s ease;
   }
 
   .feed-row-chevron svg {
@@ -439,7 +441,7 @@
   .feed-row-detail-panel {
     border-top: 1px solid hsl(var(--twc-border));
     padding: 1rem 1rem 1.25rem;
-    animation: feed-row-detail-enter 0.25s ease forwards;
+    animation: feed-row-detail-enter 0.3s var(--motion-ease-out) both;
   }
 
   .feed-row-detail-panel[hidden] {

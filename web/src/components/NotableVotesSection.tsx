@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
+import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
@@ -117,7 +118,27 @@ export function NotableVotesSection({
   error = null,
   onRetry,
 }: NotableVotesSectionProps) {
-  const [profileSeed, setProfileSeed] = useState<MemberProfileSeed | null>(null)
+  /* The key increments on every selection (including re-selecting the same
+     member); MemberProfile uses its change to cancel a pending animated close. */
+  const [selection, setSelection] = useState<{ seed: MemberProfileSeed; key: number } | null>(
+    null,
+  )
+
+  /* Warm the profile cache for every visible defector (bounded: at most a few
+     entries with a handful of defectors each) so the member profile sheet
+     opens with stats already loaded instead of a loading flash. */
+  useEffect(() => {
+    if (!notable) return
+    for (const entry of notable) {
+      for (const defector of entry.defectors) {
+        prefetchMemberProfile(defector.bioguide_id)
+      }
+    }
+  }, [notable])
+
+  const openProfile = useCallback((seed: MemberProfileSeed) => {
+    setSelection((prev) => ({ seed, key: (prev?.key ?? 0) + 1 }))
+  }, [])
 
   if (error) {
     return (
@@ -152,14 +173,15 @@ export function NotableVotesSection({
           <NotableVoteCard
             key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
             entry={entry}
-            onOpenProfile={setProfileSeed}
+            onOpenProfile={openProfile}
           />
         ))}
       </div>
       <MemberProfile
-        open={profileSeed !== null}
-        seed={profileSeed}
-        onClose={() => setProfileSeed(null)}
+        open={selection !== null}
+        seed={selection?.seed ?? null}
+        selectionKey={selection?.key ?? 0}
+        onClose={() => setSelection(null)}
       />
     </section>
   )

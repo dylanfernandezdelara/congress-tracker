@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import type { MemberProfileResponse } from '../api/types'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 
@@ -57,15 +58,24 @@ import { fetchMemberProfile } from '../api/client'
 
 const fetchMemberProfileMock = vi.mocked(fetchMemberProfile)
 
+/* jsdom has no AnimationEvent constructor, so fireEvent.animationEnd drops the
+   animationName init; build the event by hand instead. */
+function endAnimation(element: HTMLElement, animationName: string) {
+  const event = new Event('animationend', { bubbles: true })
+  Object.defineProperty(event, 'animationName', { value: animationName })
+  fireEvent(element, event)
+}
+
 afterEach(() => {
   vi.clearAllMocks()
+  clearMemberProfileCache()
   document.body.style.overflow = ''
 })
 
 describe('MemberProfile', () => {
   it('renders nothing when closed', () => {
     const { container } = render(
-      <MemberProfile open={false} seed={seed} onClose={() => undefined} />,
+      <MemberProfile open={false} seed={seed} selectionKey={1} onClose={() => undefined} />,
     )
     expect(container).toBeEmptyDOMElement()
   })
@@ -73,7 +83,7 @@ describe('MemberProfile', () => {
   it('shows seed identity immediately and loads session stats', async () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
 
-    render(<MemberProfile open seed={seed} onClose={() => undefined} />)
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
     expect(screen.getByText('Frequent cross-voter')).toBeInTheDocument()
@@ -90,20 +100,114 @@ describe('MemberProfile', () => {
     )
   })
 
-  it('closes on Escape and backdrop click', async () => {
+  it('renders stats on the first frame when the profile was prefetched', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    await loadMemberProfile(seed.bioguide_id)
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
+    expect(screen.getByText('PA-1')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument()
+  })
+
+  it('closes on Escape and backdrop click after the exit animation', async () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    render(<MemberProfile open seed={seed} onClose={onClose} />)
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    // The departing dialog must be inert (unfocusable, hidden from AT).
+    expect(dialog.closest('.member-profile-root')).toHaveAttribute('inert')
+    // A stray enter-animation end must not finish the close.
+    endAnimation(dialog, 'member-profile-rise')
+    expect(onClose).not.toHaveBeenCalled()
+    endAnimation(dialog, 'member-profile-sink')
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
+    endAnimation(dialog, 'member-profile-sink')
+    expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores repeated close requests while the exit animation is running', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
+    endAnimation(dialog, 'member-profile-sink')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels a pending close when a new profile is selected mid-animation', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    const { rerender } = render(
+      <MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />,
+    )
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
 
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(onClose).toHaveBeenCalledTimes(1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    expect(onClose).toHaveBeenCalledTimes(2)
+    const otherSeed: MemberProfileSeed = {
+      ...seed,
+      bioguide_id: 'G000002',
+      name: 'Grace Other',
+    }
+    rerender(<MemberProfile open seed={otherSeed} selectionKey={2} onClose={onClose} />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Grace Other' })
+    endAnimation(dialog, 'member-profile-sink')
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Grace Other' })).toBeInTheDocument()
+  })
+
+  it('cancels a pending close when the same member is re-selected mid-animation', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    const { rerender } = render(
+      <MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    /* Re-selecting the same member bumps selectionKey with an unchanged seed. */
+    rerender(<MemberProfile open seed={seed} selectionKey={2} onClose={onClose} />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    expect(dialog.closest('.member-profile-root')).not.toHaveAttribute('inert')
+    // Cancelling the close pulls focus back into the still-open modal.
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
+    endAnimation(dialog, 'member-profile-sink')
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
   })
 })
