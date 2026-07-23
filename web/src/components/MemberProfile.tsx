@@ -198,7 +198,10 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const state = seedProfile?.state ?? seed.state
   const photoUrl = seedProfile?.photo_url || seed.photo_url
   const hint = crossVoteHint(seedProfile?.cross_vote_label ?? seed.cross_vote_label)
-  const phase = statsPhase(seedProfile, isLoading, error)
+  /* A mismatched cached profile means the fetch for this seed has not landed
+     yet; show loading rather than flashing "unavailable" for one render. */
+  const isSeedLoading = isLoading || (profile !== null && seedProfile === null)
+  const phase = statsPhase(seedProfile, isSeedLoading, error)
 
   return (
     <div
@@ -230,7 +233,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
         </div>
 
         <div className="member-profile-header">
-          <ProfileAvatar name={name} photoUrl={photoUrl} />
+          <ProfileAvatar key={seed.bioguide_id} name={name} photoUrl={photoUrl} />
           <div className="member-profile-identity">
             <h2 id={titleId} className="member-profile-name">
               {name}
