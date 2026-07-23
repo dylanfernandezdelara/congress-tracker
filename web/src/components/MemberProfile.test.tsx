@@ -75,7 +75,7 @@ afterEach(() => {
 describe('MemberProfile', () => {
   it('renders nothing when closed', () => {
     const { container } = render(
-      <MemberProfile open={false} seed={seed} onClose={() => undefined} />,
+      <MemberProfile open={false} seed={seed} selectionKey={1} onClose={() => undefined} />,
     )
     expect(container).toBeEmptyDOMElement()
   })
@@ -83,7 +83,7 @@ describe('MemberProfile', () => {
   it('shows seed identity immediately and loads session stats', async () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
 
-    render(<MemberProfile open seed={seed} onClose={() => undefined} />)
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
     expect(screen.getByText('Frequent cross-voter')).toBeInTheDocument()
@@ -104,7 +104,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     await loadMemberProfile(seed.bioguide_id)
 
-    render(<MemberProfile open seed={seed} onClose={() => undefined} />)
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
     expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -115,7 +115,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    render(<MemberProfile open seed={seed} onClose={onClose} />)
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -141,7 +141,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    render(<MemberProfile open seed={seed} onClose={onClose} />)
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()

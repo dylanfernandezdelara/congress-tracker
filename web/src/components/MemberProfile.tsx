@@ -1,13 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 
-import { getCachedMemberProfile, loadMemberProfile } from '../api/memberProfileCache'
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { memberInitials } from '../utils/memberPhoto'
 import { useAnimatedDismiss } from '../hooks/useAnimatedDismiss'
-import { useAsyncData } from '../hooks/useAsyncData'
+import { useMemberProfile } from '../hooks/useMemberProfile'
 
 export type MemberProfileSeed = Pick<
   NotableVoteEntry['defectors'][number],
@@ -17,10 +16,10 @@ export type MemberProfileSeed = Pick<
 type MemberProfileProps = {
   open: boolean
   seed: MemberProfileSeed | null
-  /* Bumped by the parent on every selection (including re-selecting the same
-     member); a change cancels a pending animated close so the dialog stays
-     open for the new selection instead of dismissing it. */
-  selectionKey?: number
+  /* Must be bumped by the parent on every selection (including re-selecting
+     the same member); a change cancels a pending animated close so the dialog
+     stays open for the new selection instead of dismissing it. */
+  selectionKey: number
   /* Fires after the exit animation completes (immediately under reduced
      motion); the parent should unmount/clear the seed in response. */
   onClose: () => void
@@ -82,50 +81,24 @@ function statsPhase(
   return { kind: 'unavailable' }
 }
 
-export function MemberProfile({ open, seed, selectionKey = 0, onClose }: MemberProfileProps) {
+export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfileProps) {
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const bioguideId = open ? seed?.bioguide_id ?? null : null
 
-  const { rootRef, panelRef, isClosing, isClosingRef, requestClose, cancelClose } =
-    useAnimatedDismiss({
-      onDismissed: onClose,
-      exitAnimationName: EXIT_ANIMATION_NAME,
-      fallbackMs: EXIT_ANIMATION_FALLBACK_MS,
-    })
-
-  /* A new selection while the exit animation is running cancels the close so
-     the dialog animates back in with the new selection instead of the pending
-     onClose() silently discarding it. */
-  const prevSelectionKeyRef = useRef(selectionKey)
-  useEffect(() => {
-    if (prevSelectionKeyRef.current === selectionKey) return
-    prevSelectionKeyRef.current = selectionKey
-    cancelClose()
-  }, [selectionKey, cancelClose])
-
-  /* When a selection cancels a pending close, focus is still on the background
-     button that was clicked (the inert root blurred the dialog); pull it back
-     into the still-open modal. The dismiss hook's inert cleanup has already
-     run by the time this effect fires. Skipped on the finish path because
-     open flips false in the same commit. */
-  const wasClosingRef = useRef(false)
-  useEffect(() => {
-    const wasClosing = wasClosingRef.current
-    wasClosingRef.current = isClosing
-    if (wasClosing && !isClosing && open) closeRef.current?.focus()
-  }, [isClosing, open])
-
-  /* The cache is the single data source (loadMemberProfile stores every
-     success); the hook exists to drive the fetch, re-render on completion,
-     and surface loading/error state. */
-  const { error, isLoading } = useAsyncData({
-    deps: [bioguideId],
-    enabled: Boolean(bioguideId),
-    load: () => loadMemberProfile(bioguideId as string),
-    mapError: (err) => (err instanceof Error ? err.message : 'Could not load member profile'),
+  const { rootRef, panelRef, isClosing, getIsClosing, requestClose } = useAnimatedDismiss({
+    onDismissed: onClose,
+    exitAnimationName: EXIT_ANIMATION_NAME,
+    fallbackMs: EXIT_ANIMATION_FALLBACK_MS,
+    cancelKey: selectionKey,
+    restoreFocusRef: closeRef,
   })
+
+  /* Prefetched profiles render stats on the very first frame with no loading
+     flash; everything returned is scoped to the current member, so stale data
+     or errors from a previously viewed member can never leak in. */
+  const { profile, error, isPending } = useMemberProfile(bioguideId)
 
   useEffect(() => {
     if (!open) return
@@ -147,7 +120,7 @@ export function MemberProfile({ open, seed, selectionKey = 0, onClose }: MemberP
 
       /* Skip the focus trap while the exit animation runs: the root is inert,
          so Tab should move focus out of the departing dialog, not cycle it. */
-      if (event.key !== 'Tab' || !panelRef.current || isClosingRef.current) return
+      if (event.key !== 'Tab' || !panelRef.current || getIsClosing()) return
       const focusable = panelRef.current.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled])',
       )
@@ -172,23 +145,15 @@ export function MemberProfile({ open, seed, selectionKey = 0, onClose }: MemberP
       returnFocusRef.current?.focus()
       returnFocusRef.current = null
     }
-  }, [open, requestClose])
+  }, [open, requestClose, getIsClosing])
 
   if (!open || !seed) return null
 
-  /* Cache read keyed by the current seed, so stale data from a previously
-     viewed member can never leak in; prefetched profiles render stats on the
-     very first frame with no loading flash. */
-  const profile = getCachedMemberProfile(seed.bioguide_id)
   const name = profile?.name ?? seed.name
   const party = profile?.party ?? seed.party
   const state = profile?.state ?? seed.state
   const photoUrl = profile?.photo_url || seed.photo_url
   const hint = crossVoteHint(profile?.cross_vote_label ?? seed.cross_vote_label)
-  /* No data and no error means the fetch for this member has not settled yet
-     (isLoading can lag one render behind a seed change); treat it as loading
-     rather than flashing "unavailable". */
-  const isPending = isLoading || (profile === null && !error)
   const phase = statsPhase(profile, isPending, error)
 
   return (
