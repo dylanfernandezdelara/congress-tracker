@@ -57,6 +57,14 @@ import { fetchMemberProfile } from '../api/client'
 
 const fetchMemberProfileMock = vi.mocked(fetchMemberProfile)
 
+/* jsdom has no AnimationEvent constructor, so fireEvent.animationEnd drops the
+   animationName init; build the event by hand instead. */
+function endAnimation(element: HTMLElement, animationName: string) {
+  const event = new Event('animationend', { bubbles: true })
+  Object.defineProperty(event, 'animationName', { value: animationName })
+  fireEvent(element, event)
+}
+
 afterEach(() => {
   vi.clearAllMocks()
   document.body.style.overflow = ''
@@ -103,11 +111,14 @@ describe('MemberProfile', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
-    fireEvent.animationEnd(dialog)
+    // A stray enter-animation end must not finish the close.
+    endAnimation(dialog, 'member-profile-rise')
+    expect(onClose).not.toHaveBeenCalled()
+    endAnimation(dialog, 'member-profile-sink')
     expect(onClose).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    fireEvent.animationEnd(dialog)
+    endAnimation(dialog, 'member-profile-fade-out')
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
@@ -125,8 +136,34 @@ describe('MemberProfile', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    fireEvent.animationEnd(dialog)
+    endAnimation(dialog, 'member-profile-sink')
 
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels a pending close when a new profile is selected mid-animation', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    const { rerender } = render(<MemberProfile open seed={seed} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    const otherSeed: MemberProfileSeed = {
+      ...seed,
+      bioguide_id: 'G000002',
+      name: 'Grace Other',
+    }
+    rerender(<MemberProfile open seed={otherSeed} onClose={onClose} />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Grace Other' })
+    endAnimation(dialog, 'member-profile-sink')
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Grace Other' })).toBeInTheDocument()
   })
 })

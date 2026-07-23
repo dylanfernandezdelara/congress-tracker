@@ -23,6 +23,10 @@ type MemberProfileProps = {
    browser); slightly longer than the longest exit animation in profile.css. */
 const EXIT_ANIMATION_FALLBACK_MS = 400
 
+/* Exit animation names defined in profile.css; the enter animations must not
+   finish the close, so animationend events are filtered against this set. */
+const EXIT_ANIMATION_NAMES = new Set(['member-profile-sink', 'member-profile-fade-out'])
+
 type StatsPhase =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
@@ -100,11 +104,25 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
     setIsClosing(true)
   }, [])
 
+  /* If another profile is selected while the exit animation is running, cancel
+     the close so the dialog animates back in with the new member instead of the
+     pending onClose() silently discarding the new selection. */
+  const seedKey = seed?.bioguide_id ?? null
+  const prevSeedKeyRef = useRef(seedKey)
+  useEffect(() => {
+    if (prevSeedKeyRef.current === seedKey) return
+    prevSeedKeyRef.current = seedKey
+    if (seedKey !== null && isClosingRef.current) {
+      isClosingRef.current = false
+      setIsClosing(false)
+    }
+  }, [seedKey])
+
   useEffect(() => {
     if (!isClosing) return
     const panel = panelRef.current
     const handleAnimationEnd = (event: AnimationEvent) => {
-      if (event.target === panel) finishClose()
+      if (event.target === panel && EXIT_ANIMATION_NAMES.has(event.animationName)) finishClose()
     }
     panel?.addEventListener('animationend', handleAnimationEnd)
     const timer = window.setTimeout(finishClose, EXIT_ANIMATION_FALLBACK_MS)
@@ -172,12 +190,15 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
 
   if (!open || !seed) return null
 
-  const name = profile?.name ?? seed.name
-  const party = profile?.party ?? seed.party
-  const state = profile?.state ?? seed.state
-  const photoUrl = profile?.photo_url || seed.photo_url
-  const hint = crossVoteHint(profile?.cross_vote_label ?? seed.cross_vote_label)
-  const phase = statsPhase(profile, isLoading, error)
+  /* useAsyncData keeps prior data while refetching; ignore it when it belongs
+     to a different member than the current seed (e.g. reopening mid-close). */
+  const seedProfile = profile?.bioguide_id === seed.bioguide_id ? profile : null
+  const name = seedProfile?.name ?? seed.name
+  const party = seedProfile?.party ?? seed.party
+  const state = seedProfile?.state ?? seed.state
+  const photoUrl = seedProfile?.photo_url || seed.photo_url
+  const hint = crossVoteHint(seedProfile?.cross_vote_label ?? seed.cross_vote_label)
+  const phase = statsPhase(seedProfile, isLoading, error)
 
   return (
     <div
@@ -217,7 +238,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
             <p className={`member-profile-party ${partyCssClass(party)}`}>
               {partyDisplayName(party)} · {partyShortLabel(party)}-{state}
             </p>
-            {profile ? <p className="member-profile-seat">{seatLabel(profile)}</p> : null}
+            {seedProfile ? <p className="member-profile-seat">{seatLabel(seedProfile)}</p> : null}
           </div>
         </div>
 
@@ -277,10 +298,10 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
           </section>
         ) : null}
 
-        {profile?.congress_gov_url ? (
+        {seedProfile?.congress_gov_url ? (
           <a
             className="member-profile-link congress-link"
-            href={profile.congress_gov_url}
+            href={seedProfile.congress_gov_url}
             target="_blank"
             rel="noreferrer"
           >
