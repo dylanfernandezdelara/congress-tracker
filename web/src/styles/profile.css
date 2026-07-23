@@ -33,6 +33,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.875rem;
+    /* Off-screen distance for the rise/sink keyframes. The bottom-docked
+       mobile sheet only needs its own height; the centered desktop panel
+       overrides this to 100vh (see the min-width block below). */
+    --member-profile-slide-distance: 100%;
     animation: member-profile-rise 400ms var(--motion-ease-sheet) both;
   }
 
@@ -56,7 +60,7 @@
 
   @keyframes member-profile-rise {
     from {
-      transform: translateY(100%);
+      transform: translateY(var(--member-profile-slide-distance));
     }
     to {
       transform: translateY(0);
@@ -68,7 +72,7 @@
       transform: translateY(0);
     }
     to {
-      transform: translateY(100%);
+      transform: translateY(var(--member-profile-slide-distance));
     }
   }
 
@@ -293,29 +297,7 @@
     .member-profile-panel {
       border-radius: 1rem;
       max-height: min(85vh, 36rem);
-      animation: member-profile-rise-desktop 400ms var(--motion-ease-sheet) both;
-    }
-
-    .member-profile-root--closing .member-profile-panel {
-      animation: member-profile-sink-desktop 280ms var(--motion-ease-in) both;
-    }
-
-    @keyframes member-profile-rise-desktop {
-      from {
-        transform: translateY(100vh);
-      }
-      to {
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes member-profile-sink-desktop {
-      from {
-        transform: translateY(0);
-      }
-      to {
-        transform: translateY(100vh);
-      }
+      --member-profile-slide-distance: 100vh;
     }
   }
 

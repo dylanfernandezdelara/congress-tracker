@@ -118,7 +118,11 @@ export function NotableVotesSection({
   error = null,
   onRetry,
 }: NotableVotesSectionProps) {
-  const [profileSeed, setProfileSeed] = useState<MemberProfileSeed | null>(null)
+  /* The key increments on every selection (including re-selecting the same
+     member); MemberProfile uses its change to cancel a pending animated close. */
+  const [selection, setSelection] = useState<{ seed: MemberProfileSeed; key: number } | null>(
+    null,
+  )
 
   /* Warm the profile cache for every visible defector (bounded: at most a few
      entries with a handful of defectors each) so the member profile sheet
@@ -132,11 +136,8 @@ export function NotableVotesSection({
     }
   }, [notable])
 
-  /* Clone the seed so every selection produces a fresh object identity;
-     MemberProfile relies on this to cancel a pending animated close when the
-     same member is re-selected mid-exit-animation. */
   const openProfile = useCallback((seed: MemberProfileSeed) => {
-    setProfileSeed({ ...seed })
+    setSelection((prev) => ({ seed, key: (prev?.key ?? 0) + 1 }))
   }, [])
 
   if (error) {
@@ -177,9 +178,10 @@ export function NotableVotesSection({
         ))}
       </div>
       <MemberProfile
-        open={profileSeed !== null}
-        seed={profileSeed}
-        onClose={() => setProfileSeed(null)}
+        open={selection !== null}
+        seed={selection?.seed ?? null}
+        selectionKey={selection?.key ?? 0}
+        onClose={() => setSelection(null)}
       />
     </section>
   )

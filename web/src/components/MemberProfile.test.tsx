@@ -133,7 +133,7 @@ describe('MemberProfile', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    endAnimation(dialog, 'member-profile-sink-desktop')
+    endAnimation(dialog, 'member-profile-sink')
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
@@ -160,7 +160,9 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    const { rerender } = render(<MemberProfile open seed={seed} onClose={onClose} />)
+    const { rerender } = render(
+      <MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />,
+    )
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -173,7 +175,7 @@ describe('MemberProfile', () => {
       bioguide_id: 'G000002',
       name: 'Grace Other',
     }
-    rerender(<MemberProfile open seed={otherSeed} onClose={onClose} />)
+    rerender(<MemberProfile open seed={otherSeed} selectionKey={2} onClose={onClose} />)
 
     const dialog = screen.getByRole('dialog', { name: 'Grace Other' })
     endAnimation(dialog, 'member-profile-sink')
@@ -186,7 +188,9 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    const { rerender } = render(<MemberProfile open seed={seed} onClose={onClose} />)
+    const { rerender } = render(
+      <MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />,
+    )
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -194,9 +198,8 @@ describe('MemberProfile', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' })
 
-    /* The parent creates a fresh seed object per selection, so re-selecting
-       the same member arrives as a new object with the same bioguide_id. */
-    rerender(<MemberProfile open seed={{ ...seed }} onClose={onClose} />)
+    /* Re-selecting the same member bumps selectionKey with an unchanged seed. */
+    rerender(<MemberProfile open seed={seed} selectionKey={2} onClose={onClose} />)
 
     const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
     expect(dialog.closest('.member-profile-root')).not.toHaveAttribute('inert')
