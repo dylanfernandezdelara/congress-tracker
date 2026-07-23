@@ -111,6 +111,8 @@ describe('MemberProfile', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
+    // The departing dialog must be inert (unfocusable, hidden from AT).
+    expect(dialog.closest('.member-profile-root')).toHaveAttribute('inert')
     // A stray enter-animation end must not finish the close.
     endAnimation(dialog, 'member-profile-rise')
     expect(onClose).not.toHaveBeenCalled()
@@ -165,5 +167,29 @@ describe('MemberProfile', () => {
 
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'Grace Other' })).toBeInTheDocument()
+  })
+
+  it('cancels a pending close when the same member is re-selected mid-animation', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    const { rerender } = render(<MemberProfile open seed={seed} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    /* The parent creates a fresh seed object per selection, so re-selecting
+       the same member arrives as a new object with the same bioguide_id. */
+    rerender(<MemberProfile open seed={{ ...seed }} onClose={onClose} />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    expect(dialog.closest('.member-profile-root')).not.toHaveAttribute('inert')
+    endAnimation(dialog, 'member-profile-sink')
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
   })
 })

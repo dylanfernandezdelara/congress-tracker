@@ -78,6 +78,7 @@ function statsPhase(
 export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const bioguideId = open ? seed?.bioguide_id ?? null : null
@@ -85,7 +86,9 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const [isClosing, setIsClosing] = useState(false)
   const isClosingRef = useRef(false)
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   const finishClose = useCallback(() => {
     if (!isClosingRef.current) return
@@ -104,22 +107,28 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
     setIsClosing(true)
   }, [])
 
-  /* If another profile is selected while the exit animation is running, cancel
-     the close so the dialog animates back in with the new member instead of the
-     pending onClose() silently discarding the new selection. */
-  const seedKey = seed?.bioguide_id ?? null
-  const prevSeedKeyRef = useRef(seedKey)
+  /* If a profile is selected while the exit animation is running, cancel the
+     close so the dialog animates back in with the selected member instead of
+     the pending onClose() silently discarding the selection. Compared by seed
+     object identity (the parent creates a fresh seed object per selection) so
+     re-selecting the same member mid-close also cancels the close. */
+  const prevSeedRef = useRef(seed)
   useEffect(() => {
-    if (prevSeedKeyRef.current === seedKey) return
-    prevSeedKeyRef.current = seedKey
-    if (seedKey !== null && isClosingRef.current) {
+    if (prevSeedRef.current === seed) return
+    prevSeedRef.current = seed
+    if (seed !== null && isClosingRef.current) {
       isClosingRef.current = false
       setIsClosing(false)
     }
-  }, [seedKey])
+  }, [seed])
 
   useEffect(() => {
     if (!isClosing) return
+    /* React 18 has no `inert` prop support, so toggle the attribute directly.
+       While the exit animation runs, the departing dialog must be unfocusable
+       and hidden from assistive tech (pointer-events is handled in CSS). */
+    const root = rootRef.current
+    root?.setAttribute('inert', '')
     const panel = panelRef.current
     const handleAnimationEnd = (event: AnimationEvent) => {
       if (event.target === panel && EXIT_ANIMATION_NAMES.has(event.animationName)) finishClose()
@@ -127,6 +136,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
     panel?.addEventListener('animationend', handleAnimationEnd)
     const timer = window.setTimeout(finishClose, EXIT_ANIMATION_FALLBACK_MS)
     return () => {
+      root?.removeAttribute('inert')
       panel?.removeEventListener('animationend', handleAnimationEnd)
       window.clearTimeout(timer)
     }
@@ -161,7 +171,9 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
         return
       }
 
-      if (event.key !== 'Tab' || !panelRef.current) return
+      /* Skip the focus trap while the exit animation runs: the root is inert,
+         so Tab should move focus out of the departing dialog, not cycle it. */
+      if (event.key !== 'Tab' || !panelRef.current || isClosingRef.current) return
       const focusable = panelRef.current.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled])',
       )
@@ -205,6 +217,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
 
   return (
     <div
+      ref={rootRef}
       className={`member-profile-root${isClosing ? ' member-profile-root--closing' : ''}`}
       role="presentation"
     >

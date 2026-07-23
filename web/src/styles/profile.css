@@ -297,6 +297,12 @@
       animation: member-profile-fade-out 200ms var(--motion-ease-in) both;
     }
 
+    /* Unmount happens when the panel exit (200ms) ends; keep the backdrop
+       fade no longer than that so it is not cut off mid-animation. */
+    .member-profile-root--closing .member-profile-backdrop {
+      animation-duration: 200ms;
+    }
+
     @keyframes member-profile-fade-in {
       from {
         transform: translateY(0.625rem) scale(0.98);

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import type { NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
@@ -119,6 +119,13 @@ export function NotableVotesSection({
 }: NotableVotesSectionProps) {
   const [profileSeed, setProfileSeed] = useState<MemberProfileSeed | null>(null)
 
+  /* Clone the seed so every selection produces a fresh object identity;
+     MemberProfile relies on this to cancel a pending animated close when the
+     same member is re-selected mid-exit-animation. */
+  const openProfile = useCallback((seed: MemberProfileSeed) => {
+    setProfileSeed({ ...seed })
+  }, [])
+
   if (error) {
     return (
       <section className="home-enrichment" aria-label="Notable votes">
@@ -152,7 +159,7 @@ export function NotableVotesSection({
           <NotableVoteCard
             key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
             entry={entry}
-            onOpenProfile={setProfileSeed}
+            onOpenProfile={openProfile}
           />
         ))}
       </div>
