@@ -142,6 +142,18 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
     }
   }, [isClosing, finishClose])
 
+  /* When a selection cancels a pending close, focus is still on the background
+     button that was clicked (the inert root blurred the dialog); pull it back
+     into the still-open modal. Declared after the inert effect so its cleanup
+     has already removed the inert attribute when this runs. Skipped on the
+     finish path because open flips false in the same commit. */
+  const wasClosingRef = useRef(false)
+  useEffect(() => {
+    const wasClosing = wasClosingRef.current
+    wasClosingRef.current = isClosing
+    if (wasClosing && !isClosing && open) closeRef.current?.focus()
+  }, [isClosing, open])
+
   const {
     data: profile,
     error,

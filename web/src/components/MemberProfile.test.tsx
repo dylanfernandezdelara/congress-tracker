@@ -187,6 +187,8 @@ describe('MemberProfile', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
     expect(dialog.closest('.member-profile-root')).not.toHaveAttribute('inert')
+    // Cancelling the close pulls focus back into the still-open modal.
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
     endAnimation(dialog, 'member-profile-sink')
 
     expect(onClose).not.toHaveBeenCalled()
