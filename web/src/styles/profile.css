@@ -16,6 +16,7 @@
     margin: 0;
     background: hsl(var(--twc-foreground) / 0.28);
     cursor: pointer;
+    animation: member-profile-backdrop-in 320ms ease both;
   }
 
   .member-profile-panel {
@@ -32,18 +33,57 @@
     display: flex;
     flex-direction: column;
     gap: 0.875rem;
-    animation: member-profile-rise 160ms ease-out;
+    animation: member-profile-rise 400ms var(--motion-ease-sheet) both;
+  }
+
+  @keyframes member-profile-backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes member-profile-backdrop-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
   @keyframes member-profile-rise {
     from {
-      transform: translateY(0.75rem);
-      opacity: 0.6;
+      transform: translateY(100%);
     }
     to {
       transform: translateY(0);
-      opacity: 1;
     }
+  }
+
+  @keyframes member-profile-sink {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(100%);
+    }
+  }
+
+  /* Animated close: MemberProfile keeps the dialog mounted with this modifier
+     until the panel's exit animation finishes, then unmounts it. */
+  .member-profile-root--closing {
+    pointer-events: none;
+  }
+
+  .member-profile-root--closing .member-profile-backdrop {
+    animation: member-profile-backdrop-out 260ms ease both;
+  }
+
+  .member-profile-root--closing .member-profile-panel {
+    animation: member-profile-sink 280ms var(--motion-ease-in) both;
   }
 
   .member-profile-toolbar {
@@ -250,18 +290,42 @@
     .member-profile-panel {
       border-radius: 1rem;
       max-height: min(85vh, 36rem);
-      animation-name: member-profile-fade;
+      animation: member-profile-fade-in 280ms var(--motion-ease-out) both;
     }
 
-    @keyframes member-profile-fade {
+    .member-profile-root--closing .member-profile-panel {
+      animation: member-profile-fade-out 200ms var(--motion-ease-in) both;
+    }
+
+    @keyframes member-profile-fade-in {
       from {
-        transform: translateY(0.35rem);
-        opacity: 0.5;
+        transform: translateY(0.625rem) scale(0.98);
+        opacity: 0;
       }
       to {
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
         opacity: 1;
       }
+    }
+
+    @keyframes member-profile-fade-out {
+      from {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+      to {
+        transform: translateY(0.375rem) scale(0.985);
+        opacity: 0;
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .member-profile-backdrop,
+    .member-profile-panel,
+    .member-profile-root--closing .member-profile-backdrop,
+    .member-profile-root--closing .member-profile-panel {
+      animation: none;
     }
   }
 }

@@ -90,7 +90,7 @@ describe('MemberProfile', () => {
     )
   })
 
-  it('closes on Escape and backdrop click', async () => {
+  it('closes on Escape and backdrop click after the exit animation', async () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
@@ -99,11 +99,34 @@ describe('MemberProfile', () => {
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
 
     fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.animationEnd(dialog)
     expect(onClose).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
+    fireEvent.animationEnd(dialog)
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores repeated close requests while the exit animation is running', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    render(<MemberProfile open seed={seed} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
+    fireEvent.animationEnd(dialog)
+
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

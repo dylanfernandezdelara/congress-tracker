@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 import { fetchMemberProfile } from '../api/client'
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
@@ -18,6 +18,10 @@ type MemberProfileProps = {
   seed: MemberProfileSeed | null
   onClose: () => void
 }
+
+/* Safety net in case animationend never fires (e.g. animations disabled by the
+   browser); slightly longer than the longest exit animation in profile.css. */
+const EXIT_ANIMATION_FALLBACK_MS = 400
 
 type StatsPhase =
   | { kind: 'loading' }
@@ -74,6 +78,42 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const bioguideId = open ? seed?.bioguide_id ?? null : null
 
+  const [isClosing, setIsClosing] = useState(false)
+  const isClosingRef = useRef(false)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  const finishClose = useCallback(() => {
+    if (!isClosingRef.current) return
+    isClosingRef.current = false
+    setIsClosing(false)
+    onCloseRef.current()
+  }, [])
+
+  const requestClose = useCallback(() => {
+    if (isClosingRef.current) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      onCloseRef.current()
+      return
+    }
+    isClosingRef.current = true
+    setIsClosing(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isClosing) return
+    const panel = panelRef.current
+    const handleAnimationEnd = (event: AnimationEvent) => {
+      if (event.target === panel) finishClose()
+    }
+    panel?.addEventListener('animationend', handleAnimationEnd)
+    const timer = window.setTimeout(finishClose, EXIT_ANIMATION_FALLBACK_MS)
+    return () => {
+      panel?.removeEventListener('animationend', handleAnimationEnd)
+      window.clearTimeout(timer)
+    }
+  }, [isClosing, finishClose])
+
   const {
     data: profile,
     error,
@@ -99,7 +139,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        requestClose()
         return
       }
 
@@ -128,7 +168,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
       returnFocusRef.current?.focus()
       returnFocusRef.current = null
     }
-  }, [open, onClose])
+  }, [open, requestClose])
 
   if (!open || !seed) return null
 
@@ -140,12 +180,15 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   const phase = statsPhase(profile, isLoading, error)
 
   return (
-    <div className="member-profile-root" role="presentation">
+    <div
+      className={`member-profile-root${isClosing ? ' member-profile-root--closing' : ''}`}
+      role="presentation"
+    >
       <button
         type="button"
         className="member-profile-backdrop"
         aria-label="Close profile"
-        onClick={onClose}
+        onClick={requestClose}
       />
       <div
         ref={panelRef}
@@ -159,7 +202,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
             ref={closeRef}
             type="button"
             className="member-profile-close"
-            onClick={onClose}
+            onClick={requestClose}
           >
             Close
           </button>

@@ -243,7 +243,15 @@
     height: 1.5px;
     border-radius: 1px;
     background-color: currentColor;
-    transition: transform 0.15s ease, opacity 0.15s ease;
+    transition:
+      transform 0.2s var(--motion-ease-out),
+      opacity 0.2s var(--motion-ease-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .site-nav-toggle-bar {
+      transition: none;
+    }
   }
 
   .site-header--menu-open .site-nav-toggle-bar:nth-child(1) {
