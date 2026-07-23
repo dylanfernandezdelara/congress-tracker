@@ -7,19 +7,29 @@ const {
   countMemberVotesForRoll,
   countLisMemberVotesForRoll,
   deleteMemberVotesForRoll,
+  selectMemberVotesForRoll,
   upsertMemberVotesBatch,
   upsertMembersBatch,
   fetchHouseMemberVotes,
   fetchSenateMemberVotes,
+  getVoteRollMeta,
+  applyRollToMemberSessionStats,
+  reconcileMemberSessionStats,
+  refreshMemberSessionStatsForBioguides,
 } = vi.hoisted(() => ({
   selectPassageRollCalls: vi.fn(),
   countMemberVotesForRoll: vi.fn(),
   countLisMemberVotesForRoll: vi.fn(async () => 0),
   deleteMemberVotesForRoll: vi.fn(async () => {}),
+  selectMemberVotesForRoll: vi.fn(async (): Promise<Array<{ bioguide_id: string; position: string }>> => []),
   upsertMemberVotesBatch: vi.fn(async () => {}),
   upsertMembersBatch: vi.fn(async () => {}),
   fetchHouseMemberVotes: vi.fn(),
   fetchSenateMemberVotes: vi.fn(),
+  getVoteRollMeta: vi.fn(),
+  applyRollToMemberSessionStats: vi.fn(async () => {}),
+  reconcileMemberSessionStats: vi.fn(async () => false),
+  refreshMemberSessionStatsForBioguides: vi.fn(async () => {}),
 }));
 
 vi.mock("../d1/schema", () => ({ ensureSchema: vi.fn(async () => {}) }));
@@ -28,12 +38,21 @@ vi.mock("../d1/member-votes", () => ({
   countMemberVotesForRoll,
   countLisMemberVotesForRoll,
   deleteMemberVotesForRoll,
+  selectMemberVotesForRoll,
   upsertMemberVotesBatch,
 }));
 vi.mock("../d1/members", () => ({
   upsertMembersBatch,
   hasRealMemberRoster: vi.fn(async () => true),
   buildSenateBioguideLookup: vi.fn(async () => new Map()),
+}));
+vi.mock("../d1/votes", () => ({ getVoteRollMeta }));
+vi.mock("../d1/member-session-stats", () => ({
+  refreshMemberSessionStatsForBioguides,
+}));
+vi.mock("../analytics/member-session-stats", () => ({
+  applyRollToMemberSessionStats,
+  reconcileMemberSessionStats,
 }));
 vi.mock("./run-members-roster", () => ({
   runMembersRosterPipeline: vi.fn(async () => ({
@@ -86,8 +105,25 @@ describe("runMemberVotesPipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     countMemberVotesForRoll.mockResolvedValue(0);
+    countLisMemberVotesForRoll.mockResolvedValue(0);
     fetchHouseMemberVotes.mockImplementation(fakeFetch(["A", "B"]));
     fetchSenateMemberVotes.mockImplementation(fakeFetch([]));
+    getVoteRollMeta.mockImplementation(async (_db: unknown, roll: RollCallKey) => ({
+      chamber: roll.chamber,
+      congress: roll.congress,
+      session: roll.session,
+      roll_number: roll.roll_number,
+      bill_type: "hr",
+      bill_number: 1,
+      bill_congress: roll.congress,
+      yeas: 220,
+      nays: 200,
+      vote_date: "2026-07-01",
+    }));
+    applyRollToMemberSessionStats.mockResolvedValue(undefined);
+    reconcileMemberSessionStats.mockResolvedValue(false);
+    selectMemberVotesForRoll.mockResolvedValue([]);
+    refreshMemberSessionStatsForBioguides.mockResolvedValue(undefined);
   });
 
   it("batches writes and dedupes members across rolls", async () => {
@@ -101,6 +137,60 @@ describe("runMemberVotesPipeline", () => {
     // Members A and B appear on both rolls but are upserted once.
     expect(result.membersUpserted).toBe(2);
     expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(2);
+    expect(applyRollToMemberSessionStats).toHaveBeenCalledTimes(2);
+    expect(reconcileMemberSessionStats).toHaveBeenCalledWith(env.DB, 119, 2);
+    expect(reconcileMemberSessionStats.mock.invocationCallOrder[0]).toBeGreaterThan(
+      applyRollToMemberSessionStats.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it("rolls back vote rows and refreshes tallies when session-stats apply fails", async () => {
+    selectPassageRollCalls.mockResolvedValue([houseRoll(1)]);
+    applyRollToMemberSessionStats.mockRejectedValueOnce(new Error("d1 batch failed"));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(0);
+    expect(result.rollsSkipped).toBe(1);
+    expect(deleteMemberVotesForRoll).toHaveBeenCalledWith(env.DB, houseRoll(1));
+    expect(refreshMemberSessionStatsForBioguides).toHaveBeenCalledWith(
+      env.DB,
+      119,
+      2,
+      expect.arrayContaining(["A", "B"])
+    );
+  });
+
+  it("skips the roll before writing votes when roll metadata is missing", async () => {
+    selectPassageRollCalls.mockResolvedValue([houseRoll(1)]);
+    getVoteRollMeta.mockResolvedValueOnce(null);
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(0);
+    expect(result.rollsSkipped).toBe(1);
+    expect(upsertMemberVotesBatch).not.toHaveBeenCalled();
+    expect(applyRollToMemberSessionStats).not.toHaveBeenCalled();
+  });
+
+  it("refreshes tallies for bioguides removed during an LIS rewrite", async () => {
+    selectPassageRollCalls.mockResolvedValue([
+      { chamber: "Senate", congress: 119, session: 2, roll_number: 1 },
+    ]);
+    countMemberVotesForRoll.mockResolvedValue(100);
+    countLisMemberVotesForRoll.mockResolvedValue(5);
+    selectMemberVotesForRoll.mockResolvedValue([
+      { bioguide_id: "LIS:OLD", position: "Yea" },
+      { bioguide_id: "S000001", position: "Yea" },
+    ]);
+    fetchSenateMemberVotes.mockImplementation(fakeFetch(["S000001"]));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(1);
+    expect(refreshMemberSessionStatsForBioguides).toHaveBeenCalledWith(env.DB, 119, 2, [
+      "LIS:OLD",
+    ]);
   });
 
   it("skips rolls that already have member votes (idempotent re-run)", async () => {

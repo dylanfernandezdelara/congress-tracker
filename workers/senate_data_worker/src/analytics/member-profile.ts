@@ -8,6 +8,10 @@ import {
   selectMemberVotesForRollNumbers,
   type MemberVoteWithRoll,
 } from "../d1/member-votes";
+import {
+  getMemberSessionStats,
+  selectRecentMemberCrossVotes,
+} from "../d1/member-session-stats";
 import { rollCrossVotes } from "./cross-votes";
 
 const RECENT_CROSS_VOTE_LIMIT = 5;
@@ -15,6 +19,9 @@ const RECENT_CROSS_VOTE_LIMIT = 5;
 /**
  * Build a member profile for the current session: roster identity plus
  * passage-vote tallies and recent party-line breaks.
+ *
+ * Prefers denormalized member_session_stats (maintained when member votes are
+ * ingested). Falls back to a live scan when stats have not been backfilled yet.
  */
 export async function buildMemberProfile(
   db: D1Database,
@@ -25,7 +32,54 @@ export async function buildMemberProfile(
   const member = await getMember(db, bioguideId);
   if (!member) return null;
 
-  const memberVotes = await selectMemberVotesForBioguide(db, congress, session, bioguideId);
+  const stats = await getMemberSessionStats(db, congress, session, bioguideId);
+  if (stats) {
+    const recent_cross_votes = await selectRecentMemberCrossVotes(
+      db,
+      congress,
+      session,
+      bioguideId,
+      RECENT_CROSS_VOTE_LIMIT
+    );
+    return {
+      bioguide_id: member.bioguideId,
+      name: member.name,
+      chamber: member.chamber,
+      party: member.party ?? "?",
+      state: member.state ?? "?",
+      district: member.district,
+      photo_url: bioguidePhotoUrl(member.bioguideId) ?? "",
+      congress_gov_url: congressGovMemberUrl(member.bioguideId),
+      congress,
+      session,
+      votes_cast: stats.votes_cast,
+      yea_count: stats.yea_count,
+      nay_count: stats.nay_count,
+      cross_vote_count: stats.cross_vote_count,
+      cross_vote_label: crossVoteLabel(stats.cross_vote_count),
+      recent_cross_votes,
+      member_votes_available: stats.votes_cast > 0,
+      as_of: stats.updated_at,
+    };
+  }
+
+  return buildMemberProfileLive(db, congress, session, member);
+}
+
+async function buildMemberProfileLive(
+  db: D1Database,
+  congress: number,
+  session: number,
+  member: {
+    bioguideId: string;
+    name: string;
+    chamber: "House" | "Senate";
+    party: string | null;
+    state: string | null;
+    district: number | null;
+  }
+): Promise<MemberProfileResponse> {
+  const memberVotes = await selectMemberVotesForBioguide(db, congress, session, member.bioguideId);
 
   let yea_count = 0;
   let nay_count = 0;

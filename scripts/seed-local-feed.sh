@@ -81,6 +81,32 @@ CREATE TABLE IF NOT EXISTS member_votes (
   position TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number, bioguide_id)
 );
+CREATE TABLE IF NOT EXISTS member_session_stats (
+  bioguide_id TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  votes_cast INTEGER NOT NULL,
+  yea_count INTEGER NOT NULL,
+  nay_count INTEGER NOT NULL,
+  cross_vote_count INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (bioguide_id, congress, session)
+);
+CREATE TABLE IF NOT EXISTS member_cross_votes (
+  chamber TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  roll_number INTEGER NOT NULL,
+  bioguide_id TEXT NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  bill_congress INTEGER NOT NULL,
+  vote_date TEXT NOT NULL,
+  position TEXT NOT NULL,
+  party_line TEXT NOT NULL,
+  margin INTEGER NOT NULL,
+  PRIMARY KEY (chamber, congress, session, roll_number, bioguide_id)
+);
 CREATE TABLE IF NOT EXISTS financial_transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   bioguide_id TEXT NOT NULL,
@@ -183,6 +209,54 @@ print(",\n".join(member_rows) + ";")
 print("")
 print("INSERT OR REPLACE INTO member_votes (chamber, congress, session, roll_number, bioguide_id, position) VALUES")
 print(",\n".join(vote_rows) + ";")
+
+# Precomputed profile stats (mirrors applyRollToMemberSessionStats for the sample rolls).
+# Spotlight crossovers vote against their party majority on the seeded rolls.
+stats_rows = []
+cross_rows = []
+for bid, _, chamber, party, _, _, ts in spotlight_members:
+    if chamber == "House":
+        if bid in ("LOCAL:H001", "LOCAL:H002"):
+            roll, bill_type, bill_number, vote_date, yeas, nays = 9001, "hr", 1, "${D_RECENT}", 220, 213
+            position = "nay" if bid == "LOCAL:H001" else "yea"
+        else:
+            roll, bill_type, bill_number, vote_date, yeas, nays = 9003, "hr", 22, "${D_OLDER}", 314, 117
+            position = "yea"
+        # House Democrats majority Yea on 9001; H001 (D/Nay) is the crossover.
+        crossed = bid == "LOCAL:H001"
+    else:
+        roll, bill_type, bill_number, vote_date, yeas, nays = 9002, "s", 47, "${D_MID}", 68, 32
+        position = "nay" if bid == "LOCAL:S001" else "yea"
+        crossed = bid == "LOCAL:S001"
+
+    yea_count = 1 if position == "yea" else 0
+    nay_count = 1 if position == "nay" else 0
+    cross_count = 1 if crossed else 0
+    stats_rows.append(
+        f"  ('{bid}', 119, 2, 1, {yea_count}, {nay_count}, {cross_count}, '{ts}')"
+    )
+    if crossed:
+        party_line = "yea"
+        margin = abs(yeas - nays)
+        cross_rows.append(
+            f"  ('{chamber}', 119, 2, {roll}, '{bid}', '{bill_type}', {bill_number}, 119, '{vote_date}', '{position}', '{party_line}', {margin})"
+        )
+
+# Fill members: one Yea each, party-line, no crosses.
+for idx, party in enumerate(house_rest, start=1):
+    bid = f"LOCAL:HR{idx:04d}"
+    stats_rows.append(f"  ('{bid}', 119, 2, 1, 1, 0, 0, '{updated}')")
+for idx, party in enumerate(senate_rest, start=1):
+    bid = f"LOCAL:SR{idx:03d}"
+    stats_rows.append(f"  ('{bid}', 119, 2, 1, 1, 0, 0, '{updated}')")
+
+print("")
+print("INSERT OR REPLACE INTO member_session_stats (bioguide_id, congress, session, votes_cast, yea_count, nay_count, cross_vote_count, updated_at) VALUES")
+print(",\n".join(stats_rows) + ";")
+if cross_rows:
+    print("")
+    print("INSERT OR REPLACE INTO member_cross_votes (chamber, congress, session, roll_number, bioguide_id, bill_type, bill_number, bill_congress, vote_date, position, party_line, margin) VALUES")
+    print(",\n".join(cross_rows) + ";")
 PY
 }
 
