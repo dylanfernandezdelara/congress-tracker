@@ -25,7 +25,7 @@ const EXIT_ANIMATION_FALLBACK_MS = 400
 
 /* Exit animation names defined in profile.css; the enter animations must not
    finish the close, so animationend events are filtered against this set. */
-const EXIT_ANIMATION_NAMES = new Set(['member-profile-sink', 'member-profile-fade-out'])
+const EXIT_ANIMATION_NAMES = new Set(['member-profile-sink', 'member-profile-sink-desktop'])
 
 type StatsPhase =
   | { kind: 'loading' }

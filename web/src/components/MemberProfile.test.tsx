@@ -120,7 +120,7 @@ describe('MemberProfile', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    endAnimation(dialog, 'member-profile-fade-out')
+    endAnimation(dialog, 'member-profile-sink-desktop')
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 

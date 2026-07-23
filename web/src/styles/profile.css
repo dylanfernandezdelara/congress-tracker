@@ -287,41 +287,34 @@
       padding: 1.5rem;
     }
 
+    /* Same sheet motion as mobile, but the panel is vertically centered here,
+       so slide from 100vh to guarantee it starts fully off-screen regardless
+       of panel height. */
     .member-profile-panel {
       border-radius: 1rem;
       max-height: min(85vh, 36rem);
-      animation: member-profile-fade-in 280ms var(--motion-ease-out) both;
+      animation: member-profile-rise-desktop 400ms var(--motion-ease-sheet) both;
     }
 
     .member-profile-root--closing .member-profile-panel {
-      animation: member-profile-fade-out 200ms var(--motion-ease-in) both;
+      animation: member-profile-sink-desktop 280ms var(--motion-ease-in) both;
     }
 
-    /* Unmount happens when the panel exit (200ms) ends; keep the backdrop
-       fade no longer than that so it is not cut off mid-animation. */
-    .member-profile-root--closing .member-profile-backdrop {
-      animation-duration: 200ms;
-    }
-
-    @keyframes member-profile-fade-in {
+    @keyframes member-profile-rise-desktop {
       from {
-        transform: translateY(0.625rem) scale(0.98);
-        opacity: 0;
+        transform: translateY(100vh);
       }
       to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
+        transform: translateY(0);
       }
     }
 
-    @keyframes member-profile-fade-out {
+    @keyframes member-profile-sink-desktop {
       from {
-        transform: translateY(0) scale(1);
-        opacity: 1;
+        transform: translateY(0);
       }
       to {
-        transform: translateY(0.375rem) scale(0.985);
-        opacity: 0;
+        transform: translateY(100vh);
       }
     }
   }
