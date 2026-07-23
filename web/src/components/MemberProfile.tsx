@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 
-import { fetchMemberProfile } from '../api/client'
+import { getCachedMemberProfile, loadMemberProfile } from '../api/memberProfileCache'
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
@@ -161,7 +161,7 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   } = useAsyncData({
     deps: [bioguideId],
     enabled: Boolean(bioguideId),
-    load: () => fetchMemberProfile(bioguideId as string),
+    load: () => loadMemberProfile(bioguideId as string),
     mapError: (err) => (err instanceof Error ? err.message : 'Could not load member profile'),
   })
 
@@ -215,8 +215,17 @@ export function MemberProfile({ open, seed, onClose }: MemberProfileProps) {
   if (!open || !seed) return null
 
   /* useAsyncData keeps prior data while refetching; ignore it when it belongs
-     to a different member than the current seed (e.g. reopening mid-close). */
-  const seedProfile = profile?.bioguide_id === seed.bioguide_id ? profile : null
+     to a different member than the current seed (e.g. reopening mid-close).
+     Fall back to the prefetch cache so an already-fetched profile renders
+     stats on the very first frame with no loading flash; the cached value is
+     identity-checked the same way as the fetched one. */
+  const cachedProfile = getCachedMemberProfile(seed.bioguide_id)
+  const seedProfile =
+    profile?.bioguide_id === seed.bioguide_id
+      ? profile
+      : cachedProfile?.bioguide_id === seed.bioguide_id
+        ? cachedProfile
+        : null
   const name = seedProfile?.name ?? seed.name
   const party = seedProfile?.party ?? seed.party
   const state = seedProfile?.state ?? seed.state

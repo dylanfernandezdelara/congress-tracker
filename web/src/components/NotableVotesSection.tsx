@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
+import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
@@ -118,6 +119,18 @@ export function NotableVotesSection({
   onRetry,
 }: NotableVotesSectionProps) {
   const [profileSeed, setProfileSeed] = useState<MemberProfileSeed | null>(null)
+
+  /* Warm the profile cache for every visible defector (bounded: at most a few
+     entries with a handful of defectors each) so the member profile sheet
+     opens with stats already loaded instead of a loading flash. */
+  useEffect(() => {
+    if (!notable) return
+    for (const entry of notable) {
+      for (const defector of entry.defectors) {
+        prefetchMemberProfile(defector.bioguide_id)
+      }
+    }
+  }, [notable])
 
   /* Clone the seed so every selection produces a fresh object identity;
      MemberProfile relies on this to cancel a pending animated close when the

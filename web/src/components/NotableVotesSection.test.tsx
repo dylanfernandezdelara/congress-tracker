@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { NotableVotesSection } from './NotableVotesSection'
 
@@ -58,6 +59,8 @@ describe('NotableVotesSection', () => {
   })
 
   afterEach(() => {
+    vi.clearAllMocks()
+    clearMemberProfileCache()
     document.body.style.overflow = ''
   })
 
@@ -115,6 +118,38 @@ describe('NotableVotesSection', () => {
     await waitFor(() => {
       expect(screen.getByText('CA-12')).toBeInTheDocument()
     })
+  })
+
+  it('prefetches visible defector profiles so the sheet opens without loading', async () => {
+    render(
+      <NotableVotesSection
+        notable={[
+          sampleEntry({
+            member_votes_available: true,
+            defectors: [
+              {
+                bioguide_id: 'A000001',
+                name: 'Jane Example',
+                party: 'D',
+                state: 'CA',
+                photo_url: 'https://example.com/jane.jpg',
+                cross_vote_count: 1,
+                cross_vote_label: 'rare',
+              },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    /* Rendering the section starts the prefetch; loadMemberProfile de-dupes
+       to the same in-flight request, so awaiting it waits for the cache. */
+    await loadMemberProfile('A000001')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile for Jane Example' }))
+
+    expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
+    expect(screen.getByText('CA-12')).toBeInTheDocument()
   })
 
   it('states when no members broke with their party', () => {

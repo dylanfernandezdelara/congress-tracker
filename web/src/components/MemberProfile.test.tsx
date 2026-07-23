@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import type { MemberProfileResponse } from '../api/types'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 
@@ -67,6 +68,7 @@ function endAnimation(element: HTMLElement, animationName: string) {
 
 afterEach(() => {
   vi.clearAllMocks()
+  clearMemberProfileCache()
   document.body.style.overflow = ''
 })
 
@@ -96,6 +98,17 @@ describe('MemberProfile', () => {
       'href',
       'https://www.congress.gov/member/f000466',
     )
+  })
+
+  it('renders stats on the first frame when the profile was prefetched', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    await loadMemberProfile(seed.bioguide_id)
+
+    render(<MemberProfile open seed={seed} onClose={() => undefined} />)
+
+    expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
+    expect(screen.getByText('PA-1')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument()
   })
 
   it('closes on Escape and backdrop click after the exit animation', async () => {
