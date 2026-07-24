@@ -61,6 +61,8 @@ export function useFeedPagination() {
   const deepLinkPhaseRef = useRef<'idle' | 'searching' | 'done'>('done')
   /** Chamber+q+bill pair currently being searched or already resolved for deep link. */
   const deepLinkQueryRef = useRef<string | null>(null)
+  const expandedRowKeyRef = useRef<string | null>(null)
+  expandedRowKeyRef.current = expandedRowKey
   const chamberRef = useRef(chamber)
   chamberRef.current = chamber
   const queryRef = useRef(committedQuery)
@@ -256,11 +258,12 @@ export function useFeedPagination() {
     (item: FeedItem) => {
       const rowKey = feedRowKey(item)
       const bill = formatBillQueryParam(item.bill)
-      let nextKey: string | null = null
-      setExpandedRowKey((current) => {
-        nextKey = current === rowKey ? null : rowKey
-        return nextKey
-      })
+      // Read from a ref — do not capture nextKey via a setState updater side effect.
+      // Updaters are not always invoked synchronously, which left bill= out of the URL
+      // while the row still expanded (flake in CI / isolated Home tests).
+      const nextKey = expandedRowKeyRef.current === rowKey ? null : rowKey
+      expandedRowKeyRef.current = nextKey
+      setExpandedRowKey(nextKey)
       // Keep deep-link query in sync so the URL bill write does not restart search/scroll.
       if (nextKey === null) {
         clearDeepLinkState()
