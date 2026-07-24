@@ -1,38 +1,61 @@
 # Web Design Language
 
-Light-mode-only **letterpress poster** aesthetic inspired by [jzhao.xyz](https://jzhao.xyz).
+Editorial, dense UI inspired by [benji.org](https://benji.org) and [dylanfdl.com](https://www.dylanfdl.com). Simple systems — type, gray hierarchy, and hairline dividers — carry the polish.
 
 ## Palette
 
-- Paper background: `#f5eedd`
-- Navy body ink: `#2d4673`
-- Deep navy headings: `#16294e`
-- Muted metadata: `#9a8e76`
-- Vermilion accent (links hover, arrows, separators): `#c8482b`
-- Aged-paper borders: `#e3d9c0`
+Three-gray hierarchy on near-white / near-black:
+
+| Role | Light | Dark |
+| --- | --- | --- |
+| Primary text | `#292929` | `#EDEDED` |
+| Secondary text | `#5D5D5D` | `#A6A6A6` |
+| Tertiary / faint | `#9E9E9E` | `#6E6E6E` |
+| Background | `#FAFAFA` | `#0A0A0A` |
+| Card | `#FFFFFF` | `#141414` |
+| Hairline border | `#E5E5E5` | `#292929` |
+
+Functional colors (desaturated): pass green, fail red, law amber, party R/D/I. No orange accent.
+
+Tokens live as `--twc-*` HSL channels in `web/src/styles/base.css`.
 
 ## Typography
 
-**One family only: Inter** — headlines, body, UI, docket lines, and any code/meta flourishes.
+**One family:** system SF Pro stack
 
-- Load weights 400 / 500 / 600 / 700 (roman + italic) via Google Fonts in `web/index.html`
-- Use `tabular-nums` for vote tallies
-- Do not introduce a second typeface (no serif display, no monospace companion). Tailwind `font-serif` / `font-mono` are aliased to Inter.
+```css
+-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif
+```
+
+- Weights: **400** and **500** only
+- Global `letter-spacing: -0.15px`
+- Scale (only four sizes): **12px** meta/dates · **13px** body/teasers · **14px** headlines/section titles · **24px** page title
+- `tabular-nums` / `font-feature-settings: "tnum"` on tallies and dates
+
+## Radii & icons
+
+- Navigation / toggles: **8px**
+- Cards / detail panels: **16px**
+- CTA buttons: **pill** (`9999px`)
+- Icons: **14px** nav/meta, **20px** in cards
 
 ## Layout
 
-- Single column, max width ~720px, airy vertical rhythm
-- Hairline borders; type and whitespace carry hierarchy
-- Static dot/halftone texture (CSS), not generative
+- **Desktop (≥1024px):** three-column shell — left rail (Federal Control bars + member spotlights) · dense feed · right rail (pulse + compact notable votes)
+- **Mobile:** single-column feed; rails hidden
+- Hairline dividers instead of shadows; one soft shadow only on the member profile sheet
+- Theme toggle in header; `localStorage.theme` wins over `prefers-color-scheme`
 
 ## Components
 
-- **Feed card** — docket line, Inter headline, plain summary, passage vote lines, optional policy tag
-- **Flip card** — front = digestible view + congress.gov link; back = official CRS summary
-- **Reduced motion** — cross-fade swap instead of 3D flip
+- **Feed list** — one 16px card containing hairline-divided rows (~72–80px collapsed)
+- **Collapsed row** — 14px headline · 12px meta line (outcome colored) · 13px teaser; bullets live in expanded detail
+- **Expanded detail** — key points, lifecycle pipeline, vote history, multi-column defectors
+- **Federal Control compact** — horizontal seat bars (full wedges remain on `/stats`)
 
 ## Rules
 
-- No dark mode, no theme toggle
-- Vermilion is an ink-stamp accent, not a fill color
-- Avoid glassmorphism, heavy shadows, dashboard chrome
+- Do not introduce a second typeface
+- Do not invent font sizes outside 12 / 13 / 14 / 24
+- Prefer gray hierarchy over chip-soup color
+- Keep QA selectors (`feed-row`, `data-feed-*`, site-nav, aria-labels) stable

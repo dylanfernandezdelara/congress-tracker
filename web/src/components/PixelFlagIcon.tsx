@@ -8,8 +8,8 @@ export function PixelFlagIcon({ className = '' }: PixelFlagIconProps) {
     <svg
       className={`pixel-flag-icon${className ? ` ${className}` : ''}`}
       viewBox="0 0 19 13"
-      width="28"
-      height="19"
+      width="22"
+      height="15"
       aria-hidden="true"
       focusable="false"
       shapeRendering="crispEdges"

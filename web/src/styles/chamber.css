@@ -13,29 +13,30 @@
 
   .home-enrichment-title {
     margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.15px;
   }
 
   /* Federal Control — shared type scale (desktop defaults, mobile at ≤900px) */
   .federal-control {
-    --fc-font-section: 1rem;
-    --fc-font-title: 0.875rem;
-    --fc-font-meta: 0.75rem;
-    --fc-font-badge: 0.6875rem;
+    --fc-font-section: 14px;
+    --fc-font-title: 13px;
+    --fc-font-meta: 12px;
+    --fc-font-badge: 12px;
     /* SVG user units sized to render near --fc-font-meta on screen */
-    --fc-wedge-count: 14px;
-    --fc-wedge-count-compact: 13px;
+    --fc-wedge-count: 12px;
+    --fc-wedge-count-compact: 12px;
   }
 
   @media (max-width: 900px) {
     .federal-control {
-      --fc-font-section: 1.0625rem;
-      --fc-font-title: 1rem;
-      --fc-font-meta: 0.875rem;
-      --fc-font-badge: 0.75rem;
-      --fc-wedge-count: 24px;
-      --fc-wedge-count-compact: 22px;
+      --fc-font-section: 14px;
+      --fc-font-title: 13px;
+      --fc-font-meta: 12px;
+      --fc-font-badge: 12px;
+      --fc-wedge-count: 14px;
+      --fc-wedge-count-compact: 13px;
     }
   }
 
@@ -60,7 +61,7 @@
 
   .federal-control .chamber-wedge-count {
     font-size: var(--fc-wedge-count);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .federal-control .chamber-wedge-count--compact {
@@ -117,7 +118,7 @@
 
   .chamber-card {
     border: 1px solid hsl(var(--twc-border));
-    border-radius: 0.875rem;
+    border-radius: 16px;
     background: hsl(var(--twc-card));
     padding: 0.75rem 0.875rem;
     display: flex;

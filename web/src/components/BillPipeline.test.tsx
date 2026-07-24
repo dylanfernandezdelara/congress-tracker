@@ -52,7 +52,9 @@ describe('BillPipeline', () => {
 
     expect(container.querySelector('.bill-pipeline-step--current')).toBeTruthy()
     expect(container.querySelectorAll('.bill-pipeline-step--pending')).toHaveLength(2)
-    expect(container.querySelectorAll('.bill-pipeline-date--empty')).toHaveLength(3)
+    expect(container.querySelectorAll('.bill-pipeline-date')).toHaveLength(2)
+    expect(screen.getByText('Passed Senate')).toBeInTheDocument()
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
   })
 
   it('marks failed outcome stages', () => {

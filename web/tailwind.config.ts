@@ -28,11 +28,17 @@ const config: Config = {
         },
       },
       fontFamily: {
-        // One family only — serif/mono aliases map to Inter so utility classes cannot introduce a second typeface.
+        // One family only — serif/mono aliases map to the system SF Pro stack.
         sans: ['var(--font-family)'],
         serif: ['var(--font-family)'],
         mono: ['var(--font-family)'],
       },
+      borderRadius: {
+        nav: '8px',
+        card: '16px',
+        pill: '9999px',
+      },
+
     },
   },
   plugins: [tailwindcssAnimate],

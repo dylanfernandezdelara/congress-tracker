@@ -72,9 +72,7 @@ describe('FeedRowDetail', () => {
     render(<FeedRowDetail item={makeFeedItem()} />)
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Per-member vote breakdown is not available for this roll call yet/),
-      ).toBeInTheDocument()
+      expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
     })
   })
 
@@ -96,8 +94,6 @@ describe('FeedRowDetail', () => {
       />,
     )
 
-    expect(
-      screen.getByText(/Per-member vote breakdown is not available for this roll call yet/),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
   })
 })

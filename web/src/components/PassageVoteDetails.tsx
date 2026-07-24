@@ -34,22 +34,20 @@ function PartyDefectorsList({
   state: RollDefectorsState
 }) {
   if (state.status === 'idle' || state.status === 'loading') {
-    return <p className="feed-row-defectors-empty text-sm text-faint">Loading party defectors…</p>
+    return <p className="feed-row-defectors-empty">Loading party defectors…</p>
   }
 
   if (state.status === 'unavailable') {
-    return <p className="feed-row-defectors-empty text-sm text-faint">{MEMBER_VOTES_UNAVAILABLE}</p>
+    return <p className="feed-row-defectors-empty">{MEMBER_VOTES_UNAVAILABLE}</p>
   }
 
   if (state.status === 'error') {
-    return <p className="feed-row-defectors-empty text-sm text-faint">{MEMBER_VOTES_ERROR}</p>
+    return <p className="feed-row-defectors-empty">{MEMBER_VOTES_ERROR}</p>
   }
 
   if (state.defectors.length === 0) {
     return (
-      <p className="feed-row-defectors-empty text-sm text-faint">
-        {noPartyDefectorsMessage(vote.chamber)}
-      </p>
+      <p className="feed-row-defectors-empty">{noPartyDefectorsMessage(vote.chamber)}</p>
     )
   }
 

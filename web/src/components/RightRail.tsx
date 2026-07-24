@@ -20,7 +20,7 @@ function ChamberPulseSection({ title, data }: { title: string; data: ChamberPuls
       <div className="sidebar-widget space-y-2">
         <h3 className="text-[12px] font-medium text-foreground">Close votes</h3>
         {data.close_votes.length === 0 ? (
-          <p className="text-xs text-faint">None in stored data.</p>
+          <p className="text-xs text-faint">No close votes yet this session.</p>
         ) : (
           <ol className="space-y-2 text-[12px] text-secondary">
             {data.close_votes.map((v) => (

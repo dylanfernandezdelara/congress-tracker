@@ -3,6 +3,7 @@ import {
   buildFeedSummaryParts,
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
+  formatFallbackHeadline,
   formatShortBillId,
   isProceduralVote,
   proceduralHeadline,
@@ -17,7 +18,7 @@ import {
 } from './billLifecycleStages'
 import { TERMINAL_STATUS_PRESENTATION } from './terminalStatusPresentation'
 
-export const FEED_SUMMARY_PENDING = 'Summary pending'
+export const FEED_SUMMARY_PENDING = 'Plain-English summary coming soon.'
 
 export interface FeedSummaryDisplay {
   lead: string
@@ -177,7 +178,7 @@ export function getFeedTopic(item: FeedItem): string {
   if (procedural) return procedural
 
   if (item.bill.title) {
-    return trimDisplayTitle(item.bill.title)
+    return formatFallbackHeadline(trimDisplayTitle(item.bill.title))
   }
 
   return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
@@ -207,13 +208,17 @@ export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
   return parts
 }
 
-function getProceduralEventSuffix(item: FeedItem): string {
+/**
+ * Suffix after "<Chamber> agreed/rejected Y–N".
+ * Returns null when proceduralHeadline already names the underlying bill
+ * ("Sets up House debate on H.R. …"), so the event line stays tally-only.
+ */
+function getProceduralEventSuffix(item: FeedItem): string | null {
   const title = item.bill.title ?? ''
   const shortBillId = formatShortBillId(item.bill.type, item.bill.number)
-  const underlyingBillId = extractUnderlyingBillIdFromTitle(title)
 
-  if (underlyingBillId) {
-    return `debate rule for ${underlyingBillId}`
+  if (extractUnderlyingBillIdFromTitle(title)) {
+    return null
   }
 
   if (proceduralHeadline(title) !== null) {
@@ -262,6 +267,8 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
 
   if (procedural) {
     const verb = voteIndicatesFailure(vote.result) ? 'rejected' : 'agreed'
+    const tally = `${vote.chamber} ${verb} ${vote.yeas}–${vote.nays}`
+    const suffix = getProceduralEventSuffix(item)
     return withPresentation(
       {
         kind: 'procedural',
@@ -271,7 +278,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
         billId,
         presidentDeskChip: null,
       },
-      `${vote.chamber} ${verb} ${vote.yeas}–${vote.nays} · ${getProceduralEventSuffix(item)}`,
+      suffix ? `${tally} · ${suffix}` : tally,
     )
   }
 

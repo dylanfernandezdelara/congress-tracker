@@ -15,6 +15,15 @@ export function isRealBioguideId(bioguideId: string): boolean {
   return /^[A-Za-z]\d{5,6}$/.test(bioguideId)
 }
 
+/** Strip combining marks so "Luján" and "Lujan" share a lookup key. */
+function normalizeLookupName(value: string): string {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+}
+
 export function senateMemberLookupKey(lastName: string, state: string, party: string): string {
-  return `${lastName.trim().toLowerCase()}|${state.trim().toUpperCase()}|${normalizePartyCode(party)}`
+  return `${normalizeLookupName(lastName)}|${state.trim().toUpperCase()}|${normalizePartyCode(party)}`
 }

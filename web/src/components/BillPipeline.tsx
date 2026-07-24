@@ -33,9 +33,7 @@ export function BillPipeline({ stages, detail }: BillPipelineProps) {
                   <time className="bill-pipeline-date" dateTime={stage.date}>
                     {dateLabel}
                   </time>
-                ) : (
-                  <span className="bill-pipeline-date bill-pipeline-date--empty">—</span>
-                )}
+                ) : null}
               </span>
             </li>
           )

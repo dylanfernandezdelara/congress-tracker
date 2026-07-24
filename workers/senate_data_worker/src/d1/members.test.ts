@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { getMembersByIds } from "./members";
+import { describe, expect, it, vi } from "vitest";
+import { senateMemberLookupKey } from "../../../../shared/member-id";
+import {
+  buildSenateBioguideLookup,
+  getMembersByIds,
+  senateLastNameCandidates,
+} from "./members";
 import { resetSchemaFlag } from "./schema";
 
 /**
@@ -7,6 +12,7 @@ import { resetSchemaFlag } from "./schema";
  * query exceeds D1's 100-bound-parameter limit.
  */
 function createRecordingDb(boundCounts: number[]): D1Database {
+  const runResult = { success: true, meta: { duration: 0 } };
   return {
     prepare: (sql: string) => ({
       bind: (...args: unknown[]) => {
@@ -24,10 +30,43 @@ function createRecordingDb(boundCounts: number[]): D1Database {
               district: 1,
             })),
           }),
-          run: async () => ({ success: true }),
+          run: async () => runResult,
         };
       },
-      run: async () => ({ success: true }),
+      run: async () => runResult,
+    }),
+  } as unknown as D1Database;
+}
+
+type SenateLookupRow = {
+  bioguide_id: string;
+  name: string;
+  party: string;
+  state: string;
+};
+
+/** Incomplete roster + empty pipeline cache so lookup rebuilds from the given Senate rows. */
+function createSenateLookupDb(senateRows: SenateLookupRow[]): D1Database {
+  const runResult = { success: true, meta: { duration: 0 } };
+  return {
+    exec: vi.fn(async () => {}),
+    prepare: (sql: string) => ({
+      bind: (..._args: unknown[]) => ({
+        all: async () => {
+          if (sql.includes("COUNT(*)") && sql.includes("FROM members")) {
+            return { results: [] };
+          }
+          if (sql.includes("chamber = 'Senate'") && sql.includes("FROM members")) {
+            return { results: senateRows };
+          }
+          return { results: [] };
+        },
+        first: async () => null,
+        run: async () => runResult,
+      }),
+      all: async () => ({ results: [] }),
+      first: async () => null,
+      run: async () => runResult,
     }),
   } as unknown as D1Database;
 }
@@ -46,5 +85,31 @@ describe("getMembersByIds", () => {
     for (const count of boundCounts) {
       expect(count).toBeLessThanOrEqual(100);
     }
+  });
+});
+
+describe("senateLastNameCandidates", () => {
+  it("strips party-state suffixes and handles comma-inverted names", () => {
+    expect(senateLastNameCandidates("Booker (D-NJ)")).toEqual(["Booker"]);
+    expect(senateLastNameCandidates("Murkowski, Lisa")).toEqual(["Murkowski"]);
+    expect(senateLastNameCandidates("Ben Ray Luján")).toEqual(["Luján", "Ray Luján"]);
+  });
+});
+
+describe("buildSenateBioguideLookup", () => {
+  it("resolves vote XML last names from clobbered, comma, and diacritic roster names", async () => {
+    resetSchemaFlag();
+    const db = createSenateLookupDb([
+      { bioguide_id: "B001288", name: "Booker (D-NJ)", party: "D", state: "NJ" },
+      { bioguide_id: "M001153", name: "Murkowski, Lisa", party: "R", state: "AK" },
+      { bioguide_id: "L000570", name: "Ben Ray Luján", party: "D", state: "NM" },
+    ]);
+
+    const lookup = await buildSenateBioguideLookup(db);
+
+    expect(lookup.get(senateMemberLookupKey("Booker", "NJ", "D"))).toBe("B001288");
+    expect(lookup.get(senateMemberLookupKey("Murkowski", "AK", "R"))).toBe("M001153");
+    expect(lookup.get(senateMemberLookupKey("Lujan", "NM", "D"))).toBe("L000570");
+    expect(lookup.get(senateMemberLookupKey("Luján", "NM", "D"))).toBe("L000570");
   });
 });

@@ -1,86 +1,236 @@
 @layer components {
-  .home-feed-header {
+  .home-page-head {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.25rem;
+    margin: 0 0 1.5rem;
+    padding: 0;
+  }
+
+  .home-page-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .home-page-description {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .home-feed-header {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
   }
 
   .home-feed-title {
     margin: 0;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-foreground));
   }
 
   .home-feed-count {
-    display: none;
     margin: 0;
+    font-size: 12px;
+    font-weight: 400;
+    color: hsl(var(--twc-faint));
   }
 
-  .desktop-feed-intro {
+  /* Desktop three-column shell */
+  .home-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+  }
+
+  .home-rail {
     display: none;
+  }
+
+  .home-feed-column {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .federal-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .federal-compact-title,
+  .notable-compact-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .federal-compact-chamber {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .federal-compact-chamber-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .federal-compact-chamber-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .federal-compact-majority {
+    font-size: 12px;
+    color: hsl(var(--twc-faint));
+  }
+
+  .federal-compact-bar {
+    display: flex;
+    height: 6px;
+    border-radius: 9999px;
+    overflow: hidden;
+    background: hsl(var(--twc-surface-subtle));
+  }
+
+  .federal-compact-bar-seg {
+    min-width: 2px;
+  }
+
+  .federal-compact-seats {
+    margin: 0;
+    font-size: 12px;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .federal-compact-seats .party-r,
+  .federal-compact-seats .party-d,
+  .federal-compact-seats .party-i,
+  .federal-compact-seats .party-other {
+    background: transparent;
+  }
+
+  .federal-compact-seats .party-r {
+    color: hsl(var(--twc-party-r));
+  }
+
+  .federal-compact-seats .party-d {
+    color: hsl(var(--twc-party-d));
+  }
+
+  .federal-compact-seats .party-i {
+    color: hsl(var(--twc-party-i));
+  }
+
+  .federal-compact-seats .party-other {
+    color: hsl(var(--twc-party-other));
+  }
+
+  .federal-compact-president {
+    color: hsl(var(--twc-foreground));
+    font-weight: 500;
+  }
+
+  .notable-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .notable-compact-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .notable-compact-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .notable-compact-headline {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .notable-compact-meta {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--twc-faint));
+  }
+
+  .notable-compact-member {
+    align-self: flex-start;
+    margin-top: 0.15rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--twc-secondary));
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--twc-link-decoration));
+  }
+
+  .notable-compact-member:hover {
+    color: hsl(var(--twc-foreground));
   }
 
   @media (min-width: 1024px) {
-    .desktop-feed-intro {
+    .home-shell {
       display: grid;
-      grid-template-columns: 10rem minmax(0, 1fr);
-      align-items: end;
-      gap: 1.5rem;
-      padding: 1.25rem 0 1.5rem;
-      border-bottom: 1px solid hsl(var(--twc-border));
-    }
-
-    .desktop-feed-intro-eyebrow {
-      margin: 0 0 0.35rem;
-      font-size: 0.6875rem;
-      font-weight: 700;
-      line-height: 1.2;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: hsl(var(--twc-accent));
-    }
-
-    .desktop-feed-intro-copy {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
+      grid-template-columns: 240px minmax(0, 1fr) 280px;
       gap: 2rem;
-      min-width: 0;
+      align-items: start;
     }
 
-    .desktop-feed-intro-title {
-      flex-shrink: 0;
-      margin: 0;
-      font-size: clamp(1.75rem, 2.4vw, 2.35rem);
-      line-height: 1.08;
-      letter-spacing: -0.04em;
-    }
-
-    .desktop-feed-intro-description {
-      max-width: 30rem;
-      margin: 0;
-      font-size: 0.875rem;
-      line-height: 1.55;
-      color: hsl(var(--twc-secondary));
-      text-wrap: balance;
-    }
-
-    .home-feed-header {
-      flex-direction: row;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-
-    .home-feed-title {
-      font-size: 1.125rem;
-    }
-
-    .home-feed-count {
+    .home-rail {
       display: block;
-      font-size: 0.75rem;
-      color: hsl(var(--twc-faint));
+      position: sticky;
+      top: 64px;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .home-rail-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .home-page-head {
+      margin-bottom: 1.25rem;
     }
   }
 }

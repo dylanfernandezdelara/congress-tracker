@@ -2,33 +2,34 @@
   :root {
     color-scheme: light;
     --twc-background: 0 0% 98%;
-    --twc-foreground: 0 0% 9%;
-    --twc-secondary: 0 0% 38%;
-    --twc-faint: 0 0% 56%;
+    --twc-foreground: 0 0% 16%;
+    --twc-secondary: 0 0% 36%;
+    --twc-faint: 0 0% 62%;
     --twc-card: 0 0% 100%;
-    --twc-border: 0 0% 0% / 0.08;
-    --twc-border-hover: 0 0% 0% / 0.16;
-    --twc-border-muted: 0 0% 0% / 0.1;
-    --twc-surface-subtle: 0 0% 0% / 0.08;
+    --twc-border: 0 0% 90%;
+    --twc-border-hover: 0 0% 80%;
+    --twc-border-muted: 0 0% 90%;
+    --twc-surface-subtle: 0 0% 0% / 0.04;
     --twc-skeleton: 0 0% 0% / 0.05;
     --twc-link-decoration: 0 0% 0% / 0.2;
     --twc-ghost-border: 0 0% 0% / 0.1;
     --twc-ghost-border-hover: 0 0% 0% / 0.2;
     --twc-glow: 0 0% 0% / 0.03;
-    --twc-row-hover: 0 0% 0% / 0.035;
+    --twc-row-hover: 0 0% 0% / 0.03;
     --twc-row-active: 0 0% 0% / 0.05;
     --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.08);
-    --twc-accent: 24 85% 50%;
-    --twc-pass: 151 55% 36%;
-    --twc-fail: 0 65% 48%;
-    --twc-law: 38 78% 36%;
-    --twc-party-r: 0 72% 45%;
-    --twc-party-d: 217 75% 45%;
-    --twc-party-i: 270 35% 50%;
+    /* Accent equals foreground — orange accent removed from the design system. */
+    --twc-accent: 0 0% 16%;
+    --twc-pass: 151 40% 36%;
+    --twc-fail: 0 50% 48%;
+    --twc-law: 38 63% 36%;
+    --twc-party-r: 0 57% 45%;
+    --twc-party-d: 217 60% 45%;
+    --twc-party-i: 270 20% 50%;
     --twc-party-other: 0 0% 55%;
-    /* Single typeface for the whole app — do not add a second family. */
-    --font-family: 'Inter', sans-serif;
-    /* Motion — keep all animation/transition curves on these tokens. */
+    /* System SF Pro stack — SF Pro itself is not web-licensable. */
+    --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+      'Helvetica Neue', sans-serif;
     --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
     --motion-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
@@ -38,13 +39,13 @@
     color-scheme: dark;
     --twc-background: 0 0% 4%;
     --twc-foreground: 0 0% 93%;
-    --twc-secondary: 0 0% 63%;
-    --twc-faint: 0 0% 45%;
-    --twc-card: 0 0% 7%;
-    --twc-border: 0 0% 100% / 0.08;
-    --twc-border-hover: 0 0% 100% / 0.18;
-    --twc-border-muted: 0 0% 100% / 0.1;
-    --twc-surface-subtle: 0 0% 100% / 0.08;
+    --twc-secondary: 0 0% 65%;
+    --twc-faint: 0 0% 43%;
+    --twc-card: 0 0% 8%;
+    --twc-border: 0 0% 16%;
+    --twc-border-hover: 0 0% 24%;
+    --twc-border-muted: 0 0% 16%;
+    --twc-surface-subtle: 0 0% 100% / 0.06;
     --twc-skeleton: 0 0% 100% / 0.04;
     --twc-link-decoration: 0 0% 100% / 0.2;
     --twc-ghost-border: 0 0% 100% / 0.1;
@@ -53,13 +54,13 @@
     --twc-row-hover: 0 0% 100% / 0.04;
     --twc-row-active: 0 0% 100% / 0.06;
     --twc-card-shadow: 0 4px 24px rgb(0 0 0 / 0.35);
-    --twc-accent: 24 90% 58%;
-    --twc-pass: 151 45% 55%;
-    --twc-fail: 0 65% 60%;
-    --twc-law: 40 70% 58%;
-    --twc-party-r: 0 70% 58%;
-    --twc-party-d: 217 70% 62%;
-    --twc-party-i: 270 35% 62%;
+    --twc-accent: 0 0% 93%;
+    --twc-pass: 151 35% 55%;
+    --twc-fail: 0 50% 60%;
+    --twc-law: 40 55% 58%;
+    --twc-party-r: 0 55% 58%;
+    --twc-party-d: 217 55% 62%;
+    --twc-party-i: 270 20% 62%;
     --twc-party-other: 0 0% 62%;
   }
 
@@ -73,11 +74,9 @@
     font-family: var(--font-family);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: 'cv11', 'ss01';
     font-variant-numeric: tabular-nums;
   }
 
-  /* SVG text does not always inherit from html; keep the single family. */
   svg text {
     font-family: var(--font-family);
   }
@@ -99,23 +98,22 @@
   body {
     color: hsl(var(--twc-foreground));
     background-color: hsl(var(--twc-background));
-    background-image: radial-gradient(
-      ellipse 120% 600px at 50% 0%,
-      hsl(var(--twc-glow)),
-      transparent
-    );
+    letter-spacing: -0.15px;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.45;
   }
 
   ::selection {
-    background-color: hsl(var(--twc-accent) / 0.25);
+    background-color: hsl(var(--twc-foreground) / 0.12);
     color: hsl(var(--twc-foreground));
   }
 
   h1,
   h2,
   h3 {
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-weight: 500;
+    letter-spacing: -0.15px;
     text-wrap: balance;
   }
 }

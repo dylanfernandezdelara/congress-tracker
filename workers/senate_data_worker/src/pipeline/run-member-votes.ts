@@ -182,7 +182,7 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
     try {
       // Members first so a votes-batch failure leaves the roll empty (existing=0)
       // and it is safely retried on the next run.
-      await upsertMembersBatch(env.DB, newMembers);
+      await upsertMembersBatch(env.DB, newMembers, { preserveNames: true });
       await upsertMemberVotesBatch(env.DB, fetched.votes);
       await applyRollToMemberSessionStats(
         env.DB,

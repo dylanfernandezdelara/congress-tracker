@@ -10,7 +10,7 @@ const longCrsSummary = `Ukraine Support Act
 ${'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(4)}`
 
 describe('FeedRow', () => {
-  it('shows topic, policy area, digest lead, and bullets without expanding', () => {
+  it('shows topic, policy area, and digest lead without expanding; bullets wait for detail', () => {
     const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
@@ -21,10 +21,17 @@ describe('FeedRow', () => {
     expect(
       screen.getByText('It does something important in plain language.'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Point one')).toBeInTheDocument()
+    expect(screen.queryByText('Point one')).not.toBeInTheDocument()
     expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
     const hiddenEvent = document.querySelector('.feed-row-event[hidden]')
     expect(hiddenEvent?.textContent).toContain('52–47 in the Senate')
+  })
+
+  it('shows digest bullets in the expanded detail panel', () => {
+    render(<FeedRow item={makeFeedItem()} isExpanded={true} onToggle={() => {}} />)
+
+    expect(screen.getByText('Point one')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Key points' })).toBeInTheDocument()
   })
 
   it('explains Senate bill prefix with an accessible tooltip', () => {
@@ -107,7 +114,7 @@ describe('FeedRow', () => {
     expect(onToggle).toHaveBeenCalledTimes(1)
   })
 
-  it('shows Summary pending when collapsed without a digest (not raw CRS)', () => {
+  it('shows pending summary copy when collapsed without a digest (not raw CRS)', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text: longCrsSummary,
@@ -115,13 +122,13 @@ describe('FeedRow', () => {
 
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
-    expect(screen.getByText('Summary pending')).toBeInTheDocument()
+    expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
     const teaser = document.querySelector('.feed-row-teaser')
     expect(teaser?.textContent).not.toContain('Ukraine Support Act')
     expect(teaser?.textContent?.match(/financing, and oversight\./g)?.length ?? 0).toBe(0)
   })
 
-  it('shows Summary pending when no digest or CRS text is available', () => {
+  it('shows pending summary copy when no digest or CRS text is available', () => {
     render(
       <FeedRow
         item={makeFeedItem({ digest: null, raw_summary_text: null })}
@@ -130,7 +137,7 @@ describe('FeedRow', () => {
       />,
     )
 
-    expect(screen.getByText('Summary pending')).toBeInTheDocument()
+    expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
   })
 
   it('does not show CRS summary text when expanded', () => {

@@ -1,8 +1,7 @@
 import type { FeedItem } from '../api/types'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
-import { isProceduralFeedItem } from '../utils/feedRowLabels'
-import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
+import { getFeedSummaryDisplay, isProceduralFeedItem } from '../utils/feedRowLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
@@ -32,7 +31,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
           </li>
         ))}
       </ul>
-      <p className="feed-row-executive-disclaimer text-sm text-faint">
+      <p className="feed-row-executive-disclaimer text-[13px] text-faint">
         Informal presidential statement — not recorded on Congress.gov.
       </p>
     </section>
@@ -42,6 +41,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
+  const summaryBullets = getFeedSummaryDisplay(item).bullets
   const { stages, terminalStatus } = getBillLifecycleStages(item)
   const pipelineDetail =
     terminalStatus === 'became_law_unsigned' || terminalStatus === 'pending_signature'
@@ -51,14 +51,22 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
 
   return (
     <div className="feed-row-detail">
+      {summaryBullets.length > 0 ? (
+        <section className="feed-row-detail-section">
+          <h3 className="feed-row-detail-heading">Key points</h3>
+          <ul className="feed-row-summary-bullets" aria-label="Key points">
+            {summaryBullets.map((point, index) => (
+              <li key={`${index}-${point}`}>{point}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <BillPipeline stages={stages} detail={pipelineDetail} />
 
       {isProcedural ? (
-        <div className="feed-row-detail-chips flex flex-wrap gap-2">
-          <span
-            className={policyAreaChipClass('Procedural')}
-            style={policyAreaChipStyle('Procedural')}
-          >
+        <div className="feed-row-detail-chips">
+          <span data-feed-policy-area className="feed-row-policy-area">
             Procedural
           </span>
         </div>
@@ -76,7 +84,7 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
           href={sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="congress-link text-sm"
+          className="congress-link feed-row-cta"
         >
           Read on congress.gov ↗
         </a>

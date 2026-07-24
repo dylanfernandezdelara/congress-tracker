@@ -246,7 +246,7 @@ describe('getFeedRowView', () => {
     const view = getFeedRowView(item)
     expect(view.meta.kind).toBe('procedural')
     expect(view.meta.outcomeLabel).toBe('Procedural')
-    expect(view.eventDisplay).toBe('House agreed 218–210 · debate rule for H.R. 2913')
+    expect(view.eventDisplay).toBe('House agreed 218–210')
   })
 
   it('formats procedural rejected event copy with framing B', () => {
@@ -325,6 +325,23 @@ describe('isProceduralFeedItem', () => {
     expect(isProceduralFeedItem(item)).toBe(true)
     expect(getFeedTopic(item)).toBe('Ukraine security assistance')
   })
+
+  it('softens official title fallbacks when digest headline is missing', () => {
+    const item = makeFeedItem({
+      digest: null,
+      bill: {
+        congress: 119,
+        type: 'HR',
+        number: 9001,
+        title:
+          'To authorize appropriations for fiscal year 2026 for military activities of the Department of Defense, and for other purposes.',
+      },
+    })
+
+    expect(getFeedTopic(item)).toBe(
+      'Authorize appropriations for fiscal year 2026 for military activities of the Department of Defense',
+    )
+  })
 })
 
 describe('getPrimaryPassageVote', () => {
@@ -374,7 +391,7 @@ describe('getFeedSummaryDisplay', () => {
     })
   })
 
-  it('falls back to Summary pending when digest is missing even if CRS text exists', () => {
+  it('falls back to pending summary copy when digest is missing even if CRS text exists', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text:
@@ -523,7 +540,7 @@ describe('getFeedEventDisplay via getFeedRowView', () => {
     expect(getFeedRowView(item).eventDisplay).toBe('52–47 in the Senate')
   })
 
-  it('shows full procedural detail without repeating the badge label', () => {
+  it('omits debate-rule suffix when the procedural headline already names the bill', () => {
     const item = makeFeedItem({
       bill: {
         congress: 119,
@@ -544,8 +561,6 @@ describe('getFeedEventDisplay via getFeedRowView', () => {
       ],
     })
 
-    expect(getFeedRowView(item).eventDisplay).toBe(
-      'House agreed 218–210 · debate rule for H.R. 2913',
-    )
+    expect(getFeedRowView(item).eventDisplay).toBe('House agreed 218–210')
   })
 })

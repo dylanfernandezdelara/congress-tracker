@@ -117,7 +117,14 @@ async function auditPage(page) {
       issues.push('page heading should read Congress Tracker')
     }
     if (!siteNav) issues.push('site navigation missing')
-    if (membersSidebar) issues.push('sidebar stats visible on feed page')
+    // Desktop Home may include member/pulse rails; mobile hides the rail wrappers via CSS.
+    // Fail only when the members section actually occupies layout space below the desktop breakpoint.
+    if (membersSidebar && viewportWidth < 1024) {
+      const rect = membersSidebar.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        issues.push('sidebar stats visible on feed page below desktop breakpoint')
+      }
+    }
     if (!feedRow) issues.push('feed row missing')
 
     if (heading) collectFullClipping(heading.getBoundingClientRect(), 'page heading')

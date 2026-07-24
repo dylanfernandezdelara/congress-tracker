@@ -32,4 +32,6 @@ export {
   proceduralHeadline,
 } from './procedural-titles'
 
+export { formatFallbackHeadline } from './fallback-headline'
+
 export { voteIndicatesFailure } from './vote-result'

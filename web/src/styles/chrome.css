@@ -1,9 +1,10 @@
 @layer components {
   .theme-toggle {
-    @apply relative flex shrink-0 items-center justify-center overflow-visible rounded-md text-secondary transition-colors;
+    @apply relative flex shrink-0 items-center justify-center overflow-visible text-secondary transition-colors;
     width: 32px;
     height: 32px;
     border: 1px solid transparent;
+    border-radius: 8px;
     background: transparent;
     cursor: pointer;
     touch-action: manipulation;
@@ -32,7 +33,10 @@
   }
 
   .ghost-button {
-    @apply rounded-md border px-4 py-1.5 text-sm text-secondary transition-colors;
+    @apply border text-secondary transition-colors;
+    padding: 0.375rem 1rem;
+    font-size: 13px;
+    border-radius: 9999px;
     border-color: hsl(var(--twc-ghost-border));
   }
 
@@ -48,13 +52,13 @@
 
   .feed-pagination {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 1rem;
+    gap: 0.5rem;
     margin-inline: auto;
     width: 100%;
     max-width: 100%;
-    padding: 0.5rem 0 0;
+    padding: 0.75rem 0 0;
     border: none;
     border-radius: 0;
     background-color: transparent;
@@ -62,21 +66,31 @@
   }
 
   .feed-pagination-button {
-    @apply inline-flex items-center justify-center px-1 py-1 text-sm leading-none text-faint transition-colors;
-    min-width: auto;
-    min-height: auto;
-    border-radius: 0;
-    background: transparent;
-    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0.375rem 1.25rem;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--twc-border));
+    background: hsl(var(--twc-card));
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: hsl(var(--twc-foreground));
     cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease;
   }
 
   .feed-pagination-button:hover:not(:disabled) {
-    color: hsl(var(--twc-secondary));
+    border-color: hsl(var(--twc-border-hover));
+    background-color: hsl(var(--twc-row-hover));
   }
 
   .feed-pagination-button:focus-visible {
-    outline: 2px solid hsl(var(--twc-accent));
+    outline: 2px solid hsl(var(--twc-foreground));
     outline-offset: 2px;
   }
 
@@ -86,13 +100,16 @@
   }
 
   .feed-pagination-status {
-    @apply min-w-[3.5rem] px-0 text-center text-xs tabular-nums text-faint;
+    margin: 0;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--twc-faint));
   }
 
   .pixel-flag-icon {
     display: block;
     flex-shrink: 0;
-    width: 1.75rem;
+    width: 22px;
     height: auto;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
@@ -109,7 +126,7 @@
     top: 0;
     z-index: 40;
     width: 100%;
-    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: 0;
     border-bottom: 1px solid hsl(var(--twc-border));
     background-color: hsl(var(--twc-background) / 0.92);
@@ -123,17 +140,18 @@
     gap: 0.75rem;
     width: 100%;
     max-width: var(--page-max-width);
-    min-height: 2.75rem;
+    min-height: 48px;
+    height: 48px;
     margin-inline: auto;
     padding-right: max(1rem, env(safe-area-inset-right, 0px));
-    padding-bottom: 0.75rem;
+    padding-bottom: 0;
     padding-left: max(1rem, env(safe-area-inset-left, 0px));
   }
 
   .site-header-brand {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 0.5rem;
     min-width: 0;
     grid-row: 1;
     grid-column: 1;
@@ -141,12 +159,20 @@
 
   .site-header-title {
     margin: 0;
-    font-size: clamp(1rem, 3.5vw, 1.25rem);
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
     line-height: 1.2;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
     white-space: nowrap;
+  }
+
+  .site-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    grid-row: 1;
+    grid-column: 2;
   }
 
   .site-nav {
@@ -160,6 +186,11 @@
     border: none;
     border-radius: 0;
     background-color: transparent;
+  }
+
+  .site-header--menu-open .site-header-inner {
+    height: auto;
+    min-height: 48px;
   }
 
   .site-header--menu-open .site-nav {
@@ -179,11 +210,12 @@
     align-items: center;
     justify-content: center;
     min-width: 3.25rem;
-    padding: 0.4375rem 0.75rem;
-    border-radius: 0.375rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
+    padding: 0.375rem 0.75rem;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 400;
     line-height: 1.2;
+    letter-spacing: -0.15px;
     color: hsl(var(--twc-faint));
     text-decoration: none;
     transition:
@@ -199,7 +231,7 @@
   .site-nav-link.is-active {
     color: hsl(var(--twc-foreground));
     background-color: hsl(var(--twc-row-active));
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .site-nav-link:focus-visible {
@@ -214,17 +246,15 @@
     align-items: center;
     justify-content: center;
     gap: 0.1875rem;
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border: 1px solid hsl(var(--twc-ghost-border));
-    border-radius: 0.375rem;
+    border-radius: 8px;
     background: transparent;
     color: hsl(var(--twc-secondary));
     cursor: pointer;
     touch-action: manipulation;
-    grid-row: 1;
-    grid-column: 2;
   }
 
   .site-nav-toggle:hover {
@@ -272,10 +302,11 @@
 
   @media (min-width: 1024px) {
     .site-header-inner {
-      max-width: 1200px;
-      min-height: 3.25rem;
-      padding-top: 0.125rem;
-      padding-bottom: 0.875rem;
+      max-width: var(--page-max-width);
+      min-height: 48px;
+      height: 48px;
+      padding-top: 0;
+      padding-bottom: 0;
     }
 
     .stats-page {
@@ -294,13 +325,13 @@
   .page-main {
     max-width: 640px;
     margin-inline: auto;
-    margin-top: 1.25rem;
+    margin-top: 1rem;
     width: 100%;
   }
 
   @media (min-width: 640px) {
     .page-main {
-      margin-top: 1.5rem;
+      margin-top: 1.25rem;
     }
   }
 
@@ -308,7 +339,7 @@
     .page-main {
       max-width: none;
       margin-inline: 0;
-      margin-top: 2rem;
+      margin-top: 1.5rem;
     }
   }
 
@@ -320,6 +351,10 @@
     .sidebar-panel {
       position: sticky;
       top: 1.5rem;
+    }
+
+    .home-rail .sidebar-panel {
+      position: static;
     }
   }
 
@@ -353,31 +388,32 @@
   }
 
   .member-spotlight-name {
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     line-height: 1.3;
+    letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
     text-decoration: none;
   }
 
   .member-spotlight-party {
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: -0.15px;
+    text-transform: none;
     color: hsl(var(--twc-faint));
   }
 
   .member-spotlight-hook {
     margin: 0;
-    font-size: 0.75rem;
+    font-size: 12px;
     line-height: 1.45;
     color: hsl(var(--twc-secondary));
   }
 
   .member-spotlight-empty {
     margin: 0.75rem 0 0;
-    font-size: 0.75rem;
+    font-size: 12px;
     color: hsl(var(--twc-faint));
   }
 
@@ -387,17 +423,22 @@
 
   @media (min-width: 640px) {
     .site-header {
-      padding-top: max(1rem, env(safe-area-inset-top, 0px));
+      padding-top: env(safe-area-inset-top, 0px);
     }
 
     .site-header-inner {
       grid-template-columns: minmax(0, 1fr) auto auto;
       padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
-      padding-bottom: 0.75rem;
+      padding-bottom: 0;
       padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
     }
 
     .site-header-brand {
+      grid-row: auto;
+      grid-column: auto;
+    }
+
+    .site-header-actions {
       grid-row: auto;
       grid-column: auto;
     }
@@ -420,13 +461,11 @@
       justify-content: center;
       width: auto;
       min-width: 3.25rem;
-      padding: 0.4375rem 0.75rem;
+      padding: 0.375rem 0.75rem;
     }
 
     .site-nav-toggle {
       display: none;
-      grid-row: auto;
-      grid-column: auto;
     }
   }
 
