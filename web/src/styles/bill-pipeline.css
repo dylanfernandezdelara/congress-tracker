@@ -118,10 +118,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .bill-pipeline-date--empty {
-    color: hsl(var(--twc-faint));
-  }
-
   .bill-pipeline-detail {
     margin: 0;
     font-size: 0.8125rem;

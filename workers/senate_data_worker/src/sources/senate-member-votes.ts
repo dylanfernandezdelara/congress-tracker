@@ -36,7 +36,10 @@ export function parseSenateMemberVoteXml(
     const lisId = getTag(block, "lis_member_id");
     const first = getTag(block, "first_name");
     const last = getTag(block, "last_name");
-    const full = getTag(block, "member_full") || [first, last].filter(Boolean).join(" ");
+    // Prefer First Last — member_full is often "Last (P-ST)" / "Last, First (P-ST)",
+    // which breaks last-name lookup if upserted over clean roster names.
+    const nameFromParts = [first, last].filter(Boolean).join(" ");
+    const name = nameFromParts || getTag(block, "member_full");
     const party = getTag(block, "party");
     const state = getTag(block, "state");
     const position = getTag(block, "vote_cast");
@@ -47,7 +50,7 @@ export function parseSenateMemberVoteXml(
 
     members.push({
       bioguideId: id,
-      name: full,
+      name,
       chamber: "Senate",
       party: party || null,
       state: state || null,

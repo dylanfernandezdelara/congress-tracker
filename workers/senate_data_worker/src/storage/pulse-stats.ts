@@ -28,6 +28,23 @@ interface ThisWeekRow {
   congress: number | null;
 }
 
+/** Absolute margin cap for "close" passage votes (votes). */
+export const CLOSE_VOTE_MAX_ABS_MARGIN = 25;
+/**
+ * Relative close-vote rule: margin <= ceil(10% of yeas+nays), and also
+ * margin <= CLOSE_VOTE_MAX_ABS_MARGIN. Keeps blowouts out of Legislative pulse.
+ */
+export const CLOSE_VOTE_RELATIVE_FRACTION = 0.1;
+
+/** True when yea–nay margin qualifies as a close passage vote. */
+export function isQualifyingCloseVote(yeas: number, nays: number): boolean {
+  const total = yeas + nays;
+  if (total <= 0) return false;
+  const margin = Math.abs(yeas - nays);
+  const relativeCap = Math.ceil(total * CLOSE_VOTE_RELATIVE_FRACTION);
+  return margin <= relativeCap && margin <= CLOSE_VOTE_MAX_ABS_MARGIN;
+}
+
 function emptyPulse(): ChamberPulse {
   return {
     close_votes: [],
@@ -43,6 +60,7 @@ async function fetchCloseVotes(
   chamber: Chamber,
   limit: number
 ): Promise<CloseVoteEntry[]> {
+  // SQLite integer ceil(total * 0.1) ≡ (yeas + nays + 9) / 10; abs cap via CLOSE_VOTE_MAX_ABS_MARGIN.
   const { results } = await db
     .prepare(
       `SELECT v.chamber, v.congress, v.session, v.roll_number,
@@ -53,25 +71,30 @@ async function fetchCloseVotes(
        LEFT JOIN bill_digests d
          ON d.congress = v.bill_congress AND d.bill_type = v.bill_type AND d.number = v.bill_number
        WHERE v.congress = ? AND v.session = ? AND v.chamber = ? AND v.is_passage = 1
+         AND (v.yeas + v.nays) > 0
+         AND ABS(v.yeas - v.nays) <= ?
+         AND ABS(v.yeas - v.nays) <= ((v.yeas + v.nays) + 9) / 10
        ORDER BY margin ASC, v.vote_date DESC
        LIMIT ?`
     )
-    .bind(congress, session, chamber, limit)
+    .bind(congress, session, chamber, CLOSE_VOTE_MAX_ABS_MARGIN, limit)
     .all<CloseVoteRow>();
 
-  return (results ?? []).map((r) => ({
-    chamber: r.chamber as Chamber,
-    congress: r.congress,
-    session: r.session,
-    roll_number: r.roll_number,
-    bill_type: r.bill_type,
-    bill_number: r.bill_number,
-    yeas: r.yeas,
-    nays: r.nays,
-    margin: r.margin,
-    vote_date: r.vote_date,
-    headline: r.headline,
-  }));
+  return (results ?? [])
+    .filter((r) => isQualifyingCloseVote(r.yeas, r.nays))
+    .map((r) => ({
+      chamber: r.chamber as Chamber,
+      congress: r.congress,
+      session: r.session,
+      roll_number: r.roll_number,
+      bill_type: r.bill_type,
+      bill_number: r.bill_number,
+      yeas: r.yeas,
+      nays: r.nays,
+      margin: r.margin,
+      vote_date: r.vote_date,
+      headline: r.headline,
+    }));
 }
 
 async function fetchPolicyHeat(

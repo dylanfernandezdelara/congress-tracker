@@ -97,6 +97,7 @@ describe('StatsPage', () => {
     expect(screen.getByText('Donald Trump')).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
     expect(await screen.findByLabelText('Legislative pulse')).toBeInTheDocument()
+    expect(screen.getAllByText('No close votes yet this session.')).toHaveLength(2)
     expect(screen.getByRole('link', { name: 'Feed' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Stats' })).toBeInTheDocument()
   })

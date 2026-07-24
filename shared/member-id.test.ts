@@ -25,4 +25,14 @@ describe("member id helpers", () => {
     expect(senateMemberLookupKey("Smith", "CA", "Democrat")).toBe("smith|CA|D");
     expect(senateMemberLookupKey(" Jones ", " tx ", " REP ")).toBe("jones|TX|R");
   });
+
+  it("treats diacritic and ASCII last names as the same senate lookup key", () => {
+    expect(senateMemberLookupKey("Luján", "NM", "D")).toBe("lujan|NM|D");
+    expect(senateMemberLookupKey("Lujan", "NM", "D")).toBe(
+      senateMemberLookupKey("Luján", "NM", "Democrat")
+    );
+    expect(senateMemberLookupKey("Muñoz", "TX", "R")).toBe(
+      senateMemberLookupKey("Munoz", "TX", "Republican")
+    );
+  });
 });

@@ -8,7 +8,6 @@ import {
   getFeedSummaryDisplay,
   getFeedTopic,
 } from '../utils/feedRowLabels'
-import { policyAreaChipClass, policyAreaChipStyle } from '../utils/policyAreaChip'
 import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
@@ -51,39 +50,9 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
         >
           <div className="feed-row-main">
             <div className="feed-row-header">
-              <div className="feed-row-meta-row">
-                <span
-                  id={badgeId}
-                  className={`feed-row-badge feed-row-badge--${meta.kind}${badgeToneClass}`}
-                >
-                  {meta.outcomeLabel}
-                </span>
-                {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
-                {showMarginChip ? (
-                  <span id={marginId} className="feed-row-chip feed-row-chip--margin">
-                    {meta.margin}
-                  </span>
-                ) : null}
-                {meta.presidentDeskChip ? (
-                  <span id={deskChipId} className="feed-row-chip feed-row-chip--president-desk">
-                    {meta.presidentDeskChip}
-                  </span>
-                ) : null}
-                <BillIdChip type={item.bill.type} number={item.bill.number} />
-                {executiveSignal ? (
-                  <span className="feed-row-chip feed-row-chip--executive">Executive · Truth Social</span>
-                ) : null}
-                {policyArea && !isProcedural ? (
-                  <span
-                    id={policyAreaId}
-                    data-feed-policy-area
-                    className={`feed-row-policy-area ${policyAreaChipClass(policyArea)}`}
-                    style={policyAreaChipStyle(policyArea)}
-                  >
-                    {policyArea}
-                  </span>
-                ) : null}
-              </div>
+              <h2 id={topicId} data-feed-topic className="feed-row-topic">
+                {topic}
+              </h2>
               <span className="feed-row-date-wrap">
                 <time className="feed-row-date" dateTime={displayDate.iso}>
                   {formatVoteDate(displayDate.iso)}
@@ -103,9 +72,38 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               </span>
             </div>
 
-            <h2 id={topicId} data-feed-topic className="feed-row-topic">
-              {topic}
-            </h2>
+            <div className="feed-row-meta-row">
+              <span
+                id={badgeId}
+                className={`feed-row-badge feed-row-badge--${meta.kind}${badgeToneClass}`}
+              >
+                {meta.outcomeLabel}
+              </span>
+              {showMarginChip ? (
+                <span id={marginId} className="feed-row-chip feed-row-chip--margin">
+                  {meta.margin}
+                </span>
+              ) : null}
+              {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
+              <BillIdChip type={item.bill.type} number={item.bill.number} />
+              {meta.presidentDeskChip ? (
+                <span id={deskChipId} className="feed-row-chip feed-row-chip--president-desk">
+                  {meta.presidentDeskChip}
+                </span>
+              ) : null}
+              {executiveSignal ? (
+                <span className="feed-row-chip feed-row-chip--executive">Executive</span>
+              ) : null}
+              {policyArea && !isProcedural ? (
+                <span
+                  id={policyAreaId}
+                  data-feed-policy-area
+                  className="feed-row-policy-area"
+                >
+                  {policyArea}
+                </span>
+              ) : null}
+            </div>
 
             <p
               id={eventId}
@@ -121,13 +119,6 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
               className={`feed-row-summary${summary.pending ? ' feed-row-summary--pending' : ''}`}
             >
               <p className="feed-row-teaser">{summary.lead}</p>
-              {summary.bullets.length > 0 ? (
-                <ul className="feed-row-summary-bullets" aria-label="Key points">
-                  {summary.bullets.map((point, index) => (
-                    <li key={`${index}-${point}`}>{point}</li>
-                  ))}
-                </ul>
-              ) : null}
             </div>
           </div>
         </button>

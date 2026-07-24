@@ -32,7 +32,7 @@ vi.mock('../api/client', () => ({
       },
     ],
     total: 1,
-    limit: 50,
+    limit: 15,
     offset: 0,
     has_more: false,
   }),
@@ -61,6 +61,73 @@ vi.mock('../api/client', () => ({
       },
     ],
   }),
+  fetchSessionStats: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    as_of: '2026-06-14T00:00:00.000Z',
+    composition: {
+      house: {
+        total: 435,
+        majority_party: 'R',
+        control_label: 'Republican control',
+        is_sample: false,
+        seats_up_for_election: 435,
+        election_year: 2026,
+        seats: [
+          { party: 'R', seats: 218 },
+          { party: 'D', seats: 212 },
+          { party: 'I', seats: 1 },
+        ],
+      },
+      senate: {
+        total: 100,
+        majority_party: 'R',
+        control_label: 'Republican control',
+        is_sample: false,
+        seats_up_for_election: 33,
+        election_year: 2026,
+        seats: [
+          { party: 'R', seats: 53 },
+          { party: 'D', seats: 45 },
+          { party: 'I', seats: 2 },
+        ],
+      },
+    },
+    house: {
+      passage_vote_count: 10,
+      unique_bills_passed: 8,
+      avg_margin: 12,
+      closest_margin: 2,
+      date_range: { first: '2026-01-01', last: '2026-06-05' },
+      coverage_days: 120,
+    },
+    senate: {
+      passage_vote_count: 5,
+      unique_bills_passed: 4,
+      avg_margin: 10,
+      closest_margin: 1,
+      date_range: { first: '2026-01-01', last: '2026-06-05' },
+      coverage_days: 120,
+    },
+  }),
+  fetchPulseStats: vi.fn().mockResolvedValue({
+    house: {
+      close_votes: [],
+      policy_heat: [],
+      this_week: { count: 0, headline: null },
+    },
+    senate: {
+      close_votes: [],
+      policy_heat: [],
+      this_week: { count: 0, headline: null },
+    },
+  }),
+  fetchDefectors: vi.fn().mockResolvedValue({ defectors: [] }),
+  fetchPortfolioStats: vi.fn().mockResolvedValue({
+    gainers: [],
+    losers: [],
+    disclaimer: 'Estimates from public disclosures.',
+  }),
 }))
 
 function renderFeed() {
@@ -76,15 +143,21 @@ function renderFeed() {
 }
 
 describe('Home', () => {
-  it('renders the feed as a list with visible outcomes and no flip hints', async () => {
+  it('renders the dense feed with rails and no flip hints', async () => {
     const { container } = renderFeed()
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { level: 2, name: 'Plain headline for readers' })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Federal Control' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /theme/i })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Plain headline for readers' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Congressional passage votes' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
+    expect(screen.getByLabelText('Legislative pulse')).toBeInTheDocument()
+    expect(screen.getAllByText('No close votes yet this session.')).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Members in Congress')).not.toBeInTheDocument()
 
     const feedList = container.querySelector('.feed-list')
     expect(feedList).not.toBeNull()

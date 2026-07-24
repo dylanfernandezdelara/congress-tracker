@@ -56,7 +56,7 @@ export default function DebugPage() {
       {ingest && (
         <>
           <section
-            className="rounded-xl border border-border bg-card p-5 shadow-card"
+            className="rounded-card border border-border bg-card p-5"
             aria-label="Ingest status"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -86,7 +86,7 @@ export default function DebugPage() {
             </dl>
           </section>
 
-          <section className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <section className="rounded-card border border-border bg-card p-5">
             <h2 className="text-lg font-medium">Last scheduled success</h2>
             {ingest.last_scheduled_success ? (
               <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -112,7 +112,7 @@ export default function DebugPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <section className="rounded-card border border-border bg-card p-5">
             <h2 className="text-lg font-medium">Last failure</h2>
             {ingest.last_failure ? (
               <dl className="mt-3 grid gap-2 text-sm">
@@ -134,7 +134,7 @@ export default function DebugPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-card p-5 text-sm text-secondary shadow-card">
+          <section className="rounded-card border border-border bg-card p-5 text-[13px] text-secondary">
             <h2 className="text-base font-medium text-foreground">Alerting options</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>

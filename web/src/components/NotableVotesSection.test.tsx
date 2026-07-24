@@ -181,15 +181,13 @@ describe('NotableVotesSection', () => {
       />,
     )
 
-    expect(
-      screen.getByText('Per-member vote breakdown is not available for this roll call yet.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
   })
 
-  it('renders nothing when there are no notable votes', () => {
-    const { container } = render(<NotableVotesSection notable={[]} />)
+  it('shows an empty state when there are no notable votes', () => {
+    render(<NotableVotesSection notable={[]} />)
 
-    expect(screen.queryByRole('region', { name: 'Notable votes' })).not.toBeInTheDocument()
-    expect(container).toBeEmptyDOMElement()
+    expect(screen.getByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
+    expect(screen.getByText('No notable votes yet this session.')).toBeInTheDocument()
   })
 })

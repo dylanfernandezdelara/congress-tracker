@@ -38,16 +38,22 @@ export async function upsertMember(db: D1Database, member: MemberRecord): Promis
  */
 export async function upsertMembersBatch(
   db: D1Database,
-  members: MemberRecord[]
+  members: MemberRecord[],
+  options?: { preserveNames?: boolean }
 ): Promise<void> {
   if (members.length === 0) return;
   await ensureSchema(db);
   const now = new Date().toISOString();
+  // preserveNames: vote-XML ingests carry lower-fidelity names (e.g. ASCII-folded
+  // "Ben Lujan"), so keep an existing roster name instead of overwriting it.
+  const nameUpdate = options?.preserveNames
+    ? `COALESCE(NULLIF(members.name, ''), excluded.name)`
+    : `excluded.name`;
   const stmt = db.prepare(
     `INSERT INTO members (bioguide_id, name, chamber, party, state, district, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(bioguide_id) DO UPDATE SET
-       name = excluded.name,
+       name = ${nameUpdate},
        chamber = excluded.chamber,
        party = excluded.party,
        state = excluded.state,
@@ -155,6 +161,38 @@ export async function hasRealMemberRoster(db: D1Database): Promise<boolean> {
   return counts.house >= HOUSE_ROSTER_MIN && counts.senate >= SENATE_ROSTER_MIN;
 }
 
+/** Trailing " (D-NJ)" / " (I-ME)" style suffixes from Senate roll-call member_full. */
+const SENATE_PARTY_STATE_SUFFIX = /\s*\([A-Za-z]{1,3}-[A-Za-z]{2}\)\s*$/;
+
+/**
+ * Last-name strings used as senateMemberLookupKey inputs for a stored display name.
+ * Handles clean roster names, "Last, First", and clobbered "Last (P-ST)" vote XML forms.
+ */
+export function senateLastNameCandidates(name: string): string[] {
+  const cleaned = name.replace(SENATE_PARTY_STATE_SUFFIX, "").trim();
+  if (!cleaned) return [];
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    candidates.push(trimmed);
+  };
+
+  if (cleaned.includes(",")) {
+    add(cleaned.slice(0, cleaned.indexOf(",")));
+    return candidates;
+  }
+
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  for (let i = 1; i <= Math.min(2, parts.length); i += 1) {
+    add(parts.slice(-i).join(" "));
+  }
+  return candidates;
+}
+
 /**
  * Map Senate roll-call last name + state + party to bioguide IDs from the members table.
  * Used to replace LIS:* vote keys with real bioguide IDs when the roster is synced.
@@ -194,9 +232,7 @@ async function buildSenateBioguideLookupFromDb(db: D1Database): Promise<Map<stri
     if (!isRealBioguideId(row.bioguide_id) || !row.state || !row.party) continue;
     const party = normalizePartyCode(row.party);
     if (party === "Other") continue;
-    const parts = row.name.trim().split(/\s+/).filter(Boolean);
-    for (let i = 1; i <= Math.min(2, parts.length); i += 1) {
-      const lastName = parts.slice(-i).join(" ");
+    for (const lastName of senateLastNameCandidates(row.name)) {
       lookup.set(senateMemberLookupKey(lastName, row.state, party), row.bioguide_id);
     }
   }

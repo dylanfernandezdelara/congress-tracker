@@ -2,7 +2,7 @@
   .chamber-overview-skeleton,
   .notable-votes-skeleton {
     min-height: 5.5rem;
-    border-radius: 0.875rem;
+    border-radius: 16px;
     background: hsl(var(--twc-skeleton));
   }
 
@@ -11,9 +11,15 @@
     gap: 0.625rem;
   }
 
+  .notable-votes-empty {
+    margin: 0.75rem 0 0;
+    font-size: 12px;
+    color: hsl(var(--twc-faint));
+  }
+
   .notable-vote-card {
     border: 1px solid hsl(var(--twc-border));
-    border-radius: 0.875rem;
+    border-radius: 16px;
     background: hsl(var(--twc-card));
     padding: 0.875rem 1rem;
     display: flex;
@@ -23,30 +29,31 @@
 
   .notable-vote-meta {
     margin: 0;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: -0.15px;
+    text-transform: none;
     color: hsl(var(--twc-faint));
   }
 
   .notable-vote-title {
     margin: 0;
-    font-size: 0.9375rem;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
     line-height: 1.35;
+    letter-spacing: -0.15px;
   }
 
   .notable-vote-why {
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: 13px;
     line-height: 1.45;
     color: hsl(var(--twc-secondary));
   }
 
   .notable-vote-defectors-empty {
     margin: 0.35rem 0 0;
-    font-size: 0.75rem;
+    font-size: 12px;
     line-height: 1.4;
     color: hsl(var(--twc-faint));
   }
@@ -67,8 +74,8 @@
   }
 
   .notable-defector-avatar {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 20px;
+    height: 20px;
     border-radius: 9999px;
     overflow: hidden;
     flex-shrink: 0;
@@ -85,8 +92,8 @@
   }
 
   .notable-defector-avatar-fallback {
-    font-size: 0.6875rem;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 500;
     color: hsl(var(--twc-secondary));
   }
 
@@ -98,32 +105,26 @@
   }
 
   .notable-vote-defector-name {
-    font-size: 0.8125rem;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     line-height: 1.2;
   }
 
   .notable-vote-defector-party {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: -0.15px;
+    text-transform: none;
   }
 
   .notable-vote-defector-hint {
-    font-size: 0.6875rem;
+    font-size: 12px;
     color: hsl(var(--twc-faint));
   }
 
   @media (min-width: 1024px) {
     .notable-votes-list {
       grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
-      gap: 0.875rem;
-    }
-
-    .notable-vote-card {
-      min-height: 100%;
-      padding: 1rem 1.125rem;
     }
   }
 }

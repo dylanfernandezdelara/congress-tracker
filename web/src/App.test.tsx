@@ -71,6 +71,24 @@ vi.mock('./api/client', () => ({
     as_of: '2026-06-14T00:00:00.000Z',
     notable: [],
   }),
+  fetchPulseStats: vi.fn().mockResolvedValue({
+    house: {
+      close_votes: [],
+      policy_heat: [],
+      this_week: { count: 0, headline: null },
+    },
+    senate: {
+      close_votes: [],
+      policy_heat: [],
+      this_week: { count: 0, headline: null },
+    },
+  }),
+  fetchDefectors: vi.fn().mockResolvedValue({ defectors: [] }),
+  fetchPortfolioStats: vi.fn().mockResolvedValue({
+    gainers: [],
+    losers: [],
+    disclaimer: 'Estimates from public disclosures.',
+  }),
 }))
 
 describe('App routing', () => {
@@ -81,5 +99,6 @@ describe('App routing', () => {
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
+    expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
   })
 })

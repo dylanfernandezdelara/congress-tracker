@@ -19,40 +19,6 @@
     color: hsl(var(--twc-law));
   }
 
-  .policy-chip {
-    --policy-chip-fg: hsl(var(--policy-h, 0) 48% 34%);
-    --policy-chip-bg: hsl(var(--policy-h, 0) 72% 93%);
-    --policy-chip-border: hsl(var(--policy-h, 0) 42% 76%);
-    display: inline-flex;
-    align-items: center;
-    border-radius: 9999px;
-    border: 1px solid var(--policy-chip-border);
-    padding: 0.125rem 0.5rem;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    line-height: 1.3;
-    color: var(--policy-chip-fg);
-    background-color: var(--policy-chip-bg);
-  }
-
-  [data-theme='dark'] .policy-chip {
-    --policy-chip-fg: hsl(var(--policy-h, 0) 58% 78%);
-    --policy-chip-bg: hsl(var(--policy-h, 0) 32% 16%);
-    --policy-chip-border: hsl(var(--policy-h, 0) 28% 28%);
-  }
-
-  .policy-chip-neutral {
-    --policy-chip-fg: hsl(var(--twc-secondary));
-    --policy-chip-bg: hsl(var(--twc-surface-subtle) / 0.35);
-    --policy-chip-border: hsl(var(--twc-border-muted));
-  }
-
-  [data-theme='dark'] .policy-chip-neutral {
-    --policy-chip-fg: hsl(var(--twc-secondary));
-    --policy-chip-bg: hsl(var(--twc-surface-subtle) / 0.5);
-    --policy-chip-border: hsl(var(--twc-border-muted));
-  }
-
   @media (hover: hover) and (pointer: fine) {
     .theme-toggle:hover {
       border-color: hsl(var(--twc-border-hover));
