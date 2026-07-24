@@ -7,6 +7,10 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+function emptyChamberResult(): IngestVotesResult {
+  return { votes: [], skipped: 0 };
+}
+
 export interface ChamberIngestResult {
   house: IngestVotesResult;
   senate: IngestVotesResult;
@@ -14,8 +18,9 @@ export interface ChamberIngestResult {
 }
 
 /**
- * Ingest House and Senate passage votes independently so a Senate.gov outage
- * does not block House vote upserts.
+ * Ingest House and Senate passage votes independently so a single-chamber
+ * outage does not block the other chamber's vote upserts. Soft-fails per
+ * chamber (warning + empty votes); throws only when both chambers fail.
  */
 export async function ingestPassageVotesByChamber(
   env: Env,
@@ -30,16 +35,25 @@ export async function ingestPassageVotesByChamber(
 
   const chamberWarnings: string[] = [];
 
+  let house: IngestVotesResult;
   if (houseSettled.status === "rejected") {
     const message = errorMessage(houseSettled.reason);
-    if (senateSettled.status === "rejected") {
-      throw new Error(`House ingest failed: ${message}; Senate ingest failed: ${errorMessage(senateSettled.reason)}`);
+    chamberWarnings.push(`House ingest skipped: ${message}`);
+    console.warn(
+      JSON.stringify({
+        event: "house_ingest_failed",
+        error: message,
+      })
+    );
+    house = emptyChamberResult();
+  } else {
+    house = houseSettled.value;
+    if (house.warnings?.length) {
+      chamberWarnings.push(...house.warnings);
     }
-    throw new Error(`House ingest failed: ${message}`);
   }
 
-  const house = houseSettled.value;
-
+  let senate: IngestVotesResult;
   if (senateSettled.status === "rejected") {
     const message = errorMessage(senateSettled.reason);
     chamberWarnings.push(`Senate ingest skipped: ${message}`);
@@ -49,12 +63,18 @@ export async function ingestPassageVotesByChamber(
         error: message,
       })
     );
-    return { house, senate: { votes: [], skipped: 0 }, chamberWarnings };
+    senate = emptyChamberResult();
+  } else {
+    senate = senateSettled.value;
+    if (senate.warnings?.length) {
+      chamberWarnings.push(...senate.warnings);
+    }
   }
 
-  const senate = senateSettled.value;
-  if (senate.warnings?.length) {
-    chamberWarnings.push(...senate.warnings);
+  if (houseSettled.status === "rejected" && senateSettled.status === "rejected") {
+    throw new Error(
+      `House ingest failed: ${errorMessage(houseSettled.reason)}; Senate ingest failed: ${errorMessage(senateSettled.reason)}`
+    );
   }
 
   return { house, senate, chamberWarnings };

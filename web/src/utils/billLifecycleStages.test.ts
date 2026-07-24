@@ -282,6 +282,9 @@ describe('getBillLifecycleStages', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Failed',
           yeas: 198,
@@ -305,6 +308,9 @@ describe('getBillLifecycleStages', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Failed',
           yeas: 198,

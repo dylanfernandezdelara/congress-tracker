@@ -40,7 +40,8 @@
     --twc-background: 0 0% 4%;
     --twc-foreground: 0 0% 93%;
     --twc-secondary: 0 0% 65%;
-    --twc-faint: 0 0% 43%;
+    /* Raised from 43% (#6E6E6E, ~3.6:1 on card) to meet WCAG AA on card/bg. */
+    --twc-faint: 0 0% 52%;
     --twc-card: 0 0% 8%;
     --twc-border: 0 0% 16%;
     --twc-border-hover: 0 0% 24%;

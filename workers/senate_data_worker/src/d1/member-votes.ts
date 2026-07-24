@@ -2,26 +2,6 @@ import type { MemberVoteRecord } from "../types";
 import { deleteMemberCrossVotesForRoll } from "./member-session-stats";
 import { ensureSchema } from "./schema";
 
-export async function upsertMemberVote(db: D1Database, vote: MemberVoteRecord): Promise<void> {
-  await ensureSchema(db);
-  await db
-    .prepare(
-      `INSERT INTO member_votes (chamber, congress, session, roll_number, bioguide_id, position)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(chamber, congress, session, roll_number, bioguide_id) DO UPDATE SET
-         position = excluded.position`
-    )
-    .bind(
-      vote.chamber,
-      vote.congress,
-      vote.session,
-      vote.rollNumber,
-      vote.bioguideId,
-      vote.position
-    )
-    .run();
-}
-
 /**
  * Upsert all member votes for a roll in a single atomic D1 batch. The batch is
  * one transaction (all-or-nothing), so a roll is never left partially written —

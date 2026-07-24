@@ -364,21 +364,21 @@
   }
 
   [data-theme='dark'] .chamber-party-pill.party-r {
-    color: hsl(0 58% 78%);
-    background-color: hsl(0 32% 16%);
-    border-color: hsl(0 28% 28%);
+    color: hsl(var(--twc-party-r));
+    background-color: hsl(var(--twc-party-r) / 0.16);
+    border-color: hsl(var(--twc-party-r) / 0.35);
   }
 
   [data-theme='dark'] .chamber-party-pill.party-d {
-    color: hsl(217 58% 78%);
-    background-color: hsl(217 32% 16%);
-    border-color: hsl(217 28% 28%);
+    color: hsl(var(--twc-party-d));
+    background-color: hsl(var(--twc-party-d) / 0.16);
+    border-color: hsl(var(--twc-party-d) / 0.35);
   }
 
   [data-theme='dark'] .chamber-party-pill.party-i {
-    color: hsl(270 48% 78%);
-    background-color: hsl(270 28% 16%);
-    border-color: hsl(270 24% 28%);
+    color: hsl(var(--twc-party-i));
+    background-color: hsl(var(--twc-party-i) / 0.16);
+    border-color: hsl(var(--twc-party-i) / 0.35);
   }
 
   .chamber-party-pill-label {

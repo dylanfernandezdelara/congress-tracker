@@ -216,9 +216,7 @@ function ChamberSection({
 
   return (
     <section className="sidebar-chamber">
-      <h2 className="sidebar-chamber-title text-[11px] font-semibold uppercase tracking-widest text-faint">
-        {title}
-      </h2>
+      <h2 className="sidebar-kicker">{title}</h2>
 
       {loading && spotlights.length === 0 ? (
         <p className="member-spotlight-empty">Loading members…</p>
@@ -276,7 +274,7 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
   return (
     <div className="sidebar-panel space-y-5">
       {coverage && !session.isLoading ? (
-        <p className="sidebar-coverage text-[11px] leading-snug text-faint">{coverage}</p>
+        <p className="sidebar-coverage">{coverage}</p>
       ) : null}
       {session.error && onRetry ? (
         <button type="button" className="ghost-button text-xs" onClick={onRetry}>
@@ -309,7 +307,7 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         portfoliosError={portfolios.error ?? portfolios.data?.senateError ?? null}
         onOpenProfile={openProfile}
       />
-      {disclaimer ? <p className="sidebar-disclaimer text-[11px] leading-snug text-faint">{disclaimer}</p> : null}
+      {disclaimer ? <p className="sidebar-disclaimer">{disclaimer}</p> : null}
       <MemberProfile
         open={selection !== null}
         seed={selection?.seed ?? null}

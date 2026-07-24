@@ -4,7 +4,7 @@ import { runMembersRosterPipeline } from "./run-members-roster";
 
 /**
  * Sync the Congress.gov member roster when D1 has no real roster yet.
- * Safe to call from cron and read paths — upserts are idempotent.
+ * Call from cron/admin pipeline paths only — not from public GET handlers.
  */
 export async function ensureMemberRoster(env: Env): Promise<boolean> {
   if (await hasRealMemberRoster(env.DB)) return false;

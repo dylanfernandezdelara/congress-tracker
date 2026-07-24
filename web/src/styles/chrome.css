@@ -358,14 +358,31 @@
     }
   }
 
+  /* 12px meta kicker — uppercase section labels in side rails. */
+  .sidebar-kicker {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: hsl(var(--twc-faint));
+  }
+
   .sidebar-coverage {
-    margin-bottom: 0.25rem;
+    margin: 0 0 0.25rem;
+    font-size: 12px;
+    line-height: 1.35;
+    color: hsl(var(--twc-faint));
   }
 
   .sidebar-disclaimer {
-    margin-top: 0.5rem;
+    margin: 0.5rem 0 0;
     padding-top: 0.75rem;
     border-top: 1px solid hsl(var(--twc-border));
+    font-size: 12px;
+    line-height: 1.35;
+    color: hsl(var(--twc-faint));
   }
 
   .member-spotlight-list {

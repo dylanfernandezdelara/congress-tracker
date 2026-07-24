@@ -1,3 +1,4 @@
+import { daysAgoLookbackStartIso } from "../../../../shared/lookback";
 import type { Env } from "../config";
 import {
   parseLifecycleActions,
@@ -108,8 +109,7 @@ export async function fetchBillLifecycleSource(
   };
 }
 
-export function lookbackStartIso(days: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - days);
-  return d.toISOString().slice(0, 10);
+/** UTC start date for feed/vote lookback: today minus `days` (legacy days-ago window). */
+export function lookbackStartIso(days: number, asOf: Date = new Date()): string {
+  return daysAgoLookbackStartIso(days, asOf);
 }

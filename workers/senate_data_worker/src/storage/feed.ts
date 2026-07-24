@@ -196,9 +196,3 @@ export async function buildFeedPage(
     has_more: offset + items.length < cappedTotal,
   };
 }
-
-/** @deprecated Prefer buildFeedPage; kept for callers that need the full feed slice. */
-export async function buildFeed(env: Env): Promise<FeedItem[]> {
-  const page = await buildFeedPage(env, { limit: FEED_MAX_BILLS, offset: 0 });
-  return page.items;
-}

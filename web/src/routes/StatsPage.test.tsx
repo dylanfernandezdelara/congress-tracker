@@ -78,10 +78,15 @@ vi.mock('../api/client', () => ({
   }),
 }))
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const
+
 describe('StatsPage', () => {
   it('renders member and pulse sections', async () => {
     render(
-      <MemoryRouter initialEntries={['/stats']}>
+      <MemoryRouter initialEntries={['/stats']} future={routerFuture}>
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/stats" element={<StatsPage />} />

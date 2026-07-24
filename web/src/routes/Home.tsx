@@ -197,7 +197,7 @@ export default function Home() {
                     key={rowKey}
                     item={item}
                     isExpanded={expandedRowKey === rowKey}
-                    onToggle={() => toggleRow(item)}
+                    onToggle={toggleRow}
                   />
                 )
               })}

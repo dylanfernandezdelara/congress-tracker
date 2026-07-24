@@ -166,13 +166,38 @@ export async function getLatestPassageVoteDate(env: Env): Promise<string | null>
   return row?.latest_passage_vote_date ?? null;
 }
 
+/**
+ * Count digests the feed would treat as missing — mirrors `parseStoredDigest`:
+ * null JSON, invalid JSON, or JSON lacking a non-empty headline/what_it_does.
+ *
+ * D1/`json_extract` throws on malformed JSON, so invalid rows are gated with
+ * `json_valid` and extracts only run over a CASE-nullified payload.
+ */
 export async function getMissingDigestCount(env: Env): Promise<number> {
   await ensureSchema(env.DB);
   const row = await env.DB
     .prepare(
       `SELECT COUNT(*) AS missing_count
        FROM bill_digests
-       WHERE congress = ?1 AND digest_json IS NULL`
+       WHERE congress = ?1
+         AND (
+           digest_json IS NULL
+           OR json_valid(digest_json) = 0
+           OR COALESCE(
+                json_extract(
+                  CASE WHEN json_valid(digest_json) = 1 THEN digest_json END,
+                  '$.headline'
+                ),
+                ''
+              ) = ''
+           OR COALESCE(
+                json_extract(
+                  CASE WHEN json_valid(digest_json) = 1 THEN digest_json END,
+                  '$.what_it_does'
+                ),
+                ''
+              ) = ''
+         )`
     )
     .bind(congressNumber(env))
     .first<{ missing_count: number }>();

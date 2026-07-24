@@ -42,6 +42,14 @@
     .feed-row:not(.is-expanded):hover {
       background-color: hsl(var(--twc-row-hover));
     }
+
+    .feed-row:not(.is-expanded):hover .feed-row-chevron {
+      color: hsl(var(--twc-secondary));
+    }
+
+    .feed-row:not(.is-expanded):hover .feed-row-date {
+      color: hsl(var(--twc-secondary));
+    }
   }
 
   .feed-row:has(.feed-row-toggle:active),
@@ -70,6 +78,12 @@
   .feed-row-toggle:focus-visible {
     outline: 2px solid hsl(var(--twc-foreground));
     outline-offset: -2px;
+    background-color: hsl(var(--twc-row-hover));
+  }
+
+  .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-chevron,
+  .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-date {
+    color: hsl(var(--twc-secondary));
   }
 
   .feed-row-main {

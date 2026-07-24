@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeedItem, FeedPageResponse } from "../types";
+import { runMembersRosterPipeline } from "../pipeline/run-members-roster";
 import { handlePublicFetch } from "./router";
 
 vi.mock("../pipeline/run-members-roster", () => ({
@@ -353,7 +354,8 @@ describe("HTTP API", () => {
     expect(body.items[0]?.bill.number).toBe(1);
   });
 
-  it("returns session stats", async () => {
+  it("returns session stats without roster sync side effects", async () => {
+    vi.mocked(runMembersRosterPipeline).mockClear();
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/stats/session.json"),
       createMockEnv() as any
@@ -366,6 +368,7 @@ describe("HTTP API", () => {
       house: { passage_vote_count: 0 },
       senate: { passage_vote_count: 0 },
     });
+    expect(runMembersRosterPipeline).not.toHaveBeenCalled();
   });
 
   it("returns pulse stats", async () => {

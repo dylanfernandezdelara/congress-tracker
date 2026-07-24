@@ -13,9 +13,7 @@ function ChamberPulseSection({ title, data }: { title: string; data: ChamberPuls
 
   return (
     <section className="sidebar-chamber space-y-4">
-      <h2 className="sidebar-chamber-title text-[11px] font-semibold uppercase tracking-widest text-faint">
-        {title}
-      </h2>
+      <h2 className="sidebar-kicker">{title}</h2>
 
       <div className="sidebar-widget space-y-2">
         <h3 className="text-[12px] font-medium text-foreground">Close votes</h3>
@@ -93,9 +91,7 @@ export function RightRail({ pulse, loading, error, onRetry }: RightRailProps) {
 
   return (
     <div className="sidebar-panel space-y-6">
-      <p className="sidebar-chamber-title text-[11px] font-semibold uppercase tracking-widest text-faint">
-        Legislative pulse
-      </p>
+      <p className="sidebar-kicker">Legislative pulse</p>
       <ChamberPulseSection title="House" data={pulse.house} />
       <div className="border-t border-border" />
       <ChamberPulseSection title="Senate" data={pulse.senate} />

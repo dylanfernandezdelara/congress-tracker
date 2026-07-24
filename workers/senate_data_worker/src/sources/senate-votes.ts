@@ -116,16 +116,54 @@ const MONTHS: Record<string, string> = {
   Dec: "12",
 };
 
-function parseSenateVoteDate(voteDate: string, congressYear: string): string {
+/** Allow a few days of clock/source skew before treating a date as "future". */
+const FUTURE_DATE_SLACK_DAYS = 5;
+/** Nov/Dec only — year-boundary menus mis-stamp late-session votes, not mid-year ones. */
+const YEAR_BOUNDARY_ROLLBACK_MIN_MONTH = 11;
+
+/**
+ * Parse Senate menu `DD-Mon` stamps against the menu's `congress_year`.
+ *
+ * Year-boundary heuristic: a session menu can carry the new calendar year's
+ * `congress_year` while still listing late-year votes as `DD-Nov`/`DD-Dec`. If
+ * the assembled Nov/Dec date is more than {@link FUTURE_DATE_SLACK_DAYS} after
+ * `now`, roll the year back by one.
+ */
+export function parseSenateVoteDate(
+  voteDate: string,
+  congressYear: string,
+  now: Date = new Date()
+): string {
   const m = voteDate.trim().match(/^(\d{1,2})-([A-Za-z]{3})$/);
   if (!m) return voteDate;
   const day = m[1].padStart(2, "0");
   const mon = MONTHS[m[2]] ?? "01";
-  return `${congressYear}-${mon}-${day}`;
+  let year = Number.parseInt(congressYear, 10);
+  if (!Number.isFinite(year)) {
+    return `${congressYear}-${mon}-${day}`;
+  }
+
+  const monthNum = Number.parseInt(mon, 10);
+  const candidateUtc = Date.UTC(year, monthNum - 1, Number.parseInt(day, 10));
+  const nowUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const slackMs = FUTURE_DATE_SLACK_DAYS * 24 * 60 * 60 * 1000;
+  if (
+    monthNum >= YEAR_BOUNDARY_ROLLBACK_MIN_MONTH &&
+    candidateUtc - nowUtc > slackMs
+  ) {
+    year -= 1;
+  }
+
+  return `${year}-${mon}-${day}`;
 }
 
-export function parseSenateVoteMenuXml(xml: string, congress: number, session: number): PassageVote[] {
-  const congressYear = getTag(xml, "congress_year") || String(new Date().getUTCFullYear());
+export function parseSenateVoteMenuXml(
+  xml: string,
+  congress: number,
+  session: number,
+  now: Date = new Date()
+): PassageVote[] {
+  const congressYear = getTag(xml, "congress_year") || String(now.getUTCFullYear());
   const votes: PassageVote[] = [];
   const blocks = xml.match(/<vote>[\s\S]*?<\/vote>/gi) ?? [];
 
@@ -159,7 +197,7 @@ export function parseSenateVoteMenuXml(xml: string, congress: number, session: n
       result: getTag(block, "result"),
       yeas: yeasT,
       nays: naysT,
-      voteDate: parseSenateVoteDate(getTag(block, "vote_date"), congressYear),
+      voteDate: parseSenateVoteDate(getTag(block, "vote_date"), congressYear, now),
     });
   }
 

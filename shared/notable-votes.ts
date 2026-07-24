@@ -1,4 +1,5 @@
 import { proceduralHeadline } from './feed-content'
+import { inclusiveLookbackStartIso } from './lookback'
 import type { NotableVoteCrossVoteLabel } from './stats-api-types'
 
 /** Notable-votes section only considers passage votes on or after this lookback window. */
@@ -34,9 +35,7 @@ export function notableVotesLookbackStartIso(
   asOf: Date = new Date(),
   days: number = NOTABLE_VOTES_LOOKBACK_DAYS,
 ): string {
-  const d = new Date(asOf)
-  d.setUTCDate(d.getUTCDate() - (days - 1))
-  return d.toISOString().slice(0, 10)
+  return inclusiveLookbackStartIso(days, asOf)
 }
 
 const PROCEDURAL_TITLE_MAX_MARGIN = 3

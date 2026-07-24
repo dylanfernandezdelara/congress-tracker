@@ -25,6 +25,7 @@ describe('ThemeToggle', () => {
 
     const button = screen.getByRole('button', { name: 'Switch to dark theme' })
     expect(button).toBeInTheDocument()
+    expect(button).toHaveAttribute('title', 'Switch to dark theme')
 
     fireEvent.click(button)
 
@@ -33,9 +34,11 @@ describe('ThemeToggle', () => {
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
       '#0a0a0a',
     )
-    expect(screen.getByRole('button', { name: 'Switch to light theme' })).toBeInTheDocument()
+    const lightButton = screen.getByRole('button', { name: 'Switch to light theme' })
+    expect(lightButton).toBeInTheDocument()
+    expect(lightButton).toHaveAttribute('title', 'Switch to light theme')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to light theme' }))
+    fireEvent.click(lightButton)
 
     expect(document.documentElement.dataset.theme).toBe('light')
     expect(localStorage.getItem('theme')).toBe('light')

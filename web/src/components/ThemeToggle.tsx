@@ -2,6 +2,8 @@ import { useLayoutEffect, useState, type Ref } from 'react'
 
 type Theme = 'light' | 'dark'
 
+// Hex mirrors of `--twc-background` in styles/base.css (light 0 0% 98%, dark 0 0% 4%).
+// Keep in sync when those tokens change; meta theme-color needs resolved hex, not CSS vars.
 const THEME_COLOR: Record<Theme, string> = {
   light: '#fafafa',
   dark: '#0a0a0a',
@@ -76,6 +78,7 @@ export function ThemeToggle({ buttonRef }: ThemeToggleProps = {}) {
   }
 
   const isDark = theme === 'dark'
+  const label = isDark ? 'Switch to light theme' : 'Switch to dark theme'
 
   return (
     <button
@@ -83,7 +86,8 @@ export function ThemeToggle({ buttonRef }: ThemeToggleProps = {}) {
       type="button"
       className="theme-toggle"
       onClick={toggle}
-      aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+      aria-label={label}
+      title={label}
     >
       {isDark ? <SunIcon /> : <MoonIcon />}
     </button>

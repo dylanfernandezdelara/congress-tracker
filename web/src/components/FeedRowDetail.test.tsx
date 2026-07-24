@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { FeedPassageVote } from '../api/types'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { FeedRowDetail } from './FeedRowDetail'
@@ -84,19 +85,20 @@ describe('FeedRowDetail', () => {
   })
 
   it('shows unavailable copy when roll call keys are missing', () => {
+    // Incomplete vote (defensive path in voteRollKey) — cast past the required-field type.
+    const incompleteVote = {
+      chamber: 'Senate',
+      question: 'On Passage of the Bill',
+      result: 'Passed',
+      yeas: 52,
+      nays: 47,
+      date: '2026-06-05',
+    } as FeedPassageVote
+
     render(
       <FeedRowDetail
         item={makeFeedItem({
-          passage_votes: [
-            {
-              chamber: 'Senate',
-              question: 'On Passage of the Bill',
-              result: 'Passed',
-              yeas: 52,
-              nays: 47,
-              date: '2026-06-05',
-            },
-          ],
+          passage_votes: [incompleteVote],
         })}
       />,
     )

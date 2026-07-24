@@ -89,30 +89,35 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
-- `POST /__pipeline/run/feed` (cron also runs daily at 10:00 UTC)
+- `POST /__pipeline/run/feed` (cron also runs feed + member-votes daily at 10:00 UTC)
 - `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
 - `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)
-- `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin)
+- `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin; also chained after daily feed cron)
+- `POST /__pipeline/run/executive-posts` — Truth Social executive ingest (admin; also hourly cron)
 - `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 
-**Sidebar data backfill (production):** Cron runs feed only. After deploy, run
-`session-backfill` then `member-votes` against the **production** Worker before
-expecting left-rail member spotlights. Preview Workers block admin writes and use
-a separate empty D1; local offline: `npm run seed` populates sample sidebar data.
+**Sidebar data backfill (production):** Daily cron already chains feed then `member-votes`. After
+deploy, still run `session-backfill` (then re-run `member-votes` if needed) against the
+**production** Worker before expecting full-session left-rail member spotlights. Preview
+Workers block admin writes and use a separate empty D1; local offline: `npm run seed`
+populates sample sidebar data.
 
-**Daily ingest (production):** Cloudflare cron runs `runFeedPipeline` at **10:00 UTC** (see
-`[triggers]` in `workers/senate_data_worker/wrangler.toml`). `wrangler deploy` applies that
-schedule; use `npm run deploy:triggers` in `workers/senate_data_worker` only after
-`wrangler versions upload` previews. The pipeline only upserts **new** passage votes (skips known
-roll-call keys) and writes digests for bills that do not yet have one (capped by
-`DIGEST_MAX_NEW_REWRITES`). Because Congress.gov lists House votes oldest-first, daily runs scan
-list pages until the lookback window is reached (~5 list requests per run for the current session).
-Ingest success/failure is persisted in D1 (`pipeline_state`) and surfaced on `GET /health`
-(`data.ingest`) and `GET /debug/ingest.json`; web ops UI at `/debug`. See `docs/MONITORING.md`.
-Manual production ingestion is `POST /__pipeline/run/feed` on the deployed Worker with
+**Daily ingest (production):** Cloudflare cron runs `runFeedWithMemberVotes` (feed then
+best-effort `member-votes`) at **10:00 UTC**, and `runExecutivePostsPipeline` hourly (`0 * * * *`)
+— see `[triggers]` in `workers/senate_data_worker/wrangler.toml` (`crons = ["0 10 * * *", "0 * * * *"]`).
+`wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
+`workers/senate_data_worker` only after `wrangler versions upload` previews. The feed pipeline
+only upserts **new** passage votes (skips known roll-call keys) and writes digests for bills
+that do not yet have one (capped by `DIGEST_MAX_NEW_REWRITES`). Because Congress.gov lists House
+votes oldest-first, daily runs scan list pages until the lookback window is reached (~5 list
+requests per run for the current session). Ingest success/failure is persisted in D1
+(`pipeline_state`) and surfaced on `GET /health` (`data.ingest`) and `GET /debug/ingest.json`;
+web ops UI at `/debug`. See `docs/MONITORING.md`. Manual production ingestion is
+`POST /__pipeline/run/feed` on the deployed Worker with
 `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 
-Shared stats JSON types live in `shared/stats-api-types.ts` (imported by worker + web).
+Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/feed-api-types.ts`
+(imported by worker + web).
 
 ## Project structure
 

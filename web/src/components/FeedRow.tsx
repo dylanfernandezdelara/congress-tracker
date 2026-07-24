@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { memo, useId } from 'react'
 
 import type { FeedItem } from '../api/types'
 import { CURRENT_PRESIDENT } from '../constants/president'
@@ -21,10 +21,10 @@ const PRESIDENT_LAST_NAME =
 type FeedRowProps = {
   item: FeedItem
   isExpanded: boolean
-  onToggle: () => void
+  onToggle: (item: FeedItem) => void
 }
 
-export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
+export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const badgeId = useId()
   const topicId = useId()
   const policyAreaId = useId()
@@ -57,7 +57,7 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
           aria-controls={detailId}
           aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={summaryId}
-          onClick={onToggle}
+          onClick={() => onToggle(item)}
         >
           <div className="feed-row-main">
             <div className="feed-row-header">
@@ -157,4 +157,4 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
       </article>
     </li>
   )
-}
+})

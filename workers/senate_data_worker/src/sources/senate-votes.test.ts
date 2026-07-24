@@ -5,11 +5,56 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
 import { resetSchemaFlag } from "../d1/schema";
 import { voteKey } from "../vote-key";
-import { ingestSenatePassageVotes, parseSenateVoteMenuXml } from "./senate-votes";
+import {
+  ingestSenatePassageVotes,
+  parseSenateVoteDate,
+  parseSenateVoteMenuXml,
+} from "./senate-votes";
 import * as senateFetch from "./senate-fetch";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sample = readFileSync(join(here, "../fixtures/senate-vote-menu.sample.xml"), "utf8");
+
+describe("parseSenateVoteDate", () => {
+  it("keeps in-year dates when congress_year matches", () => {
+    expect(parseSenateVoteDate("05-Jun", "2026", new Date("2026-06-10T00:00:00Z"))).toBe(
+      "2026-06-05"
+    );
+  });
+
+  it("rolls December votes back one year when congress_year is already the new year", () => {
+    // Menu stamped congress_year=2027 in early January; vote is still 20-Dec.
+    expect(parseSenateVoteDate("20-Dec", "2027", new Date("2027-01-05T12:00:00Z"))).toBe(
+      "2026-12-20"
+    );
+  });
+
+  it("rolls November votes back under the same year-boundary heuristic", () => {
+    expect(parseSenateVoteDate("18-Nov", "2027", new Date("2027-01-05T12:00:00Z"))).toBe(
+      "2026-11-18"
+    );
+  });
+
+  it("does not roll back near-future dates within the slack window", () => {
+    // A vote a few days ahead of "now" can be clock/source skew, not a year error.
+    expect(parseSenateVoteDate("28-Jul", "2026", new Date("2026-07-24T00:00:00Z"))).toBe(
+      "2026-07-28"
+    );
+  });
+
+  it("rolls back dates more than a few days in the future", () => {
+    expect(parseSenateVoteDate("15-Dec", "2027", new Date("2027-01-02T00:00:00Z"))).toBe(
+      "2026-12-15"
+    );
+  });
+
+  it("does not year-roll mid-year dates even when far ahead of now", () => {
+    // Menu data errors should not invent a prior-year August stamp.
+    expect(parseSenateVoteDate("15-Aug", "2027", new Date("2027-01-02T00:00:00Z"))).toBe(
+      "2027-08-15"
+    );
+  });
+});
 
 describe("parseSenateVoteMenuXml", () => {
   beforeEach(() => {
@@ -17,7 +62,7 @@ describe("parseSenateVoteMenuXml", () => {
   });
 
   it("keeps passage votes linked to bills", () => {
-    const votes = parseSenateVoteMenuXml(sample, 119, 2);
+    const votes = parseSenateVoteMenuXml(sample, 119, 2, new Date("2026-06-30T00:00:00Z"));
     expect(votes).toHaveLength(2);
     expect(votes[0]).toMatchObject({
       chamber: "Senate",

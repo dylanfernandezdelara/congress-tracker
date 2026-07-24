@@ -54,13 +54,16 @@ describe("ingestPassageVotesByChamber", () => {
     expect(result.chamberWarnings[0]).toContain("403");
   });
 
-  it("throws when House ingest fails", async () => {
+  it("continues with Senate votes when House ingest fails", async () => {
     mockIngestHousePassageVotes.mockRejectedValue(new Error("Congress API down"));
-    mockIngestSenatePassageVotes.mockResolvedValue({ votes: [], skipped: 0 });
+    mockIngestSenatePassageVotes.mockResolvedValue({ votes: [{ chamber: "Senate" }], skipped: 0 });
 
-    await expect(ingestPassageVotesByChamber(createEnv(), "2026-05-01", new Set())).rejects.toThrow(
-      "House ingest failed"
-    );
+    const result = await ingestPassageVotesByChamber(createEnv(), "2026-05-01", new Set());
+
+    expect(result.house.votes).toEqual([]);
+    expect(result.senate.votes).toHaveLength(1);
+    expect(result.chamberWarnings[0]).toContain("House ingest skipped");
+    expect(result.chamberWarnings[0]).toContain("Congress API down");
   });
 
   it("throws when both chambers fail", async () => {
@@ -68,7 +71,7 @@ describe("ingestPassageVotesByChamber", () => {
     mockIngestSenatePassageVotes.mockRejectedValue(new Error("Senate down"));
 
     await expect(ingestPassageVotesByChamber(createEnv(), "2026-05-01", new Set())).rejects.toThrow(
-      "House ingest failed"
+      /House ingest failed: House down; Senate ingest failed: Senate down/
     );
   });
 });

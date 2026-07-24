@@ -56,6 +56,9 @@ describe('FeedRow', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Failed',
           yeas: 198,
@@ -188,6 +191,9 @@ describe('FeedRow', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Agreeing to the Resolution',
           result: 'Agreed to',
           yeas: 218,
@@ -211,6 +217,9 @@ describe('FeedRow', () => {
       passage_votes: [
         {
           chamber: 'Senate',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Passed',
           yeas: 85,

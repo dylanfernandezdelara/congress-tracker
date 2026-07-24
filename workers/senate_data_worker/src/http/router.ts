@@ -17,7 +17,6 @@ import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedWithMemberVotes } from "../pipeline/run-feed-with-member-votes";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
-import { ensureMemberRoster } from "../pipeline/ensure-member-roster";
 import { runMembersRosterPipeline } from "../pipeline/run-members-roster";
 import { runSessionBackfillPipeline } from "../pipeline/run-session-backfill";
 import {
@@ -108,7 +107,8 @@ async function healthResponse(env: Env, json: JsonFn): Promise<Response> {
 
   try {
     ingest = await loadIngestMonitor(env);
-  } catch {
+  } catch (err: unknown) {
+    console.error("health_route_error", err);
     dataError = "data_unavailable";
   }
 
@@ -200,7 +200,8 @@ async function handleStatsJson<T>(
       status: 200,
       headers: { "Cache-Control": cacheLatest },
     });
-  } catch {
+  } catch (err: unknown) {
+    console.error("stats_route_error", err);
     return json({ error: "stats_error", message: errorMessage }, { status: 500 });
   }
 }
@@ -233,6 +234,7 @@ async function handlePipelineRoute<T extends object>(
         { status: 409, headers: adminHeaders }
       );
     }
+    console.error("pipeline_route_error", err);
     return json({ ok: false, error: "pipeline_failed" }, { status: 500, headers: adminHeaders });
   }
 }
@@ -275,7 +277,8 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
         status: 200,
         headers: { "Cache-Control": cacheLatest },
       });
-    } catch {
+    } catch (err: unknown) {
+      console.error("feed_route_error", err);
       return json({ error: "feed_error", message: "feed unavailable" }, { status: 500 });
     }
   },
@@ -335,18 +338,6 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
     return handleStatsJson(
       json,
       async (): Promise<SessionStatsResponse> => {
-        try {
-          await ensureMemberRoster(env);
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error(
-            JSON.stringify({
-              event: "member_roster_sync_failed",
-              trigger: "session_stats",
-              error: message,
-            })
-          );
-        }
         const stats = await buildSessionStats(env.DB, congress, session);
         return { congress, session, ...stats, as_of: asOf };
       },
@@ -437,7 +428,8 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
         status: 200,
         headers: { "Cache-Control": cacheLatest },
       });
-    } catch {
+    } catch (err: unknown) {
+      console.error("member_route_error", err);
       return json(
         { error: "stats_error", message: "member profile unavailable" },
         { status: 500, headers: { "Cache-Control": cacheNoStore } }

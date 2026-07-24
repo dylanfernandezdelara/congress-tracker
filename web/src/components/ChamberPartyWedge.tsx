@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 
 import type { PartySeatCount } from '../api/types'
-import { useDocumentTheme } from '../hooks/useDocumentTheme'
 import { partySeatColor } from '../utils/chamberPartyColors'
 import {
   buildVisualWedgeSegments,
@@ -16,9 +15,8 @@ const OUTER_R = WEDGE_HEIGHT - 18
 const CX = WEDGE_WIDTH / 2
 const CY = WEDGE_HEIGHT - 6
 
-function wedgeCountLabelColor(theme: 'light' | 'dark'): string {
-  return theme === 'dark' ? '#141414' : '#ffffff'
-}
+/** Count labels use card surface so they stay readable on party fills in both themes. */
+const WEDGE_COUNT_FILL = 'hsl(var(--twc-card))'
 
 function wedgeCountClass(segment: { seats: number; visuallyEnlarged: boolean }): string {
   if (segment.visuallyEnlarged || segment.seats > 99) {
@@ -34,7 +32,6 @@ type ChamberPartyWedgeProps = {
 }
 
 export function ChamberPartyWedge({ chamber, seats, total }: ChamberPartyWedgeProps) {
-  const theme = useDocumentTheme()
   const wedges = useMemo(
     () => (total > 0 ? buildVisualWedgeSegments(seats, total) : []),
     [seats, total]
@@ -63,7 +60,8 @@ export function ChamberPartyWedge({ chamber, seats, total }: ChamberPartyWedgePr
           <path
             key={segment.party}
             d={wedgeArcPath(segment.start, segment.end, CX, CY, INNER_R, OUTER_R)}
-            fill={partySeatColor(segment.party, theme)}
+            // style.fill (not presentation attr) so hsl(var(--twc-party-*)) tracks theme.
+            style={{ fill: partySeatColor(segment.party) }}
             opacity={0.9}
           />
         ))}
@@ -79,7 +77,7 @@ export function ChamberPartyWedge({ chamber, seats, total }: ChamberPartyWedgePr
               y={ly}
               textAnchor="middle"
               dominantBaseline="middle"
-              fill={wedgeCountLabelColor(theme)}
+              style={{ fill: WEDGE_COUNT_FILL }}
             >
               {segment.seats}
             </text>

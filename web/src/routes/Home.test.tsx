@@ -55,9 +55,14 @@ function mockViewport(isDesktop: boolean) {
   }))
 }
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const
+
 function renderHome(initialEntry = '/') {
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
+    <MemoryRouter initialEntries={[initialEntry]} future={routerFuture}>
       <Routes>
         <Route element={<AppLayout />}>
           <Route
@@ -330,6 +335,9 @@ describe('Home', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage',
           result: 'Passed',
           yeas: 220,
@@ -524,6 +532,9 @@ describe('Home', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage',
           result: 'Passed',
           yeas: 220,
@@ -566,6 +577,9 @@ describe('Home', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage',
           result: 'Passed',
           yeas: 220,

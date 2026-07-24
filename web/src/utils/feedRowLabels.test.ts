@@ -28,6 +28,9 @@ describe('getFeedRowDisplayDate', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Passed',
           yeas: 220,
@@ -50,6 +53,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'Senate',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Passed',
           yeas: 52,
@@ -84,6 +90,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Failed',
           yeas: 198,
@@ -116,6 +125,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'Senate',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Passed',
           yeas: 85,
@@ -159,6 +171,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'Senate',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Passage of the Bill',
           result: 'Passed',
           yeas: 85,
@@ -207,6 +222,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Agreeing to the Resolution',
           result: 'Agreed to',
           yeas: 218,
@@ -234,6 +252,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Agreeing to the Resolution',
           result: 'Agreed to',
           yeas: 218,
@@ -261,6 +282,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Agreeing to the Resolution',
           result: 'Rejected',
           yeas: 198,
@@ -288,6 +312,9 @@ describe('getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'Senate',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On the Cloture Motion',
           result: 'Passed',
           yeas: 60,
@@ -348,6 +375,9 @@ describe('getPrimaryPassageVote', () => {
   it('returns the vote with the latest date when multiple votes exist', () => {
     const older = {
       chamber: 'House' as const,
+      congress: 119,
+      session: 2,
+      roll_number: 1,
       question: 'On Passage of the Bill',
       result: 'Passed',
       yeas: 220,
@@ -356,6 +386,9 @@ describe('getPrimaryPassageVote', () => {
     }
     const newer = {
       chamber: 'Senate' as const,
+      congress: 119,
+      session: 2,
+      roll_number: 2,
       question: 'On Passage of the Bill',
       result: 'Passed',
       yeas: 52,
@@ -514,6 +547,9 @@ describe('getFeedRowMeta via getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Agreeing to the Resolution',
           result: 'Agreed to',
           yeas: 218,
@@ -552,6 +588,9 @@ describe('getFeedEventDisplay via getFeedRowView', () => {
       passage_votes: [
         {
           chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 1,
           question: 'On Agreeing to the Resolution',
           result: 'Agreed to',
           yeas: 218,
