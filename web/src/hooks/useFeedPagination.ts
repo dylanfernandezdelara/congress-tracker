@@ -65,11 +65,18 @@ export function useFeedPagination() {
   chamberRef.current = chamber
   const queryRef = useRef(committedQuery)
   queryRef.current = committedQuery
+  const expandedRowKeyRef = useRef<string | null>(expandedRowKey)
+  expandedRowKeyRef.current = expandedRowKey
   const loadedFilterRef = useRef<{ chamber: ChamberFilter | null; q: string } | undefined>(
     undefined,
   )
 
   const pageSize = FEED_PAGE_SIZE
+
+  const setExpandedKey = useCallback((key: string | null) => {
+    expandedRowKeyRef.current = key
+    setExpandedRowKey(key)
+  }, [])
 
   const clearDeepLinkState = useCallback(() => {
     deepLinkPhaseRef.current = 'done'
@@ -163,27 +170,27 @@ export function useFeedPagination() {
   )
 
   const reloadFeed = useCallback(() => {
-    setExpandedRowKey(null)
+    setExpandedKey(null)
     setBillMissingNotice(false)
     clearDeepLinkState()
     replaceSearchParams((params) => {
       params.delete('bill')
     })
     setRetryKey((k) => k + 1)
-  }, [clearDeepLinkState, replaceSearchParams])
+  }, [clearDeepLinkState, replaceSearchParams, setExpandedKey])
 
   const commitSearchQuery = useCallback(
     (raw: string) => {
       const next = parseSearchQuery(raw)
       setDraftQuery(next)
-      setExpandedRowKey(null)
+      setExpandedKey(null)
       setBillMissingNotice(false)
       replaceSearchParams((params) => {
         if (next) params.set('q', next)
         else params.delete('q')
       })
     },
-    [replaceSearchParams],
+    [replaceSearchParams, setExpandedKey],
   )
 
   // Keep the input in sync when the URL changes externally (back/forward, deep link).
@@ -208,12 +215,12 @@ export function useFeedPagination() {
       prev !== undefined &&
       (prev.chamber !== chamber || prev.q !== committedQuery)
     ) {
-      setExpandedRowKey(null)
+      setExpandedKey(null)
       setFeedError(null)
     }
     loadedFilterRef.current = { chamber, q: committedQuery }
     void loadFeedPage(0, 'replace', chamber, committedQuery)
-  }, [retryKey, loadFeedPage, chamber, committedQuery])
+  }, [retryKey, loadFeedPage, chamber, committedQuery, setExpandedKey])
 
   const loadMore = useCallback(() => {
     if (!hasMore || isLoadingMore || isInitialLoading) return
@@ -222,7 +229,7 @@ export function useFeedPagination() {
 
   const setChamberFilter = useCallback(
     (next: ChamberFilter | null) => {
-      setExpandedRowKey(null)
+      setExpandedKey(null)
       setBillMissingNotice(false)
       clearDeepLinkState()
       replaceSearchParams((params) => {
@@ -231,7 +238,7 @@ export function useFeedPagination() {
         params.delete('bill')
       })
     },
-    [clearDeepLinkState, replaceSearchParams],
+    [clearDeepLinkState, replaceSearchParams, setExpandedKey],
   )
 
   const setSearchDraft = useCallback(
@@ -256,13 +263,12 @@ export function useFeedPagination() {
     (item: FeedItem) => {
       const rowKey = feedRowKey(item)
       const bill = formatBillQueryParam(item.bill)
-      let nextKey: string | null = null
-      setExpandedRowKey((current) => {
-        nextKey = current === rowKey ? null : rowKey
-        return nextKey
-      })
+      // Read from a ref — do not derive URL side effects from a useState updater.
+      // Updaters are not guaranteed to run synchronously before the next line.
+      const collapsing = expandedRowKeyRef.current === rowKey
+      setExpandedKey(collapsing ? null : rowKey)
       // Keep deep-link query in sync so the URL bill write does not restart search/scroll.
-      if (nextKey === null) {
+      if (collapsing) {
         clearDeepLinkState()
         replaceSearchParams((params) => {
           params.delete('bill')
@@ -277,7 +283,7 @@ export function useFeedPagination() {
       }
       setBillMissingNotice(false)
     },
-    [clearDeepLinkState, replaceSearchParams],
+    [clearDeepLinkState, replaceSearchParams, setExpandedKey],
   )
 
   const dismissBillMissingNotice = useCallback(() => {
@@ -319,7 +325,7 @@ export function useFeedPagination() {
     const found = items.find((item) => itemMatchesBillParam(item, target))
     if (found) {
       const rowKey = feedRowKey(found)
-      setExpandedRowKey(rowKey)
+      setExpandedKey(rowKey)
       deepLinkPhaseRef.current = 'done'
       // Scroll after paint so the expanded panel is in the DOM.
       requestAnimationFrame(() => {
@@ -335,7 +341,16 @@ export function useFeedPagination() {
 
     deepLinkPhaseRef.current = 'done'
     setBillMissingNotice(true)
-  }, [items, hasMore, isInitialLoading, isLoadingMore, feedError, loadFeedPage, nextOffset])
+  }, [
+    items,
+    hasMore,
+    isInitialLoading,
+    isLoadingMore,
+    feedError,
+    loadFeedPage,
+    nextOffset,
+    setExpandedKey,
+  ])
 
   return {
     chamber,

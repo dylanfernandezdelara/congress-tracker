@@ -420,9 +420,10 @@ describe('Home', () => {
 
     renderHome('/?bill=119-hr-1')
 
-    expect(await screen.findByText('Deep linked bill')).toBeInTheDocument()
-    const toggle = screen.getByRole('button', { name: /Deep linked bill/i })
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const toggle = await screen.findByRole('button', { name: /Deep linked bill/i })
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
     await waitFor(() => {
       expect(scrollIntoView).toHaveBeenCalled()
     })
