@@ -1,12 +1,12 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef } from 'react'
 
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
-import { memberInitials } from '../utils/memberPhoto'
 import { useAnimatedDismiss } from '../hooks/useAnimatedDismiss'
 import { useMemberProfile } from '../hooks/useMemberProfile'
+import { MemberAvatar } from './MemberAvatar'
 
 export type MemberProfileSeed = Pick<
   NotableVoteEntry['defectors'][number],
@@ -38,27 +38,6 @@ type StatsPhase =
   | { kind: 'error'; message: string }
   | { kind: 'unavailable' }
   | { kind: 'ready'; profile: MemberProfileResponse }
-
-function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl: string }) {
-  const [failed, setFailed] = useState(false)
-  const showPhoto = Boolean(photoUrl) && !failed
-
-  return (
-    <span className="member-profile-avatar" aria-hidden="true">
-      {showPhoto ? (
-        <img
-          src={photoUrl}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span className="member-profile-avatar-fallback">{memberInitials(name)}</span>
-      )}
-    </span>
-  )
-}
 
 function seatLabel(profile: Pick<MemberProfileResponse, 'chamber' | 'state' | 'district'>): string {
   if (profile.chamber === 'Senate') return `Senator from ${profile.state}`
@@ -187,7 +166,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
         </div>
 
         <div className="member-profile-header">
-          <ProfileAvatar key={seed.bioguide_id} name={name} photoUrl={photoUrl} />
+          <MemberAvatar key={seed.bioguide_id} name={name} photoUrl={photoUrl} variant="profile" />
           <div className="member-profile-identity">
             <h2 id={titleId} className="member-profile-name">
               {name}

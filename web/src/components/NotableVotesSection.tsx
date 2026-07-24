@@ -9,7 +9,7 @@ import {
   noPartyDefectorsMessage,
 } from '../constants/memberVotesCopy'
 import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
-import { memberInitials } from '../utils/memberPhoto'
+import { MemberAvatar } from './MemberAvatar'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 
 type NotableVotesSectionProps = {
@@ -19,33 +19,6 @@ type NotableVotesSectionProps = {
   onRetry?: () => void
   /** `cards` = full notable cards (default). `compact` = dense rail list. */
   variant?: 'cards' | 'compact'
-}
-
-function DefectorAvatar({
-  name,
-  photoUrl,
-}: {
-  name: string
-  photoUrl: string
-}) {
-  const [failed, setFailed] = useState(false)
-  const showPhoto = photoUrl && !failed
-
-  return (
-    <span className="notable-defector-avatar" aria-hidden="true">
-      {showPhoto ? (
-        <img
-          src={photoUrl}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span className="notable-defector-avatar-fallback">{memberInitials(name)}</span>
-      )}
-    </span>
-  )
 }
 
 function NotableVoteDefectors({
@@ -64,9 +37,15 @@ function NotableVoteDefectors({
               type="button"
               className="notable-vote-defector-button"
               onClick={() => onOpenProfile(defector)}
+              onMouseEnter={() => prefetchMemberProfile(defector.bioguide_id)}
+              onFocus={() => prefetchMemberProfile(defector.bioguide_id)}
               aria-label={`Open profile for ${defector.name}`}
             >
-              <DefectorAvatar name={defector.name} photoUrl={defector.photo_url} />
+              <MemberAvatar
+                name={defector.name}
+                photoUrl={defector.photo_url}
+                variant="defector"
+              />
               <span className="notable-vote-defector-copy">
                 <span className="notable-vote-defector-name">{defector.name}</span>
                 <span className={`notable-vote-defector-party ${partyCssClass(defector.party)}`}>
@@ -136,6 +115,8 @@ function NotableVoteCompactItem({
           type="button"
           className="notable-compact-member"
           onClick={() => onOpenProfile(firstDefector)}
+          onMouseEnter={() => prefetchMemberProfile(firstDefector.bioguide_id)}
+          onFocus={() => prefetchMemberProfile(firstDefector.bioguide_id)}
           aria-label={`Open profile for ${firstDefector.name}`}
         >
           {firstDefector.name}

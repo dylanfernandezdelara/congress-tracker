@@ -9,9 +9,11 @@ import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RightRail } from '../components/RightRail'
 import { FEED_PAGE_SIZE } from '../constants/feed'
 import { useAsyncData } from '../hooks/useAsyncData'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
 
 const LOOKBACK_DAYS = 45
+const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
 function feedRowKey(item: FeedItem): string {
   return `${item.bill.congress}-${item.bill.type}-${item.bill.number}`
@@ -41,6 +43,7 @@ export default function Home() {
   const appendLockRef = useRef(false)
   const lastFeedModeRef = useRef<'replace' | 'append'>('replace')
   const pageSize = FEED_PAGE_SIZE
+  const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
 
   const { reload: reloadStats, session, pulse, defectors, portfolios } = useStatsData()
 
@@ -132,26 +135,53 @@ export default function Home() {
   const showSkeleton = isInitialLoading && items.length === 0
   const inFlight = isInitialLoading || isLoadingMore
 
+  const federalControl = (
+    <FederalControlCompact
+      composition={session.data?.composition ?? null}
+      loading={session.isLoading}
+      error={session.error}
+      onRetry={reloadStats}
+    />
+  )
+
+  const memberSpotlights = (
+    <LeftSidebar
+      session={session}
+      defectors={defectors}
+      portfolios={portfolios}
+      onRetry={reloadStats}
+    />
+  )
+
+  const legislativePulse = (
+    <RightRail
+      pulse={pulse.data}
+      loading={pulse.isLoading}
+      error={pulse.error}
+      onRetry={reloadStats}
+    />
+  )
+
+  const notableVotesSection = (
+    <NotableVotesSection
+      variant="compact"
+      notable={notableVotes.data?.notable ?? null}
+      loading={notableVotes.isLoading}
+      error={notableVotes.error}
+      onRetry={reloadFeed}
+    />
+  )
+
   return (
     <div className="home-shell">
-      <aside className="home-rail home-rail--left" aria-label="Session context">
-        <div className="home-rail-stack">
-          <FederalControlCompact
-            composition={session.data?.composition ?? null}
-            loading={session.isLoading}
-            error={session.error}
-            onRetry={reloadStats}
-          />
-          <section aria-label="Members in Congress">
-            <LeftSidebar
-              session={session}
-              defectors={defectors}
-              portfolios={portfolios}
-              onRetry={reloadStats}
-            />
-          </section>
-        </div>
-      </aside>
+      {isDesktop ? (
+        <aside className="home-rail home-rail--left" aria-label="Session context">
+          <div className="home-rail-stack">
+            {federalControl}
+            <section aria-label="Members in Congress">{memberSpotlights}</section>
+          </div>
+        </aside>
+      ) : null}
 
       <main className="home-feed-column feed-main">
         <header className="home-page-head">
@@ -240,27 +270,29 @@ export default function Home() {
             ) : null}
           </section>
         ) : null}
+
+        {!isDesktop ? (
+          <div className="home-mobile-rails">
+            <div className="home-mobile-rail-section">{notableVotesSection}</div>
+            <section className="home-mobile-rail-section" aria-label="Legislative pulse">
+              {legislativePulse}
+            </section>
+            <div className="home-mobile-rail-section">{federalControl}</div>
+            <section className="home-mobile-rail-section" aria-label="Members in Congress">
+              {memberSpotlights}
+            </section>
+          </div>
+        ) : null}
       </main>
 
-      <aside className="home-rail home-rail--right" aria-label="Legislative context">
-        <div className="home-rail-stack">
-          <section aria-label="Legislative pulse">
-            <RightRail
-              pulse={pulse.data}
-              loading={pulse.isLoading}
-              error={pulse.error}
-              onRetry={reloadStats}
-            />
-          </section>
-          <NotableVotesSection
-            variant="compact"
-            notable={notableVotes.data?.notable ?? null}
-            loading={notableVotes.isLoading}
-            error={notableVotes.error}
-            onRetry={reloadFeed}
-          />
-        </div>
-      </aside>
+      {isDesktop ? (
+        <aside className="home-rail home-rail--right" aria-label="Legislative context">
+          <div className="home-rail-stack">
+            <section aria-label="Legislative pulse">{legislativePulse}</section>
+            {notableVotesSection}
+          </div>
+        </aside>
+      ) : null}
     </div>
   )
 }

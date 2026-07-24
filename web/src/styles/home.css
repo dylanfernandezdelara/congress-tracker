@@ -206,6 +206,26 @@
     color: hsl(var(--twc-foreground));
   }
 
+  /* Below the desktop rail breakpoint, rail content stacks under the feed. */
+  .home-mobile-rails {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 2rem;
+    padding-top: 0;
+  }
+
+  .home-mobile-rail-section {
+    padding: 1.5rem 0;
+    border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  .home-mobile-rail-section:first-child {
+    margin-top: 0;
+  }
+
+  /* Mobile rail stack visibility is gated in Home via useMediaQuery so JS and
+     CSS cannot disagree and hide both desktop rails and the mobile stack. */
   @media (min-width: 1024px) {
     .home-shell {
       display: grid;

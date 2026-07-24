@@ -117,13 +117,32 @@ async function auditPage(page) {
       issues.push('page heading should read Congress Tracker')
     }
     if (!siteNav) issues.push('site navigation missing')
-    // Desktop Home may include member/pulse rails; mobile hides the rail wrappers via CSS.
-    // Fail only when the members section actually occupies layout space below the desktop breakpoint.
-    if (membersSidebar && viewportWidth < 1024) {
-      const rect = membersSidebar.getBoundingClientRect()
-      if (rect.width > 0 && rect.height > 0) {
-        issues.push('sidebar stats visible on feed page below desktop breakpoint')
+    // Below the desktop rail breakpoint, Home stacks former rail content under the feed
+    // (.home-mobile-rails). Desktop keeps sticky .home-rail columns instead.
+    if (viewportWidth < 1024) {
+      const mobileRails = document.querySelector('.home-mobile-rails')
+      if (!mobileRails) {
+        issues.push('mobile rail stack missing on feed page below desktop breakpoint')
+      } else {
+        const railsRect = mobileRails.getBoundingClientRect()
+        if (railsRect.width <= 0 || railsRect.height <= 0) {
+          issues.push('mobile rail stack not laid out on feed page below desktop breakpoint')
+        }
       }
+      if (!membersSidebar) {
+        issues.push('members section missing on feed page below desktop breakpoint')
+      }
+      if (!document.querySelector('[aria-label="Legislative pulse"]')) {
+        issues.push('legislative pulse missing on feed page below desktop breakpoint')
+      }
+      if (!document.querySelector('[aria-label="Notable votes"]')) {
+        issues.push('notable votes missing on feed page below desktop breakpoint')
+      }
+      if (document.querySelector('.home-rail--left, .home-rail--right')) {
+        issues.push('desktop rails mounted on feed page below desktop breakpoint')
+      }
+    } else if (!membersSidebar) {
+      issues.push('members section missing on feed page at desktop breakpoint')
     }
     if (!feedRow) issues.push('feed row missing')
 

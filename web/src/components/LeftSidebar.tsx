@@ -1,3 +1,9 @@
+import { useCallback, useState, type ReactNode } from 'react'
+
+import { bioguidePhotoUrl, congressGovMemberUrl } from '@congress-tracker/shared/member-photo'
+import { crossVoteLabel } from '@congress-tracker/shared/notable-votes'
+
+import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type {
   DefectorEntry,
   PortfolioEntry,
@@ -7,6 +13,7 @@ import type {
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
 import { formatBillDocket, formatCoverageDate } from '../utils/billLabels'
+import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 
 type LeftSidebarProps = {
   session: UseAsyncDataResult<SessionStatsResponse>
@@ -23,6 +30,7 @@ type MemberSpotlight = {
   hook: string
   href?: string
   tone?: 'neutral' | 'gain' | 'loss'
+  cross_vote_count: number
 }
 
 const MAX_SPOTLIGHTS = 3
@@ -80,6 +88,7 @@ function buildSpotlights(
       hook: defectorHook(defector),
       href: defector.congress_gov_url,
       tone: 'neutral',
+      cross_vote_count: defector.cross_vote_count,
     })
   }
 
@@ -98,22 +107,66 @@ function buildSpotlights(
       party: entry.party ?? '',
       state: entry.state ?? '',
       hook: portfolioHook(entry, direction),
+      href: congressGovMemberUrl(entry.bioguide_id) ?? undefined,
       tone: direction === 'gain' ? 'gain' : 'loss',
+      cross_vote_count: 0,
     })
   }
 
   return spotlights
 }
 
-function MemberSpotlightCard({ member }: { member: MemberSpotlight }) {
+function spotlightToSeed(member: MemberSpotlight): MemberProfileSeed {
+  return {
+    bioguide_id: member.bioguide_id,
+    name: member.name,
+    party: member.party,
+    state: member.state,
+    photo_url: bioguidePhotoUrl(member.bioguide_id) ?? '',
+    cross_vote_count: member.cross_vote_count,
+    cross_vote_label: crossVoteLabel(member.cross_vote_count),
+  }
+}
+
+function MemberSpotlightCard({
+  member,
+  onOpenProfile,
+}: {
+  member: MemberSpotlight
+  onOpenProfile: (seed: MemberProfileSeed) => void
+}) {
   const meta = formatPartyState(member.party || null, member.state || null)
-  const nameEl = member.href ? (
-    <a href={member.href} target="_blank" rel="noopener noreferrer" className="member-spotlight-name congress-link">
-      {member.name}
-    </a>
-  ) : (
-    <p className="member-spotlight-name">{member.name}</p>
-  )
+  const canOpenProfile = member.bioguide_id.trim().length > 0
+
+  let nameEl: ReactNode
+  if (canOpenProfile) {
+    const seed = spotlightToSeed(member)
+    nameEl = (
+      <button
+        type="button"
+        className="member-spotlight-name"
+        onClick={() => onOpenProfile(seed)}
+        onMouseEnter={() => prefetchMemberProfile(member.bioguide_id)}
+        onFocus={() => prefetchMemberProfile(member.bioguide_id)}
+        aria-label={`Open profile for ${member.name}`}
+      >
+        {member.name}
+      </button>
+    )
+  } else if (member.href) {
+    nameEl = (
+      <a
+        href={member.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="member-spotlight-name congress-link"
+      >
+        {member.name}
+      </a>
+    )
+  } else {
+    nameEl = <p className="member-spotlight-name">{member.name}</p>
+  }
 
   return (
     <article className="member-spotlight">
@@ -144,6 +197,7 @@ function ChamberSection({
   portfoliosLoading,
   defectorsError,
   portfoliosError,
+  onOpenProfile,
 }: {
   title: 'House' | 'Senate'
   defectors: DefectorEntry[]
@@ -152,6 +206,7 @@ function ChamberSection({
   portfoliosLoading: boolean
   defectorsError: string | null
   portfoliosError: string | null
+  onOpenProfile: (seed: MemberProfileSeed) => void
 }) {
   const spotlights = buildSpotlights(
     defectorsError ? [] : defectors,
@@ -182,7 +237,11 @@ function ChamberSection({
       {spotlights.length > 0 ? (
         <div className="member-spotlight-list">
           {spotlights.map((member) => (
-            <MemberSpotlightCard key={member.bioguide_id} member={member} />
+            <MemberSpotlightCard
+              key={member.bioguide_id}
+              member={member}
+              onOpenProfile={onOpenProfile}
+            />
           ))}
         </div>
       ) : null}
@@ -191,6 +250,14 @@ function ChamberSection({
 }
 
 export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSidebarProps) {
+  const [selection, setSelection] = useState<{ seed: MemberProfileSeed; key: number } | null>(
+    null,
+  )
+
+  const openProfile = useCallback((seed: MemberProfileSeed) => {
+    setSelection((prev) => ({ seed, key: (prev?.key ?? 0) + 1 }))
+  }, [])
+
   const coverage =
     session.data && session.data.house.date_range.last
       ? `${session.data.congress}th Congress, ${session.data.session}${ordinal(session.data.session)} session · through ${formatCoverageDate(session.data.house.date_range.last)}`
@@ -229,6 +296,7 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         portfoliosLoading={portfolios.isLoading}
         defectorsError={defectors.error ?? defectors.data?.houseError ?? null}
         portfoliosError={portfolios.error ?? portfolios.data?.houseError ?? null}
+        onOpenProfile={openProfile}
       />
       <div className="border-t border-border" />
       <ChamberSection
@@ -239,8 +307,15 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         portfoliosLoading={portfolios.isLoading}
         defectorsError={defectors.error ?? defectors.data?.senateError ?? null}
         portfoliosError={portfolios.error ?? portfolios.data?.senateError ?? null}
+        onOpenProfile={openProfile}
       />
       {disclaimer ? <p className="sidebar-disclaimer text-[11px] leading-snug text-faint">{disclaimer}</p> : null}
+      <MemberProfile
+        open={selection !== null}
+        seed={selection?.seed ?? null}
+        selectionKey={selection?.key ?? 0}
+        onClose={() => setSelection(null)}
+      />
     </div>
   )
 }
