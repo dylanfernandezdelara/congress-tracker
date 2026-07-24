@@ -281,6 +281,20 @@ describe('FeedRow', () => {
         key_points: [],
         terms_explained: [],
       },
+      passage_votes: [
+        {
+          chamber: 'Senate',
+          congress: 119,
+          session: 2,
+          roll_number: 9002,
+          question: 'On Passage of the Bill',
+          result: 'Passed',
+          yeas: 52,
+          nays: 47,
+          date: '2026-06-24',
+        },
+      ],
+      latest_passage_date: '2026-06-24',
       executive_signals: [
         {
           post_id: '116805545512296111',
@@ -319,6 +333,8 @@ describe('FeedRow', () => {
       congressGovBillUrl(119, 'HR', 22),
     )
     expect(screen.getByText(/Donald Trump · Truth Social/)).toBeInTheDocument()
+    expect(screen.getByText(/Trump post/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Overhauls federal housing programs' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View post' })).toHaveAttribute(
       'href',
       'https://truthsocial.com/@realDonaldTrump/116805545512296111',

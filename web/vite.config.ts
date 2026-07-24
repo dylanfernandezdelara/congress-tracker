@@ -36,7 +36,16 @@ export default defineConfig({
         },
       },
       '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/debug': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/debug': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+        bypass(req) {
+          const path = req.url ?? ''
+          // SPA route /debug — only proxy JSON API paths (e.g. /debug/ingest.json).
+          if (/^\/debug\/[^?]+\.json(\?|$)/.test(path)) return undefined
+          return '/index.html'
+        },
+      },
     },
   },
   build: {

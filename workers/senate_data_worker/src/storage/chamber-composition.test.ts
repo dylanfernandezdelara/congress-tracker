@@ -59,10 +59,11 @@ function createMockDb(options: {
         }
         return null;
       },
+      run: async () => ({ success: true, meta: { changes: 1, duration: 0 } }),
     }),
     all: async () => ({ results: [] }),
     first: async () => null,
-    run: async () => ({ success: true }),
+    run: async () => ({ success: true, meta: { changes: 1, duration: 0 } }),
   });
 
   return {

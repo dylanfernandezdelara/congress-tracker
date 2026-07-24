@@ -1,6 +1,7 @@
 import { useId } from 'react'
 
 import type { FeedItem } from '../api/types'
+import { CURRENT_PRESIDENT } from '../constants/president'
 import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedRowDisplayDate,
@@ -11,6 +12,10 @@ import {
 import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
+
+const PRESIDENT_NAME_PARTS = CURRENT_PRESIDENT.name.trim().split(/\s+/)
+const PRESIDENT_LAST_NAME =
+  PRESIDENT_NAME_PARTS[PRESIDENT_NAME_PARTS.length - 1] ?? CURRENT_PRESIDENT.name
 
 type FeedRowProps = {
   item: FeedItem
@@ -50,13 +55,13 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
         >
           <div className="feed-row-main">
             <div className="feed-row-header">
-              <h2 id={topicId} data-feed-topic className="feed-row-topic">
+              <h3 id={topicId} data-feed-topic className="feed-row-topic">
                 {topic}
-              </h2>
+              </h3>
               <span className="feed-row-date-wrap">
                 <time className="feed-row-date" dateTime={displayDate.iso}>
                   {formatVoteDate(displayDate.iso)}
-                  {displayDate.kind === 'signal' ? ' · Trump post' : ''}
+                  {displayDate.kind === 'signal' ? ` · ${PRESIDENT_LAST_NAME} post` : ''}
                 </time>
                 <span className="feed-row-chevron" aria-hidden="true">
                   <svg viewBox="0 0 16 16" fill="none" focusable="false">

@@ -32,6 +32,20 @@ function createMockDb(options: {
         if (sql.includes("FROM member_votes")) {
           return { results: options.memberVotes ?? [] };
         }
+        if (sql.includes("FROM member_cross_votes")) {
+          const byId = new Map<string, number>();
+          for (const row of options.memberVotes ?? []) {
+            const id = String(row.bioguide_id);
+            // Approximate session cross counts from the loaded fixture rows.
+            byId.set(id, (byId.get(id) ?? 0) + 1);
+          }
+          return {
+            results: [...byId.entries()].map(([bioguide_id, count]) => ({
+              bioguide_id,
+              count,
+            })),
+          };
+        }
         if (sql.includes("FROM members") && sql.includes("GROUP BY chamber")) {
           const roster = options.realRoster ?? { house: 0, senate: 0 };
           return {

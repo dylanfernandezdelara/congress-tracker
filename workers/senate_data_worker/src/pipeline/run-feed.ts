@@ -11,7 +11,12 @@ import {
   recordFeedPipelineSuccess,
 } from "../d1/pipeline-state";
 import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
-import { selectExistingVoteKeys, upsertVote, selectRecentVotedBills } from "../d1/votes";
+import {
+  selectExistingVoteKeys,
+  upsertNonPassageVoteStub,
+  upsertVote,
+  selectRecentVotedBills,
+} from "../d1/votes";
 import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
@@ -73,6 +78,12 @@ export async function runFeedPipeline(
     const newVotes = [...houseResult.votes, ...senateResult.votes];
     for (const vote of newVotes) {
       await upsertVote(env.DB, vote);
+    }
+    for (const stub of [
+      ...(houseResult.nonPassageStubs ?? []),
+      ...(senateResult.nonPassageStubs ?? []),
+    ]) {
+      await upsertNonPassageVoteStub(env.DB, stub);
     }
 
     const bills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);

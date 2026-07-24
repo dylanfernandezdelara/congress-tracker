@@ -3,6 +3,7 @@
  */
 
 import type { Env } from "./config";
+import { isPipelineBusyError, withPipelineLease } from "./d1/pipeline-lease";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
@@ -19,7 +20,9 @@ export default {
 
     if (isExecutiveCron) {
       ctx.waitUntil(
-        runExecutivePostsPipeline(env, { trigger: "scheduled" })
+        withPipelineLease(env.DB, () =>
+          runExecutivePostsPipeline(env, { trigger: "scheduled" })
+        )
           .then((result) => {
             console.log(
               JSON.stringify({
@@ -31,6 +34,16 @@ export default {
             );
           })
           .catch((err: unknown) => {
+            if (isPipelineBusyError(err)) {
+              console.log(
+                JSON.stringify({
+                  event: "executive_posts_pipeline_skipped_busy",
+                  cron: controller.cron,
+                  scheduledTime: controller.scheduledTime,
+                }),
+              );
+              return;
+            }
             const message = err instanceof Error ? err.message : String(err);
             console.error(
               JSON.stringify({
@@ -51,7 +64,9 @@ export default {
     }
 
     ctx.waitUntil(
-      runFeedWithMemberVotes(env, { trigger: "scheduled" })
+      withPipelineLease(env.DB, () =>
+        runFeedWithMemberVotes(env, { trigger: "scheduled" })
+      )
         .then((result) => {
           const { memberVotes: _memberVotes, memberVotesError: _memberVotesError, ...feed } =
             result;
@@ -65,6 +80,16 @@ export default {
           );
         })
         .catch((err: unknown) => {
+          if (isPipelineBusyError(err)) {
+            console.log(
+              JSON.stringify({
+                event: "feed_pipeline_skipped_busy",
+                cron: controller.cron,
+                scheduledTime: controller.scheduledTime,
+              }),
+            );
+            return;
+          }
           const message = err instanceof Error ? err.message : String(err);
           console.error(
             JSON.stringify({

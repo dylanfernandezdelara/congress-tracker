@@ -108,7 +108,7 @@ function buildSpotlights(
 function MemberSpotlightCard({ member }: { member: MemberSpotlight }) {
   const meta = formatPartyState(member.party || null, member.state || null)
   const nameEl = member.href ? (
-    <a href={member.href} target="_blank" rel="noreferrer" className="member-spotlight-name congress-link">
+    <a href={member.href} target="_blank" rel="noopener noreferrer" className="member-spotlight-name congress-link">
       {member.name}
     </a>
   ) : (

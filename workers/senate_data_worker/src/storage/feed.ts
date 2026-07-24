@@ -1,15 +1,21 @@
 import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS, FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
 import type { Env } from "../config";
-import { getExecutivePostBillsForBill, getExecutivePostBillsForPost, toExecutiveSignal } from "../d1/executive";
-import { getDigest, parseStoredDigest } from "../d1/digests";
+import {
+  executiveBillMapKey,
+  getExecutivePostBillsForBills,
+  getExecutivePostBillsForPosts,
+  toExecutiveSignal,
+} from "../d1/executive";
+import { digestMapKey, getDigestsForBills, parseStoredDigest } from "../d1/digests";
 import {
   getLifecyclesForBills,
   lifecycleMapKey,
 } from "../d1/lifecycle";
 import { ensureSchema } from "../d1/schema";
 import {
+  billLookupKey,
   countFeedBills,
-  getPassageVotesForBill,
+  getPassageVotesForBills,
   selectFeedBills,
 } from "../d1/votes";
 import { lifecycleRowToApi } from "../lifecycle/to-api";
@@ -41,37 +47,72 @@ export async function buildFeedPage(
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 
-  const lifecycles = await getLifecyclesForBills(
-    env.DB,
-    bills.map((row) => ({
-      congress: row.bill_congress,
-      billType: row.bill_type,
-      billNumber: row.bill_number,
-    }))
+  const billKeys = bills.map((row) => ({
+    congress: row.bill_congress,
+    billType: row.bill_type,
+    billNumber: row.bill_number,
+  }));
+
+  const [lifecycles, digests, votesByBill, executiveByBill] = await Promise.all([
+    getLifecyclesForBills(env.DB, billKeys),
+    getDigestsForBills(
+      env.DB,
+      billKeys.map((bill) => ({
+        congress: bill.congress,
+        billType: bill.billType,
+        number: bill.billNumber,
+      }))
+    ),
+    getPassageVotesForBills(env.DB, billKeys),
+    getExecutivePostBillsForBills(env.DB, billKeys, executiveSince),
+  ]);
+
+  const postIds = new Set<string>();
+  for (const posts of executiveByBill.values()) {
+    for (const post of posts) {
+      if (post.summary) postIds.add(post.id);
+    }
+  }
+  const linksByPost = await getExecutivePostBillsForPosts(env.DB, [...postIds]);
+
+  const relatedBillKeys: Array<{ congress: number; billType: string; number: number }> = [];
+  const relatedKeySet = new Set<string>();
+  for (const [billKey, posts] of executiveByBill) {
+    for (const post of posts) {
+      if (!post.summary) continue;
+      for (const link of linksByPost.get(post.id) ?? []) {
+        const relatedKey = executiveBillMapKey(
+          link.bill_congress,
+          link.bill_type,
+          link.bill_number
+        );
+        if (relatedKey === billKey || relatedKeySet.has(relatedKey)) continue;
+        relatedKeySet.add(relatedKey);
+        relatedBillKeys.push({
+          congress: link.bill_congress,
+          billType: link.bill_type,
+          number: link.bill_number,
+        });
+      }
+    }
+  }
+
+  const missingRelated = relatedBillKeys.filter(
+    (bill) => !digests.has(digestMapKey(bill.congress, bill.billType, bill.number))
   );
+  const relatedDigests =
+    missingRelated.length > 0 ? await getDigestsForBills(env.DB, missingRelated) : new Map();
+  for (const [key, row] of relatedDigests) {
+    digests.set(key, row);
+  }
 
   const items: FeedItem[] = [];
 
   for (const row of bills) {
-    const digestRow = await getDigest(
-      env.DB,
-      row.bill_congress,
-      row.bill_type,
-      row.bill_number
-    );
-    const votes = await getPassageVotesForBill(
-      env.DB,
-      row.bill_congress,
-      row.bill_type,
-      row.bill_number
-    );
-    const executivePosts = await getExecutivePostBillsForBill(
-      env.DB,
-      row.bill_congress,
-      row.bill_type,
-      row.bill_number,
-      executiveSince
-    );
+    const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
+    const digestRow = digests.get(key) ?? null;
+    const votes = votesByBill.get(key) ?? [];
+    const executivePosts = executiveByBill.get(key) ?? [];
     const executive_signals = executivePosts
       .filter((post) => post.summary)
       .map((post) => ({
@@ -83,7 +124,7 @@ export async function buildFeedPage(
     const related_executive_bills: RelatedExecutiveBill[] = [];
     const relatedKeys = new Set<string>();
     for (const signal of executive_signals) {
-      const links = await getExecutivePostBillsForPost(env.DB, signal.post_id);
+      const links = linksByPost.get(signal.post_id) ?? [];
       for (const link of links) {
         if (
           link.bill_congress === row.bill_congress &&
@@ -95,12 +136,10 @@ export async function buildFeedPage(
         const relatedKey = `${link.bill_congress}:${link.bill_type.toUpperCase()}:${link.bill_number}`;
         if (relatedKeys.has(relatedKey)) continue;
         relatedKeys.add(relatedKey);
-        const otherDigest = await getDigest(
-          env.DB,
-          link.bill_congress,
-          link.bill_type,
-          link.bill_number
-        );
+        const otherDigest =
+          digests.get(
+            digestMapKey(link.bill_congress, link.bill_type, link.bill_number)
+          ) ?? null;
         const otherParsed = parseStoredDigest(otherDigest?.digest_json ?? null);
         related_executive_bills.push({
           congress: link.bill_congress,

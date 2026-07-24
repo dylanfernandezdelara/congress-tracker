@@ -8,12 +8,20 @@ vi.mock("./pipeline/run-executive-posts", () => ({
   runExecutivePostsPipeline: vi.fn(),
 }));
 
+vi.mock("./d1/pipeline-lease", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./d1/pipeline-lease")>();
+  return {
+    ...actual,
+    withPipelineLease: async <T>(_db: D1Database, fn: () => Promise<T>) => fn(),
+  };
+});
+
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import handler from "./worker";
 
 function createMockDb(): D1Database {
-  const runResult = { success: true, meta: { duration: 0 } };
+  const runResult = { success: true, meta: { duration: 0, changes: 1 } };
   const stmt = () => ({
     bind: vi.fn(() => stmt()),
     all: vi.fn(async () => ({ results: [] })),

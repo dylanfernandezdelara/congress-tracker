@@ -30,6 +30,62 @@ export type MemberCrossVoteRow = {
 
 const ID_LOOKUP_CHUNK = 90;
 
+export type MemberCrossVoteListRow = {
+  bioguide_id: string;
+  chamber: string;
+  roll_number: number;
+  bill_type: string;
+  bill_number: number;
+  bill_congress: number;
+  vote_date: string;
+  margin: number;
+};
+
+/** Cross-party votes for one chamber/session (newest first). Far smaller than member_votes. */
+export async function selectMemberCrossVotesForChamber(
+  db: D1Database,
+  congress: number,
+  session: number,
+  chamber: string
+): Promise<MemberCrossVoteListRow[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT bioguide_id, chamber, roll_number, bill_type, bill_number, bill_congress,
+              vote_date, margin
+       FROM member_cross_votes
+       WHERE congress = ? AND session = ? AND chamber = ?
+       ORDER BY vote_date DESC, roll_number DESC`
+    )
+    .bind(congress, session, chamber)
+    .all<MemberCrossVoteListRow>();
+  return results ?? [];
+}
+
+/** Session-wide cross-vote counts keyed by bioguide_id. */
+export async function selectSessionCrossVoteCounts(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<Map<string, number>> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT bioguide_id, COUNT(*) AS count
+       FROM member_cross_votes
+       WHERE congress = ? AND session = ?
+       GROUP BY bioguide_id`
+    )
+    .bind(congress, session)
+    .all<{ bioguide_id: string; count: number }>();
+
+  const counts = new Map<string, number>();
+  for (const row of results ?? []) {
+    counts.set(row.bioguide_id, row.count);
+  }
+  return counts;
+}
+
 export async function getMemberSessionStats(
   db: D1Database,
   congress: number,

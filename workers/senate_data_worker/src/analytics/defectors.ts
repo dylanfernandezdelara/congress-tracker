@@ -2,7 +2,8 @@ import type { Chamber, DefectorEntry, VoteDefectorEntry } from "../types";
 import { isRealBioguideId } from "../../../../shared/member-id";
 import { congressGovMemberUrl } from "../../../../shared/member-photo";
 import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
-import { selectMemberVotesForRoll, type RollCallKey, selectMemberVotesForSession } from "../d1/member-votes";
+import { selectMemberVotesForRoll, type RollCallKey } from "../d1/member-votes";
+import { selectMemberCrossVotesForChamber } from "../d1/member-session-stats";
 import { rollCrossVotes } from "./cross-votes";
 
 function defectorCongressGovUrl(bioguideId: string): string {
@@ -14,6 +15,10 @@ function defectorCongressGovUrl(bioguideId: string): string {
   );
 }
 
+/**
+ * Rank party-line breakers from denormalized `member_cross_votes` (maintained by
+ * the member-votes ingest pipeline) instead of scanning all session member_votes.
+ */
 export async function computeDefectors(
   db: D1Database,
   congress: number,
@@ -21,7 +26,7 @@ export async function computeDefectors(
   chamber: Chamber,
   limit: number
 ): Promise<DefectorEntry[]> {
-  const rows = await selectMemberVotesForSession(db, congress, session, chamber);
+  const rows = await selectMemberCrossVotesForChamber(db, congress, session, chamber);
   if (rows.length === 0) return [];
 
   const excludeLocalSample = await hasRealMemberRoster(db);
@@ -32,77 +37,44 @@ export async function computeDefectors(
         .filter((id) => !excludeLocalSample || isRealBioguideId(id))
     ),
   ];
+  if (uniqueIds.length === 0) return [];
+
   const memberRows = await getMembersByIds(db, uniqueIds);
-  const members = new Map<string, { party: string | null; state: string | null; name: string }>();
-  for (const [bioguideId, record] of memberRows) {
-    members.set(bioguideId, {
-      party: record.party,
-      state: record.state,
-      name: record.name,
-    });
-  }
-  for (const bioguideId of uniqueIds) {
-    if (!members.has(bioguideId)) {
-      members.set(bioguideId, { party: null, state: null, name: bioguideId });
-    }
-  }
-
-  const byRoll = new Map<string, typeof rows>();
-  for (const row of rows) {
-    const key = `${row.chamber}:${row.roll_number}`;
-    const list = byRoll.get(key) ?? [];
-    list.push(row);
-    byRoll.set(key, list);
-  }
-
   const scores = new Map<
     string,
     { crossVotes: number; decidingScore: number; recent?: DefectorEntry["recent_example"] }
   >();
 
-  for (const rollRows of byRoll.values()) {
-    const margin = Math.abs(rollRows[0].yeas - rollRows[0].nays);
-    const weight = 1 / Math.max(1, margin);
-    const crosses = rollCrossVotes(
-      rollRows.map((row) => ({
-        bioguideId: row.bioguide_id,
-        party: members.get(row.bioguide_id)?.party ?? null,
-        position: row.position,
-      }))
-    );
+  for (const row of rows) {
+    if (excludeLocalSample && !isRealBioguideId(row.bioguide_id)) continue;
 
-    const rowById = new Map(rollRows.map((row) => [row.bioguide_id, row]));
-    for (const cross of crosses) {
-      if (excludeLocalSample && !isRealBioguideId(cross.bioguideId)) continue;
-      const row = rowById.get(cross.bioguideId);
-      if (!row) continue;
-
-      const current = scores.get(cross.bioguideId) ?? { crossVotes: 0, decidingScore: 0 };
-      current.crossVotes += 1;
-      current.decidingScore += weight;
-      // Rows arrive newest-first (ORDER BY vote_date DESC), so the first cross
-      // vote we see for a member is their most recent — keep that one.
-      if (!current.recent) {
-        current.recent = {
-          bill_type: row.bill_type,
-          bill_number: row.bill_number,
-          congress: row.bill_congress,
-          margin,
-        };
-      }
-      scores.set(cross.bioguideId, current);
+    const weight = 1 / Math.max(1, row.margin);
+    const current = scores.get(row.bioguide_id) ?? { crossVotes: 0, decidingScore: 0 };
+    current.crossVotes += 1;
+    current.decidingScore += weight;
+    // Rows arrive newest-first, so the first cross vote is the most recent.
+    if (!current.recent) {
+      current.recent = {
+        bill_type: row.bill_type,
+        bill_number: row.bill_number,
+        congress: row.bill_congress,
+        margin: row.margin,
+      };
     }
+    scores.set(row.bioguide_id, current);
   }
 
   const defectors: DefectorEntry[] = [];
   for (const [bioguideId, score] of scores) {
-    const member = members.get(bioguideId);
-    if (!member) continue;
+    const member = memberRows.get(bioguideId);
+    const name = member?.name ?? bioguideId;
+    const party = member?.party ?? "?";
+    const state = member?.state ?? "?";
     defectors.push({
       bioguide_id: bioguideId,
-      name: member.name,
-      party: member.party ?? "?",
-      state: member.state ?? "?",
+      name,
+      party,
+      state,
       cross_vote_count: score.crossVotes,
       deciding_score: score.decidingScore,
       congress_gov_url: defectorCongressGovUrl(bioguideId),

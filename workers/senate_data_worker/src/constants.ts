@@ -50,3 +50,9 @@ export const FEED_PIPELINE_STALE_HOURS = 26;
 
 /** Alert if no successful scheduled executive ingest within this many hours. */
 export const EXECUTIVE_PIPELINE_STALE_HOURS = 2;
+
+/** D1 lease TTL so a crashed pipeline cannot block writes forever. */
+export const PIPELINE_LEASE_TTL_MS = 10 * 60 * 1000;
+
+/** Single global write lease shared by all mutating pipelines. */
+export const PIPELINE_WRITE_LEASE_NAME = "writes";

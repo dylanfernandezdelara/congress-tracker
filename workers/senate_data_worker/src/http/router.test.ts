@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { handlePublicFetch } from "./router";
 
 vi.mock("../pipeline/run-members-roster", () => ({
@@ -20,8 +20,24 @@ vi.mock("../pipeline/run-member-votes", () => ({
   })),
 }));
 
+const mockWithPipelineLease = vi.fn(
+  async <T>(_db: D1Database, fn: () => Promise<T>, _options?: unknown) => fn()
+);
+
+vi.mock("../d1/pipeline-lease", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/pipeline-lease")>();
+  return {
+    ...actual,
+    withPipelineLease: <T>(
+      db: D1Database,
+      fn: () => Promise<T>,
+      options?: Parameters<typeof actual.withPipelineLease>[2]
+    ) => mockWithPipelineLease(db, fn, options),
+  };
+});
+
 function createMockDb(): D1Database {
-  const runResult = { success: true, meta: { duration: 0 } };
+  const runResult = { success: true, meta: { duration: 0, changes: 1 } };
   const stmt = () => ({
     bind: vi.fn(() => stmt()),
     all: vi.fn(async () => ({ results: [] })),
@@ -55,6 +71,11 @@ function pipelineRequest(path: string, init?: RequestInit): Request {
 }
 
 describe("HTTP API", () => {
+  beforeEach(() => {
+    mockWithPipelineLease.mockReset();
+    mockWithPipelineLease.mockImplementation(async (_db, fn) => fn());
+  });
+
   it("returns health", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/health"),
@@ -227,6 +248,7 @@ describe("HTTP API", () => {
   });
 
   it("allows write pipelines in local dev mode (DEV_OPEN_PIPELINE=1)", async () => {
+    mockWithPipelineLease.mockImplementation(async (_db, fn) => fn());
     const response = await handlePublicFetch(
       pipelineRequest("/__pipeline/run/member-votes"),
       createMockEnv() as any
@@ -234,6 +256,18 @@ describe("HTTP API", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({ ok: true, rollsRemaining: 0 });
+  });
+
+  it("returns 409 when another pipeline holds the write lease", async () => {
+    const { PipelineBusyError } = await import("../d1/pipeline-lease");
+    mockWithPipelineLease.mockRejectedValueOnce(new PipelineBusyError("writes"));
+    const response = await handlePublicFetch(
+      pipelineRequest("/__pipeline/run/member-votes"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: false, error: "pipeline_busy" });
   });
 
   it("allows members-roster pipeline in local dev mode", async () => {

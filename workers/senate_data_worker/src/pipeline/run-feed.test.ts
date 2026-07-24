@@ -29,6 +29,7 @@ vi.mock("../d1/digests", async (importOriginal) => {
 vi.mock("../d1/votes", () => ({
   selectExistingVoteKeys: (...args: unknown[]) => mockSelectExistingVoteKeys(...args),
   upsertVote: (...args: unknown[]) => mockUpsertVote(...args),
+  upsertNonPassageVoteStub: vi.fn(async () => undefined),
   selectRecentVotedBills: (...args: unknown[]) => mockSelectRecentVotedBills(...args),
 }));
 

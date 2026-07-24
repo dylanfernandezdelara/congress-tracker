@@ -1,4 +1,4 @@
-import type { PassageVote } from "../types";
+import type { NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
@@ -10,23 +10,9 @@ export interface ExistingVoteKeyRow {
   roll_number: number;
 }
 
-export async function selectExistingVoteKeys(
-  db: D1Database,
-  lookbackDate: string,
-  congress: number
-): Promise<Set<string>> {
-  await ensureSchema(db);
-  const { results } = await db
-    .prepare(
-      `SELECT chamber, congress, session, roll_number
-       FROM votes
-       WHERE is_passage = 1 AND vote_date >= ? AND congress = ?`
-    )
-    .bind(lookbackDate, congress)
-    .all<ExistingVoteKeyRow>();
-
+function toVoteKeys(rows: ExistingVoteKeyRow[] | null | undefined): Set<string> {
   const keys = new Set<string>();
-  for (const row of results ?? []) {
+  for (const row of rows ?? []) {
     keys.add(
       voteKey({
         chamber: row.chamber as PassageVote["chamber"],
@@ -37,6 +23,28 @@ export async function selectExistingVoteKeys(
     );
   }
   return keys;
+}
+
+/**
+ * Keys for every roll already persisted in the lookback window — passage and
+ * non-passage stubs alike — so House detail fetches are not repeated daily.
+ */
+export async function selectExistingVoteKeys(
+  db: D1Database,
+  lookbackDate: string,
+  congress: number
+): Promise<Set<string>> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT chamber, congress, session, roll_number
+       FROM votes
+       WHERE vote_date >= ? AND congress = ?`
+    )
+    .bind(lookbackDate, congress)
+    .all<ExistingVoteKeyRow>();
+
+  return toVoteKeys(results);
 }
 
 export async function selectExistingVoteKeysForSession(
@@ -49,23 +57,12 @@ export async function selectExistingVoteKeysForSession(
     .prepare(
       `SELECT chamber, congress, session, roll_number
        FROM votes
-       WHERE is_passage = 1 AND congress = ? AND session = ?`
+       WHERE congress = ? AND session = ?`
     )
     .bind(congress, session)
     .all<ExistingVoteKeyRow>();
 
-  const keys = new Set<string>();
-  for (const row of results ?? []) {
-    keys.add(
-      voteKey({
-        chamber: row.chamber as PassageVote["chamber"],
-        congress: row.congress,
-        session: row.session,
-        rollNumber: row.roll_number,
-      })
-    );
-  }
-  return keys;
+  return toVoteKeys(results);
 }
 
 export async function upsertVote(db: D1Database, vote: PassageVote): Promise<void> {
@@ -85,7 +82,8 @@ export async function upsertVote(db: D1Database, vote: PassageVote): Promise<voi
         result = excluded.result,
         yeas = excluded.yeas,
         nays = excluded.nays,
-        vote_date = excluded.vote_date`
+        vote_date = excluded.vote_date,
+        is_passage = 1`
     )
     .bind(
       vote.chamber,
@@ -100,6 +98,38 @@ export async function upsertVote(db: D1Database, vote: PassageVote): Promise<voi
       vote.yeas,
       vote.nays,
       vote.voteDate
+    )
+    .run();
+}
+
+/**
+ * Record that a roll was inspected and is not a passage vote. DO NOTHING on
+ * conflict so an existing passage row is never downgraded.
+ */
+export async function upsertNonPassageVoteStub(
+  db: D1Database,
+  stub: NonPassageVoteStub
+): Promise<void> {
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `INSERT INTO votes (
+        chamber, congress, session, roll_number,
+        bill_congress, bill_type, bill_number,
+        question, result, yeas, nays, vote_date, is_passage
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 0, 0, ?, 0)
+      ON CONFLICT(chamber, congress, session, roll_number) DO NOTHING`
+    )
+    .bind(
+      stub.chamber,
+      stub.congress,
+      stub.session,
+      stub.rollNumber,
+      stub.bill.congress,
+      normalizeBillType(stub.bill.type),
+      stub.bill.number,
+      stub.result,
+      stub.voteDate
     )
     .run();
 }
@@ -252,7 +282,8 @@ export async function getVoteRollMeta(
       `SELECT chamber, congress, session, roll_number,
               bill_type, bill_number, bill_congress, yeas, nays, vote_date
        FROM votes
-       WHERE chamber = ? AND congress = ? AND session = ? AND roll_number = ?`
+       WHERE chamber = ? AND congress = ? AND session = ? AND roll_number = ?
+         AND is_passage = 1`
     )
     .bind(roll.chamber, roll.congress, roll.session, roll.roll_number)
     .first<VoteRollMeta>();
@@ -275,4 +306,88 @@ export async function getPassageVotesForBill(
     .bind(congress, normalizeBillType(billType), billNumber)
     .all<VoteRow>();
   return results ?? [];
+}
+
+export type BillLookupKey = {
+  congress: number;
+  billType: string;
+  billNumber: number;
+};
+
+export function billLookupKey(
+  congress: number,
+  billType: string,
+  billNumber: number
+): string {
+  return `${congress}:${normalizeBillType(billType)}:${billNumber}`;
+}
+
+/** D1 caps bound parameters; each bill uses 3 binds in the OR tuple query. */
+const BILL_LOOKUP_CHUNK = 30;
+
+type VoteRowWithBill = VoteRow & {
+  bill_congress: number;
+  bill_type: string;
+  bill_number: number;
+};
+
+/** Passage votes for many bills in a constant number of chunked queries. */
+export async function getPassageVotesForBills(
+  db: D1Database,
+  bills: BillLookupKey[]
+): Promise<Map<string, VoteRow[]>> {
+  await ensureSchema(db);
+  const map = new Map<string, VoteRow[]>();
+  if (bills.length === 0) return map;
+
+  const unique = new Map<string, BillLookupKey>();
+  for (const bill of bills) {
+    const key = billLookupKey(bill.congress, bill.billType, bill.billNumber);
+    unique.set(key, {
+      congress: bill.congress,
+      billType: normalizeBillType(bill.billType),
+      billNumber: bill.billNumber,
+    });
+    map.set(key, []);
+  }
+  const list = [...unique.values()];
+
+  for (let i = 0; i < list.length; i += BILL_LOOKUP_CHUNK) {
+    const chunk = list.slice(i, i + BILL_LOOKUP_CHUNK);
+    const clauses = chunk
+      .map(() => "(bill_congress = ? AND UPPER(bill_type) = ? AND bill_number = ?)")
+      .join(" OR ");
+    const binds: Array<string | number> = [];
+    for (const bill of chunk) {
+      binds.push(bill.congress, bill.billType, bill.billNumber);
+    }
+    const { results } = await db
+      .prepare(
+        `SELECT chamber, congress, session, roll_number, question, result, yeas, nays, vote_date,
+                bill_congress, bill_type, bill_number
+         FROM votes
+         WHERE is_passage = 1 AND (${clauses})
+         ORDER BY vote_date DESC`
+      )
+      .bind(...binds)
+      .all<VoteRowWithBill>();
+
+    for (const row of results ?? []) {
+      const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
+      const listForBill = map.get(key) ?? [];
+      listForBill.push({
+        chamber: row.chamber,
+        congress: row.congress,
+        session: row.session,
+        roll_number: row.roll_number,
+        question: row.question,
+        result: row.result,
+        yeas: row.yeas,
+        nays: row.nays,
+        vote_date: row.vote_date,
+      });
+      map.set(key, listForBill);
+    }
+  }
+  return map;
 }

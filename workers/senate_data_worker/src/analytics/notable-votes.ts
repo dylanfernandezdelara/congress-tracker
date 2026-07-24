@@ -17,6 +17,8 @@ import { normalizeVotePosition } from "../../../../shared/vote-positions";
 import type { Env } from "../config";
 import { ensureSchema } from "../d1/schema";
 import { hasRealMemberRoster } from "../d1/members";
+import { selectMemberVotesForRollKeys } from "../d1/member-votes";
+import { selectSessionCrossVoteCounts } from "../d1/member-session-stats";
 import { computeRollDefectors } from "./defectors";
 import { partyMajoritiesForRoll } from "./roll-party-stats";
 import { synthesizeNotableVoteBlurb } from "../synthesis/notable-vote";
@@ -119,45 +121,30 @@ async function fetchCandidates(
   return results ?? [];
 }
 
-async function fetchSessionMemberVotesByRoll(
+async function fetchCandidateMemberVotesByRoll(
   db: D1Database,
   congress: number,
-  session: number
+  session: number,
+  candidates: CandidateRow[]
 ): Promise<Map<string, SessionMemberVoteRow[]>> {
-  const { results } = await db
-    .prepare(
-      `SELECT mv.chamber, mv.congress, mv.session, mv.roll_number, mv.bioguide_id, m.party, mv.position
-       FROM member_votes mv
-       JOIN members m ON m.bioguide_id = mv.bioguide_id
-       WHERE mv.congress = ? AND mv.session = ?`
-    )
-    .bind(congress, session)
-    .all<SessionMemberVoteRow>();
+  const rows = await selectMemberVotesForRollKeys(
+    db,
+    congress,
+    session,
+    candidates.map((vote) => ({
+      chamber: vote.chamber,
+      roll_number: vote.roll_number,
+    }))
+  );
 
   const byRoll = new Map<string, SessionMemberVoteRow[]>();
-  for (const row of results ?? []) {
+  for (const row of rows) {
     const key = rollKey(row);
     const list = byRoll.get(key) ?? [];
     list.push(row);
     byRoll.set(key, list);
   }
   return byRoll;
-}
-
-function buildCrossVoteCounts(memberVotesByRoll: Map<string, SessionMemberVoteRow[]>): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const rows of memberVotesByRoll.values()) {
-    const partyMajorities = partyMajoritiesForRoll(rows);
-    for (const row of rows) {
-      const code = normalizePartyCode(row.party);
-      if (code === "Other") continue;
-      const norm = normalizeVotePosition(row.position);
-      const majority = partyMajorities.get(code);
-      if (!majority || norm === "other" || norm === majority) continue;
-      counts.set(row.bioguide_id, (counts.get(row.bioguide_id) ?? 0) + 1);
-    }
-  }
-  return counts;
 }
 
 function computeRollBreakStats(positions: MemberPartyPositionRow[]): RollBreakStats | null {
@@ -307,11 +294,11 @@ export async function buildNotableVotes(
 ): Promise<BuildNotableVotesResult> {
   await ensureSchema(db);
   const lookbackStart = notableVotesLookbackStartIso(options?.asOf ?? new Date());
-  const [candidates, memberVotesByRoll] = await Promise.all([
-    fetchCandidates(db, congress, session, lookbackStart, 60),
-    fetchSessionMemberVotesByRoll(db, congress, session),
+  const candidates = await fetchCandidates(db, congress, session, lookbackStart, 60);
+  const [memberVotesByRoll, crossVoteCounts] = await Promise.all([
+    fetchCandidateMemberVotesByRoll(db, congress, session, candidates),
+    selectSessionCrossVoteCounts(db, congress, session),
   ]);
-  const crossVoteCounts = buildCrossVoteCounts(memberVotesByRoll);
   const excludeLocalSample = await hasRealMemberRoster(db);
 
   const scored: Array<{

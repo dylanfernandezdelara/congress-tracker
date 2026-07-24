@@ -1,4 +1,9 @@
-const SCHEMA_STATEMENTS = [
+/** Bump when adding DDL or one-shot migrations. */
+export const SCHEMA_VERSION = 1;
+
+const SCHEMA_VERSION_KEY = "schema_version";
+
+const SCHEMA_DDL = [
   `CREATE TABLE IF NOT EXISTS votes (
   chamber TEXT NOT NULL,
   congress INTEGER NOT NULL,
@@ -154,7 +159,22 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_member_votes_roll ON member_votes (chamber, congress, session, roll_number)`,
   `CREATE INDEX IF NOT EXISTS idx_members_chamber ON members (chamber)`,
   `CREATE INDEX IF NOT EXISTS idx_financial_bioguide ON financial_transactions (bioguide_id)`,
-  `DELETE FROM financial_transactions
+  `CREATE INDEX IF NOT EXISTS idx_member_votes_bioguide ON member_votes (bioguide_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_member_session_stats_session ON member_session_stats (congress, session)`,
+  `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_bioguide ON member_cross_votes (bioguide_id, congress, session, vote_date DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_roll ON member_cross_votes (chamber, congress, session, roll_number)`,
+];
+
+/**
+ * One-shot data migrations keyed by the schema version they introduce.
+ * DDL stays in SCHEMA_DDL (IF NOT EXISTS); destructive/cleanup SQL lives here.
+ * Dedup DELETE must run before the unique index is created.
+ */
+const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[] }> = [
+  {
+    toVersion: 1,
+    statements: [
+      `DELETE FROM financial_transactions
    WHERE id NOT IN (
      SELECT MIN(id)
      FROM financial_transactions
@@ -167,7 +187,7 @@ const SCHEMA_STATEMENTS = [
        COALESCE(amount_min, -1),
        COALESCE(amount_max, -1)
    )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_financial_tx_dedup ON financial_transactions (
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_financial_tx_dedup ON financial_transactions (
     bioguide_id,
     COALESCE(ticker, ''),
     transaction_type,
@@ -176,23 +196,76 @@ const SCHEMA_STATEMENTS = [
     COALESCE(amount_min, -1),
     COALESCE(amount_max, -1)
   )`,
-  `CREATE INDEX IF NOT EXISTS idx_member_votes_bioguide ON member_votes (bioguide_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_member_session_stats_session ON member_session_stats (congress, session)`,
-  `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_bioguide ON member_cross_votes (bioguide_id, congress, session, vote_date DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_roll ON member_cross_votes (chamber, congress, session, roll_number)`,
+    ],
+  },
 ];
 
-let schemaApplied = false;
+/** Isolate-local fast path so warm requests skip D1 after the first ensureSchema. */
+let appliedSchemaVersion: number | null = null;
 
-export async function ensureSchema(db: D1Database): Promise<void> {
-  if (schemaApplied) return;
-  for (const sql of SCHEMA_STATEMENTS) {
-    await db.prepare(sql).run();
+async function readStoredSchemaVersion(db: D1Database): Promise<number | null> {
+  try {
+    const row = await db
+      .prepare(`SELECT value_json FROM pipeline_state WHERE key = ?1`)
+      .bind(SCHEMA_VERSION_KEY)
+      .first<{ value_json: string }>();
+    if (!row?.value_json) return 0;
+    const parsed = JSON.parse(row.value_json) as { version?: unknown };
+    return typeof parsed.version === "number" ? parsed.version : 0;
+  } catch {
+    // pipeline_state (or the DB) may not exist yet on a fresh install.
+    return null;
   }
-  schemaApplied = true;
 }
 
-/** Reset flag for tests. */
+async function writeStoredSchemaVersion(db: D1Database, version: number): Promise<void> {
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      `INSERT INTO pipeline_state (key, value_json, updated_at)
+       VALUES (?1, ?2, ?3)
+       ON CONFLICT(key) DO UPDATE SET
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at`
+    )
+    .bind(SCHEMA_VERSION_KEY, JSON.stringify({ version }), now)
+    .run();
+}
+
+export async function ensureSchema(db: D1Database): Promise<void> {
+  if (appliedSchemaVersion === SCHEMA_VERSION) return;
+
+  const stored = await readStoredSchemaVersion(db);
+  // Skip when current or newer (rollback must not downgrade schema_version or
+  // re-run one-shot migrations that a newer deploy already applied).
+  if (stored !== null && stored >= SCHEMA_VERSION) {
+    appliedSchemaVersion = SCHEMA_VERSION;
+    return;
+  }
+
+  for (const sql of SCHEMA_DDL) {
+    await db.prepare(sql).run();
+  }
+
+  const fromVersion = stored ?? 0;
+  for (const migration of SCHEMA_MIGRATIONS) {
+    if (migration.toVersion > fromVersion && migration.toVersion <= SCHEMA_VERSION) {
+      for (const sql of migration.statements) {
+        await db.prepare(sql).run();
+      }
+    }
+  }
+
+  await writeStoredSchemaVersion(db, SCHEMA_VERSION);
+  appliedSchemaVersion = SCHEMA_VERSION;
+}
+
+/** Reset isolate-local flag for tests. */
 export function resetSchemaFlag(): void {
-  schemaApplied = false;
+  appliedSchemaVersion = null;
+}
+
+/** Test helper: inspect the isolate-local cached version. */
+export function getAppliedSchemaVersionForTests(): number | null {
+  return appliedSchemaVersion;
 }

@@ -139,4 +139,130 @@ describe("ingestHousePassageVotes", () => {
 
     fetchJson.mockRestore();
   });
+
+  it("does not stub when vote detail is missing so the roll can be retried", async () => {
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      if (url.includes("/50?")) {
+        return { houseRollCallVote: undefined };
+      }
+
+      return {
+        houseRollCallVotes: [
+          {
+            congress: 119,
+            rollCallNumber: 50,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-05T12:00:00Z",
+          },
+        ],
+        pagination: {},
+      };
+    });
+
+    const result = await ingestHousePassageVotes(env, "2026-05-01", new Set());
+    expect(result.votes).toHaveLength(0);
+    expect(result.nonPassageStubs).toBeUndefined();
+
+    fetchJson.mockRestore();
+  });
+
+  it("does not stub when vote detail has empty question and title", async () => {
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      if (url.includes("/51?")) {
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: 51,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-05T12:00:00Z",
+            voteQuestion: "   ",
+            voteTitle: "",
+            votePartyTotal: [{ yeaTotal: 220, nayTotal: 210 }],
+          },
+        };
+      }
+
+      return {
+        houseRollCallVotes: [
+          {
+            congress: 119,
+            rollCallNumber: 51,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-05T12:00:00Z",
+          },
+        ],
+        pagination: {},
+      };
+    });
+
+    const result = await ingestHousePassageVotes(env, "2026-05-01", new Set());
+    expect(result.votes).toHaveLength(0);
+    expect(result.nonPassageStubs).toBeUndefined();
+
+    fetchJson.mockRestore();
+  });
+
+  it("does not re-fetch detail for a roll previously seen as non-passage", async () => {
+    let detailFetches = 0;
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      if (url.includes("/50?")) {
+        detailFetches += 1;
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: 50,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Failed",
+            startDate: "2026-06-05T12:00:00Z",
+            voteQuestion: "On Ordering the Previous Question",
+            voteTitle: "Providing for consideration",
+            votePartyTotal: [{ yeaTotal: 210, nayTotal: 200 }],
+          },
+        };
+      }
+
+      return {
+        houseRollCallVotes: [
+          {
+            congress: 119,
+            rollCallNumber: 50,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Failed",
+            startDate: "2026-06-05T12:00:00Z",
+          },
+        ],
+        pagination: {},
+      };
+    });
+
+    const first = await ingestHousePassageVotes(env, "2026-05-01", new Set());
+    expect(first.votes).toHaveLength(0);
+    expect(first.nonPassageStubs).toHaveLength(1);
+    expect(first.nonPassageStubs?.[0]?.rollNumber).toBe(50);
+    expect(detailFetches).toBe(1);
+
+    const knownAfterPersist = new Set([
+      voteKey({ chamber: "House", congress: 119, session: 2, rollNumber: 50 }),
+    ]);
+    const second = await ingestHousePassageVotes(env, "2026-05-01", knownAfterPersist);
+    expect(second.votes).toHaveLength(0);
+    expect(second.skipped).toBe(1);
+    expect(second.nonPassageStubs).toBeUndefined();
+    expect(detailFetches).toBe(1);
+
+    fetchJson.mockRestore();
+  });
 });

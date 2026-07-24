@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { FeedRowDetail } from './FeedRowDetail'
 
@@ -9,6 +10,11 @@ vi.mock('../api/client', () => ({
 }))
 
 import { fetchVoteDefectors } from '../api/client'
+
+afterEach(() => {
+  vi.clearAllMocks()
+  clearRollDefectorsCache()
+})
 
 describe('FeedRowDetail', () => {
   it('shows party defectors for an expanded vote when member data exists', async () => {

@@ -1,6 +1,6 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
-import type { BillRef, IngestVotesResult, PassageVote } from "../types";
+import type { BillRef, IngestVotesResult, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { parseHouseLegislation } from "./bill-ref";
 import { normalizeBillType } from "./bill-type";
@@ -87,6 +87,8 @@ export async function ingestHousePassageVotes(
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const out: PassageVote[] = [];
+  const nonPassageStubs: NonPassageVoteStub[] = [];
+  const seenThisRun = new Set<string>();
   let skipped = 0;
   let truncated = false;
   let nextUrl: string | null =
@@ -106,7 +108,7 @@ export async function ingestHousePassageVotes(
         session,
         rollNumber: item.rollCallNumber,
       });
-      if (knownKeys.has(key)) {
+      if (knownKeys.has(key) || seenThisRun.has(key)) {
         skipped += 1;
         continue;
       }
@@ -114,18 +116,37 @@ export async function ingestHousePassageVotes(
       const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
       const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
       const detail = detailRes.houseRollCallVote;
-      const questionText = detail?.voteQuestion ?? "";
-      const titleText = detail?.voteTitle ?? "";
-      if (!isPassageVote(questionText) && !isPassageVote(titleText)) continue;
+      // Missing/empty detail is transient — never stub, or we permanently skip
+      // re-fetch via selectExistingVoteKeys (stubs are negative cache).
+      if (!detail) continue;
+
+      const questionText = detail.voteQuestion ?? "";
+      const titleText = detail.voteTitle ?? "";
+      if (!questionText.trim() && !titleText.trim()) continue;
 
       const bill = parseHouseLegislation(
-        detail!.legislationType ?? item.legislationType,
-        detail!.legislationNumber ?? item.legislationNumber,
+        detail.legislationType ?? item.legislationType,
+        detail.legislationNumber ?? item.legislationNumber,
         congress
       );
       if (!bill) continue;
 
-      const { yeas, nays } = sumTally(detail!.votePartyTotal);
+      seenThisRun.add(key);
+
+      if (!isPassageVote(questionText) && !isPassageVote(titleText)) {
+        nonPassageStubs.push({
+          chamber: "House",
+          congress,
+          session,
+          rollNumber: item.rollCallNumber,
+          bill,
+          result: detail.result ?? item.result,
+          voteDate: voteDateFromIso(detail.startDate ?? item.startDate),
+        });
+        continue;
+      }
+
+      const { yeas, nays } = sumTally(detail.votePartyTotal);
       const displayQuestion = isPassageVote(titleText)
         ? titleText.split(";")[0]!.trim()
         : questionText.trim();
@@ -133,13 +154,13 @@ export async function ingestHousePassageVotes(
         chamber: "House",
         congress,
         session,
-        rollNumber: detail!.rollCallNumber,
+        rollNumber: detail.rollCallNumber,
         bill,
         question: displayQuestion.replace(/\s+/g, " ").trim(),
-        result: detail!.result,
+        result: detail.result,
         yeas,
         nays,
-        voteDate: voteDateFromIso(detail!.startDate),
+        voteDate: voteDateFromIso(detail.startDate),
       });
 
       if (maxNewVotes !== undefined && out.length >= maxNewVotes) {
@@ -158,7 +179,12 @@ export async function ingestHousePassageVotes(
     }
   }
 
-  return { votes: out, skipped, truncated: truncated || undefined };
+  return {
+    votes: out,
+    skipped,
+    truncated: truncated || undefined,
+    nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
+  };
 }
 
 function billMatches(a: BillRef, b: BillRef): boolean {

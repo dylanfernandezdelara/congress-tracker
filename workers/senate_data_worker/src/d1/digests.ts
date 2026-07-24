@@ -88,6 +88,66 @@ export async function getDigest(
     .first<DigestRow>();
 }
 
+export type DigestBillKey = {
+  congress: number;
+  billType: string;
+  number: number;
+};
+
+export function digestMapKey(congress: number, billType: string, number: number): string {
+  return `${congress}:${normalizeBillType(billType)}:${number}`;
+}
+
+/** D1 caps bound parameters; each bill uses 3 binds in the OR tuple query. */
+const DIGEST_LOOKUP_CHUNK = 30;
+
+/** Bulk-read digests keyed by `congress:TYPE:number`. */
+export async function getDigestsForBills(
+  db: D1Database,
+  bills: DigestBillKey[]
+): Promise<Map<string, DigestRow>> {
+  await ensureSchema(db);
+  const map = new Map<string, DigestRow>();
+  if (bills.length === 0) return map;
+
+  const unique = new Map<string, DigestBillKey>();
+  for (const bill of bills) {
+    unique.set(digestMapKey(bill.congress, bill.billType, bill.number), {
+      congress: bill.congress,
+      billType: normalizeBillType(bill.billType),
+      number: bill.number,
+    });
+  }
+  const list = [...unique.values()];
+
+  for (let i = 0; i < list.length; i += DIGEST_LOOKUP_CHUNK) {
+    const chunk = list.slice(i, i + DIGEST_LOOKUP_CHUNK);
+    const clauses = chunk
+      .map(() => "(congress = ? AND UPPER(bill_type) = ? AND number = ?)")
+      .join(" OR ");
+    const binds: Array<string | number> = [];
+    for (const bill of chunk) {
+      binds.push(bill.congress, bill.billType, bill.number);
+    }
+    const { results } = await db
+      .prepare(
+        `SELECT congress, bill_type, number, title, policy_area, raw_summary_text, digest_json
+         FROM bill_digests
+         WHERE ${clauses}`
+      )
+      .bind(...binds)
+      .all<DigestRow>();
+
+    for (const row of results ?? []) {
+      map.set(digestMapKey(row.congress, row.bill_type, row.number), {
+        ...row,
+        bill_type: normalizeBillType(row.bill_type),
+      });
+    }
+  }
+  return map;
+}
+
 export async function selectDigestBillRefs(
   db: D1Database,
   congress: number,

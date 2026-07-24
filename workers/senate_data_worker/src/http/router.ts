@@ -45,6 +45,7 @@ import type {
   SessionStatsResponse,
   VoteDefectorsResponse,
 } from "../types";
+import { isPipelineBusyError, withPipelineLease } from "../d1/pipeline-lease";
 import { authorizePipeline, isPreviewWorkerHost } from "./pipeline-auth";
 import {
   buildCorsHeaders,
@@ -223,9 +224,15 @@ async function handlePipelineRoute<T extends object>(
     return json({ error }, { status: 401, headers: adminHeaders });
   }
   try {
-    const result = await run();
+    const result = await withPipelineLease(env.DB, run);
     return json({ ok: true, ...result }, { headers: adminHeaders });
-  } catch {
+  } catch (err: unknown) {
+    if (isPipelineBusyError(err)) {
+      return json(
+        { ok: false, error: "pipeline_busy", message: "Another pipeline run is in progress" },
+        { status: 409, headers: adminHeaders }
+      );
+    }
     return json({ ok: false, error: "pipeline_failed" }, { status: 500, headers: adminHeaders });
   }
 }

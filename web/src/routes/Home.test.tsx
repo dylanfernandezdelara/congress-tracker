@@ -149,7 +149,7 @@ describe('Home', () => {
     expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /theme/i })).toBeInTheDocument()
     expect(
-      await screen.findByRole('heading', { level: 2, name: 'Plain headline for readers' }),
+      await screen.findByRole('heading', { level: 3, name: 'Plain headline for readers' }),
     ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Congressional passage votes' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()

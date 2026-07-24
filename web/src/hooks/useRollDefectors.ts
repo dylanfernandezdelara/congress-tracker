@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { fetchVoteDefectors } from '../api/client'
+import { getCachedRollDefectors, loadRollDefectors } from '../api/rollDefectorsCache'
 import type { FeedPassageVote, VoteDefectorEntry } from '../api/types'
 
 export type RollDefectorsState =
@@ -21,9 +21,22 @@ export function voteRollKey(vote: FeedPassageVote): string | null {
   return `${vote.chamber}:${vote.congress}:${vote.session}:${vote.roll_number}`
 }
 
+function stateFromResponse(
+  response: Awaited<ReturnType<typeof loadRollDefectors>>,
+): RollDefectorsState {
+  if (!response.member_votes_available) {
+    return { status: 'unavailable' }
+  }
+  return {
+    status: 'ready',
+    defectors: response.defectors,
+  }
+}
+
 /**
  * Loads party-defector lists for each passage vote that has a complete roll-call key.
  * Cancel-safe: in-flight updates are dropped after unmount / vote-list change.
+ * Session-cached via rollDefectorsCache so collapse/re-expand does not refetch.
  */
 export function useRollDefectors(
   votes: FeedPassageVote[],
@@ -47,10 +60,12 @@ export function useRollDefectors(
         }
         return {
           key,
-          vote,
-          congress: vote.congress,
-          session: vote.session,
-          rollNumber: vote.roll_number,
+          params: {
+            chamber: vote.chamber,
+            congress: vote.congress,
+            session: vote.session,
+            rollNumber: vote.roll_number,
+          },
         }
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
@@ -60,35 +75,23 @@ export function useRollDefectors(
       return
     }
 
-    setDefectorsByRoll((current) => {
+    setDefectorsByRoll(() => {
       const next = new Map<string, RollDefectorsState>()
-      for (const { key } of rollKeys) {
-        const existing = current.get(key)
-        next.set(key, existing?.status === 'ready' ? existing : { status: 'loading' })
+      for (const { key, params } of rollKeys) {
+        const cached = getCachedRollDefectors(params)
+        next.set(key, cached ? stateFromResponse(cached) : { status: 'loading' })
       }
       return next
     })
 
     void Promise.all(
-      rollKeys.map(async ({ key, vote, congress, session, rollNumber }) => {
+      rollKeys.map(async ({ key, params }) => {
         try {
-          const response = await fetchVoteDefectors({
-            chamber: vote.chamber,
-            congress,
-            session,
-            rollNumber,
-          })
+          const response = await loadRollDefectors(params)
           if (cancelled) return
           setDefectorsByRoll((current) => {
             const next = new Map(current)
-            if (!response.member_votes_available) {
-              next.set(key, { status: 'unavailable' })
-            } else {
-              next.set(key, {
-                status: 'ready',
-                defectors: response.defectors,
-              })
-            }
+            next.set(key, stateFromResponse(response))
             return next
           })
         } catch {

@@ -260,7 +260,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
             className="member-profile-link congress-link"
             href={profile.congress_gov_url}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             View on Congress.gov
           </a>

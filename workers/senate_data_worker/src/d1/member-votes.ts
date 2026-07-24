@@ -174,12 +174,71 @@ export async function selectMemberVotesForSession(
        JOIN votes v
          ON v.chamber = mv.chamber AND v.congress = mv.congress
         AND v.session = mv.session AND v.roll_number = mv.roll_number
+        AND v.is_passage = 1
        WHERE mv.congress = ? AND mv.session = ? AND mv.chamber = ?
        ORDER BY v.vote_date DESC`
     )
     .bind(congress, session, chamber)
     .all<MemberVoteWithRoll>();
   return results ?? [];
+}
+
+/** D1 caps bound parameters at 100; each roll uses 2 binds after congress/session. */
+const ROLL_IDENTITY_CHUNK = 40;
+
+export type MemberVoteWithPartyRow = {
+  bioguide_id: string;
+  party: string | null;
+  position: string;
+  chamber: string;
+  congress: number;
+  session: number;
+  roll_number: number;
+};
+
+/**
+ * Member positions (+ party) for a specific set of rolls. Prefer this over a
+ * full-session scan when only candidate rolls are needed for scoring.
+ */
+export async function selectMemberVotesForRollKeys(
+  db: D1Database,
+  congress: number,
+  session: number,
+  rolls: Array<{ chamber: string; roll_number: number }>
+): Promise<MemberVoteWithPartyRow[]> {
+  await ensureSchema(db);
+  if (rolls.length === 0) return [];
+
+  const unique = new Map<string, { chamber: string; roll_number: number }>();
+  for (const roll of rolls) {
+    unique.set(`${roll.chamber}:${roll.roll_number}`, roll);
+  }
+  const list = [...unique.values()];
+  const out: MemberVoteWithPartyRow[] = [];
+
+  for (let i = 0; i < list.length; i += ROLL_IDENTITY_CHUNK) {
+    const chunk = list.slice(i, i + ROLL_IDENTITY_CHUNK);
+    const clauses = chunk
+      .map(() => "(mv.chamber = ? AND mv.roll_number = ?)")
+      .join(" OR ");
+    const binds: Array<string | number> = [congress, session];
+    for (const roll of chunk) {
+      binds.push(roll.chamber, roll.roll_number);
+    }
+    const { results } = await db
+      .prepare(
+        `SELECT mv.chamber, mv.congress, mv.session, mv.roll_number, mv.bioguide_id,
+                m.party, mv.position
+         FROM member_votes mv
+         JOIN members m ON m.bioguide_id = mv.bioguide_id
+         WHERE mv.congress = ? AND mv.session = ?
+           AND (${clauses})`
+      )
+      .bind(...binds)
+      .all<MemberVoteWithPartyRow>();
+    out.push(...(results ?? []));
+  }
+  return out;
 }
 
 /** Passage votes for one member in a congress/session (newest first). */
@@ -198,6 +257,7 @@ export async function selectMemberVotesForBioguide(
        JOIN votes v
          ON v.chamber = mv.chamber AND v.congress = mv.congress
         AND v.session = mv.session AND v.roll_number = mv.roll_number
+        AND v.is_passage = 1
        WHERE mv.congress = ? AND mv.session = ? AND mv.bioguide_id = ?
        ORDER BY v.vote_date DESC`
     )

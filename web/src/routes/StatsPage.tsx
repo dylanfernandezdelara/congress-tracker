@@ -12,6 +12,7 @@ export default function StatsPage() {
         composition={session.data?.composition ?? null}
         loading={session.isLoading}
         error={session.error}
+        onRetry={reload}
       />
 
       <section aria-label="Members in Congress">

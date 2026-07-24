@@ -19,11 +19,23 @@ export interface PassageVote {
   voteDate: string;
 }
 
+/** Persisted so daily House ingest can skip re-fetching non-passage roll details. */
+export interface NonPassageVoteStub {
+  chamber: Chamber;
+  congress: number;
+  session: number;
+  rollNumber: number;
+  bill: BillRef;
+  result: string;
+  voteDate: string;
+}
+
 export interface IngestVotesResult {
   votes: PassageVote[];
   skipped: number;
   truncated?: boolean;
   warnings?: string[];
+  nonPassageStubs?: NonPassageVoteStub[];
 }
 
 import type { BillDigestContent } from "../../../shared/digest-api-types";

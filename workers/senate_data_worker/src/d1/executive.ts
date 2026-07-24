@@ -192,6 +192,119 @@ export async function getExecutivePostBillsForBill(
   return results ?? [];
 }
 
+export type ExecutiveBillKey = {
+  congress: number;
+  billType: string;
+  billNumber: number;
+};
+
+export function executiveBillMapKey(
+  congress: number,
+  billType: string,
+  billNumber: number
+): string {
+  return `${congress}:${normalizeBillType(billType)}:${billNumber}`;
+}
+
+export type ExecutivePostForBill = ExecutivePostRow & {
+  role: string;
+  rationale: string | null;
+  bill_congress: number;
+  bill_type: string;
+  bill_number: number;
+};
+
+/** D1 caps bound parameters; each bill uses 3 binds (+ shared sinceIso). */
+const EXECUTIVE_BILL_LOOKUP_CHUNK = 30;
+/** Stay under 100 bound params for IN (...) post_id lookups. */
+const EXECUTIVE_POST_LOOKUP_CHUNK = 90;
+
+/** Executive posts linked to many bills since `sinceIso`, keyed by bill. */
+export async function getExecutivePostBillsForBills(
+  db: D1Database,
+  bills: ExecutiveBillKey[],
+  sinceIso: string
+): Promise<Map<string, ExecutivePostForBill[]>> {
+  await ensureSchema(db);
+  const map = new Map<string, ExecutivePostForBill[]>();
+  if (bills.length === 0) return map;
+
+  const unique = new Map<string, ExecutiveBillKey>();
+  for (const bill of bills) {
+    const key = executiveBillMapKey(bill.congress, bill.billType, bill.billNumber);
+    unique.set(key, {
+      congress: bill.congress,
+      billType: normalizeBillType(bill.billType),
+      billNumber: bill.billNumber,
+    });
+    map.set(key, []);
+  }
+  const list = [...unique.values()];
+
+  for (let i = 0; i < list.length; i += EXECUTIVE_BILL_LOOKUP_CHUNK) {
+    const chunk = list.slice(i, i + EXECUTIVE_BILL_LOOKUP_CHUNK);
+    const clauses = chunk
+      .map(() => "(b.bill_congress = ? AND UPPER(b.bill_type) = ? AND b.bill_number = ?)")
+      .join(" OR ");
+    const binds: Array<string | number> = [sinceIso];
+    for (const bill of chunk) {
+      binds.push(bill.congress, bill.billType, bill.billNumber);
+    }
+    const { results } = await db
+      .prepare(
+        `SELECT ${EXECUTIVE_POST_PUBLIC_COLUMNS_QUALIFIED}, b.role, b.rationale,
+                b.bill_congress, b.bill_type, b.bill_number
+         FROM executive_post_bills b
+         JOIN executive_posts p ON p.id = b.post_id
+         WHERE p.posted_at >= ?
+           AND (${clauses})
+         ORDER BY p.posted_at DESC`
+      )
+      .bind(...binds)
+      .all<ExecutivePostForBill>();
+
+    for (const row of results ?? []) {
+      const key = executiveBillMapKey(row.bill_congress, row.bill_type, row.bill_number);
+      const listForBill = map.get(key) ?? [];
+      listForBill.push(row);
+      map.set(key, listForBill);
+    }
+  }
+  return map;
+}
+
+/** All bill links for many posts, keyed by post_id. */
+export async function getExecutivePostBillsForPosts(
+  db: D1Database,
+  postIds: string[]
+): Promise<Map<string, ExecutivePostBillRow[]>> {
+  await ensureSchema(db);
+  const map = new Map<string, ExecutivePostBillRow[]>();
+  const unique = [...new Set(postIds)];
+  if (unique.length === 0) return map;
+  for (const id of unique) map.set(id, []);
+
+  for (let i = 0; i < unique.length; i += EXECUTIVE_POST_LOOKUP_CHUNK) {
+    const chunk = unique.slice(i, i + EXECUTIVE_POST_LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const { results } = await db
+      .prepare(
+        `SELECT * FROM executive_post_bills
+         WHERE post_id IN (${placeholders})
+         ORDER BY is_primary DESC, confidence DESC`
+      )
+      .bind(...chunk)
+      .all<ExecutivePostBillRow>();
+
+    for (const row of results ?? []) {
+      const listForPost = map.get(row.post_id) ?? [];
+      listForPost.push(row);
+      map.set(row.post_id, listForPost);
+    }
+  }
+  return map;
+}
+
 export async function selectExecutiveBoostedBills(
   db: D1Database,
   sinceIso: string

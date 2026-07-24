@@ -5,10 +5,10 @@ import type { LifecycleRow } from "../d1/lifecycle";
 const mockEnsureSchema = vi.fn();
 const mockCountFeedBills = vi.fn();
 const mockSelectFeedBills = vi.fn();
-const mockGetDigest = vi.fn();
-const mockGetPassageVotesForBill = vi.fn();
-const mockGetExecutivePostBillsForBill = vi.fn();
-const mockGetExecutivePostBillsForPost = vi.fn();
+const mockGetDigestsForBills = vi.fn();
+const mockGetPassageVotesForBills = vi.fn();
+const mockGetExecutivePostBillsForBills = vi.fn();
+const mockGetExecutivePostBillsForPosts = vi.fn();
 const mockGetLifecyclesForBills = vi.fn();
 const mockLookbackStartIso = vi.fn((days: number) => `lookback-${days}`);
 
@@ -16,32 +16,34 @@ vi.mock("../d1/schema", () => ({
   ensureSchema: (...args: unknown[]) => mockEnsureSchema(...args),
 }));
 
-vi.mock("../d1/votes", () => ({
-  countFeedBills: (...args: unknown[]) => mockCountFeedBills(...args),
-  selectFeedBills: (...args: unknown[]) => mockSelectFeedBills(...args),
-  getPassageVotesForBill: (...args: unknown[]) => mockGetPassageVotesForBill(...args),
-}));
+vi.mock("../d1/votes", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/votes")>();
+  return {
+    ...actual,
+    countFeedBills: (...args: unknown[]) => mockCountFeedBills(...args),
+    selectFeedBills: (...args: unknown[]) => mockSelectFeedBills(...args),
+    getPassageVotesForBills: (...args: unknown[]) => mockGetPassageVotesForBills(...args),
+  };
+});
 
 vi.mock("../d1/digests", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/digests")>();
   return {
     ...actual,
-    getDigest: (...args: unknown[]) => mockGetDigest(...args),
+    getDigestsForBills: (...args: unknown[]) => mockGetDigestsForBills(...args),
   };
 });
 
-vi.mock("../d1/executive", () => ({
-  getExecutivePostBillsForBill: (...args: unknown[]) => mockGetExecutivePostBillsForBill(...args),
-  getExecutivePostBillsForPost: (...args: unknown[]) => mockGetExecutivePostBillsForPost(...args),
-  toExecutiveSignal: (post: { id: string; posted_at: string; summary: string; text: string; source_url: string }) => ({
-    post_id: post.id,
-    posted_at: post.posted_at,
-    summary: post.summary,
-    quote: post.text,
-    source_url: post.source_url,
-    informal: true,
-  }),
-}));
+vi.mock("../d1/executive", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/executive")>();
+  return {
+    ...actual,
+    getExecutivePostBillsForBills: (...args: unknown[]) =>
+      mockGetExecutivePostBillsForBills(...args),
+    getExecutivePostBillsForPosts: (...args: unknown[]) =>
+      mockGetExecutivePostBillsForPosts(...args),
+  };
+});
 
 vi.mock("../d1/lifecycle", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/lifecycle")>();
@@ -96,17 +98,25 @@ describe("buildFeedPage lifecycle attachment", () => {
         latest_passage_date: "2026-06-22",
       },
     ]);
-    mockGetDigest.mockResolvedValue({
-      congress: 119,
-      bill_type: "HR",
-      number: 6644,
-      title: "21st Century ROAD to Housing Act",
-      policy_area: "Housing",
-      raw_summary_text: null,
-      digest_json: null,
-    });
-    mockGetPassageVotesForBill.mockResolvedValue([]);
-    mockGetExecutivePostBillsForBill.mockResolvedValue([]);
+    mockGetDigestsForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:6644",
+          {
+            congress: 119,
+            bill_type: "HR",
+            number: 6644,
+            title: "21st Century ROAD to Housing Act",
+            policy_area: "Housing",
+            raw_summary_text: null,
+            digest_json: null,
+          },
+        ],
+      ])
+    );
+    mockGetPassageVotesForBills.mockResolvedValue(new Map([["119:HR:6644", []]]));
+    mockGetExecutivePostBillsForBills.mockResolvedValue(new Map([["119:HR:6644", []]]));
+    mockGetExecutivePostBillsForPosts.mockResolvedValue(new Map());
     mockGetLifecyclesForBills.mockResolvedValue(
       new Map([["119:HR:6644", hr6644Lifecycle]])
     );
@@ -159,5 +169,89 @@ describe("buildFeedPage lifecycle attachment", () => {
     mockGetLifecyclesForBills.mockResolvedValue(new Map());
     const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
     expect(page.items[0]?.lifecycle).toBeNull();
+  });
+
+  it("preserves feed page response shape with batch reads", async () => {
+    mockGetPassageVotesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:6644",
+          [
+            {
+              chamber: "House",
+              congress: 119,
+              session: 2,
+              roll_number: 10,
+              question: "On Passage",
+              result: "Passed",
+              yeas: 220,
+              nays: 200,
+              vote_date: "2026-06-22",
+            },
+          ],
+        ],
+      ])
+    );
+    mockGetDigestsForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:6644",
+          {
+            congress: 119,
+            bill_type: "HR",
+            number: 6644,
+            title: "21st Century ROAD to Housing Act",
+            policy_area: "Housing",
+            raw_summary_text: "Raw CRS",
+            digest_json: JSON.stringify({
+              headline: "Housing rewrite",
+              what_it_does: "Does housing things",
+            }),
+          },
+        ],
+      ])
+    );
+
+    const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
+
+    expect(mockGetDigestsForBills).toHaveBeenCalled();
+    expect(mockGetPassageVotesForBills).toHaveBeenCalledOnce();
+    expect(mockGetExecutivePostBillsForBills).toHaveBeenCalledOnce();
+    expect(page).toMatchObject({
+      total: 1,
+      limit: 50,
+      offset: 0,
+      has_more: false,
+    });
+    expect(page.items[0]).toMatchObject({
+      bill: {
+        congress: 119,
+        type: "HR",
+        number: 6644,
+        title: "21st Century ROAD to Housing Act",
+      },
+      policy_area: "Housing",
+      digest: {
+        headline: "Housing rewrite",
+        what_it_does: "Does housing things",
+      },
+      raw_summary_text: "Raw CRS",
+      passage_votes: [
+        {
+          chamber: "House",
+          congress: 119,
+          session: 2,
+          roll_number: 10,
+          question: "On Passage",
+          result: "Passed",
+          yeas: 220,
+          nays: 200,
+          date: "2026-06-22",
+        },
+      ],
+      latest_passage_date: "2026-06-22",
+      executive_signals: [],
+      related_executive_bills: [],
+    });
   });
 });
