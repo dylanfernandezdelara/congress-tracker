@@ -148,11 +148,21 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem 0.5rem;
+    column-gap: 0;
+    row-gap: 0.35rem;
     min-width: 0;
     font-size: 12px;
     line-height: 1.3;
     color: hsl(var(--twc-secondary));
+  }
+
+  /* Trailing separators stay with the preceding chip when the row wraps,
+     so a new line never starts with a lone middot. */
+  .feed-row-meta-row > *:not(:last-child)::after {
+    content: '·';
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+    color: hsl(var(--twc-faint));
   }
 
   .feed-row-badge {
@@ -207,12 +217,6 @@
     background: transparent;
   }
 
-  .feed-row-chip::before {
-    content: '·';
-    margin-right: 0.5rem;
-    color: hsl(var(--twc-faint));
-  }
-
   .feed-row-chip--bill {
     font-variant-numeric: tabular-nums;
   }
@@ -234,16 +238,11 @@
   }
 
   .feed-row-policy-area {
-    display: inline;
+    margin: 0;
     max-width: 100%;
     font-size: 12px;
     font-weight: 400;
-    color: hsl(var(--twc-faint));
-  }
-
-  .feed-row-policy-area::before {
-    content: '·';
-    margin-right: 0.5rem;
+    line-height: 1.3;
     color: hsl(var(--twc-faint));
   }
 
