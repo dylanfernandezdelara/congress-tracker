@@ -2,6 +2,7 @@ import { useId } from 'react'
 
 import type { FeedItem } from '../api/types'
 import { CURRENT_PRESIDENT } from '../constants/president'
+import { feedRowKey } from '../utils/billDeepLink'
 import { formatVoteDate } from '../utils/billLabels'
 import {
   getFeedRowDisplayDate,
@@ -41,8 +42,13 @@ export function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
   const isProcedural = meta.kind === 'procedural'
   const executiveSignal = item.executive_signals?.[0]
 
+  const rowKey = feedRowKey(item)
+
   return (
-    <li className={`feed-row feed-row--${meta.kind}${isExpanded ? ' is-expanded' : ''}`}>
+    <li
+      className={`feed-row feed-row--${meta.kind}${isExpanded ? ' is-expanded' : ''}`}
+      data-feed-row-key={rowKey}
+    >
       <article className="feed-row-article" aria-labelledby={topicId}>
         <button
           type="button"

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FeedItem, FeedPageResponse } from "../types";
 import { handlePublicFetch } from "./router";
 
 vi.mock("../pipeline/run-members-roster", () => ({
@@ -19,6 +20,17 @@ vi.mock("../pipeline/run-member-votes", () => ({
     votesUpserted: 0,
   })),
 }));
+
+const mockBuildFeedPage = vi.fn();
+
+vi.mock("../storage/feed", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../storage/feed")>();
+  return {
+    ...actual,
+    buildFeedPage: (...args: Parameters<typeof actual.buildFeedPage>) =>
+      mockBuildFeedPage(...args),
+  };
+});
 
 const mockWithPipelineLease = vi.fn(
   async <T>(_db: D1Database, fn: () => Promise<T>, _options?: unknown) => fn()
@@ -70,10 +82,80 @@ function pipelineRequest(path: string, init?: RequestInit): Request {
   });
 }
 
+function feedItem(
+  number: number,
+  passageChambers: Array<"House" | "Senate">
+): FeedItem {
+  return {
+    bill: { congress: 119, type: "HR", number, title: `Bill ${number}` },
+    policy_area: null,
+    digest: null,
+    raw_summary_text: null,
+    passage_votes: passageChambers.map((chamber, index) => ({
+      chamber,
+      congress: 119,
+      session: 2,
+      roll_number: number * 10 + index,
+      question: "On Passage",
+      result: "Passed",
+      yeas: 200,
+      nays: 100,
+      date: `2026-06-${String(10 + index).padStart(2, "0")}`,
+    })),
+    latest_passage_date: "2026-06-11",
+    lifecycle: null,
+    executive_signals: [],
+    related_executive_bills: [],
+  };
+}
+
+/** Fixture mirror of chamber filter: bills with a passage vote in that chamber. */
+const FEED_FIXTURE: FeedItem[] = [
+  feedItem(1, ["House"]),
+  feedItem(2, ["Senate"]),
+  feedItem(3, ["House", "Senate"]),
+];
+
+function emptyFeedPage(options: {
+  limit: number;
+  offset: number;
+}): FeedPageResponse {
+  return {
+    items: [],
+    total: 0,
+    limit: options.limit,
+    offset: options.offset,
+    has_more: false,
+  };
+}
+
+function filteredFeedPage(options: {
+  limit: number;
+  offset: number;
+  chamber?: "House" | "Senate";
+}): FeedPageResponse {
+  const filtered = options.chamber
+    ? FEED_FIXTURE.filter((item) =>
+        item.passage_votes.some((vote) => vote.chamber === options.chamber)
+      )
+    : FEED_FIXTURE;
+  const total = filtered.length;
+  const items = filtered.slice(options.offset, options.offset + options.limit);
+  return {
+    items,
+    total,
+    limit: options.limit,
+    offset: options.offset,
+    has_more: options.offset + items.length < total,
+  };
+}
+
 describe("HTTP API", () => {
   beforeEach(() => {
     mockWithPipelineLease.mockReset();
     mockWithPipelineLease.mockImplementation(async (_db, fn) => fn());
+    mockBuildFeedPage.mockReset();
+    mockBuildFeedPage.mockImplementation(async (_env, options) => emptyFeedPage(options));
   });
 
   it("returns health", async () => {
@@ -151,6 +233,124 @@ describe("HTTP API", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({ limit: 5, offset: 45 });
+  });
+
+  it("filters feed by chamber=House to bills with a House passage vote", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?chamber=House"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ chamber: "House" })
+    );
+    const body = (await response.json()) as FeedPageResponse;
+    expect(body.total).toBe(2);
+    expect(body.has_more).toBe(false);
+    expect(body.items.map((item) => item.bill.number)).toEqual([1, 3]);
+    expect(body.items.every((item) => item.passage_votes.some((v) => v.chamber === "House"))).toBe(
+      true
+    );
+    const both = body.items.find((item) => item.bill.number === 3);
+    expect(both?.passage_votes.map((v) => v.chamber)).toEqual(["House", "Senate"]);
+  });
+
+  it("filters feed by chamber=Senate to bills with a Senate passage vote", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?chamber=Senate"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ chamber: "Senate" })
+    );
+    const body = (await response.json()) as FeedPageResponse;
+    expect(body.total).toBe(2);
+    expect(body.items.map((item) => item.bill.number)).toEqual([2, 3]);
+    expect(body.items.every((item) => item.passage_votes.some((v) => v.chamber === "Senate"))).toBe(
+      true
+    );
+  });
+
+  it("includes bills passed by both chambers under either chamber filter", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    const house = (await (
+      await handlePublicFetch(
+        new Request("https://worker.example.com/feed/latest.json?chamber=House"),
+        createMockEnv() as any
+      )
+    ).json()) as FeedPageResponse;
+    const senate = (await (
+      await handlePublicFetch(
+        new Request("https://worker.example.com/feed/latest.json?chamber=Senate"),
+        createMockEnv() as any
+      )
+    ).json()) as FeedPageResponse;
+    expect(house.items.some((item) => item.bill.number === 3)).toBe(true);
+    expect(senate.items.some((item) => item.bill.number === 3)).toBe(true);
+  });
+
+  it("rejects invalid feed chamber values with bad_request", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?chamber=house"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(400);
+    expect(mockBuildFeedPage).not.toHaveBeenCalled();
+    const body = await response.json();
+    expect(body).toEqual({
+      error: "bad_request",
+      message: "chamber must be House or Senate",
+    });
+  });
+
+  it("omits chamber filter when chamber is absent or empty", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    const omitted = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json"),
+      createMockEnv() as any
+    );
+    const empty = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?chamber="),
+      createMockEnv() as any
+    );
+    expect(omitted.status).toBe(200);
+    expect(empty.status).toBe(200);
+    expect(mockBuildFeedPage).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ chamber: undefined })
+    );
+    expect(mockBuildFeedPage).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ chamber: undefined })
+    );
+    const omittedBody = (await omitted.json()) as FeedPageResponse;
+    expect(omittedBody.total).toBe(3);
+    expect(omittedBody.items).toHaveLength(3);
+  });
+
+  it("reflects filtered total and has_more for chamber pages", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?chamber=House&limit=1&offset=0"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as FeedPageResponse;
+    expect(body).toMatchObject({
+      total: 2,
+      limit: 1,
+      offset: 0,
+      has_more: true,
+    });
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]?.bill.number).toBe(1);
   });
 
   it("returns session stats", async () => {

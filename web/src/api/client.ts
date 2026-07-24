@@ -40,11 +40,18 @@ export async function fetchIngestMonitor(): Promise<IngestMonitorResponse> {
   return fetchJson<IngestMonitorResponse>('/debug/ingest.json')
 }
 
-export async function fetchFeed(options: { limit: number; offset: number }): Promise<FeedPageResponse> {
+export async function fetchFeed(options: {
+  limit: number
+  offset: number
+  chamber?: 'House' | 'Senate'
+}): Promise<FeedPageResponse> {
   const params = new URLSearchParams({
     limit: String(options.limit),
     offset: String(options.offset),
   })
+  if (options.chamber) {
+    params.set('chamber', options.chamber)
+  }
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
 }
 

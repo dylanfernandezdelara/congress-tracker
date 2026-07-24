@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
+
 import type { FeedItem } from '../api/types'
+import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryDisplay, isProceduralFeedItem } from '../utils/feedRowLabels'
@@ -48,6 +51,18 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
       ? (stages.find((stage) => stage.key === 'outcome')?.detail ?? null)
       : null
   const defectorsByRoll = useRollDefectors(item.passage_votes)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+
+  const handleCopyLink = async () => {
+    const ok = await copyTextToClipboard(buildBillShareUrl(item))
+    if (ok) setCopied(true)
+  }
 
   return (
     <div className="feed-row-detail">
@@ -88,6 +103,15 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
         >
           Read on congress.gov ↗
         </a>
+        <button
+          type="button"
+          className="feed-row-copy-link"
+          onClick={() => {
+            void handleCopyLink()
+          }}
+        >
+          {copied ? 'Copied' : 'Copy link'}
+        </button>
       </footer>
     </div>
   )

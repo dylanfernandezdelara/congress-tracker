@@ -41,25 +41,50 @@ async function bothChambers<T>(
   }
 }
 
-export function useStatsData() {
+export type UseStatsDataOptions = {
+  /** When false, skip rail fetches (callers can still show loading UI). */
+  enabled?: boolean
+}
+
+function withGateLoading<T>(result: {
+  data: T | null
+  error: string | null
+  isLoading: boolean
+}, enabled: boolean) {
+  return {
+    ...result,
+    // While gated off — and on the frame when the gate opens before useAsyncData's
+    // effect flips isLoading — keep loading chrome so rails don't flash empty.
+    isLoading:
+      !enabled ||
+      result.isLoading ||
+      (result.data === null && result.error === null),
+  }
+}
+
+export function useStatsData(options: UseStatsDataOptions = {}) {
+  const enabled = options.enabled ?? true
   const [retryKey, setRetryKey] = useState(0)
 
   const reload = () => setRetryKey((k) => k + 1)
 
   const session = useAsyncData<SessionStatsResponse>({
     deps: [retryKey],
+    enabled,
     load: fetchSessionStats,
     mapError: () => "Couldn't load session stats.",
   })
 
   const pulse = useAsyncData<PulseStatsResponse>({
     deps: [retryKey],
+    enabled,
     load: fetchPulseStats,
     mapError: () => "Couldn't load legislative pulse.",
   })
 
   const defectors = useAsyncData<ChamberPair<DefectorEntry[]>>({
     deps: [retryKey],
+    enabled,
     load: () =>
       bothChambers<DefectorEntry[]>(
         async (chamber) => (await fetchDefectors(chamber)).defectors,
@@ -71,6 +96,7 @@ export function useStatsData() {
 
   const portfolios = useAsyncData<ChamberPair<PortfolioMovers>>({
     deps: [retryKey],
+    enabled,
     load: () =>
       bothChambers<PortfolioMovers>(
         fetchPortfolioStats,
@@ -86,9 +112,9 @@ export function useStatsData() {
 
   return {
     reload,
-    session,
-    pulse,
-    defectors,
-    portfolios,
+    session: withGateLoading(session, enabled),
+    pulse: withGateLoading(pulse, enabled),
+    defectors: withGateLoading(defectors, enabled),
+    portfolios: withGateLoading(portfolios, enabled),
   }
 }

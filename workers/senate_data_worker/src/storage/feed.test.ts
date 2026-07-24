@@ -122,6 +122,30 @@ describe("buildFeedPage lifecycle attachment", () => {
     );
   });
 
+  it("forwards optional chamber to feed bill select and count", async () => {
+    await buildFeedPage(createEnv(), {
+      limit: 50,
+      offset: 0,
+      chamber: "Senate",
+      now: "2026-07-03",
+    });
+
+    expect(mockCountFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      "Senate"
+    );
+    expect(mockSelectFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      50,
+      0,
+      "Senate"
+    );
+  });
+
   it("attaches pending lifecycle with ten-day derivation (bulk read)", async () => {
     const page = await buildFeedPage(createEnv(), {
       limit: 50,

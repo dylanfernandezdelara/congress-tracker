@@ -1,7 +1,17 @@
-import type { NonPassageVoteStub, PassageVote } from "../types";
+import type { Chamber, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
+
+/** Bills with at least one passage roll in the given chamber (stubs never match). */
+const CHAMBER_PASSAGE_EXISTS = `EXISTS (
+         SELECT 1 FROM votes v
+         WHERE v.is_passage = 1
+           AND v.chamber = ?
+           AND v.bill_congress = combined.bill_congress
+           AND UPPER(v.bill_type) = combined.bill_type
+           AND v.bill_number = combined.bill_number
+       )`;
 
 export interface ExistingVoteKeyRow {
   chamber: string;
@@ -186,9 +196,15 @@ export async function selectFeedBills(
   voteLookbackDate: string,
   executiveSinceIso: string,
   limit: number,
-  offset = 0
+  offset = 0,
+  chamber?: Chamber
 ): Promise<BillVoteKey[]> {
   await ensureSchema(db);
+  const chamberClause = chamber ? `WHERE ${CHAMBER_PASSAGE_EXISTS}` : "";
+  const binds: Array<string | number> = [voteLookbackDate, executiveSinceIso];
+  if (chamber) binds.push(chamber);
+  binds.push(limit, offset);
+
   const { results } = await db
     .prepare(
       `WITH combined AS (
@@ -205,11 +221,12 @@ export async function selectFeedBills(
        )
        SELECT bill_congress, bill_type, bill_number, MAX(sort_date) AS latest_passage_date
        FROM combined
+       ${chamberClause}
        GROUP BY bill_congress, bill_type, bill_number
        ORDER BY latest_passage_date DESC
        LIMIT ? OFFSET ?`
     )
-    .bind(voteLookbackDate, executiveSinceIso, limit, offset)
+    .bind(...binds)
     .all<BillVoteKey>();
   return results ?? [];
 }
@@ -217,9 +234,14 @@ export async function selectFeedBills(
 export async function countFeedBills(
   db: D1Database,
   voteLookbackDate: string,
-  executiveSinceIso: string
+  executiveSinceIso: string,
+  chamber?: Chamber
 ): Promise<number> {
   await ensureSchema(db);
+  const chamberClause = chamber ? `WHERE ${CHAMBER_PASSAGE_EXISTS}` : "";
+  const binds: Array<string | number> = [voteLookbackDate, executiveSinceIso];
+  if (chamber) binds.push(chamber);
+
   const row = await db
     .prepare(
       `WITH combined AS (
@@ -234,9 +256,10 @@ export async function countFeedBills(
          WHERE p.posted_at >= ?
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
        )
-       SELECT COUNT(*) AS total FROM combined`
+       SELECT COUNT(*) AS total FROM combined
+       ${chamberClause}`
     )
-    .bind(voteLookbackDate, executiveSinceIso)
+    .bind(...binds)
     .first<{ total: number }>();
   return row?.total ?? 0;
 }

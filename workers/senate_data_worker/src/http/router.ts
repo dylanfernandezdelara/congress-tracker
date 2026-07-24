@@ -255,10 +255,22 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
   "/health": ({ env, json }) => healthResponse(env, json),
   "/debug/ingest.json": ({ env, json }) => ingestMonitorResponse(env, json),
   "/feed/latest.json": async ({ env, url, json }) => {
+    const chamberParam = url.searchParams.get("chamber");
+    let chamber: Chamber | undefined;
+    if (chamberParam !== null && chamberParam !== "") {
+      const parsed = parseChamber(chamberParam);
+      if (!parsed) {
+        return json(
+          { error: "bad_request", message: "chamber must be House or Senate" },
+          { status: 400 }
+        );
+      }
+      chamber = parsed;
+    }
     try {
       const limit = parseFeedLimit(url);
       const offset = parseFeedOffset(url, limit);
-      const feed = await buildFeedPage(env, { limit, offset });
+      const feed = await buildFeedPage(env, { limit, offset, chamber });
       return json(feed, {
         status: 200,
         headers: { "Cache-Control": cacheLatest },

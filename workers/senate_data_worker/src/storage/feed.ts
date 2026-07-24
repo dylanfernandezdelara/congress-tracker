@@ -27,6 +27,8 @@ import type { Chamber, FeedItem, FeedPageResponse } from "../types";
 export interface FeedPageOptions {
   limit: number;
   offset: number;
+  /** When set, only bills with a passage vote in this chamber. */
+  chamber?: Chamber;
   /** Injectable clock for ten-day derivation tests. */
   now?: Date | string;
 }
@@ -40,10 +42,11 @@ export async function buildFeedPage(
   const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
   const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
   const offset = Math.max(0, options.offset);
+  const chamber = options.chamber;
   const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
-    countFeedBills(env.DB, lookback, executiveSince),
-    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset),
+    countFeedBills(env.DB, lookback, executiveSince, chamber),
+    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 

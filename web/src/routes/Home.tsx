@@ -1,23 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
-import { fetchFeed, fetchNotableVotes } from '../api/client'
-import type { FeedItem, FeedPageResponse, NotableVotesResponse } from '../api/types'
+import { fetchNotableVotes } from '../api/client'
+import type { NotableVotesResponse } from '../api/types'
+import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedRow } from '../components/FeedRow'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RightRail } from '../components/RightRail'
-import { FEED_PAGE_SIZE } from '../constants/feed'
 import { useAsyncData } from '../hooks/useAsyncData'
+import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
+import { feedRowKey } from '../utils/billDeepLink'
 
 const LOOKBACK_DAYS = 45
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
-
-function feedRowKey(item: FeedItem): string {
-  return `${item.bill.congress}-${item.bill.type}-${item.bill.number}`
-}
 
 function FeedSkeleton() {
   return (
@@ -30,110 +28,52 @@ function FeedSkeleton() {
 }
 
 export default function Home() {
-  const [retryKey, setRetryKey] = useState(0)
-  const [items, setItems] = useState<FeedItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
-  const [nextOffset, setNextOffset] = useState(0)
-  const [feedError, setFeedError] = useState<string | null>(null)
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null)
-  const requestIdRef = useRef(0)
-  const appendLockRef = useRef(false)
-  const lastFeedModeRef = useRef<'replace' | 'append'>('replace')
-  const pageSize = FEED_PAGE_SIZE
   const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
+  const {
+    chamber,
+    items,
+    total,
+    hasMore,
+    feedError,
+    isInitialLoading,
+    isLoadingMore,
+    expandedRowKey,
+    feedSettled,
+    billMissingNotice,
+    lastFeedModeRef,
+    reloadFeed,
+    loadMore,
+    setChamberFilter,
+    toggleRow,
+    dismissBillMissingNotice,
+  } = useFeedPagination()
 
-  const { reload: reloadStats, session, pulse, defectors, portfolios } = useStatsData()
+  const [railRetryKey, setRailRetryKey] = useState(0)
+  const { reload: reloadStats, session, pulse, defectors, portfolios } = useStatsData({
+    enabled: feedSettled,
+  })
 
-  const loadFeedPage = useCallback(
-    async (offset: number, mode: 'replace' | 'append') => {
-      if (mode === 'append') {
-        if (appendLockRef.current) return
-        appendLockRef.current = true
-      } else {
-        // A replace supersedes any in-flight append; release the append lock so
-        // Load more is not stuck after the replace settles first.
-        appendLockRef.current = false
-      }
-
-      const requestId = ++requestIdRef.current
-      lastFeedModeRef.current = mode
-      if (mode === 'replace') {
-        setIsInitialLoading(true)
-        setIsLoadingMore(false)
-        setFeedError(null)
-      } else {
-        setIsLoadingMore(true)
-      }
-
-      try {
-        const page: FeedPageResponse = await fetchFeed({ limit: pageSize, offset })
-        if (requestId !== requestIdRef.current) return
-
-        setTotal(page.total)
-        setHasMore(page.has_more)
-        setNextOffset(page.offset + page.items.length)
-        setItems((prev) => {
-          if (mode === 'replace') return page.items
-          const seen = new Set(prev.map(feedRowKey))
-          const next = [...prev]
-          for (const item of page.items) {
-            const key = feedRowKey(item)
-            if (!seen.has(key)) {
-              seen.add(key)
-              next.push(item)
-            }
-          }
-          return next
-        })
-        setFeedError(null)
-      } catch {
-        if (requestId !== requestIdRef.current) return
-        // Keep previously loaded rows on failure (initial or append).
-        setFeedError("Couldn't load the feed.")
-      } finally {
-        if (mode === 'append' && requestId === requestIdRef.current) {
-          appendLockRef.current = false
-        }
-        if (requestId === requestIdRef.current) {
-          setIsInitialLoading(false)
-          setIsLoadingMore(false)
-        }
-      }
-    },
-    [pageSize],
-  )
-
-  const reloadFeed = useCallback(() => {
-    setExpandedRowKey(null)
-    setRetryKey((k) => k + 1)
-  }, [])
+  const handleReloadFeed = useCallback(() => {
+    reloadFeed()
+    setRailRetryKey((k) => k + 1)
+  }, [reloadFeed])
 
   const reloadAll = useCallback(() => {
-    reloadFeed()
+    handleReloadFeed()
     reloadStats()
-  }, [reloadFeed, reloadStats])
-
-  useEffect(() => {
-    void loadFeedPage(0, 'replace')
-  }, [retryKey, loadFeedPage])
+  }, [handleReloadFeed, reloadStats])
 
   const notableVotes = useAsyncData<NotableVotesResponse>({
-    deps: [retryKey],
+    deps: [railRetryKey],
+    enabled: feedSettled,
     load: () => fetchNotableVotes(3),
     mapError: () => "Couldn't load notable votes.",
   })
 
-  const loadMore = () => {
-    if (!hasMore || isLoadingMore || isInitialLoading) return
-    void loadFeedPage(nextOffset, 'append')
-  }
-
   const showFeed = items.length > 0
   const showSkeleton = isInitialLoading && items.length === 0
   const inFlight = isInitialLoading || isLoadingMore
+  const notableLoading = !feedSettled || notableVotes.isLoading
 
   const federalControl = (
     <FederalControlCompact
@@ -166,11 +106,16 @@ export default function Home() {
     <NotableVotesSection
       variant="compact"
       notable={notableVotes.data?.notable ?? null}
-      loading={notableVotes.isLoading}
+      loading={notableLoading}
       error={notableVotes.error}
-      onRetry={reloadFeed}
+      onRetry={handleReloadFeed}
     />
   )
+
+  const emptyCopy =
+    chamber === null
+      ? `No passage votes in the last ${LOOKBACK_DAYS} days.`
+      : `No ${chamber} passage votes in the last ${LOOKBACK_DAYS} days.`
 
   return (
     <div className="home-shell">
@@ -191,6 +136,23 @@ export default function Home() {
           </p>
         </header>
 
+        <div className="home-feed-toolbar">
+          <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
+        </div>
+
+        {billMissingNotice ? (
+          <div className="home-feed-notice" role="status">
+            <p className="home-feed-notice-text">That bill is no longer in the recent feed.</p>
+            <button
+              type="button"
+              className="home-feed-notice-dismiss"
+              onClick={dismissBillMissingNotice}
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
         {showSkeleton ? <FeedSkeleton /> : null}
 
         {feedError && items.length === 0 ? (
@@ -203,9 +165,18 @@ export default function Home() {
         ) : null}
 
         {!showSkeleton && !feedError && total === 0 && !inFlight ? (
-          <p className="text-[13px] text-faint">
-            No passage votes in the last {LOOKBACK_DAYS} days.
-          </p>
+          <div className="home-feed-empty">
+            <p className="text-[13px] text-faint">{emptyCopy}</p>
+            {chamber ? (
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setChamberFilter(null)}
+              >
+                Show all chambers
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {showFeed ? (
@@ -214,6 +185,7 @@ export default function Home() {
               <h2 className="home-feed-title">Chronological timeline</h2>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
+                {chamber ? ` · ${chamber}` : ''}
               </p>
             </div>
 
@@ -225,9 +197,7 @@ export default function Home() {
                     key={rowKey}
                     item={item}
                     isExpanded={expandedRowKey === rowKey}
-                    onToggle={() =>
-                      setExpandedRowKey((current) => (current === rowKey ? null : rowKey))
-                    }
+                    onToggle={() => toggleRow(item)}
                   />
                 )
               })}
@@ -243,7 +213,7 @@ export default function Home() {
                     if (lastFeedModeRef.current === 'append' && hasMore) {
                       loadMore()
                     } else {
-                      reloadFeed()
+                      handleReloadFeed()
                     }
                   }}
                 >
