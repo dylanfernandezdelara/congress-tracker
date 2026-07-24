@@ -28,7 +28,12 @@ const {
   fetchSenateMemberVotes: vi.fn(),
   getVoteRollMeta: vi.fn(),
   applyRollToMemberSessionStats: vi.fn(async () => {}),
-  reconcileMemberSessionStats: vi.fn(async () => false),
+  reconcileMemberSessionStats: vi.fn(async () => ({
+    repaired: false,
+    fullRebuild: false,
+    rollsRepaired: 0,
+    rollsRemaining: 0,
+  })),
   refreshMemberSessionStatsForBioguides: vi.fn(async () => {}),
 }));
 
@@ -121,7 +126,12 @@ describe("runMemberVotesPipeline", () => {
       vote_date: "2026-07-01",
     }));
     applyRollToMemberSessionStats.mockResolvedValue(undefined);
-    reconcileMemberSessionStats.mockResolvedValue(false);
+    reconcileMemberSessionStats.mockResolvedValue({
+      repaired: false,
+      fullRebuild: false,
+      rollsRepaired: 0,
+      rollsRemaining: 0,
+    });
     selectMemberVotesForRoll.mockResolvedValue([]);
     refreshMemberSessionStatsForBioguides.mockResolvedValue(undefined);
   });
@@ -136,6 +146,8 @@ describe("runMemberVotesPipeline", () => {
     expect(result.votesUpserted).toBe(4);
     // Members A and B appear on both rolls but are upserted once.
     expect(result.membersUpserted).toBe(2);
+    expect(result.statsRepaired).toBe(false);
+    expect(result.statsRollsRemaining).toBe(0);
     expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(2);
     expect(applyRollToMemberSessionStats).toHaveBeenCalledTimes(2);
     expect(reconcileMemberSessionStats).toHaveBeenCalledWith(env.DB, 119, 2);

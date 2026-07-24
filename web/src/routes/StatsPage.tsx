@@ -7,7 +7,7 @@ export default function StatsPage() {
   const { reload, session, pulse, defectors, portfolios } = useStatsData()
 
   return (
-    <main className="stats-page">
+    <main id="content" className="stats-page">
       <ChamberCompositionOverview
         composition={session.data?.composition ?? null}
         loading={session.isLoading}

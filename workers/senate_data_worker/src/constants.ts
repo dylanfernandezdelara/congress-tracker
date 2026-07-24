@@ -2,6 +2,8 @@
 export const FEED_MAX_BILLS = 50;
 export const FEED_DEFAULT_PAGE_SIZE = 50;
 export const FEED_MAX_PAGE_SIZE = 50;
+/** Max accepted length for feed `q` search (silently truncated). */
+export const FEED_SEARCH_MAX_LENGTH = 100;
 export const VOTE_LOOKBACK_DAYS = 45;
 /** Bills with executive signals stay feed-visible for this many days. */
 export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
@@ -25,6 +27,12 @@ export const LIFECYCLE_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
  * pipeline be re-invoked until `rollsRemaining` reaches 0.
  */
 export const MEMBER_VOTES_MAX_ROLLS_PER_RUN = 150;
+
+/**
+ * Max rolls to repair per member-session-stats reconcile invocation when drift
+ * is detected. Remaining drifted rolls are reported so the next run continues.
+ */
+export const MEMBER_SESSION_STATS_MAX_ROLLS_PER_RECONCILE = 25;
 
 /** Minimum seated members to treat a chamber roster as complete (real Congress data). */
 export const HOUSE_ROSTER_MIN = 400;

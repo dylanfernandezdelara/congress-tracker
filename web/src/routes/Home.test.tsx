@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -233,6 +233,7 @@ describe('Home', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.clearAllMocks()
     clearMemberProfileCache()
     document.body.style.overflow = ''
@@ -511,7 +512,7 @@ describe('Home', () => {
     expect(await screen.findByText('Federal Control')).toBeInTheDocument()
   })
 
-  it('clears stale rows immediately when the chamber filter changes', async () => {
+  it('keeps rows visible with a busy state while the chamber filter refetches', async () => {
     const senateItem = makeFeedItem({
       bill: { congress: 119, type: 'S', number: 2, title: 'Senate bill' },
       digest: {
@@ -554,15 +555,164 @@ describe('Home', () => {
           }),
       )
 
-    renderHome()
+    const { container } = renderHome()
     expect(await screen.findByText('Senate headline')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('radio', { name: 'House' }))
-    expect(screen.queryByText('Senate headline')).not.toBeInTheDocument()
-    expect(screen.queryByText('House headline')).not.toBeInTheDocument()
+    expect(screen.getByText('Senate headline')).toBeInTheDocument()
+    expect(container.querySelector('#feed-top')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelector('.feed-list.is-refreshing')).not.toBeNull()
+    expect(container.querySelector('.feed-row-skeleton')).toBeNull()
 
     resolveHouse(pageResponse([houseItem], { total: 1 }))
     expect(await screen.findByText('House headline')).toBeInTheDocument()
+    expect(screen.queryByText('Senate headline')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(container.querySelector('#feed-top')).not.toHaveAttribute('aria-busy')
+    })
+  })
+
+  it('debounces search input, syncs ?q=, and refetches without flashing the skeleton', async () => {
+    const allItem = makeFeedItem({
+      digest: {
+        headline: 'All bills headline',
+        what_it_does: 'Summary',
+        key_points: ['Point'],
+        terms_explained: [],
+      },
+    })
+    const matchItem = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 1, title: 'Defense Act' },
+      digest: {
+        headline: 'Defense match',
+        what_it_does: 'Summary',
+        key_points: ['Point'],
+        terms_explained: [],
+      },
+    })
+
+    fetchFeed
+      .mockResolvedValueOnce(pageResponse([allItem], { total: 1 }))
+      .mockResolvedValueOnce(pageResponse([matchItem], { total: 1 }))
+
+    const { container } = renderHome()
+    expect(await screen.findByText('All bills headline')).toBeInTheDocument()
+    expect(fetchFeed).toHaveBeenCalledTimes(1)
+
+    const input = screen.getByRole('searchbox', { name: 'Search bills' })
+    vi.useFakeTimers()
+    fireEvent.change(input, { target: { value: 'defense' } })
+    expect(fetchFeed).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      vi.advanceTimersByTime(299)
+    })
+    expect(fetchFeed).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+    })
+    vi.useRealTimers()
+
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, q: 'defense' })
+    })
+    expect(screen.getByTestId('search-params')).toHaveTextContent('q=defense')
+    expect(await screen.findByText('Defense match')).toBeInTheDocument()
+    expect(container.querySelector('.feed-row-skeleton')).toBeNull()
+  })
+
+  it('refetches immediately on Enter and clear', async () => {
+    fetchFeed.mockResolvedValue(pageResponse([makeFeedItem()], { total: 1 }))
+    renderHome()
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+
+    const input = screen.getByRole('searchbox', { name: 'Search bills' })
+    fireEvent.change(input, { target: { value: 'hr1' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, q: 'hr1' })
+    })
+    expect(screen.getByTestId('search-params')).toHaveTextContent('q=hr1')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+    })
+    expect(screen.getByTestId('search-params').textContent).not.toContain('q=')
+  })
+
+  it('clears search on Escape from the search input', async () => {
+    fetchFeed.mockResolvedValue(pageResponse([makeFeedItem()], { total: 1 }))
+    renderHome('/?q=housing')
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+
+    const input = screen.getByRole('searchbox', { name: 'Search bills' })
+    expect(input).toHaveValue('housing')
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+    })
+    expect(screen.getByTestId('search-params').textContent).not.toContain('q=')
+    expect(input).toHaveValue('')
+  })
+
+  it('shows search empty-state copy with a clear action and chamber context', async () => {
+    fetchFeed.mockResolvedValue(pageResponse([], { total: 0 }))
+    renderHome('/?chamber=House&q=xyz')
+
+    expect(await screen.findByText('No House matches for “xyz”.')).toBeInTheDocument()
+    expect(fetchFeed).toHaveBeenCalledWith({
+      limit: 15,
+      offset: 0,
+      chamber: 'House',
+      q: 'xyz',
+    })
+
+    // Toolbar × and empty-state CTA share the accessible name; use the empty CTA.
+    const clearActions = screen.getAllByRole('button', { name: 'Clear search' })
+    fireEvent.click(clearActions[clearActions.length - 1]!)
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({
+        limit: 15,
+        offset: 0,
+        chamber: 'House',
+      })
+    })
+    expect(screen.getByTestId('search-params')).toHaveTextContent('chamber=House')
+    expect(screen.getByTestId('search-params').textContent).not.toContain('q=')
+  })
+
+  it('combines search with chamber and preserves bill deep links in the URL', async () => {
+    fetchFeed.mockResolvedValue(pageResponse([], { total: 0, has_more: false }))
+    renderHome('/?chamber=Senate&q=sample&bill=119-s-2')
+
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenCalledWith({
+        limit: 15,
+        offset: 0,
+        chamber: 'Senate',
+        q: 'sample',
+      })
+    })
+    expect(
+      await screen.findByText('That bill is no longer in the recent feed.'),
+    ).toBeInTheDocument()
+
+    const params = screen.getByTestId('search-params').textContent ?? ''
+    expect(params).toContain('chamber=Senate')
+    expect(params).toContain('q=sample')
+    expect(params).toContain('bill=119-s-2')
+  })
+
+  it('exposes a skip link targeting the main content landmark', async () => {
+    renderHome()
+    const skip = screen.getByRole('link', { name: 'Skip to content' })
+    expect(skip).toHaveAttribute('href', '#content')
+    expect(document.getElementById('content')?.tagName).toBe('MAIN')
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
   })
 
   it('scopes deep links to the active chamber filter', async () => {

@@ -29,6 +29,8 @@ export interface FeedPageOptions {
   offset: number;
   /** When set, only bills with a passage vote in this chamber. */
   chamber?: Chamber;
+  /** Optional free-text search (title, policy area, headline, bill id). */
+  q?: string;
   /** Injectable clock for ten-day derivation tests. */
   now?: Date | string;
 }
@@ -43,10 +45,11 @@ export async function buildFeedPage(
   const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
   const offset = Math.max(0, options.offset);
   const chamber = options.chamber;
+  const q = options.q;
   const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
-    countFeedBills(env.DB, lookback, executiveSince, chamber),
-    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber),
+    countFeedBills(env.DB, lookback, executiveSince, chamber, q),
+    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber, q),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 

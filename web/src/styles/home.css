@@ -27,8 +27,115 @@
 
   .home-feed-toolbar {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
     margin: 0 0 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .home-feed-toolbar {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+  }
+
+  .feed-search {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    width: 100%;
+  }
+
+  @media (min-width: 640px) {
+    .feed-search {
+      width: auto;
+      flex: 1 1 auto;
+      max-width: 16rem;
+      margin-left: auto;
+    }
+  }
+
+  .feed-search-input {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 0.35rem 0;
+    border: none;
+    border-bottom: 1px solid hsl(var(--twc-border));
+    border-radius: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: -0.15px;
+    line-height: 1.3;
+    color: hsl(var(--twc-foreground));
+    appearance: none;
+  }
+
+  .feed-search-input::placeholder {
+    color: hsl(var(--twc-faint));
+  }
+
+  .feed-search-input::-webkit-search-decoration,
+  .feed-search-input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .feed-search-input:focus {
+    outline: none;
+    border-bottom-color: hsl(var(--twc-foreground));
+  }
+
+  .feed-search-input:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+    border-bottom-color: hsl(var(--twc-foreground));
+  }
+
+  .feed-search-clear {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0.25rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: hsl(var(--twc-secondary));
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  /* Expand the hit target without shifting toolbar layout. */
+  .feed-search-clear::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+
+  .feed-search-clear-glyph {
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .feed-search-clear:hover {
+    color: hsl(var(--twc-foreground));
+    background: hsl(var(--twc-surface-subtle));
+  }
+
+  .feed-search-clear:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
   }
 
   .chamber-filter {
@@ -136,6 +243,7 @@
     margin: 0;
     font-size: 12px;
     font-weight: 400;
+    font-variant-numeric: tabular-nums;
     color: hsl(var(--twc-faint));
   }
 
@@ -210,6 +318,7 @@
   .federal-compact-seats {
     margin: 0;
     font-size: 12px;
+    font-variant-numeric: tabular-nums;
     color: hsl(var(--twc-secondary));
   }
 
@@ -275,6 +384,7 @@
     margin: 0;
     font-size: 12px;
     line-height: 1.4;
+    font-variant-numeric: tabular-nums;
     color: hsl(var(--twc-faint));
   }
 

@@ -134,12 +134,23 @@ function filteredFeedPage(options: {
   limit: number;
   offset: number;
   chamber?: "House" | "Senate";
+  q?: string;
 }): FeedPageResponse {
-  const filtered = options.chamber
+  let filtered = options.chamber
     ? FEED_FIXTURE.filter((item) =>
         item.passage_votes.some((vote) => vote.chamber === options.chamber)
       )
     : FEED_FIXTURE;
+  if (options.q) {
+    const needle = options.q.toLowerCase();
+    filtered = filtered.filter(
+      (item) =>
+        (item.bill.title ?? "").toLowerCase().includes(needle) ||
+        (item.policy_area ?? "").toLowerCase().includes(needle) ||
+        (item.digest?.headline ?? "").toLowerCase().includes(needle) ||
+        `${item.bill.type}${item.bill.number}`.toLowerCase().includes(needle.replace(/[^a-z0-9]/gi, ""))
+    );
+  }
   const total = filtered.length;
   const items = filtered.slice(options.offset, options.offset + options.limit);
   return {
@@ -351,6 +362,70 @@ describe("HTTP API", () => {
       has_more: true,
     });
     expect(body.items).toHaveLength(1);
+    expect(body.items[0]?.bill.number).toBe(1);
+  });
+
+  it("forwards q search and ignores empty/whitespace q", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?q=housing"),
+      createMockEnv() as any
+    );
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ q: "housing" })
+    );
+
+    mockBuildFeedPage.mockClear();
+    await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?q=%20%20"),
+      createMockEnv() as any
+    );
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ q: undefined })
+    );
+  });
+
+  it("silently truncates q to 100 chars", async () => {
+    const long = "b".repeat(150);
+    await handlePublicFetch(
+      new Request(`https://worker.example.com/feed/latest.json?q=${long}`),
+      createMockEnv() as any
+    );
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ q: "b".repeat(100) })
+    );
+  });
+
+  it("combines q with chamber and reflects filtered total/has_more", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => {
+      // Fixture titles are "Bill N" — match bill 1 under House.
+      if (options.q === "Bill 1") {
+        return {
+          items: [FEED_FIXTURE[0]!],
+          total: 1,
+          limit: options.limit,
+          offset: options.offset,
+          has_more: false,
+        };
+      }
+      return filteredFeedPage(options);
+    });
+    const response = await handlePublicFetch(
+      new Request(
+        "https://worker.example.com/feed/latest.json?chamber=House&q=Bill%201&limit=1&offset=0"
+      ),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ chamber: "House", q: "Bill 1" })
+    );
+    const body = (await response.json()) as FeedPageResponse;
+    expect(body).toMatchObject({ total: 1, has_more: false });
     expect(body.items[0]?.bill.number).toBe(1);
   });
 

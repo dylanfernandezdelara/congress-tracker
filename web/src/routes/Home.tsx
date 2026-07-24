@@ -5,6 +5,7 @@ import type { NotableVotesResponse } from '../api/types'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedRow } from '../components/FeedRow'
+import { FeedSearchInput } from '../components/FeedSearchInput'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RightRail } from '../components/RightRail'
@@ -27,10 +28,21 @@ function FeedSkeleton() {
   )
 }
 
+function emptyFeedCopy(chamber: 'House' | 'Senate' | null, searchQuery: string): string {
+  if (searchQuery) {
+    if (chamber) return `No ${chamber} matches for “${searchQuery}”.`
+    return `No matches for “${searchQuery}”.`
+  }
+  if (chamber) return `No ${chamber} passage votes in the last ${LOOKBACK_DAYS} days.`
+  return `No passage votes in the last ${LOOKBACK_DAYS} days.`
+}
+
 export default function Home() {
   const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
   const {
     chamber,
+    searchQuery,
+    searchDraft,
     items,
     total,
     hasMore,
@@ -44,6 +56,9 @@ export default function Home() {
     reloadFeed,
     loadMore,
     setChamberFilter,
+    setSearchDraft,
+    submitSearch,
+    clearSearch,
     toggleRow,
     dismissBillMissingNotice,
   } = useFeedPagination()
@@ -72,6 +87,7 @@ export default function Home() {
 
   const showFeed = items.length > 0
   const showSkeleton = isInitialLoading && items.length === 0
+  const listRefreshing = isInitialLoading && items.length > 0
   const inFlight = isInitialLoading || isLoadingMore
   const notableLoading = !feedSettled || notableVotes.isLoading
 
@@ -112,10 +128,14 @@ export default function Home() {
     />
   )
 
-  const emptyCopy =
-    chamber === null
-      ? `No passage votes in the last ${LOOKBACK_DAYS} days.`
-      : `No ${chamber} passage votes in the last ${LOOKBACK_DAYS} days.`
+  const emptyCopy = emptyFeedCopy(chamber, searchQuery)
+
+  const countSuffix = [
+    chamber ? chamber : null,
+    searchQuery ? `“${searchQuery}”` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <div className="home-shell">
@@ -128,7 +148,7 @@ export default function Home() {
         </aside>
       ) : null}
 
-      <main className="home-feed-column feed-main">
+      <main id="content" className="home-feed-column feed-main">
         <header className="home-page-head">
           <h2 className="home-page-title">Congressional passage votes</h2>
           <p className="home-page-description">
@@ -138,6 +158,12 @@ export default function Home() {
 
         <div className="home-feed-toolbar">
           <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
+          <FeedSearchInput
+            value={searchDraft}
+            onChange={setSearchDraft}
+            onSubmit={submitSearch}
+            onClear={clearSearch}
+          />
         </div>
 
         {billMissingNotice ? (
@@ -167,7 +193,12 @@ export default function Home() {
         {!showSkeleton && !feedError && total === 0 && !inFlight ? (
           <div className="home-feed-empty">
             <p className="text-[13px] text-faint">{emptyCopy}</p>
-            {chamber ? (
+            {searchQuery ? (
+              <button type="button" className="ghost-button" onClick={clearSearch}>
+                Clear search
+              </button>
+            ) : null}
+            {chamber && !searchQuery ? (
               <button
                 type="button"
                 className="ghost-button"
@@ -180,16 +211,16 @@ export default function Home() {
         ) : null}
 
         {showFeed ? (
-          <section id="feed-top">
+          <section id="feed-top" aria-busy={listRefreshing || undefined}>
             <div className="home-feed-header">
               <h2 className="home-feed-title">Chronological timeline</h2>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
-                {chamber ? ` · ${chamber}` : ''}
+                {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
 
-            <ul className="feed-list">
+            <ul className={`feed-list${listRefreshing ? ' is-refreshing' : ''}`}>
               {items.map((item) => {
                 const rowKey = feedRowKey(item)
                 return (

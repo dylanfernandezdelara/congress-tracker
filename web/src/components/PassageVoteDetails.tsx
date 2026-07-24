@@ -12,16 +12,37 @@ function formatVoteSide(side: 'yea' | 'nay'): string {
   return side === 'yea' ? 'Yea' : 'Nay'
 }
 
-function VoteSplitBar({ yeas, nays }: { yeas: number; nays: number }) {
+export function VoteSplitBar({
+  chamber,
+  yeas,
+  nays,
+}: {
+  chamber: string
+  yeas: number
+  nays: number
+}) {
   const total = yeas + nays
+  const label = `${chamber} vote: ${yeas} yea, ${nays} nay`
   if (total === 0) {
-    return <div className="h-1 w-full rounded-full bg-surface-subtle" />
+    return (
+      <div
+        role="img"
+        aria-label={label}
+        className="h-1 w-full rounded-full bg-surface-subtle"
+      />
+    )
   }
 
   return (
-    <div className="flex h-1 w-full gap-0.5 overflow-hidden rounded-full bg-surface-subtle">
-      {yeas > 0 ? <div className="rounded-full bg-pass" style={{ flex: yeas }} /> : null}
-      {nays > 0 ? <div className="rounded-full bg-fail opacity-75" style={{ flex: nays }} /> : null}
+    <div
+      role="img"
+      aria-label={label}
+      className="flex h-1 w-full gap-0.5 overflow-hidden rounded-full bg-surface-subtle"
+    >
+      {yeas > 0 ? <div className="rounded-full bg-pass" style={{ flex: yeas }} aria-hidden="true" /> : null}
+      {nays > 0 ? (
+        <div className="rounded-full bg-fail opacity-75" style={{ flex: nays }} aria-hidden="true" />
+      ) : null}
     </div>
   )
 }
@@ -103,7 +124,7 @@ export function PassageVoteDetails({
               </div>
               <p className="text-sm text-faint">{formatVoteDate(vote.date)}</p>
             </div>
-            <VoteSplitBar yeas={vote.yeas} nays={vote.nays} />
+            <VoteSplitBar chamber={vote.chamber} yeas={vote.yeas} nays={vote.nays} />
             <div className="feed-row-defectors">
               <p className="feed-row-defectors-label">Party defectors</p>
               <PartyDefectorsList vote={vote} state={defectorsState} />

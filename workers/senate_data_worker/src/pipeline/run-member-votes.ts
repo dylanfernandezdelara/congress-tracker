@@ -36,6 +36,14 @@ export interface RunMemberVotesResult {
   rollsRemaining: number;
   membersUpserted: number;
   votesUpserted: number;
+  /** Session-stats reconcile wrote repairs this run. */
+  statsRepaired: boolean;
+  /** Empty denormalized tables triggered a full clear+rebuild. */
+  statsFullRebuild: boolean;
+  /** Drifted rolls repaired this reconcile pass. */
+  statsRollsRepaired: number;
+  /** Drifted rolls still outstanding after bounded reconcile. */
+  statsRollsRemaining: number;
 }
 
 async function refreshStatsForBioguides(
@@ -226,8 +234,8 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
   }
 
   // Repair / backfill after ingest so a heavy rebuild cannot block new rolls.
-  // Covers pre-stats deploys and any residual drift (e.g. partial failures).
-  await reconcileMemberSessionStats(env.DB, congress, session);
+  // Incremental + bounded; empty denormalized tables still full-rebuild once.
+  const statsReconcile = await reconcileMemberSessionStats(env.DB, congress, session);
 
   return {
     rollsProcessed,
@@ -236,5 +244,9 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
     rollsRemaining: Math.max(0, rolls.length - index),
     membersUpserted,
     votesUpserted,
+    statsRepaired: statsReconcile.repaired,
+    statsFullRebuild: statsReconcile.fullRebuild,
+    statsRollsRepaired: statsReconcile.rollsRepaired,
+    statsRollsRemaining: statsReconcile.rollsRemaining,
   };
 }

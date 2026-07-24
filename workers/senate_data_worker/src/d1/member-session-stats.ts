@@ -160,6 +160,27 @@ export async function selectRecentMemberCrossVotes(
   });
 }
 
+export async function selectMemberCrossVoteBioguidesForRoll(
+  db: D1Database,
+  roll: {
+    chamber: string;
+    congress: number;
+    session: number;
+    roll_number: number;
+  }
+): Promise<string[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT bioguide_id
+       FROM member_cross_votes
+       WHERE chamber = ? AND congress = ? AND session = ? AND roll_number = ?`
+    )
+    .bind(roll.chamber, roll.congress, roll.session, roll.roll_number)
+    .all<{ bioguide_id: string }>();
+  return (results ?? []).map((row) => row.bioguide_id);
+}
+
 export async function deleteMemberCrossVotesForRoll(
   db: D1Database,
   roll: {
@@ -266,6 +287,130 @@ export async function sumMemberSessionVotesCast(
     .bind(congress, session)
     .first<{ total: number }>();
   return row?.total ?? 0;
+}
+
+export async function countMemberSessionStatsRows(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM member_session_stats
+       WHERE congress = ? AND session = ?`
+    )
+    .bind(congress, session)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+export async function countMemberCrossVotesInSession(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM member_cross_votes
+       WHERE congress = ? AND session = ?`
+    )
+    .bind(congress, session)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+export type SessionRollKey = {
+  chamber: string;
+  roll_number: number;
+};
+
+/**
+ * Rolls that need repair: those involving members whose session tallies drifted
+ * vs member_votes, plus rolls with orphan cross-vote rows (no member_votes).
+ * Ordered stably so bounded reconcile can resume across runs.
+ */
+export async function selectDriftedSessionRolls(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<SessionRollKey[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `WITH vote_counts AS (
+         SELECT bioguide_id, COUNT(*) AS votes_cast
+         FROM member_votes
+         WHERE congress = ?1 AND session = ?2
+         GROUP BY bioguide_id
+       ),
+       drifted_members AS (
+         SELECT vc.bioguide_id
+         FROM vote_counts vc
+         LEFT JOIN member_session_stats mss
+           ON mss.bioguide_id = vc.bioguide_id
+          AND mss.congress = ?1 AND mss.session = ?2
+         WHERE mss.bioguide_id IS NULL OR mss.votes_cast != vc.votes_cast
+         UNION
+         SELECT mss.bioguide_id
+         FROM member_session_stats mss
+         WHERE mss.congress = ?1 AND mss.session = ?2
+           AND NOT EXISTS (
+             SELECT 1 FROM member_votes mv
+             WHERE mv.bioguide_id = mss.bioguide_id
+               AND mv.congress = mss.congress
+               AND mv.session = mss.session
+           )
+       ),
+       drifted_rolls AS (
+         SELECT DISTINCT mv.chamber AS chamber, mv.roll_number AS roll_number
+         FROM member_votes mv
+         WHERE mv.congress = ?1 AND mv.session = ?2
+           AND mv.bioguide_id IN (SELECT bioguide_id FROM drifted_members)
+         UNION
+         SELECT mcv.chamber, mcv.roll_number
+         FROM member_cross_votes mcv
+         WHERE mcv.congress = ?1 AND mcv.session = ?2
+           AND NOT EXISTS (
+             SELECT 1 FROM member_votes mv
+             WHERE mv.chamber = mcv.chamber
+               AND mv.congress = mcv.congress
+               AND mv.session = mcv.session
+               AND mv.roll_number = mcv.roll_number
+           )
+       )
+       SELECT chamber, roll_number
+       FROM drifted_rolls
+       ORDER BY chamber, roll_number`
+    )
+    .bind(congress, session)
+    .all<SessionRollKey>();
+  return results ?? [];
+}
+
+/** Bioguides with session stats rows but no member_votes (orphans). */
+export async function selectOrphanSessionStatsBioguides(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<string[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT mss.bioguide_id
+       FROM member_session_stats mss
+       WHERE mss.congress = ? AND mss.session = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM member_votes mv
+           WHERE mv.bioguide_id = mss.bioguide_id
+             AND mv.congress = mss.congress
+             AND mv.session = mss.session
+         )`
+    )
+    .bind(congress, session)
+    .all<{ bioguide_id: string }>();
+  return (results ?? []).map((row) => row.bioguide_id);
 }
 
 type PositionTally = { votes_cast: number; yea_count: number; nay_count: number };

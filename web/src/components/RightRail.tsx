@@ -26,7 +26,7 @@ function ChamberPulseSection({ title, data }: { title: string; data: ChamberPuls
                 <span className="font-medium text-foreground">
                   {formatShortBillId(v.bill_type, v.bill_number)}
                 </span>
-                <span className="text-faint">
+                <span className="text-faint tabular-nums">
                   {' '}
                   · {v.yeas}–{v.nays} ({v.margin}) · {formatVoteDate(v.vote_date)}
                 </span>

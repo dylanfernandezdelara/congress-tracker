@@ -56,12 +56,12 @@ describe("selectExistingVoteKeys", () => {
   });
 });
 
-describe("selectFeedBills / countFeedBills chamber filter", () => {
+describe("selectFeedBills / countFeedBills chamber + q filters", () => {
   beforeEach(() => {
     resetSchemaFlag();
   });
 
-  it("omits chamber EXISTS when chamber is not provided", async () => {
+  it("omits chamber/q filters when not provided", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([]);
     await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", 50, 0);
     await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z");
@@ -70,6 +70,7 @@ describe("selectFeedBills / countFeedBills chamber filter", () => {
     expect(feedSql.length).toBeGreaterThanOrEqual(2);
     for (const sql of feedSql) {
       expect(sql).not.toContain("v.chamber = ?");
+      expect(sql).not.toContain("bill_digests");
       expect(sql).toMatch(/is_passage = 1/);
     }
     const selectSql = feedSql.find((sql) => sql.includes("LIMIT ? OFFSET ?"));
@@ -119,6 +120,79 @@ describe("selectFeedBills / countFeedBills chamber filter", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "Senate",
+    ]);
+  });
+
+  it("adds q search binds for title/policy/headline/bill-id and keeps executive UNION ALL", async () => {
+    const { db, preparedSql, bindsBySql } = createMockDb([]);
+    await selectFeedBills(
+      db,
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      20,
+      0,
+      undefined,
+      "hr1"
+    );
+    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", undefined, "hr1");
+
+    const selectSql = preparedSql.find(
+      (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
+    )!;
+    const countSql = preparedSql.find(
+      (sql) => sql.includes("WITH combined AS") && sql.includes("SELECT COUNT(*) AS total")
+    )!;
+    expect(selectSql).toContain("UNION ALL");
+    expect(selectSql).toContain("executive_boost");
+    expect(selectSql).toContain("bill_digests");
+    expect(selectSql).toContain("$.headline");
+    expect(bindsBySql.get(selectSql)).toEqual([
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "%hr1%",
+      "%hr1%",
+      "%hr1%",
+      "hr1%",
+      20,
+      0,
+    ]);
+    expect(bindsBySql.get(countSql)).toEqual([
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "%hr1%",
+      "%hr1%",
+      "%hr1%",
+      "hr1%",
+    ]);
+  });
+
+  it("ANDs chamber with q and escapes LIKE wildcards in q", async () => {
+    const { db, preparedSql, bindsBySql } = createMockDb([]);
+    await selectFeedBills(
+      db,
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      5,
+      0,
+      "Senate",
+      "100%"
+    );
+
+    const selectSql = preparedSql.find(
+      (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
+    )!;
+    expect(selectSql).toContain("v.chamber = ?");
+    expect(selectSql).toContain(" AND ");
+    expect(bindsBySql.get(selectSql)).toEqual([
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "Senate",
+      "%100\\%%",
+      "%100\\%%",
+      "%100\\%%",
+      "100%",
+      5,
+      0,
     ]);
   });
 });

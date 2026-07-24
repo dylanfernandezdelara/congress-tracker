@@ -1,19 +1,41 @@
+import { MEMBER_SESSION_STATS_MAX_ROLLS_PER_RECONCILE } from "../constants";
 import type { VoteRollMeta } from "../d1/votes";
+import { getVoteRollMeta } from "../d1/votes";
 import { getMembersByIds } from "../d1/members";
-import { selectMemberVotesForSession } from "../d1/member-votes";
+import {
+  selectMemberVotesForRoll,
+  selectMemberVotesForSession,
+} from "../d1/member-votes";
 import {
   clearMemberSessionStatsForSession,
+  countMemberCrossVotesInSession,
+  countMemberSessionStatsRows,
   countMemberVotesInSession,
+  deleteMemberCrossVotesForRoll,
   refreshMemberSessionStatsForBioguides,
   replaceMemberCrossVotesForRoll,
+  selectDriftedSessionRolls,
+  selectMemberCrossVoteBioguidesForRoll,
+  selectOrphanSessionStatsBioguides,
   sumMemberSessionVotesCast,
   type MemberCrossVoteRow,
+  type SessionRollKey,
 } from "../d1/member-session-stats";
 import { rollCrossVotes } from "./cross-votes";
 
 export type RollVotePosition = {
   bioguideId: string;
   position: string;
+};
+
+export type ReconcileMemberSessionStatsResult = {
+  /** True when any repair work ran (writes occurred). */
+  repaired: boolean;
+  /** True when the empty-table full clear+rebuild path ran. */
+  fullRebuild: boolean;
+  rollsRepaired: number;
+  /** Drifted rolls still outstanding after this bounded pass. */
+  rollsRemaining: number;
 };
 
 /**
@@ -29,6 +51,18 @@ export async function memberSessionStatsOutOfSync(
   if (voteCount === 0) return false;
   const statsSum = await sumMemberSessionVotesCast(db, congress, session);
   return statsSum !== voteCount;
+}
+
+async function denormalizedStatsEmpty(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<boolean> {
+  const [statsRows, crossRows] = await Promise.all([
+    countMemberSessionStatsRows(db, congress, session),
+    countMemberCrossVotesInSession(db, congress, session),
+  ]);
+  return statsRows === 0 && crossRows === 0;
 }
 
 function crossVoteRowsForRoll(
@@ -167,15 +201,115 @@ export async function rebuildMemberSessionStats(
   );
 }
 
-/** Rebuild when member_votes and member_session_stats disagree. */
+async function repairSessionRoll(
+  db: D1Database,
+  congress: number,
+  session: number,
+  roll: SessionRollKey
+): Promise<void> {
+  const rollKey = {
+    chamber: roll.chamber,
+    congress,
+    session,
+    roll_number: roll.roll_number,
+  };
+  const votes = await selectMemberVotesForRoll(db, rollKey);
+  if (votes.length === 0) {
+    // Orphan cross-vote rows for a roll with no member_votes: delete them, then
+    // refresh affected tallies so cross_vote_count cannot stay inflated.
+    const affected = await selectMemberCrossVoteBioguidesForRoll(db, rollKey);
+    await deleteMemberCrossVotesForRoll(db, rollKey);
+    if (affected.length > 0) {
+      await refreshMemberSessionStatsForBioguides(db, congress, session, affected);
+    }
+    return;
+  }
+
+  const rollMeta = await getVoteRollMeta(db, rollKey);
+  if (!rollMeta) {
+    // Cannot rebuild cross-votes without passage roll tallies. Drop stale cross
+    // rows for this roll and still refresh votes_cast so drift cannot stick
+    // across bounded reconcile passes.
+    await deleteMemberCrossVotesForRoll(db, rollKey);
+    await refreshMemberSessionStatsForBioguides(
+      db,
+      congress,
+      session,
+      votes.map((vote) => vote.bioguide_id)
+    );
+    return;
+  }
+
+  const roster = await getMembersByIds(
+    db,
+    votes.map((vote) => vote.bioguide_id)
+  );
+  const parties = new Map<string, string | null>();
+  for (const [id, record] of roster) {
+    parties.set(id, record.party);
+  }
+
+  await applyRollToMemberSessionStats(
+    db,
+    rollMeta,
+    votes.map((vote) => ({
+      bioguideId: vote.bioguide_id,
+      position: vote.position,
+    })),
+    parties
+  );
+}
+
+/**
+ * Repair drifted member_session_stats / member_cross_votes incrementally.
+ * - Empty denormalized tables → full clear+rebuild escape hatch.
+ * - Otherwise repair at most MEMBER_SESSION_STATS_MAX_ROLLS_PER_RECONCILE rolls
+ *   and report how many remain for the next run.
+ * - No-drift is a no-op (constant-time count queries, no writes).
+ */
 export async function reconcileMemberSessionStats(
   db: D1Database,
   congress: number,
-  session: number
-): Promise<boolean> {
+  session: number,
+  maxRolls: number = MEMBER_SESSION_STATS_MAX_ROLLS_PER_RECONCILE
+): Promise<ReconcileMemberSessionStatsResult> {
+  const noop: ReconcileMemberSessionStatsResult = {
+    repaired: false,
+    fullRebuild: false,
+    rollsRepaired: 0,
+    rollsRemaining: 0,
+  };
+
   if (!(await memberSessionStatsOutOfSync(db, congress, session))) {
-    return false;
+    return noop;
   }
-  await rebuildMemberSessionStats(db, congress, session);
-  return true;
+
+  if (await denormalizedStatsEmpty(db, congress, session)) {
+    await rebuildMemberSessionStats(db, congress, session);
+    return {
+      repaired: true,
+      fullRebuild: true,
+      rollsRepaired: 0,
+      rollsRemaining: 0,
+    };
+  }
+
+  const driftedRolls = await selectDriftedSessionRolls(db, congress, session);
+  const batch = driftedRolls.slice(0, Math.max(0, maxRolls));
+  for (const roll of batch) {
+    await repairSessionRoll(db, congress, session, roll);
+  }
+
+  const orphans = await selectOrphanSessionStatsBioguides(db, congress, session);
+  if (orphans.length > 0) {
+    await refreshMemberSessionStatsForBioguides(db, congress, session, orphans);
+  }
+
+  const rollsRemaining = Math.max(0, driftedRolls.length - batch.length);
+  return {
+    repaired: batch.length > 0 || orphans.length > 0,
+    fullRebuild: false,
+    rollsRepaired: batch.length,
+    rollsRemaining,
+  };
 }

@@ -134,7 +134,8 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "Senate"
+      "Senate",
+      undefined
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -142,7 +143,34 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      "Senate"
+      "Senate",
+      undefined
+    );
+  });
+
+  it("forwards optional q search to feed bill select and count", async () => {
+    await buildFeedPage(createEnv(), {
+      limit: 50,
+      offset: 0,
+      q: "housing",
+      now: "2026-07-03",
+    });
+
+    expect(mockCountFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      undefined,
+      "housing"
+    );
+    expect(mockSelectFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      50,
+      0,
+      undefined,
+      "housing"
     );
   });
 

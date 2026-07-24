@@ -44,6 +44,7 @@ export async function fetchFeed(options: {
   limit: number
   offset: number
   chamber?: 'House' | 'Senate'
+  q?: string
 }): Promise<FeedPageResponse> {
   const params = new URLSearchParams({
     limit: String(options.limit),
@@ -51,6 +52,10 @@ export async function fetchFeed(options: {
   })
   if (options.chamber) {
     params.set('chamber', options.chamber)
+  }
+  const q = options.q?.trim()
+  if (q) {
+    params.set('q', q)
   }
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
 }

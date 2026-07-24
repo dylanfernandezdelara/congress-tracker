@@ -117,6 +117,10 @@ describe("worker", () => {
         rollsRemaining: 0,
         membersUpserted: 2,
         votesUpserted: 400,
+        statsRepaired: false,
+        statsFullRebuild: false,
+        statsRollsRepaired: 0,
+        statsRollsRemaining: 0,
       },
     });
 

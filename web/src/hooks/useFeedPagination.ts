@@ -11,6 +11,8 @@ import {
 } from '../utils/billDeepLink'
 import { parseChamberFilter, type ChamberFilter } from '../utils/chamberFilter'
 
+const SEARCH_DEBOUNCE_MS = 300
+
 function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
@@ -25,16 +27,22 @@ function scrollRowIntoView(rowKey: string) {
   })
 }
 
-function deepLinkQueryKey(chamber: ChamberFilter | null, bill: string): string {
-  return `${chamber ?? ''}|${bill}`
+function deepLinkQueryKey(chamber: ChamberFilter | null, bill: string, q: string): string {
+  return `${chamber ?? ''}|${q}|${bill}`
+}
+
+function parseSearchQuery(value: string | null | undefined): string {
+  return value?.trim() ?? ''
 }
 
 export function useFeedPagination() {
   const [searchParams, setSearchParams] = useSearchParams()
   const chamber = parseChamberFilter(searchParams.get('chamber'))
   const billParam = searchParams.get('bill')
+  const committedQuery = parseSearchQuery(searchParams.get('q'))
 
   const [retryKey, setRetryKey] = useState(0)
+  const [draftQuery, setDraftQuery] = useState(committedQuery)
   const [items, setItems] = useState<FeedItem[]>([])
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -51,11 +59,15 @@ export function useFeedPagination() {
   const lastFeedModeRef = useRef<'replace' | 'append'>('replace')
   const deepLinkBillRef = useRef<string | null>(null)
   const deepLinkPhaseRef = useRef<'idle' | 'searching' | 'done'>('done')
-  /** Chamber+bill pair currently being searched or already resolved for deep link. */
+  /** Chamber+q+bill pair currently being searched or already resolved for deep link. */
   const deepLinkQueryRef = useRef<string | null>(null)
   const chamberRef = useRef(chamber)
   chamberRef.current = chamber
-  const loadedChamberRef = useRef<ChamberFilter | null | undefined>(undefined)
+  const queryRef = useRef(committedQuery)
+  queryRef.current = committedQuery
+  const loadedFilterRef = useRef<{ chamber: ChamberFilter | null; q: string } | undefined>(
+    undefined,
+  )
 
   const pageSize = FEED_PAGE_SIZE
 
@@ -80,7 +92,12 @@ export function useFeedPagination() {
   )
 
   const loadFeedPage = useCallback(
-    async (offset: number, mode: 'replace' | 'append', chamberFilter: ChamberFilter | null) => {
+    async (
+      offset: number,
+      mode: 'replace' | 'append',
+      chamberFilter: ChamberFilter | null,
+      q: string,
+    ) => {
       if (mode === 'append') {
         if (appendLockRef.current) return
         appendLockRef.current = true
@@ -105,6 +122,7 @@ export function useFeedPagination() {
           limit: pageSize,
           offset,
           ...(chamberFilter ? { chamber: chamberFilter } : {}),
+          ...(q ? { q } : {}),
         })
         if (requestId !== requestIdRef.current) return
 
@@ -154,24 +172,52 @@ export function useFeedPagination() {
     setRetryKey((k) => k + 1)
   }, [clearDeepLinkState, replaceSearchParams])
 
-  // Reset list immediately on chamber change so stale rows cannot be toggled/deep-linked
-  // while the replacement page is in flight.
+  const commitSearchQuery = useCallback(
+    (raw: string) => {
+      const next = parseSearchQuery(raw)
+      setDraftQuery(next)
+      setExpandedRowKey(null)
+      setBillMissingNotice(false)
+      replaceSearchParams((params) => {
+        if (next) params.set('q', next)
+        else params.delete('q')
+      })
+    },
+    [replaceSearchParams],
+  )
+
+  // Keep the input in sync when the URL changes externally (back/forward, deep link).
   useEffect(() => {
-    if (loadedChamberRef.current !== undefined && loadedChamberRef.current !== chamber) {
-      setItems([])
-      setTotal(0)
-      setHasMore(false)
-      setNextOffset(0)
+    setDraftQuery(committedQuery)
+  }, [committedQuery])
+
+  // Debounce draft → URL (immediate path handled by clear / Enter).
+  useEffect(() => {
+    if (parseSearchQuery(draftQuery) === committedQuery) return
+    const handle = window.setTimeout(() => {
+      commitSearchQuery(draftQuery)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(handle)
+  }, [draftQuery, committedQuery, commitSearchQuery])
+
+  // Reset expansion on chamber/search change; keep rows visible while the replacement
+  // page is in flight (skeleton only for true first load / empty list).
+  useEffect(() => {
+    const prev = loadedFilterRef.current
+    if (
+      prev !== undefined &&
+      (prev.chamber !== chamber || prev.q !== committedQuery)
+    ) {
       setExpandedRowKey(null)
       setFeedError(null)
     }
-    loadedChamberRef.current = chamber
-    void loadFeedPage(0, 'replace', chamber)
-  }, [retryKey, loadFeedPage, chamber])
+    loadedFilterRef.current = { chamber, q: committedQuery }
+    void loadFeedPage(0, 'replace', chamber, committedQuery)
+  }, [retryKey, loadFeedPage, chamber, committedQuery])
 
   const loadMore = useCallback(() => {
     if (!hasMore || isLoadingMore || isInitialLoading) return
-    void loadFeedPage(nextOffset, 'append', chamberRef.current)
+    void loadFeedPage(nextOffset, 'append', chamberRef.current, queryRef.current)
   }, [hasMore, isLoadingMore, isInitialLoading, loadFeedPage, nextOffset])
 
   const setChamberFilter = useCallback(
@@ -187,6 +233,24 @@ export function useFeedPagination() {
     },
     [clearDeepLinkState, replaceSearchParams],
   )
+
+  const setSearchDraft = useCallback(
+    (value: string) => {
+      setDraftQuery(value)
+      if (parseSearchQuery(value) === '') {
+        commitSearchQuery('')
+      }
+    },
+    [commitSearchQuery],
+  )
+
+  const submitSearch = useCallback(() => {
+    commitSearchQuery(draftQuery)
+  }, [commitSearchQuery, draftQuery])
+
+  const clearSearch = useCallback(() => {
+    commitSearchQuery('')
+  }, [commitSearchQuery])
 
   const toggleRow = useCallback(
     (item: FeedItem) => {
@@ -206,7 +270,7 @@ export function useFeedPagination() {
       } else {
         deepLinkPhaseRef.current = 'done'
         deepLinkBillRef.current = bill
-        deepLinkQueryRef.current = deepLinkQueryKey(chamberRef.current, bill)
+        deepLinkQueryRef.current = deepLinkQueryKey(chamberRef.current, bill, queryRef.current)
         replaceSearchParams((params) => {
           params.set('bill', bill)
         })
@@ -224,20 +288,20 @@ export function useFeedPagination() {
     })
   }, [clearDeepLinkState, replaceSearchParams])
 
-  // Start (or restart) deep-link search when ?bill= and/or ?chamber= change together.
+  // Start (or restart) deep-link search when ?bill= and/or filter params change together.
   useEffect(() => {
     if (!billParam) {
       clearDeepLinkState()
       setBillMissingNotice(false)
       return
     }
-    const queryKey = deepLinkQueryKey(chamber, billParam)
+    const queryKey = deepLinkQueryKey(chamber, billParam, committedQuery)
     if (deepLinkQueryRef.current === queryKey) return
     deepLinkQueryRef.current = queryKey
     deepLinkBillRef.current = billParam
     deepLinkPhaseRef.current = 'searching'
     setBillMissingNotice(false)
-  }, [billParam, chamber, clearDeepLinkState])
+  }, [billParam, chamber, committedQuery, clearDeepLinkState])
 
   // Deep-link: after pages load, find the bill or keep appending until exhausted.
   useEffect(() => {
@@ -265,7 +329,7 @@ export function useFeedPagination() {
     }
 
     if (hasMore) {
-      void loadFeedPage(nextOffset, 'append', chamberRef.current)
+      void loadFeedPage(nextOffset, 'append', chamberRef.current, queryRef.current)
       return
     }
 
@@ -275,6 +339,8 @@ export function useFeedPagination() {
 
   return {
     chamber,
+    searchQuery: committedQuery,
+    searchDraft: draftQuery,
     items,
     total,
     hasMore,
@@ -288,6 +354,9 @@ export function useFeedPagination() {
     reloadFeed,
     loadMore,
     setChamberFilter,
+    setSearchDraft,
+    submitSearch,
+    clearSearch,
     toggleRow,
     dismissBillMissingNotice,
   }

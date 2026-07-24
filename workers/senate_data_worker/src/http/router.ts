@@ -28,6 +28,7 @@ import {
   EXECUTIVE_PIPELINE_STALE_HOURS,
   EXECUTIVE_POSTS_CRON_UTC,
 } from "../constants";
+import { normalizeFeedSearchQuery } from "../d1/feed-search";
 import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
@@ -184,6 +185,10 @@ function parseFeedOffset(url: URL, limit: number): number {
   return Math.min(offset, maxOffset);
 }
 
+function parseFeedSearchQuery(url: URL): string | undefined {
+  return normalizeFeedSearchQuery(url.searchParams.get("q"));
+}
+
 function parseRollNumber(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number.parseInt(value, 10);
@@ -272,7 +277,8 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
     try {
       const limit = parseFeedLimit(url);
       const offset = parseFeedOffset(url, limit);
-      const feed = await buildFeedPage(env, { limit, offset, chamber });
+      const q = parseFeedSearchQuery(url);
+      const feed = await buildFeedPage(env, { limit, offset, chamber, q });
       return json(feed, {
         status: 200,
         headers: { "Cache-Control": cacheLatest },
