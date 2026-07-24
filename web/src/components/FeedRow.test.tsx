@@ -14,8 +14,12 @@ describe('FeedRow', () => {
     const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
-    expect(screen.getByText('Defense')).toBeInTheDocument()
-    expect(container.querySelector('.feed-row-meta-row')).toContainElement(screen.getByText('Defense'))
+    const policyArea = screen.getByText('Defense')
+    expect(policyArea).toBeInTheDocument()
+    expect(policyArea).toHaveClass('feed-row-policy-area')
+    // Policy area sits on its own line below the middot meta chips so wraps
+    // never start with a lone separator.
+    expect(container.querySelector('.feed-row-meta-row')).not.toContainElement(policyArea)
     expect(screen.getByText('Passed')).toBeInTheDocument()
     expect(screen.getByText('Passed')).toHaveClass('text-pass')
     expect(

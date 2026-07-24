@@ -105,16 +105,17 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
               {executiveSignal ? (
                 <span className="feed-row-chip feed-row-chip--executive">Executive</span>
               ) : null}
-              {policyArea && !isProcedural ? (
-                <span
-                  id={policyAreaId}
-                  data-feed-policy-area
-                  className="feed-row-policy-area"
-                >
-                  {policyArea}
-                </span>
-              ) : null}
             </div>
+
+            {policyArea && !isProcedural ? (
+              <p
+                id={policyAreaId}
+                data-feed-policy-area
+                className="feed-row-policy-area"
+              >
+                {policyArea}
+              </p>
+            ) : null}
 
             <p
               id={eventId}
