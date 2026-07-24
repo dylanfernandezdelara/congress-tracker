@@ -1,30 +1,4 @@
 @layer components {
-  .home-page-head {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin: 0 0 1.5rem;
-    padding: 0;
-  }
-
-  .home-page-title {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 500;
-    line-height: 1.2;
-    letter-spacing: -0.15px;
-    color: hsl(var(--twc-foreground));
-  }
-
-  .home-page-description {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 400;
-    line-height: 1.45;
-    letter-spacing: -0.15px;
-    color: hsl(var(--twc-secondary));
-  }
-
   .home-feed-toolbar {
     display: flex;
     flex-direction: column;
@@ -447,10 +421,6 @@
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
-    }
-
-    .home-page-head {
-      margin-bottom: 1.25rem;
     }
   }
 }

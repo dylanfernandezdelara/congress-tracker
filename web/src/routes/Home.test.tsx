@@ -247,7 +247,7 @@ describe('Home', () => {
     expect(
       await screen.findByRole('heading', { level: 3, name: 'Plain headline for readers' }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Congressional passage votes' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Congressional passage votes' })).not.toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()

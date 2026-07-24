@@ -150,13 +150,6 @@ export default function Home() {
       ) : null}
 
       <main id="content" className="home-feed-column feed-main">
-        <header className="home-page-head">
-          <h2 className="home-page-title">Congressional passage votes</h2>
-          <p className="home-page-description">
-            Passage votes, key provisions, and the lawmakers who crossed party lines.
-          </p>
-        </header>
-
         <div className="home-feed-toolbar">
           <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
           <FeedSearchInput
