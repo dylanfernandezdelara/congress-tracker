@@ -391,18 +391,18 @@ describe('getFeedSummaryDisplay', () => {
     })
   })
 
-  it('falls back to pending summary copy when digest is missing even if CRS text exists', () => {
+  it('falls back to a short CRS lead when digest is missing but CRS text exists', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text:
         'No Aid for Ghost Students Act\n\nThis bill blocks federal aid for students enrolled at institutions with no physical campus.',
     })
 
-    expect(getFeedSummaryDisplay(item)).toEqual({
-      lead: FEED_SUMMARY_PENDING,
-      bullets: [],
-      pending: true,
-    })
+    const summary = getFeedSummaryDisplay(item)
+    expect(summary.pending).toBe(false)
+    expect(summary.bullets).toEqual([])
+    expect(summary.lead).toContain('This bill blocks federal aid')
+    expect(summary.lead).not.toBe(FEED_SUMMARY_PENDING)
   })
 
   it('falls back to the first key point when digest lacks what_it_does', () => {

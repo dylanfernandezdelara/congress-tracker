@@ -5,6 +5,7 @@ import {
   normalizeDigestLead,
   proceduralHeadline,
   trimDisplayTitle,
+  truncateAtSentenceBoundary,
   voteIndicatesFailure,
 } from "./feed-content";
 
@@ -163,5 +164,14 @@ describe("feed-content helpers", () => {
     expect(
       normalizeDigestLead("Amends Title 18 U.S.C. Section 401 to add penalties. More follows.")
     ).toBe("Amends Title 18 U.S.C. Section 401 to add penalties.");
+  });
+
+  it("truncates at sentence boundaries without cutting on U.S. abbreviations", () => {
+    const lead = "Word ".repeat(150).trim();
+    const input = `${lead} The act directs the U.S. Department of Energy to publish rules after enactment.`;
+    const cutBudget = lead.length + " The act directs the U.S. Dep".length;
+    const out = truncateAtSentenceBoundary(input, cutBudget);
+    expect(out.endsWith("U.S.")).toBe(false);
+    expect(out.endsWith("…")).toBe(true);
   });
 });
