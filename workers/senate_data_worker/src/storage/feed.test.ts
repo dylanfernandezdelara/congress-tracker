@@ -96,6 +96,7 @@ describe("buildFeedPage lifecycle attachment", () => {
         bill_type: "HR",
         bill_number: 6644,
         latest_passage_date: "2026-06-22",
+        latest_activity_date: "2026-06-22",
       },
     ]);
     mockGetDigestsForBills.mockResolvedValue(
@@ -302,8 +303,121 @@ describe("buildFeedPage lifecycle attachment", () => {
         },
       ],
       latest_passage_date: "2026-06-22",
+      latest_activity_date: "2026-06-22",
       executive_signals: [],
       related_executive_bills: [],
+    });
+  });
+
+  it("keeps vote-only latest_passage_date when executive activity is newer", async () => {
+    mockSelectFeedBills.mockResolvedValue([
+      {
+        bill_congress: 119,
+        bill_type: "HR",
+        bill_number: 6644,
+        latest_passage_date: "2026-04-10",
+        latest_activity_date: "2026-06-24T14:26:00.000Z",
+      },
+    ]);
+    mockGetPassageVotesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:6644",
+          [
+            {
+              chamber: "House",
+              congress: 119,
+              session: 2,
+              roll_number: 10,
+              question: "On Passage",
+              result: "Passed",
+              yeas: 220,
+              nays: 200,
+              vote_date: "2026-04-10",
+            },
+          ],
+        ],
+      ])
+    );
+    mockGetExecutivePostBillsForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:6644",
+          [
+            {
+              id: "post-1",
+              platform: "truth_social",
+              author: "realDonaldTrump",
+              text: "Quote",
+              posted_at: "2026-06-24T14:26:00.000Z",
+              source_url: "https://example.com/post",
+              archive_url: null,
+              summary: "Executive post",
+              raw_json: null,
+              ingested_at: "2026-06-24T15:00:00.000Z",
+              role: "support",
+              rationale: null,
+              bill_congress: 119,
+              bill_type: "HR",
+              bill_number: 6644,
+            },
+          ],
+        ],
+      ])
+    );
+
+    const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
+
+    expect(page.items[0]).toMatchObject({
+      latest_passage_date: "2026-04-10",
+      latest_activity_date: "2026-06-24T14:26:00.000Z",
+    });
+  });
+
+  it("returns null latest_passage_date for executive-only feed bills", async () => {
+    mockSelectFeedBills.mockResolvedValue([
+      {
+        bill_congress: 119,
+        bill_type: "HR",
+        bill_number: 22,
+        latest_passage_date: null,
+        latest_activity_date: "2026-06-24T14:26:00.000Z",
+      },
+    ]);
+    mockGetPassageVotesForBills.mockResolvedValue(new Map());
+    mockGetExecutivePostBillsForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:22",
+          [
+            {
+              id: "post-exec-only",
+              platform: "truth_social",
+              author: "realDonaldTrump",
+              text: "Quote",
+              posted_at: "2026-06-24T14:26:00.000Z",
+              source_url: "https://example.com/post",
+              archive_url: null,
+              summary: "Executive post",
+              raw_json: null,
+              ingested_at: "2026-06-24T15:00:00.000Z",
+              role: "support",
+              rationale: null,
+              bill_congress: 119,
+              bill_type: "HR",
+              bill_number: 22,
+            },
+          ],
+        ],
+      ])
+    );
+
+    const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
+
+    expect(page.items[0]).toMatchObject({
+      latest_passage_date: null,
+      latest_activity_date: "2026-06-24T14:26:00.000Z",
+      passage_votes: [],
     });
   });
 });

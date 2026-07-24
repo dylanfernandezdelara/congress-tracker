@@ -12,9 +12,10 @@ import {
 } from './feedRowLabels'
 
 describe('getFeedRowDisplayDate', () => {
-  it('uses latest_passage_date for executive-linked bills with old passage votes', () => {
+  it('uses latest_activity_date for executive-linked bills with old passage votes', () => {
     const item = makeFeedItem({
-      latest_passage_date: '2026-06-24',
+      latest_passage_date: '2026-04-10',
+      latest_activity_date: '2026-06-24',
       executive_signals: [
         {
           post_id: 'post-1',
@@ -36,6 +37,26 @@ describe('getFeedRowDisplayDate', () => {
           yeas: 220,
           nays: 210,
           date: '2026-04-10',
+        },
+      ],
+    })
+
+    expect(getFeedRowDisplayDate(item)).toEqual({ iso: '2026-06-24', kind: 'signal' })
+  })
+
+  it('handles null latest_passage_date for executive-only bills', () => {
+    const item = makeFeedItem({
+      latest_passage_date: null,
+      latest_activity_date: '2026-06-24T14:26:00.000Z',
+      passage_votes: [],
+      executive_signals: [
+        {
+          post_id: 'post-1',
+          posted_at: '2026-06-24T14:26:00.000Z',
+          summary: 'Executive post',
+          quote: 'Quote text',
+          source_url: 'https://example.com/post',
+          informal: false,
         },
       ],
     })

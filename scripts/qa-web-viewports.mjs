@@ -54,6 +54,7 @@ const MOCK_FEED = {
         },
       ],
       latest_passage_date: '2026-06-05',
+      latest_activity_date: '2026-06-05',
     },
   ],
   total: 1,
@@ -86,7 +87,7 @@ async function waitForServer(url) {
   throw new Error(`Dev server not reachable at ${url}. Start it with: npm run dev:web`)
 }
 
-async function auditPage(page) {
+async function auditHomePage(page) {
   return page.evaluate(() => {
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
@@ -222,6 +223,65 @@ async function auditPage(page) {
   })
 }
 
+async function auditStatsPage(page) {
+  return page.evaluate(() => {
+    const viewportWidth = window.innerWidth
+    const heading = document.querySelector('h1')
+    const siteNav = document.querySelector('.site-nav')
+    const federalControl = document.querySelector('[aria-label="Federal Control"]')
+    const members = document.querySelector('[aria-label="Members in Congress"]')
+    const pulse = document.querySelector('[aria-label="Legislative pulse"]')
+    const issues = []
+
+    const collectHorizontalClipping = (rect, label) => {
+      if (rect.left < -0.5) issues.push(`${label} clipped on the left`)
+      if (rect.right > viewportWidth + 0.5) issues.push(`${label} clipped on the right`)
+      if (rect.width <= 0 || rect.height <= 0) issues.push(`${label} not visible`)
+    }
+
+    if (!heading) issues.push('stats page heading missing')
+    if (heading && heading.textContent?.trim() !== 'Congress Tracker') {
+      issues.push('stats page heading should read Congress Tracker')
+    }
+    // Presence only — on narrow viewports the nav collapses into the menu control.
+    if (!siteNav) issues.push('site navigation missing on stats page')
+
+    if (!federalControl) {
+      issues.push('federal-control section missing on stats page')
+    } else {
+      collectHorizontalClipping(federalControl.getBoundingClientRect(), 'federal-control section')
+      const title = federalControl.querySelector('h2')
+      if (!title || !/federal control/i.test(title.textContent ?? '')) {
+        issues.push('federal-control heading missing on stats page')
+      }
+    }
+
+    if (!members) {
+      issues.push('members section missing on stats page')
+    } else {
+      collectHorizontalClipping(members.getBoundingClientRect(), 'members section')
+    }
+
+    if (!pulse) {
+      issues.push('legislative pulse missing on stats page')
+    } else {
+      collectHorizontalClipping(pulse.getBoundingClientRect(), 'legislative pulse')
+    }
+
+    if (heading) collectHorizontalClipping(heading.getBoundingClientRect(), 'stats page heading')
+
+    const docWidth = document.documentElement.scrollWidth
+    if (docWidth > viewportWidth + 1) {
+      issues.push('stats page has horizontal overflow')
+    }
+
+    return {
+      issues,
+      theme: document.documentElement.dataset.theme ?? 'light',
+    }
+  })
+}
+
 const MOCK_SESSION_STATS = {
   congress: 119,
   session: 2,
@@ -310,6 +370,59 @@ const MOCK_PORTFOLIOS = {
   as_of: '2026-06-14T00:00:00.000Z',
 }
 
+async function installApiMocks(page) {
+  await page.route('**/feed/latest.json**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FEED),
+    })
+  })
+
+  await page.route('**/stats/session.json', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_SESSION_STATS),
+    })
+  })
+
+  await page.route('**/stats/notable.json**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_NOTABLE_VOTES),
+    })
+  })
+
+  await page.route('**/stats/pulse.json', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_PULSE_STATS),
+    })
+  })
+
+  await page.route('**/stats/defectors.json**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_DEFECTORS),
+    })
+  })
+
+  await page.route('**/stats/portfolios.json**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_PORTFOLIOS),
+    })
+  })
+
+  await page.route('https://fonts.googleapis.com/**', async (route) => route.abort())
+  await page.route('https://fonts.gstatic.com/**', async (route) => route.abort())
+}
+
 async function main() {
   await waitForServer(baseUrl)
 
@@ -330,101 +443,60 @@ async function main() {
           deviceScaleFactor: viewport.width < 500 ? 2 : 1,
         })
 
-        await page.route('**/feed/latest.json**', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(MOCK_FEED),
-          })
-        })
-
-        await page.route('**/stats/session.json', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(MOCK_SESSION_STATS),
-          })
-        })
-
-        await page.route('**/stats/notable.json**', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(MOCK_NOTABLE_VOTES),
-          })
-        })
-
-        await page.route('**/stats/pulse.json', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(MOCK_PULSE_STATS),
-          })
-        })
-
-        await page.route('**/stats/defectors.json**', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(MOCK_DEFECTORS),
-          })
-        })
-
-        await page.route('**/stats/portfolios.json**', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(MOCK_PORTFOLIOS),
-          })
-        })
-
-        await page.route('https://fonts.googleapis.com/**', async (route) => route.abort())
-        await page.route('https://fonts.gstatic.com/**', async (route) => route.abort())
+        await installApiMocks(page)
 
         await page.addInitScript((selectedTheme) => {
           localStorage.setItem('theme', selectedTheme)
           document.documentElement.dataset.theme = selectedTheme
         }, theme)
 
+        // Home
         await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
         await page.getByText('Plain headline for readers').waitFor({ timeout: 10_000 })
         await page.locator('#feed-top').scrollIntoViewIfNeeded()
 
-        const audit = await auditPage(page)
-        if (audit.theme !== theme) {
-          audit.issues.push(`expected ${theme} theme but got ${audit.theme}`)
+        const homeAudit = await auditHomePage(page)
+        if (homeAudit.theme !== theme) {
+          homeAudit.issues.push(`expected ${theme} theme but got ${homeAudit.theme}`)
         }
 
-        const feedScreenshotPath = path.join(outDir, `${caseId}.png`)
-        await page.screenshot({ path: feedScreenshotPath, fullPage: false })
+        const homeScreenshotPath = path.join(outDir, `${caseId}.png`)
+        await page.screenshot({ path: homeScreenshotPath, fullPage: false })
 
-        await page.goto(`${baseUrl.replace(/\/$/, '')}/stats`, { waitUntil: 'domcontentloaded' })
-        await page.getByLabel('Members in Congress').waitFor({ timeout: 10_000 })
-        const statsIssues = await page.evaluate(() => {
-          const issues = []
-          if (!document.querySelector('[aria-label="Members in Congress"]')) {
-            issues.push('members section missing on stats page')
-          }
-          if (!document.querySelector('[aria-label="Legislative pulse"]')) {
-            issues.push('pulse section missing on stats page')
-          }
-          if (!document.querySelector('.site-nav')) {
-            issues.push('site navigation missing on stats page')
-          }
-          return issues
-        })
-        audit.issues.push(...statsIssues)
-
-        const passed = audit.issues.length === 0
-        if (!passed) failures += 1
-
+        const homePassed = homeAudit.issues.length === 0
+        if (!homePassed) failures += 1
         results.push({
           id: caseId,
+          route: 'home',
           viewport: viewport.label,
           theme,
-          passed,
-          issues: audit.issues,
-          screenshot: path.relative(rootDir, feedScreenshotPath),
+          passed: homePassed,
+          issues: homeAudit.issues,
+          screenshot: path.relative(rootDir, homeScreenshotPath),
+        })
+
+        // Stats — same viewport/theme context (reuse page)
+        await page.goto(`${baseUrl.replace(/\/$/, '')}/stats`, { waitUntil: 'domcontentloaded' })
+        await page.getByRole('heading', { name: 'Federal Control' }).waitFor({ timeout: 10_000 })
+
+        const statsAudit = await auditStatsPage(page)
+        if (statsAudit.theme !== theme) {
+          statsAudit.issues.push(`expected ${theme} theme but got ${statsAudit.theme}`)
+        }
+
+        const statsScreenshotPath = path.join(outDir, `${caseId}-stats.png`)
+        await page.screenshot({ path: statsScreenshotPath, fullPage: false })
+
+        const statsPassed = statsAudit.issues.length === 0
+        if (!statsPassed) failures += 1
+        results.push({
+          id: `${caseId}-stats`,
+          route: 'stats',
+          viewport: viewport.label,
+          theme,
+          passed: statsPassed,
+          issues: statsAudit.issues,
+          screenshot: path.relative(rootDir, statsScreenshotPath),
         })
 
         await page.close()
@@ -449,7 +521,8 @@ async function main() {
   console.log(`Viewport QA: ${summary.passed}/${summary.total} passed`)
   for (const result of results) {
     const status = result.passed ? 'PASS' : 'FAIL'
-    console.log(`  [${status}] ${result.viewport} / ${result.theme}`)
+    const routeLabel = result.route === 'stats' ? 'stats' : 'home'
+    console.log(`  [${status}] ${result.viewport} / ${result.theme} / ${routeLabel}`)
     if (!result.passed) {
       for (const issue of result.issues) {
         console.log(`         - ${issue}`)

@@ -13,6 +13,8 @@ test('AGENTS.md requires viewport QA for web UI PRs', () => {
   assert.match(agents, /qa:web/)
   assert.match(agents, /iPhone SE/i)
   assert.match(agents, /desktop/i)
+  assert.match(agents, /16 checks/)
+  assert.match(agents, /\/stats/)
 })
 
 test('qa:web script is wired in package.json', () => {
@@ -67,4 +69,30 @@ test('Vite binds 127.0.0.1:5173 with strictPort (docs/agent healthchecks)', () =
 test('qa:web defaults to IPv4 loopback URL', () => {
   const qa = fs.readFileSync(qaScript, 'utf8')
   assert.match(qa, /QA_WEB_URL \?\? 'http:\/\/127\.0\.0\.1:5173'/)
+})
+
+test('qa:web covers home and /stats across the viewport/theme matrix', () => {
+  const qa = fs.readFileSync(qaScript, 'utf8')
+  assert.match(qa, /auditHomePage/)
+  assert.match(qa, /auditStatsPage/)
+  assert.match(qa, /\/stats/)
+  assert.match(qa, /Federal Control/)
+  assert.match(qa, /federal-control section/)
+  assert.match(qa, /\$\{caseId\}-stats\.png/)
+  // Both route audits must run inside the viewport×theme loop (16 results).
+  assert.match(qa, /const homeAudit = await auditHomePage\(page\)/)
+  assert.match(qa, /const statsAudit = await auditStatsPage\(page\)/)
+  // Home checks remain (feed row + brand heading).
+  assert.match(qa, /Plain headline for readers/)
+  assert.match(qa, /\.feed-row/)
+  assert.match(qa, /Congress Tracker/)
+})
+
+test('viewport QA rule expects home+stats matrix coverage', () => {
+  const viewportRule = fs.readFileSync(
+    path.join(rootDir, '.cursor', 'rules', 'pr-viewport-qa.mdc'),
+    'utf8',
+  )
+  assert.match(viewportRule, /16\/16/)
+  assert.match(viewportRule, /\/stats/)
 })

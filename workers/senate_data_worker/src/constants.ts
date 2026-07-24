@@ -1,10 +1,11 @@
 /** Feed and pipeline tuning (module constants, not env). */
+export { VOTE_LOOKBACK_DAYS } from "../../../shared/feed-constants";
+
 export const FEED_MAX_BILLS = 50;
 export const FEED_DEFAULT_PAGE_SIZE = 50;
 export const FEED_MAX_PAGE_SIZE = 50;
 /** Max accepted length for feed `q` search (silently truncated). */
 export const FEED_SEARCH_MAX_LENGTH = 100;
-export const VOTE_LOOKBACK_DAYS = 45;
 /** Bills with executive signals stay feed-visible for this many days. */
 export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
 /** Homepage statuses fetched per executive ingest run. */

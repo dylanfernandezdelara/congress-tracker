@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { VOTE_LOOKBACK_DAYS } from './feed-constants'
 import { daysAgoLookbackStartIso, inclusiveLookbackStartIso } from './lookback'
 
 describe('lookbackStartIso semantics', () => {
@@ -11,15 +12,16 @@ describe('lookbackStartIso semantics', () => {
   })
 
   it('daysAgo subtracts N days (feed/vote lookback style)', () => {
-    // VOTE_LOOKBACK_DAYS=45 → start Jul 24 − 45 = Jun 9 (46 inclusive days)
-    expect(daysAgoLookbackStartIso(45, asOf)).toBe('2026-06-09')
-    expect(daysAgoLookbackStartIso(45, asOf)).toBe(inclusiveLookbackStartIso(46, asOf))
+    // VOTE_LOOKBACK_DAYS → start Jul 24 − N = Jun 9 for N=45 (46 inclusive days)
+    expect(daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf)).toBe('2026-06-09')
+    expect(daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf)).toBe(
+      inclusiveLookbackStartIso(VOTE_LOOKBACK_DAYS + 1, asOf),
+    )
   })
 
   it('documents the historical semantic gap without changing effective windows', () => {
     const notableDays = 14
-    const voteLookbackDays = 45
     expect(inclusiveLookbackStartIso(notableDays, asOf)).toBe('2026-07-11')
-    expect(daysAgoLookbackStartIso(voteLookbackDays, asOf)).toBe('2026-06-09')
+    expect(daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf)).toBe('2026-06-09')
   })
 })

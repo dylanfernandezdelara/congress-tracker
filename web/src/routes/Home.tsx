@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
 
+import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
+
 import { fetchNotableVotes } from '../api/client'
 import type { NotableVotesResponse } from '../api/types'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
@@ -15,7 +17,6 @@ import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
 
-const LOOKBACK_DAYS = 45
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
 function FeedSkeleton() {
@@ -33,8 +34,8 @@ function emptyFeedCopy(chamber: 'House' | 'Senate' | null, searchQuery: string):
     if (chamber) return `No ${chamber} matches for “${searchQuery}”.`
     return `No matches for “${searchQuery}”.`
   }
-  if (chamber) return `No ${chamber} passage votes in the last ${LOOKBACK_DAYS} days.`
-  return `No passage votes in the last ${LOOKBACK_DAYS} days.`
+  if (chamber) return `No ${chamber} passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
+  return `No passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
 }
 
 export default function Home() {

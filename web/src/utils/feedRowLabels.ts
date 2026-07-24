@@ -150,7 +150,14 @@ export function getFeedRowDisplayDate(item: FeedItem): { iso: string; kind: 'vot
   const signal = item.executive_signals?.[0]
   const signalDate = signal?.posted_at.slice(0, 10)
   const vote = getPrimaryPassageVote(item)
-  const activityDate = item.latest_passage_date.slice(0, 10)
+  // Chronology uses activity (votes + executive). Fall back for older payloads that
+  // only sent latest_passage_date; never read null passage as a date string.
+  const activityRaw = item.latest_activity_date ?? item.latest_passage_date
+  const activityDate = activityRaw?.slice(0, 10) ?? signalDate ?? vote?.date ?? ''
+
+  if (!activityDate) {
+    return { iso: '', kind: vote ? 'vote' : signalDate ? 'signal' : 'vote' }
+  }
 
   if (signalDate && activityDate === signalDate) {
     return { iso: signalDate, kind: 'signal' }

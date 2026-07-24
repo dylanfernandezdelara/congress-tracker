@@ -12,7 +12,7 @@ For every PR that changes `web/`:
 
 1. Start the dev server: `npm run dev:web`
 2. Run viewport QA: `npm run qa:web`
-3. Confirm 8/8 checks pass (mobile + desktop, light + dark)
+3. Confirm 16/16 checks pass (home + `/stats` × 4 viewports × light/dark)
 4. Include the QA summary in the PR description before opening or updating the PR
 
 Do not skip this for UI bugfixes or small CSS tweaks.

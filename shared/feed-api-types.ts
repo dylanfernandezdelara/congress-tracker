@@ -32,7 +32,17 @@ export interface FeedItem {
   digest: BillDigestContent | null
   raw_summary_text: string | null
   passage_votes: FeedPassageVote[]
-  latest_passage_date: string
+  /**
+   * Latest passage-vote date for the bill (vote dates only).
+   * Null when the bill is feed-visible via executive signals but has no
+   * passage votes loaded.
+   */
+  latest_passage_date: string | null
+  /**
+   * Latest feed-sort activity date — max of passage votes and executive
+   * signal timestamps. Used for chronology / row ordering, not as a vote date.
+   */
+  latest_activity_date: string
   lifecycle: BillLifecycle | null
   executive_signals?: ExecutiveSignal[]
   related_executive_bills?: RelatedExecutiveBill[]

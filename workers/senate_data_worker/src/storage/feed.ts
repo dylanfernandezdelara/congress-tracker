@@ -184,7 +184,18 @@ export async function buildFeedPage(
         nays: v.nays,
         date: v.vote_date,
       })),
-      latest_passage_date: row.latest_passage_date,
+      // Prefer SQL vote-only max; fall back to loaded votes (e.g. outside lookback
+      // but attached because an executive signal kept the bill feed-visible).
+      // Treat empty string like null — D1/SQLite MAX of all-NULL CASE arms is NULL.
+      latest_passage_date:
+        row.latest_passage_date ||
+        (votes.length === 0
+          ? null
+          : votes.reduce(
+              (latest, vote) => (vote.vote_date > latest ? vote.vote_date : latest),
+              votes[0]!.vote_date
+            )),
+      latest_activity_date: row.latest_activity_date,
       lifecycle: lifecycleRow ? lifecycleRowToApi(lifecycleRow, now) : null,
       executive_signals,
       related_executive_bills,

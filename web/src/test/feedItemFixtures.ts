@@ -1,7 +1,7 @@
 import type { FeedItem } from '../api/types'
 
 export function makeFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
-  return {
+  const item: FeedItem = {
     bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
     policy_area: 'Defense',
     digest: {
@@ -25,7 +25,19 @@ export function makeFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
       },
     ],
     latest_passage_date: '2026-06-05',
+    latest_activity_date: '2026-06-05',
     lifecycle: null,
     ...overrides,
   }
+
+  // Callers often override only latest_passage_date; keep activity aligned unless set.
+  if (
+    overrides.latest_activity_date === undefined &&
+    overrides.latest_passage_date !== undefined &&
+    overrides.latest_passage_date !== null
+  ) {
+    item.latest_activity_date = overrides.latest_passage_date
+  }
+
+  return item
 }

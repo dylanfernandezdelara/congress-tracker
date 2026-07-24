@@ -104,6 +104,7 @@ function feedItem(
       date: `2026-06-${String(10 + index).padStart(2, "0")}`,
     })),
     latest_passage_date: "2026-06-11",
+    latest_activity_date: "2026-06-11",
     lifecycle: null,
     executive_signals: [],
     related_executive_bills: [],

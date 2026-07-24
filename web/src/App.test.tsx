@@ -17,7 +17,9 @@ vi.mock('./api/client', () => ({
         },
         raw_summary_text: 'Official CRS summary text.',
         passage_votes: [],
-        latest_passage_date: '2026-06-05',
+        // No passage votes loaded — passage date is null; activity still drives chronology.
+        latest_passage_date: null,
+        latest_activity_date: '2026-06-05',
       },
     ],
     total: 1,

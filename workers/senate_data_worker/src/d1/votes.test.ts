@@ -93,6 +93,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
         bill_type: "HR",
         bill_number: 1,
         latest_passage_date: "2026-06-10",
+        latest_activity_date: "2026-06-10",
       },
     ]);
     await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", 10, 5, "House");
@@ -121,6 +122,41 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-06-01T00:00:00.000Z",
       "Senate",
     ]);
+  });
+
+  it("separates vote-only latest_passage_date from activity sort date", async () => {
+    const { db, preparedSql } = createMockDb([
+      {
+        bill_congress: 119,
+        bill_type: "HR",
+        bill_number: 1,
+        latest_passage_date: "2026-04-10",
+        latest_activity_date: "2026-06-24T14:26:00.000Z",
+      },
+    ]);
+
+    const rows = await selectFeedBills(
+      db,
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      50,
+      0
+    );
+
+    expect(rows[0]).toMatchObject({
+      latest_passage_date: "2026-04-10",
+      latest_activity_date: "2026-06-24T14:26:00.000Z",
+    });
+
+    const selectSql = preparedSql.find(
+      (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
+    );
+    expect(selectSql).toMatch(
+      /MAX\s*\(\s*CASE\s+WHEN\s+executive_boost\s*=\s*0\s+THEN\s+sort_date\s+END\s*\)\s+AS\s+latest_passage_date/i
+    );
+    expect(selectSql).toMatch(/MAX\s*\(\s*sort_date\s*\)\s+AS\s+latest_activity_date/i);
+    expect(selectSql).toMatch(/ORDER BY\s+latest_activity_date\s+DESC/i);
+    expect(selectSql).not.toMatch(/ORDER BY\s+latest_passage_date\s+DESC/i);
   });
 
   it("adds q search binds for title/policy/headline/bill-id and keeps executive UNION ALL", async () => {

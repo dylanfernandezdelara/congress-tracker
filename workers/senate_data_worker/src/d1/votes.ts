@@ -142,6 +142,17 @@ export interface BillVoteKey {
   latest_passage_date: string;
 }
 
+/** Feed bill row: passage date is vote-only; activity drives sort order. */
+export interface FeedBillRow {
+  bill_congress: number;
+  bill_type: string;
+  bill_number: number;
+  /** MAX of passage-vote dates only; null when the bill is executive-only. */
+  latest_passage_date: string | null;
+  /** MAX of passage + executive sort dates (feed ordering). */
+  latest_activity_date: string;
+}
+
 export async function selectRecentVotedBills(
   db: D1Database,
   lookbackDate: string,
@@ -171,7 +182,7 @@ export async function selectFeedBills(
   offset = 0,
   chamber?: Chamber,
   q?: string
-): Promise<BillVoteKey[]> {
+): Promise<FeedBillRow[]> {
   await ensureSchema(db);
   const filter = buildFeedFilterClause({ chamber, q });
   const binds: Array<string | number> = [
@@ -196,15 +207,17 @@ export async function selectFeedBills(
          WHERE p.posted_at >= ?
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
        )
-       SELECT bill_congress, bill_type, bill_number, MAX(sort_date) AS latest_passage_date
+       SELECT bill_congress, bill_type, bill_number,
+              MAX(CASE WHEN executive_boost = 0 THEN sort_date END) AS latest_passage_date,
+              MAX(sort_date) AS latest_activity_date
        FROM combined
        ${filter.sql}
        GROUP BY bill_congress, bill_type, bill_number
-       ORDER BY latest_passage_date DESC
+       ORDER BY latest_activity_date DESC
        LIMIT ? OFFSET ?`
     )
     .bind(...binds)
-    .all<BillVoteKey>();
+    .all<FeedBillRow>();
   return results ?? [];
 }
 
