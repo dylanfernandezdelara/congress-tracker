@@ -15,6 +15,7 @@ export {
   formatCollapsedDigestLead,
   normalizeDigestBullets,
   normalizeDigestLead,
+  truncateAtSentenceBoundary,
   truncateAtWordBoundary,
 } from './digest-format'
 

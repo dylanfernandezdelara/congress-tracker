@@ -95,7 +95,7 @@ export function buildFeedSummaryParts(input: {
     }
   }
 
-  // No OpenRouter digest yet — do not dump raw CRS on the collapsed card.
+  // No digest lead — prefer a key point before the UI falls back to CRS text.
   const firstKeyPoint = input.keyPoints?.find((point) => point.trim().length > 0)
   if (firstKeyPoint) {
     return {
@@ -113,4 +113,26 @@ export function truncateAtWordBoundary(text: string, maxLength: number): string 
   const lastSpace = slice.lastIndexOf(' ')
   if (lastSpace <= 0) return `${slice.trimEnd()}…`
   return `${slice.slice(0, lastSpace).trimEnd()}…`
+}
+
+/**
+ * Truncate at a sentence boundary when one exists in the second half of the
+ * window. Abbreviations like "U.S." / "H.R." are protected so they are not
+ * mistaken for sentence ends. Falls back to a word-boundary ellipsis cut.
+ */
+export function truncateAtSentenceBoundary(text: string, maxLength: number): string {
+  const collapsed = collapseWhitespace(text)
+  if (collapsed.length <= maxLength) return collapsed
+
+  const window = collapsed.slice(0, maxLength)
+  const protectedWindow = protectAbbreviations(window)
+  const markers = ['. ', '! ', '? ']
+  const sentenceAt = Math.max(...markers.map((marker) => protectedWindow.lastIndexOf(marker)))
+  const minSentenceChars = Math.floor(maxLength * 0.5)
+
+  if (sentenceAt >= minSentenceChars) {
+    return restoreAbbreviations(protectedWindow.slice(0, sentenceAt + 1).trimEnd())
+  }
+
+  return truncateAtWordBoundary(collapsed, maxLength)
 }

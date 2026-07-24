@@ -3,6 +3,7 @@ import {
   buildFeedSummaryParts,
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
+  formatCollapsedDigestLead,
   formatFallbackHeadline,
   formatShortBillId,
   isProceduralVote,
@@ -201,11 +202,20 @@ function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
 
 export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
   const parts = getFeedSummaryParts(item)
-  if (!parts) {
-    return { lead: FEED_SUMMARY_PENDING, bullets: [], pending: true }
+  if (parts) return parts
+
+  // When OpenRouter has not produced a digest yet, surface a short CRS lead
+  // so the card always has a summary when Congress.gov provided one.
+  const crs = item.raw_summary_text?.trim()
+  if (crs) {
+    return {
+      lead: formatCollapsedDigestLead(crs),
+      bullets: [],
+      pending: false,
+    }
   }
 
-  return parts
+  return { lead: FEED_SUMMARY_PENDING, bullets: [], pending: true }
 }
 
 /**

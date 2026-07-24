@@ -114,7 +114,7 @@ describe('FeedRow', () => {
     expect(onToggle).toHaveBeenCalledTimes(1)
   })
 
-  it('shows pending summary copy when collapsed without a digest (not raw CRS)', () => {
+  it('shows a short CRS lead when collapsed without a digest', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text: longCrsSummary,
@@ -122,10 +122,11 @@ describe('FeedRow', () => {
 
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
-    expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
+    expect(screen.queryByText('Plain-English summary coming soon.')).not.toBeInTheDocument()
     const teaser = document.querySelector('.feed-row-teaser')
-    expect(teaser?.textContent).not.toContain('Ukraine Support Act')
-    expect(teaser?.textContent?.match(/financing, and oversight\./g)?.length ?? 0).toBe(0)
+    expect(teaser?.textContent).toMatch(/This bill provides support/i)
+    // Collapsed card uses the first CRS sentence only — not the repeated paragraphs.
+    expect(teaser?.textContent?.match(/This bill provides support/g)?.length ?? 0).toBe(1)
   })
 
   it('shows pending summary copy when no digest or CRS text is available', () => {
