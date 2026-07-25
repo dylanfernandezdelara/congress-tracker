@@ -167,7 +167,7 @@ export interface VoteDefectorEntry {
 
 /** How one party voted on a single roll call. */
 export interface RollPartySplit {
-  /** Normalized party code: `R`, `D`, or `I`. */
+  /** Normalized party code: `R`, `D`, `I`, or `Other`. */
   party: string
   yeas: number
   nays: number
