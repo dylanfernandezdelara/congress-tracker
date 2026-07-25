@@ -63,21 +63,6 @@ function withinLookback(isoDate: string, lookbackStart: string): boolean {
   return voteDateFromIso(isoDate) >= lookbackStart;
 }
 
-function newestVoteDateOnPage(items: HouseVoteListItem[]): string | null {
-  if (items.length === 0) return null;
-  let newest = voteDateFromIso(items[0]!.startDate);
-  for (const item of items) {
-    const date = voteDateFromIso(item.startDate);
-    if (date > newest) newest = date;
-  }
-  return newest;
-}
-
-function pageEntirelyBeforeLookback(items: HouseVoteListItem[], lookbackStart: string): boolean {
-  const newest = newestVoteDateOnPage(items);
-  return newest !== null && newest < lookbackStart;
-}
-
 /** A listed roll that still needs a detail request, with its bill reference known. */
 type PendingRoll = HouseVoteListItem & {
   legislationNumber: string;
@@ -129,12 +114,10 @@ export async function ingestHousePassageVotes(
       });
     }
 
+    // Congress.gov returns House votes oldest-first, so early pages can predate
+    // the lookback window entirely. Paging continues regardless until the list
+    // is exhausted; there is no page at which it is safe to stop early.
     nextUrl = nextPageUrl(data.pagination?.next, apiKey);
-    if (lookbackStart && pageEntirelyBeforeLookback(items, lookbackStart)) {
-      // Congress.gov returns House votes oldest-first. Early pages can predate the
-      // lookback window; keep paging until we reach recent votes.
-      continue;
-    }
   }
 
   // Phase 2: spend the detail budget newest-first. The list arrives oldest-first,
