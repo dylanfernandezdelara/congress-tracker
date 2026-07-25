@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  compareBillText,
   diffAddedSections,
   parseBillSections,
   selectLatestSummary,
@@ -62,7 +63,7 @@ describe("parseBillSections", () => {
 });
 
 describe("diffAddedSections", () => {
-  it("reports sections whose numbering is absent from the summarized text", () => {
+  it("reports sections absent from the summarized text", () => {
     const result = diffAddedSections(
       parseBillSections(REPORTED_XML),
       parseBillSections(ENGROSSED_XML)
@@ -74,6 +75,58 @@ describe("diffAddedSections", () => {
     expect(result.moreAddedCount).toBe(0);
   });
 
+  it("names the inserted section, not the neighbour it renumbered", () => {
+    // H.R. 7128 (119th) inserted "Reporting" as section 4, pushing "Technical
+    // amendments" from 4 to 5. Matching on section number alone reports the
+    // renumbered neighbour and hides the provision that was actually added.
+    const basis = [
+      { label: "1.", heading: "Short title" },
+      { label: "2.", heading: "Extension" },
+      { label: "3.", heading: "Improvements to certification process" },
+      { label: "4.", heading: "Technical amendments" },
+    ];
+    const latest = [
+      { label: "1.", heading: "Short title" },
+      { label: "2.", heading: "Extension" },
+      { label: "3.", heading: "Improvements to certification process" },
+      { label: "4.", heading: "Reporting" },
+      { label: "5.", heading: "Technical amendments" },
+    ];
+    expect(diffAddedSections(basis, latest).added).toEqual([
+      { label: "4.", heading: "Reporting" },
+    ]);
+  });
+
+  it("separates a genuinely new section from headings shortened in place", () => {
+    // H.R. 6955 (119th) shortened the section 177/178 headings and added
+    // section 803. Only 803 is new text.
+    const basis = [
+      { label: "177.", heading: "Periodic adjustments to thresholds to account for increases in current-dollar United States gross domestic product" },
+      { label: "178.", heading: "Adjustments to thresholds established by rule to account for increases in current-dollar United States gross domestic product" },
+      { label: "802.", heading: "Bank-Fintech Partnership Enhancement" },
+    ];
+    const latest = [
+      { label: "177.", heading: "Periodic adjustments to thresholds" },
+      { label: "178.", heading: "Periodic adjustments to thresholds established by rule" },
+      { label: "802.", heading: "Bank-Fintech Partnership Enhancement" },
+      { label: "803.", heading: "Discretionary surplus fund" },
+    ];
+    expect(diffAddedSections(basis, latest).added).toEqual([
+      { label: "803.", heading: "Discretionary surplus fund" },
+    ]);
+  });
+
+  it("treats a section moved to a new number as unchanged text", () => {
+    // H.R. 6955 renumbered "Tailoring and Indexing Enhanced Regulations" from
+    // 204 to 203 when earlier sections were dropped.
+    const basis = [
+      { label: "203.", heading: "Community Bank Leverage Improvement" },
+      { label: "204.", heading: "Tailoring and Indexing Enhanced Regulations" },
+    ];
+    const latest = [{ label: "203.", heading: "Tailoring and Indexing Enhanced Regulations" }];
+    expect(diffAddedSections(basis, latest).added).toEqual([]);
+  });
+
   it("ignores a reworded heading under the same section number", () => {
     // H.R. 1181 renamed section 2 between prints; that is an edit, not an addition.
     const basis = [{ label: "2.", heading: "Distinguishing firearms sales" }];
@@ -81,11 +134,24 @@ describe("diffAddedSections", () => {
     expect(diffAddedSections(basis, latest).added).toEqual([]);
   });
 
-  it("treats trailing punctuation and case as the same section", () => {
+  it("does not let one dropped section mask two reworded headings", () => {
+    // The same-number edit allowance is consumed per basis section, so a second
+    // unmatched heading under a number the basis no longer has is still added.
+    const basis = [{ label: "5.", heading: "Original heading" }];
+    const latest = [
+      { label: "5.", heading: "Reworded heading" },
+      { label: "6.", heading: "Brand new provision" },
+    ];
+    expect(diffAddedSections(basis, latest).added).toEqual([
+      { label: "6.", heading: "Brand new provision" },
+    ]);
+  });
+
+  it("treats punctuation, case, and quote glyphs as the same heading", () => {
     expect(
       diffAddedSections(
-        [{ label: "303a", heading: "Photo identification requirements" }],
-        [{ label: "303A.", heading: "Photo identification requirements" }]
+        [{ label: "303a", heading: "Regulators\u2019 exams" }],
+        [{ label: "303A.", heading: "Regulators' Exams" }]
       ).added
     ).toEqual([]);
   });
@@ -110,6 +176,74 @@ describe("diffAddedSections", () => {
     );
     expect(result.added).toHaveLength(1);
     expect(result.moreAddedCount).toBe(0);
+  });
+});
+
+describe("compareBillText", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubFetch(byUrl: Record<string, string>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === "HEAD") {
+          return new Response(null, { status: 200, headers: { "content-length": "1000" } });
+        }
+        return new Response(byUrl[url] ?? "", { status: 200 });
+      })
+    );
+  }
+
+  const basisVersion = { type: "Reported in House", date: "2026-02-03", xmlUrl: "https://x.test/rh.xml" };
+  const latestVersion = { type: "Engrossed in House", date: "2026-07-22", xmlUrl: "https://x.test/eh.xml" };
+
+  it("reports provisions added after the summarized version", async () => {
+    stubFetch({ "https://x.test/rh.xml": REPORTED_XML, "https://x.test/eh.xml": ENGROSSED_XML });
+
+    const changes = await compareBillText({
+      summaryDate: "2026-02-03",
+      summaryVersion: basisVersion,
+      latestVersion,
+    });
+
+    expect(changes).toMatchObject({
+      summary_version: "Reported in House",
+      latest_version: "Engrossed in House",
+      added_provisions: [
+        { label: "3.", heading: "Requiring voters to provide photo identification" },
+        { label: "303A.", heading: "Photo identification requirements" },
+      ],
+      more_added_count: 0,
+    });
+  });
+
+  it("reports nothing when the summarized text has no parseable sections", async () => {
+    // Otherwise every section of the newer text would look newly added.
+    stubFetch({
+      "https://x.test/rh.xml": "<resolution><resolution-body>Resolved.</resolution-body></resolution>",
+      "https://x.test/eh.xml": ENGROSSED_XML,
+    });
+
+    await expect(
+      compareBillText({
+        summaryDate: "2026-02-03",
+        summaryVersion: basisVersion,
+        latestVersion,
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("reports nothing when the summary already describes the newest text", async () => {
+    await expect(
+      compareBillText({
+        summaryDate: "2026-07-22",
+        summaryVersion: latestVersion,
+        latestVersion,
+      })
+    ).resolves.toBeNull();
   });
 });
 

@@ -66,9 +66,21 @@ export function parseBillSections(xml: string): BillSection[] {
   return out;
 }
 
-/** Normalized section identity — trailing punctuation and case vary between prints. */
+/** Normalized section number — trailing punctuation and case vary between prints. */
 function sectionKey(label: string): string {
   return label.replace(/[.\s]+$/, "").toLowerCase();
+}
+
+/** Normalized heading text — prints vary in case, spacing, and quote glyphs. */
+function headingKey(heading: string): string {
+  return heading
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/[.\s]+$/, "")
+    .trim()
+    .toLowerCase();
 }
 
 export interface AddedSectionsResult {
@@ -77,25 +89,57 @@ export interface AddedSectionsResult {
 }
 
 /**
- * Sections present in `latest` whose numbering does not appear in `basis`.
+ * Sections in `latest` that have no counterpart in `basis`.
  *
- * Matching on section numbering (not heading text) is deliberate: a reworded
- * heading under the same section number is an edit, not an added provision, and
- * reporting it would be misleading.
+ * Matching is heading-first because section numbers are not stable identities:
+ * inserting one section renumbers every section after it, so a number-based
+ * diff names the renumbered neighbour instead of the provision that was
+ * actually added. Headings alone are not sufficient either — a heading reworded
+ * in place would look like an addition — so a heading-unmatched section is
+ * treated as an edit when the basis still has an unmatched section under the
+ * same number. Each basis section is consumed by at most one match so repeated
+ * headings cannot mask an addition.
  */
 export function diffAddedSections(
   basis: BillSection[],
   latest: BillSection[],
   limit: number = TEXT_CHANGES_MAX_LISTED_PROVISIONS
 ): AddedSectionsResult {
-  const basisKeys = new Set(basis.map((section) => sectionKey(section.label)));
+  const unmatchedByHeading = new Map<string, BillSection[]>();
+  for (const section of basis) {
+    const key = headingKey(section.heading);
+    const pool = unmatchedByHeading.get(key);
+    if (pool) pool.push(section);
+    else unmatchedByHeading.set(key, [section]);
+  }
+
+  const candidates: BillSection[] = [];
+  for (const section of latest) {
+    const pool = unmatchedByHeading.get(headingKey(section.heading));
+    if (pool && pool.length > 0) {
+      pool.shift();
+      continue;
+    }
+    candidates.push(section);
+  }
+
+  const unmatchedBasisLabels = new Set<string>();
+  for (const pool of unmatchedByHeading.values()) {
+    for (const section of pool) unmatchedBasisLabels.add(sectionKey(section.label));
+  }
+
   const seen = new Set<string>();
   const added: BillAddedProvision[] = [];
   let total = 0;
 
-  for (const section of latest) {
-    const key = sectionKey(section.label);
-    if (basisKeys.has(key) || seen.has(key)) continue;
+  for (const section of candidates) {
+    const labelKey = sectionKey(section.label);
+    if (unmatchedBasisLabels.has(labelKey)) {
+      unmatchedBasisLabels.delete(labelKey);
+      continue;
+    }
+    const key = `${labelKey}|${headingKey(section.heading)}`;
+    if (seen.has(key)) continue;
     seen.add(key);
     total += 1;
     if (added.length < limit) {
@@ -222,8 +266,14 @@ export async function compareBillText(
   ]);
   if (basisXml === null || latestXml === null) return null;
 
+  const basisSections = parseBillSections(basisXml);
+  // Simple resolutions and a few unusual prints expose no parseable sections.
+  // Without a basis to compare against, every section of the newer text would
+  // look added, so report nothing rather than a fabricated list.
+  if (basisSections.length === 0) return null;
+
   const { added, moreAddedCount } = diffAddedSections(
-    parseBillSections(basisXml),
+    basisSections,
     parseBillSections(latestXml)
   );
   if (added.length === 0) return null;
