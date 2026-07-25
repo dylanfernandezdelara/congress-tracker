@@ -28,7 +28,7 @@ type MemberSpotlight = {
   party: string
   state: string
   hook: string
-  href?: string
+  href?: string | null
   tone?: 'neutral' | 'gain' | 'loss'
   cross_vote_count: number
 }
@@ -86,7 +86,7 @@ function buildSpotlights(
       party: defector.party,
       state: defector.state,
       hook: defectorHook(defector),
-      href: defector.congress_gov_url ?? undefined,
+      href: defector.congress_gov_url,
       tone: 'neutral',
       cross_vote_count: defector.cross_vote_count,
     })
@@ -107,7 +107,7 @@ function buildSpotlights(
       party: entry.party ?? '',
       state: entry.state ?? '',
       hook: portfolioHook(entry, direction),
-      href: congressGovMemberUrl(entry.bioguide_id, entry.name) ?? undefined,
+      href: congressGovMemberUrl(entry.bioguide_id, entry.name),
       tone: direction === 'gain' ? 'gain' : 'loss',
       cross_vote_count: 0,
     })

@@ -137,7 +137,7 @@ export interface DefectorEntry {
   state: string
   cross_vote_count: number
   deciding_score: number
-  /** Null when the id is not a real bioguide (local seed / unresolved LIS). */
+  /** Null when the id is not a real bioguide (local seed / LIS placeholder). */
   congress_gov_url: string | null
   recent_example?: {
     bill_type: string
@@ -163,7 +163,7 @@ export interface VoteDefectorEntry {
   state: string
   position: 'yea' | 'nay'
   party_line: 'yea' | 'nay'
-  /** Null when the id is not a real bioguide (local seed / unresolved LIS). */
+  /** Null when the id is not a real bioguide (local seed / LIS placeholder). */
   congress_gov_url: string | null
 }
 

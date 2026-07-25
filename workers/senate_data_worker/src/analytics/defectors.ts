@@ -1,9 +1,5 @@
 import type { Chamber, DefectorEntry, VoteDefectorEntry } from "../types";
-import {
-  isLisMemberId,
-  isLocalSampleMemberId,
-  isRealBioguideId,
-} from "../../../../shared/member-id";
+import { isLocalSampleMemberId, isRealBioguideId } from "../../../../shared/member-id";
 import { congressGovMemberUrl } from "../../../../shared/member-photo";
 import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
 import { selectMemberVotesForRoll, type RollCallKey } from "../d1/member-votes";
@@ -11,16 +7,6 @@ import { selectMemberCrossVotesForChamber } from "../d1/member-session-stats";
 import type { RollPartySplit } from "../../../../shared/stats-api-types";
 import { rollCrossVotes } from "./cross-votes";
 import { rollPartySplits } from "./roll-party-stats";
-
-/** Real bioguide → congress.gov; unresolved LIS → Senate directory; else null. */
-function defectorCongressGovUrl(bioguideId: string, name: string): string | null {
-  const memberUrl = congressGovMemberUrl(bioguideId, name);
-  if (memberUrl) return memberUrl;
-  if (isLisMemberId(bioguideId)) {
-    return "https://www.senate.gov/general/contact_information/senators_cfm.cfm";
-  }
-  return null;
-}
 
 /**
  * Rank party-line breakers from denormalized `member_cross_votes` (maintained by
@@ -84,7 +70,7 @@ export async function computeDefectors(
       state,
       cross_vote_count: score.crossVotes,
       deciding_score: score.decidingScore,
-      congress_gov_url: defectorCongressGovUrl(bioguideId, name),
+      congress_gov_url: congressGovMemberUrl(bioguideId, name),
       recent_example: score.recent,
     });
   }
@@ -155,7 +141,7 @@ export async function computeRollDefectors(
       state: member.state ?? "?",
       position: cross.position,
       party_line: cross.partyLine,
-      congress_gov_url: defectorCongressGovUrl(cross.bioguideId, member.name),
+      congress_gov_url: congressGovMemberUrl(cross.bioguideId, member.name),
     });
   }
 

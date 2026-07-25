@@ -9,8 +9,8 @@ export function bioguidePhotoUrl(bioguideId: string): string | null {
 
 /**
  * Slug for congress.gov `/member/{slug}/{bioguide}` paths.
- * Bioguide is authoritative — a wrong slug still redirects to the right page —
- * so prefer first+last and fall back to a stable placeholder.
+ * Joins alphanumeric name tokens with hyphens. Bioguide is authoritative —
+ * an imperfect slug still redirects to the right member page.
  */
 export function memberNameSlug(name: string): string {
   const cleaned = name
