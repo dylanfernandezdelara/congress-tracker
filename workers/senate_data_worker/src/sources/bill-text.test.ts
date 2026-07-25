@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BILL_TEXT_MAX_BYTES } from "../constants";
+import {
+  BILL_TEXT_MAX_BYTES,
+  TEXT_CHANGES_MAX_LISTED_PROVISIONS,
+  TEXT_CHANGES_MAX_STORED_PROVISIONS,
+} from "../constants";
 import {
   compareBillText,
   diffAddedSections,
@@ -157,14 +161,40 @@ describe("diffAddedSections", () => {
     ).toEqual([]);
   });
 
-  it("caps the listed sections and counts the rest", () => {
+  it("caps the listed sections and counts the rest when given an explicit limit", () => {
     const latest = Array.from({ length: 9 }, (_, i) => ({
       label: `${i + 1}.`,
       heading: `Section ${i + 1}`,
     }));
-    const result = diffAddedSections([], latest, 5);
-    expect(result.added).toHaveLength(5);
+    const result = diffAddedSections([], latest, TEXT_CHANGES_MAX_LISTED_PROVISIONS);
+    expect(result.added).toHaveLength(TEXT_CHANGES_MAX_LISTED_PROVISIONS);
     expect(result.moreAddedCount).toBe(4);
+  });
+
+  it("stores every addition up to the storage cap with no overflow count", () => {
+    // More than the initial UI density (5) but within what the feed persists.
+    const count = TEXT_CHANGES_MAX_LISTED_PROVISIONS + 3;
+    const latest = Array.from({ length: count }, (_, i) => ({
+      label: `${i + 1}.`,
+      heading: `Section ${i + 1}`,
+    }));
+    const result = diffAddedSections([], latest);
+    expect(result.added).toHaveLength(count);
+    expect(result.moreAddedCount).toBe(0);
+  });
+
+  it("stores up to the storage cap and counts only genuine overflow", () => {
+    const overflow = 7;
+    const latest = Array.from(
+      { length: TEXT_CHANGES_MAX_STORED_PROVISIONS + overflow },
+      (_, i) => ({
+        label: `${i + 1}.`,
+        heading: `Section ${i + 1}`,
+      })
+    );
+    const result = diffAddedSections([], latest);
+    expect(result.added).toHaveLength(TEXT_CHANGES_MAX_STORED_PROVISIONS);
+    expect(result.moreAddedCount).toBe(overflow);
   });
 
   it("does not double-count a section number repeated in the latest text", () => {

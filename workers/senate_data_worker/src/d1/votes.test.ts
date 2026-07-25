@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { COMPANION_VOTES_PER_BILL } from "../constants";
 import {
   countFeedBills,
   getCompanionVotesForBills,
@@ -179,6 +180,65 @@ describe("getCompanionVotesForBills", () => {
     ]);
 
     expect(map.get("119:HR:1")).toEqual([]);
+  });
+
+  it("bounds companion rolls per bill in SQL and keeps the newest ones", async () => {
+    const makeRoll = (
+      billNumber: number,
+      rollNumber: number,
+      voteDate: string
+    ): Record<string, unknown> => ({
+      chamber: "House",
+      congress: 119,
+      session: 2,
+      roll_number: rollNumber,
+      question: `On Motion ${rollNumber}`,
+      result: "Failed",
+      yeas: 200,
+      nays: 220,
+      vote_date: voteDate,
+      bill_congress: 119,
+      bill_type: "HR",
+      bill_number: billNumber,
+    });
+
+    // Newest-first order mirrors the SQL ORDER BY; more than the cap per bill.
+    const rows: Array<Record<string, unknown>> = [];
+    for (let i = 0; i < COMPANION_VOTES_PER_BILL + 4; i++) {
+      rows.push(makeRoll(7008, 300 - i, `2026-05-${String(20 - i).padStart(2, "0")}`));
+    }
+    for (let i = 0; i < COMPANION_VOTES_PER_BILL + 3; i++) {
+      rows.push(makeRoll(1, 100 - i, `2026-04-${String(20 - i).padStart(2, "0")}`));
+    }
+
+    const { db, preparedSql } = createMockDb(rows);
+
+    const map = await getCompanionVotesForBills(db, [
+      { congress: 119, billType: "hr", billNumber: 7008 },
+      { congress: 119, billType: "hr", billNumber: 1 },
+    ]);
+
+    const selectSql = preparedSql.find((sql) => sql.includes("FROM votes"))!;
+    expect(selectSql).toMatch(
+      /ROW_NUMBER\(\)\s+OVER\s*\(\s*PARTITION BY bill_congress,\s*UPPER\(bill_type\),\s*bill_number/
+    );
+    expect(selectSql).toMatch(
+      new RegExp(`WHERE rn <= ${COMPANION_VOTES_PER_BILL}`)
+    );
+    expect(selectSql).toMatch(
+      /ORDER BY vote_date DESC, roll_number DESC/
+    );
+
+    const bill7008 = map.get("119:HR:7008")!;
+    const bill1 = map.get("119:HR:1")!;
+    expect(bill7008).toHaveLength(COMPANION_VOTES_PER_BILL);
+    expect(bill1).toHaveLength(COMPANION_VOTES_PER_BILL);
+    expect(bill7008.map((r) => r.roll_number)).toEqual(
+      Array.from({ length: COMPANION_VOTES_PER_BILL }, (_, i) => 300 - i)
+    );
+    expect(bill1.map((r) => r.roll_number)).toEqual(
+      Array.from({ length: COMPANION_VOTES_PER_BILL }, (_, i) => 100 - i)
+    );
   });
 });
 

@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import { TEXT_CHANGES_MAX_LISTED_PROVISIONS } from '@congress-tracker/shared/bill-text-constants'
 import type { BillTextChanges } from '../api/types'
 import { BillTextChangesSection } from './BillTextChangesSection'
 
@@ -14,6 +15,13 @@ const hr7008Changes: BillTextChanges = {
     { label: '303A.', heading: 'Photo identification requirements' },
   ],
   more_added_count: 0,
+}
+
+function manyProvisions(count: number): BillTextChanges['added_provisions'] {
+  return Array.from({ length: count }, (_, i) => ({
+    label: `${i + 1}.`,
+    heading: `Added provision ${i + 1}`,
+  }))
 }
 
 describe('BillTextChangesSection', () => {
@@ -49,6 +57,40 @@ describe('BillTextChangesSection', () => {
       <BillTextChangesSection changes={{ ...hr7008Changes, more_added_count: 1 }} />,
     )
     expect(screen.getByText('+ 1 more added section')).toBeInTheDocument()
+  })
+
+  it('collapses long lists behind a Show all toggle', () => {
+    const stored = TEXT_CHANGES_MAX_LISTED_PROVISIONS + 3
+    render(
+      <BillTextChangesSection
+        changes={{
+          ...hr7008Changes,
+          added_provisions: manyProvisions(stored),
+          more_added_count: 2,
+        }}
+      />,
+    )
+
+    expect(screen.getAllByText(/Added provision/)).toHaveLength(
+      TEXT_CHANGES_MAX_LISTED_PROVISIONS,
+    )
+    expect(screen.getByText('3 more not shown')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: `Show all ${stored}` }))
+
+    expect(screen.getAllByText(/Added provision/)).toHaveLength(stored)
+    expect(screen.getByRole('button', { name: 'Show fewer' })).toBeInTheDocument()
+    expect(screen.getByText('+ 2 more added sections')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }))
+    expect(screen.getAllByText(/Added provision/)).toHaveLength(
+      TEXT_CHANGES_MAX_LISTED_PROVISIONS,
+    )
+  })
+
+  it('does not offer a toggle when every provision already fits', () => {
+    render(<BillTextChangesSection changes={hr7008Changes} />)
+    expect(screen.queryByRole('button', { name: /Show all/ })).not.toBeInTheDocument()
   })
 
   it('renders nothing when no provisions were added', () => {

@@ -1,7 +1,7 @@
 import type { Env } from "../config";
 import {
   BILL_TEXT_MAX_BYTES,
-  TEXT_CHANGES_MAX_LISTED_PROVISIONS,
+  TEXT_CHANGES_MAX_STORED_PROVISIONS,
   USER_AGENT,
 } from "../constants";
 import type { BillRef } from "../types";
@@ -103,7 +103,7 @@ export interface AddedSectionsResult {
 export function diffAddedSections(
   basis: BillSection[],
   latest: BillSection[],
-  limit: number = TEXT_CHANGES_MAX_LISTED_PROVISIONS
+  limit: number = TEXT_CHANGES_MAX_STORED_PROVISIONS
 ): AddedSectionsResult {
   const unmatchedByHeading = new Map<string, BillSection[]>();
   for (const section of basis) {
@@ -286,6 +286,17 @@ async function fetchBillTextXml(url: string): Promise<string | null> {
 }
 
 /**
+ * Fetch one print and return only its sections so the XML string can be
+ * collected before the next print is downloaded. Peak memory is then one
+ * document buffer plus the compact section lists — not two full strings.
+ */
+async function fetchParsedBillSections(url: string): Promise<BillSection[] | null> {
+  const xml = await fetchBillTextXml(url);
+  if (xml === null) return null;
+  return parseBillSections(xml);
+}
+
+/**
  * Compare the summarized text against the newest text. Returns null when there
  * is nothing meaningful to show: same version, no summary, or no added sections.
  */
@@ -296,24 +307,19 @@ export async function compareBillText(
   if (!summaryVersion || !latestVersion) return null;
   if (summaryVersion.xmlUrl === latestVersion.xmlUrl) return null;
 
-  // Fetched one at a time so only one bill text is resident at a time — two
-  // large prints held together are the worst case for Worker memory.
-  const basisXml = await fetchBillTextXml(summaryVersion.xmlUrl);
-  if (basisXml === null) return null;
-
-  const basisSections = parseBillSections(basisXml);
+  // One print at a time: parse (and drop) the basis before fetching the latest.
+  const basisSections = await fetchParsedBillSections(summaryVersion.xmlUrl);
+  if (basisSections === null) return null;
   // Simple resolutions and a few unusual prints expose no parseable sections.
   // Without a basis to compare against, every section of the newer text would
-  // look added, so report nothing rather than a fabricated list.
+  // look added, so report nothing rather than a fabricated list — and skip the
+  // second subrequest.
   if (basisSections.length === 0) return null;
 
-  const latestXml = await fetchBillTextXml(latestVersion.xmlUrl);
-  if (latestXml === null) return null;
+  const latestSections = await fetchParsedBillSections(latestVersion.xmlUrl);
+  if (latestSections === null) return null;
 
-  const { added, moreAddedCount } = diffAddedSections(
-    basisSections,
-    parseBillSections(latestXml)
-  );
+  const { added, moreAddedCount } = diffAddedSections(basisSections, latestSections);
   if (added.length === 0) return null;
 
   return {

@@ -1,5 +1,9 @@
 /** Feed and pipeline tuning (module constants, not env). */
 export { VOTE_LOOKBACK_DAYS } from "../../../shared/feed-constants";
+export {
+  TEXT_CHANGES_MAX_LISTED_PROVISIONS,
+  TEXT_CHANGES_MAX_STORED_PROVISIONS,
+} from "../../../shared/bill-text-constants";
 
 export const FEED_MAX_BILLS = 50;
 export const FEED_DEFAULT_PAGE_SIZE = 50;
@@ -21,8 +25,6 @@ export const DIGEST_REFRESH_MAX_BILLS = 25;
  * last check download XML, so the steady-state cost is the JSON probes alone.
  */
 export const TEXT_CHANGES_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
-/** Added sections listed in the UI before collapsing to a "+N more" count. */
-export const TEXT_CHANGES_MAX_LISTED_PROVISIONS = 5;
 /** Skip text diffing above this document size to bound cron memory and time. */
 export const BILL_TEXT_MAX_BYTES = 8 * 1024 * 1024;
 /** Newest companion (non-passage) rolls carried per bill in the feed payload. */

@@ -464,13 +464,26 @@ export async function getCompanionVotesForBills(
     for (const bill of chunk) {
       binds.push(bill.congress, bill.billType, bill.billNumber);
     }
+    // A long-running bill accumulates dozens of procedural rolls, so the cap is
+    // applied per bill rather than to the chunk: one busy bill must not crowd
+    // the others out. The partition has to match billLookupKey, which folds
+    // bill_type case.
     const { results } = await db
       .prepare(
         `SELECT chamber, congress, session, roll_number, question, result, yeas, nays, vote_date,
                 bill_congress, bill_type, bill_number
-         FROM votes
-         WHERE is_passage = 0 AND TRIM(question) <> '' AND (yeas + nays) > 0
-           AND (${clauses})
+         FROM (
+           SELECT chamber, congress, session, roll_number, question, result, yeas, nays, vote_date,
+                  bill_congress, bill_type, bill_number,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY bill_congress, UPPER(bill_type), bill_number
+                    ORDER BY vote_date DESC, roll_number DESC
+                  ) AS rn
+           FROM votes
+           WHERE is_passage = 0 AND TRIM(question) <> '' AND (yeas + nays) > 0
+             AND (${clauses})
+         )
+         WHERE rn <= ${COMPANION_VOTES_PER_BILL}
          ORDER BY vote_date DESC, roll_number DESC`
       )
       .bind(...binds)
@@ -479,9 +492,7 @@ export async function getCompanionVotesForBills(
     for (const row of results ?? []) {
       const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
       const listForBill = map.get(key) ?? [];
-      // A long-running bill can accumulate dozens of procedural rolls. Rows
-      // arrive newest first, so keeping the first few per bill bounds the feed
-      // payload without another query.
+      // Backstop for the SQL cap above; both must move together.
       if (listForBill.length >= COMPANION_VOTES_PER_BILL) continue;
       listForBill.push({
         chamber: row.chamber,

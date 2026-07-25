@@ -1,3 +1,7 @@
+import { useState } from 'react'
+
+import { TEXT_CHANGES_MAX_LISTED_PROVISIONS } from '@congress-tracker/shared/bill-text-constants'
+
 import type { BillTextChanges } from '../api/types'
 import {
   billTextChangesExplanation,
@@ -11,7 +15,16 @@ import {
  * the feed never mentions.
  */
 export function BillTextChangesSection({ changes }: { changes: BillTextChanges }) {
+  const [expanded, setExpanded] = useState(false)
+
   if (changes.added_provisions.length === 0) return null
+
+  const collapsible = changes.added_provisions.length > TEXT_CHANGES_MAX_LISTED_PROVISIONS
+  const visible =
+    collapsible && !expanded
+      ? changes.added_provisions.slice(0, TEXT_CHANGES_MAX_LISTED_PROVISIONS)
+      : changes.added_provisions
+  const hidden = changes.added_provisions.length - visible.length
 
   return (
     <section
@@ -21,7 +34,7 @@ export function BillTextChangesSection({ changes }: { changes: BillTextChanges }
       <h3 className="feed-row-detail-heading">Added after this summary</h3>
       <p className="feed-row-added-provisions-lede">{billTextChangesExplanation(changes)}</p>
       <ul className="feed-row-added-provisions-list">
-        {changes.added_provisions.map((provision) => (
+        {visible.map((provision) => (
           <li key={`${provision.label}-${provision.heading}`}>
             <span className="feed-row-added-provisions-label">
               {formatProvisionLabel(provision.label)}
@@ -30,6 +43,18 @@ export function BillTextChangesSection({ changes }: { changes: BillTextChanges }
           </li>
         ))}
       </ul>
+      {collapsible ? (
+        <button
+          type="button"
+          className="feed-row-added-provisions-toggle"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? 'Show fewer' : `Show all ${changes.added_provisions.length}`}
+        </button>
+      ) : null}
+      {collapsible && !expanded && hidden > 0 ? (
+        <span className="sr-only">{hidden} more not shown</span>
+      ) : null}
       {changes.more_added_count > 0 ? (
         <p className="feed-row-added-provisions-more">
           + {changes.more_added_count} more added section
