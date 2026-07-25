@@ -86,7 +86,7 @@ function buildSpotlights(
       party: defector.party,
       state: defector.state,
       hook: defectorHook(defector),
-      href: defector.congress_gov_url,
+      href: defector.congress_gov_url ?? undefined,
       tone: 'neutral',
       cross_vote_count: defector.cross_vote_count,
     })
