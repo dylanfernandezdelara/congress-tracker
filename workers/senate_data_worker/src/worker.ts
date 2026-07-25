@@ -4,6 +4,7 @@
 
 import type { Env } from "./config";
 import { isPipelineBusyError, withPipelineLease } from "./d1/pipeline-lease";
+import { recordFeedPipelineSkipped } from "./d1/pipeline-state";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
@@ -79,7 +80,7 @@ export default {
             }),
           );
         })
-        .catch((err: unknown) => {
+        .catch(async (err: unknown) => {
           if (isPipelineBusyError(err)) {
             console.log(
               JSON.stringify({
@@ -88,6 +89,20 @@ export default {
                 scheduledTime: controller.scheduledTime,
               }),
             );
+            try {
+              await recordFeedPipelineSkipped(env.DB, "scheduled", "pipeline_busy");
+            } catch (recordErr: unknown) {
+              const recordMessage =
+                recordErr instanceof Error ? recordErr.message : String(recordErr);
+              console.error(
+                JSON.stringify({
+                  event: "feed_pipeline_skip_record_failed",
+                  cron: controller.cron,
+                  scheduledTime: controller.scheduledTime,
+                  error: recordMessage,
+                }),
+              );
+            }
             return;
           }
           const message = err instanceof Error ? err.message : String(err);

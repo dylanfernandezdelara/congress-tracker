@@ -103,8 +103,10 @@ Workers block admin writes and use a separate empty D1; local offline: `npm run 
 populates sample sidebar data.
 
 **Daily ingest (production):** Cloudflare cron runs `runFeedWithMemberVotes` (feed then
-best-effort `member-votes`) at **10:00 UTC**, and `runExecutivePostsPipeline` hourly (`0 * * * *`)
-— see `[triggers]` in `workers/senate_data_worker/wrangler.toml` (`crons = ["0 10 * * *", "0 * * * *"]`).
+best-effort `member-votes`) at **10:00 UTC**, and `runExecutivePostsPipeline` hourly at **:20**
+(`20 * * * *`) — see `[triggers]` in `workers/senate_data_worker/wrangler.toml`
+(`crons = ["0 10 * * *", "20 * * * *"]`). The executive cron is off the top of the hour so it
+never shares a minute with the daily feed cron (both share one write lease).
 `wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
 `workers/senate_data_worker` only after `wrangler versions upload` previews. The feed pipeline
 only upserts **new** passage votes (skips known roll-call keys) and writes digests for bills

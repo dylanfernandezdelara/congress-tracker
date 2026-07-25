@@ -3,9 +3,11 @@ import type { Env } from "../config";
 import {
   getFeedPipelineFailure,
   getFeedPipelineScheduledSuccess,
+  getFeedPipelineSkipped,
   getFeedPipelineSuccess,
   getMissingDigestCount,
   recordFeedPipelineFailure,
+  recordFeedPipelineSkipped,
   recordFeedPipelineSuccess,
 } from "./pipeline-state";
 import { resetSchemaFlag } from "./schema";
@@ -107,6 +109,18 @@ describe("pipeline-state", () => {
       error: "Congress.gov 503",
     });
     expect(record?.failed_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("records and reads feed pipeline busy-skips", async () => {
+    const { db } = createMockDb();
+    await recordFeedPipelineSkipped(db, "scheduled", "pipeline_busy");
+
+    const record = await getFeedPipelineSkipped(db);
+    expect(record).toMatchObject({
+      trigger: "scheduled",
+      reason: "pipeline_busy",
+    });
+    expect(record?.skipped_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it("counts null and unparseable digests as missing (matches parseStoredDigest)", async () => {

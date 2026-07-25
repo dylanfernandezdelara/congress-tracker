@@ -13,7 +13,11 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 [triggers]
-crons = ["0 10 * * *", "0 * * * *"]
+crons = ["0 10 * * *", "20 * * * *"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 [limits]
 cpu_ms = 300000

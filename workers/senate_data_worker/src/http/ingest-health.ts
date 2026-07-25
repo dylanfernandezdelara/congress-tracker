@@ -3,7 +3,7 @@ import type {
   ExecutivePipelineRunRecord,
   FeedPipelineFailureRecord,
   FeedPipelineRunRecord,
-  FeedPipelineTrigger,
+  FeedPipelineSkipRecord,
   IngestMonitorPayload,
   IngestMonitorStatus,
 } from "../../../../shared/ingest-api-types";
@@ -84,6 +84,7 @@ export function buildIngestMonitorPayload(params: {
   lastSuccess: FeedPipelineRunRecord | null;
   lastScheduledSuccess?: FeedPipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
+  lastSkipped?: FeedPipelineSkipRecord | null;
   executive?: {
     staleAfterHours: number;
     hourlyCronUtc: string;
@@ -129,6 +130,7 @@ export function buildIngestMonitorPayload(params: {
     last_failure: sanitizeFailureRecord(params.lastFailure),
     last_scheduled_success:
       (evaluated.last_scheduled_success as FeedPipelineRunRecord | null) ?? null,
+    last_skipped: params.lastSkipped ?? null,
     admin_feed_ingest: "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
     executive,
   };

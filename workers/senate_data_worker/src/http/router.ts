@@ -8,6 +8,7 @@ import {
   getExecutivePostsPipelineSuccess,
   getFeedPipelineFailure,
   getFeedPipelineScheduledSuccess,
+  getFeedPipelineSkipped,
   getFeedPipelineSuccess,
   getLatestPassageVoteDate,
   getMissingDigestCount,
@@ -72,6 +73,7 @@ async function loadIngestMonitor(env: Env) {
     lastSuccess,
     lastScheduledSuccess,
     lastFailure,
+    lastSkipped,
     executiveLastSuccess,
     executiveLastFailure,
   ] = await Promise.all([
@@ -80,6 +82,7 @@ async function loadIngestMonitor(env: Env) {
     getFeedPipelineSuccess(env.DB),
     getFeedPipelineScheduledSuccess(env.DB),
     getFeedPipelineFailure(env.DB),
+    getFeedPipelineSkipped(env.DB),
     getExecutivePostsPipelineSuccess(env.DB),
     getExecutivePostsPipelineFailure(env.DB),
   ]);
@@ -93,6 +96,7 @@ async function loadIngestMonitor(env: Env) {
     lastSuccess,
     lastScheduledSuccess,
     lastFailure,
+    lastSkipped,
     executive: {
       staleAfterHours: EXECUTIVE_PIPELINE_STALE_HOURS,
       hourlyCronUtc: EXECUTIVE_POSTS_CRON_UTC,

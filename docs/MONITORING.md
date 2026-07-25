@@ -2,6 +2,8 @@
 
 Daily feed ingest runs via the Cloudflare Worker cron (`0 10 * * *` UTC). Each run records
 success or failure in D1 so you can tell whether the **scheduled** pipeline completed recently.
+If the daily cron loses the shared write lease, it records `last_skipped` (reason
+`pipeline_busy`) without changing `status` / `last_success` / `last_failure`.
 
 ## Status endpoints
 
@@ -40,7 +42,9 @@ scheduled freshness on their own.
 The `pipeline_state` table stores JSON blobs:
 
 - `feed_pipeline_last_success` — last run result (includes `trigger`: `scheduled` | `admin`)
+- `feed_pipeline_last_scheduled_success` — last **scheduled** success (admin runs do not overwrite)
 - `feed_pipeline_last_failure` — last error message and timestamp
+- `feed_pipeline_last_skipped` — last busy-skip (lease held); does not affect `status`
 
 Schema is created lazily via `ensureSchema` on first pipeline run after deploy.
 

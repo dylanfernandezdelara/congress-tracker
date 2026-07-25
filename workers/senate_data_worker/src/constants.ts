@@ -76,8 +76,12 @@ export const USER_AGENT = "congress-tracker/0.1";
 /** Daily feed ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml. */
 export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
 
-/** Executive Truth Social ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml. */
-export const EXECUTIVE_POSTS_CRON_UTC = "0 * * * *";
+/**
+ * Executive Truth Social ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml.
+ * Off :00 so it never shares a minute with FEED_PIPELINE_CRON_UTC — both use one write lease;
+ * a collision silently skips the daily feed ingest.
+ */
+export const EXECUTIVE_POSTS_CRON_UTC = "20 * * * *";
 
 /** Alert if no successful scheduled ingest within this many hours after cron. */
 export const FEED_PIPELINE_STALE_HOURS = 26;
@@ -85,8 +89,13 @@ export const FEED_PIPELINE_STALE_HOURS = 26;
 /** Alert if no successful scheduled executive ingest within this many hours. */
 export const EXECUTIVE_PIPELINE_STALE_HOURS = 2;
 
-/** D1 lease TTL so a crashed pipeline cannot block writes forever. */
-export const PIPELINE_LEASE_TTL_MS = 10 * 60 * 1000;
+/**
+ * D1 lease TTL so a crashed pipeline cannot block writes forever. Must outlast
+ * the longest run by more than the gap between FEED_PIPELINE_CRON_UTC and the
+ * next EXECUTIVE_POSTS_CRON_UTC firing: if it expires mid-run, the hourly cron
+ * acquires the lease and writes alongside a daily ingest that is still going.
+ */
+export const PIPELINE_LEASE_TTL_MS = 30 * 60 * 1000;
 
 /** Single global write lease shared by all mutating pipelines. */
 export const PIPELINE_WRITE_LEASE_NAME = "writes";
