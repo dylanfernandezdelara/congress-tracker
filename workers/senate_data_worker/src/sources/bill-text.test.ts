@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { BILL_TEXT_MAX_BYTES } from "../constants";
 import {
   compareBillText,
   diffAddedSections,
@@ -187,13 +188,7 @@ describe("compareBillText", () => {
   function stubFetch(byUrl: Record<string, string>) {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (init?.method === "HEAD") {
-          return new Response(null, { status: 200, headers: { "content-length": "1000" } });
-        }
-        return new Response(byUrl[url] ?? "", { status: 200 });
-      })
+      vi.fn(async (input: RequestInfo | URL) => new Response(byUrl[String(input)] ?? "", { status: 200 }))
     );
   }
 
@@ -234,6 +229,43 @@ describe("compareBillText", () => {
         latestVersion,
       })
     ).resolves.toBeNull();
+  });
+
+  it("skips documents larger than the byte cap even without a Content-Length", async () => {
+    // Congress.gov omits Content-Length on chunked responses, so the limit has
+    // to hold while reading the body.
+    const oversize = `<bill>${"x".repeat(BILL_TEXT_MAX_BYTES + 1)}</bill>`;
+    stubFetch({ "https://x.test/rh.xml": REPORTED_XML, "https://x.test/eh.xml": oversize });
+
+    await expect(
+      compareBillText({
+        summaryDate: "2026-02-03",
+        summaryVersion: basisVersion,
+        latestVersion,
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("preserves multi-byte characters that span read chunks", async () => {
+    const engrossedWithCurlyQuote = ENGROSSED_XML.replace(
+      "Photo identification requirements",
+      "Regulators\u2019 photo identification requirements"
+    );
+    stubFetch({
+      "https://x.test/rh.xml": REPORTED_XML,
+      "https://x.test/eh.xml": engrossedWithCurlyQuote,
+    });
+
+    const changes = await compareBillText({
+      summaryDate: "2026-02-03",
+      summaryVersion: basisVersion,
+      latestVersion,
+    });
+
+    expect(changes?.added_provisions).toContainEqual({
+      label: "303A.",
+      heading: "Regulators\u2019 photo identification requirements",
+    });
   });
 
   it("reports nothing when the summary already describes the newest text", async () => {

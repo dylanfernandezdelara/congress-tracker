@@ -4,6 +4,7 @@ import type { BillTextChangesRow } from "../d1/bill-text-changes";
 
 const mockGetBillTextChangesForBills = vi.fn();
 const mockUpsertBillTextChanges = vi.fn();
+const mockTouchCheckedAt = vi.fn();
 const mockFetchSource = vi.fn();
 const mockCompareBillText = vi.fn();
 
@@ -13,6 +14,7 @@ vi.mock("../d1/bill-text-changes", async (importOriginal) => {
     ...actual,
     getBillTextChangesForBills: (...args: unknown[]) => mockGetBillTextChangesForBills(...args),
     upsertBillTextChanges: (...args: unknown[]) => mockUpsertBillTextChanges(...args),
+    touchBillTextChangesCheckedAt: (...args: unknown[]) => mockTouchCheckedAt(...args),
   };
 });
 
@@ -115,6 +117,7 @@ describe("refreshBillTextChanges", () => {
     vi.clearAllMocks();
     mockGetBillTextChangesForBills.mockResolvedValue(new Map());
     mockUpsertBillTextChanges.mockResolvedValue(undefined);
+    mockTouchCheckedAt.mockResolvedValue(undefined);
     mockFetchSource.mockResolvedValue({
       summaryDate: "2026-02-03",
       summaryVersion: reportedVersion,
@@ -171,6 +174,11 @@ describe("refreshBillTextChanges", () => {
     expect(mockCompareBillText).not.toHaveBeenCalled();
     expect(mockUpsertBillTextChanges).not.toHaveBeenCalled();
     expect(result).toMatchObject({ refreshed: 0, skipped: 1, withAddedProvisions: 1 });
+    // Records the probe so a re-run the same day does not repeat it.
+    expect(mockTouchCheckedAt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ congress: 119, billType: "HR", billNumber: 7008 })
+    );
   });
 
   it("does not re-probe versions for a bill already checked today", async () => {

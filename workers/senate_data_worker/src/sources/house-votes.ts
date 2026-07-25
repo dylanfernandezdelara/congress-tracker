@@ -78,6 +78,12 @@ function pageEntirelyBeforeLookback(items: HouseVoteListItem[], lookbackStart: s
   return newest !== null && newest < lookbackStart;
 }
 
+/** A listed roll that still needs a detail request, with its bill reference known. */
+type PendingRoll = HouseVoteListItem & {
+  legislationNumber: string;
+  legislationType: string;
+};
+
 export async function ingestHousePassageVotes(
   env: Env,
   lookbackStart: string | null,
@@ -92,10 +98,11 @@ export async function ingestHousePassageVotes(
   const seenThisRun = new Set<string>();
   let skipped = 0;
   let truncated = false;
-  let detailFetches = 0;
   let nextUrl: string | null =
     `https://api.congress.gov/v3/house-vote/${congress}/${session}?format=json&limit=50&api_key=${apiKey}`;
 
+  // Phase 1: page the list and collect rolls that still need a detail request.
+  const pending: PendingRoll[] = [];
   while (nextUrl) {
     const data: HouseVoteListResponse = await fetchJson<HouseVoteListResponse>(nextUrl);
     const items = data.houseRollCallVotes ?? [];
@@ -114,86 +121,99 @@ export async function ingestHousePassageVotes(
         skipped += 1;
         continue;
       }
-
-      // Passage votes and companion stubs each cost one detail request, so the
-      // budget is shared. Stopping leaves the remaining rolls unknown for the
-      // next run rather than dropping them.
-      if (detailFetches >= HOUSE_VOTE_DETAIL_FETCHES_PER_RUN) {
-        truncated = true;
-        break;
-      }
-
-      const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
-      detailFetches += 1;
-      const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
-      const detail = detailRes.houseRollCallVote;
-      // Missing/empty detail is transient — never stub, or we permanently skip
-      // re-fetch via selectExistingVoteKeys (stubs are negative cache).
-      if (!detail) continue;
-
-      const questionText = detail.voteQuestion ?? "";
-      const titleText = detail.voteTitle ?? "";
-      if (!questionText.trim() && !titleText.trim()) continue;
-
-      const bill = parseHouseLegislation(
-        detail.legislationType ?? item.legislationType,
-        detail.legislationNumber ?? item.legislationNumber,
-        congress
-      );
-      if (!bill) continue;
-
       seenThisRun.add(key);
-
-      if (!isPassageVote(questionText) && !isPassageVote(titleText)) {
-        const stubTally = sumTally(detail.votePartyTotal);
-        nonPassageStubs.push({
-          chamber: "House",
-          congress,
-          session,
-          rollNumber: item.rollCallNumber,
-          bill,
-          // Some rolls carry only a title. Storing an empty question would make
-          // the row look unfilled forever: it is re-fetched by every run and
-          // never shown as a companion vote.
-          question: (questionText.trim() || titleText).replace(/\s+/g, " ").trim(),
-          result: detail.result ?? item.result,
-          yeas: stubTally.yeas,
-          nays: stubTally.nays,
-          voteDate: voteDateFromIso(detail.startDate ?? item.startDate),
-        });
-        continue;
-      }
-
-      const { yeas, nays } = sumTally(detail.votePartyTotal);
-      const displayQuestion = isPassageVote(titleText)
-        ? titleText.split(";")[0]!.trim()
-        : questionText.trim();
-      out.push({
-        chamber: "House",
-        congress,
-        session,
-        rollNumber: detail.rollCallNumber,
-        bill,
-        question: displayQuestion.replace(/\s+/g, " ").trim(),
-        result: detail.result,
-        yeas,
-        nays,
-        voteDate: voteDateFromIso(detail.startDate),
+      pending.push({
+        ...item,
+        legislationNumber: item.legislationNumber,
+        legislationType: item.legislationType,
       });
-
-      if (maxNewVotes !== undefined && out.length >= maxNewVotes) {
-        truncated = true;
-        break;
-      }
     }
-
-    if (truncated) break;
 
     nextUrl = nextPageUrl(data.pagination?.next, apiKey);
     if (lookbackStart && pageEntirelyBeforeLookback(items, lookbackStart)) {
       // Congress.gov returns House votes oldest-first. Early pages can predate the
       // lookback window; keep paging until we reach recent votes.
       continue;
+    }
+  }
+
+  // Phase 2: spend the detail budget newest-first. The list arrives oldest-first,
+  // so a backlog of older rolls — such as the companion stubs written before
+  // questions were stored — would otherwise delay the current week's passage
+  // votes by however many runs the backlog takes to clear.
+  pending.sort(
+    (a, b) => b.startDate.localeCompare(a.startDate) || b.rollCallNumber - a.rollCallNumber
+  );
+
+  let detailFetches = 0;
+  for (const item of pending) {
+    // Passage votes and companion stubs each cost one detail request, so the
+    // budget is shared. Stopping leaves the remaining rolls unknown for the
+    // next run rather than dropping them.
+    if (detailFetches >= HOUSE_VOTE_DETAIL_FETCHES_PER_RUN) {
+      truncated = true;
+      break;
+    }
+
+    const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
+    detailFetches += 1;
+    const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
+    const detail = detailRes.houseRollCallVote;
+    // Missing/empty detail is transient — never stub, or we permanently skip
+    // re-fetch via selectExistingVoteKeys (stubs are negative cache).
+    if (!detail) continue;
+
+    const questionText = detail.voteQuestion ?? "";
+    const titleText = detail.voteTitle ?? "";
+    if (!questionText.trim() && !titleText.trim()) continue;
+
+    const bill = parseHouseLegislation(
+      detail.legislationType ?? item.legislationType,
+      detail.legislationNumber ?? item.legislationNumber,
+      congress
+    );
+    if (!bill) continue;
+
+    if (!isPassageVote(questionText) && !isPassageVote(titleText)) {
+      const stubTally = sumTally(detail.votePartyTotal);
+      nonPassageStubs.push({
+        chamber: "House",
+        congress,
+        session,
+        rollNumber: item.rollCallNumber,
+        bill,
+        // Some rolls carry only a title. Storing an empty question would make
+        // the row look unfilled forever: it is re-fetched by every run and
+        // never shown as a companion vote.
+        question: (questionText.trim() || titleText).replace(/\s+/g, " ").trim(),
+        result: detail.result ?? item.result,
+        yeas: stubTally.yeas,
+        nays: stubTally.nays,
+        voteDate: voteDateFromIso(detail.startDate ?? item.startDate),
+      });
+      continue;
+    }
+
+    const { yeas, nays } = sumTally(detail.votePartyTotal);
+    const displayQuestion = isPassageVote(titleText)
+      ? titleText.split(";")[0]!.trim()
+      : questionText.trim();
+    out.push({
+      chamber: "House",
+      congress,
+      session,
+      rollNumber: detail.rollCallNumber,
+      bill,
+      question: displayQuestion.replace(/\s+/g, " ").trim(),
+      result: detail.result,
+      yeas,
+      nays,
+      voteDate: voteDateFromIso(detail.startDate),
+    });
+
+    if (maxNewVotes !== undefined && out.length >= maxNewVotes) {
+      truncated = true;
+      break;
     }
   }
 

@@ -103,6 +103,25 @@ export async function upsertBillTextChanges(
     .run();
 }
 
+/**
+ * Record that a bill's versions were probed and found unchanged, without
+ * rewriting the comparison. Keeps the same-day skip honest: otherwise only
+ * bills that actually changed would avoid a repeat probe.
+ */
+export async function touchBillTextChangesCheckedAt(
+  db: D1Database,
+  key: { congress: number; billType: string; billNumber: number }
+): Promise<void> {
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `UPDATE bill_text_changes SET checked_at = ?
+       WHERE congress = ? AND bill_type = ? AND bill_number = ?`
+    )
+    .bind(new Date().toISOString(), key.congress, normalizeBillType(key.billType), key.billNumber)
+    .run();
+}
+
 export type BillTextChangesKey = {
   congress: number;
   billType: string;

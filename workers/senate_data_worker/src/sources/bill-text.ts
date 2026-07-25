@@ -6,7 +6,7 @@ import {
 } from "../constants";
 import type { BillRef } from "../types";
 import type { BillAddedProvision, BillTextChanges } from "../../../../shared/bill-text-api-types";
-import { fetchJson } from "./http";
+import { fetchJson, redactUrl } from "./http";
 
 interface TextVersionFormat {
   type?: string;
@@ -248,7 +248,7 @@ export async function fetchBillTextChangesSource(
  */
 async function fetchBillTextXml(url: string): Promise<string | null> {
   const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${redactUrl(url)}`);
 
   const declared = Number.parseInt(res.headers.get("content-length") ?? "", 10);
   if (Number.isFinite(declared) && declared > BILL_TEXT_MAX_BYTES) return null;
@@ -258,15 +258,17 @@ async function fetchBillTextXml(url: string): Promise<string | null> {
 
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > BILL_TEXT_MAX_BYTES) {
-      await reader.cancel();
-      return null;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > BILL_TEXT_MAX_BYTES) return null;
+      chunks.push(value);
     }
-    chunks.push(value);
+  } finally {
+    // Releases the connection on the oversize path and on a mid-stream throw.
+    await reader.cancel().catch(() => {});
   }
 
   const merged = new Uint8Array(total);
@@ -275,6 +277,8 @@ async function fetchBillTextXml(url: string): Promise<string | null> {
     merged.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  // Decoding the merged bytes avoids splitting a multi-byte character on a
+  // chunk boundary.
   return new TextDecoder().decode(merged);
 }
 

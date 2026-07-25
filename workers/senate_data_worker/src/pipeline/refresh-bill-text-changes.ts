@@ -4,6 +4,7 @@ import {
   billTextChangesMapKey,
   getBillTextChangesForBills,
   rowToBillTextChanges,
+  touchBillTextChangesCheckedAt,
   upsertBillTextChanges,
   type BillTextChangesRow,
 } from "../d1/bill-text-changes";
@@ -113,6 +114,11 @@ export async function refreshBillTextChanges(
     try {
       const source = await fetchBillTextChangesSource(env, bill);
       if (stored && isStoredComparisonCurrent(stored, source)) {
+        await touchBillTextChangesCheckedAt(env.DB, {
+          congress: row.bill_congress,
+          billType: row.bill_type,
+          billNumber: row.bill_number,
+        });
         if (rowToBillTextChanges(stored) !== null) withAddedProvisions += 1;
         skipped += 1;
         continue;
