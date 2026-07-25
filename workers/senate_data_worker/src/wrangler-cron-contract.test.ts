@@ -18,11 +18,18 @@ const wranglerTomlPaths = [
 /** Cron expressions the scheduled handler dispatches on. */
 const claimedCrons = [FEED_PIPELINE_CRON_UTC, EXECUTIVE_POSTS_CRON_UTC] as const;
 
+/**
+ * Anchored to column 0 so a commented-out `# crons = [...]` left above the live
+ * array cannot be the match — validating a comment while Cloudflare deploys
+ * something else is the silent green-suite failure this file exists to prevent.
+ */
 function parseCronsFromToml(filePath: string): string[] {
   const content = readFileSync(filePath, "utf8");
-  const cronMatch = content.match(/crons\s*=\s*\[([^\]]+)\]/);
-  expect(cronMatch, `${filePath}: missing [triggers] crons array`).toBeTruthy();
-  const crons = [...cronMatch![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  const cronMatch = content.match(/^crons\s*=\s*\[([^\]]+)\]/m);
+  if (cronMatch === null) {
+    throw new Error(`${filePath}: no [triggers] crons array at column 0`);
+  }
+  const crons = [...cronMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
   expect(crons.length, `${filePath}: crons array parsed empty`).toBeGreaterThan(0);
   return crons;
 }

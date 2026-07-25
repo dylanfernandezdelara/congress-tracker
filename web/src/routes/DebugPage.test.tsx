@@ -196,7 +196,7 @@ describe('DebugPage', () => {
         executive: {
           status: 'ok',
           message: 'Hourly executive ingest is fresh.',
-          hourly_cron_utc: '0 * * * *',
+          hourly_cron_utc: '20 * * * *',
           stale_after_hours: 3,
           last_success: {
             completed_at: '2026-07-25T11:00:00.000Z',
@@ -227,7 +227,7 @@ describe('DebugPage', () => {
     expect(await screen.findByRole('region', { name: 'Executive ingest status' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Executive posts cron' })).toBeInTheDocument()
     expect(screen.getByText('Hourly executive ingest is fresh.')).toBeInTheDocument()
-    expect(screen.getByText('0 * * * *')).toBeInTheDocument()
+    expect(screen.getByText('20 * * * *')).toBeInTheDocument()
     expect(screen.getByText('3 hours')).toBeInTheDocument()
     expect(screen.getByText('POST /__pipeline/run/executive-posts')).toBeInTheDocument()
 
@@ -238,6 +238,103 @@ describe('DebugPage', () => {
     expect(await screen.findByRole('heading', { name: 'Daily cron' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Executive ingest status' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Executive posts cron' })).not.toBeInTheDocument()
+  })
+
+  it('marks a skip superseded once a later scheduled run has succeeded', async () => {
+    mockMonitor(
+      baseIngest({
+        last_skipped: {
+          skipped_at: '2026-07-20T10:00:00.000Z',
+          trigger: 'scheduled',
+          reason: 'pipeline_busy',
+        },
+        last_scheduled_success: {
+          completed_at: '2026-07-25T10:00:00.000Z',
+          trigger: 'scheduled',
+          votesUpserted: 4,
+          votesSkipped: 0,
+          billsSelected: 3,
+          digestsWritten: 2,
+          digestsSkipped: 0,
+        },
+      }),
+    )
+
+    renderDebugPage()
+
+    expect(
+      await screen.findByText('A scheduled run has succeeded since this skip.'),
+    ).toBeInTheDocument()
+  })
+
+  it('does not mark a skip superseded when it is newer than the last scheduled run', async () => {
+    mockMonitor(
+      baseIngest({
+        last_skipped: {
+          skipped_at: '2026-07-25T10:00:00.000Z',
+          trigger: 'scheduled',
+          reason: 'pipeline_busy',
+        },
+        last_scheduled_success: {
+          completed_at: '2026-07-24T10:00:00.000Z',
+          trigger: 'scheduled',
+          votesUpserted: 4,
+          votesSkipped: 0,
+          billsSelected: 3,
+          digestsWritten: 2,
+          digestsSkipped: 0,
+        },
+      }),
+    )
+
+    renderDebugPage()
+
+    expect(await screen.findByRole('heading', { name: 'Last skipped' })).toBeInTheDocument()
+    expect(
+      screen.queryByText('A scheduled run has succeeded since this skip.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('collapses the executive scheduled block only when it is the same run', async () => {
+    const scheduledRun = {
+      completed_at: '2026-07-25T11:20:00.000Z',
+      trigger: 'scheduled' as const,
+      fetched: 4,
+      ingested: 2,
+      linked: 1,
+      hydrated: 1,
+      skipped: 1,
+    }
+    mockMonitor(
+      baseIngest({
+        executive: {
+          status: 'ok',
+          message: 'Hourly executive ingest is fresh.',
+          hourly_cron_utc: '20 * * * *',
+          stale_after_hours: 3,
+          last_success: {
+            completed_at: '2026-07-25T11:45:00.000Z',
+            trigger: 'admin',
+            fetched: 9,
+            ingested: 7,
+            linked: 3,
+            hydrated: 2,
+            skipped: 0,
+          },
+          last_failure: null,
+          last_scheduled_success: scheduledRun,
+          admin_executive_ingest: 'POST /__pipeline/run/executive-posts',
+        },
+      }),
+    )
+
+    renderDebugPage()
+
+    const region = await screen.findByRole('region', { name: 'Executive ingest status' })
+    // An admin run must not hide when the cron itself last succeeded.
+    expect(within(region).getByRole('heading', { name: 'Last scheduled success' })).toBeInTheDocument()
+    expect(within(region).getByText('admin')).toBeInTheDocument()
+    expect(within(region).getByText('scheduled')).toBeInTheDocument()
   })
 
   it('mentions last_skipped in alerting options', async () => {

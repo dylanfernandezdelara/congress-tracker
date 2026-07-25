@@ -17,7 +17,8 @@ function parseWranglerConfig(filePath) {
   }
 
   const previewUrlsMatch = content.match(/^preview_urls\s*=\s*(true|false)/m)
-  const cronMatch = content.match(/crons\s*=\s*\[([^\]]+)\]/)
+  // Anchored so a commented-out `# crons = [...]` above the live array cannot win.
+  const cronMatch = content.match(/^crons\s*=\s*\[([^\]]+)\]/m)
   const crons = cronMatch
     ? [...cronMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
     : []

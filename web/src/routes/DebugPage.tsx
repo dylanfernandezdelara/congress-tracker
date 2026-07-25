@@ -31,7 +31,11 @@ function statusClass(status: IngestMonitorStatus): string {
 
 function formatTimestamp(value: string | null | undefined): string {
   if (!value) return '—'
-  return new Date(value).toLocaleString(undefined, { timeZoneName: 'short' })
+  const parsed = new Date(value)
+  // Show the raw value rather than "Invalid Date"; on an ops page the unparseable
+  // string is itself the diagnostic.
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString(undefined, { timeZoneName: 'short' })
 }
 
 interface RunIdentity {
@@ -48,6 +52,21 @@ function isSameRun(a: RunIdentity | null, b: RunIdentity | null): boolean {
   if (!a && !b) return true
   if (!a || !b) return false
   return a.completed_at === b.completed_at && a.trigger === b.trigger
+}
+
+/**
+ * Only the newest skip is retained, so a months-old one still renders. A later
+ * scheduled success means that skip is history, not a live alarm.
+ */
+function isSkipSuperseded(
+  skip: FeedPipelineSkipRecord,
+  lastScheduledSuccess: FeedPipelineRunRecord | null,
+): boolean {
+  if (!lastScheduledSuccess) return false
+  const skippedAt = Date.parse(skip.skipped_at)
+  const succeededAt = Date.parse(lastScheduledSuccess.completed_at)
+  if (Number.isNaN(skippedAt) || Number.isNaN(succeededAt)) return false
+  return succeededAt > skippedAt
 }
 
 function FeedRunDetails({ run }: { run: FeedPipelineRunRecord }) {
@@ -99,6 +118,10 @@ function ExecutiveRunDetails({ run }: { run: ExecutivePipelineRunRecord }) {
       <div>
         <dt className="text-secondary">Linked</dt>
         <dd>{run.linked}</dd>
+      </div>
+      <div>
+        <dt className="text-secondary">Hydrated</dt>
+        <dd>{run.hydrated}</dd>
       </div>
       <div>
         <dt className="text-secondary">Skipped</dt>
@@ -292,6 +315,12 @@ export default function DebugPage() {
                   <dt className="text-secondary">Reason</dt>
                   <dd className="break-words">{SKIP_REASON_LABEL[ingest.last_skipped.reason]}</dd>
                 </div>
+                {isSkipSuperseded(ingest.last_skipped, ingest.last_scheduled_success) && (
+                  <div>
+                    <dt className="text-secondary">Superseded</dt>
+                    <dd>A scheduled run has succeeded since this skip.</dd>
+                  </div>
+                )}
               </dl>
             ) : (
               <p className="mt-2 text-sm text-secondary">No recorded skips.</p>
