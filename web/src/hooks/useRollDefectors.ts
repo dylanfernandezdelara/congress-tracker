@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 
 import { getCachedRollDefectors, loadRollDefectors } from '../api/rollDefectorsCache'
-import type { FeedPassageVote, VoteDefectorEntry } from '../api/types'
+import type { FeedPassageVote, RollPartySplit, VoteDefectorEntry } from '../api/types'
 
 export type RollDefectorsState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; defectors: VoteDefectorEntry[] }
+  | { status: 'ready'; defectors: VoteDefectorEntry[]; partySplits: RollPartySplit[] }
   | { status: 'unavailable' }
   | { status: 'error' }
 
@@ -30,6 +30,8 @@ function stateFromResponse(
   return {
     status: 'ready',
     defectors: response.defectors,
+    // Sessions cached before party splits shipped replay without the field.
+    partySplits: response.party_splits ?? [],
   }
 }
 

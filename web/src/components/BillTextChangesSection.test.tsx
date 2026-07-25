@@ -1,0 +1,60 @@
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+
+import type { BillTextChanges } from '../api/types'
+import { BillTextChangesSection } from './BillTextChangesSection'
+
+const hr7008Changes: BillTextChanges = {
+  summary_version: 'Reported in House',
+  summary_version_date: '2026-02-03',
+  latest_version: 'Engrossed in House',
+  latest_version_date: '2026-07-22',
+  added_provisions: [
+    { label: '3.', heading: 'Requiring voters to provide photo identification' },
+    { label: '303A.', heading: 'Photo identification requirements' },
+  ],
+  more_added_count: 0,
+}
+
+describe('BillTextChangesSection', () => {
+  it('names the provisions the summary does not describe', () => {
+    render(<BillTextChangesSection changes={hr7008Changes} />)
+
+    expect(screen.getByText('Added after this summary')).toBeInTheDocument()
+    expect(screen.getByText('Sec. 3')).toBeInTheDocument()
+    expect(
+      screen.getByText('Requiring voters to provide photo identification'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Sec. 303A')).toBeInTheDocument()
+  })
+
+  it('explains which version the summary covers', () => {
+    render(<BillTextChangesSection changes={hr7008Changes} />)
+
+    expect(
+      screen.getByText(/describes this bill reported by committee \(Feb 3, 2026\)/),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/passed by the House on Jul 22, 2026/)).toBeInTheDocument()
+  })
+
+  it('counts additions beyond the listed provisions', () => {
+    render(
+      <BillTextChangesSection changes={{ ...hr7008Changes, more_added_count: 5 }} />,
+    )
+    expect(screen.getByText('+ 5 more added sections')).toBeInTheDocument()
+  })
+
+  it('uses singular copy for a single extra addition', () => {
+    render(
+      <BillTextChangesSection changes={{ ...hr7008Changes, more_added_count: 1 }} />,
+    )
+    expect(screen.getByText('+ 1 more added section')).toBeInTheDocument()
+  })
+
+  it('renders nothing when no provisions were added', () => {
+    const { container } = render(
+      <BillTextChangesSection changes={{ ...hr7008Changes, added_provisions: [] }} />,
+    )
+    expect(container).toBeEmptyDOMElement()
+  })
+})

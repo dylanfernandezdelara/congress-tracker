@@ -464,6 +464,110 @@
     color: hsl(var(--twc-faint));
   }
 
+  .feed-row-party-split {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-defector-groups {
+    display: grid;
+    gap: 0.625rem;
+  }
+
+  .feed-row-defector-group {
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  .feed-row-defector-group-summary {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-defector-toggle {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--twc-secondary));
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--twc-link-decoration));
+  }
+
+  .feed-row-defector-toggle:hover {
+    color: hsl(var(--twc-foreground));
+  }
+
+  .feed-row-companion-votes {
+    display: grid;
+    gap: 0.375rem;
+    border-top: 1px solid hsl(var(--twc-border));
+    padding-top: 0.75rem;
+  }
+
+  .feed-row-companion-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .feed-row-companion-item {
+    display: grid;
+    gap: 0.125rem;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .feed-row-companion-question {
+    color: hsl(var(--twc-foreground));
+  }
+
+  .feed-row-companion-meta {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--twc-faint));
+  }
+
+  .feed-row-added-provisions-lede {
+    margin: 0 0 0.5rem;
+    font-size: 13px;
+    line-height: 1.45;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-added-provisions-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.375rem;
+    font-size: 13px;
+    line-height: 1.4;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .feed-row-added-provisions-label {
+    font-weight: 500;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-added-provisions-more {
+    margin: 0.5rem 0 0;
+    font-size: 12px;
+    color: hsl(var(--twc-faint));
+  }
+
   .feed-row-defectors-list {
     margin: 0;
     padding: 0;

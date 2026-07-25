@@ -19,14 +19,22 @@ export interface PassageVote {
   voteDate: string;
 }
 
-/** Persisted so daily House ingest can skip re-fetching non-passage roll details. */
+/**
+ * A recorded roll on a bill that is not a passage vote — a rule, a motion to
+ * recommit, an amendment. Persisted so daily House ingest can skip re-fetching
+ * the detail, and surfaced as feed "companion votes" because these rolls show
+ * what the chamber actually fought over before final passage.
+ */
 export interface NonPassageVoteStub {
   chamber: Chamber;
   congress: number;
   session: number;
   rollNumber: number;
   bill: BillRef;
+  question: string;
   result: string;
+  yeas: number;
+  nays: number;
   voteDate: string;
 }
 

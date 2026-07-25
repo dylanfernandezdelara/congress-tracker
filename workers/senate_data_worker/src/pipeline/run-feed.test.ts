@@ -16,6 +16,12 @@ const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 const mockGetLifecyclesForBills = vi.fn();
 const mockUpsertLifecycle = vi.fn();
+const mockRefreshBillTextChanges = vi.fn(async (..._args: unknown[]) => ({
+  refreshed: 0,
+  skipped: 0,
+  withAddedProvisions: 0,
+  warnings: [] as string[],
+}));
 
 vi.mock("../d1/digests", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/digests")>();
@@ -62,6 +68,10 @@ vi.mock("./ingest-chambers", () => ({
 
 vi.mock("./ensure-member-roster", () => ({
   ensureMemberRoster: () => mockEnsureMemberRoster(),
+}));
+
+vi.mock("./refresh-bill-text-changes", () => ({
+  refreshBillTextChanges: (...args: unknown[]) => mockRefreshBillTextChanges(...args),
 }));
 
 import { runFeedPipeline } from "./run-feed";

@@ -62,7 +62,7 @@ describe("parseSenateVoteMenuXml", () => {
   });
 
   it("keeps passage votes linked to bills", () => {
-    const votes = parseSenateVoteMenuXml(sample, 119, 2, new Date("2026-06-30T00:00:00Z"));
+    const { votes } = parseSenateVoteMenuXml(sample, 119, 2, new Date("2026-06-30T00:00:00Z"));
     expect(votes).toHaveLength(2);
     expect(votes[0]).toMatchObject({
       chamber: "Senate",
@@ -82,6 +82,30 @@ describe("parseSenateVoteMenuXml", () => {
       yeas: 85,
       nays: 5,
       voteDate: "2026-06-22",
+    });
+  });
+
+  it("returns bill-linked non-passage rolls as companion stubs with question and tally", () => {
+    const { nonPassageStubs } = parseSenateVoteMenuXml(
+      sample,
+      119,
+      2,
+      new Date("2026-06-30T00:00:00Z")
+    );
+
+    // The nomination roll (PN851-4) has no bill reference, so it is not a companion.
+    expect(nonPassageStubs).toHaveLength(1);
+    expect(nonPassageStubs[0]).toMatchObject({
+      chamber: "Senate",
+      congress: 119,
+      session: 2,
+      rollNumber: 162,
+      bill: { congress: 119, type: "S", number: 2 },
+      question: "On the Cloture Motion",
+      result: "Agreed to",
+      yeas: 60,
+      nays: 39,
+      voteDate: "2026-06-04",
     });
   });
 

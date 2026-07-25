@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { countFeedBills, selectExistingVoteKeys, selectFeedBills } from "./votes";
+import {
+  countFeedBills,
+  getCompanionVotesForBills,
+  selectExistingVoteKeys,
+  selectFeedBills,
+  upsertNonPassageVoteStub,
+} from "./votes";
 import { resetSchemaFlag } from "./schema";
 
 function createMockDb(rows: Array<Record<string, unknown>>): {
@@ -38,7 +44,7 @@ describe("selectExistingVoteKeys", () => {
     resetSchemaFlag();
   });
 
-  it("returns vote keys for passage and non-passage rolls in the lookback window", async () => {
+  it("returns vote keys for passage and detailed non-passage rolls in the lookback window", async () => {
     const { db, preparedSql } = createMockDb([
       { chamber: "House", congress: 119, session: 2, roll_number: 10 },
       { chamber: "House", congress: 119, session: 2, roll_number: 11 },
@@ -52,7 +58,127 @@ describe("selectExistingVoteKeys", () => {
     );
     const selectSql = preparedSql.find((sql) => sql.includes("FROM votes"));
     expect(selectSql).toBeDefined();
-    expect(selectSql).not.toMatch(/is_passage\s*=\s*1/);
+    // Non-passage stubs count as known, so their details are not re-fetched daily.
+    expect(selectSql).toMatch(/is_passage = 1 OR/);
+  });
+
+  it("treats question-less non-passage stubs as unknown so they are refilled once", async () => {
+    const { db, preparedSql } = createMockDb([]);
+
+    await selectExistingVoteKeys(db, "2026-05-01", 119);
+
+    const selectSql = preparedSql.find((sql) => sql.includes("FROM votes"))!;
+    expect(selectSql).toMatch(/TRIM\(question\)\s*<>\s*''/);
+  });
+});
+
+describe("upsertNonPassageVoteStub", () => {
+  beforeEach(() => {
+    resetSchemaFlag();
+  });
+
+  it("stores question and tallies and backfills earlier question-less stubs", async () => {
+    const { db, preparedSql, bindsBySql } = createMockDb([]);
+
+    await upsertNonPassageVoteStub(db, {
+      chamber: "House",
+      congress: 119,
+      session: 2,
+      rollNumber: 249,
+      bill: { congress: 119, type: "hr", number: 7008 },
+      question: "On Motion to Recommit",
+      result: "Failed",
+      yeas: 209,
+      nays: 217,
+      voteDate: "2026-05-12",
+    });
+
+    const insertSql = preparedSql.find((sql) => sql.includes("INSERT INTO votes"))!;
+    expect(insertSql).toContain("DO UPDATE SET");
+    expect(insertSql).toMatch(/question = excluded\.question/);
+    expect(insertSql).toMatch(/yeas = excluded\.yeas/);
+    expect(bindsBySql.get(insertSql)).toEqual([
+      "House",
+      119,
+      2,
+      249,
+      119,
+      "HR",
+      7008,
+      "On Motion to Recommit",
+      "Failed",
+      209,
+      217,
+      "2026-05-12",
+    ]);
+  });
+
+  it("never overwrites a passage row that shares the roll-call key", async () => {
+    const { db, preparedSql } = createMockDb([]);
+
+    await upsertNonPassageVoteStub(db, {
+      chamber: "Senate",
+      congress: 119,
+      session: 2,
+      rollNumber: 163,
+      bill: { congress: 119, type: "s", number: 2 },
+      question: "On the Motion to Table",
+      result: "Agreed to",
+      yeas: 51,
+      nays: 47,
+      voteDate: "2026-05-12",
+    });
+
+    const insertSql = preparedSql.find((sql) => sql.includes("INSERT INTO votes"))!;
+    expect(insertSql).toMatch(/WHERE votes\.is_passage = 0/);
+  });
+});
+
+describe("getCompanionVotesForBills", () => {
+  beforeEach(() => {
+    resetSchemaFlag();
+  });
+
+  it("returns only detailed non-passage rolls, newest first, keyed by bill", async () => {
+    const { db, preparedSql } = createMockDb([
+      {
+        chamber: "House",
+        congress: 119,
+        session: 2,
+        roll_number: 249,
+        question: "On Motion to Recommit",
+        result: "Failed",
+        yeas: 209,
+        nays: 217,
+        vote_date: "2026-05-12",
+        bill_congress: 119,
+        bill_type: "HR",
+        bill_number: 7008,
+      },
+    ]);
+
+    const map = await getCompanionVotesForBills(db, [
+      { congress: 119, billType: "hr", billNumber: 7008 },
+    ]);
+
+    const selectSql = preparedSql.find((sql) => sql.includes("FROM votes"))!;
+    expect(selectSql).toMatch(/is_passage = 0/);
+    expect(selectSql).toMatch(/TRIM\(question\)\s*<>\s*''/);
+    expect(selectSql).toMatch(/\(yeas \+ nays\) > 0/);
+    expect(selectSql).toMatch(/ORDER BY vote_date DESC, roll_number DESC/);
+    expect(map.get("119:HR:7008")).toEqual([
+      expect.objectContaining({ roll_number: 249, question: "On Motion to Recommit" }),
+    ]);
+  });
+
+  it("returns an empty list for bills with no companion rolls", async () => {
+    const { db } = createMockDb([]);
+
+    const map = await getCompanionVotesForBills(db, [
+      { congress: 119, billType: "hr", billNumber: 1 },
+    ]);
+
+    expect(map.get("119:HR:1")).toEqual([]);
   });
 });
 

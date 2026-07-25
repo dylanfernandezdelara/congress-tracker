@@ -1,0 +1,176 @@
+import { describe, expect, it } from "vitest";
+import {
+  diffAddedSections,
+  parseBillSections,
+  selectLatestSummary,
+  selectSummaryBasisVersion,
+  usableTextVersions,
+} from "./bill-text";
+
+const REPORTED_XML = `<?xml version="1.0"?>
+<bill>
+  <legis-body>
+    <section id="id1" section-type="section-one"><enum>1.</enum><header>Short title</header>
+      <text>This Act may be cited as the Stop Insider Trading Act.</text>
+    </section>
+    <section id="id2"><enum>2.</enum><header>Prohibition on certain transactions</header>
+      <text>Members may not purchase covered investments.</text>
+    </section>
+  </legis-body>
+</bill>`;
+
+const ENGROSSED_XML = `<?xml version="1.0"?>
+<bill>
+  <legis-body>
+    <section id="id1" section-type="section-one"><enum>1.</enum><header>Short title</header>
+      <text>This Act may be cited as the Stop Insider Trading Act.</text>
+    </section>
+    <section id="id2"><enum>2.</enum><header>Prohibition on certain transactions</header>
+      <text>Members may not purchase covered investments.</text>
+    </section>
+    <section id="id3"><enum>3.</enum><header>Requiring voters to provide photo
+      identification</header>
+      <quoted-block>
+        <section><enum>303A.</enum><header>Photo identification requirements</header>
+          <text>Each State shall require photo identification.</text>
+        </section>
+      </quoted-block>
+    </section>
+  </legis-body>
+</bill>`;
+
+describe("parseBillSections", () => {
+  it("reads section numbering and headings, including quoted-block insertions", () => {
+    expect(parseBillSections(ENGROSSED_XML)).toEqual([
+      { label: "1.", heading: "Short title" },
+      { label: "2.", heading: "Prohibition on certain transactions" },
+      { label: "3.", heading: "Requiring voters to provide photo identification" },
+      { label: "303A.", heading: "Photo identification requirements" },
+    ]);
+  });
+
+  it("skips sections without a plain-text header rather than guessing", () => {
+    const xml = `<section><enum>4.</enum><header>Ok</header></section>
+      <section><enum>5.</enum><header>Has <term>markup</term></header></section>
+      <section><enum>6.</enum></section>`;
+    expect(parseBillSections(xml)).toEqual([{ label: "4.", heading: "Ok" }]);
+  });
+
+  it("returns nothing for documents without sections (simple resolutions)", () => {
+    expect(parseBillSections("<resolution><resolution-body>Resolved.</resolution-body></resolution>")).toEqual([]);
+  });
+});
+
+describe("diffAddedSections", () => {
+  it("reports sections whose numbering is absent from the summarized text", () => {
+    const result = diffAddedSections(
+      parseBillSections(REPORTED_XML),
+      parseBillSections(ENGROSSED_XML)
+    );
+    expect(result.added).toEqual([
+      { label: "3.", heading: "Requiring voters to provide photo identification" },
+      { label: "303A.", heading: "Photo identification requirements" },
+    ]);
+    expect(result.moreAddedCount).toBe(0);
+  });
+
+  it("ignores a reworded heading under the same section number", () => {
+    // H.R. 1181 renamed section 2 between prints; that is an edit, not an addition.
+    const basis = [{ label: "2.", heading: "Distinguishing firearms sales" }];
+    const latest = [{ label: "2.", heading: "Distinguishing firearm retailers prohibited" }];
+    expect(diffAddedSections(basis, latest).added).toEqual([]);
+  });
+
+  it("treats trailing punctuation and case as the same section", () => {
+    expect(
+      diffAddedSections(
+        [{ label: "303a", heading: "Photo identification requirements" }],
+        [{ label: "303A.", heading: "Photo identification requirements" }]
+      ).added
+    ).toEqual([]);
+  });
+
+  it("caps the listed sections and counts the rest", () => {
+    const latest = Array.from({ length: 9 }, (_, i) => ({
+      label: `${i + 1}.`,
+      heading: `Section ${i + 1}`,
+    }));
+    const result = diffAddedSections([], latest, 5);
+    expect(result.added).toHaveLength(5);
+    expect(result.moreAddedCount).toBe(4);
+  });
+
+  it("does not double-count a section number repeated in the latest text", () => {
+    const result = diffAddedSections(
+      [],
+      [
+        { label: "3.", heading: "Photo identification" },
+        { label: "3.", heading: "Photo identification" },
+      ]
+    );
+    expect(result.added).toHaveLength(1);
+    expect(result.moreAddedCount).toBe(0);
+  });
+});
+
+describe("usableTextVersions", () => {
+  it("keeps only dated versions with an XML format and sorts oldest first", () => {
+    const versions = usableTextVersions([
+      {
+        type: "Engrossed in House",
+        date: "2026-07-22T04:00:00Z",
+        formats: [{ type: "Formatted XML", url: "https://example.test/eh.xml" }],
+      },
+      {
+        type: "Public Law",
+        date: "2026-08-01T04:00:00Z",
+        formats: [{ type: "Formatted Text", url: "https://example.test/pl.htm" }],
+      },
+      {
+        type: "Reported in House",
+        date: "2026-02-03T05:00:00Z",
+        formats: [{ type: "Formatted XML", url: "https://example.test/rh.xml" }],
+      },
+      { type: "No date", formats: [{ type: "Formatted XML", url: "https://example.test/x.xml" }] },
+    ]);
+
+    expect(versions).toEqual([
+      { type: "Reported in House", date: "2026-02-03", xmlUrl: "https://example.test/rh.xml" },
+      { type: "Engrossed in House", date: "2026-07-22", xmlUrl: "https://example.test/eh.xml" },
+    ]);
+  });
+});
+
+describe("selectSummaryBasisVersion", () => {
+  const versions = [
+    { type: "Introduced in House", date: "2026-01-12", xmlUrl: "ih" },
+    { type: "Reported in House", date: "2026-02-03", xmlUrl: "rh" },
+    { type: "Engrossed in House", date: "2026-07-22", xmlUrl: "eh" },
+  ];
+
+  it("picks the newest version published on or before the summary date", () => {
+    expect(selectSummaryBasisVersion(versions, "2026-02-03")?.type).toBe("Reported in House");
+    expect(selectSummaryBasisVersion(versions, "2026-07-01")?.type).toBe("Reported in House");
+    expect(selectSummaryBasisVersion(versions, "2026-08-01")?.type).toBe("Engrossed in House");
+  });
+
+  it("returns null when no text predates the summary or no summary exists", () => {
+    expect(selectSummaryBasisVersion(versions, "2026-01-01")).toBeNull();
+    expect(selectSummaryBasisVersion(versions, null)).toBeNull();
+  });
+});
+
+describe("selectLatestSummary", () => {
+  it("picks the most recently updated summary", () => {
+    expect(
+      selectLatestSummary([
+        { actionDate: "2026-01-12", updateDate: "2026-01-13T00:00:00Z" },
+        { actionDate: "2026-02-03", updateDate: "2026-02-04T00:00:00Z" },
+      ])?.actionDate
+    ).toBe("2026-02-03");
+  });
+
+  it("returns null with no summaries", () => {
+    expect(selectLatestSummary([])).toBeNull();
+  });
+});

@@ -134,13 +134,17 @@ export async function ingestHousePassageVotes(
       seenThisRun.add(key);
 
       if (!isPassageVote(questionText) && !isPassageVote(titleText)) {
+        const stubTally = sumTally(detail.votePartyTotal);
         nonPassageStubs.push({
           chamber: "House",
           congress,
           session,
           rollNumber: item.rollCallNumber,
           bill,
+          question: questionText.replace(/\s+/g, " ").trim(),
           result: detail.result ?? item.result,
+          yeas: stubTally.yeas,
+          nays: stubTally.nays,
           voteDate: voteDateFromIso(detail.startDate ?? item.startDate),
         });
         continue;

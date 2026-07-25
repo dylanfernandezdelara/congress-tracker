@@ -28,6 +28,18 @@
       <title>Nomination</title>
     </vote>
     <vote>
+      <vote_number>00162</vote_number>
+      <vote_date>04-Jun</vote_date>
+      <issue>S. 2</issue>
+      <question>On the Cloture Motion</question>
+      <result>Agreed to</result>
+      <vote_tally>
+        <yeas>60</yeas>
+        <nays>39</nays>
+      </vote_tally>
+      <title>Sample bill title</title>
+    </vote>
+    <vote>
       <vote_number>00182</vote_number>
       <vote_date>22-Jun</vote_date>
       <issue>H.R. 6644</issue>

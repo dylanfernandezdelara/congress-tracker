@@ -6,6 +6,11 @@ import {
   getExecutivePostBillsForPosts,
   toExecutiveSignal,
 } from "../d1/executive";
+import {
+  billTextChangesMapKey,
+  getBillTextChangesForBills,
+  rowToBillTextChanges,
+} from "../d1/bill-text-changes";
 import { digestMapKey, getDigestsForBills, parseStoredDigest } from "../d1/digests";
 import {
   getLifecyclesForBills,
@@ -15,6 +20,7 @@ import { ensureSchema } from "../d1/schema";
 import {
   billLookupKey,
   countFeedBills,
+  getCompanionVotesForBills,
   getPassageVotesForBills,
   selectFeedBills,
 } from "../d1/votes";
@@ -59,7 +65,14 @@ export async function buildFeedPage(
     billNumber: row.bill_number,
   }));
 
-  const [lifecycles, digests, votesByBill, executiveByBill] = await Promise.all([
+  const [
+    lifecycles,
+    digests,
+    votesByBill,
+    executiveByBill,
+    textChangesByBill,
+    companionVotesByBill,
+  ] = await Promise.all([
     getLifecyclesForBills(env.DB, billKeys),
     getDigestsForBills(
       env.DB,
@@ -71,6 +84,8 @@ export async function buildFeedPage(
     ),
     getPassageVotesForBills(env.DB, billKeys),
     getExecutivePostBillsForBills(env.DB, billKeys, executiveSince),
+    getBillTextChangesForBills(env.DB, billKeys),
+    getCompanionVotesForBills(env.DB, billKeys),
   ]);
 
   const postIds = new Set<string>();
@@ -163,6 +178,23 @@ export async function buildFeedPage(
       lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number)
     );
 
+    const textChangesRow = textChangesByBill.get(
+      billTextChangesMapKey(row.bill_congress, row.bill_type, row.bill_number)
+    );
+    const text_changes = textChangesRow ? rowToBillTextChanges(textChangesRow) : null;
+
+    const companion_votes = (companionVotesByBill.get(key) ?? []).map((v) => ({
+      chamber: v.chamber as Chamber,
+      congress: v.congress,
+      session: v.session,
+      roll_number: v.roll_number,
+      question: v.question,
+      result: v.result,
+      yeas: v.yeas,
+      nays: v.nays,
+      date: v.vote_date,
+    }));
+
     items.push({
       bill: {
         congress: row.bill_congress,
@@ -199,6 +231,8 @@ export async function buildFeedPage(
       lifecycle: lifecycleRow ? lifecycleRowToApi(lifecycleRow, now) : null,
       executive_signals,
       related_executive_bills,
+      ...(text_changes ? { text_changes } : {}),
+      ...(companion_votes.length > 0 ? { companion_votes } : {}),
     });
   }
 

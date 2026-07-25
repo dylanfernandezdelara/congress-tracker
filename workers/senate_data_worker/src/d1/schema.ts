@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -109,6 +109,19 @@ const SCHEMA_DDL = [
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number)
+)`,
+  `CREATE TABLE IF NOT EXISTS bill_text_changes (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  summary_version TEXT,
+  summary_version_date TEXT,
+  latest_version TEXT,
+  latest_version_date TEXT,
+  added_json TEXT,
+  more_added_count INTEGER NOT NULL DEFAULT 0,
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number)
 )`,
   `CREATE TABLE IF NOT EXISTS bill_lifecycle (
   congress INTEGER NOT NULL,

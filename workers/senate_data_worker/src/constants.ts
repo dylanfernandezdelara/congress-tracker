@@ -14,6 +14,17 @@ export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
 export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
+
+/**
+ * Bill text-version comparisons per feed pipeline run. Each candidate costs two
+ * small JSON requests; only bills whose newest text version changed since the
+ * last check download XML, so the steady-state cost is the JSON probes alone.
+ */
+export const TEXT_CHANGES_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
+/** Added sections listed in the UI before collapsing to a "+N more" count. */
+export const TEXT_CHANGES_MAX_LISTED_PROVISIONS = 5;
+/** Skip text diffing above this document size to bound cron memory and time. */
+export const BILL_TEXT_MAX_BYTES = 8 * 1024 * 1024;
 /**
  * Congress.gov lifecycle refreshes (actions + detail) per feed pipeline run.
  * Must cover the full feed window so older desk/unsigned bills are not starved

@@ -1,13 +1,18 @@
-const YEA_POSITIONS = new Set(['Yea', 'Aye', 'Yes'])
+/**
+ * Non-voting positions must be recognized before yea/nay so an absence is never
+ * scored as a vote. Congress.gov and Senate LIS both publish `Not Voting`, and
+ * counting those as `Nay` invents party-line defectors out of absentees.
+ */
+const ABSTAIN_PATTERN = /not\s*voting|no\s*vote|present|abstain|absent|excused/
+
+const YEA_PATTERN = /\b(yea|aye|yes)\b/
+const NAY_PATTERN = /\b(nay|no)\b/
 
 export function normalizeVotePosition(position: string): 'yea' | 'nay' | 'other' {
-  const trimmed = position.trim()
-  if (YEA_POSITIONS.has(trimmed)) return 'yea'
-
-  const normalized = trimmed.toLowerCase()
-  if (normalized.includes('yea') || normalized.includes('aye') || normalized === 'yes') {
-    return 'yea'
-  }
-  if (normalized.includes('nay') || normalized.includes('no')) return 'nay'
+  const normalized = position.trim().toLowerCase()
+  if (!normalized) return 'other'
+  if (ABSTAIN_PATTERN.test(normalized)) return 'other'
+  if (YEA_PATTERN.test(normalized)) return 'yea'
+  if (NAY_PATTERN.test(normalized)) return 'nay'
   return 'other'
 }

@@ -14,6 +14,9 @@ export interface FeedPipelineRunRecord {
   lifecycleRefreshed?: number;
   lifecycleSkipped?: number;
   lifecycle_warnings?: string[];
+  textChangesRefreshed?: number;
+  textChangesWithAddedProvisions?: number;
+  text_changes_warnings?: string[];
 }
 
 export interface FeedPipelineFailureRecord {
