@@ -63,7 +63,7 @@ export function evaluateIngestMonitorStatus(params: {
   if (ageMs > staleAfterMs) {
     return {
       status: "stale",
-      message: `Last scheduled ingest was ${lastScheduledSuccess.completed_at}; expected within ${params.staleAfterHours}h of daily cron.`,
+      message: `Last scheduled ingest was ${lastScheduledSuccess.completed_at}; expected within ${params.staleAfterHours}h of its cron.`,
       last_scheduled_success: lastScheduledSuccess,
     };
   }

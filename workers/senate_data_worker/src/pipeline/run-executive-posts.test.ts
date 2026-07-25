@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  recordExecutivePostsPipelineFailure,
+  recordExecutivePostsPipelineSuccess,
+} from "../d1/pipeline-state";
 import { resetSchemaFlag } from "../d1/schema";
 import {
   HOUSING_SAVE_LLM_RESULT,
@@ -228,5 +232,46 @@ describe("runExecutivePostsPipeline", () => {
     await runExecutivePostsPipeline(env as any, { statuses: [status], linkFn });
     expect(linkFn).toHaveBeenCalledTimes(1);
     expect(posts.get("retry-test-post")?.summary).toBeNull();
+  });
+
+  it("still reports success when recording the run to pipeline_state fails", async () => {
+    const { db } = createExecutiveMockDb();
+    // Scheduled runs write two pipeline_state keys, making this bookkeeping the
+    // likeliest thing to fail on an otherwise healthy run.
+    vi.mocked(recordExecutivePostsPipelineSuccess).mockRejectedValueOnce(
+      new Error("d1 write failed")
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const env = {
+      DB: db,
+      CONGRESS: "119",
+      SESSION: "2",
+      CONGRESS_API_KEY: "test",
+      OPENROUTER_API_KEY: "test",
+    };
+
+    const result = await runExecutivePostsPipeline(env as any, {
+      trigger: "scheduled",
+      statuses: [
+        {
+          id: "state-write-failure-post",
+          text: "Generic post with no bill references.",
+          postedAt: "2026-06-24T14:26:00.000Z",
+          sourceUrl: "https://truthsocial.com/@realDonaldTrump/state-write-failure-post",
+          archiveUrl: "https://www.trumpstruth.org/statuses/state-write-failure",
+        },
+      ],
+      linkFn: vi.fn(async () => null),
+    });
+
+    expect(result.fetched).toBe(1);
+    const logged = consoleError.mock.calls.map((call) => String(call[0]));
+    consoleError.mockRestore();
+    expect(
+      logged.some((line) => line.includes("executive_posts_pipeline_state_write_failed"))
+    ).toBe(true);
+    // The point of the guard: a failed bookkeeping write must not be recorded as
+    // a failed run, or a healthy cron shows up as broken.
+    expect(recordExecutivePostsPipelineFailure).not.toHaveBeenCalled();
   });
 });

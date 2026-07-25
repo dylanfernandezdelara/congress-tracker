@@ -224,8 +224,12 @@ describe('DebugPage', () => {
 
     const { unmount } = renderDebugPage()
 
-    expect(await screen.findByRole('region', { name: 'Executive ingest status' })).toBeInTheDocument()
+    const executiveRegion = await screen.findByRole('region', { name: 'Executive ingest status' })
     expect(screen.getByRole('heading', { name: 'Executive posts cron' })).toBeInTheDocument()
+    // Identical runs, so the scheduled block would only repeat the success block.
+    expect(
+      within(executiveRegion).queryByRole('heading', { name: 'Last scheduled success' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('Hourly executive ingest is fresh.')).toBeInTheDocument()
     expect(screen.getByText('20 * * * *')).toBeInTheDocument()
     expect(screen.getByText('3 hours')).toBeInTheDocument()

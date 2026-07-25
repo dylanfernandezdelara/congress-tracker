@@ -243,7 +243,21 @@ export async function runExecutivePostsPipeline(
       skipped,
     };
 
-    await recordExecutivePostsPipelineSuccess(env.DB, trigger, pipelineResult);
+    // Guarded like the feed pipeline: a failed bookkeeping write must not be
+    // reported as a failed run. Inside the try it would land in the catch below
+    // and record a failure for a run that succeeded.
+    try {
+      await recordExecutivePostsPipelineSuccess(env.DB, trigger, pipelineResult);
+    } catch (stateErr: unknown) {
+      const stateMessage = stateErr instanceof Error ? stateErr.message : String(stateErr);
+      console.error(
+        JSON.stringify({
+          event: "executive_posts_pipeline_state_write_failed",
+          trigger,
+          error: stateMessage,
+        })
+      );
+    }
     return pipelineResult;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

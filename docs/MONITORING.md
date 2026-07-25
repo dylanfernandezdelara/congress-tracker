@@ -60,6 +60,16 @@ The `pipeline_state` table stores JSON blobs:
 - `feed_pipeline_last_failure` — last error message and timestamp
 - `feed_pipeline_last_skipped` — last busy-skip (lease held); does not affect `status` (see
   intro: alert on a `skipped_at` with no matching scheduled success)
+- `executive_posts_pipeline_last_success` — last executive run result (any trigger)
+- `executive_posts_pipeline_last_scheduled_success` — last **scheduled** executive success; the
+  hourly cron's health is read from this key, so a manual run cannot make a broken cron look
+  healthy or a healthy one look broken
+- `executive_posts_pipeline_last_failure` — last executive error message and timestamp
+
+Both pipelines split "last run" from "last scheduled run" for the same reason: `status` answers
+"is the cron healthy?", and admin runs must not be able to answer it. Until the next scheduled
+executive run writes the key after deploy, the executive status reads `unknown` rather than
+guessing.
 
 Schema is created lazily via `ensureSchema` on first pipeline run after deploy.
 
