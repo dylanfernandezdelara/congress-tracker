@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { bioguidePhotoUrl, congressGovMemberUrl, memberInitials } from "./member-photo";
+import {
+  bioguidePhotoUrl,
+  congressGovMemberUrl,
+  memberInitials,
+  memberNameSlug,
+} from "./member-photo";
 
 describe("member photo helpers", () => {
   it("builds bioguide photo urls for valid ids", () => {
@@ -14,9 +19,22 @@ describe("member photo helpers", () => {
     expect(bioguidePhotoUrl("")).toBeNull();
   });
 
-  it("builds congress.gov member urls for valid ids only", () => {
-    expect(congressGovMemberUrl("P000197")).toBe("https://www.congress.gov/member/p000197");
-    expect(congressGovMemberUrl("LOCAL:smith")).toBeNull();
+  it("slugs member names for congress.gov paths", () => {
+    expect(memberNameSlug("Christopher A. Coons")).toBe("christopher-a-coons");
+    expect(memberNameSlug("Nancy Pelosi")).toBe("nancy-pelosi");
+    expect(memberNameSlug("Alexandria Ocasio-Cortez")).toBe("alexandria-ocasio-cortez");
+    expect(memberNameSlug("Robert Menendez Jr.")).toBe("robert-menendez");
+    expect(memberNameSlug("  ")).toBe("member");
+  });
+
+  it("builds congress.gov member urls with name slug and uppercase bioguide", () => {
+    expect(congressGovMemberUrl("P000197", "Nancy Pelosi")).toBe(
+      "https://www.congress.gov/member/nancy-pelosi/P000197",
+    );
+    expect(congressGovMemberUrl("C001088")).toBe(
+      "https://www.congress.gov/member/member/C001088",
+    );
+    expect(congressGovMemberUrl("LOCAL:smith", "Local Smith")).toBeNull();
     expect(congressGovMemberUrl("LIS:12345")).toBeNull();
   });
 

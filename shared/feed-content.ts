@@ -20,6 +20,8 @@ export {
 } from './digest-format'
 
 export {
+  congressGovBillUrl,
+  congressOrdinal,
   formatBillDocket,
   formatBillIdParts,
   formatShortBillId,

@@ -130,7 +130,9 @@ describe("buildMemberProfile", () => {
       recent_cross_votes: [],
     });
     expect(profile?.photo_url).toContain("F000466");
-    expect(profile?.congress_gov_url).toContain("f000466");
+    expect(profile?.congress_gov_url).toBe(
+      "https://www.congress.gov/member/brian-fitzpatrick/F000466",
+    );
   });
 
   it("reads precomputed session stats when available", async () => {

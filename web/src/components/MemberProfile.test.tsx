@@ -23,7 +23,7 @@ const profile: MemberProfileResponse = {
   state: 'PA',
   district: 1,
   photo_url: 'https://example.com/fitz.jpg',
-  congress_gov_url: 'https://www.congress.gov/member/f000466',
+  congress_gov_url: 'https://www.congress.gov/member/brian-fitzpatrick/F000466',
   congress: 119,
   session: 2,
   votes_cast: 42,
@@ -96,7 +96,7 @@ describe('MemberProfile', () => {
     expect(screen.getByText(/S\. 2/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toHaveAttribute(
       'href',
-      'https://www.congress.gov/member/f000466',
+      'https://www.congress.gov/member/brian-fitzpatrick/F000466',
     )
   })
 
