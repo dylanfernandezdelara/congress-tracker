@@ -204,7 +204,7 @@ describe('Home', () => {
                 state: 'PA',
                 cross_vote_count: 5,
                 deciding_score: 2,
-                congress_gov_url: 'https://www.congress.gov/member/f000466',
+                congress_gov_url: 'https://www.congress.gov/member/brian-fitzpatrick/F000466',
               },
             ]
           : [],
@@ -217,7 +217,7 @@ describe('Home', () => {
       state: 'PA',
       district: 1,
       photo_url: 'https://example.com/fitz.jpg',
-      congress_gov_url: 'https://www.congress.gov/member/f000466',
+      congress_gov_url: 'https://www.congress.gov/member/brian-fitzpatrick/F000466',
       congress: 119,
       session: 2,
       votes_cast: 20,

@@ -28,7 +28,7 @@ type MemberSpotlight = {
   party: string
   state: string
   hook: string
-  href?: string
+  href: string | null
   tone?: 'neutral' | 'gain' | 'loss'
   cross_vote_count: number
 }
@@ -107,7 +107,7 @@ function buildSpotlights(
       party: entry.party ?? '',
       state: entry.state ?? '',
       hook: portfolioHook(entry, direction),
-      href: congressGovMemberUrl(entry.bioguide_id) ?? undefined,
+      href: congressGovMemberUrl(entry.bioguide_id, entry.name),
       tone: direction === 'gain' ? 'gain' : 'loss',
       cross_vote_count: 0,
     })

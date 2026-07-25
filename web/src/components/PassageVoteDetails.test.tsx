@@ -34,4 +34,62 @@ describe('PassageVoteDetails', () => {
     expect(screen.getByRole('img', { name: 'Senate vote: 52 yea, 47 nay' })).toBeInTheDocument()
     expect(screen.getByText('52–47')).toBeInTheDocument()
   })
+
+  it('links defectors with congress.gov urls and leaves others as text', () => {
+    const vote = {
+      chamber: 'Senate' as const,
+      congress: 119,
+      session: 2,
+      roll_number: 10,
+      question: 'On Passage',
+      result: 'Passed',
+      yeas: 52,
+      nays: 47,
+      date: '2026-06-05',
+    }
+    render(
+      <PassageVoteDetails
+        votes={[vote]}
+        defectorsByRoll={
+          new Map([
+            [
+              'Senate:119:2:10',
+              {
+                status: 'ready' as const,
+                defectors: [
+                  {
+                    bioguide_id: 'C001088',
+                    name: 'Chris Coons',
+                    party: 'D',
+                    state: 'DE',
+                    position: 'nay' as const,
+                    party_line: 'yea' as const,
+                    congress_gov_url:
+                      'https://www.congress.gov/member/chris-coons/C001088',
+                  },
+                  {
+                    bioguide_id: 'LOCAL:s001',
+                    name: 'Local Sample',
+                    party: 'R',
+                    state: 'TX',
+                    position: 'yea' as const,
+                    party_line: 'nay' as const,
+                    congress_gov_url: null,
+                  },
+                ],
+                partySplits: [],
+              },
+            ],
+          ])
+        }
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: 'Chris Coons' })).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/member/chris-coons/C001088',
+    )
+    expect(screen.queryByRole('link', { name: 'Local Sample' })).not.toBeInTheDocument()
+    expect(screen.getByText('Local Sample')).toBeInTheDocument()
+  })
 })

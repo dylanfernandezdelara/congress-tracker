@@ -16,7 +16,7 @@ vi.mock('../api/client', () => ({
     state: 'PA',
     district: 1,
     photo_url: 'https://example.com/fitz.jpg',
-    congress_gov_url: 'https://www.congress.gov/member/f000466',
+    congress_gov_url: 'https://www.congress.gov/member/brian-fitzpatrick/F000466',
     congress: 119,
     session: 2,
     votes_cast: 20,
@@ -103,7 +103,7 @@ const houseDefector: DefectorEntry = {
   state: 'PA',
   cross_vote_count: 5,
   deciding_score: 2,
-  congress_gov_url: 'https://www.congress.gov/member/f000466',
+  congress_gov_url: 'https://www.congress.gov/member/brian-fitzpatrick/F000466',
 }
 
 const emptyPortfolios: PortfolioMovers = {
@@ -156,7 +156,10 @@ describe('LeftSidebar', () => {
     )
 
     const link = screen.getByRole('link', { name: 'No Id Member' })
-    expect(link).toHaveAttribute('href', 'https://www.congress.gov/member/f000466')
+    expect(link).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/member/brian-fitzpatrick/F000466',
+    )
     expect(
       screen.queryByRole('button', { name: 'Open profile for No Id Member' }),
     ).not.toBeInTheDocument()

@@ -9,6 +9,18 @@ const TYPE_LABELS: Record<string, string> = {
   SJRES: 'S.J.Res.',
 }
 
+/** Public congress.gov path segment for each bill type code. */
+const CONGRESS_GOV_BILL_SEGMENTS: Record<string, string> = {
+  HR: 'house-bill',
+  S: 'senate-bill',
+  HRES: 'house-resolution',
+  SRES: 'senate-resolution',
+  HCONRES: 'house-concurrent-resolution',
+  SCONRES: 'senate-concurrent-resolution',
+  HJRES: 'house-joint-resolution',
+  SJRES: 'senate-joint-resolution',
+}
+
 const BILL_TYPE_TOOLTIPS: Record<string, string> = {
   HR: 'House bill',
   S: 'Senate bill',
@@ -38,8 +50,35 @@ export function formatBillIdParts(
   }
 }
 
+/** English ordinal suffix for a congress number (11th/12th/13th special-cased). */
+export function congressOrdinal(congress: number): string {
+  const abs = Math.abs(congress)
+  const mod100 = abs % 100
+  if (mod100 >= 11 && mod100 <= 13) return `${congress}th`
+  switch (abs % 10) {
+    case 1:
+      return `${congress}st`
+    case 2:
+      return `${congress}nd`
+    case 3:
+      return `${congress}rd`
+    default:
+      return `${congress}th`
+  }
+}
+
 export function formatBillDocket(type: string, number: number, congress: number): string {
-  return `${formatShortBillId(type, number)} · ${congress}th Congress`
+  return `${formatShortBillId(type, number)} · ${congressOrdinal(congress)} Congress`
+}
+
+/**
+ * Public congress.gov bill page URL.
+ * Uses long-form path segments (`house-bill`, `house-joint-resolution`, …).
+ */
+export function congressGovBillUrl(congress: number, type: string, number: number): string {
+  const key = type.trim().toUpperCase().replace(/\./g, '')
+  const segment = CONGRESS_GOV_BILL_SEGMENTS[key] ?? key.toLowerCase()
+  return `https://www.congress.gov/bill/${congressOrdinal(congress)}-congress/${segment}/${number}`
 }
 
 /** Strip offline seed marker from titles/headlines when real data is shown. */

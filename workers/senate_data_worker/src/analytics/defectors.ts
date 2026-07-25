@@ -8,15 +8,6 @@ import type { RollPartySplit } from "../../../../shared/stats-api-types";
 import { rollCrossVotes } from "./cross-votes";
 import { rollPartySplits } from "./roll-party-stats";
 
-function defectorCongressGovUrl(bioguideId: string): string {
-  return (
-    congressGovMemberUrl(bioguideId) ??
-    (bioguideId.startsWith("LIS:")
-      ? "https://www.senate.gov/general/contact_information/senators_cfm.cfm"
-      : `https://www.congress.gov/member/${bioguideId.toLowerCase()}`)
-  );
-}
-
 /**
  * Rank party-line breakers from denormalized `member_cross_votes` (maintained by
  * the member-votes ingest pipeline) instead of scanning all session member_votes.
@@ -79,7 +70,7 @@ export async function computeDefectors(
       state,
       cross_vote_count: score.crossVotes,
       deciding_score: score.decidingScore,
-      congress_gov_url: defectorCongressGovUrl(bioguideId),
+      congress_gov_url: congressGovMemberUrl(bioguideId, name),
       recent_example: score.recent,
     });
   }
@@ -150,7 +141,7 @@ export async function computeRollDefectors(
       state: member.state ?? "?",
       position: cross.position,
       party_line: cross.partyLine,
-      congress_gov_url: defectorCongressGovUrl(cross.bioguideId),
+      congress_gov_url: congressGovMemberUrl(cross.bioguideId, member.name),
     });
   }
 

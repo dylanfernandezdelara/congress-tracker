@@ -67,14 +67,18 @@ function DefectorGroup({ group }: { group: DefectorPartyGroup }) {
       <ul className="feed-row-defectors-list">
         {visible.map((defector: VoteDefectorEntry) => (
           <li key={defector.bioguide_id} className="feed-row-defector">
-            <a
-              href={defector.congress_gov_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="feed-row-defector-name congress-link"
-            >
-              {defector.name}
-            </a>
+            {defector.congress_gov_url ? (
+              <a
+                href={defector.congress_gov_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="feed-row-defector-name congress-link"
+              >
+                {defector.name}
+              </a>
+            ) : (
+              <span className="feed-row-defector-name">{defector.name}</span>
+            )}
             <span className="feed-row-defector-meta">
               {defector.party}-{defector.state}
             </span>
