@@ -85,6 +85,7 @@ function DefectorGroup({ group }: { group: DefectorPartyGroup }) {
         <button
           type="button"
           className="feed-row-defector-toggle"
+          aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
           {expanded ? 'Show fewer' : `Show all ${group.members.length}`}

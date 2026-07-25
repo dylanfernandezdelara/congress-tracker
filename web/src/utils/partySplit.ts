@@ -1,30 +1,18 @@
+import {
+  normalizePartyCode,
+  partyDisplayName,
+  partyShortLabel,
+  type PartyCode,
+} from '@congress-tracker/shared/party'
+
 import type { RollPartySplit, VoteDefectorEntry } from '../api/types'
 
-const PARTY_PLURALS: Record<string, string> = {
-  R: 'Republicans',
-  D: 'Democrats',
-  I: 'Independents',
-}
-
-const PARTY_SINGULARS: Record<string, string> = {
-  R: 'Republican',
-  D: 'Democrat',
-  I: 'Independent',
-}
-
-/** Normalize the many party spellings that reach the UI (`R`, `Republican`, `REP`). */
-export function partyCode(party: string | null | undefined): string {
-  const raw = (party ?? '').trim().toUpperCase()
-  if (raw.startsWith('R')) return 'R'
-  if (raw.startsWith('D')) return 'D'
-  if (raw.startsWith('I')) return 'I'
-  return raw.slice(0, 1) || '?'
-}
-
-export function partyNoun(party: string, count: number): string {
-  const code = partyCode(party)
-  if (count === 1) return PARTY_SINGULARS[code] ?? `${code} member`
-  return PARTY_PLURALS[code] ?? `${code} members`
+/** Prose noun for defector summaries; `Other` falls back so "Others" never appears. */
+function partyNoun(party: string, count: number): string {
+  const code = normalizePartyCode(party)
+  if (code === 'Other') return count === 1 ? 'member' : 'members'
+  const display = partyDisplayName(code)
+  return count === 1 ? display : `${display}s`
 }
 
 export function formatVoteSide(side: 'yea' | 'nay'): string {
@@ -34,12 +22,12 @@ export function formatVoteSide(side: 'yea' | 'nay'): string {
 /** `R 218–0 · D 13–198` — reading order follows the largest caucus. */
 export function formatPartySplits(splits: RollPartySplit[]): string {
   return splits
-    .map((split) => `${partyCode(split.party)} ${split.yeas}–${split.nays}`)
+    .map((split) => `${partyShortLabel(split.party)} ${split.yeas}–${split.nays}`)
     .join(' · ')
 }
 
 export interface DefectorPartyGroup {
-  party: string
+  party: PartyCode
   position: 'yea' | 'nay'
   partyLine: 'yea' | 'nay'
   members: VoteDefectorEntry[]
@@ -58,14 +46,14 @@ export function groupDefectorsByParty(
   defectors: VoteDefectorEntry[],
   splits: RollPartySplit[],
 ): DefectorPartyGroup[] {
-  const totals = new Map<string, number>()
+  const totals = new Map<PartyCode, number>()
   for (const split of splits) {
-    totals.set(partyCode(split.party), split.yeas + split.nays)
+    totals.set(normalizePartyCode(split.party), split.yeas + split.nays)
   }
 
   const groups = new Map<string, DefectorPartyGroup>()
   for (const defector of defectors) {
-    const code = partyCode(defector.party)
+    const code = normalizePartyCode(defector.party)
     const key = `${code}:${defector.position}`
     const existing = groups.get(key)
     if (existing) {

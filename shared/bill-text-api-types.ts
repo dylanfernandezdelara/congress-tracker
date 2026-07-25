@@ -22,7 +22,11 @@ export interface BillTextChanges {
   latest_version: string
   /** ISO date (YYYY-MM-DD) of the newest published version. */
   latest_version_date: string
-  /** Sections in the newest text whose numbering is absent from the summarized text. */
+  /**
+   * Provisions in the newest text with no counterpart in the summarized text.
+   * Matched heading-first; section numbers are not stable identities and are
+   * only a fallback when a heading was reworded in place.
+   */
   added_provisions: BillAddedProvision[]
   /** Added sections beyond those listed in `added_provisions`. */
   more_added_count: number

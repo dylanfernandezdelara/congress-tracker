@@ -61,12 +61,13 @@ describe('BillTextChangesSection', () => {
 
   it('collapses long lists behind a Show all toggle', () => {
     const stored = TEXT_CHANGES_MAX_LISTED_PROVISIONS + 3
+    const overflow = 2
     render(
       <BillTextChangesSection
         changes={{
           ...hr7008Changes,
           added_provisions: manyProvisions(stored),
-          more_added_count: 2,
+          more_added_count: overflow,
         }}
       />,
     )
@@ -74,18 +75,29 @@ describe('BillTextChangesSection', () => {
     expect(screen.getAllByText(/Added provision/)).toHaveLength(
       TEXT_CHANGES_MAX_LISTED_PROVISIONS,
     )
-    expect(screen.getByText('3 more not shown')).toBeInTheDocument()
+    expect(screen.queryByText('+ 2 more added sections')).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        `${stored - TEXT_CHANGES_MAX_LISTED_PROVISIONS + overflow} more not shown`,
+      ),
+    ).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: `Show all ${stored}` }))
+    const toggle = screen.getByRole('button', { name: `Show all ${stored}` })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(toggle)
 
     expect(screen.getAllByText(/Added provision/)).toHaveLength(stored)
-    expect(screen.getByRole('button', { name: 'Show fewer' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show fewer' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
     expect(screen.getByText('+ 2 more added sections')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }))
     expect(screen.getAllByText(/Added provision/)).toHaveLength(
       TEXT_CHANGES_MAX_LISTED_PROVISIONS,
     )
+    expect(screen.queryByText('+ 2 more added sections')).not.toBeInTheDocument()
   })
 
   it('does not offer a toggle when every provision already fits', () => {

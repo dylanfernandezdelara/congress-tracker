@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { RollPartySplit, VoteDefectorEntry } from '../api/types'
-import {
-  formatPartySplits,
-  groupDefectorsByParty,
-  partyCode,
-  partyNoun,
-} from './partySplit'
+import { formatPartySplits, groupDefectorsByParty } from './partySplit'
 
 function defector(
   overrides: Partial<VoteDefectorEntry> & Pick<VoteDefectorEntry, 'bioguide_id'>,
@@ -26,24 +21,6 @@ const hr7008Splits: RollPartySplit[] = [
   { party: 'R', yeas: 218, nays: 0, party_line: 'yea' },
   { party: 'D', yeas: 13, nays: 198, party_line: 'nay' },
 ]
-
-describe('partyCode', () => {
-  it('normalizes the spellings that reach the UI', () => {
-    expect(partyCode('R')).toBe('R')
-    expect(partyCode('Republican')).toBe('R')
-    expect(partyCode('democrat')).toBe('D')
-    expect(partyCode('Independent')).toBe('I')
-    expect(partyCode(null)).toBe('?')
-  })
-})
-
-describe('partyNoun', () => {
-  it('agrees with the count', () => {
-    expect(partyNoun('D', 1)).toBe('Democrat')
-    expect(partyNoun('D', 13)).toBe('Democrats')
-    expect(partyNoun('R', 2)).toBe('Republicans')
-  })
-})
 
 describe('formatPartySplits', () => {
   it('renders one compact segment per party', () => {
@@ -104,5 +81,27 @@ describe('groupDefectorsByParty', () => {
     )
 
     expect(groups).toHaveLength(2)
+  })
+
+  it('uses members for the Other bucket', () => {
+    const groups = groupDefectorsByParty(
+      [
+        defector({ bioguide_id: 'O1', party: 'Other', position: 'yea', party_line: 'nay' }),
+        defector({ bioguide_id: 'O2', party: 'Other', position: 'yea', party_line: 'nay' }),
+      ],
+      [{ party: 'Other', yeas: 2, nays: 1, party_line: 'nay' }],
+    )
+
+    expect(groups[0]?.summary).toBe('2 of 3 members voted Yea — the caucus voted Nay.')
+  })
+
+  it('uses member singular for a lone Other defector', () => {
+    const groups = groupDefectorsByParty(
+      [defector({ bioguide_id: 'O3', party: 'Green', position: 'yea', party_line: 'nay' })],
+      [],
+    )
+
+    expect(groups[0]?.party).toBe('Other')
+    expect(groups[0]?.summary).toBe('1 member voted Yea — the caucus voted Nay.')
   })
 })

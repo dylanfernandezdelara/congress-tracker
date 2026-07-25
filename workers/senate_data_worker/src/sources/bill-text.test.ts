@@ -166,8 +166,8 @@ describe("diffAddedSections", () => {
       label: `${i + 1}.`,
       heading: `Section ${i + 1}`,
     }));
-    const result = diffAddedSections([], latest, TEXT_CHANGES_MAX_LISTED_PROVISIONS);
-    expect(result.added).toHaveLength(TEXT_CHANGES_MAX_LISTED_PROVISIONS);
+    const result = diffAddedSections([], latest, 5);
+    expect(result.added).toHaveLength(5);
     expect(result.moreAddedCount).toBe(4);
   });
 

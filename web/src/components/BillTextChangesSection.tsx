@@ -24,7 +24,10 @@ export function BillTextChangesSection({ changes }: { changes: BillTextChanges }
     collapsible && !expanded
       ? changes.added_provisions.slice(0, TEXT_CHANGES_MAX_LISTED_PROVISIONS)
       : changes.added_provisions
-  const hidden = changes.added_provisions.length - visible.length
+  // Unshown stored rows plus payload overflow — the true remaining total.
+  const remainingNotShown =
+    changes.added_provisions.length - visible.length + changes.more_added_count
+  const showOverflow = (!collapsible || expanded) && changes.more_added_count > 0
 
   return (
     <section
@@ -47,15 +50,16 @@ export function BillTextChangesSection({ changes }: { changes: BillTextChanges }
         <button
           type="button"
           className="feed-row-added-provisions-toggle"
+          aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
           {expanded ? 'Show fewer' : `Show all ${changes.added_provisions.length}`}
         </button>
       ) : null}
-      {collapsible && !expanded && hidden > 0 ? (
-        <span className="sr-only">{hidden} more not shown</span>
+      {collapsible && !expanded && remainingNotShown > 0 ? (
+        <span className="sr-only">{remainingNotShown} more not shown</span>
       ) : null}
-      {changes.more_added_count > 0 ? (
+      {showOverflow ? (
         <p className="feed-row-added-provisions-more">
           + {changes.more_added_count} more added section
           {changes.more_added_count === 1 ? '' : 's'}
