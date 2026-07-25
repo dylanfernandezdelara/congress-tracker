@@ -28,7 +28,7 @@ type MemberSpotlight = {
   party: string
   state: string
   hook: string
-  href?: string | null
+  href: string | null
   tone?: 'neutral' | 'gain' | 'loss'
   cross_vote_count: number
 }

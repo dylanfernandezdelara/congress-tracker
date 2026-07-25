@@ -24,7 +24,6 @@ export function memberNameSlug(name: string): string {
   )
   if (filtered.length === 0) return 'member'
   // Join all tokens so compound surnames (Ocasio-Cortez) stay in the path.
-  // Bioguide is authoritative; an imperfect slug still redirects.
   return filtered.join('-')
 }
 
@@ -32,13 +31,9 @@ export function memberNameSlug(name: string): string {
  * Public Congress.gov member page, or null for non-bioguide identifiers.
  * Format: `/member/{name-slug}/{BIOGUIDE}` — bioguide-only paths 404.
  */
-export function congressGovMemberUrl(
-  bioguideId: string,
-  name?: string | null,
-): string | null {
+export function congressGovMemberUrl(bioguideId: string, name: string): string | null {
   if (!isRealBioguideId(bioguideId)) return null
-  const slug = name?.trim() ? memberNameSlug(name) : 'member'
-  return `https://www.congress.gov/member/${slug}/${bioguideId.toUpperCase()}`
+  return `https://www.congress.gov/member/${memberNameSlug(name)}/${bioguideId.toUpperCase()}`
 }
 
 export function memberInitials(name: string): string {

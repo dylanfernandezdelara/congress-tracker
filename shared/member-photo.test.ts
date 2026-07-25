@@ -31,11 +31,11 @@ describe("member photo helpers", () => {
     expect(congressGovMemberUrl("P000197", "Nancy Pelosi")).toBe(
       "https://www.congress.gov/member/nancy-pelosi/P000197",
     );
-    expect(congressGovMemberUrl("C001088")).toBe(
+    expect(congressGovMemberUrl("C001088", "")).toBe(
       "https://www.congress.gov/member/member/C001088",
     );
     expect(congressGovMemberUrl("LOCAL:smith", "Local Smith")).toBeNull();
-    expect(congressGovMemberUrl("LIS:12345")).toBeNull();
+    expect(congressGovMemberUrl("LIS:12345", "Unresolved")).toBeNull();
   });
 
   it("derives member initials", () => {
