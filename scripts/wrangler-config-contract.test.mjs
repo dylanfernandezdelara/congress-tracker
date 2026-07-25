@@ -17,10 +17,17 @@ function parseWranglerConfig(filePath) {
   }
 
   const previewUrlsMatch = content.match(/^preview_urls\s*=\s*(true|false)/m)
-  const cronMatch = content.match(/crons\s*=\s*\["([^"]+)"\]/)
+  const cronMatch = content.match(/crons\s*=\s*\[([^\]]+)\]/)
+  const crons = cronMatch
+    ? [...cronMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
+    : []
   const congressMatch = content.match(/^CONGRESS\s*=\s*"([^"]+)"/m)
   const sessionMatch = content.match(/^SESSION\s*=\s*"([^"]+)"/m)
   const assetsMatch = content.match(/\[assets\][\s\S]*?^directory\s*=\s*"([^"]+)"/m)
+
+  const observabilitySection = content.match(
+    /\[observability\]\s*\nenabled\s*=\s*(true|false)\s*\nhead_sampling_rate\s*=\s*([0-9.]+)/,
+  )
 
   const d1Match = content.match(
     /\[\[d1_databases\]\][\s\S]*?^binding\s*=\s*"([^"]+)"[\s\S]*?^database_name\s*=\s*"([^"]+)"[\s\S]*?^database_id\s*=\s*"([^"]+)"[\s\S]*?^preview_database_id\s*=\s*"([^"]+)"/m,
@@ -34,10 +41,14 @@ function parseWranglerConfig(filePath) {
     main: getTopLevelString('main'),
     compatibility_date: getTopLevelString('compatibility_date'),
     preview_urls: previewUrlsMatch?.[1] === 'true',
-    cron: cronMatch?.[1],
+    crons,
     congress: congressMatch?.[1],
     session: sessionMatch?.[1],
     assetsDirectory: assetsMatch?.[1],
+    observabilityEnabled: observabilitySection?.[1] === 'true',
+    observabilityHeadSamplingRate: observabilitySection
+      ? Number(observabilitySection[2])
+      : undefined,
     d1Binding: d1Match?.[1],
     d1DatabaseName: d1Match?.[2],
     d1DatabaseId: d1Match?.[3],
@@ -55,7 +66,7 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.name, worker.name)
   assert.equal(root.compatibility_date, worker.compatibility_date)
   assert.equal(root.preview_urls, worker.preview_urls)
-  assert.equal(root.cron, worker.cron)
+  assert.deepEqual(root.crons, worker.crons)
   assert.equal(root.congress, worker.congress)
   assert.equal(root.session, worker.session)
   assert.equal(root.d1Binding, worker.d1Binding)
@@ -64,6 +75,23 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.d1PreviewDatabaseId, worker.d1PreviewDatabaseId)
   assert.equal(root.previewEnvD1Binding, worker.previewEnvD1Binding)
   assert.equal(root.previewEnvD1DatabaseId, worker.previewEnvD1DatabaseId)
+  assert.equal(root.observabilityEnabled, worker.observabilityEnabled)
+  assert.equal(root.observabilityHeadSamplingRate, worker.observabilityHeadSamplingRate)
+})
+
+test('cron triggers keep daily feed and hourly executive on distinct minutes', () => {
+  const root = parseWranglerConfig(rootConfigPath)
+  assert.deepEqual(root.crons, ['0 10 * * *', '20 * * * *'])
+})
+
+test('Workers Logs observability is enabled at full sampling on both configs', () => {
+  const root = parseWranglerConfig(rootConfigPath)
+  const worker = parseWranglerConfig(workerConfigPath)
+
+  assert.equal(root.observabilityEnabled, true)
+  assert.equal(root.observabilityHeadSamplingRate, 1)
+  assert.equal(worker.observabilityEnabled, true)
+  assert.equal(worker.observabilityHeadSamplingRate, 1)
 })
 
 test('preview D1 database is isolated from production', () => {

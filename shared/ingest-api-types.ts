@@ -25,6 +25,13 @@ export interface FeedPipelineFailureRecord {
   error: string;
 }
 
+/** Durable trace when a feed cron invocation skips without running (e.g. lease held). */
+export interface FeedPipelineSkipRecord {
+  skipped_at: string;
+  trigger: FeedPipelineTrigger;
+  reason: "pipeline_busy";
+}
+
 export type IngestMonitorStatus = "ok" | "stale" | "failed" | "unknown";
 
 export interface IngestMonitorPayload {
@@ -37,6 +44,7 @@ export interface IngestMonitorPayload {
   last_success: FeedPipelineRunRecord | null;
   last_failure: FeedPipelineFailureRecord | null;
   last_scheduled_success: FeedPipelineRunRecord | null;
+  last_skipped: FeedPipelineSkipRecord | null;
   admin_feed_ingest: string;
   executive?: ExecutiveIngestMonitorPayload;
 }

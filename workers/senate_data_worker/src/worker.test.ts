@@ -8,14 +8,30 @@ vi.mock("./pipeline/run-executive-posts", () => ({
   runExecutivePostsPipeline: vi.fn(),
 }));
 
+vi.mock("./d1/pipeline-state", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./d1/pipeline-state")>();
+  return {
+    ...actual,
+    recordFeedPipelineSkipped: vi.fn(actual.recordFeedPipelineSkipped),
+  };
+});
+
+const withPipelineLeaseMock = vi.fn(
+  async <T>(_db: D1Database, fn: () => Promise<T>) => fn(),
+);
+
 vi.mock("./d1/pipeline-lease", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./d1/pipeline-lease")>();
   return {
     ...actual,
-    withPipelineLease: async <T>(_db: D1Database, fn: () => Promise<T>) => fn(),
+    withPipelineLease: <T>(db: D1Database, fn: () => Promise<T>) =>
+      withPipelineLeaseMock(db, fn),
   };
 });
 
+import { PipelineBusyError } from "./d1/pipeline-lease";
+import { recordFeedPipelineSkipped } from "./d1/pipeline-state";
+import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import handler from "./worker";
@@ -64,6 +80,9 @@ function createScheduledContext() {
 describe("worker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    withPipelineLeaseMock.mockImplementation(
+      async <T>(_db: D1Database, fn: () => Promise<T>) => fn(),
+    );
   });
 
   it("returns health", async () => {
@@ -129,7 +148,7 @@ describe("worker", () => {
 
     const { ctx, awaitScheduled } = createScheduledContext();
     handler.scheduled(
-      { cron: "0 10 * * *", scheduledTime: 1_234 } as ScheduledController,
+      { cron: FEED_PIPELINE_CRON_UTC, scheduledTime: 1_234 } as ScheduledController,
       createMockEnv() as any,
       ctx,
     );
@@ -152,7 +171,7 @@ describe("worker", () => {
 
     const { ctx, awaitScheduled } = createScheduledContext();
     handler.scheduled(
-      { cron: "0 10 * * *", scheduledTime: 1_234 } as ScheduledController,
+      { cron: FEED_PIPELINE_CRON_UTC, scheduledTime: 1_234 } as ScheduledController,
       createMockEnv() as any,
       ctx,
     );
@@ -163,6 +182,27 @@ describe("worker", () => {
     );
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('"stack":'));
     errorLog.mockRestore();
+  });
+
+  it("records a durable skip when the feed cron loses the write lease", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    withPipelineLeaseMock.mockRejectedValueOnce(new PipelineBusyError("writes"));
+
+    const env = createMockEnv();
+    const { ctx, awaitScheduled } = createScheduledContext();
+    handler.scheduled(
+      { cron: FEED_PIPELINE_CRON_UTC, scheduledTime: 1_234 } as ScheduledController,
+      env as any,
+      ctx,
+    );
+    await awaitScheduled();
+
+    expect(runFeedWithMemberVotes).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"feed_pipeline_skipped_busy"'),
+    );
+    expect(recordFeedPipelineSkipped).toHaveBeenCalledWith(env.DB, "scheduled", "pipeline_busy");
+    log.mockRestore();
   });
 
   it("runs executive posts pipeline on hourly cron", async () => {
@@ -177,17 +217,35 @@ describe("worker", () => {
 
     const { ctx, awaitScheduled } = createScheduledContext();
     handler.scheduled(
-      { cron: "0 * * * *", scheduledTime: 1_234 } as ScheduledController,
+      { cron: EXECUTIVE_POSTS_CRON_UTC, scheduledTime: 1_234 } as ScheduledController,
       createMockEnv() as any,
       ctx,
     );
     await awaitScheduled();
 
+    expect(EXECUTIVE_POSTS_CRON_UTC).toBe("20 * * * *");
     expect(runExecutivePostsPipeline).toHaveBeenCalled();
     expect(runFeedWithMemberVotes).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('"event":"executive_posts_pipeline_complete"'),
     );
     log.mockRestore();
+  });
+
+  it("warns on unknown cron expressions", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { ctx } = createScheduledContext();
+    handler.scheduled(
+      { cron: "0 0 * * *", scheduledTime: 1_234 } as ScheduledController,
+      createMockEnv() as any,
+      ctx,
+    );
+
+    expect(runFeedWithMemberVotes).not.toHaveBeenCalled();
+    expect(runExecutivePostsPipeline).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"scheduled_unknown_cron"'),
+    );
+    warn.mockRestore();
   });
 });

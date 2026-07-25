@@ -4,12 +4,14 @@ import type {
   ExecutivePipelineRunRecord,
   FeedPipelineFailureRecord,
   FeedPipelineRunRecord,
+  FeedPipelineSkipRecord,
   FeedPipelineTrigger,
 } from "../../../../shared/ingest-api-types";
 
 const FEED_PIPELINE_LAST_SUCCESS_KEY = "feed_pipeline_last_success";
 const FEED_PIPELINE_LAST_SCHEDULED_SUCCESS_KEY = "feed_pipeline_last_scheduled_success";
 const FEED_PIPELINE_LAST_FAILURE_KEY = "feed_pipeline_last_failure";
+const FEED_PIPELINE_LAST_SKIPPED_KEY = "feed_pipeline_last_skipped";
 const EXECUTIVE_POSTS_LAST_SUCCESS_KEY = "executive_posts_pipeline_last_success";
 const EXECUTIVE_POSTS_LAST_FAILURE_KEY = "executive_posts_pipeline_last_failure";
 
@@ -93,6 +95,20 @@ export async function recordFeedPipelineFailure(
   await upsertPipelineState(db, FEED_PIPELINE_LAST_FAILURE_KEY, record, failedAt);
 }
 
+export async function recordFeedPipelineSkipped(
+  db: D1Database,
+  trigger: FeedPipelineTrigger,
+  reason: FeedPipelineSkipRecord["reason"]
+): Promise<void> {
+  const skippedAt = new Date().toISOString();
+  const record: FeedPipelineSkipRecord = {
+    skipped_at: skippedAt,
+    trigger,
+    reason,
+  };
+  await upsertPipelineState(db, FEED_PIPELINE_LAST_SKIPPED_KEY, record, skippedAt);
+}
+
 export async function getFeedPipelineSuccess(
   db: D1Database
 ): Promise<FeedPipelineRunRecord | null> {
@@ -109,6 +125,12 @@ export async function getFeedPipelineFailure(
   db: D1Database
 ): Promise<FeedPipelineFailureRecord | null> {
   return readPipelineState<FeedPipelineFailureRecord>(db, FEED_PIPELINE_LAST_FAILURE_KEY);
+}
+
+export async function getFeedPipelineSkipped(
+  db: D1Database
+): Promise<FeedPipelineSkipRecord | null> {
+  return readPipelineState<FeedPipelineSkipRecord>(db, FEED_PIPELINE_LAST_SKIPPED_KEY);
 }
 
 type ExecutivePipelineRunInput = Omit<ExecutivePipelineRunRecord, "completed_at" | "trigger">;

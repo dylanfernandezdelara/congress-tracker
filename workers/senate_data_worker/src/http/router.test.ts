@@ -196,13 +196,20 @@ describe("HTTP API", () => {
     );
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
-      ingest: { status: string; stale_after_hours: number };
+      ingest: {
+        status: string;
+        stale_after_hours: number;
+        last_skipped: unknown;
+        executive?: { hourly_cron_utc: string };
+      };
       alerting: unknown;
     };
     expect(body.ingest).toMatchObject({
       status: "unknown",
       stale_after_hours: 26,
+      last_skipped: null,
     });
+    expect(body.ingest.executive?.hourly_cron_utc).toBe("20 * * * *");
     expect(body.alerting).toBeDefined();
   });
 

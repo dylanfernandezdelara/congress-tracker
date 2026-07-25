@@ -76,8 +76,12 @@ export const USER_AGENT = "congress-tracker/0.1";
 /** Daily feed ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml. */
 export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
 
-/** Executive Truth Social ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml. */
-export const EXECUTIVE_POSTS_CRON_UTC = "0 * * * *";
+/**
+ * Executive Truth Social ingest cron (UTC). Must match `[triggers].crons` in wrangler.toml.
+ * Off :00 so it never shares a minute with FEED_PIPELINE_CRON_UTC — both use one write lease;
+ * a collision silently skips the daily feed ingest.
+ */
+export const EXECUTIVE_POSTS_CRON_UTC = "20 * * * *";
 
 /** Alert if no successful scheduled ingest within this many hours after cron. */
 export const FEED_PIPELINE_STALE_HOURS = 26;
