@@ -13,6 +13,8 @@ const FEED_PIPELINE_LAST_SCHEDULED_SUCCESS_KEY = "feed_pipeline_last_scheduled_s
 const FEED_PIPELINE_LAST_FAILURE_KEY = "feed_pipeline_last_failure";
 const FEED_PIPELINE_LAST_SKIPPED_KEY = "feed_pipeline_last_skipped";
 const EXECUTIVE_POSTS_LAST_SUCCESS_KEY = "executive_posts_pipeline_last_success";
+const EXECUTIVE_POSTS_LAST_SCHEDULED_SUCCESS_KEY =
+  "executive_posts_pipeline_last_scheduled_success";
 const EXECUTIVE_POSTS_LAST_FAILURE_KEY = "executive_posts_pipeline_last_failure";
 
 type FeedPipelineRunInput = Omit<FeedPipelineRunRecord, "completed_at" | "trigger">;
@@ -147,6 +149,9 @@ export async function recordExecutivePostsPipelineSuccess(
     ...result,
   };
   await upsertPipelineState(db, EXECUTIVE_POSTS_LAST_SUCCESS_KEY, record, completedAt);
+  if (trigger === "scheduled") {
+    await upsertPipelineState(db, EXECUTIVE_POSTS_LAST_SCHEDULED_SUCCESS_KEY, record, completedAt);
+  }
 }
 
 export async function recordExecutivePostsPipelineFailure(
@@ -167,6 +172,15 @@ export async function getExecutivePostsPipelineSuccess(
   db: D1Database
 ): Promise<ExecutivePipelineRunRecord | null> {
   return readPipelineState<ExecutivePipelineRunRecord>(db, EXECUTIVE_POSTS_LAST_SUCCESS_KEY);
+}
+
+export async function getExecutivePostsPipelineScheduledSuccess(
+  db: D1Database
+): Promise<ExecutivePipelineRunRecord | null> {
+  return readPipelineState<ExecutivePipelineRunRecord>(
+    db,
+    EXECUTIVE_POSTS_LAST_SCHEDULED_SUCCESS_KEY
+  );
 }
 
 export async function getExecutivePostsPipelineFailure(

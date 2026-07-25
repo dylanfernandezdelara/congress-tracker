@@ -108,6 +108,25 @@ describe("evaluateIngestMonitorStatus", () => {
 describe("buildIngestMonitorPayload", () => {
   const now = new Date("2026-06-23T12:00:00.000Z");
 
+  const executiveScheduled = {
+    completed_at: "2026-06-23T11:20:00.000Z",
+    trigger: "scheduled" as const,
+    fetched: 3,
+    ingested: 2,
+    linked: 1,
+    hydrated: 1,
+    skipped: 0,
+  };
+  const executiveAdmin = {
+    completed_at: "2026-06-23T11:45:00.000Z",
+    trigger: "admin" as const,
+    fetched: 1,
+    ingested: 1,
+    linked: 0,
+    hydrated: 0,
+    skipped: 0,
+  };
+
   it("surfaces last_skipped without changing status fields", () => {
     const skipped = {
       skipped_at: "2026-06-23T10:00:35.000Z",
@@ -153,5 +172,78 @@ describe("buildIngestMonitorPayload", () => {
     });
     expect(payload.last_skipped).toBeNull();
     expect(payload.status).toBe("unknown");
+  });
+
+  it("keeps executive cron health after an admin success when scheduled success is persisted separately", () => {
+    // Regression: deriving scheduled success from last_success alone reports
+    // unknown after any admin run, even when the hourly cron succeeded recently.
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: null,
+      missingDigestCount: 0,
+      lastSuccess: null,
+      lastFailure: null,
+      executive: {
+        staleAfterHours: 2,
+        hourlyCronUtc: "20 * * * *",
+        lastSuccess: executiveAdmin,
+        lastScheduledSuccess: executiveScheduled,
+        lastFailure: null,
+      },
+    });
+
+    expect(payload.executive?.status).toBe("ok");
+    expect(payload.executive?.last_success?.trigger).toBe("admin");
+    expect(payload.executive?.last_scheduled_success).toEqual(executiveScheduled);
+    expect(payload.executive?.message).toContain("Scheduled ingest completed");
+  });
+
+  it("reports executive unknown when scheduled key is absent and latest success is admin (migration)", () => {
+    // Pre-migration D1 has no executive_posts_pipeline_last_scheduled_success.
+    // Falling back to lastSuccess must not treat an admin run as cron health.
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: null,
+      missingDigestCount: 0,
+      lastSuccess: null,
+      lastFailure: null,
+      executive: {
+        staleAfterHours: 2,
+        hourlyCronUtc: "20 * * * *",
+        lastSuccess: executiveAdmin,
+        lastScheduledSuccess: null,
+        lastFailure: null,
+      },
+    });
+
+    expect(payload.executive?.status).toBe("unknown");
+    expect(payload.executive?.last_scheduled_success).toBeNull();
+    expect(payload.executive?.last_success?.trigger).toBe("admin");
+  });
+
+  it("falls back to executive lastSuccess when scheduled key is absent and latest is scheduled", () => {
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: null,
+      missingDigestCount: 0,
+      lastSuccess: null,
+      lastFailure: null,
+      executive: {
+        staleAfterHours: 2,
+        hourlyCronUtc: "20 * * * *",
+        lastSuccess: executiveScheduled,
+        // Omit lastScheduledSuccess entirely (undefined) — pre-wiring callers.
+        lastFailure: null,
+      },
+    });
+
+    expect(payload.executive?.status).toBe("ok");
+    expect(payload.executive?.last_scheduled_success).toEqual(executiveScheduled);
   });
 });

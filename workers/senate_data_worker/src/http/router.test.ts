@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeedItem, FeedPageResponse } from "../types";
+import {
+  recordExecutivePostsPipelineSuccess,
+} from "../d1/pipeline-state";
+import { resetSchemaFlag } from "../d1/schema";
 import { runMembersRosterPipeline } from "../pipeline/run-members-roster";
 import { handlePublicFetch } from "./router";
 
@@ -60,6 +64,49 @@ function createMockDb(): D1Database {
   return {
     exec: vi.fn(async () => {}),
     prepare: vi.fn(() => stmt()),
+  } as unknown as D1Database;
+}
+
+/** In-memory D1 that persists `pipeline_state` rows for ingest-monitor tests. */
+function createPipelineStateMockDb(): D1Database {
+  const store = new Map<string, { value_json: string; updated_at: string }>();
+  const runResult = { success: true, meta: { duration: 0, changes: 1 } };
+  return {
+    exec: vi.fn(async () => {}),
+    prepare(sql: string) {
+      const state = {
+        bind: vi.fn((...args: unknown[]) => {
+          state.args = args;
+          return state;
+        }),
+        args: [] as unknown[],
+        all: vi.fn(async () => ({ results: [] })),
+        first: vi.fn(async () => {
+          if (sql.includes("FROM pipeline_state") && sql.includes("WHERE key")) {
+            const row = store.get(String(state.args[0]));
+            return row ? { value_json: row.value_json } : null;
+          }
+          if (sql.includes("MAX(vote_date)")) {
+            return { latest_passage_vote_date: null };
+          }
+          if (sql.includes("missing_count")) {
+            return { missing_count: 0 };
+          }
+          return null;
+        }),
+        run: vi.fn(async () => {
+          if (sql.includes("INSERT INTO pipeline_state")) {
+            const [key, valueJson, updatedAt] = state.args;
+            store.set(String(key), {
+              value_json: String(valueJson),
+              updated_at: String(updatedAt),
+            });
+          }
+          return runResult;
+        }),
+      };
+      return state;
+    },
   } as unknown as D1Database;
 }
 
@@ -211,6 +258,47 @@ describe("HTTP API", () => {
     });
     expect(body.ingest.executive?.hourly_cron_utc).toBe("20 * * * *");
     expect(body.alerting).toBeDefined();
+  });
+
+  it("keeps executive ingest monitor ok after a later admin success", async () => {
+    resetSchemaFlag();
+    const db = createPipelineStateMockDb();
+    await recordExecutivePostsPipelineSuccess(db, "scheduled", {
+      fetched: 3,
+      ingested: 2,
+      linked: 1,
+      hydrated: 1,
+      skipped: 0,
+    });
+    await recordExecutivePostsPipelineSuccess(db, "admin", {
+      fetched: 1,
+      ingested: 1,
+      linked: 0,
+      hydrated: 0,
+      skipped: 0,
+    });
+
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/debug/ingest.json"),
+      createMockEnv({ DB: db }) as any
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      ingest: {
+        executive?: {
+          status: string;
+          last_success: { trigger: string } | null;
+          last_scheduled_success: { trigger: string; fetched: number } | null;
+        };
+      };
+    };
+
+    expect(body.ingest.executive?.last_success?.trigger).toBe("admin");
+    expect(body.ingest.executive?.last_scheduled_success).toMatchObject({
+      trigger: "scheduled",
+      fetched: 3,
+    });
+    expect(body.ingest.executive?.status).toBe("ok");
   });
 
   it("returns empty feed page", async () => {

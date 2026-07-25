@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
 import {
+  getExecutivePostsPipelineScheduledSuccess,
+  getExecutivePostsPipelineSuccess,
   getFeedPipelineFailure,
   getFeedPipelineScheduledSuccess,
   getFeedPipelineSkipped,
   getFeedPipelineSuccess,
   getMissingDigestCount,
+  recordExecutivePostsPipelineSuccess,
   recordFeedPipelineFailure,
   recordFeedPipelineSkipped,
   recordFeedPipelineSuccess,
@@ -78,6 +81,48 @@ describe("pipeline-state", () => {
     expect(scheduled?.trigger).toBe("scheduled");
     expect(scheduled?.votesUpserted).toBe(2);
     expect(store.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("records executive scheduled success in a dedicated key that admin runs do not overwrite", async () => {
+    const { db, store } = createMockDb();
+    await recordExecutivePostsPipelineSuccess(db, "scheduled", {
+      fetched: 4,
+      ingested: 2,
+      linked: 1,
+      hydrated: 1,
+      skipped: 0,
+    });
+    await recordExecutivePostsPipelineSuccess(db, "admin", {
+      fetched: 1,
+      ingested: 1,
+      linked: 0,
+      hydrated: 0,
+      skipped: 0,
+    });
+
+    const latest = await getExecutivePostsPipelineSuccess(db);
+    const scheduled = await getExecutivePostsPipelineScheduledSuccess(db);
+    expect(latest?.trigger).toBe("admin");
+    expect(latest?.fetched).toBe(1);
+    expect(scheduled?.trigger).toBe("scheduled");
+    expect(scheduled?.fetched).toBe(4);
+    expect(store.has("executive_posts_pipeline_last_success")).toBe(true);
+    expect(store.has("executive_posts_pipeline_last_scheduled_success")).toBe(true);
+  });
+
+  it("does not write executive scheduled success key for admin-only runs", async () => {
+    const { db, store } = createMockDb();
+    await recordExecutivePostsPipelineSuccess(db, "admin", {
+      fetched: 1,
+      ingested: 1,
+      linked: 0,
+      hydrated: 0,
+      skipped: 0,
+    });
+
+    expect(await getExecutivePostsPipelineSuccess(db)).toMatchObject({ trigger: "admin" });
+    expect(await getExecutivePostsPipelineScheduledSuccess(db)).toBeNull();
+    expect(store.has("executive_posts_pipeline_last_scheduled_success")).toBe(false);
   });
 
   it("records and reads successful feed pipeline runs", async () => {

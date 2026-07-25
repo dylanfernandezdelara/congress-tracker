@@ -89,6 +89,7 @@ export function buildIngestMonitorPayload(params: {
     staleAfterHours: number;
     hourlyCronUtc: string;
     lastSuccess: ExecutivePipelineRunRecord | null;
+    lastScheduledSuccess?: ExecutivePipelineRunRecord | null;
     lastFailure: FeedPipelineFailureRecord | null;
   };
 }): IngestMonitorPayload {
@@ -115,6 +116,7 @@ export function buildIngestMonitorPayload(params: {
         staleAfterHours: params.executive.staleAfterHours,
         hourlyCronUtc: params.executive.hourlyCronUtc,
         lastSuccess: params.executive.lastSuccess,
+        lastScheduledSuccess: params.executive.lastScheduledSuccess,
         lastFailure: params.executive.lastFailure,
       })
     : undefined;
@@ -141,12 +143,17 @@ function buildExecutiveIngestMonitorPayload(params: {
   staleAfterHours: number;
   hourlyCronUtc: string;
   lastSuccess: ExecutivePipelineRunRecord | null;
+  lastScheduledSuccess?: ExecutivePipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
 }): ExecutiveIngestMonitorPayload {
+  // Mirror feed: prefer the durable scheduled-only key; when absent (pre-migration
+  // D1), fall back to lastSuccess so a still-scheduled latest record stays honest.
+  // An admin-only lastSuccess must not be treated as cron health.
+  const scheduledSuccess = params.lastScheduledSuccess ?? params.lastSuccess;
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
-    lastSuccess: params.lastSuccess,
+    lastSuccess: scheduledSuccess,
     lastFailure: params.lastFailure,
   });
 
