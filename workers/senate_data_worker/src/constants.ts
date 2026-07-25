@@ -89,8 +89,13 @@ export const FEED_PIPELINE_STALE_HOURS = 26;
 /** Alert if no successful scheduled executive ingest within this many hours. */
 export const EXECUTIVE_PIPELINE_STALE_HOURS = 2;
 
-/** D1 lease TTL so a crashed pipeline cannot block writes forever. */
-export const PIPELINE_LEASE_TTL_MS = 10 * 60 * 1000;
+/**
+ * D1 lease TTL so a crashed pipeline cannot block writes forever. Must outlast
+ * the longest run by more than the gap between FEED_PIPELINE_CRON_UTC and the
+ * next EXECUTIVE_POSTS_CRON_UTC firing: if it expires mid-run, the hourly cron
+ * acquires the lease and writes alongside a daily ingest that is still going.
+ */
+export const PIPELINE_LEASE_TTL_MS = 30 * 60 * 1000;
 
 /** Single global write lease shared by all mutating pipelines. */
 export const PIPELINE_WRITE_LEASE_NAME = "writes";

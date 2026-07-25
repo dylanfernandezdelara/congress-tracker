@@ -31,7 +31,11 @@ vi.mock("./d1/pipeline-lease", async (importOriginal) => {
 
 import { PipelineBusyError } from "./d1/pipeline-lease";
 import { recordFeedPipelineSkipped } from "./d1/pipeline-state";
-import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
+import {
+  EXECUTIVE_POSTS_CRON_UTC,
+  FEED_PIPELINE_CRON_UTC,
+  PIPELINE_LEASE_TTL_MS,
+} from "./constants";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import handler from "./worker";
@@ -247,5 +251,17 @@ describe("worker", () => {
       expect.stringContaining('"event":"scheduled_unknown_cron"'),
     );
     warn.mockRestore();
+  });
+
+  it("keeps the write lease alive until after the next executive firing", () => {
+    const dailyMinute = Number(FEED_PIPELINE_CRON_UTC.split(" ")[0]);
+    const executiveMinute = Number(EXECUTIVE_POSTS_CRON_UTC.split(" ")[0]);
+    expect(dailyMinute).not.toBe(executiveMinute);
+
+    // Both crons take the one global lease. If it expires while a long daily
+    // ingest is still running, the next hourly firing acquires it and writes
+    // alongside that run, so the TTL has to outlast the gap between them.
+    const gapMinutes = (executiveMinute - dailyMinute + 60) % 60;
+    expect(PIPELINE_LEASE_TTL_MS).toBeGreaterThan(gapMinutes * 60 * 1000);
   });
 });
