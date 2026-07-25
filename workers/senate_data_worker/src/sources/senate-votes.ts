@@ -198,18 +198,24 @@ export function parseSenateVoteMenuXml(
     const result = getTag(block, "result");
 
     if (!isPassageVote(question) && !isPassageVote(title)) {
-      nonPassageStubs.push({
-        chamber: "Senate",
-        congress,
-        session,
-        rollNumber: voteNumber,
-        bill,
-        question: question.replace(/\s+/g, " ").trim(),
-        result,
-        yeas: yeasT,
-        nays: naysT,
-        voteDate,
-      });
+      // Some rolls carry only a title. Storing an empty question would make the
+      // row look unfilled forever: it is re-fetched by every run and never
+      // shown as a companion vote.
+      const stubQuestion = (question.trim() || title).replace(/\s+/g, " ").trim();
+      if (stubQuestion) {
+        nonPassageStubs.push({
+          chamber: "Senate",
+          congress,
+          session,
+          rollNumber: voteNumber,
+          bill,
+          question: stubQuestion,
+          result,
+          yeas: yeasT,
+          nays: naysT,
+          voteDate,
+        });
+      }
       continue;
     }
 

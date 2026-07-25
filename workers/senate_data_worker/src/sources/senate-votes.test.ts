@@ -109,6 +109,44 @@ describe("parseSenateVoteMenuXml", () => {
     });
   });
 
+  it("falls back to the title when a companion roll has no question", () => {
+    const xml = `<vote_summary><congress_year>2026</congress_year><votes>
+      <vote>
+        <vote_number>00170</vote_number>
+        <vote_date>June 10</vote_date>
+        <issue>S. 2</issue>
+        <question></question>
+        <title>Motion to Table the Motion to Reconsider</title>
+        <result>Agreed to</result>
+        <vote_tally><yeas>55</yeas><nays>44</nays></vote_tally>
+      </vote>
+      <vote>
+        <vote_number>00171</vote_number>
+        <vote_date>June 10</vote_date>
+        <issue>S. 2</issue>
+        <question></question>
+        <title></title>
+        <result>Agreed to</result>
+        <vote_tally><yeas>55</yeas><nays>44</nays></vote_tally>
+      </vote>
+    </votes></vote_summary>`;
+
+    const { nonPassageStubs } = parseSenateVoteMenuXml(
+      xml,
+      119,
+      2,
+      new Date("2026-06-30T00:00:00Z")
+    );
+
+    // A blank question would be re-fetched every run and never shown, so the
+    // title stands in and the wholly unlabelled roll is dropped.
+    expect(nonPassageStubs).toHaveLength(1);
+    expect(nonPassageStubs[0]).toMatchObject({
+      rollNumber: 170,
+      question: "Motion to Table the Motion to Reconsider",
+    });
+  });
+
   it("skips votes already stored in D1", async () => {
     const fetchSenate = vi
       .spyOn(senateFetch, "fetchSenateLegislativeText")

@@ -251,7 +251,10 @@ async function fetchBillTextXml(url: string): Promise<string | null> {
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${redactUrl(url)}`);
 
   const declared = Number.parseInt(res.headers.get("content-length") ?? "", 10);
-  if (Number.isFinite(declared) && declared > BILL_TEXT_MAX_BYTES) return null;
+  if (Number.isFinite(declared) && declared > BILL_TEXT_MAX_BYTES) {
+    await res.body?.cancel().catch(() => {});
+    return null;
+  }
 
   const reader = res.body?.getReader();
   if (!reader) return null;
@@ -293,17 +296,19 @@ export async function compareBillText(
   if (!summaryVersion || !latestVersion) return null;
   if (summaryVersion.xmlUrl === latestVersion.xmlUrl) return null;
 
-  const [basisXml, latestXml] = await Promise.all([
-    fetchBillTextXml(summaryVersion.xmlUrl),
-    fetchBillTextXml(latestVersion.xmlUrl),
-  ]);
-  if (basisXml === null || latestXml === null) return null;
+  // Fetched one at a time so only one bill text is resident at a time — two
+  // large prints held together are the worst case for Worker memory.
+  const basisXml = await fetchBillTextXml(summaryVersion.xmlUrl);
+  if (basisXml === null) return null;
 
   const basisSections = parseBillSections(basisXml);
   // Simple resolutions and a few unusual prints expose no parseable sections.
   // Without a basis to compare against, every section of the newer text would
   // look added, so report nothing rather than a fabricated list.
   if (basisSections.length === 0) return null;
+
+  const latestXml = await fetchBillTextXml(latestVersion.xmlUrl);
+  if (latestXml === null) return null;
 
   const { added, moreAddedCount } = diffAddedSections(
     basisSections,
