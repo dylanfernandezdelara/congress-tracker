@@ -1,3 +1,4 @@
+import { COMPANION_VOTES_PER_BILL } from "../constants";
 import type { Chamber, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { buildFeedFilterClause } from "./feed-search";
@@ -53,6 +54,7 @@ export async function selectExistingVoteKeys(
   return toVoteKeys(results);
 }
 
+/** Session-wide equivalent of {@link selectExistingVoteKeys}, same stub rule. */
 export async function selectExistingVoteKeysForSession(
   db: D1Database,
   congress: number,
@@ -63,7 +65,8 @@ export async function selectExistingVoteKeysForSession(
     .prepare(
       `SELECT chamber, congress, session, roll_number
        FROM votes
-       WHERE congress = ? AND session = ?`
+       WHERE congress = ? AND session = ?
+         AND (is_passage = 1 OR TRIM(question) <> '')`
     )
     .bind(congress, session)
     .all<ExistingVoteKeyRow>();
@@ -476,6 +479,10 @@ export async function getCompanionVotesForBills(
     for (const row of results ?? []) {
       const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
       const listForBill = map.get(key) ?? [];
+      // A long-running bill can accumulate dozens of procedural rolls. Rows
+      // arrive newest first, so keeping the first few per bill bounds the feed
+      // payload without another query.
+      if (listForBill.length >= COMPANION_VOTES_PER_BILL) continue;
       listForBill.push({
         chamber: row.chamber,
         congress: row.congress,

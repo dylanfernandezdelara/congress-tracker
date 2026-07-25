@@ -48,6 +48,16 @@ export function isStoredComparisonCurrent(
 }
 
 /**
+ * True when a bill was already probed on `today`, so even the two version
+ * metadata requests can be skipped. New text versions appear at most daily, and
+ * the ingest cron runs daily, so this only suppresses repeat work from manual
+ * re-runs — without it every admin run re-probes all 50 feed bills.
+ */
+export function wasCheckedOn(stored: BillTextChangesRow | undefined, today: string): boolean {
+  return stored?.checked_at?.slice(0, 10) === today;
+}
+
+/**
  * Detect provisions added to a bill after the version our plain-English summary
  * describes. This is the generic form of a real failure mode: CRS summaries lag
  * floor amendments, so a bill can pass with whole sections the feed never
@@ -77,11 +87,19 @@ export async function refreshBillTextChanges(
     }))
   );
 
+  const today = new Date().toISOString().slice(0, 10);
+
   for (const row of bills) {
     const key = billTextChangesMapKey(row.bill_congress, row.bill_type, row.bill_number);
     const stored = existing.get(key);
 
     if (refreshed >= TEXT_CHANGES_MAX_REFRESHES_PER_RUN) {
+      skipped += 1;
+      continue;
+    }
+
+    if (stored && wasCheckedOn(stored, today)) {
+      if (rowToBillTextChanges(stored) !== null) withAddedProvisions += 1;
       skipped += 1;
       continue;
     }

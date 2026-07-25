@@ -25,6 +25,18 @@ export const TEXT_CHANGES_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 export const TEXT_CHANGES_MAX_LISTED_PROVISIONS = 5;
 /** Skip text diffing above this document size to bound cron memory and time. */
 export const BILL_TEXT_MAX_BYTES = 8 * 1024 * 1024;
+/** Newest companion (non-passage) rolls carried per bill in the feed payload. */
+export const COMPANION_VOTES_PER_BILL = 6;
+
+/**
+ * House roll-call detail fetches per ingest run. Every roll missing from the
+ * known-key set costs one request, so an unfetched backlog — such as the
+ * non-passage stubs written before companion votes were stored — must not be
+ * able to exhaust the Worker subrequest limit (1000) in a single run. Rolls
+ * beyond the cap stay unknown and are picked up by the next run.
+ */
+export const HOUSE_VOTE_DETAIL_FETCHES_PER_RUN = 200;
+
 /**
  * Congress.gov lifecycle refreshes (actions + detail) per feed pipeline run.
  * Must cover the full feed window so older desk/unsigned bills are not starved

@@ -1,5 +1,6 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
+import { HOUSE_VOTE_DETAIL_FETCHES_PER_RUN } from "../constants";
 import type { BillRef, IngestVotesResult, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { parseHouseLegislation } from "./bill-ref";
@@ -91,6 +92,7 @@ export async function ingestHousePassageVotes(
   const seenThisRun = new Set<string>();
   let skipped = 0;
   let truncated = false;
+  let detailFetches = 0;
   let nextUrl: string | null =
     `https://api.congress.gov/v3/house-vote/${congress}/${session}?format=json&limit=50&api_key=${apiKey}`;
 
@@ -113,7 +115,16 @@ export async function ingestHousePassageVotes(
         continue;
       }
 
+      // Passage votes and companion stubs each cost one detail request, so the
+      // budget is shared. Stopping leaves the remaining rolls unknown for the
+      // next run rather than dropping them.
+      if (detailFetches >= HOUSE_VOTE_DETAIL_FETCHES_PER_RUN) {
+        truncated = true;
+        break;
+      }
+
       const detailUrl = `https://api.congress.gov/v3/house-vote/${congress}/${session}/${item.rollCallNumber}?format=json&api_key=${apiKey}`;
+      detailFetches += 1;
       const detailRes = await fetchJson<HouseVoteDetailResponse>(detailUrl);
       const detail = detailRes.houseRollCallVote;
       // Missing/empty detail is transient — never stub, or we permanently skip
@@ -141,7 +152,10 @@ export async function ingestHousePassageVotes(
           session,
           rollNumber: item.rollCallNumber,
           bill,
-          question: questionText.replace(/\s+/g, " ").trim(),
+          // Some rolls carry only a title. Storing an empty question would make
+          // the row look unfilled forever: it is re-fetched by every run and
+          // never shown as a companion vote.
+          question: (questionText.trim() || titleText).replace(/\s+/g, " ").trim(),
           result: detail.result ?? item.result,
           yeas: stubTally.yeas,
           nays: stubTally.nays,

@@ -6,7 +6,7 @@ import {
 } from "../constants";
 import type { BillRef } from "../types";
 import type { BillAddedProvision, BillTextChanges } from "../../../../shared/bill-text-api-types";
-import { fetchJson, fetchText } from "./http";
+import { fetchJson } from "./http";
 
 interface TextVersionFormat {
   type?: string;
@@ -239,14 +239,43 @@ export async function fetchBillTextChangesSource(
   };
 }
 
-/** Guard the cron against pathologically large documents (e.g. omnibus prints). */
+/**
+ * Guard the cron against pathologically large documents (e.g. omnibus prints).
+ *
+ * The limit is enforced while reading the body rather than from a declared
+ * `Content-Length`, which Congress.gov omits on chunked responses. Returns null
+ * when the document is too large to diff.
+ */
 async function fetchBillTextXml(url: string): Promise<string | null> {
-  const head = await fetch(url, { method: "HEAD", headers: { "User-Agent": USER_AGENT } });
-  if (head.ok) {
-    const declared = Number.parseInt(head.headers.get("content-length") ?? "", 10);
-    if (Number.isFinite(declared) && declared > BILL_TEXT_MAX_BYTES) return null;
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+
+  const declared = Number.parseInt(res.headers.get("content-length") ?? "", 10);
+  if (Number.isFinite(declared) && declared > BILL_TEXT_MAX_BYTES) return null;
+
+  const reader = res.body?.getReader();
+  if (!reader) return null;
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > BILL_TEXT_MAX_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
   }
-  return fetchText(url);
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
 }
 
 /**

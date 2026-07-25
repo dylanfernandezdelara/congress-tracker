@@ -21,7 +21,11 @@ vi.mock("../sources/bill-text", () => ({
   compareBillText: (...args: unknown[]) => mockCompareBillText(...args),
 }));
 
-import { isStoredComparisonCurrent, refreshBillTextChanges } from "./refresh-bill-text-changes";
+import {
+  isStoredComparisonCurrent,
+  refreshBillTextChanges,
+  wasCheckedOn,
+} from "./refresh-bill-text-changes";
 
 function createEnv(overrides: Partial<Env> = {}): Env {
   return {
@@ -62,6 +66,18 @@ function storedRow(overrides: Partial<BillTextChangesRow> = {}): BillTextChanges
     ...overrides,
   };
 }
+
+describe("wasCheckedOn", () => {
+  it("matches a row already probed today and nothing else", () => {
+    expect(wasCheckedOn(storedRow({ checked_at: "2026-07-23T09:00:00.000Z" }), "2026-07-23")).toBe(
+      true
+    );
+    expect(wasCheckedOn(storedRow({ checked_at: "2026-07-22T23:59:00.000Z" }), "2026-07-23")).toBe(
+      false
+    );
+    expect(wasCheckedOn(undefined, "2026-07-23")).toBe(false);
+  });
+});
 
 describe("isStoredComparisonCurrent", () => {
   const source = {
@@ -154,6 +170,26 @@ describe("refreshBillTextChanges", () => {
 
     expect(mockCompareBillText).not.toHaveBeenCalled();
     expect(mockUpsertBillTextChanges).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ refreshed: 0, skipped: 1, withAddedProvisions: 1 });
+  });
+
+  it("does not re-probe versions for a bill already checked today", async () => {
+    // Without this, every manual re-run costs two Congress.gov requests per feed bill.
+    mockGetBillTextChangesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:7008",
+          storedRow({
+            checked_at: new Date().toISOString(),
+            added_json: '[{"label":"3.","heading":"Photo ID"}]',
+          }),
+        ],
+      ])
+    );
+
+    const result = await refreshBillTextChanges(createEnv(), [hr7008], "manual");
+
+    expect(mockFetchSource).not.toHaveBeenCalled();
     expect(result).toMatchObject({ refreshed: 0, skipped: 1, withAddedProvisions: 1 });
   });
 
