@@ -1,5 +1,5 @@
 import type { Chamber, DefectorEntry, VoteDefectorEntry } from "../types";
-import { isRealBioguideId } from "../../../../shared/member-id";
+import { isLocalSampleMemberId, isRealBioguideId } from "../../../../shared/member-id";
 import { congressGovMemberUrl } from "../../../../shared/member-photo";
 import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
 import { selectMemberVotesForRoll, type RollCallKey } from "../d1/member-votes";
@@ -105,8 +105,11 @@ export async function computeRollDefectors(
   }
 
   const excludeLocalSample = await hasRealMemberRoster(db);
+  // Only seeded rows are dropped. Senators still carried under an unresolved
+  // LIS id cast real votes, and discarding them would leave the party splits
+  // short of the chamber totals shown next to them.
   const filteredRows = excludeLocalSample
-    ? rows.filter((row) => isRealBioguideId(row.bioguide_id))
+    ? rows.filter((row) => !isLocalSampleMemberId(row.bioguide_id))
     : rows;
   if (filteredRows.length === 0) {
     return { defectors: [], party_splits: [], member_votes_available: false };

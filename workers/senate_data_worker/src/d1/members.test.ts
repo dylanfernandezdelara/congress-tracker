@@ -91,8 +91,18 @@ describe("getMembersByIds", () => {
 describe("senateLastNameCandidates", () => {
   it("strips party-state suffixes and handles comma-inverted names", () => {
     expect(senateLastNameCandidates("Booker (D-NJ)")).toEqual(["Booker"]);
-    expect(senateLastNameCandidates("Murkowski, Lisa")).toEqual(["Murkowski"]);
+    expect(senateLastNameCandidates("Murkowski, Lisa")).toContain("Murkowski");
     expect(senateLastNameCandidates("Ben Ray Luján")).toEqual(["Luján", "Ray Luján"]);
+  });
+
+  it("finds the surname when a generational suffix sits mid-name", () => {
+    // Congress.gov "King, Angus S., Jr." is stored as this display name.
+    expect(senateLastNameCandidates("Angus S., Jr. King")).toContain("King");
+    expect(senateLastNameCandidates("John D., IV Rockefeller")).toContain("Rockefeller");
+  });
+
+  it("finds the surname when a generational suffix trails the name", () => {
+    expect(senateLastNameCandidates("Angus S. King, Jr.")).toContain("King");
   });
 });
 
@@ -103,6 +113,7 @@ describe("buildSenateBioguideLookup", () => {
       { bioguide_id: "B001288", name: "Booker (D-NJ)", party: "D", state: "NJ" },
       { bioguide_id: "M001153", name: "Murkowski, Lisa", party: "R", state: "AK" },
       { bioguide_id: "L000570", name: "Ben Ray Luján", party: "D", state: "NM" },
+      { bioguide_id: "K000383", name: "Angus S., Jr. King", party: "I", state: "ME" },
     ]);
 
     const lookup = await buildSenateBioguideLookup(db);
@@ -111,5 +122,6 @@ describe("buildSenateBioguideLookup", () => {
     expect(lookup.get(senateMemberLookupKey("Murkowski", "AK", "R"))).toBe("M001153");
     expect(lookup.get(senateMemberLookupKey("Lujan", "NM", "D"))).toBe("L000570");
     expect(lookup.get(senateMemberLookupKey("Luján", "NM", "D"))).toBe("L000570");
+    expect(lookup.get(senateMemberLookupKey("King", "ME", "I"))).toBe("K000383");
   });
 });

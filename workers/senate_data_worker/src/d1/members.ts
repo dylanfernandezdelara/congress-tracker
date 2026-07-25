@@ -164,9 +164,20 @@ export async function hasRealMemberRoster(db: D1Database): Promise<boolean> {
 /** Trailing " (D-NJ)" / " (I-ME)" style suffixes from Senate roll-call member_full. */
 const SENATE_PARTY_STATE_SUFFIX = /\s*\([A-Za-z]{1,3}-[A-Za-z]{2}\)\s*$/;
 
+/** Generational suffixes, which are never the surname Senate roll-call XML reports. */
+const GENERATIONAL_SUFFIX = /^(?:jr|sr|ii|iii|iv|v)$/i;
+
+function trimNameToken(value: string): string {
+  return value.replace(/^[,\s]+|[,\s]+$/g, "");
+}
+
 /**
  * Last-name strings used as senateMemberLookupKey inputs for a stored display name.
  * Handles clean roster names, "Last, First", and clobbered "Last (P-ST)" vote XML forms.
+ *
+ * Both comma orderings have to be tried: Congress.gov returns "King, Angus S., Jr.",
+ * which the roster stores as the display name "Angus S., Jr. King", so an embedded
+ * comma does not mean the surname comes first.
  */
 export function senateLastNameCandidates(name: string): string[] {
   const cleaned = name.replace(SENATE_PARTY_STATE_SUFFIX, "").trim();
@@ -175,18 +186,19 @@ export function senateLastNameCandidates(name: string): string[] {
   const candidates: string[] = [];
   const seen = new Set<string>();
   const add = (value: string) => {
-    const trimmed = value.trim();
+    const trimmed = trimNameToken(value);
     if (!trimmed || seen.has(trimmed)) return;
     seen.add(trimmed);
     candidates.push(trimmed);
   };
 
-  if (cleaned.includes(",")) {
-    add(cleaned.slice(0, cleaned.indexOf(",")));
-    return candidates;
-  }
+  const comma = cleaned.indexOf(",");
+  if (comma !== -1) add(cleaned.slice(0, comma));
 
-  const parts = cleaned.split(/\s+/).filter(Boolean);
+  const parts = cleaned.split(/\s+/).map(trimNameToken).filter(Boolean);
+  while (parts.length > 1 && GENERATIONAL_SUFFIX.test(parts[parts.length - 1]!.replace(/\.$/, ""))) {
+    parts.pop();
+  }
   for (let i = 1; i <= Math.min(2, parts.length); i += 1) {
     add(parts.slice(-i).join(" "));
   }
