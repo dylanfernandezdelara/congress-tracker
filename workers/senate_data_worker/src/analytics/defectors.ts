@@ -1,10 +1,12 @@
 import type { Chamber, DefectorEntry, VoteDefectorEntry } from "../types";
-import { isRealBioguideId } from "../../../../shared/member-id";
+import { isLocalSampleMemberId, isRealBioguideId } from "../../../../shared/member-id";
 import { congressGovMemberUrl } from "../../../../shared/member-photo";
 import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
 import { selectMemberVotesForRoll, type RollCallKey } from "../d1/member-votes";
 import { selectMemberCrossVotesForChamber } from "../d1/member-session-stats";
+import type { RollPartySplit } from "../../../../shared/stats-api-types";
 import { rollCrossVotes } from "./cross-votes";
+import { rollPartySplits } from "./roll-party-stats";
 
 function defectorCongressGovUrl(bioguideId: string): string {
   return (
@@ -89,6 +91,7 @@ export async function computeDefectors(
 
 export type RollDefectorsResult = {
   defectors: VoteDefectorEntry[];
+  party_splits: RollPartySplit[];
   member_votes_available: boolean;
 };
 
@@ -98,15 +101,18 @@ export async function computeRollDefectors(
 ): Promise<RollDefectorsResult> {
   const rows = await selectMemberVotesForRoll(db, roll);
   if (rows.length === 0) {
-    return { defectors: [], member_votes_available: false };
+    return { defectors: [], party_splits: [], member_votes_available: false };
   }
 
   const excludeLocalSample = await hasRealMemberRoster(db);
+  // Only seeded rows are dropped. Senators still carried under an unresolved
+  // LIS id cast real votes, and discarding them would leave the party splits
+  // short of the chamber totals shown next to them.
   const filteredRows = excludeLocalSample
-    ? rows.filter((row) => isRealBioguideId(row.bioguide_id))
+    ? rows.filter((row) => !isLocalSampleMemberId(row.bioguide_id))
     : rows;
   if (filteredRows.length === 0) {
-    return { defectors: [], member_votes_available: false };
+    return { defectors: [], party_splits: [], member_votes_available: false };
   }
 
   const uniqueIds = [...new Set(filteredRows.map((row) => row.bioguide_id))];
@@ -125,13 +131,13 @@ export async function computeRollDefectors(
     }
   }
 
-  const crosses = rollCrossVotes(
-    filteredRows.map((row) => ({
-      bioguideId: row.bioguide_id,
-      party: members.get(row.bioguide_id)?.party ?? null,
-      position: row.position,
-    }))
-  );
+  const positions = filteredRows.map((row) => ({
+    bioguideId: row.bioguide_id,
+    party: members.get(row.bioguide_id)?.party ?? null,
+    position: row.position,
+  }));
+  const crosses = rollCrossVotes(positions);
+  const party_splits = rollPartySplits(positions);
 
   const defectors: VoteDefectorEntry[] = [];
   for (const cross of crosses) {
@@ -150,6 +156,7 @@ export async function computeRollDefectors(
 
   return {
     defectors: defectors.sort((a, b) => a.name.localeCompare(b.name)),
+    party_splits,
     member_votes_available: true,
   };
 }

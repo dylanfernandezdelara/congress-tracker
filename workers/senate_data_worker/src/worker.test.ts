@@ -110,6 +110,9 @@ describe("worker", () => {
       lifecycleRefreshed: 0,
       lifecycleSkipped: 0,
       lifecycleWarnings: [],
+      textChangesRefreshed: 0,
+      textChangesWithAddedProvisions: 0,
+      textChangesWarnings: [],
       memberVotes: {
         rollsProcessed: 1,
         rollsSkipped: 0,

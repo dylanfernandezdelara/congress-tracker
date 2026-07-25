@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
+import { HOUSE_VOTE_DETAIL_FETCHES_PER_RUN } from "../constants";
 import { voteKey } from "../vote-key";
 import { ingestHousePassageVotes } from "./house-votes";
 import * as http from "./http";
@@ -262,6 +263,141 @@ describe("ingestHousePassageVotes", () => {
     expect(second.skipped).toBe(1);
     expect(second.nonPassageStubs).toBeUndefined();
     expect(detailFetches).toBe(1);
+
+    fetchJson.mockRestore();
+  });
+
+  it("falls back to the vote title when a companion roll has no question", async () => {
+    // An empty question would make the stub look unfilled forever: it is
+    // re-fetched by every run and never shown as a companion vote.
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      if (url.includes("/51?")) {
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: 51,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Failed",
+            startDate: "2026-06-05T12:00:00Z",
+            voteQuestion: "  ",
+            voteTitle: "Motion to Recommit  with Instructions",
+            votePartyTotal: [{ yeaTotal: 210, nayTotal: 216 }],
+          },
+        };
+      }
+      return {
+        houseRollCallVotes: [
+          {
+            congress: 119,
+            rollCallNumber: 51,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Failed",
+            startDate: "2026-06-05T12:00:00Z",
+          },
+        ],
+        pagination: {},
+      };
+    });
+
+    const result = await ingestHousePassageVotes(env, "2026-05-01", new Set());
+    expect(result.nonPassageStubs?.[0]).toMatchObject({
+      rollNumber: 51,
+      question: "Motion to Recommit with Instructions",
+      yeas: 210,
+      nays: 216,
+    });
+
+    fetchJson.mockRestore();
+  });
+
+  it("stops fetching roll detail once the per-run budget is spent", async () => {
+    // A backlog of unfetched rolls must not exhaust the Worker subrequest limit.
+    let detailFetches = 0;
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      const detail = url.match(/\/(\d+)\?format=json/);
+      if (detail && !url.includes("/119/2?")) {
+        detailFetches += 1;
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: Number(detail[1]),
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-05T12:00:00Z",
+            voteQuestion: "On Passage",
+            votePartyTotal: [{ yeaTotal: 220, nayTotal: 200 }],
+          },
+        };
+      }
+      return {
+        houseRollCallVotes: Array.from({ length: 300 }, (_, i) => ({
+          congress: 119,
+          rollCallNumber: i + 1,
+          sessionNumber: 2,
+          legislationNumber: "100",
+          legislationType: "HR",
+          result: "Passed",
+          startDate: "2026-06-05T12:00:00Z",
+        })),
+        pagination: {},
+      };
+    });
+
+    const result = await ingestHousePassageVotes(env, "2026-05-01", new Set());
+
+    expect(detailFetches).toBe(HOUSE_VOTE_DETAIL_FETCHES_PER_RUN);
+    expect(result.truncated).toBe(true);
+    expect(result.votes).toHaveLength(HOUSE_VOTE_DETAIL_FETCHES_PER_RUN);
+
+    fetchJson.mockRestore();
+  });
+
+  it("spends the detail budget on the newest rolls first", async () => {
+    // The list arrives oldest-first, so a backlog of old rolls would otherwise
+    // delay the current week's passage votes until it cleared.
+    const fetched: number[] = [];
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      const detail = url.match(/\/(\d+)\?format=json/);
+      if (detail && !url.includes("/119/2?")) {
+        const roll = Number(detail[1]);
+        fetched.push(roll);
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: roll,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: `2026-06-${String(roll).padStart(2, "0")}T12:00:00Z`,
+            voteQuestion: "On Passage",
+            votePartyTotal: [{ yeaTotal: 220, nayTotal: 200 }],
+          },
+        };
+      }
+      return {
+        houseRollCallVotes: [1, 2, 3].map((roll) => ({
+          congress: 119,
+          rollCallNumber: roll,
+          sessionNumber: 2,
+          legislationNumber: "100",
+          legislationType: "HR",
+          result: "Passed",
+          startDate: `2026-06-${String(roll).padStart(2, "0")}T12:00:00Z`,
+        })),
+        pagination: {},
+      };
+    });
+
+    await ingestHousePassageVotes(env, "2026-05-01", new Set());
+
+    expect(fetched).toEqual([3, 2, 1]);
 
     fetchJson.mockRestore();
   });

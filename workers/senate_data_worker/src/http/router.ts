@@ -314,18 +314,22 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       );
     }
     try {
-      const { defectors, member_votes_available } = await computeRollDefectors(env.DB, {
-        chamber,
-        congress: rollCongress,
-        session: rollSession,
-        roll_number: rollNumber,
-      });
+      const { defectors, party_splits, member_votes_available } = await computeRollDefectors(
+        env.DB,
+        {
+          chamber,
+          congress: rollCongress,
+          session: rollSession,
+          roll_number: rollNumber,
+        }
+      );
       const body: VoteDefectorsResponse = {
         chamber,
         congress: rollCongress,
         session: rollSession,
         roll_number: rollNumber,
         defectors,
+        party_splits,
         member_votes_available,
         as_of: new Date().toISOString(),
       };

@@ -164,9 +164,33 @@ export async function hasRealMemberRoster(db: D1Database): Promise<boolean> {
 /** Trailing " (D-NJ)" / " (I-ME)" style suffixes from Senate roll-call member_full. */
 const SENATE_PARTY_STATE_SUFFIX = /\s*\([A-Za-z]{1,3}-[A-Za-z]{2}\)\s*$/;
 
+/** Generational suffixes, which are never the surname Senate roll-call XML reports. */
+const GENERATIONAL_SUFFIX = /^(?:jr|sr|ii|iii|iv|v)$/i;
+
+function trimNameToken(value: string): string {
+  return value.replace(/^[,\s]+|[,\s]+$/g, "");
+}
+
+function nameTokens(value: string): string[] {
+  return value.split(/\s+/).map(trimNameToken).filter(Boolean);
+}
+
+function isGenerationalSuffix(token: string): boolean {
+  return GENERATIONAL_SUFFIX.test(token.replace(/\.$/, ""));
+}
+
+/** Nested-comma forms recurse at most this deep before giving up. */
+const NAME_FORM_MAX_DEPTH = 2;
+
 /**
  * Last-name strings used as senateMemberLookupKey inputs for a stored display name.
  * Handles clean roster names, "Last, First", and clobbered "Last (P-ST)" vote XML forms.
+ *
+ * A comma alone does not mean the surname comes first. Congress.gov returns
+ * "King, Angus S., Jr.", which the roster stores as the display name
+ * "Angus S., Jr. King" — there the surname trails the generational suffix.
+ * Only surname candidates are emitted: registering a given name would let one
+ * senator's key collide with another's surname and misattribute their votes.
  */
 export function senateLastNameCandidates(name: string): string[] {
   const cleaned = name.replace(SENATE_PARTY_STATE_SUFFIX, "").trim();
@@ -175,21 +199,45 @@ export function senateLastNameCandidates(name: string): string[] {
   const candidates: string[] = [];
   const seen = new Set<string>();
   const add = (value: string) => {
-    const trimmed = value.trim();
+    const trimmed = trimNameToken(value);
     if (!trimmed || seen.has(trimmed)) return;
     seen.add(trimmed);
     candidates.push(trimmed);
   };
 
-  if (cleaned.includes(",")) {
-    add(cleaned.slice(0, cleaned.indexOf(",")));
-    return candidates;
-  }
+  /** Trailing 1-2 tokens of a first-last ordered name, ignoring any suffix. */
+  const addTrailing = (value: string) => {
+    const parts = nameTokens(value);
+    while (parts.length > 1 && isGenerationalSuffix(parts[parts.length - 1]!)) parts.pop();
+    for (let i = 1; i <= Math.min(2, parts.length); i += 1) {
+      add(parts.slice(-i).join(" "));
+    }
+  };
 
-  const parts = cleaned.split(/\s+/).filter(Boolean);
-  for (let i = 1; i <= Math.min(2, parts.length); i += 1) {
-    add(parts.slice(-i).join(" "));
-  }
+  const collect = (value: string, depth: number) => {
+    const trimmed = trimNameToken(value);
+    if (!trimmed || depth > NAME_FORM_MAX_DEPTH) return;
+
+    const lastComma = trimmed.lastIndexOf(",");
+    if (lastComma === -1) {
+      addTrailing(trimmed);
+      return;
+    }
+
+    const tail = nameTokens(trimmed.slice(lastComma + 1));
+    if (tail.length > 0 && isGenerationalSuffix(tail[0]!)) {
+      // "Angus S., Jr. King" — the surname follows the suffix. When nothing
+      // follows it ("King, Angus S., Jr."), drop the suffix and re-read.
+      if (tail.length > 1) addTrailing(tail.slice(1).join(" "));
+      else collect(trimmed.slice(0, lastComma), depth + 1);
+      return;
+    }
+
+    // "Murkowski, Lisa" — inverted roster form, surname first.
+    add(trimmed.slice(0, trimmed.indexOf(",")));
+  };
+
+  collect(cleaned, 0);
   return candidates;
 }
 
@@ -228,14 +276,24 @@ async function buildSenateBioguideLookupFromDb(db: D1Database): Promise<Map<stri
     }>();
 
   const lookup = new Map<string, string>();
+  // A key two senators could both answer to must resolve to neither: leaving a
+  // vote on its LIS id is recoverable, attributing it to the wrong senator is not.
+  const ambiguous = new Set<string>();
   for (const row of results ?? []) {
     if (!isRealBioguideId(row.bioguide_id) || !row.state || !row.party) continue;
     const party = normalizePartyCode(row.party);
     if (party === "Other") continue;
     for (const lastName of senateLastNameCandidates(row.name)) {
-      lookup.set(senateMemberLookupKey(lastName, row.state, party), row.bioguide_id);
+      const key = senateMemberLookupKey(lastName, row.state, party);
+      const claimed = lookup.get(key);
+      if (claimed !== undefined && claimed !== row.bioguide_id) {
+        ambiguous.add(key);
+        continue;
+      }
+      lookup.set(key, row.bioguide_id);
     }
   }
+  for (const key of ambiguous) lookup.delete(key);
   return lookup;
 }
 

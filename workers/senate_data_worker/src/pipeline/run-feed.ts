@@ -22,6 +22,7 @@ import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import { refreshBillLifecycles } from "./refresh-lifecycles";
+import { refreshBillTextChanges } from "./refresh-bill-text-changes";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
 
@@ -36,6 +37,9 @@ export interface RunFeedResult {
   lifecycleRefreshed: number;
   lifecycleSkipped: number;
   lifecycleWarnings: string[];
+  textChangesRefreshed: number;
+  textChangesWithAddedProvisions: number;
+  textChangesWarnings: string[];
 }
 
 export async function runFeedPipeline(
@@ -190,6 +194,17 @@ export async function runFeedPipeline(
       );
     }
 
+    const textChanges = await refreshBillTextChanges(env, bills, trigger);
+    if (textChanges.warnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_text_changes_refresh",
+          trigger,
+          warnings: textChanges.warnings,
+        })
+      );
+    }
+
     const result: RunFeedResult = {
       votesUpserted: newVotes.length,
       votesSkipped: houseResult.skipped + senateResult.skipped,
@@ -201,6 +216,9 @@ export async function runFeedPipeline(
       lifecycleRefreshed,
       lifecycleSkipped,
       lifecycleWarnings,
+      textChangesRefreshed: textChanges.refreshed,
+      textChangesWithAddedProvisions: textChanges.withAddedProvisions,
+      textChangesWarnings: textChanges.warnings,
     };
 
     try {
@@ -215,6 +233,11 @@ export async function runFeedPipeline(
         lifecycleSkipped: result.lifecycleSkipped,
         ...(lifecycleWarnings.length > 0
           ? { lifecycle_warnings: lifecycleWarnings }
+          : {}),
+        textChangesRefreshed: result.textChangesRefreshed,
+        textChangesWithAddedProvisions: result.textChangesWithAddedProvisions,
+        ...(textChanges.warnings.length > 0
+          ? { text_changes_warnings: textChanges.warnings }
           : {}),
       });
     } catch (err: unknown) {

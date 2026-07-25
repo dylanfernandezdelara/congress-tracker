@@ -6,3 +6,6 @@ export const MEMBER_VOTES_ERROR = 'Party defector data is temporarily unavailabl
 export function noPartyDefectorsMessage(chamber: string): string {
   return `No members broke with their party on this ${chamber} vote.`
 }
+
+/** Names shown per party group before collapsing behind a "Show all" toggle. */
+export const DEFECTOR_GROUP_COLLAPSE_THRESHOLD = 6

@@ -43,6 +43,10 @@ const response = {
       congress_gov_url: 'https://www.congress.gov/member/local:s001',
     },
   ],
+  party_splits: [
+    { party: 'R', yeas: 52, nays: 1, party_line: 'yea' },
+    { party: 'D', yeas: 0, nays: 46, party_line: 'nay' },
+  ],
 } satisfies VoteDefectorsResponse
 
 afterEach(() => {
@@ -73,6 +77,7 @@ describe('useRollDefectors', () => {
     expect(second.result.current.get(key!)).toEqual({
       status: 'ready',
       defectors: response.defectors,
+      partySplits: response.party_splits,
     })
     second.unmount()
   })

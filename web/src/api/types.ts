@@ -5,10 +5,16 @@ export type { BillDigestContent, BillLifecycle }
 
 export type {
   FeedBill,
+  FeedCompanionVote,
   FeedItem,
   FeedPageResponse,
   FeedPassageVote,
 } from '@congress-tracker/shared/feed-api-types'
+
+export type {
+  BillAddedProvision,
+  BillTextChanges,
+} from '../../../shared/bill-text-api-types'
 
 export type {
   ExecutiveBillLink,
@@ -34,6 +40,7 @@ export type {
   PortfoliosResponse,
   PolicyHeatEntry,
   PulseStatsResponse,
+  RollPartySplit,
   SessionStatsResponse,
   StatsChamber,
   ThisWeekSummary,

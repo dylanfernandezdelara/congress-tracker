@@ -1,3 +1,4 @@
+import { COMPANION_VOTES_PER_BILL } from "../constants";
 import type { Chamber, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { buildFeedFilterClause } from "./feed-search";
@@ -27,8 +28,12 @@ function toVoteKeys(rows: ExistingVoteKeyRow[] | null | undefined): Set<string> 
 }
 
 /**
- * Keys for every roll already persisted in the lookback window — passage and
- * non-passage stubs alike — so House detail fetches are not repeated daily.
+ * Keys for every roll already fully persisted in the lookback window, so House
+ * detail fetches are not repeated daily.
+ *
+ * Non-passage stubs written before companion-vote support carry an empty
+ * question and a 0-0 tally. They are deliberately treated as not-yet-known so
+ * one later run refills them instead of caching the gap forever.
  */
 export async function selectExistingVoteKeys(
   db: D1Database,
@@ -40,7 +45,8 @@ export async function selectExistingVoteKeys(
     .prepare(
       `SELECT chamber, congress, session, roll_number
        FROM votes
-       WHERE vote_date >= ? AND congress = ?`
+       WHERE vote_date >= ? AND congress = ?
+         AND (is_passage = 1 OR TRIM(question) <> '')`
     )
     .bind(lookbackDate, congress)
     .all<ExistingVoteKeyRow>();
@@ -48,6 +54,7 @@ export async function selectExistingVoteKeys(
   return toVoteKeys(results);
 }
 
+/** Session-wide equivalent of {@link selectExistingVoteKeys}, same stub rule. */
 export async function selectExistingVoteKeysForSession(
   db: D1Database,
   congress: number,
@@ -58,7 +65,8 @@ export async function selectExistingVoteKeysForSession(
     .prepare(
       `SELECT chamber, congress, session, roll_number
        FROM votes
-       WHERE congress = ? AND session = ?`
+       WHERE congress = ? AND session = ?
+         AND (is_passage = 1 OR TRIM(question) <> '')`
     )
     .bind(congress, session)
     .all<ExistingVoteKeyRow>();
@@ -104,8 +112,9 @@ export async function upsertVote(db: D1Database, vote: PassageVote): Promise<voi
 }
 
 /**
- * Record that a roll was inspected and is not a passage vote. DO NOTHING on
- * conflict so an existing passage row is never downgraded.
+ * Record a non-passage companion roll (rule, motion to recommit, amendment).
+ * The conflict update is guarded on `is_passage = 0` so an existing passage row
+ * is never downgraded, while a previously blank stub can still be filled in.
  */
 export async function upsertNonPassageVoteStub(
   db: D1Database,
@@ -118,8 +127,17 @@ export async function upsertNonPassageVoteStub(
         chamber, congress, session, roll_number,
         bill_congress, bill_type, bill_number,
         question, result, yeas, nays, vote_date, is_passage
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 0, 0, ?, 0)
-      ON CONFLICT(chamber, congress, session, roll_number) DO NOTHING`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      ON CONFLICT(chamber, congress, session, roll_number) DO UPDATE SET
+        bill_congress = excluded.bill_congress,
+        bill_type = excluded.bill_type,
+        bill_number = excluded.bill_number,
+        question = excluded.question,
+        result = excluded.result,
+        yeas = excluded.yeas,
+        nays = excluded.nays,
+        vote_date = excluded.vote_date
+      WHERE votes.is_passage = 0`
     )
     .bind(
       stub.chamber,
@@ -129,7 +147,10 @@ export async function upsertNonPassageVoteStub(
       stub.bill.congress,
       normalizeBillType(stub.bill.type),
       stub.bill.number,
+      stub.question,
       stub.result,
+      stub.yeas,
+      stub.nays,
       stub.voteDate
     )
     .run();
@@ -392,6 +413,87 @@ export async function getPassageVotesForBills(
     for (const row of results ?? []) {
       const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
       const listForBill = map.get(key) ?? [];
+      listForBill.push({
+        chamber: row.chamber,
+        congress: row.congress,
+        session: row.session,
+        roll_number: row.roll_number,
+        question: row.question,
+        result: row.result,
+        yeas: row.yeas,
+        nays: row.nays,
+        vote_date: row.vote_date,
+      });
+      map.set(key, listForBill);
+    }
+  }
+  return map;
+}
+
+/**
+ * Non-passage companion rolls (rules, motions to recommit, amendment votes) for
+ * many bills. Rolls with no recorded question or tally are excluded: those are
+ * legacy negative-cache stubs with nothing to show a reader.
+ */
+export async function getCompanionVotesForBills(
+  db: D1Database,
+  bills: BillLookupKey[]
+): Promise<Map<string, VoteRow[]>> {
+  await ensureSchema(db);
+  const map = new Map<string, VoteRow[]>();
+  if (bills.length === 0) return map;
+
+  const unique = new Map<string, BillLookupKey>();
+  for (const bill of bills) {
+    const key = billLookupKey(bill.congress, bill.billType, bill.billNumber);
+    unique.set(key, {
+      congress: bill.congress,
+      billType: normalizeBillType(bill.billType),
+      billNumber: bill.billNumber,
+    });
+    map.set(key, []);
+  }
+  const list = [...unique.values()];
+
+  for (let i = 0; i < list.length; i += BILL_LOOKUP_CHUNK) {
+    const chunk = list.slice(i, i + BILL_LOOKUP_CHUNK);
+    const clauses = chunk
+      .map(() => "(bill_congress = ? AND UPPER(bill_type) = ? AND bill_number = ?)")
+      .join(" OR ");
+    const binds: Array<string | number> = [];
+    for (const bill of chunk) {
+      binds.push(bill.congress, bill.billType, bill.billNumber);
+    }
+    // A long-running bill accumulates dozens of procedural rolls, so the cap is
+    // applied per bill rather than to the chunk: one busy bill must not crowd
+    // the others out. The partition has to match billLookupKey, which folds
+    // bill_type case.
+    const { results } = await db
+      .prepare(
+        `SELECT chamber, congress, session, roll_number, question, result, yeas, nays, vote_date,
+                bill_congress, bill_type, bill_number
+         FROM (
+           SELECT chamber, congress, session, roll_number, question, result, yeas, nays, vote_date,
+                  bill_congress, bill_type, bill_number,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY bill_congress, UPPER(bill_type), bill_number
+                    ORDER BY vote_date DESC, roll_number DESC
+                  ) AS rn
+           FROM votes
+           WHERE is_passage = 0 AND TRIM(question) <> '' AND (yeas + nays) > 0
+             AND (${clauses})
+         )
+         WHERE rn <= ${COMPANION_VOTES_PER_BILL}
+         ORDER BY vote_date DESC, roll_number DESC`
+      )
+      .bind(...binds)
+      .all<VoteRowWithBill>();
+
+    for (const row of results ?? []) {
+      const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
+      const listForBill = map.get(key) ?? [];
+      // Backstop for the SQL cap above; both must move together.
+      if (listForBill.length >= COMPANION_VOTES_PER_BILL) continue;
       listForBill.push({
         chamber: row.chamber,
         congress: row.congress,

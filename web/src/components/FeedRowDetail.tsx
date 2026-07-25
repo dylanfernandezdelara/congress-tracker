@@ -7,6 +7,7 @@ import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryDisplay, isProceduralFeedItem } from '../utils/feedRowLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
+import { BillTextChangesSection } from './BillTextChangesSection'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 import { PassageVoteDetails } from './PassageVoteDetails'
 
@@ -77,6 +78,8 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
         </section>
       ) : null}
 
+      {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
+
       <BillPipeline stages={stages} detail={pipelineDetail} />
 
       {isProcedural ? (
@@ -91,7 +94,11 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
 
       <section className="feed-row-detail-section">
         <h3 className="feed-row-detail-heading">Vote history</h3>
-        <PassageVoteDetails votes={item.passage_votes} defectorsByRoll={defectorsByRoll} />
+        <PassageVoteDetails
+          votes={item.passage_votes}
+          defectorsByRoll={defectorsByRoll}
+          companionVotes={item.companion_votes ?? []}
+        />
       </section>
 
       <footer className="feed-row-detail-footer">

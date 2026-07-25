@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
@@ -11,6 +11,20 @@ vi.mock('../api/client', () => ({
 }))
 
 import { fetchVoteDefectors } from '../api/client'
+
+beforeEach(() => {
+  // Tests that are not about defectors still render the vote section.
+  vi.mocked(fetchVoteDefectors).mockResolvedValue({
+    chamber: 'Senate',
+    congress: 119,
+    session: 2,
+    roll_number: 9002,
+    as_of: '2026-06-05T00:00:00.000Z',
+    member_votes_available: false,
+    defectors: [],
+    party_splits: [],
+  })
+})
 
 afterEach(() => {
   vi.clearAllMocks()
@@ -38,6 +52,10 @@ describe('FeedRowDetail', () => {
           congress_gov_url: 'https://www.congress.gov/member/local:s001',
         },
       ],
+      party_splits: [
+        { party: 'R', yeas: 52, nays: 1, party_line: 'yea' },
+        { party: 'D', yeas: 0, nays: 46, party_line: 'nay' },
+      ],
     })
 
     render(<FeedRowDetail item={makeFeedItem()} />)
@@ -45,7 +63,11 @@ describe('FeedRowDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('Sen. Sample Crossover (local)')).toBeInTheDocument()
     })
-    expect(screen.getByText(/voted Nay \(party Yea\)/)).toBeInTheDocument()
+    // The proportion is what keeps a lone crossover from reading as a party split.
+    expect(
+      screen.getByText('1 of 53 Republicans voted Nay — the caucus voted Yea.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('R 52–1 · D 0–46')).toBeInTheDocument()
   })
 
   it('shows an empty state when no members broke with their party', async () => {
@@ -57,6 +79,7 @@ describe('FeedRowDetail', () => {
       as_of: '2026-06-05T00:00:00.000Z',
       member_votes_available: true,
       defectors: [],
+      party_splits: [],
     })
 
     render(<FeedRowDetail item={makeFeedItem()} />)
@@ -75,6 +98,7 @@ describe('FeedRowDetail', () => {
       as_of: '2026-06-05T00:00:00.000Z',
       member_votes_available: false,
       defectors: [],
+      party_splits: [],
     })
 
     render(<FeedRowDetail item={makeFeedItem()} />)
@@ -106,6 +130,98 @@ describe('FeedRowDetail', () => {
     expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
   })
 
+  it('collapses a long single-party defector list behind a toggle', async () => {
+    vi.mocked(fetchVoteDefectors).mockResolvedValue({
+      chamber: 'Senate',
+      congress: 119,
+      session: 2,
+      roll_number: 9002,
+      as_of: '2026-06-05T00:00:00.000Z',
+      member_votes_available: true,
+      defectors: Array.from({ length: 13 }, (_, i) => ({
+        bioguide_id: `D00${i}`,
+        name: `Rep. Crossover ${i}`,
+        party: 'D',
+        state: 'CA',
+        position: 'yea' as const,
+        party_line: 'nay' as const,
+        congress_gov_url: `https://www.congress.gov/member/d00${i}`,
+      })),
+      party_splits: [
+        { party: 'R', yeas: 218, nays: 0, party_line: 'yea' },
+        { party: 'D', yeas: 13, nays: 198, party_line: 'nay' },
+      ],
+    })
+
+    render(<FeedRowDetail item={makeFeedItem()} />)
+
+    const toggle = await screen.findByRole('button', { name: 'Show all 13' })
+    expect(screen.getAllByText(/Rep. Crossover/)).toHaveLength(6)
+    expect(
+      screen.getByText('13 of 211 Democrats voted Yea — the caucus voted Nay.'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    expect(screen.getAllByText(/Rep. Crossover/)).toHaveLength(13)
+    expect(screen.getByRole('button', { name: 'Show fewer' })).toBeInTheDocument()
+  })
+
+  it('flags provisions added after the summarized bill version', async () => {
+    render(
+      <FeedRowDetail
+        item={makeFeedItem({
+          text_changes: {
+            summary_version: 'Reported in House',
+            summary_version_date: '2026-02-03',
+            latest_version: 'Engrossed in House',
+            latest_version_date: '2026-07-22',
+            added_provisions: [
+              { label: '3.', heading: 'Requiring voters to provide photo identification' },
+            ],
+            more_added_count: 0,
+          },
+        })}
+      />,
+    )
+
+    expect(screen.getByText('Added after this summary')).toBeInTheDocument()
+    expect(
+      screen.getByText('Requiring voters to provide photo identification'),
+    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
+    })
+  })
+
+  it('lists companion floor votes alongside the passage vote', async () => {
+    render(
+      <FeedRowDetail
+        item={makeFeedItem({
+          companion_votes: [
+            {
+              chamber: 'House',
+              congress: 119,
+              session: 2,
+              roll_number: 279,
+              question: 'On Motion to Recommit',
+              result: 'Failed',
+              yeas: 211,
+              nays: 218,
+              date: '2026-07-22',
+            },
+          ],
+        })}
+      />,
+    )
+
+    expect(screen.getByText('On Motion to Recommit')).toBeInTheDocument()
+    expect(screen.getByText(/Failed · 211–218/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
+    })
+  })
+
   it('copies a shareable bill link to the clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
@@ -117,6 +233,7 @@ describe('FeedRowDetail', () => {
       as_of: '2026-06-05T00:00:00.000Z',
       member_votes_available: false,
       defectors: [],
+      party_splits: [],
     })
 
     render(<FeedRowDetail item={makeFeedItem()} />)

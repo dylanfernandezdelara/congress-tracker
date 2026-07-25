@@ -1,6 +1,6 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
-import type { IngestVotesResult, PassageVote } from "../types";
+import type { IngestVotesResult, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { parseSenateIssue } from "./bill-ref";
 import { fetchSenateLegislativeText } from "./senate-fetch";
@@ -157,20 +157,30 @@ export function parseSenateVoteDate(
   return `${year}-${mon}-${day}`;
 }
 
+export interface ParsedSenateVoteMenu {
+  votes: PassageVote[];
+  nonPassageStubs: NonPassageVoteStub[];
+}
+
+/**
+ * Parse the session vote menu into passage votes plus non-passage companion
+ * rolls (cloture, amendments, motions). The menu already carries question,
+ * result, and tally for every roll, so companion votes cost no extra request.
+ */
 export function parseSenateVoteMenuXml(
   xml: string,
   congress: number,
   session: number,
   now: Date = new Date()
-): PassageVote[] {
+): ParsedSenateVoteMenu {
   const congressYear = getTag(xml, "congress_year") || String(now.getUTCFullYear());
   const votes: PassageVote[] = [];
+  const nonPassageStubs: NonPassageVoteStub[] = [];
   const blocks = xml.match(/<vote>[\s\S]*?<\/vote>/gi) ?? [];
 
   for (const block of blocks) {
     const question = getTag(block, "question");
     const title = getTag(block, "title");
-    if (!isPassageVote(question) && !isPassageVote(title)) continue;
 
     const issue = getTag(block, "issue");
     const bill = parseSenateIssue(issue, congress);
@@ -184,6 +194,30 @@ export function parseSenateVoteMenuXml(
     const tallyBlock = block.match(/<vote_tally>[\s\S]*?<\/vote_tally>/i)?.[0] ?? block;
     const yeasT = Number.parseInt(getTag(tallyBlock, "yeas"), 10) || yeas;
     const naysT = Number.parseInt(getTag(tallyBlock, "nays"), 10) || nays;
+    const voteDate = parseSenateVoteDate(getTag(block, "vote_date"), congressYear, now);
+    const result = getTag(block, "result");
+
+    if (!isPassageVote(question) && !isPassageVote(title)) {
+      // Some rolls carry only a title. Storing an empty question would make the
+      // row look unfilled forever: it is re-fetched by every run and never
+      // shown as a companion vote.
+      const stubQuestion = (question.trim() || title).replace(/\s+/g, " ").trim();
+      if (stubQuestion) {
+        nonPassageStubs.push({
+          chamber: "Senate",
+          congress,
+          session,
+          rollNumber: voteNumber,
+          bill,
+          question: stubQuestion,
+          result,
+          yeas: yeasT,
+          nays: naysT,
+          voteDate,
+        });
+      }
+      continue;
+    }
 
     const displayQuestion = isPassageVote(title) ? title.split(";")[0]!.trim() : question;
 
@@ -194,14 +228,14 @@ export function parseSenateVoteMenuXml(
       rollNumber: voteNumber,
       bill,
       question: displayQuestion.replace(/\s+/g, " ").trim(),
-      result: getTag(block, "result"),
+      result,
       yeas: yeasT,
       nays: naysT,
-      voteDate: parseSenateVoteDate(getTag(block, "vote_date"), congressYear, now),
+      voteDate,
     });
   }
 
-  return votes;
+  return { votes, nonPassageStubs };
 }
 
 export async function ingestSenatePassageVotes(
@@ -212,11 +246,11 @@ export async function ingestSenatePassageVotes(
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const { xml, warnings } = await fetchSenateVoteMenuXml(env, congress, session);
-  const all = parseSenateVoteMenuXml(xml, congress, session);
+  const parsed = parseSenateVoteMenuXml(xml, congress, session);
 
   const votes: PassageVote[] = [];
   let skipped = 0;
-  for (const vote of all) {
+  for (const vote of parsed.votes) {
     if (lookbackStart && vote.voteDate < lookbackStart) continue;
     if (knownKeys.has(voteKey(vote))) {
       skipped += 1;
@@ -225,5 +259,17 @@ export async function ingestSenatePassageVotes(
     votes.push(vote);
   }
 
-  return { votes, skipped, warnings: warnings.length > 0 ? warnings : undefined };
+  const nonPassageStubs: NonPassageVoteStub[] = [];
+  for (const stub of parsed.nonPassageStubs) {
+    if (lookbackStart && stub.voteDate < lookbackStart) continue;
+    if (knownKeys.has(voteKey(stub))) continue;
+    nonPassageStubs.push(stub);
+  }
+
+  return {
+    votes,
+    skipped,
+    warnings: warnings.length > 0 ? warnings : undefined,
+    nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
+  };
 }

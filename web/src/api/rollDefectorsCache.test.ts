@@ -30,6 +30,7 @@ const response = {
   as_of: '2026-06-05T00:00:00.000Z',
   member_votes_available: true,
   defectors: [],
+  party_splits: [],
 } satisfies VoteDefectorsResponse
 
 function deferred<T>() {

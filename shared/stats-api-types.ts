@@ -165,12 +165,24 @@ export interface VoteDefectorEntry {
   congress_gov_url: string
 }
 
+/** How one party voted on a single roll call. */
+export interface RollPartySplit {
+  /** Normalized party code: `R`, `D`, `I`, or `Other`. */
+  party: string
+  yeas: number
+  nays: number
+  /** Majority side for this party — the line a defector broke from. */
+  party_line: 'yea' | 'nay'
+}
+
 export interface VoteDefectorsResponse {
   chamber: StatsChamber
   congress: number
   session: number
   roll_number: number
   defectors: VoteDefectorEntry[]
+  /** Per-party yea/nay counts, largest caucus first. Empty when votes are unavailable. */
+  party_splits: RollPartySplit[]
   /** False when member-level votes were never ingested (or only local samples remain). */
   member_votes_available: boolean
   as_of: string
