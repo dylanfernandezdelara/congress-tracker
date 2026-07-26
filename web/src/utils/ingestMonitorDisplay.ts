@@ -1,5 +1,4 @@
 import type {
-  FeedPipelineRunRecord,
   FeedPipelineSkipRecord,
   FeedPipelineTrigger,
 } from '@congress-tracker/shared/ingest-api-types'
@@ -19,7 +18,7 @@ export function isSameRun(a: RunIdentity | null, b: RunIdentity | null): boolean
 /** True when a later scheduled success makes this skip historical, not a live alarm. */
 export function isSkipSuperseded(
   skip: FeedPipelineSkipRecord,
-  lastScheduledSuccess: FeedPipelineRunRecord | null,
+  lastScheduledSuccess: Pick<RunIdentity, 'completed_at'> | null,
 ): boolean {
   if (!lastScheduledSuccess) return false
   const skippedAt = Date.parse(skip.skipped_at)

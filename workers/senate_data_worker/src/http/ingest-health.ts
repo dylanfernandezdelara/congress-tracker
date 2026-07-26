@@ -22,10 +22,10 @@ function sanitizeFailureRecord(
 
 /** Prefer dedicated scheduled key; fall back to latest (admin-only still yields unknown). */
 function resolveScheduledSuccess<T extends { trigger: FeedPipelineTrigger }>(
-  dedicated: T | null | undefined,
+  dedicated: T | null,
   latest: T | null
 ): T | null {
-  return dedicated ?? latest ?? null;
+  return dedicated ?? latest;
 }
 
 export function evaluateIngestMonitorStatus<
@@ -33,7 +33,8 @@ export function evaluateIngestMonitorStatus<
 >(params: {
   now: Date;
   staleAfterHours: number;
-  lastSuccess: T | null;
+  /** Resolved scheduled-success candidate (dedicated key or latest fallback). */
+  scheduledSuccess: T | null;
   lastFailure: FeedPipelineFailureRecord | null;
 }): {
   status: IngestMonitorStatus;
@@ -41,7 +42,7 @@ export function evaluateIngestMonitorStatus<
   last_scheduled_success: T | null;
 } {
   const lastScheduledSuccess =
-    params.lastSuccess?.trigger === "scheduled" ? params.lastSuccess : null;
+    params.scheduledSuccess?.trigger === "scheduled" ? params.scheduledSuccess : null;
   const lastScheduledFailure =
     params.lastFailure?.trigger === "scheduled" ? params.lastFailure : null;
 
@@ -91,14 +92,14 @@ export function buildIngestMonitorPayload(params: {
   latestPassageVoteDate: string | null;
   missingDigestCount: number;
   lastSuccess: FeedPipelineRunRecord | null;
-  lastScheduledSuccess?: FeedPipelineRunRecord | null;
+  lastScheduledSuccess: FeedPipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
-  lastSkipped?: FeedPipelineSkipRecord | null;
+  lastSkipped: FeedPipelineSkipRecord | null;
   executive?: {
     staleAfterHours: number;
     hourlyCronUtc: string;
     lastSuccess: ExecutivePipelineRunRecord | null;
-    lastScheduledSuccess?: ExecutivePipelineRunRecord | null;
+    lastScheduledSuccess: ExecutivePipelineRunRecord | null;
     lastFailure: FeedPipelineFailureRecord | null;
   };
 }): IngestMonitorPayload {
@@ -109,7 +110,7 @@ export function buildIngestMonitorPayload(params: {
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
-    lastSuccess: scheduledSuccess,
+    scheduledSuccess,
     lastFailure: params.lastFailure,
   });
 
@@ -143,7 +144,7 @@ export function buildIngestMonitorPayload(params: {
     last_success: params.lastSuccess,
     last_failure: sanitizeFailureRecord(params.lastFailure),
     last_scheduled_success: evaluated.last_scheduled_success,
-    last_skipped: params.lastSkipped ?? null,
+    last_skipped: params.lastSkipped,
     admin_feed_ingest: "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
     executive,
   };
@@ -154,7 +155,7 @@ function buildExecutiveIngestMonitorPayload(params: {
   staleAfterHours: number;
   hourlyCronUtc: string;
   lastSuccess: ExecutivePipelineRunRecord | null;
-  lastScheduledSuccess?: ExecutivePipelineRunRecord | null;
+  lastScheduledSuccess: ExecutivePipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
 }): ExecutiveIngestMonitorPayload {
   const scheduledSuccess = resolveScheduledSuccess(
@@ -164,7 +165,7 @@ function buildExecutiveIngestMonitorPayload(params: {
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
-    lastSuccess: scheduledSuccess,
+    scheduledSuccess,
     lastFailure: params.lastFailure,
   });
 

@@ -19,6 +19,23 @@ const EXECUTIVE_POSTS_LAST_FAILURE_KEY = "executive_posts_pipeline_last_failure"
 
 type FeedPipelineRunInput = Omit<FeedPipelineRunRecord, "completed_at" | "trigger">;
 
+const PIPELINE_STATE_UPSERT_SQL = `INSERT INTO pipeline_state (key, value_json, updated_at)
+       VALUES (?1, ?2, ?3)
+       ON CONFLICT(key) DO UPDATE SET
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at`;
+
+function preparePipelineStateUpsert(
+  db: D1Database,
+  key: string,
+  value: unknown,
+  updatedAt: string
+): D1PreparedStatement {
+  return db
+    .prepare(PIPELINE_STATE_UPSERT_SQL)
+    .bind(key, JSON.stringify(value), updatedAt);
+}
+
 async function upsertPipelineState(
   db: D1Database,
   key: string,
@@ -26,16 +43,7 @@ async function upsertPipelineState(
   updatedAt: string
 ): Promise<void> {
   await ensureSchema(db);
-  await db
-    .prepare(
-      `INSERT INTO pipeline_state (key, value_json, updated_at)
-       VALUES (?1, ?2, ?3)
-       ON CONFLICT(key) DO UPDATE SET
-         value_json = excluded.value_json,
-         updated_at = excluded.updated_at`
-    )
-    .bind(key, JSON.stringify(value), updatedAt)
-    .run();
+  await preparePipelineStateUpsert(db, key, value, updatedAt).run();
 }
 
 async function readPipelineState<T>(db: D1Database, key: string): Promise<T | null> {
@@ -66,7 +74,12 @@ export async function readSenateBioguideLookup(db: D1Database): Promise<Map<stri
   return new Map(Object.entries(stored ?? {}));
 }
 
-/** Write last-success always; also write scheduled-success when trigger is cron. */
+/**
+ * Write last-success always; also write scheduled-success when trigger is cron.
+ * Scheduled runs use a single D1 batch so both keys succeed or neither does —
+ * a partial write would leave the dedicated scheduled key lagging behind
+ * last_success and falsely report failed/stale.
+ */
 async function recordTriggeredSuccess<T extends { trigger: FeedPipelineTrigger; completed_at: string }>(
   db: D1Database,
   keys: { lastKey: string; scheduledKey: string },
@@ -74,10 +87,14 @@ async function recordTriggeredSuccess<T extends { trigger: FeedPipelineTrigger; 
   record: T
 ): Promise<void> {
   const updatedAt = record.completed_at;
-  await upsertPipelineState(db, keys.lastKey, record, updatedAt);
+  await ensureSchema(db);
+  const lastStmt = preparePipelineStateUpsert(db, keys.lastKey, record, updatedAt);
   if (trigger === "scheduled") {
-    await upsertPipelineState(db, keys.scheduledKey, record, updatedAt);
+    const scheduledStmt = preparePipelineStateUpsert(db, keys.scheduledKey, record, updatedAt);
+    await db.batch([lastStmt, scheduledStmt]);
+    return;
   }
+  await lastStmt.run();
 }
 
 export async function recordFeedPipelineSuccess(

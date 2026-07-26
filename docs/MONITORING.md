@@ -29,7 +29,9 @@ Admin runs update `last_success` only; they do not satisfy scheduled freshness.
 ## Alerting
 
 1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
-   `last_skipped` (lease skips leave no failure log).
+   `last_skipped` (lease skips leave no failure log). Alert only when the skip
+   is not superseded by a later / same-day scheduled success — the field is
+   sticky and non-null alone is not an alarm.
 2. **Uptime** — poll `/health` or `/debug/ingest.json` when status ≠ `ok` (or
    top-level `degraded`).
 3. **Manual** — `POST /__pipeline/run/feed` with

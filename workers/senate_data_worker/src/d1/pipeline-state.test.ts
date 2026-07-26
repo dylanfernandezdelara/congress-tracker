@@ -23,18 +23,38 @@ type DualShapeRecorder = (
   result: Record<string, number>
 ) => Promise<void>;
 
-function createMockDb() {
+type PreparedState = {
+  sql: string;
+  args: unknown[];
+  bind: (...args: unknown[]) => PreparedState;
+  first: () => Promise<{ value_json: string } | null>;
+  run: () => Promise<{ success: boolean; meta: { duration: number } }>;
+};
+
+function createMockDb(options?: { batchShouldFail?: boolean }) {
   const store = new Map<string, { value_json: string; updated_at: string }>();
   const runResult = { success: true, meta: { duration: 0 } };
+  const batchCalls: PreparedState[][] = [];
+
+  function applyUpsert(sql: string, args: unknown[]) {
+    if (sql.includes("INSERT INTO pipeline_state")) {
+      const [key, valueJson, updatedAt] = args;
+      store.set(String(key), {
+        value_json: String(valueJson),
+        updated_at: String(updatedAt),
+      });
+    }
+  }
 
   const db = {
     prepare(sql: string) {
-      const state = {
+      const state: PreparedState = {
+        sql,
+        args: [] as unknown[],
         bind: vi.fn((...args: unknown[]) => {
           state.args = args;
           return state;
         }),
-        args: [] as unknown[],
         first: vi.fn(async () => {
           if (sql.includes("FROM pipeline_state")) {
             const key = state.args[0];
@@ -44,21 +64,26 @@ function createMockDb() {
           return null;
         }),
         run: vi.fn(async () => {
-          if (sql.includes("INSERT INTO pipeline_state")) {
-            const [key, valueJson, updatedAt] = state.args;
-            store.set(String(key), {
-              value_json: String(valueJson),
-              updated_at: String(updatedAt),
-            });
-          }
+          applyUpsert(sql, state.args);
           return runResult;
         }),
       };
       return state;
     },
+    batch: vi.fn(async (statements: PreparedState[]) => {
+      batchCalls.push(statements);
+      if (options?.batchShouldFail) {
+        throw new Error("d1 batch failed");
+      }
+      // Atomic: apply all or none (failure path throws before writes).
+      for (const stmt of statements) {
+        applyUpsert(stmt.sql, stmt.args);
+      }
+      return statements.map(() => runResult);
+    }),
   } as unknown as D1Database;
 
-  return { db, store };
+  return { db, store, batchCalls };
 }
 
 const feedScheduledResult = {
@@ -152,12 +177,41 @@ describe("pipeline-state", () => {
       });
 
       it("does not write scheduled success key for admin-only runs", async () => {
-        const { db, store } = createMockDb();
+        const { db, store, batchCalls } = createMockDb();
         await recordSuccess(db, "admin", adminResult);
 
         expect(await getSuccess(db)).toMatchObject({ trigger: "admin" });
         expect(await getScheduledSuccess(db)).toBeNull();
         expect(store.has(scheduledKey)).toBe(false);
+        expect(batchCalls).toHaveLength(0);
+      });
+
+      it("writes scheduled success keys in one atomic batch", async () => {
+        const { db, store, batchCalls } = createMockDb();
+        await recordSuccess(db, "scheduled", scheduledResult);
+
+        expect(batchCalls).toHaveLength(1);
+        expect(batchCalls[0]).toHaveLength(2);
+        expect(store.has(lastKey)).toBe(true);
+        expect(store.has(scheduledKey)).toBe(true);
+        const latest = await getSuccess(db);
+        const scheduled = await getScheduledSuccess(db);
+        expect(latest?.completed_at).toBe(scheduled?.completed_at);
+        expect(latest?.trigger).toBe("scheduled");
+        expect(scheduled?.trigger).toBe("scheduled");
+      });
+
+      it("leaves neither key written when the scheduled success batch fails", async () => {
+        const { db, store, batchCalls } = createMockDb({ batchShouldFail: true });
+        await expect(recordSuccess(db, "scheduled", scheduledResult)).rejects.toThrow(
+          "d1 batch failed"
+        );
+
+        expect(batchCalls).toHaveLength(1);
+        expect(store.has(lastKey)).toBe(false);
+        expect(store.has(scheduledKey)).toBe(false);
+        expect(await getSuccess(db)).toBeNull();
+        expect(await getScheduledSuccess(db)).toBeNull();
       });
     }
   );

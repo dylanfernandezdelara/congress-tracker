@@ -8,7 +8,7 @@ describe("evaluateIngestMonitorStatus", () => {
     const result = evaluateIngestMonitorStatus({
       now,
       staleAfterHours: 26,
-      lastSuccess: {
+      scheduledSuccess: {
         completed_at: "2026-06-23T10:05:00.000Z",
         trigger: "scheduled",
         votesUpserted: 0,
@@ -26,7 +26,7 @@ describe("evaluateIngestMonitorStatus", () => {
     const result = evaluateIngestMonitorStatus({
       now,
       staleAfterHours: 26,
-      lastSuccess: {
+      scheduledSuccess: {
         completed_at: "2026-06-22T10:05:00.000Z",
         trigger: "scheduled",
         votesUpserted: 0,
@@ -50,7 +50,7 @@ describe("evaluateIngestMonitorStatus", () => {
     const result = evaluateIngestMonitorStatus({
       now,
       staleAfterHours: 26,
-      lastSuccess: {
+      scheduledSuccess: {
         completed_at: "2026-06-20T10:05:00.000Z",
         trigger: "scheduled",
         votesUpserted: 0,
@@ -68,7 +68,7 @@ describe("evaluateIngestMonitorStatus", () => {
     const result = evaluateIngestMonitorStatus({
       now,
       staleAfterHours: 26,
-      lastSuccess: {
+      scheduledSuccess: {
         completed_at: "2026-06-23T10:05:00.000Z",
         trigger: "scheduled",
         votesUpserted: 0,
@@ -90,7 +90,7 @@ describe("evaluateIngestMonitorStatus", () => {
     const result = evaluateIngestMonitorStatus({
       now,
       staleAfterHours: 26,
-      lastSuccess: {
+      scheduledSuccess: {
         completed_at: "2026-06-23T10:05:00.000Z",
         trigger: "admin",
         votesUpserted: 1,
@@ -168,7 +168,9 @@ describe("buildIngestMonitorPayload", () => {
       latestPassageVoteDate: null,
       missingDigestCount: 0,
       lastSuccess: null,
+      lastScheduledSuccess: null,
       lastFailure: null,
+      lastSkipped: null,
     });
     expect(payload.last_skipped).toBeNull();
     expect(payload.status).toBe("unknown");
@@ -184,7 +186,9 @@ describe("buildIngestMonitorPayload", () => {
       latestPassageVoteDate: null,
       missingDigestCount: 0,
       lastSuccess: null,
+      lastScheduledSuccess: null,
       lastFailure: null,
+      lastSkipped: null,
       executive: {
         staleAfterHours: 2,
         hourlyCronUtc: "20 * * * *",
@@ -210,7 +214,9 @@ describe("buildIngestMonitorPayload", () => {
       latestPassageVoteDate: null,
       missingDigestCount: 0,
       lastSuccess: null,
+      lastScheduledSuccess: null,
       lastFailure: null,
+      lastSkipped: null,
       executive: {
         staleAfterHours: 2,
         hourlyCronUtc: "20 * * * *",
@@ -225,7 +231,7 @@ describe("buildIngestMonitorPayload", () => {
     expect(payload.executive?.last_success?.trigger).toBe("admin");
   });
 
-  it("falls back to executive lastSuccess when scheduled key is absent and latest is scheduled", () => {
+  it("falls back to executive lastSuccess when scheduled key is null and latest is scheduled", () => {
     const payload = buildIngestMonitorPayload({
       now,
       staleAfterHours: 26,
@@ -233,12 +239,14 @@ describe("buildIngestMonitorPayload", () => {
       latestPassageVoteDate: null,
       missingDigestCount: 0,
       lastSuccess: null,
+      lastScheduledSuccess: null,
       lastFailure: null,
+      lastSkipped: null,
       executive: {
         staleAfterHours: 2,
         hourlyCronUtc: "20 * * * *",
         lastSuccess: executiveScheduled,
-        // Omit lastScheduledSuccess entirely (undefined) — pre-wiring callers.
+        lastScheduledSuccess: null,
         lastFailure: null,
       },
     });

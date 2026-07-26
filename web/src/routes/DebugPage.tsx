@@ -106,7 +106,7 @@ function SkipDetails({
   lastScheduledSuccess,
 }: {
   skip: FeedPipelineSkipRecord
-  lastScheduledSuccess: FeedPipelineRunRecord | null
+  lastScheduledSuccess: RunIdentity | null
 }) {
   return (
     <dl className="mt-3 grid gap-2 text-sm">
@@ -172,7 +172,7 @@ function PipelineMonitorSection<T extends RunIdentity>({
   lastScheduledSuccessDescription,
   metricsFor,
   lastFailure,
-  skipSlot,
+  lastSkipped,
   footer,
 }: {
   ariaLabel: string
@@ -188,10 +188,11 @@ function PipelineMonitorSection<T extends RunIdentity>({
   lastScheduledSuccessDescription?: string
   metricsFor: (run: T) => RunMetric[]
   lastFailure: FeedPipelineFailureRecord | null
-  skipSlot?: ReactNode
+  lastSkipped?: FeedPipelineSkipRecord | null
   footer?: ReactNode
 }) {
   const showScheduledSuccess = !isSameRun(lastSuccess, lastScheduledSuccess)
+  const showSkip = lastSkipped !== undefined
 
   return (
     <section className="rounded-card border border-border bg-card p-5" aria-label={ariaLabel}>
@@ -230,7 +231,16 @@ function PipelineMonitorSection<T extends RunIdentity>({
         />
       )}
 
-      {skipSlot}
+      {showSkip && (
+        <div className="mt-5 border-t border-border pt-4">
+          <h3 className="text-base font-medium">Last skipped</h3>
+          {lastSkipped ? (
+            <SkipDetails skip={lastSkipped} lastScheduledSuccess={lastScheduledSuccess} />
+          ) : (
+            <p className="mt-2 text-sm text-secondary">No recorded skips.</p>
+          )}
+        </div>
+      )}
 
       <div className="mt-5 border-t border-border pt-4">
         <h3 className="text-base font-medium">Last failure</h3>
@@ -273,19 +283,7 @@ function FeedMonitorSection({ ingest }: { ingest: IngestMonitorPayload }) {
       lastScheduledSuccessDescription="Most recent successful daily cron run (status above tracks this, not admin runs)."
       metricsFor={feedRunMetrics}
       lastFailure={ingest.last_failure}
-      skipSlot={
-        <div className="mt-5 border-t border-border pt-4">
-          <h3 className="text-base font-medium">Last skipped</h3>
-          {ingest.last_skipped ? (
-            <SkipDetails
-              skip={ingest.last_skipped}
-              lastScheduledSuccess={ingest.last_scheduled_success}
-            />
-          ) : (
-            <p className="mt-2 text-sm text-secondary">No recorded skips.</p>
-          )}
-        </div>
-      }
+      lastSkipped={ingest.last_skipped}
     />
   )
 }
@@ -368,8 +366,11 @@ export default function DebugPage() {
                 Busy-skip signal: poll{' '}
                 <code className="rounded bg-surface-subtle px-1">/debug/ingest.json</code> and alert
                 when{' '}
-                <code className="rounded bg-surface-subtle px-1">ingest.last_skipped</code> is recent
-                (feed cron aborted because another pipeline held the write lease).
+                <code className="rounded bg-surface-subtle px-1">ingest.last_skipped</code> is not
+                superseded by a later scheduled success for that day (
+                <code className="rounded bg-surface-subtle px-1">ingest.last_scheduled_success</code>{' '}
+                after the skip, or no matching same-day scheduled success). The field is sticky —
+                non-null alone is not an alarm.
               </li>
               <li>
                 Manual override:{' '}

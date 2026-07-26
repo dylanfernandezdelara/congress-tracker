@@ -71,15 +71,36 @@ function createMockDb(): D1Database {
 function createPipelineStateMockDb(): D1Database {
   const store = new Map<string, { value_json: string; updated_at: string }>();
   const runResult = { success: true, meta: { duration: 0, changes: 1 } };
+
+  type Stmt = {
+    sql: string;
+    args: unknown[];
+    bind: (...args: unknown[]) => Stmt;
+    all: () => Promise<{ results: unknown[] }>;
+    first: () => Promise<unknown>;
+    run: () => Promise<typeof runResult>;
+  };
+
+  function applyUpsert(sql: string, args: unknown[]) {
+    if (sql.includes("INSERT INTO pipeline_state")) {
+      const [key, valueJson, updatedAt] = args;
+      store.set(String(key), {
+        value_json: String(valueJson),
+        updated_at: String(updatedAt),
+      });
+    }
+  }
+
   return {
     exec: vi.fn(async () => {}),
     prepare(sql: string) {
-      const state = {
+      const state: Stmt = {
+        sql,
+        args: [] as unknown[],
         bind: vi.fn((...args: unknown[]) => {
           state.args = args;
           return state;
         }),
-        args: [] as unknown[],
         all: vi.fn(async () => ({ results: [] })),
         first: vi.fn(async () => {
           if (sql.includes("FROM pipeline_state") && sql.includes("WHERE key")) {
@@ -95,18 +116,18 @@ function createPipelineStateMockDb(): D1Database {
           return null;
         }),
         run: vi.fn(async () => {
-          if (sql.includes("INSERT INTO pipeline_state")) {
-            const [key, valueJson, updatedAt] = state.args;
-            store.set(String(key), {
-              value_json: String(valueJson),
-              updated_at: String(updatedAt),
-            });
-          }
+          applyUpsert(sql, state.args);
           return runResult;
         }),
       };
       return state;
     },
+    batch: vi.fn(async (statements: Stmt[]) => {
+      for (const stmt of statements) {
+        applyUpsert(stmt.sql, stmt.args);
+      }
+      return statements.map(() => runResult);
+    }),
   } as unknown as D1Database;
 }
 
