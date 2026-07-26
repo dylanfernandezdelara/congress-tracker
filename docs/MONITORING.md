@@ -5,7 +5,9 @@ minutes avoid write-lease collisions.
 
 Scheduled runs persist success/failure in D1. A busy lease records
 `last_skipped` (`pipeline_busy`) without changing status fields — alert when
-that skip has no matching scheduled success for the day.
+`last_skipped` exists and is not superseded by a later scheduled success
+(`last_scheduled_success.completed_at` after `skipped_at`). Sticky non-null
+alone is not an alarm.
 
 ## Endpoints
 
@@ -29,9 +31,10 @@ Admin runs update `last_success` only; they do not satisfy scheduled freshness.
 ## Alerting
 
 1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
-   `last_skipped` (lease skips leave no failure log). Alert only when the skip
-   is not superseded by a later / same-day scheduled success — the field is
-   sticky and non-null alone is not an alarm.
+   `last_skipped` (lease skips leave no failure log). Alert only when
+   `last_skipped` exists and
+   `last_scheduled_success.completed_at` is missing or not after
+   `skipped_at` — the field is sticky and non-null alone is not an alarm.
 2. **Uptime** — poll `/health` or `/debug/ingest.json` when status ≠ `ok` (or
    top-level `degraded`).
 3. **Manual** — `POST /__pipeline/run/feed` with

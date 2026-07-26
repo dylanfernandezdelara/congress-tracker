@@ -366,11 +366,12 @@ export default function DebugPage() {
                 Busy-skip signal: poll{' '}
                 <code className="rounded bg-surface-subtle px-1">/debug/ingest.json</code> and alert
                 when{' '}
-                <code className="rounded bg-surface-subtle px-1">ingest.last_skipped</code> is not
-                superseded by a later scheduled success for that day (
-                <code className="rounded bg-surface-subtle px-1">ingest.last_scheduled_success</code>{' '}
-                after the skip, or no matching same-day scheduled success). The field is sticky —
-                non-null alone is not an alarm.
+                <code className="rounded bg-surface-subtle px-1">ingest.last_skipped</code> exists and
+                is not superseded — superseded only when{' '}
+                <code className="rounded bg-surface-subtle px-1">ingest.last_scheduled_success.completed_at</code>{' '}
+                is later than{' '}
+                <code className="rounded bg-surface-subtle px-1">skipped_at</code>. The field is sticky
+                — non-null alone is not an alarm.
               </li>
               <li>
                 Manual override:{' '}
