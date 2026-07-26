@@ -6,10 +6,10 @@ import type {
   ExecutivePipelineRunRecord,
   FeedPipelineRunRecord,
   FeedPipelineSkipRecord,
-  FeedPipelineTrigger,
   IngestMonitorStatus,
 } from '@congress-tracker/shared/ingest-api-types'
 import { useAsyncData } from '../hooks/useAsyncData'
+import { isSameRun, isSkipSuperseded } from '../utils/ingestMonitorDisplay'
 
 const STATUS_LABEL: Record<IngestMonitorStatus, string> = {
   ok: 'Healthy',
@@ -36,37 +36,6 @@ function formatTimestamp(value: string | null | undefined): string {
   // string is itself the diagnostic.
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleString(undefined, { timeZoneName: 'short' })
-}
-
-interface RunIdentity {
-  completed_at: string
-  trigger: FeedPipelineTrigger
-}
-
-/**
- * Two absent runs say the same thing, so they collapse into one block. An absent
- * scheduled run next to a present admin run does not: "the cron has never
- * succeeded" is the answer an operator came to this page for.
- */
-function isSameRun(a: RunIdentity | null, b: RunIdentity | null): boolean {
-  if (!a && !b) return true
-  if (!a || !b) return false
-  return a.completed_at === b.completed_at && a.trigger === b.trigger
-}
-
-/**
- * Only the newest skip is retained, so a months-old one still renders. A later
- * scheduled success means that skip is history, not a live alarm.
- */
-function isSkipSuperseded(
-  skip: FeedPipelineSkipRecord,
-  lastScheduledSuccess: FeedPipelineRunRecord | null,
-): boolean {
-  if (!lastScheduledSuccess) return false
-  const skippedAt = Date.parse(skip.skipped_at)
-  const succeededAt = Date.parse(lastScheduledSuccess.completed_at)
-  if (Number.isNaN(skippedAt) || Number.isNaN(succeededAt)) return false
-  return succeededAt > skippedAt
 }
 
 function FeedRunDetails({ run }: { run: FeedPipelineRunRecord }) {
