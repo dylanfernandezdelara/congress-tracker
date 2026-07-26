@@ -224,7 +224,7 @@ export default function DebugPage() {
         <p className="text-sm text-secondary">Internal ops</p>
         <h1 className="text-2xl font-semibold tracking-tight">Ingest monitor</h1>
         <p className="text-sm text-secondary">
-          Temporary debug view for feed and executive ingest health. Not linked in site navigation.
+          Ops view for feed and executive ingest health. Not linked in site navigation.
         </p>
       </header>
 
