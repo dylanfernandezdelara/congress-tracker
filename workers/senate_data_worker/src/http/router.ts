@@ -5,6 +5,7 @@ import { buildMemberProfile } from "../analytics/member-profile";
 import { buildPortfolioMovers } from "../d1/disclosures";
 import {
   getExecutivePostsPipelineFailure,
+  getExecutivePostsPipelineScheduledSuccess,
   getExecutivePostsPipelineSuccess,
   getFeedPipelineFailure,
   getFeedPipelineScheduledSuccess,
@@ -75,6 +76,7 @@ async function loadIngestMonitor(env: Env) {
     lastFailure,
     lastSkipped,
     executiveLastSuccess,
+    executiveLastScheduledSuccess,
     executiveLastFailure,
   ] = await Promise.all([
     getLatestPassageVoteDate(env),
@@ -84,6 +86,7 @@ async function loadIngestMonitor(env: Env) {
     getFeedPipelineFailure(env.DB),
     getFeedPipelineSkipped(env.DB),
     getExecutivePostsPipelineSuccess(env.DB),
+    getExecutivePostsPipelineScheduledSuccess(env.DB),
     getExecutivePostsPipelineFailure(env.DB),
   ]);
 
@@ -101,6 +104,7 @@ async function loadIngestMonitor(env: Env) {
       staleAfterHours: EXECUTIVE_PIPELINE_STALE_HOURS,
       hourlyCronUtc: EXECUTIVE_POSTS_CRON_UTC,
       lastSuccess: executiveLastSuccess,
+      lastScheduledSuccess: executiveLastScheduledSuccess,
       lastFailure: executiveLastFailure,
     },
   });

@@ -1,55 +1,57 @@
 # Ingest monitoring
 
-Daily feed ingest runs via the Cloudflare Worker cron (`0 10 * * *` UTC). Each run records
-success or failure in D1 so you can tell whether the **scheduled** pipeline completed recently.
-If the daily cron loses the shared write lease, it records `last_skipped` (reason
-`pipeline_busy`) without changing `status` / `last_success` / `last_failure`.
+Crons (UTC): daily feed `0 10 * * *`, hourly executive `20 * * * *`. Distinct
+minutes avoid write-lease collisions.
 
-## Status endpoints
+Scheduled runs persist success/failure in D1. A busy lease records
+`last_skipped` (`pipeline_busy`) without changing status fields — alert when
+`last_skipped` exists and is not superseded by a later scheduled success
+(`last_scheduled_success.completed_at` after `skipped_at`). Sticky non-null
+alone is not an alarm.
+
+## Endpoints
 
 | Endpoint | Use |
 |----------|-----|
-| `GET /health` | Liveness + `data.ingest` summary (cache-friendly) |
-| `GET /debug/ingest.json` | Full ingest monitor payload + alerting hints |
-| `/debug` (web) | Human-readable ops page (not linked in nav) |
+| `GET /health` | Liveness + `data.ingest` |
+| `GET /debug/ingest.json` | Full monitor payload |
+| `/debug` | Ops UI (not in nav) |
 
-### Status values
+## Status
 
 | Status | Meaning |
 |--------|---------|
-| `ok` | Last **scheduled** run succeeded within the stale window (26h) |
-| `stale` | Last scheduled success is older than 26h |
-| `failed` | A failure is recorded newer than the last scheduled success |
-| `unknown` | No scheduled success recorded yet (admin-only runs do not count) |
+| `ok` | Last scheduled success within 26h |
+| `stale` | Last scheduled success older than 26h |
+| `failed` | Failure newer than last scheduled success |
+| `unknown` | No scheduled success yet |
 
-Admin-triggered runs (`POST /__pipeline/run/feed`) update `last_success` but do not satisfy
-scheduled freshness on their own.
+Admin runs update `last_success` only; they do not satisfy scheduled freshness.
 
-## Alerting options
+## Alerting
 
-1. **Cloudflare Workers Observability** — filter logs for `feed_pipeline_failed` or cron
-   `0 10 * * *`. Failed runs also log structured JSON from the scheduled handler.
-
-2. **External uptime monitor** — poll `/health` or `/debug/ingest.json` and alert when
-   `data.ingest.status` (or `ingest.status`) is not `ok`, or when top-level `/health`
-   `status` is `degraded` (ingest stale or failed).
-
-3. **Manual override** — `POST /__pipeline/run/feed` with
+1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
+   `last_skipped` (lease skips leave no failure log). Alert only when
+   `last_skipped` exists and
+   `last_scheduled_success.completed_at` is missing or not after
+   `skipped_at` — the field is sticky and non-null alone is not an alarm.
+2. **Uptime** — poll `/health` or `/debug/ingest.json` when status ≠ `ok` (or
+   top-level `degraded`).
+3. **Manual** — `POST /__pipeline/run/feed` with
    `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 
-## D1 storage
+## D1 keys (`pipeline_state`)
 
-The `pipeline_state` table stores JSON blobs:
+Feed: `feed_pipeline_last_success`, `…_last_scheduled_success`, `…_last_failure`,
+`…_last_skipped`.
 
-- `feed_pipeline_last_success` — last run result (includes `trigger`: `scheduled` | `admin`)
-- `feed_pipeline_last_scheduled_success` — last **scheduled** success (admin runs do not overwrite)
-- `feed_pipeline_last_failure` — last error message and timestamp
-- `feed_pipeline_last_skipped` — last busy-skip (lease held); does not affect `status`
+Executive: `executive_posts_pipeline_last_success`, `…_last_scheduled_success`,
+`…_last_failure`.
 
-Schema is created lazily via `ensureSchema` on first pipeline run after deploy.
+Both split last-run vs last-scheduled-run so `status` answers "is the cron
+healthy?" only. Schema is created via `ensureSchema` on first pipeline run.
 
-## Local development
+## Local
 
-After `npm run seed` or a local pipeline run, status may still be `unknown` until a run with
-`trigger: "scheduled"` is recorded. Cron does not fire in `wrangler dev` by default; use
-`POST /__pipeline/run/feed` for manual runs.
+Cron does not fire in `wrangler dev`. Status stays `unknown` until a
+`trigger: "scheduled"` run is recorded; use `POST /__pipeline/run/feed`.

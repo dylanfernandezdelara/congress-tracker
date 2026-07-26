@@ -17,7 +17,8 @@ function parseWranglerConfig(filePath) {
   }
 
   const previewUrlsMatch = content.match(/^preview_urls\s*=\s*(true|false)/m)
-  const cronMatch = content.match(/crons\s*=\s*\[([^\]]+)\]/)
+  // Anchored so a commented-out `# crons = [...]` above the live array cannot win.
+  const cronMatch = content.match(/^crons\s*=\s*\[([^\]]+)\]/m)
   const crons = cronMatch
     ? [...cronMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
     : []
@@ -80,8 +81,22 @@ test('root and worker wrangler.toml share deployment metadata', () => {
 })
 
 test('cron triggers keep daily feed and hourly executive on distinct minutes', () => {
+  // Schedule strings are locked to TypeScript constants in
+  // workers/senate_data_worker/src/wrangler-cron-contract.test.ts.
+  // Here we only assert the lease-safety invariant: both pipelines share one
+  // D1 write lease, so crons must not fire on the same minute.
   const root = parseWranglerConfig(rootConfigPath)
-  assert.deepEqual(root.crons, ['0 10 * * *', '20 * * * *'])
+  assert.equal(root.crons.length, 2, 'expected exactly two cron triggers')
+  const minutes = root.crons.map((cron) => {
+    const minuteField = cron.split(' ')[0]
+    assert.match(minuteField, /^\d+$/, `cron minute must be numeric: ${cron}`)
+    return Number(minuteField)
+  })
+  assert.equal(
+    new Set(minutes).size,
+    minutes.length,
+    'cron triggers must fire on distinct minutes to avoid D1 write-lease races',
+  )
 })
 
 test('Workers Logs observability is enabled at full sampling on both configs', () => {
