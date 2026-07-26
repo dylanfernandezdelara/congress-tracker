@@ -9,21 +9,14 @@ export interface RunIdentity {
   trigger: FeedPipelineTrigger
 }
 
-/**
- * Two absent runs say the same thing, so they collapse into one block. An absent
- * scheduled run next to a present admin run does not: "the cron has never
- * succeeded" is the answer an operator came for.
- */
+/** Collapse identical run identities; keep distinct when only one side is absent. */
 export function isSameRun(a: RunIdentity | null, b: RunIdentity | null): boolean {
   if (!a && !b) return true
   if (!a || !b) return false
   return a.completed_at === b.completed_at && a.trigger === b.trigger
 }
 
-/**
- * Only the newest skip is retained, so a months-old one still renders. A later
- * scheduled success means that skip is history, not a live alarm.
- */
+/** True when a later scheduled success makes this skip historical, not a live alarm. */
 export function isSkipSuperseded(
   skip: FeedPipelineSkipRecord,
   lastScheduledSuccess: FeedPipelineRunRecord | null,

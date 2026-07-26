@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
 import type { Env } from "../config";
 import {
   getExecutivePostsPipelineScheduledSuccess,
@@ -14,6 +15,13 @@ import {
   recordFeedPipelineSuccess,
 } from "./pipeline-state";
 import { resetSchemaFlag } from "./schema";
+
+/** Dual-shape recorder for parameterized feed/executive two-key coverage. */
+type DualShapeRecorder = (
+  db: D1Database,
+  trigger: FeedPipelineTrigger,
+  result: Record<string, number>
+) => Promise<void>;
 
 function createMockDb() {
   const store = new Map<string, { value_json: string; updated_at: string }>();
@@ -53,87 +61,110 @@ function createMockDb() {
   return { db, store };
 }
 
+const feedScheduledResult = {
+  votesUpserted: 2,
+  votesSkipped: 5,
+  billsSelected: 7,
+  digestsWritten: 3,
+  digestsSkipped: 4,
+};
+
+const feedAdminResult = {
+  votesUpserted: 1,
+  votesSkipped: 0,
+  billsSelected: 1,
+  digestsWritten: 1,
+  digestsSkipped: 0,
+};
+
+const executiveScheduledResult = {
+  fetched: 4,
+  ingested: 2,
+  linked: 1,
+  hydrated: 1,
+  skipped: 0,
+};
+
+const executiveAdminResult = {
+  fetched: 1,
+  ingested: 1,
+  linked: 0,
+  hydrated: 0,
+  skipped: 0,
+};
+
 describe("pipeline-state", () => {
   beforeEach(() => {
     resetSchemaFlag();
   });
 
-  it("records scheduled success in a dedicated key", async () => {
-    const { db, store } = createMockDb();
-    await recordFeedPipelineSuccess(db, "scheduled", {
-      votesUpserted: 2,
-      votesSkipped: 5,
-      billsSelected: 7,
-      digestsWritten: 3,
-      digestsSkipped: 4,
-    });
-    await recordFeedPipelineSuccess(db, "admin", {
-      votesUpserted: 1,
-      votesSkipped: 0,
-      billsSelected: 1,
-      digestsWritten: 1,
-      digestsSkipped: 0,
-    });
+  describe.each([
+    {
+      name: "feed",
+      lastKey: "feed_pipeline_last_success",
+      scheduledKey: "feed_pipeline_last_scheduled_success",
+      recordSuccess: recordFeedPipelineSuccess as unknown as DualShapeRecorder,
+      getSuccess: getFeedPipelineSuccess,
+      getScheduledSuccess: getFeedPipelineScheduledSuccess,
+      scheduledResult: feedScheduledResult,
+      adminResult: feedAdminResult,
+      scheduledMetric: { votesUpserted: 2 },
+      adminMetric: { votesUpserted: 1 },
+    },
+    {
+      name: "executive",
+      lastKey: "executive_posts_pipeline_last_success",
+      scheduledKey: "executive_posts_pipeline_last_scheduled_success",
+      recordSuccess: recordExecutivePostsPipelineSuccess as unknown as DualShapeRecorder,
+      getSuccess: getExecutivePostsPipelineSuccess,
+      getScheduledSuccess: getExecutivePostsPipelineScheduledSuccess,
+      scheduledResult: executiveScheduledResult,
+      adminResult: executiveAdminResult,
+      scheduledMetric: { fetched: 4 },
+      adminMetric: { fetched: 1 },
+    },
+  ])(
+    "$name two-key success recording",
+    ({
+      lastKey,
+      scheduledKey,
+      recordSuccess,
+      getSuccess,
+      getScheduledSuccess,
+      scheduledResult,
+      adminResult,
+      scheduledMetric,
+      adminMetric,
+    }) => {
+      it("records scheduled success in a dedicated key that admin runs do not overwrite", async () => {
+        const { db, store } = createMockDb();
+        await recordSuccess(db, "scheduled", scheduledResult);
+        await recordSuccess(db, "admin", adminResult);
 
-    const latest = await getFeedPipelineSuccess(db);
-    const scheduled = await getFeedPipelineScheduledSuccess(db);
-    expect(latest?.trigger).toBe("admin");
-    expect(scheduled?.trigger).toBe("scheduled");
-    expect(scheduled?.votesUpserted).toBe(2);
-    expect(store.size).toBeGreaterThanOrEqual(2);
-  });
+        const latest = await getSuccess(db);
+        const scheduled = await getScheduledSuccess(db);
+        expect(latest?.trigger).toBe("admin");
+        expect(latest).toMatchObject(adminMetric);
+        expect(scheduled?.trigger).toBe("scheduled");
+        expect(scheduled).toMatchObject(scheduledMetric);
+        expect(store.has(lastKey)).toBe(true);
+        expect(store.has(scheduledKey)).toBe(true);
+      });
 
-  it("records executive scheduled success in a dedicated key that admin runs do not overwrite", async () => {
-    const { db, store } = createMockDb();
-    await recordExecutivePostsPipelineSuccess(db, "scheduled", {
-      fetched: 4,
-      ingested: 2,
-      linked: 1,
-      hydrated: 1,
-      skipped: 0,
-    });
-    await recordExecutivePostsPipelineSuccess(db, "admin", {
-      fetched: 1,
-      ingested: 1,
-      linked: 0,
-      hydrated: 0,
-      skipped: 0,
-    });
+      it("does not write scheduled success key for admin-only runs", async () => {
+        const { db, store } = createMockDb();
+        await recordSuccess(db, "admin", adminResult);
 
-    const latest = await getExecutivePostsPipelineSuccess(db);
-    const scheduled = await getExecutivePostsPipelineScheduledSuccess(db);
-    expect(latest?.trigger).toBe("admin");
-    expect(latest?.fetched).toBe(1);
-    expect(scheduled?.trigger).toBe("scheduled");
-    expect(scheduled?.fetched).toBe(4);
-    expect(store.has("executive_posts_pipeline_last_success")).toBe(true);
-    expect(store.has("executive_posts_pipeline_last_scheduled_success")).toBe(true);
-  });
-
-  it("does not write executive scheduled success key for admin-only runs", async () => {
-    const { db, store } = createMockDb();
-    await recordExecutivePostsPipelineSuccess(db, "admin", {
-      fetched: 1,
-      ingested: 1,
-      linked: 0,
-      hydrated: 0,
-      skipped: 0,
-    });
-
-    expect(await getExecutivePostsPipelineSuccess(db)).toMatchObject({ trigger: "admin" });
-    expect(await getExecutivePostsPipelineScheduledSuccess(db)).toBeNull();
-    expect(store.has("executive_posts_pipeline_last_scheduled_success")).toBe(false);
-  });
+        expect(await getSuccess(db)).toMatchObject({ trigger: "admin" });
+        expect(await getScheduledSuccess(db)).toBeNull();
+        expect(store.has(scheduledKey)).toBe(false);
+      });
+    }
+  );
 
   it("records and reads successful feed pipeline runs", async () => {
     const { db } = createMockDb();
-    await recordFeedPipelineSuccess(db, "scheduled", {
-      votesUpserted: 2,
-      votesSkipped: 5,
-      billsSelected: 7,
-      digestsWritten: 3,
-      digestsSkipped: 4,
-    });
+    await recordFeedPipelineSuccess(db, "scheduled", feedScheduledResult);
 
     const record = await getFeedPipelineSuccess(db);
     expect(record).toMatchObject({

@@ -66,6 +66,20 @@ export async function readSenateBioguideLookup(db: D1Database): Promise<Map<stri
   return new Map(Object.entries(stored ?? {}));
 }
 
+/** Write last-success always; also write scheduled-success when trigger is cron. */
+async function recordTriggeredSuccess<T extends { trigger: FeedPipelineTrigger; completed_at: string }>(
+  db: D1Database,
+  keys: { lastKey: string; scheduledKey: string },
+  trigger: FeedPipelineTrigger,
+  record: T
+): Promise<void> {
+  const updatedAt = record.completed_at;
+  await upsertPipelineState(db, keys.lastKey, record, updatedAt);
+  if (trigger === "scheduled") {
+    await upsertPipelineState(db, keys.scheduledKey, record, updatedAt);
+  }
+}
+
 export async function recordFeedPipelineSuccess(
   db: D1Database,
   trigger: FeedPipelineTrigger,
@@ -77,10 +91,15 @@ export async function recordFeedPipelineSuccess(
     trigger,
     ...result,
   };
-  await upsertPipelineState(db, FEED_PIPELINE_LAST_SUCCESS_KEY, record, completedAt);
-  if (trigger === "scheduled") {
-    await upsertPipelineState(db, FEED_PIPELINE_LAST_SCHEDULED_SUCCESS_KEY, record, completedAt);
-  }
+  await recordTriggeredSuccess(
+    db,
+    {
+      lastKey: FEED_PIPELINE_LAST_SUCCESS_KEY,
+      scheduledKey: FEED_PIPELINE_LAST_SCHEDULED_SUCCESS_KEY,
+    },
+    trigger,
+    record
+  );
 }
 
 export async function recordFeedPipelineFailure(
@@ -148,10 +167,15 @@ export async function recordExecutivePostsPipelineSuccess(
     trigger,
     ...result,
   };
-  await upsertPipelineState(db, EXECUTIVE_POSTS_LAST_SUCCESS_KEY, record, completedAt);
-  if (trigger === "scheduled") {
-    await upsertPipelineState(db, EXECUTIVE_POSTS_LAST_SCHEDULED_SUCCESS_KEY, record, completedAt);
-  }
+  await recordTriggeredSuccess(
+    db,
+    {
+      lastKey: EXECUTIVE_POSTS_LAST_SUCCESS_KEY,
+      scheduledKey: EXECUTIVE_POSTS_LAST_SCHEDULED_SUCCESS_KEY,
+    },
+    trigger,
+    record
+  );
 }
 
 export async function recordExecutivePostsPipelineFailure(

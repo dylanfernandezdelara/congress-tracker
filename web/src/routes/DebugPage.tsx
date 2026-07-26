@@ -1,15 +1,18 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import { fetchIngestMonitor } from '../api/client'
 import type {
   ExecutiveIngestMonitorPayload,
   ExecutivePipelineRunRecord,
+  FeedPipelineFailureRecord,
   FeedPipelineRunRecord,
   FeedPipelineSkipRecord,
+  IngestMonitorPayload,
   IngestMonitorStatus,
 } from '@congress-tracker/shared/ingest-api-types'
 import { useAsyncData } from '../hooks/useAsyncData'
-import { isSameRun, isSkipSuperseded } from '../utils/ingestMonitorDisplay'
+import { isSameRun, isSkipSuperseded, type RunIdentity } from '../utils/ingestMonitorDisplay'
 
 const STATUS_LABEL: Record<IngestMonitorStatus, string> = {
   ok: 'Healthy',
@@ -22,6 +25,8 @@ const SKIP_REASON_LABEL: Record<FeedPipelineSkipRecord['reason'], string> = {
   pipeline_busy:
     'Skipped because another pipeline held the write lease, so no new data was ingested on that invocation.',
 }
+
+type RunMetric = { label: string; value: string | number }
 
 function statusClass(status: IngestMonitorStatus): string {
   if (status === 'ok') return 'text-pass'
@@ -38,7 +43,7 @@ function formatTimestamp(value: string | null | undefined): string {
   return parsed.toLocaleString(undefined, { timeZoneName: 'short' })
 }
 
-function FeedRunDetails({ run }: { run: FeedPipelineRunRecord }) {
+function PipelineRunDetails({ run, metrics }: { run: RunIdentity; metrics: RunMetric[] }) {
   return (
     <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
       <div>
@@ -49,130 +54,262 @@ function FeedRunDetails({ run }: { run: FeedPipelineRunRecord }) {
         <dt className="text-secondary">Trigger</dt>
         <dd>{run.trigger}</dd>
       </div>
-      <div>
-        <dt className="text-secondary">Votes upserted</dt>
-        <dd>{run.votesUpserted}</dd>
-      </div>
-      <div>
-        <dt className="text-secondary">Digests written</dt>
-        <dd>{run.digestsWritten}</dd>
-      </div>
-      <div>
-        <dt className="text-secondary">Digests skipped</dt>
-        <dd>{run.digestsSkipped}</dd>
-      </div>
+      {metrics.map((metric) => (
+        <div key={metric.label}>
+          <dt className="text-secondary">{metric.label}</dt>
+          <dd>{metric.value}</dd>
+        </div>
+      ))}
     </dl>
   )
 }
 
-function ExecutiveRunDetails({ run }: { run: ExecutivePipelineRunRecord }) {
+function feedRunMetrics(run: FeedPipelineRunRecord): RunMetric[] {
+  return [
+    { label: 'Votes upserted', value: run.votesUpserted },
+    { label: 'Digests written', value: run.digestsWritten },
+    { label: 'Digests skipped', value: run.digestsSkipped },
+  ]
+}
+
+function executiveRunMetrics(run: ExecutivePipelineRunRecord): RunMetric[] {
+  return [
+    { label: 'Fetched', value: run.fetched },
+    { label: 'Ingested', value: run.ingested },
+    { label: 'Linked', value: run.linked },
+    { label: 'Hydrated', value: run.hydrated },
+    { label: 'Skipped', value: run.skipped },
+  ]
+}
+
+function FailureDetails({ failure }: { failure: FeedPipelineFailureRecord }) {
   return (
-    <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+    <dl className="mt-3 grid gap-2 text-sm">
       <div>
-        <dt className="text-secondary">Completed</dt>
-        <dd>{formatTimestamp(run.completed_at)}</dd>
+        <dt className="text-secondary">Failed at</dt>
+        <dd>{formatTimestamp(failure.failed_at)}</dd>
       </div>
       <div>
         <dt className="text-secondary">Trigger</dt>
-        <dd>{run.trigger}</dd>
+        <dd>{failure.trigger}</dd>
       </div>
       <div>
-        <dt className="text-secondary">Fetched</dt>
-        <dd>{run.fetched}</dd>
-      </div>
-      <div>
-        <dt className="text-secondary">Ingested</dt>
-        <dd>{run.ingested}</dd>
-      </div>
-      <div>
-        <dt className="text-secondary">Linked</dt>
-        <dd>{run.linked}</dd>
-      </div>
-      <div>
-        <dt className="text-secondary">Hydrated</dt>
-        <dd>{run.hydrated}</dd>
-      </div>
-      <div>
-        <dt className="text-secondary">Skipped</dt>
-        <dd>{run.skipped}</dd>
+        <dt className="text-secondary">Error</dt>
+        <dd className="break-words text-fail">{failure.error}</dd>
       </div>
     </dl>
   )
 }
 
-function ExecutiveMonitorSection({ executive }: { executive: ExecutiveIngestMonitorPayload }) {
-  const showScheduledSuccess = !isSameRun(executive.last_success, executive.last_scheduled_success)
+function SkipDetails({
+  skip,
+  lastScheduledSuccess,
+}: {
+  skip: FeedPipelineSkipRecord
+  lastScheduledSuccess: FeedPipelineRunRecord | null
+}) {
+  return (
+    <dl className="mt-3 grid gap-2 text-sm">
+      <div>
+        <dt className="text-secondary">Skipped at</dt>
+        <dd>{formatTimestamp(skip.skipped_at)}</dd>
+      </div>
+      <div>
+        <dt className="text-secondary">Trigger</dt>
+        <dd>{skip.trigger}</dd>
+      </div>
+      <div>
+        <dt className="text-secondary">Reason</dt>
+        <dd className="break-words">{SKIP_REASON_LABEL[skip.reason]}</dd>
+      </div>
+      {isSkipSuperseded(skip, lastScheduledSuccess) && (
+        <div>
+          <dt className="text-secondary">Superseded</dt>
+          <dd>A scheduled run has succeeded since this skip.</dd>
+        </div>
+      )}
+    </dl>
+  )
+}
+
+function RunBlock<T extends RunIdentity>({
+  title,
+  description,
+  run,
+  emptyLabel,
+  metricsFor,
+}: {
+  title: string
+  description?: string
+  run: T | null
+  emptyLabel: string
+  metricsFor: (run: T) => RunMetric[]
+}) {
+  return (
+    <div className="mt-5 border-t border-border pt-4">
+      <h3 className="text-base font-medium">{title}</h3>
+      {description ? <p className="mt-1 text-sm text-secondary">{description}</p> : null}
+      {run ? (
+        <PipelineRunDetails run={run} metrics={metricsFor(run)} />
+      ) : (
+        <p className="mt-2 text-sm text-secondary">{emptyLabel}</p>
+      )}
+    </div>
+  )
+}
+
+function PipelineMonitorSection<T extends RunIdentity>({
+  ariaLabel,
+  title,
+  status,
+  message,
+  cronUtc,
+  staleAfterHours,
+  headerExtras,
+  lastSuccess,
+  lastScheduledSuccess,
+  lastSuccessDescription,
+  lastScheduledSuccessDescription,
+  metricsFor,
+  lastFailure,
+  skipSlot,
+  footer,
+}: {
+  ariaLabel: string
+  title: string
+  status: IngestMonitorStatus
+  message: string
+  cronUtc: string
+  staleAfterHours: number
+  headerExtras?: ReactNode
+  lastSuccess: T | null
+  lastScheduledSuccess: T | null
+  lastSuccessDescription?: string
+  lastScheduledSuccessDescription?: string
+  metricsFor: (run: T) => RunMetric[]
+  lastFailure: FeedPipelineFailureRecord | null
+  skipSlot?: ReactNode
+  footer?: ReactNode
+}) {
+  const showScheduledSuccess = !isSameRun(lastSuccess, lastScheduledSuccess)
 
   return (
-    <section
-      className="rounded-card border border-border bg-card p-5"
-      aria-label="Executive ingest status"
-    >
+    <section className="rounded-card border border-border bg-card p-5" aria-label={ariaLabel}>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-lg font-medium">Executive posts cron</h2>
-        <p className={`text-sm font-medium ${statusClass(executive.status)}`}>
-          {STATUS_LABEL[executive.status]}
-        </p>
+        <h2 className="text-lg font-medium">{title}</h2>
+        <p className={`text-sm font-medium ${statusClass(status)}`}>{STATUS_LABEL[status]}</p>
       </div>
-      <p className="mt-2 text-sm text-secondary">{executive.message}</p>
+      <p className="mt-2 text-sm text-secondary">{message}</p>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-secondary">Cron (UTC)</dt>
-          <dd className="font-medium">{executive.hourly_cron_utc}</dd>
+          <dd className="font-medium">{cronUtc}</dd>
         </div>
         <div>
           <dt className="text-secondary">Stale after</dt>
-          <dd className="font-medium">{executive.stale_after_hours} hours</dd>
+          <dd className="font-medium">{staleAfterHours} hours</dd>
         </div>
+        {headerExtras}
       </dl>
 
-      <div className="mt-5 border-t border-border pt-4">
-        <h3 className="text-base font-medium">Last success</h3>
-        {executive.last_success ? (
-          <ExecutiveRunDetails run={executive.last_success} />
-        ) : (
-          <p className="mt-2 text-sm text-secondary">No success recorded yet.</p>
-        )}
-      </div>
+      <RunBlock
+        title="Last success"
+        description={lastSuccessDescription}
+        run={lastSuccess}
+        emptyLabel="No success recorded yet."
+        metricsFor={metricsFor}
+      />
 
       {showScheduledSuccess && (
-        <div className="mt-5 border-t border-border pt-4">
-          <h3 className="text-base font-medium">Last scheduled success</h3>
-          {executive.last_scheduled_success ? (
-            <ExecutiveRunDetails run={executive.last_scheduled_success} />
-          ) : (
-            <p className="mt-2 text-sm text-secondary">No scheduled success recorded yet.</p>
-          )}
-        </div>
+        <RunBlock
+          title="Last scheduled success"
+          description={lastScheduledSuccessDescription}
+          run={lastScheduledSuccess}
+          emptyLabel="No scheduled success recorded yet."
+          metricsFor={metricsFor}
+        />
       )}
+
+      {skipSlot}
 
       <div className="mt-5 border-t border-border pt-4">
         <h3 className="text-base font-medium">Last failure</h3>
-        {executive.last_failure ? (
-          <dl className="mt-3 grid gap-2 text-sm">
-            <div>
-              <dt className="text-secondary">Failed at</dt>
-              <dd>{formatTimestamp(executive.last_failure.failed_at)}</dd>
-            </div>
-            <div>
-              <dt className="text-secondary">Trigger</dt>
-              <dd>{executive.last_failure.trigger}</dd>
-            </div>
-            <div>
-              <dt className="text-secondary">Error</dt>
-              <dd className="break-words text-fail">{executive.last_failure.error}</dd>
-            </div>
-          </dl>
+        {lastFailure ? (
+          <FailureDetails failure={lastFailure} />
         ) : (
           <p className="mt-2 text-sm text-secondary">No recorded failures.</p>
         )}
       </div>
 
-      <p className="mt-4 text-sm text-secondary">
-        Manual override:{' '}
-        <code className="rounded bg-surface-subtle px-1">{executive.admin_executive_ingest}</code>
-      </p>
+      {footer}
     </section>
+  )
+}
+
+function FeedMonitorSection({ ingest }: { ingest: IngestMonitorPayload }) {
+  return (
+    <PipelineMonitorSection
+      ariaLabel="Ingest status"
+      title="Daily cron"
+      status={ingest.status}
+      message={ingest.message}
+      cronUtc={ingest.daily_cron_utc}
+      staleAfterHours={ingest.stale_after_hours}
+      headerExtras={
+        <>
+          <div>
+            <dt className="text-secondary">Latest passage vote in D1</dt>
+            <dd className="font-medium">{ingest.latest_passage_vote_date ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-secondary">Missing digests</dt>
+            <dd className="font-medium">{ingest.missing_digest_count}</dd>
+          </div>
+        </>
+      }
+      lastSuccess={ingest.last_success}
+      lastScheduledSuccess={ingest.last_scheduled_success}
+      lastSuccessDescription="Most recent successful feed run of any trigger (admin or scheduled)."
+      lastScheduledSuccessDescription="Most recent successful daily cron run (status above tracks this, not admin runs)."
+      metricsFor={feedRunMetrics}
+      lastFailure={ingest.last_failure}
+      skipSlot={
+        <div className="mt-5 border-t border-border pt-4">
+          <h3 className="text-base font-medium">Last skipped</h3>
+          {ingest.last_skipped ? (
+            <SkipDetails
+              skip={ingest.last_skipped}
+              lastScheduledSuccess={ingest.last_scheduled_success}
+            />
+          ) : (
+            <p className="mt-2 text-sm text-secondary">No recorded skips.</p>
+          )}
+        </div>
+      }
+    />
+  )
+}
+
+function ExecutiveMonitorSection({ executive }: { executive: ExecutiveIngestMonitorPayload }) {
+  return (
+    <PipelineMonitorSection
+      ariaLabel="Executive ingest status"
+      title="Executive posts cron"
+      status={executive.status}
+      message={executive.message}
+      cronUtc={executive.hourly_cron_utc}
+      staleAfterHours={executive.stale_after_hours}
+      lastSuccess={executive.last_success}
+      lastScheduledSuccess={executive.last_scheduled_success}
+      metricsFor={executiveRunMetrics}
+      lastFailure={executive.last_failure}
+      footer={
+        <p className="mt-4 text-sm text-secondary">
+          Manual override:{' '}
+          <code className="rounded bg-surface-subtle px-1">{executive.admin_executive_ingest}</code>
+        </p>
+      }
+    />
   )
 }
 
@@ -184,8 +321,6 @@ export default function DebugPage() {
   })
 
   const ingest = monitor.data?.ingest
-  const showScheduledSuccess =
-    ingest != null && !isSameRun(ingest.last_success, ingest.last_scheduled_success)
 
   return (
     <main id="content" className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
@@ -211,112 +346,7 @@ export default function DebugPage() {
 
       {ingest && (
         <>
-          <section
-            className="rounded-card border border-border bg-card p-5"
-            aria-label="Ingest status"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="text-lg font-medium">Daily cron</h2>
-              <p className={`text-sm font-medium ${statusClass(ingest.status)}`}>
-                {STATUS_LABEL[ingest.status]}
-              </p>
-            </div>
-            <p className="mt-2 text-sm text-secondary">{ingest.message}</p>
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-secondary">Cron (UTC)</dt>
-                <dd className="font-medium">{ingest.daily_cron_utc}</dd>
-              </div>
-              <div>
-                <dt className="text-secondary">Stale after</dt>
-                <dd className="font-medium">{ingest.stale_after_hours} hours</dd>
-              </div>
-              <div>
-                <dt className="text-secondary">Latest passage vote in D1</dt>
-                <dd className="font-medium">{ingest.latest_passage_vote_date ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-secondary">Missing digests</dt>
-                <dd className="font-medium">{ingest.missing_digest_count}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="rounded-card border border-border bg-card p-5">
-            <h2 className="text-lg font-medium">Last success</h2>
-            <p className="mt-1 text-sm text-secondary">
-              Most recent successful feed run of any trigger (admin or scheduled).
-            </p>
-            {ingest.last_success ? (
-              <FeedRunDetails run={ingest.last_success} />
-            ) : (
-              <p className="mt-2 text-sm text-secondary">No success recorded yet.</p>
-            )}
-          </section>
-
-          {showScheduledSuccess && (
-            <section className="rounded-card border border-border bg-card p-5">
-              <h2 className="text-lg font-medium">Last scheduled success</h2>
-              <p className="mt-1 text-sm text-secondary">
-                Most recent successful daily cron run (status above tracks this, not admin runs).
-              </p>
-              {ingest.last_scheduled_success ? (
-                <FeedRunDetails run={ingest.last_scheduled_success} />
-              ) : (
-                <p className="mt-2 text-sm text-secondary">No scheduled success recorded yet.</p>
-              )}
-            </section>
-          )}
-
-          <section className="rounded-card border border-border bg-card p-5">
-            <h2 className="text-lg font-medium">Last skipped</h2>
-            {ingest.last_skipped ? (
-              <dl className="mt-3 grid gap-2 text-sm">
-                <div>
-                  <dt className="text-secondary">Skipped at</dt>
-                  <dd>{formatTimestamp(ingest.last_skipped.skipped_at)}</dd>
-                </div>
-                <div>
-                  <dt className="text-secondary">Trigger</dt>
-                  <dd>{ingest.last_skipped.trigger}</dd>
-                </div>
-                <div>
-                  <dt className="text-secondary">Reason</dt>
-                  <dd className="break-words">{SKIP_REASON_LABEL[ingest.last_skipped.reason]}</dd>
-                </div>
-                {isSkipSuperseded(ingest.last_skipped, ingest.last_scheduled_success) && (
-                  <div>
-                    <dt className="text-secondary">Superseded</dt>
-                    <dd>A scheduled run has succeeded since this skip.</dd>
-                  </div>
-                )}
-              </dl>
-            ) : (
-              <p className="mt-2 text-sm text-secondary">No recorded skips.</p>
-            )}
-          </section>
-
-          <section className="rounded-card border border-border bg-card p-5">
-            <h2 className="text-lg font-medium">Last failure</h2>
-            {ingest.last_failure ? (
-              <dl className="mt-3 grid gap-2 text-sm">
-                <div>
-                  <dt className="text-secondary">Failed at</dt>
-                  <dd>{formatTimestamp(ingest.last_failure.failed_at)}</dd>
-                </div>
-                <div>
-                  <dt className="text-secondary">Trigger</dt>
-                  <dd>{ingest.last_failure.trigger}</dd>
-                </div>
-                <div>
-                  <dt className="text-secondary">Error</dt>
-                  <dd className="break-words text-fail">{ingest.last_failure.error}</dd>
-                </div>
-              </dl>
-            ) : (
-              <p className="mt-2 text-sm text-secondary">No recorded failures.</p>
-            )}
-          </section>
+          <FeedMonitorSection ingest={ingest} />
 
           {ingest.executive && <ExecutiveMonitorSection executive={ingest.executive} />}
 
