@@ -42,8 +42,6 @@ export function BrandFlagIcon({ className = '' }: BrandFlagIconProps) {
     <svg
       className={`brand-flag-icon${className ? ` ${className}` : ''}`}
       viewBox={`0 0 ${FLAG_W} ${FLAG_H}`}
-      width="28"
-      height={Number(((28 * FLAG_H) / FLAG_W).toFixed(2))}
       aria-hidden="true"
       focusable="false"
     >
