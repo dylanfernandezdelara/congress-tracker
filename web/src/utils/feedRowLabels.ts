@@ -3,7 +3,6 @@ import {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatCollapsedDigestLead,
-  formatFallbackHeadline,
   formatShortBillId,
   isProceduralVote,
   normalizeDigestBullets,
@@ -192,6 +191,7 @@ export function isProceduralFeedItem(item: FeedItem): boolean {
 }
 
 export function getFeedTopic(item: FeedItem): string {
+  // Full title/headline — never ellipsis-truncate. CSS must not line-clamp.
   if (item.digest?.headline) {
     return trimDisplayTitle(item.digest.headline)
   }
@@ -200,8 +200,8 @@ export function getFeedTopic(item: FeedItem): string {
   const procedural = proceduralHeadline(title)
   if (procedural) return procedural
 
-  if (item.bill.title) {
-    return formatFallbackHeadline(trimDisplayTitle(item.bill.title))
+  if (title) {
+    return trimDisplayTitle(title)
   }
 
   return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
@@ -242,10 +242,15 @@ export function getFeedSummarySectionsModel(
   const hasDigestSummary = Boolean(content.whatItDoes) || content.keyPoints.length > 0
 
   let primary: FeedSummaryPrimary
+  let crsDisclosure: string | null = hasDigestSummary ? content.crsSummary : null
+
   if (content.whatItDoes) {
     primary = { kind: 'what_it_does', text: content.whatItDoes }
   } else if (!hasDigestSummary && content.crsSummary) {
-    primary = { kind: 'crs', text: content.crsSummary }
+    // Glanceable lead only — full official CRS stays in the disclosure panel.
+    const crsLead = formatCollapsedDigestLead(content.crsSummary)
+    primary = { kind: 'crs', text: crsLead }
+    crsDisclosure = content.crsSummary.length > crsLead.length ? content.crsSummary : null
   } else {
     primary = { kind: 'none' }
   }
@@ -253,7 +258,7 @@ export function getFeedSummarySectionsModel(
   return {
     primary,
     keyPoints: content.keyPoints,
-    crsDisclosure: hasDigestSummary ? content.crsSummary : null,
+    crsDisclosure,
   }
 }
 

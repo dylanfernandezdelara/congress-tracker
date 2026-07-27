@@ -41,7 +41,7 @@ function PrimarySummarySection({ primary }: { primary: FeedSummaryPrimary }) {
       return (
         <section className="feed-row-detail-section">
           <h3 className="feed-row-detail-heading">Summary</h3>
-          <ScrollableCrsBody text={primary.text} label="Official CRS summary" />
+          <p className="feed-row-summary-body">{primary.text}</p>
         </section>
       )
     case 'none':

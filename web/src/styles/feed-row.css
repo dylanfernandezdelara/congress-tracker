@@ -121,10 +121,8 @@
     line-height: 1.35;
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
+    /* Full title wraps; never CSS line-clamp or ellipsis-truncate. */
+    overflow-wrap: anywhere;
   }
 
   .feed-row-date-wrap {
