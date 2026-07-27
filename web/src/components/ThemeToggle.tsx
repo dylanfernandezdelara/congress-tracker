@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type Ref } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark'
 
@@ -60,11 +60,7 @@ function MoonIcon() {
   )
 }
 
-type ThemeToggleProps = {
-  buttonRef?: Ref<HTMLButtonElement>
-}
-
-export function ThemeToggle({ buttonRef }: ThemeToggleProps = {}) {
+export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(readTheme)
 
   useLayoutEffect(() => {
@@ -82,7 +78,6 @@ export function ThemeToggle({ buttonRef }: ThemeToggleProps = {}) {
 
   return (
     <button
-      ref={buttonRef}
       type="button"
       className="theme-toggle"
       onClick={toggle}

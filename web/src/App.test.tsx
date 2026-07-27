@@ -100,7 +100,6 @@ describe('App routing', () => {
 
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
     expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
   })
 })

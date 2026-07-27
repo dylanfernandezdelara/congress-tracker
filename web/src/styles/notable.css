@@ -1,5 +1,27 @@
 @layer components {
-  .chamber-overview-skeleton,
+  .home-enrichment {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .home-enrichment-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .home-enrichment-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.15px;
+  }
+
+  .home-enrichment-error {
+    margin: 0;
+  }
+
   .notable-votes-skeleton {
     min-height: 5.5rem;
     border-radius: 16px;

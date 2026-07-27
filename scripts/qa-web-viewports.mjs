@@ -92,7 +92,6 @@ async function auditHomePage(page) {
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
     const heading = document.querySelector('h1')
-    const siteNav = document.querySelector('.site-nav')
     const membersSidebar = document.querySelector('[aria-label="Members in Congress"]')
     const feedRow = document.querySelector('.feed-row')
     const topic = document.querySelector('[data-feed-topic]')
@@ -117,7 +116,6 @@ async function auditHomePage(page) {
     if (heading && heading.textContent?.trim() !== 'Congress Tracker') {
       issues.push('page heading should read Congress Tracker')
     }
-    if (!siteNav) issues.push('site navigation missing')
     // Below the desktop rail breakpoint, Home stacks former rail content under the feed
     // (.home-mobile-rails). Desktop keeps sticky .home-rail columns instead.
     if (viewportWidth < 1024) {
@@ -214,65 +212,6 @@ async function auditHomePage(page) {
       }
     } else {
       issues.push('feed summary missing')
-    }
-
-    return {
-      issues,
-      theme: document.documentElement.dataset.theme ?? 'light',
-    }
-  })
-}
-
-async function auditStatsPage(page) {
-  return page.evaluate(() => {
-    const viewportWidth = window.innerWidth
-    const heading = document.querySelector('h1')
-    const siteNav = document.querySelector('.site-nav')
-    const federalControl = document.querySelector('[aria-label="Federal Control"]')
-    const members = document.querySelector('[aria-label="Members in Congress"]')
-    const pulse = document.querySelector('[aria-label="Legislative pulse"]')
-    const issues = []
-
-    const collectHorizontalClipping = (rect, label) => {
-      if (rect.left < -0.5) issues.push(`${label} clipped on the left`)
-      if (rect.right > viewportWidth + 0.5) issues.push(`${label} clipped on the right`)
-      if (rect.width <= 0 || rect.height <= 0) issues.push(`${label} not visible`)
-    }
-
-    if (!heading) issues.push('stats page heading missing')
-    if (heading && heading.textContent?.trim() !== 'Congress Tracker') {
-      issues.push('stats page heading should read Congress Tracker')
-    }
-    // Presence only — on narrow viewports the nav collapses into the menu control.
-    if (!siteNav) issues.push('site navigation missing on stats page')
-
-    if (!federalControl) {
-      issues.push('federal-control section missing on stats page')
-    } else {
-      collectHorizontalClipping(federalControl.getBoundingClientRect(), 'federal-control section')
-      const title = federalControl.querySelector('h2')
-      if (!title || !/federal control/i.test(title.textContent ?? '')) {
-        issues.push('federal-control heading missing on stats page')
-      }
-    }
-
-    if (!members) {
-      issues.push('members section missing on stats page')
-    } else {
-      collectHorizontalClipping(members.getBoundingClientRect(), 'members section')
-    }
-
-    if (!pulse) {
-      issues.push('legislative pulse missing on stats page')
-    } else {
-      collectHorizontalClipping(pulse.getBoundingClientRect(), 'legislative pulse')
-    }
-
-    if (heading) collectHorizontalClipping(heading.getBoundingClientRect(), 'stats page heading')
-
-    const docWidth = document.documentElement.scrollWidth
-    if (docWidth > viewportWidth + 1) {
-      issues.push('stats page has horizontal overflow')
     }
 
     return {
@@ -475,30 +414,6 @@ async function main() {
           screenshot: path.relative(rootDir, homeScreenshotPath),
         })
 
-        // Stats — same viewport/theme context (reuse page)
-        await page.goto(`${baseUrl.replace(/\/$/, '')}/stats`, { waitUntil: 'domcontentloaded' })
-        await page.getByRole('heading', { name: 'Federal Control' }).waitFor({ timeout: 10_000 })
-
-        const statsAudit = await auditStatsPage(page)
-        if (statsAudit.theme !== theme) {
-          statsAudit.issues.push(`expected ${theme} theme but got ${statsAudit.theme}`)
-        }
-
-        const statsScreenshotPath = path.join(outDir, `${caseId}-stats.png`)
-        await page.screenshot({ path: statsScreenshotPath, fullPage: false })
-
-        const statsPassed = statsAudit.issues.length === 0
-        if (!statsPassed) failures += 1
-        results.push({
-          id: `${caseId}-stats`,
-          route: 'stats',
-          viewport: viewport.label,
-          theme,
-          passed: statsPassed,
-          issues: statsAudit.issues,
-          screenshot: path.relative(rootDir, statsScreenshotPath),
-        })
-
         await page.close()
       }
     }
@@ -521,8 +436,7 @@ async function main() {
   console.log(`Viewport QA: ${summary.passed}/${summary.total} passed`)
   for (const result of results) {
     const status = result.passed ? 'PASS' : 'FAIL'
-    const routeLabel = result.route === 'stats' ? 'stats' : 'home'
-    console.log(`  [${status}] ${result.viewport} / ${result.theme} / ${routeLabel}`)
+    console.log(`  [${status}] ${result.viewport} / ${result.theme} / home`)
     if (!result.passed) {
       for (const issue of result.issues) {
         console.log(`         - ${issue}`)

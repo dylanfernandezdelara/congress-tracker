@@ -212,131 +212,6 @@
     grid-column: 2;
   }
 
-  .site-nav {
-    display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.125rem;
-    grid-row: 2;
-    grid-column: 1 / -1;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background-color: transparent;
-  }
-
-  .site-header--menu-open .site-header-inner {
-    height: auto;
-    min-height: 48px;
-  }
-
-  .site-header--menu-open .site-nav {
-    display: flex;
-    padding-bottom: 0.75rem;
-  }
-
-  .site-header--menu-open .site-nav-link {
-    justify-content: flex-start;
-    width: 100%;
-    min-width: 0;
-    padding: 0.625rem 0.75rem;
-  }
-
-  .site-nav-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 3.25rem;
-    padding: 0.375rem 0.75rem;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: -0.15px;
-    color: hsl(var(--twc-faint));
-    text-decoration: none;
-    transition:
-      color 0.15s ease,
-      background-color 0.15s ease;
-  }
-
-  .site-nav-link:hover {
-    color: hsl(var(--twc-secondary));
-    background-color: hsl(var(--twc-row-hover));
-  }
-
-  .site-nav-link.is-active {
-    color: hsl(var(--twc-foreground));
-    background-color: hsl(var(--twc-row-active));
-    font-weight: 500;
-  }
-
-  .site-nav-link:focus-visible {
-    outline: 2px solid hsl(var(--twc-accent));
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
-
-  .site-nav-toggle {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.1875rem;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid hsl(var(--twc-ghost-border));
-    border-radius: 8px;
-    background: transparent;
-    color: hsl(var(--twc-secondary));
-    cursor: pointer;
-    touch-action: manipulation;
-  }
-
-  .site-nav-toggle:hover {
-    background-color: hsl(var(--twc-row-hover));
-    border-color: hsl(var(--twc-ghost-border-hover));
-  }
-
-  .site-nav-toggle:focus-visible {
-    outline: 2px solid hsl(var(--twc-accent));
-    outline-offset: 2px;
-  }
-
-  .site-nav-toggle-bar {
-    display: block;
-    width: 0.875rem;
-    height: 1.5px;
-    border-radius: 1px;
-    background-color: currentColor;
-    transition:
-      transform 0.2s var(--motion-ease-out),
-      opacity 0.2s var(--motion-ease-out);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .site-nav-toggle-bar {
-      transition: none;
-    }
-  }
-
-  .site-header--menu-open .site-nav-toggle-bar:nth-child(1) {
-    transform: translateY(4px) rotate(45deg);
-  }
-
-  .site-header--menu-open .site-nav-toggle-bar:nth-child(2) {
-    opacity: 0;
-  }
-
-  .site-header--menu-open .site-nav-toggle-bar:nth-child(3) {
-    transform: translateY(-4px) rotate(-45deg);
-  }
-
-  .stats-page {
-    @apply mx-auto max-w-[640px] space-y-8;
-  }
-
   @media (min-width: 1024px) {
     .site-header-inner {
       max-width: var(--page-max-width);
@@ -344,18 +219,6 @@
       height: 48px;
       padding-top: 0;
       padding-bottom: 0;
-    }
-
-    .stats-page {
-      max-width: none;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 2rem;
-      align-items: start;
-    }
-
-    .stats-page > .federal-control {
-      grid-column: 1 / -1;
     }
   }
 
@@ -505,45 +368,8 @@
     }
 
     .site-header-inner {
-      grid-template-columns: minmax(0, 1fr) auto auto;
       padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
-      padding-bottom: 0;
       padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
-    }
-
-    .site-header-brand {
-      grid-row: auto;
-      grid-column: auto;
-    }
-
-    .site-header-actions {
-      grid-row: auto;
-      grid-column: auto;
-    }
-
-    .site-nav {
-      display: inline-flex;
-      flex-direction: row;
-      align-items: center;
-      grid-row: auto;
-      grid-column: auto;
-      gap: 0.125rem;
-      padding-bottom: 0;
-    }
-
-    .site-header--menu-open .site-nav {
-      padding-bottom: 0;
-    }
-
-    .site-header--menu-open .site-nav-link {
-      justify-content: center;
-      width: auto;
-      min-width: 3.25rem;
-      padding: 0.375rem 0.75rem;
-    }
-
-    .site-nav-toggle {
-      display: none;
     }
   }
 

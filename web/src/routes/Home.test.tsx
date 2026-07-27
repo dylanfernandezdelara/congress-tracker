@@ -242,7 +242,7 @@ describe('Home', () => {
   it('renders the dense feed with rails and no flip hints', async () => {
     const { container } = renderHome()
     expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Site sections' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Site sections' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /theme/i })).toBeInTheDocument()
     expect(
       await screen.findByRole('heading', { level: 3, name: 'Plain headline for readers' }),

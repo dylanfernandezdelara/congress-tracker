@@ -51,7 +51,7 @@ Tokens live as `--twc-*` HSL channels in `web/src/styles/base.css`.
 - **Feed list** — one 16px card containing hairline-divided rows (~72–80px collapsed)
 - **Collapsed row** — 14px headline · 12px meta line (outcome colored) · 13px teaser; bullets live in expanded detail
 - **Expanded detail** — key points, lifecycle pipeline, vote history, multi-column defectors
-- **Federal Control compact** — horizontal seat bars (full wedges remain on `/stats`)
+- **Federal Control compact** — horizontal seat bars on the home feed sidebar
 
 ## Rules
 

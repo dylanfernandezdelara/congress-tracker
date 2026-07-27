@@ -1,7 +1,7 @@
 import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
 
 import type { ChamberComposition, SessionStatsResponse } from '../api/types'
-import { sortPartySeatCounts } from '../utils/chamberWedge'
+import { sortPartySeatCounts } from '../utils/chamberSeats'
 import { CURRENT_PRESIDENT } from '../constants/president'
 
 type FederalControlCompactProps = {
