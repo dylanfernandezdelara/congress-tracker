@@ -2,7 +2,8 @@ type PixelFlagIconProps = {
   className?: string
 }
 
-/** Small 8-bit style US flag for the site brand mark. */
+/** Small 8-bit style US flag for the site brand mark.
+ *  Keep geometry in sync with web/public/favicon.svg; run npm run generate:favicons for PNGs. */
 export function PixelFlagIcon({ className = '' }: PixelFlagIconProps) {
   return (
     <svg

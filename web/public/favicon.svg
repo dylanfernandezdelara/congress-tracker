@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Congress Tracker">
-  <!-- Brand mark: pixel flag on dark rounded square (matches site chrome). -->
-  <rect width="32" height="32" rx="6" fill="#0a0a0a"/>
-  <g transform="translate(6.5 9.5)" shape-rendering="crispEdges">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19 13" role="img" aria-label="Track Congress">
+  <!-- Pixel flag brand mark (transparent background).
+       Keep in sync with web/src/components/PixelFlagIcon.tsx and npm run generate:favicons -->
+  <g shape-rendering="crispEdges">
     <rect width="19" height="13" fill="#B22234"/>
     <rect y="1" width="19" height="1" fill="#FFFFFF"/>
     <rect y="3" width="19" height="1" fill="#FFFFFF"/>
