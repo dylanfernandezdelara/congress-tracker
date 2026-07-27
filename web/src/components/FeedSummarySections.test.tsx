@@ -42,14 +42,26 @@ describe('FeedSummarySections', () => {
     expect(screen.getAllByText('Official CRS summary text.')).toHaveLength(1)
   })
 
-  it('renders CRS as the primary scrollable summary when there is no digest', () => {
+  it('renders a short CRS lead when there is no digest and puts the full CRS in disclosure', () => {
     const crs =
-      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran unless a later authorization is enacted.'
+      'This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit. The resolution recommends levels and amounts for many accounts across the federal government.'
+    render(<FeedSummarySections content={content({ crsSummary: crs })} />)
+
+    expect(screen.getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
+    const lead = document.querySelector('.feed-row-detail-section .feed-row-summary-body')
+    expect(lead).toHaveTextContent(/This concurrent resolution establishes/)
+    expect(lead?.textContent?.endsWith('…')).toBe(true)
+    expect(lead?.textContent?.length).toBeLessThan(crs.length)
+    expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Official CRS summary' })).toHaveTextContent(crs)
+  })
+
+  it('keeps a short CRS as the primary summary without a redundant disclosure', () => {
+    const crs = 'This bill funds rural hospitals.'
     render(<FeedSummarySections content={content({ crsSummary: crs })} />)
 
     expect(screen.getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
     expect(screen.getByText(crs)).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Official CRS summary' })).toBeInTheDocument()
     expect(screen.queryByText('Official CRS summary')).toBeNull()
   })
 

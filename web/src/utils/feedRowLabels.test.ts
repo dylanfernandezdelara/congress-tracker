@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { FEED_TOPIC_HEADLINE_MAX_CHARS } from '@congress-tracker/shared/feed-content'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   FEED_SUMMARY_PENDING,
@@ -379,7 +378,24 @@ describe('isProceduralFeedItem', () => {
 })
 
 describe('getFeedTopic', () => {
-  it('softens official title fallbacks when digest headline is missing', () => {
+  it('shows the full official title without ellipsis truncation when digest is missing', () => {
+    const title =
+      'Establishing the congressional budget for the United States Government for fiscal year 2027 and setting forth the appropriate budgetary levels for fiscal years 2028 through 2036.'
+    const item = makeFeedItem({
+      digest: null,
+      bill: {
+        congress: 119,
+        type: 'HCONRES',
+        number: 113,
+        title,
+      },
+    })
+
+    expect(getFeedTopic(item)).toBe(title)
+    expect(getFeedTopic(item).endsWith('…')).toBe(false)
+  })
+
+  it('strips only the boilerplate suffix from official titles', () => {
     const item = makeFeedItem({
       digest: null,
       bill: {
@@ -392,11 +408,11 @@ describe('getFeedTopic', () => {
     })
 
     expect(getFeedTopic(item)).toBe(
-      'Authorize appropriations for fiscal year 2026 for military activities of the Department of Defense',
+      'To authorize appropriations for fiscal year 2026 for military activities of the Department of Defense',
     )
   })
 
-  it('intentionally shortens long digest headlines instead of leaving them full-length', () => {
+  it('keeps long digest headlines intact (no ellipsis soft-cut)', () => {
     const longHeadline =
       'Directing the President pursuant to section 5(c) of the War Powers Resolution to remove United States Armed Forces from hostilities in Lebanon.'
     const item = makeFeedItem({
@@ -408,11 +424,7 @@ describe('getFeedTopic', () => {
       },
     })
 
-    const topic = getFeedTopic(item)
-    expect(topic.endsWith('…')).toBe(true)
-    expect(topic.length).toBeLessThan(longHeadline.length)
-    expect(topic.length).toBeLessThanOrEqual(FEED_TOPIC_HEADLINE_MAX_CHARS + 1)
-    expect(topic.startsWith('Directing ')).toBe(true)
+    expect(getFeedTopic(item)).toBe(longHeadline)
   })
 })
 
@@ -611,9 +623,26 @@ describe('getFeedSummarySectionsModel', () => {
     })
   })
 
-  it('uses CRS as the primary summary when there is no digest content', () => {
+  it('uses a short CRS lead as primary and keeps the full CRS in disclosure', () => {
     const crs =
-      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran unless a later authorization is enacted.'
+      'This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit. The resolution recommends levels and amounts for many accounts.'
+    const model = getFeedSummarySectionsModel({
+      whatItDoes: null,
+      keyPoints: [],
+      crsSummary: crs,
+      pending: false,
+    })
+    expect(model.primary).toEqual({
+      kind: 'crs',
+      text: expect.stringMatching(/^This concurrent resolution establishes/),
+    })
+    expect(model.primary.kind === 'crs' && model.primary.text.length).toBeLessThan(crs.length)
+    expect(model.crsDisclosure).toBe(crs)
+    expect(model.keyPoints).toEqual([])
+  })
+
+  it('does not duplicate a short CRS in disclosure when the lead is the whole summary', () => {
+    const crs = 'This bill funds rural hospitals.'
     expect(
       getFeedSummarySectionsModel({
         whatItDoes: null,
