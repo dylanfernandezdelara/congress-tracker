@@ -91,7 +91,7 @@ export function RightRail({ pulse, loading, error, onRetry }: RightRailProps) {
 
   return (
     <div className="sidebar-panel space-y-6">
-      <p className="sidebar-kicker">Legislative pulse</p>
+      <h2 className="sidebar-section-title">Legislative pulse</h2>
       <ChamberPulseSection title="House" data={pulse.house} />
       <div className="border-t border-border" />
       <ChamberPulseSection title="Senate" data={pulse.senate} />

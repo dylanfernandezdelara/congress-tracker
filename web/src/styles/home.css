@@ -244,8 +244,10 @@
     gap: 0.875rem;
   }
 
+  /* Shared rail / sidebar section headers (Federal Control, Notable votes, Legislative pulse). */
   .federal-compact-title,
-  .notable-compact-title {
+  .notable-compact-title,
+  .sidebar-section-title {
     margin: 0;
     font-size: 14px;
     font-weight: 500;
