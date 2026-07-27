@@ -70,6 +70,32 @@ describe('FeedRowDetail', () => {
     expect(screen.getByText('R 52–1 · D 0–46')).toBeInTheDocument()
   })
 
+  it('shows the full digest summary and key points in the detail panel', () => {
+    render(<FeedRowDetail item={makeFeedItem()} />)
+
+    expect(screen.getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
+    expect(
+      screen.getByText('It does something important in plain language.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Key points' })).toBeInTheDocument()
+    expect(screen.getByText('Point one')).toBeInTheDocument()
+    expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
+  })
+
+  it('shows a scrollable CRS summary when no digest exists', () => {
+    const crs =
+      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran unless a later authorization is enacted.'
+    render(
+      <FeedRowDetail
+        item={makeFeedItem({ digest: null, raw_summary_text: crs })}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
+    expect(screen.getByText(crs)).toBeInTheDocument()
+    expect(document.querySelector('.feed-row-summary-body--scrollable')).toBeInTheDocument()
+  })
+
   it('shows an empty state when no members broke with their party', async () => {
     vi.mocked(fetchVoteDefectors).mockResolvedValue({
       chamber: 'Senate',

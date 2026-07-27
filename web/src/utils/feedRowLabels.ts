@@ -7,6 +7,7 @@ import {
   formatFallbackHeadline,
   formatShortBillId,
   isProceduralVote,
+  normalizeDigestBullets,
   proceduralHeadline,
   trimDisplayTitle,
   voteIndicatesFailure,
@@ -24,6 +25,13 @@ export const FEED_SUMMARY_PENDING = 'Plain-English summary coming soon.'
 export interface FeedSummaryDisplay {
   lead: string
   bullets: string[]
+  pending: boolean
+}
+
+export interface FeedSummaryExpandedDisplay {
+  whatItDoes: string | null
+  keyPoints: string[]
+  crsSummary: string | null
   pending: boolean
 }
 
@@ -223,6 +231,23 @@ export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
   }
 
   return { lead: FEED_SUMMARY_PENDING, bullets: [], pending: true }
+}
+
+/** Full summary content for the expanded feed row detail panel. */
+export function getFeedSummaryExpandedDisplay(item: FeedItem): FeedSummaryExpandedDisplay {
+  const whatItDoes = item.digest?.what_it_does?.trim() || null
+  const keyPoints = normalizeDigestBullets(item.digest?.key_points ?? [])
+  const crsSummary = item.raw_summary_text?.trim() || null
+
+  if (whatItDoes || keyPoints.length > 0) {
+    return { whatItDoes, keyPoints, crsSummary, pending: false }
+  }
+
+  if (crsSummary) {
+    return { whatItDoes: null, keyPoints: [], crsSummary, pending: false }
+  }
+
+  return { whatItDoes: null, keyPoints: [], crsSummary: null, pending: true }
 }
 
 /**

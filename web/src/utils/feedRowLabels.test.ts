@@ -6,6 +6,7 @@ import {
   getFeedRowDisplayDate,
   getFeedRowView,
   getFeedSummaryDisplay,
+  getFeedSummaryExpandedDisplay,
   getFeedTopic,
   getPrimaryPassageVote,
   isProceduralFeedItem,
@@ -537,6 +538,47 @@ describe('getFeedSummaryDisplay', () => {
     })
 
     expect(getFeedSummaryDisplay(item).lead).toBe('This bill blocks aid for ghost students.')
+  })
+})
+
+describe('getFeedSummaryExpandedDisplay', () => {
+  it('returns the full digest lead and uncapped key points', () => {
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Sample headline',
+        what_it_does:
+          'This bill provides support to Ukraine and allied countries through security assistance. It also adds reporting rules.',
+        key_points: [
+          'Financing and oversight requirements for federal agencies that administer foreign military aid programs across multiple regions.',
+        ],
+        terms_explained: [],
+      },
+    })
+
+    expect(getFeedSummaryExpandedDisplay(item)).toEqual({
+      whatItDoes:
+        'This bill provides support to Ukraine and allied countries through security assistance. It also adds reporting rules.',
+      keyPoints: [
+        'Financing and oversight requirements for federal agencies that administer foreign military aid programs across multiple regions.',
+      ],
+      crsSummary: 'Official CRS summary text.',
+      pending: false,
+    })
+  })
+
+  it('returns CRS text when no digest exists', () => {
+    const crs =
+      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran unless a later authorization is enacted.'
+    expect(
+      getFeedSummaryExpandedDisplay(
+        makeFeedItem({ digest: null, raw_summary_text: crs }),
+      ),
+    ).toEqual({
+      whatItDoes: null,
+      keyPoints: [],
+      crsSummary: crs,
+      pending: false,
+    })
   })
 })
 
