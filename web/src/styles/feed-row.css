@@ -121,7 +121,7 @@
     line-height: 1.35;
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
-    /* Length is controlled in getFeedTopic / formatFallbackHeadline — never CSS-clamp. */
+    /* Length is controlled in getFeedTopic / formatFeedTopicHeadline — never CSS-clamp. */
     overflow-wrap: anywhere;
   }
 
