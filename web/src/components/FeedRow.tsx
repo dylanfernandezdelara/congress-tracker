@@ -56,7 +56,7 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
           aria-expanded={isExpanded}
           aria-controls={detailId}
           aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
-          aria-describedby={summaryId}
+          aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
           <div className="feed-row-main">
@@ -125,13 +125,15 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
               {eventDisplay}
             </p>
 
-            <div
-              id={summaryId}
-              data-feed-summary
-              className={`feed-row-summary${summary.pending ? ' feed-row-summary--pending' : ''}`}
-            >
-              <p className="feed-row-teaser">{summary.lead}</p>
-            </div>
+            {!isExpanded ? (
+              <div
+                id={summaryId}
+                data-feed-summary
+                className={`feed-row-summary${summary.pending ? ' feed-row-summary--pending' : ''}`}
+              >
+                <p className="feed-row-teaser">{summary.lead}</p>
+              </div>
+            ) : null}
           </div>
         </button>
 

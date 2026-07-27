@@ -34,6 +34,8 @@ describe('FeedRow', () => {
   it('shows digest bullets in the expanded detail panel', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={true} onToggle={() => {}} />)
 
+    expect(document.querySelector('.feed-row-teaser')).not.toBeInTheDocument()
+
     const detailPanel = screen.getByRole('region', { name: /Details for Plain headline for readers/ })
 
     expect(within(detailPanel).getByText('Point one')).toBeInTheDocument()
