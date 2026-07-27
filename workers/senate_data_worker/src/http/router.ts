@@ -487,7 +487,7 @@ export async function handlePublicFetch(
 ): Promise<Response> {
   const url = new URL(request.url);
   const { pathname } = url;
-  const corsHeaders = buildCorsHeaders(env);
+  const corsHeaders = buildCorsHeaders(env, request.headers.get("Origin"));
   const json: JsonFn = (body, init) => buildJsonResponse(body, corsHeaders, init);
   const notFound = (path: string) =>
     json({ error: "not_found", message: "Resource not found", path }, { status: 404 });

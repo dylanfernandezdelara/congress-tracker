@@ -557,17 +557,41 @@
     padding-left: max(1rem, env(safe-area-inset-left, 0px));
   }
 
+  .site-footer {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  .site-footer-disclaimer {
+    margin: 0;
+    max-width: 40rem;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-faint));
+  }
+
   @media (min-width: 640px) {
     .page-shell {
       padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
-      padding-bottom: max(4rem, env(safe-area-inset-bottom, 0px));
+      padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
       padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+    }
+
+    .site-footer {
+      margin-top: 3rem;
     }
   }
 
   @media (min-width: 1024px) {
     .page-shell {
-      padding-bottom: max(5rem, env(safe-area-inset-bottom, 0px));
+      padding-bottom: max(3rem, env(safe-area-inset-bottom, 0px));
+    }
+
+    .site-footer {
+      margin-top: 4rem;
     }
   }
 

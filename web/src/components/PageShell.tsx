@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { SiteFooter } from './SiteFooter'
 import { SiteHeader } from './SiteHeader'
 
 type PageShellProps = {
@@ -15,6 +16,7 @@ export function PageShell({ children }: PageShellProps) {
       <SiteHeader />
       <div className="page-shell">
         <div className="page-main min-w-0">{children}</div>
+        <SiteFooter />
       </div>
     </div>
   )

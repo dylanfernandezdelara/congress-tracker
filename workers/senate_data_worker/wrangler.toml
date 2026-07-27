@@ -32,8 +32,17 @@ cpu_ms = 300000
 [vars]
 CONGRESS = "119"
 SESSION = "2"
-# Production: set to your deployed frontend origin (do not use "*" publicly).
-# ALLOWED_ORIGIN = "https://your-site.example"
+# Production custom domains (do not use "*" publicly). Comma-separated allowlist.
+ALLOWED_ORIGIN = "https://trackcongress.org,https://www.trackcongress.org"
+
+# Apex + www Custom Domains (Cloudflare manages DNS + certs on the zone).
+[[routes]]
+pattern = "trackcongress.org"
+custom_domain = true
+
+[[routes]]
+pattern = "www.trackcongress.org"
+custom_domain = true
 
 [[d1_databases]]
 binding = "DB"
@@ -43,7 +52,15 @@ preview_database_id = "da5dbbc1-8111-4aa9-a49e-5e03022e44cc"
 
 # Deployed preview URLs (`wrangler versions upload --env preview`) bind the isolated
 # preview D1 below. `preview_database_id` applies to local `wrangler dev` only.
+# Clear routes so preview never inherits production custom domains.
 [env.preview]
+routes = []
+
+[env.preview.vars]
+CONGRESS = "119"
+SESSION = "2"
+ALLOWED_ORIGIN = "*"
+
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "congress-tracker-preview"
