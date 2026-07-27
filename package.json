@@ -11,7 +11,7 @@
     "generate:favicons": "node scripts/generate-favicons.mjs",
     "preview": "npm run build:web && node scripts/preview-upload.mjs",
     "qa:web": "node scripts/qa-web-viewports.mjs",
-    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/cursor-cloud-setup-contract.test.mjs scripts/configure-workers-builds-production-deploy-contract.test.mjs scripts/generate-favicons-contract.test.mjs scripts/preview-upload-contract.test.mjs scripts/qa-web-viewports-contract.test.mjs scripts/seed-executive-signal-contract.test.mjs scripts/seed-local-feed-contract.test.mjs scripts/verify-local-env-contract.test.mjs scripts/wrangler-config-contract.test.mjs",
+    "test": "npm --prefix workers/senate_data_worker run check && npm --prefix workers/senate_data_worker test && npm --prefix web test && npm --prefix web run build && node --test scripts/cursor-cloud-setup-contract.test.mjs scripts/configure-workers-builds-production-deploy-contract.test.mjs scripts/domain-assets-contract.test.mjs scripts/generate-favicons-contract.test.mjs scripts/preview-upload-contract.test.mjs scripts/qa-web-viewports-contract.test.mjs scripts/seed-executive-signal-contract.test.mjs scripts/seed-local-feed-contract.test.mjs scripts/verify-local-env-contract.test.mjs scripts/wrangler-config-contract.test.mjs",
     "deploy": "npm run build:web && npm --prefix workers/senate_data_worker run deploy",
     "configure:cloudflare-builds": "./scripts/configure-workers-builds-production-deploy.sh",
     "public:check": "./scripts/public-readiness-check.sh",

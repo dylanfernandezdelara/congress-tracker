@@ -1,0 +1,5 @@
+# https://trackcongress.org
+User-agent: *
+Allow: /
+Disallow: /debug
+Disallow: /__pipeline/

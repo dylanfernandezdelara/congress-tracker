@@ -1,0 +1,13 @@
+# Keep values in lockstep with shared/security-headers.ts (enforced by domain-assets-contract.test.mjs).
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'none'
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+/debug*
+  X-Robots-Tag: noindex
+
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
