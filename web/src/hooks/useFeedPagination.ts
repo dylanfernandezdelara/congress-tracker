@@ -295,6 +295,8 @@ export function useFeedPagination() {
         Boolean(bill.chamber) &&
         chamberRef.current != null &&
         chamberRef.current !== bill.chamber
+      const clearSearch = Boolean(queryRef.current)
+      const filterWillReload = clearChamber || clearSearch
 
       setBillMissingNotice(false)
       // Cancel any pending search-draft debounce before it can re-apply `q`.
@@ -306,10 +308,18 @@ export function useFeedPagination() {
         if (clearChamber) params.delete('chamber')
       })
 
-      // Restart the existing deep-link machine (including same-`?bill=` retries).
       deepLinkBillRef.current = target
       deepLinkQueryRef.current = null
       deepLinkPhaseRef.current = 'searching'
+
+      if (filterWillReload) {
+        // Chamber/`q` clear reloads the feed; the searcher re-runs when `items`
+        // update. Kicking now would race stale items and flash a missing notice.
+        return
+      }
+
+      // `bill` alone (or same-`?bill=` retry) may not change `items` — kick the
+      // existing searcher so expand/scroll still happens.
       setDeepLinkKick((k) => k + 1)
     },
     [replaceSearchParams],
