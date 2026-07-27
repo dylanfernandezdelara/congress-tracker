@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { FEED_TOPIC_HEADLINE_MAX_CHARS } from '@congress-tracker/shared/feed-content'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   FEED_SUMMARY_PENDING,
@@ -375,7 +376,9 @@ describe('isProceduralFeedItem', () => {
     expect(isProceduralFeedItem(item)).toBe(true)
     expect(getFeedTopic(item)).toBe('Ukraine security assistance')
   })
+})
 
+describe('getFeedTopic', () => {
   it('softens official title fallbacks when digest headline is missing', () => {
     const item = makeFeedItem({
       digest: null,
@@ -408,7 +411,7 @@ describe('isProceduralFeedItem', () => {
     const topic = getFeedTopic(item)
     expect(topic.endsWith('…')).toBe(true)
     expect(topic.length).toBeLessThan(longHeadline.length)
-    expect(topic.length).toBeLessThanOrEqual(111)
+    expect(topic.length).toBeLessThanOrEqual(FEED_TOPIC_HEADLINE_MAX_CHARS + 1)
     expect(topic.startsWith('Directing ')).toBe(true)
   })
 })

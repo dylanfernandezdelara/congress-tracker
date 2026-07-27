@@ -3,7 +3,7 @@ import {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatCollapsedDigestLead,
-  formatFallbackHeadline,
+  formatFeedTopicHeadline,
   formatShortBillId,
   isProceduralVote,
   normalizeDigestBullets,
@@ -191,18 +191,21 @@ export function isProceduralFeedItem(item: FeedItem): boolean {
   return isProceduralVote(item.bill.title, vote.question)
 }
 
+function formatTopicText(text: string): string {
+  return formatFeedTopicHeadline(trimDisplayTitle(text))
+}
+
 export function getFeedTopic(item: FeedItem): string {
-  // Intentional string shorten only — CSS must not line-clamp this.
   if (item.digest?.headline) {
-    return formatFallbackHeadline(trimDisplayTitle(item.digest.headline))
+    return formatTopicText(item.digest.headline)
   }
 
   const title = item.bill.title ?? ''
   const procedural = proceduralHeadline(title)
   if (procedural) return procedural
 
-  if (item.bill.title) {
-    return formatFallbackHeadline(trimDisplayTitle(item.bill.title))
+  if (title) {
+    return formatTopicText(title)
   }
 
   return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)

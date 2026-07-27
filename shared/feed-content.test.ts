@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  FEED_TOPIC_HEADLINE_MAX_CHARS,
   formatCollapsedDigestLead,
-  formatFallbackHeadline,
+  formatFeedTopicHeadline,
   normalizeDigestLead,
   proceduralHeadline,
   trimDisplayTitle,
@@ -48,56 +49,58 @@ describe("feed-content helpers", () => {
     expect(trimDisplayTitle("Sample bill and for other purposes.")).toBe("Sample bill");
   });
 
-  describe("formatFallbackHeadline", () => {
+  describe("formatFeedTopicHeadline", () => {
     it("leaves short titles untouched", () => {
-      expect(formatFallbackHeadline("Authorize support for Ukraine")).toBe(
+      expect(formatFeedTopicHeadline("Authorize support for Ukraine")).toBe(
         "Authorize support for Ukraine",
       );
     });
 
     it("strips To / A bill to / An act to prefixes and capitalizes the remainder", () => {
       expect(
-        formatFallbackHeadline(
+        formatFeedTopicHeadline(
           "To authorize appropriations for fiscal year 2026 for military activities.",
         ),
       ).toBe("Authorize appropriations for fiscal year 2026 for military activities.");
-      expect(formatFallbackHeadline("A bill to improve veterans' healthcare access.")).toBe(
+      expect(formatFeedTopicHeadline("A bill to improve veterans' healthcare access.")).toBe(
         "Improve veterans' healthcare access.",
       );
-      expect(formatFallbackHeadline("An act to designate a national memorial.")).toBe(
+      expect(formatFeedTopicHeadline("An act to designate a national memorial.")).toBe(
         "Designate a national memorial.",
       );
     });
 
     it("does not strip Condemning or Directing prefixes", () => {
       expect(
-        formatFallbackHeadline(
+        formatFeedTopicHeadline(
           "Directing the President pursuant to section 5(c) of the War Powers Resolution to remove United States Armed Forces from hostilities in Lebanon.",
         ).startsWith("Directing "),
       ).toBe(true);
       expect(
-        formatFallbackHeadline(
+        formatFeedTopicHeadline(
           "Condemning actors seeking to defraud the United States Government, and expressing the sense of the House.",
         ).startsWith("Condemning "),
       ).toBe(true);
     });
 
-    it("truncates long titles at a clause boundary before 110 chars", () => {
+    it("truncates long titles at a clause boundary before the topic char budget", () => {
       const title =
         "Condemning actors seeking to defraud the United States Government, and expressing the sense of the House of Representatives that governmentwide fraud and improper payment prevention reforms will meaningfully improve the fiscal state of the United States.";
 
-      expect(formatFallbackHeadline(title)).toBe(
+      expect(formatFeedTopicHeadline(title)).toBe(
         "Condemning actors seeking to defraud the United States Government…",
       );
-      expect(formatFallbackHeadline(title).endsWith("…")).toBe(true);
-      expect(formatFallbackHeadline(title).length).toBeLessThanOrEqual(111);
+      expect(formatFeedTopicHeadline(title).endsWith("…")).toBe(true);
+      expect(formatFeedTopicHeadline(title).length).toBeLessThanOrEqual(
+        FEED_TOPIC_HEADLINE_MAX_CHARS + 1,
+      );
     });
 
     it("truncates at a word boundary when no usable clause break exists", () => {
       const title =
         "Directing the President pursuant to section 5(c) of the War Powers Resolution to remove United States Armed Forces from hostilities in Lebanon.";
 
-      const result = formatFallbackHeadline(title);
+      const result = formatFeedTopicHeadline(title);
       expect(result.endsWith("…")).toBe(true);
       expect(result.includes(",")).toBe(false);
       expect(result.length).toBeLessThan(title.length);
@@ -109,7 +112,7 @@ describe("feed-content helpers", () => {
     it("never cuts mid-word", () => {
       const title =
         "Appropriating emergency supplemental funding for disaster relief operations across multiple federal agencies during the current fiscal year without delay";
-      const result = formatFallbackHeadline(title);
+      const result = formatFeedTopicHeadline(title);
       expect(result.endsWith("…")).toBe(true);
       const withoutEllipsis = result.slice(0, -1);
       expect(title.startsWith(withoutEllipsis)).toBe(true);
@@ -119,7 +122,7 @@ describe("feed-content helpers", () => {
     });
 
     it("collapses internal whitespace", () => {
-      expect(formatFallbackHeadline("  Authorize   support\nfor   Ukraine  ")).toBe(
+      expect(formatFeedTopicHeadline("  Authorize   support\nfor   Ukraine  ")).toBe(
         "Authorize support for Ukraine",
       );
     });

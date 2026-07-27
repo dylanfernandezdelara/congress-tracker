@@ -156,15 +156,14 @@ async function auditHomePage(page) {
       // The collapsed row height is content-driven; mobile summary height is capped by word limits.
     }
 
+    const isCssLineClamped = (element) => {
+      const style = window.getComputedStyle(element)
+      const clamp = style.webkitLineClamp || style.getPropertyValue('-webkit-line-clamp')
+      return Boolean(clamp && clamp !== 'none' && clamp !== 'unset' && Number(clamp) > 0)
+    }
+
     if (topic) {
       collectHorizontalClipping(topic.getBoundingClientRect(), 'feed topic')
-      // Topics are intentionally shortened in JS — never CSS line-clamped.
-      const topicStyle = window.getComputedStyle(topic)
-      const topicClamp =
-        topicStyle.webkitLineClamp || topicStyle.getPropertyValue('-webkit-line-clamp')
-      if (topicClamp && topicClamp !== 'none' && topicClamp !== 'unset' && Number(topicClamp) > 0) {
-        issues.push('feed topic is line-clamped (title truncated by CSS)')
-      }
     } else {
       issues.push('feed topic missing')
     }
@@ -204,21 +203,21 @@ async function auditHomePage(page) {
           issues.push('feed summary taller than 45% of viewport on mobile')
         }
       }
-
-      const clampTargets = [
-        ['feed teaser', summary.querySelector('.feed-row-teaser')],
-        ['feed summary bullets', summary.querySelector('.feed-row-summary-bullets')],
-      ]
-      for (const [label, element] of clampTargets) {
-        if (!element) continue
-        const style = window.getComputedStyle(element)
-        const lineClamp = style.webkitLineClamp || style.getPropertyValue('-webkit-line-clamp')
-        if (lineClamp && lineClamp !== 'none' && lineClamp !== 'unset' && Number(lineClamp) > 0) {
-          issues.push(`${label} is line-clamped (summary truncated)`)
-        }
-      }
     } else {
       issues.push('feed summary missing')
+    }
+
+    // Length for topic/teaser/bullets is owned in JS — CSS must not line-clamp them.
+    const clampTargets = [
+      ['feed topic', topic],
+      ['feed teaser', summary?.querySelector('.feed-row-teaser')],
+      ['feed summary bullets', summary?.querySelector('.feed-row-summary-bullets')],
+    ]
+    for (const [label, element] of clampTargets) {
+      if (!element) continue
+      if (isCssLineClamped(element)) {
+        issues.push(`${label} is line-clamped (JS owns length; CSS must not truncate)`)
+      }
     }
 
     return {

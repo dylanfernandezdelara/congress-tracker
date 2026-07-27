@@ -1,5 +1,6 @@
-const FALLBACK_HEADLINE_MAX_CHARS = 110
-const FALLBACK_HEADLINE_MIN_CLAUSE_CHARS = 60
+/** Soft cap for collapsed feed topics (digest headline or official title). */
+export const FEED_TOPIC_HEADLINE_MAX_CHARS = 110
+const FEED_TOPIC_HEADLINE_MIN_CLAUSE_CHARS = 60
 
 /** Leading legislative boilerplate safe to strip when a meaningful remainder remains. */
 const LEADING_TITLE_BOILERPLATE = /^(?:A bill to |An act to |To )(.+)$/i
@@ -25,8 +26,8 @@ function stripLeadingBoilerplate(title: string): string {
 
 function truncateOfficialTitle(
   text: string,
-  maxChars: number = FALLBACK_HEADLINE_MAX_CHARS,
-  minClauseChars: number = FALLBACK_HEADLINE_MIN_CLAUSE_CHARS,
+  maxChars: number = FEED_TOPIC_HEADLINE_MAX_CHARS,
+  minClauseChars: number = FEED_TOPIC_HEADLINE_MIN_CLAUSE_CHARS,
 ): string {
   if (text.length <= maxChars) return text
 
@@ -47,10 +48,17 @@ function truncateOfficialTitle(
   return text
 }
 
-/** Soften official bill titles for feed headlines when no digest exists. */
-export function formatFallbackHeadline(title: string): string {
+/**
+ * Soften a collapsed feed topic for display: strip legislative boilerplate when
+ * present, then soft-cap at a clause/word boundary. Used for digest headlines
+ * and official-title fallbacks alike — CSS must not line-clamp the result.
+ */
+export function formatFeedTopicHeadline(title: string): string {
   const collapsed = collapseWhitespace(title)
   if (!collapsed) return collapsed
 
   return truncateOfficialTitle(stripLeadingBoilerplate(collapsed))
 }
+
+/** @deprecated Prefer {@link formatFeedTopicHeadline}. */
+export const formatFallbackHeadline = formatFeedTopicHeadline
