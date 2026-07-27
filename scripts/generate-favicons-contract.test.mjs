@@ -5,55 +5,19 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
-  FLAG_HEIGHT,
-  FLAG_WIDTH,
-  flagColor,
+  FAVICON_VIEWBOX,
   generateFavicons,
   renderAppleTouchIcon,
   renderFavicon32,
+  renderFaviconSvg,
+  sampleFaviconColor,
 } from './generate-favicons.mjs'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const scriptPath = path.join(rootDir, 'scripts', 'generate-favicons.mjs')
 const publicDir = path.join(rootDir, 'web', 'public')
 const faviconSvgPath = path.join(publicDir, 'favicon.svg')
-
-const FILL_TO_RGB = {
-  '#B22234': [178, 34, 52],
-  '#FFFFFF': [255, 255, 255],
-  '#3C3B6E': [60, 59, 110],
-}
-
-/** @param {string} svg */
-function parseSvgFlagGrid(svg) {
-  /** @type {Array<Array<[number, number, number] | null>>} */
-  const grid = Array.from({ length: FLAG_HEIGHT }, () =>
-    Array.from({ length: FLAG_WIDTH }, () => null),
-  )
-
-  const rectRe =
-    /<rect\b(?=[^>]*\bwidth="(\d+)")(?=[^>]*\bheight="(\d+)")(?=[^>]*\bfill="([^"]+)")[^>]*>/g
-
-  for (const match of svg.matchAll(rectRe)) {
-    const width = Number(match[1])
-    const height = Number(match[2])
-    const fill = match[3]
-    const rgb = FILL_TO_RGB[fill]
-    assert.ok(rgb, `unexpected fill ${fill}`)
-
-    const attrs = match[0]
-    const x = Number(/(?:^|\s)x="(\d+)"/.exec(attrs)?.[1] ?? 0)
-    const y = Number(/(?:^|\s)y="(\d+)"/.exec(attrs)?.[1] ?? 0)
-
-    for (let dy = 0; dy < height; dy += 1) {
-      for (let dx = 0; dx < width; dx += 1) {
-        grid[y + dy][x + dx] = rgb
-      }
-    }
-  }
-
-  return grid
-}
+const brandFlagPath = path.join(rootDir, 'web', 'src', 'components', 'BrandFlagIcon.tsx')
 
 /** @param {Buffer} png */
 function readPngMeta(png) {
@@ -68,7 +32,15 @@ test('generate-favicons script exists', () => {
   assert.ok(fs.statSync(scriptPath).isFile())
 })
 
-test('generateFavicons writes crisp PNGs with expected dimensions', () => {
+test('header brand mark is a separate high-detail component', () => {
+  assert.ok(fs.statSync(brandFlagPath).isFile())
+  const src = fs.readFileSync(brandFlagPath, 'utf8')
+  assert.match(src, /BrandFlagIcon/)
+  assert.match(src, /viewBox="0 0 190 100"/)
+  assert.doesNotMatch(src, /crispEdges|pixelated|8-bit/i)
+})
+
+test('generateFavicons writes antialiased PNGs + SVG with expected dimensions', () => {
   const tmpDir = fs.mkdtempSync(path.join(rootDir, '.favicon-gen-'))
   try {
     const result = generateFavicons({ outDir: tmpDir })
@@ -80,12 +52,17 @@ test('generateFavicons writes crisp PNGs with expected dimensions', () => {
     assert.equal(appleMeta.width, 180)
     assert.equal(appleMeta.height, 180)
     assert.equal(appleMeta.colorType, 6)
+    assert.equal(FAVICON_VIEWBOX, 32)
+    const svg = fs.readFileSync(result.faviconSvgPath, 'utf8')
+    assert.match(svg, /viewBox="0 0 32 32"/)
+    assert.match(svg, /<path\b[^>]*scale\(/)
+    assert.doesNotMatch(svg, /crispEdges|shape-rendering/)
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 })
 
-test('checked-in favicon PNGs match generator output', () => {
+test('checked-in favicon assets match generator output', () => {
   const expectedFaviconSha = createHash('sha256').update(renderFavicon32()).digest('hex')
   const expectedAppleSha = createHash('sha256').update(renderAppleTouchIcon()).digest('hex')
   const committedFaviconSha = createHash('sha256')
@@ -96,20 +73,23 @@ test('checked-in favicon PNGs match generator output', () => {
     .digest('hex')
   assert.equal(expectedFaviconSha, committedFaviconSha)
   assert.equal(expectedAppleSha, committedAppleSha)
+  assert.equal(
+    fs.readFileSync(faviconSvgPath, 'utf8'),
+    renderFaviconSvg(),
+  )
 })
 
-test('generator flagColor matches favicon.svg rects', () => {
-  const svg = fs.readFileSync(faviconSvgPath, 'utf8')
-  const grid = parseSvgFlagGrid(svg)
-  for (let y = 0; y < FLAG_HEIGHT; y += 1) {
-    for (let x = 0; x < FLAG_WIDTH; x += 1) {
-      const fromSvg = grid[y][x]
-      const fromGenerator = flagColor(x, y)
-      assert.ok(fromSvg, `missing svg pixel at ${x},${y}`)
-      assert.ok(fromGenerator, `missing generator pixel at ${x},${y}`)
-      assert.deepEqual(fromGenerator, fromSvg)
-    }
-  }
+test('sampleFaviconColor covers flag stripes, canton, and stars', () => {
+  // Outside the flag pad → transparent
+  assert.equal(sampleFaviconColor(0.2, 0.2), null)
+  // Red stripe near top-right of flag
+  assert.deepEqual(sampleFaviconColor(20, 8), [178, 34, 52])
+  // White stripe
+  assert.deepEqual(sampleFaviconColor(20, 9.4), [255, 255, 255])
+  // Canton blue
+  assert.deepEqual(sampleFaviconColor(2, 10), [60, 59, 110])
+  // Star center
+  assert.deepEqual(sampleFaviconColor(3.5, 9.3), [255, 255, 255])
 })
 
 test('generator output is deterministic', () => {
@@ -119,4 +99,5 @@ test('generator output is deterministic', () => {
   const d = createHash('sha256').update(renderAppleTouchIcon()).digest('hex')
   assert.equal(a, b)
   assert.equal(c, d)
+  assert.equal(renderFaviconSvg(), renderFaviconSvg())
 })
