@@ -327,6 +327,11 @@
     padding-right: 0.25rem;
   }
 
+  .feed-row-summary-body--scrollable:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+  }
+
   .feed-row-crs-details {
     border-top: 1px solid hsl(var(--twc-border));
     padding-top: 1rem;

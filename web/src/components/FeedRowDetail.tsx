@@ -46,6 +46,8 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
   const expandedSummary = getFeedSummaryExpandedDisplay(item)
+  const hasDigestSummary =
+    Boolean(expandedSummary.whatItDoes) || expandedSummary.keyPoints.length > 0
   const { stages, terminalStatus } = getBillLifecycleStages(item)
   const pipelineDetail =
     terminalStatus === 'became_law_unsigned' || terminalStatus === 'pending_signature'
@@ -72,10 +74,15 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
           <h3 className="feed-row-detail-heading">What it does</h3>
           <p className="feed-row-summary-body">{expandedSummary.whatItDoes}</p>
         </section>
-      ) : expandedSummary.crsSummary ? (
+      ) : !hasDigestSummary && expandedSummary.crsSummary ? (
         <section className="feed-row-detail-section">
           <h3 className="feed-row-detail-heading">Summary</h3>
-          <div className="feed-row-summary-body feed-row-summary-body--scrollable">
+          <div
+            className="feed-row-summary-body feed-row-summary-body--scrollable"
+            tabIndex={0}
+            role="region"
+            aria-label="Official CRS summary"
+          >
             <p>{expandedSummary.crsSummary}</p>
           </div>
         </section>
@@ -92,10 +99,15 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
         </section>
       ) : null}
 
-      {expandedSummary.crsSummary && item.digest ? (
+      {hasDigestSummary && expandedSummary.crsSummary ? (
         <details className="feed-row-crs-details">
           <summary className="feed-row-crs-details-summary">Official CRS summary</summary>
-          <div className="feed-row-summary-body feed-row-summary-body--scrollable">
+          <div
+            className="feed-row-summary-body feed-row-summary-body--scrollable"
+            tabIndex={0}
+            role="region"
+            aria-label="Official CRS summary"
+          >
             <p>{expandedSummary.crsSummary}</p>
           </div>
         </details>
