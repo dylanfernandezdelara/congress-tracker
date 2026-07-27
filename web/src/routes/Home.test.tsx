@@ -113,8 +113,8 @@ describe('Home', () => {
           congress: 119,
           session: 2,
           roll_number: 9002,
-          bill_type: 's',
-          bill_number: 47,
+          bill_type: 'S',
+          bill_number: 2,
           yeas: 68,
           nays: 32,
           margin: 36,
@@ -460,6 +460,32 @@ describe('Home', () => {
     await waitFor(() => {
       expect(screen.getByTestId('search-params')).toHaveTextContent('chamber=Senate')
       expect(screen.getByTestId('search-params').textContent).not.toContain('bill=')
+    })
+  })
+
+  it('opens a feed bill detail when a notable vote headline is pressed', async () => {
+    const scrollIntoView = vi.fn()
+    HTMLElement.prototype.scrollIntoView = scrollIntoView
+
+    renderHome()
+
+    expect(await screen.findByText('Notable vote headline for sidebar')).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Open bill details for Notable vote headline for sidebar',
+      }),
+    )
+
+    const toggle = await screen.findByRole('button', { name: /Plain headline for readers/i })
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('search-params').textContent).toContain('bill=119-s-2')
+    })
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalled()
     })
   })
 

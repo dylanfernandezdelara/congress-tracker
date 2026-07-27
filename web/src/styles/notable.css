@@ -67,6 +67,34 @@
     letter-spacing: -0.15px;
   }
 
+  .notable-vote-title-button {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+  }
+
+  .notable-vote-title-button:hover .notable-vote-title,
+  .notable-vote-title-button:focus-visible .notable-vote-title {
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--twc-link-decoration));
+  }
+
+  .notable-vote-title-button:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .notable-vote-bill-id {
+    font-variant-numeric: tabular-nums;
+  }
+
   .notable-vote-why {
     margin: 0;
     font-size: 13px;

@@ -58,6 +58,57 @@ describe('NotableVotesSection', () => {
     expect(screen.queryByText(/119th Congress/i)).not.toBeInTheDocument()
   })
 
+  it('opens a bill when the notable headline is clicked', () => {
+    const onOpenBill = vi.fn()
+    render(<NotableVotesSection notable={[sampleEntry()]} onOpenBill={onOpenBill} />)
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Open bill details for Gives Money for Border and Immigration Enforcement Until 2029',
+      }),
+    )
+
+    expect(onOpenBill).toHaveBeenCalledWith({
+      congress: 119,
+      type: 'S',
+      number: 2,
+      chamber: 'House',
+    })
+  })
+
+  it('shows a short bill id in meta when bills are openable', () => {
+    render(<NotableVotesSection notable={[sampleEntry()]} onOpenBill={() => {}} />)
+
+    expect(screen.getByText('S. 2')).toBeInTheDocument()
+    expect(
+      screen.getByText((_, node) => node?.textContent === 'House · Jun 9 · S. 2'),
+    ).toBeInTheDocument()
+  })
+
+  it('opens a bill from the compact headline', () => {
+    const onOpenBill = vi.fn()
+    render(
+      <NotableVotesSection
+        variant="compact"
+        notable={[sampleEntry()]}
+        onOpenBill={onOpenBill}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Open bill details for Gives Money for Border and Immigration Enforcement Until 2029',
+      }),
+    )
+
+    expect(onOpenBill).toHaveBeenCalledWith({
+      congress: 119,
+      type: 'S',
+      number: 2,
+      chamber: 'House',
+    })
+  })
+
   afterEach(() => {
     vi.clearAllMocks()
     clearMemberProfileCache()

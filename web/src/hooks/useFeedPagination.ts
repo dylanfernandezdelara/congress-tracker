@@ -286,6 +286,50 @@ export function useFeedPagination() {
     [clearDeepLinkState, replaceSearchParams, setExpandedKey],
   )
 
+  /** Open a bill from outside the feed (e.g. notable votes) via the deep-link path. */
+  const openBill = useCallback(
+    (
+      bill: { congress: number; type: string; number: number },
+      options?: { chamber?: ChamberFilter },
+    ) => {
+      const target = formatBillQueryParam(bill)
+      const clearChamber =
+        Boolean(options?.chamber) &&
+        chamberRef.current != null &&
+        chamberRef.current !== options?.chamber
+      const clearSearch = Boolean(queryRef.current)
+
+      setBillMissingNotice(false)
+
+      replaceSearchParams((params) => {
+        params.set('bill', target)
+        params.delete('q')
+        if (clearChamber) params.delete('chamber')
+      })
+
+      // Restart deep-link resolution (needed when ?bill= is unchanged, or after a
+      // chamber/q clear that reloads the feed).
+      deepLinkBillRef.current = target
+      deepLinkQueryRef.current = null
+      deepLinkPhaseRef.current = 'searching'
+
+      // Snappy path: bill already on screen under the current filter.
+      if (!clearChamber && !clearSearch) {
+        const found = items.find((item) => itemMatchesBillParam(item, target))
+        if (found) {
+          const rowKey = feedRowKey(found)
+          setExpandedKey(rowKey)
+          deepLinkPhaseRef.current = 'done'
+          deepLinkQueryRef.current = deepLinkQueryKey(chamberRef.current, target, '')
+          requestAnimationFrame(() => {
+            scrollRowIntoView(rowKey)
+          })
+        }
+      }
+    },
+    [items, replaceSearchParams, setExpandedKey],
+  )
+
   const dismissBillMissingNotice = useCallback(() => {
     setBillMissingNotice(false)
     clearDeepLinkState()
@@ -373,6 +417,7 @@ export function useFeedPagination() {
     submitSearch,
     clearSearch,
     toggleRow,
+    openBill,
     dismissBillMissingNotice,
   }
 }

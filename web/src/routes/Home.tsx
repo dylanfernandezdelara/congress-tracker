@@ -61,6 +61,7 @@ export default function Home() {
     submitSearch,
     clearSearch,
     toggleRow,
+    openBill,
     dismissBillMissingNotice,
   } = useFeedPagination()
 
@@ -119,6 +120,16 @@ export default function Home() {
     />
   )
 
+  const handleOpenNotableBill = useCallback(
+    (bill: { congress: number; type: string; number: number; chamber: 'House' | 'Senate' }) => {
+      openBill(
+        { congress: bill.congress, type: bill.type, number: bill.number },
+        { chamber: bill.chamber },
+      )
+    },
+    [openBill],
+  )
+
   const notableVotesSection = (
     <NotableVotesSection
       variant="compact"
@@ -126,6 +137,7 @@ export default function Home() {
       loading={notableLoading}
       error={notableVotes.error}
       onRetry={handleReloadFeed}
+      onOpenBill={handleOpenNotableBill}
     />
   )
 

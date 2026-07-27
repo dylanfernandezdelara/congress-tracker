@@ -1,24 +1,42 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { prefetchMemberProfile } from '../api/memberProfileCache'
-import type { NotableVoteEntry } from '../api/types'
+import type { NotableVoteEntry, StatsChamber } from '../api/types'
 import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import {
   MEMBER_VOTES_UNAVAILABLE,
   noPartyDefectorsMessage,
 } from '../constants/memberVotesCopy'
-import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
+import { formatBillDocket, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { MemberAvatar } from './MemberAvatar'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
+
+export type NotableBillRef = {
+  congress: number
+  type: string
+  number: number
+  chamber: StatsChamber
+}
 
 type NotableVotesSectionProps = {
   notable: NotableVoteEntry[] | null
   loading?: boolean
   error?: string | null
   onRetry?: () => void
+  /** Open the bill in the main feed (deep-link expand). */
+  onOpenBill?: (bill: NotableBillRef) => void
   /** `cards` = full notable cards (default). `compact` = dense rail list. */
   variant?: 'cards' | 'compact'
+}
+
+function billRefFromEntry(entry: NotableVoteEntry): NotableBillRef {
+  return {
+    congress: entry.congress,
+    type: entry.bill_type,
+    number: entry.bill_number,
+    chamber: entry.chamber,
+  }
 }
 
 function NotableVoteDefectors({
@@ -74,19 +92,40 @@ function NotableVoteDefectors({
 function NotableVoteCard({
   entry,
   onOpenProfile,
+  onOpenBill,
 }: {
   entry: NotableVoteEntry
   onOpenProfile: (seed: MemberProfileSeed) => void
+  onOpenBill?: (bill: NotableBillRef) => void
 }) {
   const billLabel = formatBillDocket(entry.bill_type, entry.bill_number, entry.congress)
+  const shortBillId = formatShortBillId(entry.bill_type, entry.bill_number)
   const title = entry.headline ?? `${billLabel} passage vote`
+  const openLabel = `Open bill details for ${title}`
 
   return (
     <article className="notable-vote-card">
-      <h3 className="notable-vote-title">{title}</h3>
+      {onOpenBill ? (
+        <button
+          type="button"
+          className="notable-vote-title-button"
+          onClick={() => onOpenBill(billRefFromEntry(entry))}
+          aria-label={openLabel}
+        >
+          <h3 className="notable-vote-title">{title}</h3>
+        </button>
+      ) : (
+        <h3 className="notable-vote-title">{title}</h3>
+      )}
       <p className="notable-vote-why">{entry.why_it_matters}</p>
       <p className="notable-vote-meta">
         {entry.chamber} · {formatVoteDate(entry.vote_date)}
+        {onOpenBill ? (
+          <>
+            {' · '}
+            <span className="notable-vote-bill-id">{shortBillId}</span>
+          </>
+        ) : null}
       </p>
       <NotableVoteDefectors entry={entry} onOpenProfile={onOpenProfile} />
     </article>
@@ -96,18 +135,34 @@ function NotableVoteCard({
 function NotableVoteCompactItem({
   entry,
   onOpenProfile,
+  onOpenBill,
 }: {
   entry: NotableVoteEntry
   onOpenProfile: (seed: MemberProfileSeed) => void
+  onOpenBill?: (bill: NotableBillRef) => void
 }) {
+  const shortBillId = formatShortBillId(entry.bill_type, entry.bill_number)
   const title = entry.headline ?? `${entry.chamber} passage vote`
   const firstDefector = entry.defectors[0]
+  const openLabel = `Open bill details for ${title}`
 
   return (
     <li className="notable-compact-item">
-      <p className="notable-compact-headline">{title}</p>
+      {onOpenBill ? (
+        <button
+          type="button"
+          className="notable-compact-headline-button"
+          onClick={() => onOpenBill(billRefFromEntry(entry))}
+          aria-label={openLabel}
+        >
+          <span className="notable-compact-headline">{title}</span>
+        </button>
+      ) : (
+        <p className="notable-compact-headline">{title}</p>
+      )}
       <p className="notable-compact-meta">
         {entry.chamber} · {formatVoteDate(entry.vote_date)}
+        {onOpenBill ? ` · ${shortBillId}` : ''}
         {entry.why_it_matters ? ` · ${entry.why_it_matters}` : ''}
       </p>
       {firstDefector ? (
@@ -132,6 +187,7 @@ export function NotableVotesSection({
   loading = false,
   error = null,
   onRetry,
+  onOpenBill,
   variant = 'cards',
 }: NotableVotesSectionProps) {
   const [selection, setSelection] = useState<{ seed: MemberProfileSeed; key: number } | null>(
@@ -219,6 +275,7 @@ export function NotableVotesSection({
               key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
               entry={entry}
               onOpenProfile={openProfile}
+              onOpenBill={onOpenBill}
             />
           ))}
         </ul>
@@ -238,6 +295,7 @@ export function NotableVotesSection({
             key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
             entry={entry}
             onOpenProfile={openProfile}
+            onOpenBill={onOpenBill}
           />
         ))}
       </div>
