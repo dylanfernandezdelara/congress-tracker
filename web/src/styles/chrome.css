@@ -146,13 +146,13 @@
   .brand-flag-icon {
     display: block;
     flex-shrink: 0;
-    width: 24px;
+    width: 26px;
     height: auto;
   }
 
   @media (min-width: 640px) {
     .brand-flag-icon {
-      width: 28px;
+      width: 32px;
     }
   }
 
