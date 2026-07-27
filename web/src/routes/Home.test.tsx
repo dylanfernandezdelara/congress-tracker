@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
+import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { AppLayout } from '../layouts/AppLayout'
 import Home from './Home'
@@ -120,6 +121,9 @@ describe('Home', () => {
           margin: 36,
           vote_date: '2026-06-05',
           headline: 'Notable vote headline for sidebar',
+          what_it_does: 'It does something important in plain language.',
+          key_points: ['Point one'],
+          raw_summary_text: null,
           significance_score: 42,
           why_it_matters: 'Bipartisan coalition carried the vote',
           defectors: [],
@@ -236,6 +240,7 @@ describe('Home', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     clearMemberProfileCache()
+    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 
@@ -482,9 +487,11 @@ describe('Home', () => {
     ).toBeInTheDocument()
     expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('bill=')
     expect(scrollIntoView).not.toHaveBeenCalled()
-    await waitFor(() => {
-      expect(screen.getByText(/It does something important/i)).toBeInTheDocument()
-    })
+    expect(
+      within(screen.getByRole('dialog', { name: 'Notable vote headline for sidebar' })).getByText(
+        /It does something important/i,
+      ),
+    ).toBeInTheDocument()
   })
 
   it('does not start stats fetches until the first feed page settles', async () => {

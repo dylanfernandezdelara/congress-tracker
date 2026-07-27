@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
-import { formatBillDocket, formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 import { NotableBillSheet } from './NotableBillSheet'
 import { NotableVoteDefectors } from './NotableVoteDefectors'
@@ -27,15 +27,11 @@ function NotableVoteHeadline({
   as = 'h3',
 }: {
   title: string
-  onOpen?: () => void
+  onOpen: () => void
   headingClassName: string
   as?: 'h3' | 'p'
 }) {
   const HeadingTag = as
-
-  if (!onOpen) {
-    return <HeadingTag className={headingClassName}>{title}</HeadingTag>
-  }
 
   // Keep the heading element outside the button (valid content model).
   return (
@@ -54,22 +50,26 @@ function NotableVoteHeadline({
 
 function NotableVoteMeta({
   entry,
-  showBillId,
   className,
   trailing,
 }: {
   entry: NotableVoteEntry
-  showBillId: boolean
   className: string
   trailing?: ReactNode
 }) {
   const shortBillId = formatShortBillId(entry.bill_type, entry.bill_number)
   return (
     <p className={className}>
-      {entry.chamber} · {formatVoteDate(entry.vote_date)}
-      {showBillId ? ` · ${shortBillId}` : ''}
+      {entry.chamber} · {formatVoteDate(entry.vote_date)} · {shortBillId}
       {trailing}
     </p>
+  )
+}
+
+function notableTitle(entry: NotableVoteEntry): string {
+  return (
+    entry.headline ??
+    `${formatShortBillId(entry.bill_type, entry.bill_number)} passage vote`
   )
 }
 
@@ -82,8 +82,7 @@ function NotableVoteCard({
   onOpenProfile: (seed: MemberProfileSeed) => void
   onOpenBill: (entry: NotableVoteEntry) => void
 }) {
-  const billLabel = formatBillDocket(entry.bill_type, entry.bill_number, entry.congress)
-  const title = entry.headline ?? `${billLabel} passage vote`
+  const title = notableTitle(entry)
 
   return (
     <article className="notable-vote-card">
@@ -93,7 +92,7 @@ function NotableVoteCard({
         onOpen={() => onOpenBill(entry)}
       />
       <p className="notable-vote-why">{entry.why_it_matters}</p>
-      <NotableVoteMeta entry={entry} showBillId className="notable-vote-meta" />
+      <NotableVoteMeta entry={entry} className="notable-vote-meta" />
       <NotableVoteDefectors entry={entry} onOpenProfile={onOpenProfile} />
     </article>
   )
@@ -108,7 +107,7 @@ function NotableVoteCompactItem({
   onOpenProfile: (seed: MemberProfileSeed) => void
   onOpenBill: (entry: NotableVoteEntry) => void
 }) {
-  const title = entry.headline ?? `${entry.chamber} passage vote`
+  const title = notableTitle(entry)
   const firstDefector = entry.defectors[0]
 
   return (
@@ -121,7 +120,6 @@ function NotableVoteCompactItem({
       />
       <NotableVoteMeta
         entry={entry}
-        showBillId
         className="notable-compact-meta"
         trailing={entry.why_it_matters ? ` · ${entry.why_it_matters}` : null}
       />
@@ -170,23 +168,23 @@ export function NotableVotesSection({
 
   const closeOverlay = useCallback(() => setSelection(null), [])
 
-  const overlays = (
-    <>
+  const overlays =
+    selection?.kind === 'member' ? (
       <MemberProfile
-        open={selection?.kind === 'member'}
-        seed={selection?.kind === 'member' ? selection.seed : null}
-        selectionKey={selection?.kind === 'member' ? selection.key : 0}
+        open
+        seed={selection.seed}
+        selectionKey={selection.key}
         onClose={closeOverlay}
       />
+    ) : selection?.kind === 'bill' ? (
       <NotableBillSheet
-        open={selection?.kind === 'bill'}
-        entry={selection?.kind === 'bill' ? selection.entry : null}
-        selectionKey={selection?.kind === 'bill' ? selection.key : 0}
+        open
+        entry={selection.entry}
+        selectionKey={selection.key}
         onClose={closeOverlay}
         onOpenProfile={openProfile}
       />
-    </>
-  )
+    ) : null
 
   if (error) {
     const className = variant === 'compact' ? 'notable-compact' : 'home-enrichment'

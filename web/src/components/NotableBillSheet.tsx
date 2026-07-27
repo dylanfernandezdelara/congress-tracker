@@ -1,11 +1,9 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId } from 'react'
 
-import { fetchFeed } from '../api/client'
-import type { FeedItem, NotableVoteEntry } from '../api/types'
-import { FEED_MAX_PAGE_SIZE } from '../constants/feed'
+import { normalizeDigestBullets } from '@congress-tracker/shared/feed-content'
+import type { NotableVoteEntry } from '../api/types'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
-import { formatBillQueryParam, itemMatchesBillParam } from '../utils/billDeepLink'
-import { getFeedSummaryContent } from '../utils/feedRowLabels'
+import type { FeedSummaryContent } from '../utils/feedRowLabels'
 import { AnimatedSheet } from './AnimatedSheet'
 import { FeedSummarySections } from './FeedSummarySections'
 import type { MemberProfileSeed } from './MemberProfile'
@@ -19,32 +17,21 @@ type NotableBillSheetProps = {
   onOpenProfile: (seed: MemberProfileSeed) => void
 }
 
-type DigestPhase =
-  | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'ready'; item: FeedItem }
-  | { kind: 'missing' }
-  | { kind: 'error'; message: string }
-
 function billTitle(entry: NotableVoteEntry): string {
   const billLabel = formatShortBillId(entry.bill_type, entry.bill_number)
   return entry.headline ?? `${billLabel} passage vote`
 }
 
-async function loadFeedItemForNotable(entry: NotableVoteEntry): Promise<FeedItem | null> {
-  const billParam = formatBillQueryParam({
-    congress: entry.congress,
-    type: entry.bill_type,
-    number: entry.bill_number,
-  })
-  // Use the worker max page size: bill-id search is prefix-based, so a short
-  // id like "S. 2" can match many siblings (S. 20–S. 29, …) ahead of the exact bill.
-  const page = await fetchFeed({
-    limit: FEED_MAX_PAGE_SIZE,
-    offset: 0,
-    q: formatShortBillId(entry.bill_type, entry.bill_number),
-  })
-  return page.items.find((item) => itemMatchesBillParam(item, billParam)) ?? null
+function summaryFromEntry(entry: NotableVoteEntry): FeedSummaryContent {
+  const whatItDoes = entry.what_it_does?.trim() || null
+  const keyPoints = normalizeDigestBullets(entry.key_points)
+  const crsSummary = entry.raw_summary_text?.trim() || null
+  return {
+    whatItDoes,
+    keyPoints,
+    crsSummary,
+    pending: !whatItDoes && keyPoints.length === 0 && !crsSummary,
+  }
 }
 
 export function NotableBillSheet({
@@ -55,40 +42,13 @@ export function NotableBillSheet({
   onOpenProfile,
 }: NotableBillSheetProps) {
   const titleId = useId()
-  const [digest, setDigest] = useState<DigestPhase>({ kind: 'idle' })
-  const requestIdRef = useRef(0)
-
-  useEffect(() => {
-    if (!open || !entry) {
-      setDigest({ kind: 'idle' })
-      return
-    }
-
-    const requestId = ++requestIdRef.current
-    setDigest({ kind: 'loading' })
-    let cancelled = false
-
-    void loadFeedItemForNotable(entry)
-      .then((item) => {
-        if (cancelled || requestId !== requestIdRef.current) return
-        setDigest(item ? { kind: 'ready', item } : { kind: 'missing' })
-      })
-      .catch(() => {
-        if (cancelled || requestId !== requestIdRef.current) return
-        setDigest({ kind: 'error', message: "Couldn't load the bill summary." })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [open, entry, selectionKey])
 
   if (!entry) return null
 
   const title = billTitle(entry)
   const billId = formatShortBillId(entry.bill_type, entry.bill_number)
   const sourceUrl = congressGovBillUrl(entry.congress, entry.bill_type, entry.bill_number)
-  const summary = digest.kind === 'ready' ? getFeedSummaryContent(digest.item) : null
+  const summary = summaryFromEntry(entry)
 
   return (
     <AnimatedSheet
@@ -113,18 +73,7 @@ export function NotableBillSheet({
         ) : null}
       </header>
 
-      {digest.kind === 'loading' || digest.kind === 'idle' ? (
-        <p className="member-profile-muted">Loading plain-English summary…</p>
-      ) : null}
-      {digest.kind === 'error' ? (
-        <p className="member-profile-muted">{digest.message}</p>
-      ) : null}
-      {digest.kind === 'missing' ? (
-        <p className="member-profile-muted">
-          No plain-English summary is in the recent feed for this bill.
-        </p>
-      ) : null}
-      {summary ? <FeedSummarySections content={summary} /> : null}
+      <FeedSummarySections content={summary} />
 
       <section className="member-profile-section" aria-label="Party-line breaks">
         <h3 className="member-profile-section-title">Party-line breaks</h3>

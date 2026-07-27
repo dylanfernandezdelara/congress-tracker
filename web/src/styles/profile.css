@@ -1,5 +1,5 @@
 @layer components {
-  .member-profile-root {
+  .sheet-root {
     position: fixed;
     inset: 0;
     z-index: 40;
@@ -8,7 +8,7 @@
     justify-content: center;
   }
 
-  .member-profile-backdrop {
+  .sheet-backdrop {
     position: absolute;
     inset: 0;
     border: none;
@@ -16,10 +16,10 @@
     margin: 0;
     background: hsl(var(--twc-foreground) / 0.28);
     cursor: pointer;
-    animation: member-profile-backdrop-in 320ms ease both;
+    animation: sheet-backdrop-in 320ms ease both;
   }
 
-  .member-profile-panel {
+  .sheet-panel {
     position: relative;
     z-index: 1;
     width: min(28rem, 100%);
@@ -36,11 +36,11 @@
     /* Off-screen distance for the rise/sink keyframes. The bottom-docked
        mobile sheet only needs its own height; the centered desktop panel
        overrides this to 100vh (see the min-width block below). */
-    --member-profile-slide-distance: 100%;
-    animation: member-profile-rise 400ms var(--motion-ease-sheet) both;
+    --sheet-slide-distance: 100%;
+    animation: sheet-rise 400ms var(--motion-ease-sheet) both;
   }
 
-  @keyframes member-profile-backdrop-in {
+  @keyframes sheet-backdrop-in {
     from {
       opacity: 0;
     }
@@ -49,7 +49,7 @@
     }
   }
 
-  @keyframes member-profile-backdrop-out {
+  @keyframes sheet-backdrop-out {
     from {
       opacity: 1;
     }
@@ -58,44 +58,44 @@
     }
   }
 
-  @keyframes member-profile-rise {
+  @keyframes sheet-rise {
     from {
-      transform: translateY(var(--member-profile-slide-distance));
+      transform: translateY(var(--sheet-slide-distance));
     }
     to {
       transform: translateY(0);
     }
   }
 
-  @keyframes member-profile-sink {
+  @keyframes sheet-sink {
     from {
       transform: translateY(0);
     }
     to {
-      transform: translateY(var(--member-profile-slide-distance));
+      transform: translateY(var(--sheet-slide-distance));
     }
   }
 
-  /* Animated close: MemberProfile keeps the dialog mounted with this modifier
-     until the panel's exit animation finishes, then unmounts it. */
-  .member-profile-root--closing {
+  /* Animated close: keep the dialog mounted with this modifier until the
+     panel's exit animation finishes, then unmount it. */
+  .sheet-root--closing {
     pointer-events: none;
   }
 
-  .member-profile-root--closing .member-profile-backdrop {
-    animation: member-profile-backdrop-out 260ms ease both;
+  .sheet-root--closing .sheet-backdrop {
+    animation: sheet-backdrop-out 260ms ease both;
   }
 
-  .member-profile-root--closing .member-profile-panel {
-    animation: member-profile-sink 280ms var(--motion-ease-in) both;
+  .sheet-root--closing .sheet-panel {
+    animation: sheet-sink 280ms var(--motion-ease-in) both;
   }
 
-  .member-profile-toolbar {
+  .sheet-toolbar {
     display: flex;
     justify-content: flex-end;
   }
 
-  .member-profile-close {
+  .sheet-close {
     border: none;
     background: transparent;
     color: hsl(var(--twc-secondary));
@@ -105,11 +105,11 @@
     cursor: pointer;
   }
 
-  .member-profile-close:hover {
+  .sheet-close:hover {
     color: hsl(var(--twc-foreground));
   }
 
-  .member-profile-close:focus-visible {
+  .sheet-close:focus-visible {
     outline: 2px solid hsl(var(--twc-accent));
     outline-offset: 2px;
     border-radius: 2px;
@@ -286,7 +286,7 @@
   }
 
   @media (min-width: 640px) {
-    .member-profile-root {
+    .sheet-root {
       align-items: center;
       padding: 1.5rem;
     }
@@ -294,18 +294,18 @@
     /* Same sheet motion as mobile, but the panel is vertically centered here,
        so slide from 100vh to guarantee it starts fully off-screen regardless
        of panel height. */
-    .member-profile-panel {
+    .sheet-panel {
       border-radius: 1rem;
       max-height: min(85vh, 36rem);
-      --member-profile-slide-distance: 100vh;
+      --sheet-slide-distance: 100vh;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .member-profile-backdrop,
-    .member-profile-panel,
-    .member-profile-root--closing .member-profile-backdrop,
-    .member-profile-root--closing .member-profile-panel {
+    .sheet-backdrop,
+    .sheet-panel,
+    .sheet-root--closing .sheet-backdrop,
+    .sheet-root--closing .sheet-panel {
       animation: none;
     }
   }

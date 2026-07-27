@@ -74,6 +74,12 @@ export interface NotableVoteEntry {
   margin: number
   vote_date: string
   headline: string | null
+  /** Plain-English lead from the bill digest, when available. */
+  what_it_does: string | null
+  /** Digest key points (may be empty). */
+  key_points: string[]
+  /** Official CRS summary text when no digest lead is available. */
+  raw_summary_text: string | null
   significance_score: number
   why_it_matters: string
   defectors: NotableVoteDefector[]

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
+import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { DefectorEntry, PortfolioMovers, SessionStatsResponse } from '../api/types'
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
@@ -116,6 +117,7 @@ describe('LeftSidebar', () => {
   afterEach(() => {
     vi.clearAllMocks()
     clearMemberProfileCache()
+    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 

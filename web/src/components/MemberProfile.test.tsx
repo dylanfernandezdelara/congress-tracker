@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
+import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { MemberProfileResponse } from '../api/types'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 
@@ -69,6 +70,7 @@ function endAnimation(element: HTMLElement, animationName: string) {
 afterEach(() => {
   vi.clearAllMocks()
   clearMemberProfileCache()
+  resetSheetLayerForTests()
   document.body.style.overflow = ''
 })
 
@@ -125,15 +127,15 @@ describe('MemberProfile', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
     // The departing dialog must be inert (unfocusable, hidden from AT).
-    expect(dialog.closest('.member-profile-root')).toHaveAttribute('inert')
+    expect(dialog.closest('.sheet-root')).toHaveAttribute('inert')
     // A stray enter-animation end must not finish the close.
-    endAnimation(dialog, 'member-profile-rise')
+    endAnimation(dialog, 'sheet-rise')
     expect(onClose).not.toHaveBeenCalled()
-    endAnimation(dialog, 'member-profile-sink')
+    endAnimation(dialog, 'sheet-sink')
     expect(onClose).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    endAnimation(dialog, 'member-profile-sink')
+    endAnimation(dialog, 'sheet-sink')
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
@@ -151,7 +153,7 @@ describe('MemberProfile', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    endAnimation(dialog, 'member-profile-sink')
+    endAnimation(dialog, 'sheet-sink')
 
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -178,7 +180,7 @@ describe('MemberProfile', () => {
     rerender(<MemberProfile open seed={otherSeed} selectionKey={2} onClose={onClose} />)
 
     const dialog = screen.getByRole('dialog', { name: 'Grace Other' })
-    endAnimation(dialog, 'member-profile-sink')
+    endAnimation(dialog, 'sheet-sink')
 
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'Grace Other' })).toBeInTheDocument()
@@ -202,10 +204,10 @@ describe('MemberProfile', () => {
     rerender(<MemberProfile open seed={seed} selectionKey={2} onClose={onClose} />)
 
     const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
-    expect(dialog.closest('.member-profile-root')).not.toHaveAttribute('inert')
+    expect(dialog.closest('.sheet-root')).not.toHaveAttribute('inert')
     // Cancelling the close pulls focus back into the still-open modal.
     expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
-    endAnimation(dialog, 'member-profile-sink')
+    endAnimation(dialog, 'sheet-sink')
 
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
+import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { NotableVotesSection } from './NotableVotesSection'
 
 vi.mock('../api/client', () => ({
@@ -26,29 +27,6 @@ vi.mock('../api/client', () => ({
     member_votes_available: true,
     as_of: '2026-07-20T00:00:00.000Z',
   })),
-  fetchFeed: vi.fn(async () => ({
-    items: [
-      {
-        bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
-        policy_area: 'Immigration',
-        digest: {
-          headline: 'Gives Money for Border and Immigration Enforcement Until 2029',
-          what_it_does: 'Funds border enforcement programs through 2029.',
-          key_points: ['Adds border funding'],
-          terms_explained: [],
-        },
-        raw_summary_text: null,
-        passage_votes: [],
-        latest_passage_date: '2026-06-09',
-        latest_activity_date: '2026-06-09',
-        lifecycle: null,
-      },
-    ],
-    total: 1,
-    limit: 15,
-    offset: 0,
-    has_more: false,
-  })),
 }))
 
 function sampleEntry(overrides: Partial<NotableVoteEntry> = {}): NotableVoteEntry {
@@ -64,6 +42,9 @@ function sampleEntry(overrides: Partial<NotableVoteEntry> = {}): NotableVoteEntr
     margin: 2,
     vote_date: '2026-06-09',
     headline: 'Gives Money for Border and Immigration Enforcement Until 2029',
+    what_it_does: 'Funds border enforcement programs through 2029.',
+    key_points: ['Adds border funding'],
+    raw_summary_text: null,
     significance_score: 43,
     why_it_matters: 'Passed in the House by just 2 votes',
     defectors: [],
@@ -82,7 +63,7 @@ describe('NotableVotesSection', () => {
     expect(screen.queryByText(/119th Congress/i)).not.toBeInTheDocument()
   })
 
-  it('opens an in-place bill sheet when the notable headline is clicked', async () => {
+  it('opens an in-place bill sheet when the notable headline is clicked', () => {
     render(<NotableVotesSection notable={[sampleEntry()]} />)
 
     fireEvent.click(
@@ -96,16 +77,14 @@ describe('NotableVotesSection', () => {
     })
     expect(dialog).toBeInTheDocument()
     expect(screen.getByText(/214–212 \(2\)/)).toBeInTheDocument()
-    await waitFor(() => {
-      expect(screen.getByText('Funds border enforcement programs through 2029.')).toBeInTheDocument()
-    })
+    expect(screen.getByText('Funds border enforcement programs through 2029.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Read on congress.gov/i })).toHaveAttribute(
       'href',
       expect.stringContaining('/bill/119th-congress/senate-bill/2'),
     )
   })
 
-  it('opens a bill sheet from the compact headline without changing the page URL', async () => {
+  it('opens a bill sheet from the compact headline without changing the page URL', () => {
     render(<NotableVotesSection variant="compact" notable={[sampleEntry()]} />)
 
     fireEvent.click(
@@ -119,14 +98,13 @@ describe('NotableVotesSection', () => {
         name: 'Gives Money for Border and Immigration Enforcement Until 2029',
       }),
     ).toBeInTheDocument()
-    await waitFor(() => {
-      expect(screen.getByText('What it does')).toBeInTheDocument()
-    })
+    expect(screen.getByText('What it does')).toBeInTheDocument()
   })
 
   afterEach(() => {
     vi.clearAllMocks()
     clearMemberProfileCache()
+    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 

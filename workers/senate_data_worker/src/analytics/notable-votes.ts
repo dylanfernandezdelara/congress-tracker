@@ -45,6 +45,7 @@ interface CandidateRow {
   headline: string | null;
   bill_title: string | null;
   digest_lead: string | null;
+  key_points_json: string | null;
   raw_summary: string | null;
 }
 
@@ -87,6 +88,17 @@ export interface BuildNotableVotesResult {
   detection_method: "heuristic" | "llm";
 }
 
+function parseDigestKeyPoints(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((point): point is string => typeof point === "string" && point.trim() !== "");
+  } catch {
+    return [];
+  }
+}
+
 function rollKey(vote: Pick<CandidateRow, "chamber" | "congress" | "session" | "roll_number">): string {
   return `${vote.chamber}:${vote.congress}:${vote.session}:${vote.roll_number}`;
 }
@@ -105,6 +117,7 @@ async function fetchCandidates(
               ABS(v.yeas - v.nays) AS margin, v.vote_date, v.result, v.question,
               json_extract(d.digest_json, '$.headline') AS headline,
               json_extract(d.digest_json, '$.what_it_does') AS digest_lead,
+              json_extract(d.digest_json, '$.key_points') AS key_points_json,
               d.title AS bill_title,
               d.raw_summary_text AS raw_summary
        FROM votes v
@@ -405,6 +418,9 @@ export async function buildNotableVotes(
       margin: vote.margin,
       vote_date: vote.vote_date,
       headline: vote.headline ? stripLocalSampleLabel(vote.headline) : null,
+      what_it_does: vote.digest_lead ? stripLocalSampleLabel(vote.digest_lead) : null,
+      key_points: parseDigestKeyPoints(vote.key_points_json),
+      raw_summary_text: vote.raw_summary,
       significance_score,
       why_it_matters,
       defectors,
