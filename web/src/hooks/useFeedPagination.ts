@@ -51,6 +51,7 @@ export function useFeedPagination() {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null)
+  const [deepLinkKick, setDeepLinkKick] = useState(0)
   const [feedSettled, setFeedSettled] = useState(false)
   const [billMissingNotice, setBillMissingNotice] = useState(false)
 
@@ -288,18 +289,16 @@ export function useFeedPagination() {
 
   /** Open a bill from outside the feed (e.g. notable votes) via the deep-link path. */
   const openBill = useCallback(
-    (
-      bill: { congress: number; type: string; number: number },
-      options?: { chamber?: ChamberFilter },
-    ) => {
+    (bill: { congress: number; type: string; number: number; chamber?: ChamberFilter }) => {
       const target = formatBillQueryParam(bill)
       const clearChamber =
-        Boolean(options?.chamber) &&
+        Boolean(bill.chamber) &&
         chamberRef.current != null &&
-        chamberRef.current !== options?.chamber
-      const clearSearch = Boolean(queryRef.current)
+        chamberRef.current !== bill.chamber
 
       setBillMissingNotice(false)
+      // Cancel any pending search-draft debounce before it can re-apply `q`.
+      setDraftQuery('')
 
       replaceSearchParams((params) => {
         params.set('bill', target)
@@ -307,27 +306,13 @@ export function useFeedPagination() {
         if (clearChamber) params.delete('chamber')
       })
 
-      // Restart deep-link resolution (needed when ?bill= is unchanged, or after a
-      // chamber/q clear that reloads the feed).
+      // Restart the existing deep-link machine (including same-`?bill=` retries).
       deepLinkBillRef.current = target
       deepLinkQueryRef.current = null
       deepLinkPhaseRef.current = 'searching'
-
-      // Snappy path: bill already on screen under the current filter.
-      if (!clearChamber && !clearSearch) {
-        const found = items.find((item) => itemMatchesBillParam(item, target))
-        if (found) {
-          const rowKey = feedRowKey(found)
-          setExpandedKey(rowKey)
-          deepLinkPhaseRef.current = 'done'
-          deepLinkQueryRef.current = deepLinkQueryKey(chamberRef.current, target, '')
-          requestAnimationFrame(() => {
-            scrollRowIntoView(rowKey)
-          })
-        }
-      }
+      setDeepLinkKick((k) => k + 1)
     },
-    [items, replaceSearchParams, setExpandedKey],
+    [replaceSearchParams],
   )
 
   const dismissBillMissingNotice = useCallback(() => {
@@ -394,6 +379,7 @@ export function useFeedPagination() {
     loadFeedPage,
     nextOffset,
     setExpandedKey,
+    deepLinkKick,
   ])
 
   return {

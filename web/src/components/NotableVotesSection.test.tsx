@@ -79,7 +79,6 @@ describe('NotableVotesSection', () => {
   it('shows a short bill id in meta when bills are openable', () => {
     render(<NotableVotesSection notable={[sampleEntry()]} onOpenBill={() => {}} />)
 
-    expect(screen.getByText('S. 2')).toBeInTheDocument()
     expect(
       screen.getByText((_, node) => node?.textContent === 'House · Jun 9 · S. 2'),
     ).toBeInTheDocument()

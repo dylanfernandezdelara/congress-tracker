@@ -356,30 +356,6 @@
     color: hsl(var(--twc-foreground));
   }
 
-  .notable-compact-headline-button {
-    display: block;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-    color: inherit;
-  }
-
-  .notable-compact-headline-button:hover .notable-compact-headline,
-  .notable-compact-headline-button:focus-visible .notable-compact-headline {
-    text-decoration: underline;
-    text-decoration-color: hsl(var(--twc-link-decoration));
-  }
-
-  .notable-compact-headline-button:focus-visible {
-    outline: 2px solid hsl(var(--twc-foreground));
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-
   .notable-compact-meta {
     margin: 0;
     font-size: 12px;
