@@ -47,13 +47,6 @@ const STAR_CENTERS = [
   [10.5, 14.8],
 ]
 
-/**
- * Unit five-point star path (radius 1), used for SVG markup.
- * Keep in sync with pointInStar().
- */
-const STAR_PATH =
-  'M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z'
-
 /** @type {ReadonlyArray<readonly [number, number]>} */
 const STAR_VERTICES = [
   [0, -1],
@@ -67,6 +60,9 @@ const STAR_VERTICES = [
   [-0.9511, -0.309],
   [-0.2245, -0.309],
 ]
+
+/** Unit five-point star path derived from STAR_VERTICES (evenodd fill). */
+const STAR_PATH = `M${STAR_VERTICES.map(([x, y]) => `${x},${y}`).join(' ')}Z`
 
 /**
  * @param {number} px
@@ -187,7 +183,7 @@ export function renderFaviconPng(size = FAVICON_SIZE, samples = SUPERSAMPLE) {
       let r = 0
       let g = 0
       let b = 0
-      let a = 0
+      let opaque = 0
       for (let sy = 0; sy < samples; sy += 1) {
         for (let sx = 0; sx < samples; sx += 1) {
           const vx = (x + (sx + 0.5) / samples) * scale
@@ -197,15 +193,19 @@ export function renderFaviconPng(size = FAVICON_SIZE, samples = SUPERSAMPLE) {
           r += color[0]
           g += color[1]
           b += color[2]
-          a += 255
+          opaque += 1
         }
       }
       const n = samples * samples
+      if (opaque === 0) {
+        pixels.push([0, 0, 0, 0])
+        continue
+      }
       pixels.push([
-        Math.round(r / n),
-        Math.round(g / n),
-        Math.round(b / n),
-        Math.round(a / n),
+        Math.round(r / opaque),
+        Math.round(g / opaque),
+        Math.round(b / opaque),
+        Math.round((opaque / n) * 255),
       ])
     }
   }
@@ -231,7 +231,7 @@ export function renderFaviconSvg() {
     .join('\n')
   const stars = STAR_CENTERS.map(
     ([cx, cy]) =>
-      `  <path d="${STAR_PATH}" fill="#FFFFFF" transform="translate(${cx} ${cy}) scale(${STAR_R})"/>`,
+      `  <path d="${STAR_PATH}" fill="#FFFFFF" fill-rule="evenodd" transform="translate(${cx} ${cy}) scale(${STAR_R})"/>`,
   ).join('\n')
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${FAVICON_VIEWBOX} ${FAVICON_VIEWBOX}" role="img" aria-label="Track Congress">

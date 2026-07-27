@@ -6,6 +6,12 @@ type BrandFlagIconProps = {
 const STAR_PATH =
   'M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z'
 
+const FLAG_W = 190
+const FLAG_H = 100
+const CANTON_W = 76
+const CANTON_H = (7 / 13) * FLAG_H
+const STAR_SCALE = 3.1
+
 function buildStarCenters(cantonW: number, cantonH: number): Array<{ cx: number; cy: number }> {
   const stars: Array<{ cx: number; cy: number }> = []
   const hGap = cantonW / 12
@@ -24,42 +30,41 @@ function buildStarCenters(cantonW: number, cantonH: number): Array<{ cx: number;
   return stars
 }
 
+const STAR_CENTERS = buildStarCenters(CANTON_W, CANTON_H)
+
 /**
  * High-resolution US flag brand mark for the site header.
  * Separate from the favicon assets (web/public/favicon.svg + generate:favicons),
  * which use a simplified geometry tuned for tiny tab / touch icons.
  */
 export function BrandFlagIcon({ className = '' }: BrandFlagIconProps) {
-  const cantonW = 76
-  const cantonH = (7 / 13) * 100
-  const stars = buildStarCenters(cantonW, cantonH)
-
   return (
     <svg
       className={`brand-flag-icon${className ? ` ${className}` : ''}`}
-      viewBox="0 0 190 100"
+      viewBox={`0 0 ${FLAG_W} ${FLAG_H}`}
       width="28"
-      height="15"
+      height={Number(((28 * FLAG_H) / FLAG_W).toFixed(2))}
       aria-hidden="true"
       focusable="false"
     >
-      <rect width="190" height="100" fill="#B22234" />
+      <rect width={FLAG_W} height={FLAG_H} fill="#B22234" />
       {Array.from({ length: 6 }, (_, i) => (
         <rect
           key={`stripe-${i}`}
-          y={((2 * i + 1) * 100) / 13}
-          width="190"
-          height={100 / 13}
+          y={((2 * i + 1) * FLAG_H) / 13}
+          width={FLAG_W}
+          height={FLAG_H / 13}
           fill="#FFFFFF"
         />
       ))}
-      <rect width={cantonW} height={cantonH} fill="#3C3B6E" />
-      {stars.map((star, i) => (
+      <rect width={CANTON_W} height={CANTON_H} fill="#3C3B6E" />
+      {STAR_CENTERS.map((star, i) => (
         <path
           key={`star-${i}`}
           d={STAR_PATH}
           fill="#FFFFFF"
-          transform={`translate(${star.cx} ${star.cy}) scale(3.1)`}
+          fillRule="evenodd"
+          transform={`translate(${star.cx} ${star.cy}) scale(${STAR_SCALE})`}
         />
       ))}
     </svg>
