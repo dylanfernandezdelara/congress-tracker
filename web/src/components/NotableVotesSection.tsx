@@ -2,16 +2,10 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
-import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
-import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
-import {
-  MEMBER_VOTES_UNAVAILABLE,
-  noPartyDefectorsMessage,
-} from '../constants/memberVotesCopy'
 import { formatBillDocket, formatShortBillId, formatVoteDate } from '../utils/billLabels'
-import { MemberAvatar } from './MemberAvatar'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 import { NotableBillSheet } from './NotableBillSheet'
+import { NotableVoteDefectors } from './NotableVoteDefectors'
 
 type NotableVotesSectionProps = {
   notable: NotableVoteEntry[] | null
@@ -21,6 +15,10 @@ type NotableVotesSectionProps = {
   /** `cards` = full notable cards (default). `compact` = dense rail list. */
   variant?: 'cards' | 'compact'
 }
+
+type OverlaySelection =
+  | { kind: 'member'; seed: MemberProfileSeed; key: number }
+  | { kind: 'bill'; entry: NotableVoteEntry; key: number }
 
 function NotableVoteHeadline({
   title,
@@ -51,56 +49,6 @@ function NotableVoteHeadline({
         {title}
       </button>
     </HeadingTag>
-  )
-}
-
-function NotableVoteDefectors({
-  entry,
-  onOpenProfile,
-}: {
-  entry: NotableVoteEntry
-  onOpenProfile: (seed: MemberProfileSeed) => void
-}) {
-  if (entry.defectors.length > 0) {
-    return (
-      <ul className="notable-vote-defectors">
-        {entry.defectors.map((defector) => (
-          <li key={defector.bioguide_id} className="notable-vote-defector">
-            <button
-              type="button"
-              className="notable-vote-defector-button"
-              onClick={() => onOpenProfile(defector)}
-              onMouseEnter={() => prefetchMemberProfile(defector.bioguide_id)}
-              onFocus={() => prefetchMemberProfile(defector.bioguide_id)}
-              aria-label={`Open profile for ${defector.name}`}
-            >
-              <MemberAvatar
-                name={defector.name}
-                photoUrl={defector.photo_url}
-                variant="defector"
-              />
-              <span className="notable-vote-defector-copy">
-                <span className="notable-vote-defector-name">{defector.name}</span>
-                <span className={`notable-vote-defector-party ${partyCssClass(defector.party)}`}>
-                  {partyShortLabel(defector.party)}-{defector.state}
-                </span>
-                <span className="notable-vote-defector-hint">
-                  {crossVoteHint(defector.cross_vote_label)}
-                </span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    )
-  }
-
-  if (entry.member_votes_available === false) {
-    return <p className="notable-vote-defectors-empty">{MEMBER_VOTES_UNAVAILABLE}</p>
-  }
-
-  return (
-    <p className="notable-vote-defectors-empty">{noPartyDefectorsMessage(entry.chamber)}</p>
   )
 }
 
@@ -201,14 +149,7 @@ export function NotableVotesSection({
   onRetry,
   variant = 'cards',
 }: NotableVotesSectionProps) {
-  const [memberSelection, setMemberSelection] = useState<{
-    seed: MemberProfileSeed
-    key: number
-  } | null>(null)
-  const [billSelection, setBillSelection] = useState<{
-    entry: NotableVoteEntry
-    key: number
-  } | null>(null)
+  const [selection, setSelection] = useState<OverlaySelection | null>(null)
 
   useEffect(() => {
     if (!notable) return
@@ -220,28 +161,28 @@ export function NotableVotesSection({
   }, [notable])
 
   const openProfile = useCallback((seed: MemberProfileSeed) => {
-    setBillSelection(null)
-    setMemberSelection((prev) => ({ seed, key: (prev?.key ?? 0) + 1 }))
+    setSelection((prev) => ({ kind: 'member', seed, key: (prev?.key ?? 0) + 1 }))
   }, [])
 
   const openBill = useCallback((entry: NotableVoteEntry) => {
-    setMemberSelection(null)
-    setBillSelection((prev) => ({ entry, key: (prev?.key ?? 0) + 1 }))
+    setSelection((prev) => ({ kind: 'bill', entry, key: (prev?.key ?? 0) + 1 }))
   }, [])
+
+  const closeOverlay = useCallback(() => setSelection(null), [])
 
   const overlays = (
     <>
       <MemberProfile
-        open={memberSelection !== null}
-        seed={memberSelection?.seed ?? null}
-        selectionKey={memberSelection?.key ?? 0}
-        onClose={() => setMemberSelection(null)}
+        open={selection?.kind === 'member'}
+        seed={selection?.kind === 'member' ? selection.seed : null}
+        selectionKey={selection?.kind === 'member' ? selection.key : 0}
+        onClose={closeOverlay}
       />
       <NotableBillSheet
-        open={billSelection !== null}
-        entry={billSelection?.entry ?? null}
-        selectionKey={billSelection?.key ?? 0}
-        onClose={() => setBillSelection(null)}
+        open={selection?.kind === 'bill'}
+        entry={selection?.kind === 'bill' ? selection.entry : null}
+        selectionKey={selection?.kind === 'bill' ? selection.key : 0}
+        onClose={closeOverlay}
         onOpenProfile={openProfile}
       />
     </>
