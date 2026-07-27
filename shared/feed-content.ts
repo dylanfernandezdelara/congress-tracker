@@ -33,10 +33,4 @@ export {
   proceduralHeadline,
 } from './procedural-titles'
 
-export {
-  FEED_TOPIC_HEADLINE_MAX_CHARS,
-  formatFeedTopicHeadline,
-  formatFallbackHeadline,
-} from './fallback-headline'
-
 export { voteIndicatesFailure } from './vote-result'

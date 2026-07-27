@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  FEED_TOPIC_HEADLINE_MAX_CHARS,
   formatCollapsedDigestLead,
-  formatFeedTopicHeadline,
   normalizeDigestLead,
   proceduralHeadline,
   trimDisplayTitle,
@@ -47,85 +45,6 @@ describe("feed-content helpers", () => {
       "Authorize support for Ukraine",
     );
     expect(trimDisplayTitle("Sample bill and for other purposes.")).toBe("Sample bill");
-  });
-
-  describe("formatFeedTopicHeadline", () => {
-    it("leaves short titles untouched", () => {
-      expect(formatFeedTopicHeadline("Authorize support for Ukraine")).toBe(
-        "Authorize support for Ukraine",
-      );
-    });
-
-    it("strips To / A bill to / An act to prefixes and capitalizes the remainder", () => {
-      expect(
-        formatFeedTopicHeadline(
-          "To authorize appropriations for fiscal year 2026 for military activities.",
-        ),
-      ).toBe("Authorize appropriations for fiscal year 2026 for military activities.");
-      expect(formatFeedTopicHeadline("A bill to improve veterans' healthcare access.")).toBe(
-        "Improve veterans' healthcare access.",
-      );
-      expect(formatFeedTopicHeadline("An act to designate a national memorial.")).toBe(
-        "Designate a national memorial.",
-      );
-    });
-
-    it("does not strip Condemning or Directing prefixes", () => {
-      expect(
-        formatFeedTopicHeadline(
-          "Directing the President pursuant to section 5(c) of the War Powers Resolution to remove United States Armed Forces from hostilities in Lebanon.",
-        ).startsWith("Directing "),
-      ).toBe(true);
-      expect(
-        formatFeedTopicHeadline(
-          "Condemning actors seeking to defraud the United States Government, and expressing the sense of the House.",
-        ).startsWith("Condemning "),
-      ).toBe(true);
-    });
-
-    it("truncates long titles at a clause boundary before the topic char budget", () => {
-      const title =
-        "Condemning actors seeking to defraud the United States Government, and expressing the sense of the House of Representatives that governmentwide fraud and improper payment prevention reforms will meaningfully improve the fiscal state of the United States.";
-
-      expect(formatFeedTopicHeadline(title)).toBe(
-        "Condemning actors seeking to defraud the United States Government…",
-      );
-      expect(formatFeedTopicHeadline(title).endsWith("…")).toBe(true);
-      expect(formatFeedTopicHeadline(title).length).toBeLessThanOrEqual(
-        FEED_TOPIC_HEADLINE_MAX_CHARS + 1,
-      );
-    });
-
-    it("truncates at a word boundary when no usable clause break exists", () => {
-      const title =
-        "Directing the President pursuant to section 5(c) of the War Powers Resolution to remove United States Armed Forces from hostilities in Lebanon.";
-
-      const result = formatFeedTopicHeadline(title);
-      expect(result.endsWith("…")).toBe(true);
-      expect(result.includes(",")).toBe(false);
-      expect(result.length).toBeLessThan(title.length);
-      // Never mid-word: last character before ellipsis is end of a full word.
-      expect(result.slice(0, -1)).toMatch(/\S$/);
-      expect(result.slice(0, -1).split(/\s+/).every((word) => word.length > 0)).toBe(true);
-    });
-
-    it("never cuts mid-word", () => {
-      const title =
-        "Appropriating emergency supplemental funding for disaster relief operations across multiple federal agencies during the current fiscal year without delay";
-      const result = formatFeedTopicHeadline(title);
-      expect(result.endsWith("…")).toBe(true);
-      const withoutEllipsis = result.slice(0, -1);
-      expect(title.startsWith(withoutEllipsis)).toBe(true);
-      expect(withoutEllipsis.endsWith(" ")).toBe(false);
-      const nextChar = title.charAt(withoutEllipsis.length);
-      expect(nextChar === " " || nextChar === "").toBe(true);
-    });
-
-    it("collapses internal whitespace", () => {
-      expect(formatFeedTopicHeadline("  Authorize   support\nfor   Ukraine  ")).toBe(
-        "Authorize support for Ukraine",
-      );
-    });
   });
 
   it("normalizes digest leads at ingest and formats collapsed teasers", () => {
