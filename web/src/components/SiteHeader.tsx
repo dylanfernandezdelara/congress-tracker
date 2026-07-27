@@ -1,4 +1,4 @@
-import { PixelFlagIcon } from './PixelFlagIcon'
+import { BrandFlagIcon } from './BrandFlagIcon'
 import { ThemeToggle } from './ThemeToggle'
 
 export function SiteHeader() {
@@ -6,7 +6,7 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="site-header-inner">
         <div className="site-header-brand">
-          <PixelFlagIcon />
+          <BrandFlagIcon />
           <h1 className="site-header-title">Congress Tracker</h1>
         </div>
 

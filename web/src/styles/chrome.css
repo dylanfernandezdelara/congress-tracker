@@ -143,13 +143,17 @@
     color: hsl(var(--twc-faint));
   }
 
-  .pixel-flag-icon {
+  .brand-flag-icon {
     display: block;
     flex-shrink: 0;
-    width: 22px;
+    width: 26px;
     height: auto;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
+  }
+
+  @media (min-width: 640px) {
+    .brand-flag-icon {
+      width: 32px;
+    }
   }
 
   .page-frame {
