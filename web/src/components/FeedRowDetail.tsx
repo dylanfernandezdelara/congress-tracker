@@ -4,11 +4,12 @@ import type { FeedItem } from '../api/types'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
-import { getFeedSummaryDisplay, isProceduralFeedItem } from '../utils/feedRowLabels'
+import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
 import { BillTextChangesSection } from './BillTextChangesSection'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
+import { FeedSummarySections } from './FeedSummarySections'
 import { PassageVoteDetails } from './PassageVoteDetails'
 
 type FeedRowDetailProps = {
@@ -45,7 +46,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
-  const summaryBullets = getFeedSummaryDisplay(item).bullets
+  const summary = getFeedSummaryContent(item)
   const { stages, terminalStatus } = getBillLifecycleStages(item)
   const pipelineDetail =
     terminalStatus === 'became_law_unsigned' || terminalStatus === 'pending_signature'
@@ -67,16 +68,7 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
 
   return (
     <div className="feed-row-detail">
-      {summaryBullets.length > 0 ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">Key points</h3>
-          <ul className="feed-row-summary-bullets" aria-label="Key points">
-            {summaryBullets.map((point, index) => (
-              <li key={`${index}-${point}`}>{point}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <FeedSummarySections content={summary} />
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 

@@ -58,14 +58,6 @@ export function formatCollapsedDigestLead(text: string): string {
   return truncateWords(firstSentence(text.trim()), FEED_LEAD_MAX_WORDS)
 }
 
-/** Collapsed feed card: capped bullets for glanceable mobile layout. */
-export function formatCollapsedDigestBullets(points: string[]): string[] {
-  return normalizeDigestBullets(points, {
-    maxWords: FEED_BULLET_MAX_WORDS,
-    maxBullets: FEED_COLLAPSED_MAX_BULLETS,
-  })
-}
-
 export function normalizeDigestBullets(
   points: string[],
   options: { maxWords?: number; maxBullets?: number } = {},
@@ -75,36 +67,6 @@ export function normalizeDigestBullets(
     .map((point) => truncateWords(point.trim(), maxWords))
     .filter((point) => point.length > 0)
     .slice(0, maxBullets)
-}
-
-export interface FeedSummaryParts {
-  lead: string
-  bullets: string[]
-}
-
-export function buildFeedSummaryParts(input: {
-  whatItDoes: string | null | undefined
-  keyPoints: string[] | null | undefined
-}): FeedSummaryParts | null {
-  const whatItDoes = input.whatItDoes?.trim()
-
-  if (whatItDoes) {
-    return {
-      lead: formatCollapsedDigestLead(whatItDoes),
-      bullets: formatCollapsedDigestBullets(input.keyPoints ?? []),
-    }
-  }
-
-  // No digest lead — prefer a key point before the UI falls back to CRS text.
-  const firstKeyPoint = input.keyPoints?.find((point) => point.trim().length > 0)
-  if (firstKeyPoint) {
-    return {
-      lead: formatCollapsedDigestLead(firstKeyPoint),
-      bullets: [],
-    }
-  }
-
-  return null
 }
 
 export function truncateAtWordBoundary(text: string, maxLength: number): string {

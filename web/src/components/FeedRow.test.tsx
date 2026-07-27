@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { congressGovBillUrl } from '../utils/billLabels'
@@ -34,8 +34,16 @@ describe('FeedRow', () => {
   it('shows digest bullets in the expanded detail panel', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={true} onToggle={() => {}} />)
 
-    expect(screen.getByText('Point one')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Key points' })).toBeInTheDocument()
+    expect(document.querySelector('.feed-row-teaser')).not.toBeInTheDocument()
+
+    const detailPanel = screen.getByRole('region', { name: /Details for Plain headline for readers/ })
+
+    expect(within(detailPanel).getByText('Point one')).toBeInTheDocument()
+    expect(within(detailPanel).getByRole('heading', { name: 'Key points' })).toBeInTheDocument()
+    expect(within(detailPanel).getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
+    expect(
+      within(detailPanel).getByText('It does something important in plain language.'),
+    ).toBeInTheDocument()
   })
 
   it('explains Senate bill prefix with an accessible tooltip', () => {
@@ -148,12 +156,40 @@ describe('FeedRow', () => {
     expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
   })
 
-  it('does not show CRS summary text when expanded', () => {
+  it('keeps pending summary visible in the detail panel when expanded', () => {
+    render(
+      <FeedRow
+        item={makeFeedItem({ digest: null, raw_summary_text: null })}
+        isExpanded={true}
+        onToggle={() => {}}
+      />,
+    )
+
+    expect(document.querySelector('.feed-row-teaser')).not.toBeInTheDocument()
+    expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
+  })
+
+  it('shows the full CRS summary in a scrollable panel when expanded without a digest', () => {
+    const item = makeFeedItem({ digest: null, raw_summary_text: longCrsSummary })
+
+    render(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
+
+    const detailPanel = screen.getByRole('region', { name: /Details for Sample Act/ })
+    expect(within(detailPanel).getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
+    expect(within(detailPanel).getByText(/Ukraine Support Act/)).toBeInTheDocument()
+    expect(detailPanel.querySelector('.feed-row-summary-body--scrollable')).toBeInTheDocument()
+  })
+
+  it('tucks the official CRS summary behind a disclosure when a digest exists', () => {
     const item = makeFeedItem({ raw_summary_text: longCrsSummary })
 
     render(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
 
-    expect(screen.queryByText(/Ukraine Support Act/)).not.toBeInTheDocument()
+    const detailPanel = screen.getByRole('region', { name: /Details for Plain headline for readers/ })
+    const crsDetails = within(detailPanel).getByText('Official CRS summary').closest('details')
+    expect(crsDetails).not.toBeNull()
+    expect(crsDetails).not.toHaveAttribute('open')
+    expect(within(crsDetails as HTMLElement).getByText(/Ukraine Support Act/)).not.toBeVisible()
   })
 
   it('does not toggle expand when the congress.gov link is clicked', () => {

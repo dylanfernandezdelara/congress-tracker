@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   FEED_SUMMARY_PENDING,
+  getCollapsedSummaryLead,
   getFeedRowDisplayDate,
   getFeedRowView,
-  getFeedSummaryDisplay,
+  getFeedSummaryContent,
+  getFeedSummarySectionsModel,
   getFeedTopic,
   getPrimaryPassageVote,
   isProceduralFeedItem,
@@ -426,8 +428,8 @@ describe('getPrimaryPassageVote', () => {
   })
 })
 
-describe('getFeedSummaryDisplay', () => {
-  it('prefers digest what_it_does over CRS text', () => {
+describe('getFeedSummaryContent', () => {
+  it('prefers digest what_it_does and keeps CRS for disclosure', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
@@ -438,28 +440,29 @@ describe('getFeedSummaryDisplay', () => {
       raw_summary_text: 'Official CRS summary text.',
     })
 
-    expect(getFeedSummaryDisplay(item)).toEqual({
-      lead: 'Plain-language implications from the digest.',
-      bullets: ['Fallback point'],
+    expect(getFeedSummaryContent(item)).toEqual({
+      whatItDoes: 'Plain-language implications from the digest.',
+      keyPoints: ['Fallback point'],
+      crsSummary: 'Official CRS summary text.',
       pending: false,
     })
   })
 
-  it('falls back to a short CRS lead when digest is missing but CRS text exists', () => {
+  it('keeps CRS text when digest is missing', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text:
         'No Aid for Ghost Students Act\n\nThis bill blocks federal aid for students enrolled at institutions with no physical campus.',
     })
 
-    const summary = getFeedSummaryDisplay(item)
+    const summary = getFeedSummaryContent(item)
     expect(summary.pending).toBe(false)
-    expect(summary.bullets).toEqual([])
-    expect(summary.lead).toContain('This bill blocks federal aid')
-    expect(summary.lead).not.toBe(FEED_SUMMARY_PENDING)
+    expect(summary.whatItDoes).toBeNull()
+    expect(summary.keyPoints).toEqual([])
+    expect(summary.crsSummary).toContain('This bill blocks federal aid')
   })
 
-  it('falls back to the first key point when digest lacks what_it_does', () => {
+  it('keeps key points when digest lacks what_it_does', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
@@ -470,27 +473,29 @@ describe('getFeedSummaryDisplay', () => {
       raw_summary_text: null,
     })
 
-    expect(getFeedSummaryDisplay(item)).toEqual({
-      lead: 'Requires agencies to publish contract performance data',
-      bullets: [],
+    expect(getFeedSummaryContent(item)).toEqual({
+      whatItDoes: null,
+      keyPoints: ['Requires agencies to publish contract performance data'],
+      crsSummary: null,
       pending: false,
     })
   })
 
-  it('returns a pending placeholder when no summary sources exist', () => {
-    expect(getFeedSummaryDisplay(makeFeedItem({ digest: null, raw_summary_text: null }))).toEqual({
-      lead: FEED_SUMMARY_PENDING,
-      bullets: [],
+  it('returns pending when no summary sources exist', () => {
+    expect(getFeedSummaryContent(makeFeedItem({ digest: null, raw_summary_text: null }))).toEqual({
+      whatItDoes: null,
+      keyPoints: [],
+      crsSummary: null,
       pending: true,
     })
   })
 
-  it('caps lead and bullets to collapsed feed word limits', () => {
+  it('keeps the full digest lead and key points for expanded display', () => {
     const item = makeFeedItem({
       digest: {
         headline: 'Sample headline',
         what_it_does:
-          'This bill provides support to Ukraine and allied countries through security assistance.',
+          'This bill provides support to Ukraine and allied countries through security assistance. It also adds reporting rules.',
         key_points: [
           'Financing and oversight requirements for federal agencies that administer foreign military aid programs across multiple regions.',
         ],
@@ -498,45 +503,122 @@ describe('getFeedSummaryDisplay', () => {
       },
     })
 
-    const summary = getFeedSummaryDisplay(item)
-    expect(summary.pending).toBe(false)
-    expect(summary.lead).toBe(
-      'This bill provides support to Ukraine and allied countries through security assistance.',
-    )
-    expect(summary.bullets).toEqual([
-      'Financing and oversight requirements for federal agencies that administer foreign military aid…',
-    ])
-  })
-
-  it('returns a lead sentence and bullet points from the digest', () => {
-    const item = makeFeedItem({
-      digest: {
-        headline: 'Headline',
-        what_it_does: 'Blocks federal aid for ghost students.',
-        key_points: ['Targets online-only schools', 'Requires enrollment verification'],
-        terms_explained: [],
-      },
-    })
-
-    expect(getFeedSummaryDisplay(item)).toEqual({
-      lead: 'Blocks federal aid for ghost students.',
-      bullets: ['Targets online-only schools', 'Requires enrollment verification'],
+    expect(getFeedSummaryContent(item)).toEqual({
+      whatItDoes:
+        'This bill provides support to Ukraine and allied countries through security assistance. It also adds reporting rules.',
+      keyPoints: [
+        'Financing and oversight requirements for federal agencies that administer foreign military aid programs across multiple regions.',
+      ],
+      crsSummary: 'Official CRS summary text.',
       pending: false,
     })
   })
+})
 
-  it('keeps only the first sentence for long digest text', () => {
-    const item = makeFeedItem({
-      digest: {
-        headline: 'Headline',
-        what_it_does:
-          'This bill blocks aid for ghost students. It also creates new reporting rules and audit requirements for schools.',
-        key_points: ['Requires annual audits'],
-        terms_explained: [],
-      },
+describe('getCollapsedSummaryLead', () => {
+  it('caps collapsed teasers to the first sentence', () => {
+    const content = getFeedSummaryContent(
+      makeFeedItem({
+        digest: {
+          headline: 'Headline',
+          what_it_does:
+            'This bill blocks aid for ghost students. It also creates new reporting rules and audit requirements for schools.',
+          key_points: ['Requires annual audits'],
+          terms_explained: [],
+        },
+      }),
+    )
+
+    expect(getCollapsedSummaryLead(content)).toBe('This bill blocks aid for ghost students.')
+  })
+
+  it('uses the first key point when what_it_does is missing', () => {
+    const content = getFeedSummaryContent(
+      makeFeedItem({
+        digest: {
+          headline: 'Sample headline',
+          what_it_does: '',
+          key_points: ['Requires agencies to publish contract performance data'],
+          terms_explained: [],
+        },
+        raw_summary_text: null,
+      }),
+    )
+
+    expect(getCollapsedSummaryLead(content)).toBe(
+      'Requires agencies to publish contract performance data',
+    )
+  })
+
+  it('falls back to a short CRS lead when digest is missing', () => {
+    const content = getFeedSummaryContent(
+      makeFeedItem({
+        digest: null,
+        raw_summary_text:
+          'No Aid for Ghost Students Act\n\nThis bill blocks federal aid for students enrolled at institutions with no physical campus.',
+      }),
+    )
+
+    const lead = getCollapsedSummaryLead(content)
+    expect(lead).toContain('This bill blocks federal aid')
+    expect(lead).not.toBe(FEED_SUMMARY_PENDING)
+  })
+
+  it('returns the pending placeholder when no summary sources exist', () => {
+    expect(
+      getCollapsedSummaryLead(
+        getFeedSummaryContent(makeFeedItem({ digest: null, raw_summary_text: null })),
+      ),
+    ).toBe(FEED_SUMMARY_PENDING)
+  })
+})
+
+describe('getFeedSummarySectionsModel', () => {
+  it('puts CRS in the disclosure when digest content exists', () => {
+    expect(
+      getFeedSummarySectionsModel({
+        whatItDoes: 'Plain-language implications from the digest.',
+        keyPoints: ['Fallback point'],
+        crsSummary: 'Official CRS summary text.',
+        pending: false,
+      }),
+    ).toEqual({
+      primary: { kind: 'what_it_does', text: 'Plain-language implications from the digest.' },
+      keyPoints: ['Fallback point'],
+      crsDisclosure: 'Official CRS summary text.',
     })
+  })
 
-    expect(getFeedSummaryDisplay(item).lead).toBe('This bill blocks aid for ghost students.')
+  it('uses CRS as the primary summary when there is no digest content', () => {
+    const crs =
+      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran unless a later authorization is enacted.'
+    expect(
+      getFeedSummarySectionsModel({
+        whatItDoes: null,
+        keyPoints: [],
+        crsSummary: crs,
+        pending: false,
+      }),
+    ).toEqual({
+      primary: { kind: 'crs', text: crs },
+      keyPoints: [],
+      crsDisclosure: null,
+    })
+  })
+
+  it('discloses CRS when only key points exist', () => {
+    expect(
+      getFeedSummarySectionsModel({
+        whatItDoes: null,
+        keyPoints: ['Point one'],
+        crsSummary: 'Official CRS summary text.',
+        pending: false,
+      }),
+    ).toEqual({
+      primary: { kind: 'none' },
+      keyPoints: ['Point one'],
+      crsDisclosure: 'Official CRS summary text.',
+    })
   })
 })
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildFeedSummaryParts,
+  formatCollapsedDigestLead,
   formatFallbackHeadline,
   normalizeDigestLead,
   proceduralHeadline,
@@ -125,28 +125,12 @@ describe("feed-content helpers", () => {
     });
   });
 
-  it("normalizes digest leads at ingest and builds collapsed feed summaries", () => {
+  it("normalizes digest leads at ingest and formats collapsed teasers", () => {
     const lead = normalizeDigestLead(
       "This bill blocks aid for ghost students. It also creates reporting rules and audit requirements."
     );
     expect(lead).toBe("This bill blocks aid for ghost students.");
-
-    const parts = buildFeedSummaryParts({
-      whatItDoes: lead,
-      keyPoints: ["Requires campus verification", "Adds annual reporting"],
-    });
-    expect(parts).toEqual({
-      lead: "This bill blocks aid for ghost students.",
-      bullets: ["Requires campus verification", "Adds annual reporting"],
-    });
-  });
-
-  it("does not show raw CRS on the collapsed card when no digest exists", () => {
-    const parts = buildFeedSummaryParts({
-      whatItDoes: null,
-      keyPoints: null,
-    });
-    expect(parts).toBeNull();
+    expect(formatCollapsedDigestLead(lead)).toBe("This bill blocks aid for ghost students.");
   });
 
   it("preserves common abbreviations when extracting the first sentence", () => {

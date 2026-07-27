@@ -10,8 +10,6 @@ export {
   FEED_BULLET_MAX_WORDS,
   FEED_COLLAPSED_MAX_BULLETS,
   FEED_LEAD_MAX_WORDS,
-  buildFeedSummaryParts,
-  formatCollapsedDigestBullets,
   formatCollapsedDigestLead,
   normalizeDigestBullets,
   normalizeDigestLead,

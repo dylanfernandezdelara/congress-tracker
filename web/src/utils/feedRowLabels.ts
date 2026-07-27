@@ -1,12 +1,12 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
 import {
-  buildFeedSummaryParts,
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatCollapsedDigestLead,
   formatFallbackHeadline,
   formatShortBillId,
   isProceduralVote,
+  normalizeDigestBullets,
   proceduralHeadline,
   trimDisplayTitle,
   voteIndicatesFailure,
@@ -21,10 +21,25 @@ import { TERMINAL_STATUS_PRESENTATION } from './terminalStatusPresentation'
 
 export const FEED_SUMMARY_PENDING = 'Plain-English summary coming soon.'
 
-export interface FeedSummaryDisplay {
-  lead: string
-  bullets: string[]
+/** Canonical bill summary for collapsed teasers and expanded detail. */
+export interface FeedSummaryContent {
+  whatItDoes: string | null
+  keyPoints: string[]
+  crsSummary: string | null
   pending: boolean
+}
+
+export type FeedSummaryPrimary =
+  | { kind: 'pending' }
+  | { kind: 'what_it_does'; text: string }
+  | { kind: 'crs'; text: string }
+  | { kind: 'none' }
+
+/** Presentation slots for the expanded detail summary block. */
+export interface FeedSummarySectionsModel {
+  primary: FeedSummaryPrimary
+  keyPoints: string[]
+  crsDisclosure: string | null
 }
 
 export type FeedStatusKind =
@@ -192,37 +207,54 @@ export function getFeedTopic(item: FeedItem): string {
   return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
 }
 
-function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
-  const parts = buildFeedSummaryParts({
-    whatItDoes: item.digest?.what_it_does,
-    keyPoints: item.digest?.key_points,
-  })
-
-  if (!parts) return null
+/** Single source of truth for digest / CRS / pending summary content. */
+export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
+  const whatItDoes = item.digest?.what_it_does?.trim() || null
+  const keyPoints = normalizeDigestBullets(item.digest?.key_points ?? [])
+  const crsSummary = item.raw_summary_text?.trim() || null
 
   return {
-    lead: parts.lead,
-    bullets: parts.bullets,
-    pending: false,
+    whatItDoes,
+    keyPoints,
+    crsSummary,
+    pending: !whatItDoes && keyPoints.length === 0 && !crsSummary,
   }
 }
 
-export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
-  const parts = getFeedSummaryParts(item)
-  if (parts) return parts
+/** Short teaser for the collapsed feed row (~25 words, first sentence). */
+export function getCollapsedSummaryLead(content: FeedSummaryContent): string {
+  if (content.pending) return FEED_SUMMARY_PENDING
+  if (content.whatItDoes) return formatCollapsedDigestLead(content.whatItDoes)
+  const firstKeyPoint = content.keyPoints[0]
+  if (firstKeyPoint) return formatCollapsedDigestLead(firstKeyPoint)
+  if (content.crsSummary) return formatCollapsedDigestLead(content.crsSummary)
+  return FEED_SUMMARY_PENDING
+}
 
-  // When OpenRouter has not produced a digest yet, surface a short CRS lead
-  // so the card always has a summary when Congress.gov provided one.
-  const crs = item.raw_summary_text?.trim()
-  if (crs) {
-    return {
-      lead: formatCollapsedDigestLead(crs),
-      bullets: [],
-      pending: false,
-    }
+/** Derive primary / key-points / CRS-disclosure slots from canonical content. */
+export function getFeedSummarySectionsModel(
+  content: FeedSummaryContent,
+): FeedSummarySectionsModel {
+  if (content.pending) {
+    return { primary: { kind: 'pending' }, keyPoints: [], crsDisclosure: null }
   }
 
-  return { lead: FEED_SUMMARY_PENDING, bullets: [], pending: true }
+  const hasDigestSummary = Boolean(content.whatItDoes) || content.keyPoints.length > 0
+
+  let primary: FeedSummaryPrimary
+  if (content.whatItDoes) {
+    primary = { kind: 'what_it_does', text: content.whatItDoes }
+  } else if (!hasDigestSummary && content.crsSummary) {
+    primary = { kind: 'crs', text: content.crsSummary }
+  } else {
+    primary = { kind: 'none' }
+  }
+
+  return {
+    primary,
+    keyPoints: content.keyPoints,
+    crsDisclosure: hasDigestSummary ? content.crsSummary : null,
+  }
 }
 
 /**
