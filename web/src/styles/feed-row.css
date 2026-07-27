@@ -283,6 +283,13 @@
     letter-spacing: 0;
   }
 
+  .feed-row-summary-body.feed-row-summary--pending {
+    color: hsl(var(--twc-faint));
+    font-size: 12px;
+    font-style: normal;
+    letter-spacing: 0;
+  }
+
   .feed-row-summary-bullets {
     margin: 0;
     padding: 0;

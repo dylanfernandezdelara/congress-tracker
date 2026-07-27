@@ -4,7 +4,7 @@ import type { FeedItem } from '../api/types'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
-import { getFeedSummaryExpandedDisplay, isProceduralFeedItem } from '../utils/feedRowLabels'
+import { getFeedSummaryExpandedDisplay, isProceduralFeedItem, FEED_SUMMARY_PENDING } from '../utils/feedRowLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
 import { BillTextChangesSection } from './BillTextChangesSection'
@@ -69,7 +69,11 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
 
   return (
     <div className="feed-row-detail">
-      {expandedSummary.whatItDoes ? (
+      {expandedSummary.pending ? (
+        <section className="feed-row-detail-section">
+          <p className="feed-row-summary-body feed-row-summary--pending">{FEED_SUMMARY_PENDING}</p>
+        </section>
+      ) : expandedSummary.whatItDoes ? (
         <section className="feed-row-detail-section">
           <h3 className="feed-row-detail-heading">What it does</h3>
           <p className="feed-row-summary-body">{expandedSummary.whatItDoes}</p>

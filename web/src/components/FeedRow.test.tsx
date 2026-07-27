@@ -156,6 +156,19 @@ describe('FeedRow', () => {
     expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
   })
 
+  it('keeps pending summary visible in the detail panel when expanded', () => {
+    render(
+      <FeedRow
+        item={makeFeedItem({ digest: null, raw_summary_text: null })}
+        isExpanded={true}
+        onToggle={() => {}}
+      />,
+    )
+
+    expect(document.querySelector('.feed-row-teaser')).not.toBeInTheDocument()
+    expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
+  })
+
   it('shows the full CRS summary in a scrollable panel when expanded without a digest', () => {
     const item = makeFeedItem({ digest: null, raw_summary_text: longCrsSummary })
 
