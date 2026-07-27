@@ -392,6 +392,25 @@ describe('isProceduralFeedItem', () => {
       'Authorize appropriations for fiscal year 2026 for military activities of the Department of Defense',
     )
   })
+
+  it('intentionally shortens long digest headlines instead of leaving them full-length', () => {
+    const longHeadline =
+      'Directing the President pursuant to section 5(c) of the War Powers Resolution to remove United States Armed Forces from hostilities in Lebanon.'
+    const item = makeFeedItem({
+      digest: {
+        headline: longHeadline,
+        what_it_does: 'Requires withdrawal of U.S. forces from hostilities in Lebanon.',
+        key_points: [],
+        terms_explained: [],
+      },
+    })
+
+    const topic = getFeedTopic(item)
+    expect(topic.endsWith('…')).toBe(true)
+    expect(topic.length).toBeLessThan(longHeadline.length)
+    expect(topic.length).toBeLessThanOrEqual(111)
+    expect(topic.startsWith('Directing ')).toBe(true)
+  })
 })
 
 describe('getPrimaryPassageVote', () => {

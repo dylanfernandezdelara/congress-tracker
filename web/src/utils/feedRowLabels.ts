@@ -192,8 +192,9 @@ export function isProceduralFeedItem(item: FeedItem): boolean {
 }
 
 export function getFeedTopic(item: FeedItem): string {
+  // Intentional string shorten only — CSS must not line-clamp this.
   if (item.digest?.headline) {
-    return trimDisplayTitle(item.digest.headline)
+    return formatFallbackHeadline(trimDisplayTitle(item.digest.headline))
   }
 
   const title = item.bill.title ?? ''

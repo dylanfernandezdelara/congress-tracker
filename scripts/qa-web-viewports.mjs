@@ -158,6 +158,13 @@ async function auditHomePage(page) {
 
     if (topic) {
       collectHorizontalClipping(topic.getBoundingClientRect(), 'feed topic')
+      // Topics are intentionally shortened in JS — never CSS line-clamped.
+      const topicStyle = window.getComputedStyle(topic)
+      const topicClamp =
+        topicStyle.webkitLineClamp || topicStyle.getPropertyValue('-webkit-line-clamp')
+      if (topicClamp && topicClamp !== 'none' && topicClamp !== 'unset' && Number(topicClamp) > 0) {
+        issues.push('feed topic is line-clamped (title truncated by CSS)')
+      }
     } else {
       issues.push('feed topic missing')
     }
