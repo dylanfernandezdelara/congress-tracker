@@ -213,15 +213,12 @@ export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
   const keyPoints = normalizeDigestBullets(item.digest?.key_points ?? [])
   const crsSummary = item.raw_summary_text?.trim() || null
 
-  if (whatItDoes || keyPoints.length > 0) {
-    return { whatItDoes, keyPoints, crsSummary, pending: false }
+  return {
+    whatItDoes,
+    keyPoints,
+    crsSummary,
+    pending: !whatItDoes && keyPoints.length === 0 && !crsSummary,
   }
-
-  if (crsSummary) {
-    return { whatItDoes: null, keyPoints: [], crsSummary, pending: false }
-  }
-
-  return { whatItDoes: null, keyPoints: [], crsSummary: null, pending: true }
 }
 
 /** Short teaser for the collapsed feed row (~25 words, first sentence). */
