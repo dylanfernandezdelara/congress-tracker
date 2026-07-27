@@ -5,9 +5,10 @@ import { CURRENT_PRESIDENT } from '../constants/president'
 import { feedRowKey } from '../utils/billDeepLink'
 import { formatVoteDate } from '../utils/billLabels'
 import {
+  getCollapsedSummaryLead,
   getFeedRowDisplayDate,
   getFeedRowView,
-  getFeedSummaryDisplay,
+  getFeedSummaryContent,
   getFeedTopic,
 } from '../utils/feedRowLabels'
 import { BillIdChip } from './BillIdChip'
@@ -34,7 +35,8 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
   const summaryId = useId()
   const detailId = useId()
   const topic = getFeedTopic(item)
-  const summary = getFeedSummaryDisplay(item)
+  const summary = getFeedSummaryContent(item)
+  const summaryLead = getCollapsedSummaryLead(summary)
   const { meta, eventDisplay, badgeToneClass, showMarginChip, showEventLine, eventToneClass } =
     getFeedRowView(item)
   const displayDate = getFeedRowDisplayDate(item)
@@ -131,7 +133,7 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
                 data-feed-summary
                 className={`feed-row-summary${summary.pending ? ' feed-row-summary--pending' : ''}`}
               >
-                <p className="feed-row-teaser">{summary.lead}</p>
+                <p className="feed-row-teaser">{summaryLead}</p>
               </div>
             ) : null}
           </div>

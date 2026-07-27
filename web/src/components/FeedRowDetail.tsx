@@ -4,11 +4,12 @@ import type { FeedItem } from '../api/types'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
-import { getFeedSummaryExpandedDisplay, isProceduralFeedItem, FEED_SUMMARY_PENDING } from '../utils/feedRowLabels'
+import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
 import { BillTextChangesSection } from './BillTextChangesSection'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
+import { FeedSummarySections } from './FeedSummarySections'
 import { PassageVoteDetails } from './PassageVoteDetails'
 
 type FeedRowDetailProps = {
@@ -45,9 +46,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
 export function FeedRowDetail({ item }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
-  const expandedSummary = getFeedSummaryExpandedDisplay(item)
-  const hasDigestSummary =
-    Boolean(expandedSummary.whatItDoes) || expandedSummary.keyPoints.length > 0
+  const summary = getFeedSummaryContent(item)
   const { stages, terminalStatus } = getBillLifecycleStages(item)
   const pipelineDetail =
     terminalStatus === 'became_law_unsigned' || terminalStatus === 'pending_signature'
@@ -69,53 +68,7 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
 
   return (
     <div className="feed-row-detail">
-      {expandedSummary.pending ? (
-        <section className="feed-row-detail-section">
-          <p className="feed-row-summary-body feed-row-summary--pending">{FEED_SUMMARY_PENDING}</p>
-        </section>
-      ) : expandedSummary.whatItDoes ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">What it does</h3>
-          <p className="feed-row-summary-body">{expandedSummary.whatItDoes}</p>
-        </section>
-      ) : !hasDigestSummary && expandedSummary.crsSummary ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">Summary</h3>
-          <div
-            className="feed-row-summary-body feed-row-summary-body--scrollable"
-            tabIndex={0}
-            role="region"
-            aria-label="Official CRS summary"
-          >
-            <p>{expandedSummary.crsSummary}</p>
-          </div>
-        </section>
-      ) : null}
-
-      {expandedSummary.keyPoints.length > 0 ? (
-        <section className="feed-row-detail-section">
-          <h3 className="feed-row-detail-heading">Key points</h3>
-          <ul className="feed-row-summary-bullets" aria-label="Key points">
-            {expandedSummary.keyPoints.map((point, index) => (
-              <li key={`${index}-${point}`}>{point}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {hasDigestSummary && expandedSummary.crsSummary ? (
-        <details className="feed-row-crs-details">
-          <summary className="feed-row-crs-details-summary">Official CRS summary</summary>
-          <div
-            className="feed-row-summary-body feed-row-summary-body--scrollable"
-            tabIndex={0}
-            role="region"
-            aria-label="Official CRS summary"
-          >
-            <p>{expandedSummary.crsSummary}</p>
-          </div>
-        </details>
-      ) : null}
+      <FeedSummarySections content={summary} />
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 

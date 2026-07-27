@@ -1,6 +1,5 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
 import {
-  buildFeedSummaryParts,
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatCollapsedDigestLead,
@@ -22,17 +21,25 @@ import { TERMINAL_STATUS_PRESENTATION } from './terminalStatusPresentation'
 
 export const FEED_SUMMARY_PENDING = 'Plain-English summary coming soon.'
 
-export interface FeedSummaryDisplay {
-  lead: string
-  bullets: string[]
-  pending: boolean
-}
-
-export interface FeedSummaryExpandedDisplay {
+/** Canonical bill summary for collapsed teasers and expanded detail. */
+export interface FeedSummaryContent {
   whatItDoes: string | null
   keyPoints: string[]
   crsSummary: string | null
   pending: boolean
+}
+
+export type FeedSummaryPrimary =
+  | { kind: 'pending' }
+  | { kind: 'what_it_does'; text: string }
+  | { kind: 'crs'; text: string }
+  | { kind: 'none' }
+
+/** Presentation slots for the expanded detail summary block. */
+export interface FeedSummarySectionsModel {
+  primary: FeedSummaryPrimary
+  keyPoints: string[]
+  crsDisclosure: string | null
 }
 
 export type FeedStatusKind =
@@ -200,41 +207,8 @@ export function getFeedTopic(item: FeedItem): string {
   return formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
 }
 
-function getFeedSummaryParts(item: FeedItem): FeedSummaryDisplay | null {
-  const parts = buildFeedSummaryParts({
-    whatItDoes: item.digest?.what_it_does,
-    keyPoints: item.digest?.key_points,
-  })
-
-  if (!parts) return null
-
-  return {
-    lead: parts.lead,
-    bullets: parts.bullets,
-    pending: false,
-  }
-}
-
-export function getFeedSummaryDisplay(item: FeedItem): FeedSummaryDisplay {
-  const parts = getFeedSummaryParts(item)
-  if (parts) return parts
-
-  // When OpenRouter has not produced a digest yet, surface a short CRS lead
-  // so the card always has a summary when Congress.gov provided one.
-  const crs = item.raw_summary_text?.trim()
-  if (crs) {
-    return {
-      lead: formatCollapsedDigestLead(crs),
-      bullets: [],
-      pending: false,
-    }
-  }
-
-  return { lead: FEED_SUMMARY_PENDING, bullets: [], pending: true }
-}
-
-/** Full summary content for the expanded feed row detail panel. */
-export function getFeedSummaryExpandedDisplay(item: FeedItem): FeedSummaryExpandedDisplay {
+/** Single source of truth for digest / CRS / pending summary content. */
+export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
   const whatItDoes = item.digest?.what_it_does?.trim() || null
   const keyPoints = normalizeDigestBullets(item.digest?.key_points ?? [])
   const crsSummary = item.raw_summary_text?.trim() || null
@@ -248,6 +222,42 @@ export function getFeedSummaryExpandedDisplay(item: FeedItem): FeedSummaryExpand
   }
 
   return { whatItDoes: null, keyPoints: [], crsSummary: null, pending: true }
+}
+
+/** Short teaser for the collapsed feed row (~25 words, first sentence). */
+export function getCollapsedSummaryLead(content: FeedSummaryContent): string {
+  if (content.pending) return FEED_SUMMARY_PENDING
+  if (content.whatItDoes) return formatCollapsedDigestLead(content.whatItDoes)
+  const firstKeyPoint = content.keyPoints[0]
+  if (firstKeyPoint) return formatCollapsedDigestLead(firstKeyPoint)
+  if (content.crsSummary) return formatCollapsedDigestLead(content.crsSummary)
+  return FEED_SUMMARY_PENDING
+}
+
+/** Derive primary / key-points / CRS-disclosure slots from canonical content. */
+export function getFeedSummarySectionsModel(
+  content: FeedSummaryContent,
+): FeedSummarySectionsModel {
+  if (content.pending) {
+    return { primary: { kind: 'pending' }, keyPoints: [], crsDisclosure: null }
+  }
+
+  const hasDigestSummary = Boolean(content.whatItDoes) || content.keyPoints.length > 0
+
+  let primary: FeedSummaryPrimary
+  if (content.whatItDoes) {
+    primary = { kind: 'what_it_does', text: content.whatItDoes }
+  } else if (!hasDigestSummary && content.crsSummary) {
+    primary = { kind: 'crs', text: content.crsSummary }
+  } else {
+    primary = { kind: 'none' }
+  }
+
+  return {
+    primary,
+    keyPoints: content.keyPoints,
+    crsDisclosure: hasDigestSummary ? content.crsSummary : null,
+  }
 }
 
 /**

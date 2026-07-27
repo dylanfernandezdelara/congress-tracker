@@ -276,13 +276,7 @@
     gap: 0;
   }
 
-  .feed-row-summary--pending .feed-row-teaser {
-    color: hsl(var(--twc-faint));
-    font-size: 12px;
-    font-style: normal;
-    letter-spacing: 0;
-  }
-
+  .feed-row-summary--pending .feed-row-teaser,
   .feed-row-summary-body.feed-row-summary--pending {
     color: hsl(var(--twc-faint));
     font-size: 12px;
@@ -324,6 +318,7 @@
 
   .feed-row-summary-body p {
     margin: 0;
+    white-space: pre-wrap;
   }
 
   .feed-row-summary-body--scrollable {
