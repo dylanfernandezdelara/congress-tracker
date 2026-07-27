@@ -94,6 +94,53 @@
     border-radius: 4px;
   }
 
+  .notable-bill-sheet-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .notable-bill-sheet-bill-id {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--twc-faint));
+  }
+
+  .notable-bill-sheet-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: -0.15px;
+  }
+
+  .notable-bill-sheet-meta {
+    margin: 0;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--twc-faint));
+  }
+
+  .notable-bill-sheet-why {
+    margin: 0.15rem 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .notable-bill-sheet .feed-row-detail-section {
+    margin: 0;
+  }
+
+  .notable-bill-sheet .feed-row-detail-heading {
+    margin: 0 0 0.35rem;
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--twc-faint));
+  }
+
   .notable-vote-why {
     margin: 0;
     font-size: 13px;

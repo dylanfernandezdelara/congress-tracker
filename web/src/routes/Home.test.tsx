@@ -463,7 +463,7 @@ describe('Home', () => {
     })
   })
 
-  it('opens a feed bill detail when a notable vote headline is pressed', async () => {
+  it('opens an in-place bill sheet from a notable vote without scrolling the feed', async () => {
     const scrollIntoView = vi.fn()
     HTMLElement.prototype.scrollIntoView = scrollIntoView
 
@@ -477,60 +477,14 @@ describe('Home', () => {
       }),
     )
 
-    const toggle = await screen.findByRole('button', { name: /Plain headline for readers/i })
-    await waitFor(() => {
-      expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    })
-    await waitFor(() => {
-      expect(screen.getByTestId('search-params').textContent).toContain('bill=119-s-2')
-    })
-    await waitFor(() => {
-      expect(scrollIntoView).toHaveBeenCalled()
-    })
-  })
-
-  it('clears a conflicting chamber filter when opening a notable bill', async () => {
-    const senateItem = makeFeedItem({
-      bill: { congress: 119, type: 'S', number: 2, title: 'Senate bill' },
-      digest: {
-        headline: 'Plain headline for readers',
-        what_it_does: 'Does a thing.',
-        key_points: ['One'],
-        terms_explained: [],
-      },
-    })
-
-    fetchFeed.mockImplementation(async (opts?: { chamber?: string | null }) => {
-      if (opts?.chamber === 'House') {
-        return pageResponse([], { total: 0, has_more: false })
-      }
-      return pageResponse([senateItem], { total: 1, has_more: false })
-    })
-
-    renderHome('/?chamber=House')
-
-    expect(await screen.findByText('Notable vote headline for sidebar')).toBeInTheDocument()
-    expect(screen.getByTestId('search-params')).toHaveTextContent('chamber=House')
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Open bill details for Notable vote headline for sidebar',
-      }),
-    )
-
-    await waitFor(() => {
-      const search = screen.getByTestId('search-params').textContent ?? ''
-      expect(search).toContain('bill=119-s-2')
-      expect(search).not.toContain('chamber=')
-    })
-
-    const toggle = await screen.findByRole('button', { name: /Plain headline for readers/i })
-    await waitFor(() => {
-      expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    })
     expect(
-      screen.queryByText('That bill is no longer in the recent feed.'),
-    ).not.toBeInTheDocument()
+      screen.getByRole('dialog', { name: 'Notable vote headline for sidebar' }),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('bill=')
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByText(/It does something important/i)).toBeInTheDocument()
+    })
   })
 
   it('does not start stats fetches until the first feed page settles', async () => {

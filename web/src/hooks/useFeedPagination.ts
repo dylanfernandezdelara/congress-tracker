@@ -51,7 +51,6 @@ export function useFeedPagination() {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null)
-  const [deepLinkKick, setDeepLinkKick] = useState(0)
   const [feedSettled, setFeedSettled] = useState(false)
   const [billMissingNotice, setBillMissingNotice] = useState(false)
 
@@ -287,44 +286,6 @@ export function useFeedPagination() {
     [clearDeepLinkState, replaceSearchParams, setExpandedKey],
   )
 
-  /** Open a bill from outside the feed (e.g. notable votes) via the deep-link path. */
-  const openBill = useCallback(
-    (bill: { congress: number; type: string; number: number; chamber?: ChamberFilter }) => {
-      const target = formatBillQueryParam(bill)
-      const clearChamber =
-        Boolean(bill.chamber) &&
-        chamberRef.current != null &&
-        chamberRef.current !== bill.chamber
-      const clearSearch = Boolean(queryRef.current)
-      const filterWillReload = clearChamber || clearSearch
-
-      setBillMissingNotice(false)
-      // Cancel any pending search-draft debounce before it can re-apply `q`.
-      setDraftQuery('')
-
-      replaceSearchParams((params) => {
-        params.set('bill', target)
-        params.delete('q')
-        if (clearChamber) params.delete('chamber')
-      })
-
-      deepLinkBillRef.current = target
-      deepLinkQueryRef.current = null
-      deepLinkPhaseRef.current = 'searching'
-
-      if (filterWillReload) {
-        // Chamber/`q` clear reloads the feed; the searcher re-runs when `items`
-        // update. Kicking now would race stale items and flash a missing notice.
-        return
-      }
-
-      // `bill` alone (or same-`?bill=` retry) may not change `items` — kick the
-      // existing searcher so expand/scroll still happens.
-      setDeepLinkKick((k) => k + 1)
-    },
-    [replaceSearchParams],
-  )
-
   const dismissBillMissingNotice = useCallback(() => {
     setBillMissingNotice(false)
     clearDeepLinkState()
@@ -389,7 +350,6 @@ export function useFeedPagination() {
     loadFeedPage,
     nextOffset,
     setExpandedKey,
-    deepLinkKick,
   ])
 
   return {
@@ -413,7 +373,6 @@ export function useFeedPagination() {
     submitSearch,
     clearSearch,
     toggleRow,
-    openBill,
     dismissBillMissingNotice,
   }
 }

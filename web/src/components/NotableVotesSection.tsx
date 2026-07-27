@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 import { prefetchMemberProfile } from '../api/memberProfileCache'
-import type { NotableVoteEntry, StatsChamber } from '../api/types'
+import type { NotableVoteEntry } from '../api/types'
 import { partyCssClass, partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import {
@@ -11,33 +11,15 @@ import {
 import { formatBillDocket, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { MemberAvatar } from './MemberAvatar'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
-
-/** Bill identity passed to the feed deep-link opener. */
-export type NotableBillRef = {
-  congress: number
-  type: string
-  number: number
-  chamber?: StatsChamber
-}
+import { NotableBillSheet } from './NotableBillSheet'
 
 type NotableVotesSectionProps = {
   notable: NotableVoteEntry[] | null
   loading?: boolean
   error?: string | null
   onRetry?: () => void
-  /** Open the bill in the main feed (deep-link expand). */
-  onOpenBill?: (bill: NotableBillRef) => void
   /** `cards` = full notable cards (default). `compact` = dense rail list. */
   variant?: 'cards' | 'compact'
-}
-
-function billRefFromEntry(entry: NotableVoteEntry): NotableBillRef {
-  return {
-    congress: entry.congress,
-    type: entry.bill_type,
-    number: entry.bill_number,
-    chamber: entry.chamber,
-  }
 }
 
 function NotableVoteHeadline({
@@ -150,7 +132,7 @@ function NotableVoteCard({
 }: {
   entry: NotableVoteEntry
   onOpenProfile: (seed: MemberProfileSeed) => void
-  onOpenBill?: (bill: NotableBillRef) => void
+  onOpenBill: (entry: NotableVoteEntry) => void
 }) {
   const billLabel = formatBillDocket(entry.bill_type, entry.bill_number, entry.congress)
   const title = entry.headline ?? `${billLabel} passage vote`
@@ -160,10 +142,10 @@ function NotableVoteCard({
       <NotableVoteHeadline
         title={title}
         headingClassName="notable-vote-title"
-        onOpen={onOpenBill ? () => onOpenBill(billRefFromEntry(entry)) : undefined}
+        onOpen={() => onOpenBill(entry)}
       />
       <p className="notable-vote-why">{entry.why_it_matters}</p>
-      <NotableVoteMeta entry={entry} showBillId={Boolean(onOpenBill)} className="notable-vote-meta" />
+      <NotableVoteMeta entry={entry} showBillId className="notable-vote-meta" />
       <NotableVoteDefectors entry={entry} onOpenProfile={onOpenProfile} />
     </article>
   )
@@ -176,7 +158,7 @@ function NotableVoteCompactItem({
 }: {
   entry: NotableVoteEntry
   onOpenProfile: (seed: MemberProfileSeed) => void
-  onOpenBill?: (bill: NotableBillRef) => void
+  onOpenBill: (entry: NotableVoteEntry) => void
 }) {
   const title = entry.headline ?? `${entry.chamber} passage vote`
   const firstDefector = entry.defectors[0]
@@ -187,11 +169,11 @@ function NotableVoteCompactItem({
         as="p"
         title={title}
         headingClassName="notable-compact-headline"
-        onOpen={onOpenBill ? () => onOpenBill(billRefFromEntry(entry)) : undefined}
+        onOpen={() => onOpenBill(entry)}
       />
       <NotableVoteMeta
         entry={entry}
-        showBillId={Boolean(onOpenBill)}
+        showBillId
         className="notable-compact-meta"
         trailing={entry.why_it_matters ? ` · ${entry.why_it_matters}` : null}
       />
@@ -217,12 +199,16 @@ export function NotableVotesSection({
   loading = false,
   error = null,
   onRetry,
-  onOpenBill,
   variant = 'cards',
 }: NotableVotesSectionProps) {
-  const [selection, setSelection] = useState<{ seed: MemberProfileSeed; key: number } | null>(
-    null,
-  )
+  const [memberSelection, setMemberSelection] = useState<{
+    seed: MemberProfileSeed
+    key: number
+  } | null>(null)
+  const [billSelection, setBillSelection] = useState<{
+    entry: NotableVoteEntry
+    key: number
+  } | null>(null)
 
   useEffect(() => {
     if (!notable) return
@@ -234,16 +220,31 @@ export function NotableVotesSection({
   }, [notable])
 
   const openProfile = useCallback((seed: MemberProfileSeed) => {
-    setSelection((prev) => ({ seed, key: (prev?.key ?? 0) + 1 }))
+    setBillSelection(null)
+    setMemberSelection((prev) => ({ seed, key: (prev?.key ?? 0) + 1 }))
   }, [])
 
-  const profile = (
-    <MemberProfile
-      open={selection !== null}
-      seed={selection?.seed ?? null}
-      selectionKey={selection?.key ?? 0}
-      onClose={() => setSelection(null)}
-    />
+  const openBill = useCallback((entry: NotableVoteEntry) => {
+    setMemberSelection(null)
+    setBillSelection((prev) => ({ entry, key: (prev?.key ?? 0) + 1 }))
+  }, [])
+
+  const overlays = (
+    <>
+      <MemberProfile
+        open={memberSelection !== null}
+        seed={memberSelection?.seed ?? null}
+        selectionKey={memberSelection?.key ?? 0}
+        onClose={() => setMemberSelection(null)}
+      />
+      <NotableBillSheet
+        open={billSelection !== null}
+        entry={billSelection?.entry ?? null}
+        selectionKey={billSelection?.key ?? 0}
+        onClose={() => setBillSelection(null)}
+        onOpenProfile={openProfile}
+      />
+    </>
   )
 
   if (error) {
@@ -305,11 +306,11 @@ export function NotableVotesSection({
               key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
               entry={entry}
               onOpenProfile={openProfile}
-              onOpenBill={onOpenBill}
+              onOpenBill={openBill}
             />
           ))}
         </ul>
-        {profile}
+        {overlays}
       </section>
     )
   }
@@ -325,11 +326,11 @@ export function NotableVotesSection({
             key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
             entry={entry}
             onOpenProfile={openProfile}
-            onOpenBill={onOpenBill}
+            onOpenBill={openBill}
           />
         ))}
       </div>
-      {profile}
+      {overlays}
     </section>
   )
 }

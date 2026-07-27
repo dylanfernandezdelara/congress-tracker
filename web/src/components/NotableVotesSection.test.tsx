@@ -26,6 +26,29 @@ vi.mock('../api/client', () => ({
     member_votes_available: true,
     as_of: '2026-07-20T00:00:00.000Z',
   })),
+  fetchFeed: vi.fn(async () => ({
+    items: [
+      {
+        bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
+        policy_area: 'Immigration',
+        digest: {
+          headline: 'Gives Money for Border and Immigration Enforcement Until 2029',
+          what_it_does: 'Funds border enforcement programs through 2029.',
+          key_points: ['Adds border funding'],
+          terms_explained: [],
+        },
+        raw_summary_text: null,
+        passage_votes: [],
+        latest_passage_date: '2026-06-09',
+        latest_activity_date: '2026-06-09',
+        lifecycle: null,
+      },
+    ],
+    total: 1,
+    limit: 15,
+    offset: 0,
+    has_more: false,
+  })),
 }))
 
 function sampleEntry(overrides: Partial<NotableVoteEntry> = {}): NotableVoteEntry {
@@ -50,49 +73,17 @@ function sampleEntry(overrides: Partial<NotableVoteEntry> = {}): NotableVoteEntr
 }
 
 describe('NotableVotesSection', () => {
-  it('shows chamber and vote date only in meta', () => {
+  it('shows chamber, vote date, and short bill id in meta', () => {
     render(<NotableVotesSection notable={[sampleEntry()]} />)
-
-    expect(screen.getByText('House · Jun 9')).toBeInTheDocument()
-    expect(screen.queryByText(/S\. 2/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/119th Congress/i)).not.toBeInTheDocument()
-  })
-
-  it('opens a bill when the notable headline is clicked', () => {
-    const onOpenBill = vi.fn()
-    render(<NotableVotesSection notable={[sampleEntry()]} onOpenBill={onOpenBill} />)
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Open bill details for Gives Money for Border and Immigration Enforcement Until 2029',
-      }),
-    )
-
-    expect(onOpenBill).toHaveBeenCalledWith({
-      congress: 119,
-      type: 'S',
-      number: 2,
-      chamber: 'House',
-    })
-  })
-
-  it('shows a short bill id in meta when bills are openable', () => {
-    render(<NotableVotesSection notable={[sampleEntry()]} onOpenBill={() => {}} />)
 
     expect(
       screen.getByText((_, node) => node?.textContent === 'House · Jun 9 · S. 2'),
     ).toBeInTheDocument()
+    expect(screen.queryByText(/119th Congress/i)).not.toBeInTheDocument()
   })
 
-  it('opens a bill from the compact headline', () => {
-    const onOpenBill = vi.fn()
-    render(
-      <NotableVotesSection
-        variant="compact"
-        notable={[sampleEntry()]}
-        onOpenBill={onOpenBill}
-      />,
-    )
+  it('opens an in-place bill sheet when the notable headline is clicked', async () => {
+    render(<NotableVotesSection notable={[sampleEntry()]} />)
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -100,11 +91,36 @@ describe('NotableVotesSection', () => {
       }),
     )
 
-    expect(onOpenBill).toHaveBeenCalledWith({
-      congress: 119,
-      type: 'S',
-      number: 2,
-      chamber: 'House',
+    const dialog = screen.getByRole('dialog', {
+      name: 'Gives Money for Border and Immigration Enforcement Until 2029',
+    })
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByText(/214–212 \(2\)/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Funds border enforcement programs through 2029.')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('link', { name: /Read on congress.gov/i })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/bill/119th-congress/senate-bill/2'),
+    )
+  })
+
+  it('opens a bill sheet from the compact headline without changing the page URL', async () => {
+    render(<NotableVotesSection variant="compact" notable={[sampleEntry()]} />)
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Open bill details for Gives Money for Border and Immigration Enforcement Until 2029',
+      }),
+    )
+
+    expect(
+      screen.getByRole('dialog', {
+        name: 'Gives Money for Border and Immigration Enforcement Until 2029',
+      }),
+    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('What it does')).toBeInTheDocument()
     })
   })
 

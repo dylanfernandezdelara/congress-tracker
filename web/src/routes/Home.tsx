@@ -61,7 +61,6 @@ export default function Home() {
     submitSearch,
     clearSearch,
     toggleRow,
-    openBill,
     dismissBillMissingNotice,
   } = useFeedPagination()
 
@@ -127,7 +126,6 @@ export default function Home() {
       loading={notableLoading}
       error={notableVotes.error}
       onRetry={handleReloadFeed}
-      onOpenBill={openBill}
     />
   )
 
