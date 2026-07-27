@@ -1,9 +1,9 @@
 import { useId } from 'react'
 
-import { normalizeDigestBullets } from '@congress-tracker/shared/feed-content'
 import type { NotableVoteEntry } from '../api/types'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
-import type { FeedSummaryContent } from '../utils/feedRowLabels'
+import { toFeedSummaryContent } from '../utils/feedRowLabels'
+import { notableVoteTitle } from '../utils/notableVoteLabels'
 import { AnimatedSheet } from './AnimatedSheet'
 import { FeedSummarySections } from './FeedSummarySections'
 import type { MemberProfileSeed } from './MemberProfile'
@@ -17,23 +17,6 @@ type NotableBillSheetProps = {
   onOpenProfile: (seed: MemberProfileSeed) => void
 }
 
-function billTitle(entry: NotableVoteEntry): string {
-  const billLabel = formatShortBillId(entry.bill_type, entry.bill_number)
-  return entry.headline ?? `${billLabel} passage vote`
-}
-
-function summaryFromEntry(entry: NotableVoteEntry): FeedSummaryContent {
-  const whatItDoes = entry.what_it_does?.trim() || null
-  const keyPoints = normalizeDigestBullets(entry.key_points)
-  const crsSummary = entry.raw_summary_text?.trim() || null
-  return {
-    whatItDoes,
-    keyPoints,
-    crsSummary,
-    pending: !whatItDoes && keyPoints.length === 0 && !crsSummary,
-  }
-}
-
 export function NotableBillSheet({
   open,
   entry,
@@ -45,10 +28,10 @@ export function NotableBillSheet({
 
   if (!entry) return null
 
-  const title = billTitle(entry)
+  const title = notableVoteTitle(entry)
   const billId = formatShortBillId(entry.bill_type, entry.bill_number)
   const sourceUrl = congressGovBillUrl(entry.congress, entry.bill_type, entry.bill_number)
-  const summary = summaryFromEntry(entry)
+  const summary = toFeedSummaryContent(entry)
 
   return (
     <AnimatedSheet
@@ -75,17 +58,17 @@ export function NotableBillSheet({
 
       <FeedSummarySections content={summary} />
 
-      <section className="member-profile-section" aria-label="Party-line breaks">
-        <h3 className="member-profile-section-title">Party-line breaks</h3>
+      <section className="sheet-section" aria-label="Party-line breaks">
+        <h3 className="sheet-section-title">Party-line breaks</h3>
         <NotableVoteDefectors
           entry={entry}
           onOpenProfile={onOpenProfile}
-          emptyClassName="member-profile-muted"
+          emptyClassName="sheet-muted"
         />
       </section>
 
       <a
-        className="member-profile-link congress-link"
+        className="sheet-link congress-link"
         href={sourceUrl}
         target="_blank"
         rel="noopener noreferrer"

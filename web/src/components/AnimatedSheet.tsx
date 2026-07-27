@@ -1,7 +1,11 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { useAnimatedDismiss } from '../hooks/useAnimatedDismiss'
-import { registerSheetLayer, type SheetLayerController } from '../utils/sheetLayer'
+import {
+  registerSheetLayer,
+  SHEET_BASE_Z_INDEX,
+  type SheetLayerController,
+} from '../utils/sheetLayer'
 
 const EXIT_ANIMATION_FALLBACK_MS = 400
 const EXIT_ANIMATION_NAME = 'sheet-sink'
@@ -32,6 +36,7 @@ export function AnimatedSheet({
 }: AnimatedSheetProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const [layerZIndex, setLayerZIndex] = useState(SHEET_BASE_Z_INDEX)
   const controllerRef = useRef<SheetLayerController>({
     requestClose: () => undefined,
     getIsClosing: () => false,
@@ -58,7 +63,8 @@ export function AnimatedSheet({
     returnFocusRef.current = previouslyFocused
     closeRef.current?.focus()
 
-    const unregister = registerSheetLayer(controllerRef.current)
+    const { unregister, zIndex } = registerSheetLayer(controllerRef.current)
+    setLayerZIndex(zIndex)
     return () => {
       unregister()
       returnFocusRef.current?.focus()
@@ -79,6 +85,7 @@ export function AnimatedSheet({
     <div
       ref={rootRef}
       className={`sheet-root${isClosing ? ' sheet-root--closing' : ''}`}
+      style={{ zIndex: layerZIndex }}
       role="presentation"
     >
       <button

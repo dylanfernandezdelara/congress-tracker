@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import { notableVoteTitle } from '../utils/notableVoteLabels'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 import { NotableBillSheet } from './NotableBillSheet'
 import { NotableVoteDefectors } from './NotableVoteDefectors'
@@ -16,9 +17,13 @@ type NotableVotesSectionProps = {
   variant?: 'cards' | 'compact'
 }
 
-type OverlaySelection =
-  | { kind: 'member'; seed: MemberProfileSeed; key: number }
-  | { kind: 'bill'; entry: NotableVoteEntry; key: number }
+type BillOverlay = { entry: NotableVoteEntry; key: number }
+type MemberOverlay = { seed: MemberProfileSeed; key: number }
+
+type OverlayState = {
+  bill: BillOverlay | null
+  member: MemberOverlay | null
+}
 
 function NotableVoteHeadline({
   title,
@@ -66,13 +71,6 @@ function NotableVoteMeta({
   )
 }
 
-function notableTitle(entry: NotableVoteEntry): string {
-  return (
-    entry.headline ??
-    `${formatShortBillId(entry.bill_type, entry.bill_number)} passage vote`
-  )
-}
-
 function NotableVoteCard({
   entry,
   onOpenProfile,
@@ -82,7 +80,7 @@ function NotableVoteCard({
   onOpenProfile: (seed: MemberProfileSeed) => void
   onOpenBill: (entry: NotableVoteEntry) => void
 }) {
-  const title = notableTitle(entry)
+  const title = notableVoteTitle(entry)
 
   return (
     <article className="notable-vote-card">
@@ -107,7 +105,7 @@ function NotableVoteCompactItem({
   onOpenProfile: (seed: MemberProfileSeed) => void
   onOpenBill: (entry: NotableVoteEntry) => void
 }) {
-  const title = notableTitle(entry)
+  const title = notableVoteTitle(entry)
   const firstDefector = entry.defectors[0]
 
   return (
@@ -140,6 +138,10 @@ function NotableVoteCompactItem({
   )
 }
 
+function nextOverlayKey(state: OverlayState): number {
+  return Math.max(state.bill?.key ?? 0, state.member?.key ?? 0) + 1
+}
+
 export function NotableVotesSection({
   notable,
   loading = false,
@@ -147,7 +149,7 @@ export function NotableVotesSection({
   onRetry,
   variant = 'cards',
 }: NotableVotesSectionProps) {
-  const [selection, setSelection] = useState<OverlaySelection | null>(null)
+  const [overlays, setOverlays] = useState<OverlayState>({ bill: null, member: null })
 
   useEffect(() => {
     if (!notable) return
@@ -158,33 +160,50 @@ export function NotableVotesSection({
     }
   }, [notable])
 
+  /* Profile stacks on top of an open bill sheet (Escape returns to the bill). */
   const openProfile = useCallback((seed: MemberProfileSeed) => {
-    setSelection((prev) => ({ kind: 'member', seed, key: (prev?.key ?? 0) + 1 }))
+    setOverlays((prev) => ({
+      ...prev,
+      member: { seed, key: nextOverlayKey(prev) },
+    }))
   }, [])
 
   const openBill = useCallback((entry: NotableVoteEntry) => {
-    setSelection((prev) => ({ kind: 'bill', entry, key: (prev?.key ?? 0) + 1 }))
+    setOverlays((prev) => ({
+      ...prev,
+      bill: { entry, key: nextOverlayKey(prev) },
+    }))
   }, [])
 
-  const closeOverlay = useCallback(() => setSelection(null), [])
+  const closeBill = useCallback(() => {
+    setOverlays((prev) => ({ ...prev, bill: null }))
+  }, [])
 
-  const overlays =
-    selection?.kind === 'member' ? (
-      <MemberProfile
-        open
-        seed={selection.seed}
-        selectionKey={selection.key}
-        onClose={closeOverlay}
-      />
-    ) : selection?.kind === 'bill' ? (
-      <NotableBillSheet
-        open
-        entry={selection.entry}
-        selectionKey={selection.key}
-        onClose={closeOverlay}
-        onOpenProfile={openProfile}
-      />
-    ) : null
+  const closeMember = useCallback(() => {
+    setOverlays((prev) => ({ ...prev, member: null }))
+  }, [])
+
+  const overlayNodes = (
+    <>
+      {overlays.bill ? (
+        <NotableBillSheet
+          open
+          entry={overlays.bill.entry}
+          selectionKey={overlays.bill.key}
+          onClose={closeBill}
+          onOpenProfile={openProfile}
+        />
+      ) : null}
+      {overlays.member ? (
+        <MemberProfile
+          open
+          seed={overlays.member.seed}
+          selectionKey={overlays.member.key}
+          onClose={closeMember}
+        />
+      ) : null}
+    </>
+  )
 
   if (error) {
     const className = variant === 'compact' ? 'notable-compact' : 'home-enrichment'
@@ -196,6 +215,7 @@ export function NotableVotesSection({
             Retry
           </button>
         ) : null}
+        {overlayNodes}
       </section>
     )
   }
@@ -205,12 +225,14 @@ export function NotableVotesSection({
       return (
         <section className="notable-compact" aria-label="Notable votes">
           <p className="text-[12px] text-faint">Loading notable votes…</p>
+          {overlayNodes}
         </section>
       )
     }
     return (
       <section className="home-enrichment" aria-label="Notable votes">
         <div className="notable-votes-skeleton" aria-hidden="true" />
+        {overlayNodes}
       </section>
     )
   }
@@ -221,6 +243,7 @@ export function NotableVotesSection({
         <section className="notable-compact" aria-label="Notable votes">
           <h2 className="notable-compact-title">Notable votes</h2>
           <p className="notable-votes-empty">No notable votes yet this session.</p>
+          {overlayNodes}
         </section>
       )
     }
@@ -231,6 +254,7 @@ export function NotableVotesSection({
           <h2 className="home-enrichment-title">Notable votes</h2>
         </div>
         <p className="notable-votes-empty">No notable votes yet this session.</p>
+        {overlayNodes}
       </section>
     )
   }
@@ -249,7 +273,7 @@ export function NotableVotesSection({
             />
           ))}
         </ul>
-        {overlays}
+        {overlayNodes}
       </section>
     )
   }
@@ -269,7 +293,7 @@ export function NotableVotesSection({
           />
         ))}
       </div>
-      {overlays}
+      {overlayNodes}
     </section>
   )
 }

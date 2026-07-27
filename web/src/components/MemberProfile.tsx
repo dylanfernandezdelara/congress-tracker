@@ -91,8 +91,8 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
         </div>
       </div>
 
-      <section className="member-profile-section" aria-label="Voting behavior">
-        <h3 className="member-profile-section-title">Voting behavior</h3>
+      <section className="sheet-section" aria-label="Voting behavior">
+        <h3 className="sheet-section-title">Voting behavior</h3>
         <p className="member-profile-behavior">{hint}</p>
         {phase.kind === 'ready' ? (
           <dl className="member-profile-stats">
@@ -113,21 +113,21 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
           </dl>
         ) : null}
         {phase.kind === 'loading' ? (
-          <p className="member-profile-muted">Loading session voting stats…</p>
+          <p className="sheet-muted">Loading session voting stats…</p>
         ) : null}
         {phase.kind === 'error' ? (
-          <p className="member-profile-muted">{phase.message}</p>
+          <p className="sheet-muted">{phase.message}</p>
         ) : null}
         {phase.kind === 'unavailable' ? (
-          <p className="member-profile-muted">
+          <p className="sheet-muted">
             Per-member vote history is not available for this session yet.
           </p>
         ) : null}
       </section>
 
       {phase.kind === 'ready' && phase.profile.recent_cross_votes.length > 0 ? (
-        <section className="member-profile-section" aria-label="Recent party-line breaks">
-          <h3 className="member-profile-section-title">Recent party-line breaks</h3>
+        <section className="sheet-section" aria-label="Recent party-line breaks">
+          <h3 className="sheet-section-title">Recent party-line breaks</h3>
           <ul className="member-profile-recent">
             {phase.profile.recent_cross_votes.map((vote) => (
               <li
@@ -149,7 +149,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
 
       {profile?.congress_gov_url ? (
         <a
-          className="member-profile-link congress-link"
+          className="sheet-link congress-link"
           href={profile.congress_gov_url}
           target="_blank"
           rel="noopener noreferrer"

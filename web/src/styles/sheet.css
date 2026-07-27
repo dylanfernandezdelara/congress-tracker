@@ -1,0 +1,173 @@
+@layer components {
+  .sheet-root {
+    position: fixed;
+    inset: 0;
+    /* Base layer; AnimatedSheet raises this by stack depth so keyboard
+       “top” matches paint order when multiple sheets are open. */
+    z-index: 40;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: hsl(var(--twc-foreground) / 0.28);
+    cursor: pointer;
+    animation: sheet-backdrop-in 320ms ease both;
+  }
+
+  .sheet-panel {
+    position: relative;
+    z-index: 1;
+    width: min(28rem, 100%);
+    max-height: min(88vh, 40rem);
+    overflow: auto;
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 1rem 1rem 0 0;
+    background: hsl(var(--twc-card));
+    box-shadow: var(--twc-card-shadow);
+    padding: 0.875rem 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    /* Off-screen distance for the rise/sink keyframes. The bottom-docked
+       mobile sheet only needs its own height; the centered desktop panel
+       overrides this to 100vh (see the min-width block below). */
+    --sheet-slide-distance: 100%;
+    animation: sheet-rise 400ms var(--motion-ease-sheet) both;
+  }
+
+  @keyframes sheet-backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes sheet-backdrop-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes sheet-rise {
+    from {
+      transform: translateY(var(--sheet-slide-distance));
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes sheet-sink {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(var(--sheet-slide-distance));
+    }
+  }
+
+  /* Animated close: keep the dialog mounted with this modifier until the
+     panel's exit animation finishes, then unmount it. */
+  .sheet-root--closing {
+    pointer-events: none;
+  }
+
+  .sheet-root--closing .sheet-backdrop {
+    animation: sheet-backdrop-out 260ms ease both;
+  }
+
+  .sheet-root--closing .sheet-panel {
+    animation: sheet-sink 280ms var(--motion-ease-in) both;
+  }
+
+  .sheet-toolbar {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .sheet-close {
+    border: none;
+    background: transparent;
+    color: hsl(var(--twc-secondary));
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.25rem 0.15rem;
+    cursor: pointer;
+  }
+
+  .sheet-close:hover {
+    color: hsl(var(--twc-foreground));
+  }
+
+  .sheet-close:focus-visible {
+    outline: 2px solid hsl(var(--twc-accent));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Shared content tokens used by member + bill sheets. */
+  .sheet-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .sheet-section-title {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(var(--twc-faint));
+  }
+
+  .sheet-muted {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: hsl(var(--twc-faint));
+  }
+
+  .sheet-link {
+    align-self: flex-start;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  @media (min-width: 640px) {
+    .sheet-root {
+      align-items: center;
+      padding: 1.5rem;
+    }
+
+    /* Same sheet motion as mobile, but the panel is vertically centered here,
+       so slide from 100vh to guarantee it starts fully off-screen regardless
+       of panel height. */
+    .sheet-panel {
+      border-radius: 1rem;
+      max-height: min(85vh, 36rem);
+      --sheet-slide-distance: 100vh;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet-backdrop,
+    .sheet-panel,
+    .sheet-root--closing .sheet-backdrop,
+    .sheet-root--closing .sheet-panel {
+      animation: none;
+    }
+  }
+}

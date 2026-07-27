@@ -9,6 +9,9 @@ export type SheetLayerController = {
   panel: HTMLElement | null
 }
 
+/** Matches `.sheet-root` base z-index in sheet.css; each stacked sheet adds +1. */
+export const SHEET_BASE_Z_INDEX = 40
+
 const stack: SheetLayerController[] = []
 let keyListenerAttached = false
 let previousBodyOverflow = ''
@@ -53,23 +56,34 @@ function releaseKeyListener() {
   keyListenerAttached = false
 }
 
-/** Register an open sheet; returns an unregister function for effect cleanup. */
-export function registerSheetLayer(controller: SheetLayerController): () => void {
+export type SheetLayerRegistration = {
+  /** Unregister this sheet from the stack. */
+  unregister: () => void
+  /** z-index for this sheet so paint order matches stack order. */
+  zIndex: number
+}
+
+/** Register an open sheet; returns unregister + paint z-index for this layer. */
+export function registerSheetLayer(controller: SheetLayerController): SheetLayerRegistration {
   if (stack.length === 0) {
     previousBodyOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     ensureKeyListener()
   }
   stack.push(controller)
+  const zIndex = SHEET_BASE_Z_INDEX + stack.length - 1
 
-  return () => {
-    const index = stack.lastIndexOf(controller)
-    if (index >= 0) stack.splice(index, 1)
-    if (stack.length === 0) {
-      document.body.style.overflow = previousBodyOverflow
-      previousBodyOverflow = ''
-      releaseKeyListener()
-    }
+  return {
+    zIndex,
+    unregister: () => {
+      const index = stack.lastIndexOf(controller)
+      if (index >= 0) stack.splice(index, 1)
+      if (stack.length === 0) {
+        document.body.style.overflow = previousBodyOverflow
+        previousBodyOverflow = ''
+        releaseKeyListener()
+      }
+    },
   }
 }
 
@@ -82,4 +96,9 @@ export function resetSheetLayerForTests(): void {
   }
   document.body.style.overflow = ''
   previousBodyOverflow = ''
+}
+
+/** Test helper — current stack depth (0 when empty). */
+export function sheetLayerDepthForTests(): number {
+  return stack.length
 }

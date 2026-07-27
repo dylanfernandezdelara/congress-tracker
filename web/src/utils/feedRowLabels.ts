@@ -208,10 +208,15 @@ export function getFeedTopic(item: FeedItem): string {
 }
 
 /** Single source of truth for digest / CRS / pending summary content. */
-export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
-  const whatItDoes = item.digest?.what_it_does?.trim() || null
-  const keyPoints = normalizeDigestBullets(item.digest?.key_points ?? [])
-  const crsSummary = item.raw_summary_text?.trim() || null
+/** Build canonical summary content from digest / CRS fields (feed or notable). */
+export function toFeedSummaryContent(fields: {
+  what_it_does?: string | null
+  key_points?: string[] | null
+  raw_summary_text?: string | null
+}): FeedSummaryContent {
+  const whatItDoes = fields.what_it_does?.trim() || null
+  const keyPoints = normalizeDigestBullets(fields.key_points ?? [])
+  const crsSummary = fields.raw_summary_text?.trim() || null
 
   return {
     whatItDoes,
@@ -219,6 +224,14 @@ export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
     crsSummary,
     pending: !whatItDoes && keyPoints.length === 0 && !crsSummary,
   }
+}
+
+export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
+  return toFeedSummaryContent({
+    what_it_does: item.digest?.what_it_does,
+    key_points: item.digest?.key_points,
+    raw_summary_text: item.raw_summary_text,
+  })
 }
 
 /** Short teaser for the collapsed feed row (~25 words, first sentence). */

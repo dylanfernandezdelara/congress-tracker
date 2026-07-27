@@ -228,6 +228,54 @@ describe('NotableVotesSection', () => {
     expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
   })
 
+  it('stacks a member profile on top of an open bill sheet', async () => {
+    render(
+      <NotableVotesSection
+        notable={[
+          sampleEntry({
+            member_votes_available: true,
+            defectors: [
+              {
+                bioguide_id: 'A000001',
+                name: 'Jane Example',
+                party: 'D',
+                state: 'CA',
+                photo_url: 'https://example.com/jane.jpg',
+                cross_vote_count: 1,
+                cross_vote_label: 'rare',
+              },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Open bill details for Gives Money for Border and Immigration Enforcement Until 2029',
+      }),
+    )
+    expect(
+      screen.getByRole('dialog', {
+        name: 'Gives Money for Border and Immigration Enforcement Until 2029',
+      }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open profile for Jane Example' })[0]!)
+    expect(screen.getByRole('dialog', { name: 'Jane Example' })).toBeInTheDocument()
+    // Bill sheet stays mounted underneath.
+    expect(
+      screen.getByRole('dialog', {
+        name: 'Gives Money for Border and Immigration Enforcement Until 2029',
+        hidden: true,
+      }),
+    ).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('CA-12')).toBeInTheDocument()
+    })
+  })
+
   it('shows an empty state when there are no notable votes', () => {
     render(<NotableVotesSection notable={[]} />)
 
