@@ -42,16 +42,20 @@ describe('FeedSummarySections', () => {
     expect(screen.getAllByText('Official CRS summary text.')).toHaveLength(1)
   })
 
-  it('renders the full CRS as the primary summary when there is no digest', () => {
+  it('renders a short complete CRS sentence and puts the full CRS in disclosure', () => {
     const crs =
       'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted. Congress retains the power to authorize force.'
     render(<FeedSummarySections content={content({ crsSummary: crs })} />)
 
     expect(screen.getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
     const body = document.querySelector('.feed-row-detail-section .feed-row-summary-body')
-    expect(body).toHaveTextContent(crs)
+    expect(body).toHaveTextContent(
+      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted.',
+    )
     expect(body?.textContent?.endsWith('…')).toBe(false)
-    expect(screen.queryByText('Official CRS summary')).toBeNull()
+    expect(body?.textContent?.length).toBeLessThan(crs.length)
+    expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Official CRS summary' })).toHaveTextContent(crs)
   })
 
   it('keeps a short CRS as the primary summary without a redundant disclosure', () => {

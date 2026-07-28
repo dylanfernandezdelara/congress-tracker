@@ -82,7 +82,7 @@ describe('FeedRowDetail', () => {
     expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
   })
 
-  it('shows the full CRS summary when no digest exists', () => {
+  it('shows a short complete CRS sentence when no digest exists and keeps the full CRS in disclosure', () => {
     const crs =
       'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted. Congress retains the power to authorize force.'
     render(
@@ -93,9 +93,15 @@ describe('FeedRowDetail', () => {
 
     expect(screen.getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
     const body = document.querySelector('.feed-row-detail-section .feed-row-summary-body')
-    expect(body).toHaveTextContent(crs)
+    expect(body).toHaveTextContent(
+      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted.',
+    )
     expect(body?.textContent?.endsWith('…')).toBe(false)
-    expect(screen.queryByText('Official CRS summary')).not.toBeInTheDocument()
+    expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
+    const crsDetails = screen.getByText('Official CRS summary').closest('details')
+    expect(crsDetails).toBeTruthy()
+    expect(crsDetails?.querySelector('.feed-row-summary-body--scrollable')).toBeInTheDocument()
+    expect(crsDetails).toHaveTextContent(crs)
   })
 
   it('shows CRS only in the disclosure when digest key points exist without a lead', () => {

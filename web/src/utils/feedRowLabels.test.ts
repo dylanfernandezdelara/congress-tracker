@@ -623,7 +623,7 @@ describe('getFeedSummarySectionsModel', () => {
     })
   })
 
-  it('uses the full CRS as primary when no digest exists (no word-cap truncation)', () => {
+  it('uses a short complete CRS sentence as primary and keeps the full CRS in disclosure', () => {
     const crs =
       'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted. Congress retains the power to authorize force.'
     const model = getFeedSummarySectionsModel({
@@ -632,8 +632,12 @@ describe('getFeedSummarySectionsModel', () => {
       crsSummary: crs,
       pending: false,
     })
-    expect(model.primary).toEqual({ kind: 'crs', text: crs })
-    expect(model.crsDisclosure).toBeNull()
+    expect(model.primary).toEqual({
+      kind: 'crs',
+      text: 'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted.',
+    })
+    expect(model.primary.kind === 'crs' && model.primary.text.endsWith('…')).toBe(false)
+    expect(model.crsDisclosure).toBe(crs)
     expect(model.keyPoints).toEqual([])
   })
 

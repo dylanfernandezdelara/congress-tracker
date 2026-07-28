@@ -3,6 +3,9 @@ export const FEED_LEAD_MAX_WORDS = 25
 export const FEED_BULLET_MAX_WORDS = 12
 export const FEED_COLLAPSED_MAX_BULLETS = 4
 
+// Expanded CRS-only primary: one complete sentence (keeps mobile detail panels short).
+export const FEED_EXPANDED_CRS_MAX_WORDS = 60
+
 // Ingest caps: generous safety bounds for pathological model output at storage time.
 export const DIGEST_LEAD_MAX_WORDS = 60
 export const DIGEST_BULLET_MAX_WORDS = 40
@@ -56,6 +59,15 @@ export function normalizeDigestLead(
 /** Collapsed feed card: one short sentence capped at FEED_LEAD_MAX_WORDS. */
 export function formatCollapsedDigestLead(text: string): string {
   return truncateWords(firstSentence(text.trim()), FEED_LEAD_MAX_WORDS)
+}
+
+/**
+ * Expanded detail when only CRS text is available: one complete sentence so
+ * mobile readers get a short summary without mid-sentence teaser cuts.
+ * Full CRS belongs in the disclosure when longer than this lead.
+ */
+export function formatExpandedCrsLead(text: string): string {
+  return truncateWords(firstSentence(text.trim()), FEED_EXPANDED_CRS_MAX_WORDS)
 }
 
 export function normalizeDigestBullets(
