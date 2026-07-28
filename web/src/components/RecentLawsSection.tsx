@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 
+import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 import type { BillLawKind } from '@congress-tracker/shared/lifecycle-api-types'
+import { daysAgoLookbackStartIso } from '@congress-tracker/shared/lookback'
 
 import type { RecentLawItem } from '../api/types'
 import { assertNever } from '../utils/assertNever'
@@ -48,37 +50,67 @@ function billDeepLinkTo(law: RecentLawItem): string {
   return `/?bill=${bill}`
 }
 
+/** True when a passage vote is still inside the feed lookback window. */
+export function isPassageVoteInFeedWindow(
+  voteDate: string | null,
+  asOf: Date = new Date(),
+): boolean {
+  if (!voteDate) return false
+  return voteDate >= daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf)
+}
+
 function RecentLawItemRow({ law }: { law: RecentLawItem }) {
   const billId = formatShortBillId(law.bill_type, law.bill_number)
   const headline = law.headline?.trim() || law.title?.trim() || billId
   const outcome = recentLawOutcomeLabel(law.law_kind)
   const sourceUrl = congressGovBillUrl(law.congress, law.bill_type, law.bill_number)
+  const linkInFeed = isPassageVoteInFeedWindow(law.latest_passage_vote_date)
   const metaParts = [outcome]
   if (law.public_law) metaParts.push(formatPublicLawLabel(law.public_law))
   metaParts.push(formatVoteDate(law.became_law_date))
 
+  const titleInner = (
+    <>
+      <span className="recent-laws-bill-id">{billId}</span>
+      <span className="recent-laws-headline-sep"> — </span>
+      <span className="recent-laws-headline-text">{headline}</span>
+    </>
+  )
+
   return (
     <li className="recent-laws-item">
       <p className="recent-laws-headline">
-        <Link
-          to={billDeepLinkTo(law)}
-          className="recent-laws-feed-link"
-          aria-label={`Open ${billId} in the feed`}
-        >
-          <span className="recent-laws-bill-id">{billId}</span>
-          <span className="recent-laws-headline-sep"> — </span>
-          <span className="recent-laws-headline-text">{headline}</span>
-        </Link>
+        {linkInFeed ? (
+          <Link
+            to={billDeepLinkTo(law)}
+            className="recent-laws-feed-link"
+            aria-label={`Open ${billId} in the feed`}
+          >
+            {titleInner}
+          </Link>
+        ) : (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="recent-laws-feed-link congress-link"
+            aria-label={`Read ${billId} on congress.gov`}
+          >
+            {titleInner}
+          </a>
+        )}
       </p>
       <p className="recent-laws-meta">{metaParts.join(' · ')}</p>
-      <a
-        href={sourceUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="recent-laws-congress-link congress-link"
-      >
-        congress.gov ↗
-      </a>
+      {linkInFeed ? (
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="recent-laws-congress-link congress-link"
+        >
+          congress.gov ↗
+        </a>
+      ) : null}
     </li>
   )
 }

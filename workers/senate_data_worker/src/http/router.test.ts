@@ -267,6 +267,7 @@ describe("HTTP API", () => {
           presented_date: null,
           latest_action_date: null,
           latest_action_text: null,
+          latest_passage_vote_date: null,
         })),
         as_of: asOf ?? "2026-07-28T00:00:00.000Z",
       })

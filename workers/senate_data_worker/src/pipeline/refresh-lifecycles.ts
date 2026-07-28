@@ -1,5 +1,5 @@
 import { LIFECYCLE_MAX_REFRESHES_PER_RUN } from "../constants";
-import type { Env } from "../config";
+import { congressNumber, type Env } from "../config";
 import {
   getLifecyclesForBills,
   lifecycleMapKey,
@@ -70,7 +70,11 @@ export async function refreshBillLifecycles(
   let skipped = 0;
   const warnings: string[] = [];
 
-  const presentedPending = await selectPresentedPendingLifecycleBills(env.DB);
+  const presentedPending = await selectPresentedPendingLifecycleBills(
+    env.DB,
+    congressNumber(env),
+    LIFECYCLE_MAX_REFRESHES_PER_RUN
+  );
   const candidates = mergeLifecycleRefreshCandidates(bills, presentedPending);
 
   const existing = await getLifecyclesForBills(

@@ -122,13 +122,14 @@ describe("refreshBillLifecycles", () => {
     mockUpsertLifecycle.mockResolvedValue(undefined);
 
     const result = await refreshBillLifecycles(
-      { DB: {} as D1Database } as never,
+      { DB: {} as D1Database, CONGRESS: "119", SESSION: "2" } as never,
       [],
       "test"
     );
 
     expect(result.refreshed).toBe(1);
     expect(result.skipped).toBe(0);
+    expect(mockSelectPresentedPending).toHaveBeenCalledWith({}, 119, 1);
     expect(mockFetchBillLifecycleSource).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ congress: 119, type: "HR", number: 6644 })
@@ -188,11 +189,12 @@ describe("refreshBillLifecycles", () => {
     mockUpsertLifecycle.mockResolvedValue(undefined);
 
     const result = await refreshBillLifecycles(
-      { DB: {} as D1Database } as never,
+      { DB: {} as D1Database, CONGRESS: "119", SESSION: "2" } as never,
       [{ bill_congress: 119, bill_type: "HR", bill_number: 3 }],
       "test"
     );
 
+    expect(mockSelectPresentedPending).toHaveBeenCalledWith({}, 119, 1);
     expect(mockFetchBillLifecycleSource).toHaveBeenCalledTimes(1);
     expect(result.refreshed).toBe(1);
     expect(result.skipped).toBe(2);

@@ -17,6 +17,8 @@ export interface RecentLawItem {
   presented_date: string | null
   latest_action_date: string | null
   latest_action_text: string | null
+  /** Latest passage-vote date for this bill, if any are stored. */
+  latest_passage_vote_date: string | null
 }
 
 export interface RecentLawsResponse {

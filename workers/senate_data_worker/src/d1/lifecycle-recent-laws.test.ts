@@ -28,20 +28,51 @@ type DigestFixture = {
   digest_json: string | null;
 };
 
+type VoteFixture = {
+  bill_congress: number;
+  bill_type: string;
+  bill_number: number;
+  vote_date: string;
+  is_passage: number;
+};
+
 function createLifecycleQueryDb(opts: {
   lifecycles: LifecycleFixture[];
   digests?: DigestFixture[];
+  votes?: VoteFixture[];
 }): D1Database {
   const digests = opts.digests ?? [];
+  const votes = opts.votes ?? [];
 
-  function presentedPendingResults() {
+  function latestPassageVoteDate(row: LifecycleFixture): string | null {
+    const dates = votes
+      .filter(
+        (v) =>
+          v.is_passage === 1 &&
+          v.bill_congress === row.congress &&
+          v.bill_type.toUpperCase() === row.bill_type.toUpperCase() &&
+          v.bill_number === row.bill_number
+      )
+      .map((v) => v.vote_date)
+      .sort((a, b) => b.localeCompare(a));
+    return dates[0] ?? null;
+  }
+
+  function presentedPendingResults(congress: number, limit: number) {
     return opts.lifecycles
+      .filter((row) => row.congress === congress)
       .filter((row) => row.presented_date != null)
       .filter(
         (row) =>
           row.became_law_date == null ||
           (row.law_kind === "law_unsigned" && (row.public_law == null || row.public_law === ""))
       )
+      .sort((a, b) => {
+        const byPresented = (a.presented_date ?? "").localeCompare(b.presented_date ?? "");
+        if (byPresented !== 0) return byPresented;
+        return (a.latest_action_date ?? "").localeCompare(b.latest_action_date ?? "");
+      })
+      .slice(0, limit)
       .map((row) => ({
         bill_congress: row.congress,
         bill_type: row.bill_type,
@@ -86,6 +117,7 @@ function createLifecycleQueryDb(opts: {
           presented_date: row.presented_date,
           latest_action_date: row.latest_action_date,
           latest_action_text: row.latest_action_text,
+          latest_passage_vote_date: latestPassageVoteDate(row),
         };
       })
       .sort((a, b) => {
@@ -98,7 +130,10 @@ function createLifecycleQueryDb(opts: {
 
   const stmt = (sql: string) => {
     const isEnacted = sql.includes("FROM bill_lifecycle l") && sql.includes("became_law_date IS NOT NULL");
-    const isPresented = sql.includes("FROM bill_lifecycle") && sql.includes("presented_date IS NOT NULL");
+    const isPresented =
+      sql.includes("FROM bill_lifecycle") &&
+      sql.includes("presented_date IS NOT NULL") &&
+      sql.includes("congress = ?");
 
     return {
       bind: (...args: unknown[]) => ({
@@ -107,19 +142,14 @@ function createLifecycleQueryDb(opts: {
             return { results: enactedResults(args[0] as number, args[1] as number) };
           }
           if (isPresented) {
-            return { results: presentedPendingResults() };
+            return { results: presentedPendingResults(args[0] as number, args[1] as number) };
           }
           return { results: [] };
         },
         first: async () => null,
         run: async () => ({ success: true }),
       }),
-      all: async () => {
-        if (isPresented) {
-          return { results: presentedPendingResults() };
-        }
-        return { results: [] };
-      },
+      all: async () => ({ results: [] }),
       first: async () => null,
       run: async () => ({ success: true }),
     };
@@ -233,6 +263,29 @@ describe("selectRecentlyEnactedBills", () => {
           }),
         },
       ],
+      votes: [
+        {
+          bill_congress: 119,
+          bill_type: "S",
+          bill_number: 50,
+          vote_date: "2026-06-20",
+          is_passage: 1,
+        },
+        {
+          bill_congress: 119,
+          bill_type: "S",
+          bill_number: 50,
+          vote_date: "2026-07-01",
+          is_passage: 1,
+        },
+        {
+          bill_congress: 119,
+          bill_type: "S",
+          bill_number: 50,
+          vote_date: "2026-07-02",
+          is_passage: 0,
+        },
+      ],
     });
 
     const rows = await selectRecentlyEnactedBills(db, 119, 1);
@@ -248,12 +301,14 @@ describe("selectRecentlyEnactedBills", () => {
       became_law_date: "2026-07-15",
       law_kind: "signed",
       public_law: "119-20",
+      latest_passage_vote_date: "2026-07-01",
     });
 
     const all = await selectRecentlyEnactedBills(db, 119, 10);
     expect(all.map((r) => r.bill_number)).toEqual([50, 100]);
     expect(all.every((r) => r.law_kind !== "vetoed")).toBe(true);
     expect(all.every((r) => r.became_law_date != null)).toBe(true);
+    expect(all.find((r) => r.bill_number === 100)?.latest_passage_vote_date).toBeNull();
   });
 });
 
@@ -262,7 +317,7 @@ describe("selectPresentedPendingLifecycleBills", () => {
     resetSchemaFlag();
   });
 
-  it("returns presented non-terminal rows and skips terminal enactment", async () => {
+  it("returns presented non-terminal rows for the congress, respects limit, and skips terminal enactment", async () => {
     const db = createLifecycleQueryDb({
       lifecycles: [
         {
@@ -276,6 +331,19 @@ describe("selectPresentedPendingLifecycleBills", () => {
           law_kind: null,
           public_law: null,
           latest_action_date: "2026-01-01",
+          latest_action_text: "Presented to President.",
+        },
+        {
+          congress: 119,
+          bill_type: "S",
+          bill_number: 9,
+          presented_date: "2026-01-15",
+          signed_date: null,
+          vetoed_date: null,
+          became_law_date: null,
+          law_kind: null,
+          public_law: null,
+          latest_action_date: "2026-01-15",
           latest_action_text: "Presented to President.",
         },
         {
@@ -304,12 +372,32 @@ describe("selectPresentedPendingLifecycleBills", () => {
           latest_action_date: null,
           latest_action_text: null,
         },
+        {
+          congress: 118,
+          bill_type: "HR",
+          bill_number: 99,
+          presented_date: "2024-01-01",
+          signed_date: null,
+          vetoed_date: null,
+          became_law_date: null,
+          law_kind: null,
+          public_law: null,
+          latest_action_date: "2024-01-01",
+          latest_action_text: "Presented to President.",
+        },
       ],
     });
 
-    const rows = await selectPresentedPendingLifecycleBills(db);
+    const rows = await selectPresentedPendingLifecycleBills(db, 119, 50);
     expect(rows).toEqual([
       { bill_congress: 119, bill_type: "HR", bill_number: 6644 },
+      { bill_congress: 119, bill_type: "S", bill_number: 9 },
     ]);
+
+    const capped = await selectPresentedPendingLifecycleBills(db, 119, 1);
+    expect(capped).toEqual([{ bill_congress: 119, bill_type: "HR", bill_number: 6644 }]);
+
+    const otherCongress = await selectPresentedPendingLifecycleBills(db, 118, 50);
+    expect(otherCongress).toEqual([{ bill_congress: 118, bill_type: "HR", bill_number: 99 }]);
   });
 });

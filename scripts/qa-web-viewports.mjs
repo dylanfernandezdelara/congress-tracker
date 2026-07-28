@@ -334,6 +334,7 @@ const MOCK_RECENT_LAWS = {
       presented_date: '2026-06-08',
       latest_action_date: '2026-06-12',
       latest_action_text: 'Became Public Law No: 119-1.',
+      latest_passage_vote_date: '2026-06-05',
     },
     {
       congress: 119,
@@ -349,6 +350,7 @@ const MOCK_RECENT_LAWS = {
       presented_date: '2026-05-28',
       latest_action_date: '2026-06-10',
       latest_action_text: 'Became Public Law No: 119-2 without signature.',
+      latest_passage_vote_date: '2026-05-20',
     },
   ],
 }

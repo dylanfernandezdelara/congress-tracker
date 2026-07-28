@@ -16,6 +16,7 @@ type LawFixture = {
   presented_date: string | null;
   latest_action_date: string | null;
   latest_action_text: string | null;
+  latest_passage_vote_date: string | null;
 };
 
 function createRecentLawsDb(rows: LawFixture[]): D1Database {
@@ -73,6 +74,7 @@ describe("buildRecentLaws", () => {
         presented_date: "2026-04-20",
         latest_action_date: "2026-05-01",
         latest_action_text: "Became Public Law No: 119-5.",
+        latest_passage_vote_date: "2026-04-15",
       },
       {
         congress: 119,
@@ -88,6 +90,7 @@ describe("buildRecentLaws", () => {
         presented_date: "2026-07-01",
         latest_action_date: "2026-07-15",
         latest_action_text: "Became Public Law No: 119-20.",
+        latest_passage_vote_date: null,
       },
     ]);
 
@@ -100,6 +103,8 @@ describe("buildRecentLaws", () => {
     expect(body.laws).toHaveLength(2);
     expect(body.laws[0]?.bill_number).toBe(50);
     expect(body.laws[0]?.headline).toBe("Newer headline");
+    expect(body.laws[0]?.latest_passage_vote_date).toBeNull();
     expect(body.laws[1]?.bill_number).toBe(100);
+    expect(body.laws[1]?.latest_passage_vote_date).toBe("2026-04-15");
   });
 });

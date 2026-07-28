@@ -25,6 +25,7 @@ export async function buildRecentLaws(
     presented_date: row.presented_date,
     latest_action_date: row.latest_action_date,
     latest_action_text: row.latest_action_text,
+    latest_passage_vote_date: row.latest_passage_vote_date,
   }));
   return { congress, session, laws, as_of: asOf };
 }

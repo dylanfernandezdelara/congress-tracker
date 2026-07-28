@@ -153,6 +153,7 @@ describe('Home', () => {
           presented_date: '2026-06-05',
           latest_action_date: '2026-06-10',
           latest_action_text: 'Became Public Law No: 119-5.',
+          latest_passage_vote_date: '2026-06-05',
         },
       ],
     })

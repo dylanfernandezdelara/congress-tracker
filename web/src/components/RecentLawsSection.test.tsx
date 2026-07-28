@@ -3,6 +3,9 @@ import type { ReactElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
+import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
+import { daysAgoLookbackStartIso } from '@congress-tracker/shared/lookback'
+
 import type { RecentLawItem } from '../api/types'
 import { RecentLawsSection } from './RecentLawsSection'
 
@@ -10,6 +13,12 @@ const routerFuture = {
   v7_startTransition: true,
   v7_relativeSplatPath: true,
 } as const
+
+function isoDaysAgo(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
+}
 
 function sampleLaw(overrides: Partial<RecentLawItem> = {}): RecentLawItem {
   return {
@@ -26,6 +35,7 @@ function sampleLaw(overrides: Partial<RecentLawItem> = {}): RecentLawItem {
     presented_date: '2026-07-10',
     latest_action_date: '2026-07-15',
     latest_action_text: 'Became Public Law No: 119-1.',
+    latest_passage_vote_date: isoDaysAgo(3),
     ...overrides,
   }
 }
@@ -69,6 +79,44 @@ describe('RecentLawsSection', () => {
       'href',
       expect.stringContaining('/bill/119th-congress/house-bill/1'),
     )
+  })
+
+  it('deep-links to the feed when the passage vote is still in the lookback window', () => {
+    const recentVote = daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS)
+    renderSection(
+      <RecentLawsSection laws={[sampleLaw({ latest_passage_vote_date: recentVote })]} />,
+    )
+
+    expect(screen.getByRole('link', { name: 'Open H.R. 1 in the feed' })).toHaveAttribute(
+      'href',
+      '/?bill=119-hr-1',
+    )
+    expect(screen.getByRole('link', { name: /congress\.gov/i })).toBeInTheDocument()
+  })
+
+  it('uses congress.gov as the primary link when the passage vote is outside the feed window', () => {
+    renderSection(
+      <RecentLawsSection
+        laws={[sampleLaw({ latest_passage_vote_date: isoDaysAgo(VOTE_LOOKBACK_DAYS + 5) })]}
+      />,
+    )
+
+    expect(screen.queryByRole('link', { name: 'Open H.R. 1 in the feed' })).not.toBeInTheDocument()
+    const primary = screen.getByRole('link', { name: 'Read H.R. 1 on congress.gov' })
+    expect(primary).toHaveAttribute(
+      'href',
+      expect.stringContaining('/bill/119th-congress/house-bill/1'),
+    )
+    expect(screen.queryByRole('link', { name: /^congress\.gov/i })).not.toBeInTheDocument()
+  })
+
+  it('uses congress.gov as the primary link when no passage vote date is recorded', () => {
+    renderSection(
+      <RecentLawsSection laws={[sampleLaw({ latest_passage_vote_date: null })]} />,
+    )
+
+    expect(screen.queryByRole('link', { name: 'Open H.R. 1 in the feed' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Read H.R. 1 on congress.gov' })).toBeInTheDocument()
   })
 
   it('falls back to Became law when law_kind is null', () => {
