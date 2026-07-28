@@ -625,7 +625,7 @@ describe('getFeedSummarySectionsModel', () => {
 
   it('uses a short complete CRS sentence as primary and keeps the full CRS in disclosure', () => {
     const crs =
-      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted. Congress retains the power to authorize force.'
+      'This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit. The resolution recommends levels and amounts for many accounts.'
     const model = getFeedSummarySectionsModel({
       whatItDoes: null,
       keyPoints: [],
@@ -634,7 +634,7 @@ describe('getFeedSummarySectionsModel', () => {
     })
     expect(model.primary).toEqual({
       kind: 'crs',
-      text: 'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted.',
+      text: 'This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit.',
     })
     expect(model.primary.kind === 'crs' && model.primary.text.endsWith('…')).toBe(false)
     expect(model.crsDisclosure).toBe(crs)

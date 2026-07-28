@@ -314,11 +314,6 @@
     overflow-wrap: anywhere;
   }
 
-  /* Official CRS often includes paragraph breaks; keep them when it is primary. */
-  .feed-row-summary-body--crs {
-    white-space: pre-wrap;
-  }
-
   .feed-row-summary-body p {
     margin: 0;
     white-space: pre-wrap;

@@ -9,7 +9,6 @@ export {
   DIGEST_MAX_BULLETS,
   FEED_BULLET_MAX_WORDS,
   FEED_COLLAPSED_MAX_BULLETS,
-  FEED_EXPANDED_CRS_MAX_WORDS,
   FEED_LEAD_MAX_WORDS,
   formatCollapsedDigestLead,
   formatExpandedCrsLead,
