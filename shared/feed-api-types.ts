@@ -80,3 +80,9 @@ export interface FeedPageResponse {
   offset: number
   has_more: boolean
 }
+
+/** Single-bill feed detail: `GET /feed/bill.json`. */
+export interface FeedBillResponse {
+  item: FeedItem | null
+  as_of: string
+}

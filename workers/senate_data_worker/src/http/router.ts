@@ -32,7 +32,7 @@ import {
 } from "../constants";
 import { normalizeFeedSearchQuery } from "../d1/feed-search";
 import { buildIngestMonitorPayload } from "./ingest-health";
-import { buildFeedPage } from "../storage/feed";
+import { buildFeedPage, buildFeedItemForBill } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildRecentLaws } from "../storage/recent-laws";
@@ -41,6 +41,7 @@ import { buildSessionStats } from "../storage/session-stats";
 import type {
   Chamber,
   DefectorsResponse,
+  FeedBillResponse,
   MemberProfileResponse,
   NotableVotesResponse,
   PortfoliosResponse,
@@ -349,6 +350,38 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       });
     } catch {
       return json({ error: "feed_error", message: "vote defectors unavailable" }, { status: 500 });
+    }
+  },
+  "/feed/bill.json": async ({ env, url, json }) => {
+    const congress = Number.parseInt(url.searchParams.get("congress") ?? "", 10);
+    const typeRaw = url.searchParams.get("type")?.trim() ?? "";
+    const number = Number.parseInt(url.searchParams.get("number") ?? "", 10);
+    if (!Number.isFinite(congress) || congress <= 0 || !typeRaw || !Number.isFinite(number) || number <= 0) {
+      return json(
+        {
+          error: "bad_request",
+          message: "congress, type, and number are required",
+        },
+        { status: 400 }
+      );
+    }
+    try {
+      const item = await buildFeedItemForBill(env, {
+        congress,
+        billType: typeRaw,
+        billNumber: number,
+      });
+      const body: FeedBillResponse = {
+        item,
+        as_of: new Date().toISOString(),
+      };
+      return json(body, {
+        status: 200,
+        headers: { "Cache-Control": cacheLatest },
+      });
+    } catch (err: unknown) {
+      console.error("feed_bill_route_error", err);
+      return json({ error: "feed_error", message: "bill unavailable" }, { status: 500 });
     }
   },
   "/stats/session.json": ({ env, json }) => {

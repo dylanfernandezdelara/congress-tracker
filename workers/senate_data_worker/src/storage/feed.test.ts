@@ -68,7 +68,7 @@ vi.mock("../sources/congress-client", () => ({
   lookbackStartIso: (days: number) => mockLookbackStartIso(days),
 }));
 
-import { buildFeedPage } from "./feed";
+import { buildFeedPage, buildFeedItemForBill } from "./feed";
 
 function createEnv(): Env {
   return {
@@ -432,5 +432,161 @@ describe("buildFeedPage lifecycle attachment", () => {
       latest_activity_date: "2026-06-24T14:26:00.000Z",
       passage_votes: [],
     });
+  });
+});
+
+describe("buildFeedItemForBill", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEnsureSchema.mockResolvedValue(undefined);
+    mockGetDigestsForBills.mockResolvedValue(new Map());
+    mockGetPassageVotesForBills.mockResolvedValue(new Map());
+    mockGetExecutivePostBillsForBills.mockResolvedValue(new Map());
+    mockGetExecutivePostBillsForPosts.mockResolvedValue(new Map());
+    mockGetLifecyclesForBills.mockResolvedValue(new Map());
+    mockGetCompanionVotesForBills.mockResolvedValue(new Map());
+    mockGetBillTextChangesForBills.mockResolvedValue(new Map());
+  });
+
+  it("returns a full item for a bill whose passage vote is outside the feed lookback", async () => {
+    mockGetDigestsForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:100",
+          {
+            congress: 119,
+            bill_type: "HR",
+            number: 100,
+            title: "Old Passage Bill",
+            policy_area: "Energy",
+            raw_summary_text: "CRS text",
+            digest_json: JSON.stringify({
+              headline: "Funds energy grid",
+              what_it_does: "Pays for transmission.",
+              key_points: [],
+              terms_explained: [],
+            }),
+          },
+        ],
+      ])
+    );
+    mockGetPassageVotesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:100",
+          [
+            {
+              chamber: "House",
+              congress: 119,
+              session: 1,
+              roll_number: 40,
+              question: "On Passage",
+              result: "Passed",
+              yeas: 230,
+              nays: 190,
+              vote_date: "2026-01-05",
+            },
+          ],
+        ],
+      ])
+    );
+    mockGetLifecyclesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:100",
+          {
+            congress: 119,
+            bill_type: "HR",
+            bill_number: 100,
+            introduced_date: "2025-11-01",
+            presented_date: "2026-01-20",
+            signed_date: "2026-02-01",
+            vetoed_date: null,
+            became_law_date: "2026-02-01",
+            law_kind: "signed",
+            public_law: "119-8",
+            latest_action_date: "2026-02-01",
+            latest_action_text: "Became Public Law No: 119-8.",
+            updated_at: "2026-02-01T00:00:00.000Z",
+          },
+        ],
+      ])
+    );
+    mockGetCompanionVotesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:100",
+          [
+            {
+              chamber: "House",
+              congress: 119,
+              session: 1,
+              roll_number: 39,
+              question: "On Agreeing to the Resolution",
+              result: "Passed",
+              yeas: 218,
+              nays: 210,
+              vote_date: "2026-01-04",
+            },
+          ],
+        ],
+      ])
+    );
+
+    const item = await buildFeedItemForBill(createEnv(), {
+      congress: 119,
+      billType: "hr",
+      billNumber: 100,
+      now: "2026-07-28",
+    });
+
+    expect(mockSelectFeedBills).not.toHaveBeenCalled();
+    expect(mockCountFeedBills).not.toHaveBeenCalled();
+    expect(mockGetPassageVotesForBills).toHaveBeenCalledWith(expect.anything(), [
+      { congress: 119, billType: "HR", billNumber: 100 },
+    ]);
+    expect(item).toMatchObject({
+      bill: {
+        congress: 119,
+        type: "HR",
+        number: 100,
+        title: "Old Passage Bill",
+      },
+      policy_area: "Energy",
+      digest: {
+        headline: "Funds energy grid",
+        what_it_does: "Pays for transmission.",
+      },
+      passage_votes: [
+        {
+          chamber: "House",
+          roll_number: 40,
+          date: "2026-01-05",
+        },
+      ],
+      companion_votes: [
+        {
+          chamber: "House",
+          roll_number: 39,
+          date: "2026-01-04",
+        },
+      ],
+      latest_passage_date: "2026-01-05",
+      latest_activity_date: "2026-02-01",
+      lifecycle: {
+        became_law_date: "2026-02-01",
+        law_kind: "signed",
+        public_law: "119-8",
+      },
+    });
+  });
+
+  it("returns null for a completely unknown bill", async () => {
+    const item = await buildFeedItemForBill(createEnv(), {
+      congress: 119,
+      billType: "HR",
+      billNumber: 99999,
+    });
+    expect(item).toBeNull();
   });
 });
