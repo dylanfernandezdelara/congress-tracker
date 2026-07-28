@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatCollapsedDigestLead,
+  formatExpandedCrsLead,
   normalizeDigestLead,
   proceduralHeadline,
   trimDisplayTitle,
@@ -53,6 +54,26 @@ describe("feed-content helpers", () => {
     );
     expect(lead).toBe("This bill blocks aid for ghost students.");
     expect(formatCollapsedDigestLead(lead)).toBe("This bill blocks aid for ghost students.");
+  });
+
+  it("formats expanded CRS leads as one complete sentence without the 25-word teaser cut", () => {
+    const crs =
+      "This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted. Congress retains the power to authorize force.";
+    expect(formatExpandedCrsLead(crs)).toBe(
+      "This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted.",
+    );
+    expect(formatExpandedCrsLead(crs).endsWith("…")).toBe(false);
+    expect(formatCollapsedDigestLead(crs).endsWith("…")).toBe(true);
+  });
+
+  it("keeps expanded CRS leads short for multi-paragraph budget resolutions", () => {
+    const crs = `This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit.
+The resolution recommends levels and amounts for FY2027-FY2036 for federal revenues and new budget authority.`;
+    const lead = formatExpandedCrsLead(crs);
+    expect(lead).toBe(
+      "This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit.",
+    );
+    expect(lead.length).toBeLessThan(crs.length);
   });
 
   it("preserves common abbreviations when extracting the first sentence", () => {

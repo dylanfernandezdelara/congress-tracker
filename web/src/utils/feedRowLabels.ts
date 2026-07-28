@@ -3,6 +3,7 @@ import {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
   formatCollapsedDigestLead,
+  formatExpandedCrsLead,
   formatShortBillId,
   isProceduralVote,
   normalizeDigestBullets,
@@ -260,10 +261,12 @@ export function getFeedSummarySectionsModel(
   if (content.whatItDoes) {
     primary = { kind: 'what_it_does', text: content.whatItDoes }
   } else if (!hasDigestSummary && content.crsSummary) {
-    // Glanceable lead only — full official CRS stays in the disclosure panel.
-    const crsLead = formatCollapsedDigestLead(content.crsSummary)
+    // One complete sentence for mobile — not the 25-word collapsed teaser, and not
+    // the full multi-paragraph CRS. Longer official text stays in disclosure.
+    const crsLead = formatExpandedCrsLead(content.crsSummary)
     primary = { kind: 'crs', text: crsLead }
-    crsDisclosure = content.crsSummary.length > crsLead.length ? content.crsSummary : null
+    const collapsedFull = content.crsSummary.replace(/\s+/g, ' ').trim()
+    crsDisclosure = collapsedFull === crsLead ? null : content.crsSummary
   } else {
     primary = { kind: 'none' }
   }

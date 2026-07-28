@@ -623,7 +623,7 @@ describe('getFeedSummarySectionsModel', () => {
     })
   })
 
-  it('uses a short CRS lead as primary and keeps the full CRS in disclosure', () => {
+  it('uses a short complete CRS sentence as primary and keeps the full CRS in disclosure', () => {
     const crs =
       'This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit. The resolution recommends levels and amounts for many accounts.'
     const model = getFeedSummarySectionsModel({
@@ -634,14 +634,14 @@ describe('getFeedSummarySectionsModel', () => {
     })
     expect(model.primary).toEqual({
       kind: 'crs',
-      text: expect.stringMatching(/^This concurrent resolution establishes/),
+      text: 'This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit.',
     })
-    expect(model.primary.kind === 'crs' && model.primary.text.length).toBeLessThan(crs.length)
+    expect(model.primary.kind === 'crs' && model.primary.text.endsWith('…')).toBe(false)
     expect(model.crsDisclosure).toBe(crs)
     expect(model.keyPoints).toEqual([])
   })
 
-  it('does not duplicate a short CRS in disclosure when the lead is the whole summary', () => {
+  it('does not put a short CRS-only summary in a redundant disclosure', () => {
     const crs = 'This bill funds rural hospitals.'
     expect(
       getFeedSummarySectionsModel({

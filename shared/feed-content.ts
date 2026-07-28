@@ -11,6 +11,7 @@ export {
   FEED_COLLAPSED_MAX_BULLETS,
   FEED_LEAD_MAX_WORDS,
   formatCollapsedDigestLead,
+  formatExpandedCrsLead,
   normalizeDigestBullets,
   normalizeDigestLead,
   truncateAtSentenceBoundary,

@@ -58,6 +58,15 @@ export function formatCollapsedDigestLead(text: string): string {
   return truncateWords(firstSentence(text.trim()), FEED_LEAD_MAX_WORDS)
 }
 
+/**
+ * Expanded detail when only CRS text is available: one complete sentence so
+ * mobile readers get a short summary without mid-sentence teaser cuts.
+ * Does not apply a word cap — longer official text belongs in the disclosure.
+ */
+export function formatExpandedCrsLead(text: string): string {
+  return firstSentence(text.trim())
+}
+
 export function normalizeDigestBullets(
   points: string[],
   options: { maxWords?: number; maxBullets?: number } = {},
