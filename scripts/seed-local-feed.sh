@@ -125,6 +125,22 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   session_return_pct REAL NOT NULL,
   PRIMARY KEY (bioguide_id, as_of_date)
 );
+CREATE TABLE IF NOT EXISTS bill_lifecycle (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  introduced_date TEXT,
+  presented_date TEXT,
+  signed_date TEXT,
+  vetoed_date TEXT,
+  became_law_date TEXT,
+  law_kind TEXT,
+  public_law TEXT,
+  latest_action_date TEXT,
+  latest_action_text TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number)
+);
 
 INSERT OR REPLACE INTO votes
   (chamber, congress, session, roll_number, bill_congress, bill_type, bill_number, question, result, yeas, nays, vote_date, is_passage)
@@ -148,6 +164,16 @@ VALUES
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"House passes a federal spending oversight bill (local sample)","what_it_does":"Adds reporting requirements for large federal contracts and creates a public dashboard for tracking agency spending.","key_points":["Requires agencies to publish contract performance data","Stands up a public spending dashboard","Adds penalties for repeated reporting failures"],"terms_explained":[{"term":"Federal contract","plain":"An agreement where the government pays a company to provide goods or services."},{"term":"Oversight","plain":"Monitoring done to make sure money and programs are used as intended."}]}',
    '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO bill_lifecycle
+  (congress, bill_type, bill_number, introduced_date, presented_date, signed_date, vetoed_date, became_law_date, law_kind, public_law, latest_action_date, latest_action_text, updated_at)
+VALUES
+  (119, 'hr', 1, '${D_OLDER}', '${D_MID}', '${D_RECENT}', NULL, '${D_RECENT}', 'signed', '119-1',
+   '${D_RECENT}', 'Became Public Law No: 119-1. (local sample)', '${D_RECENT}T00:00:00.000Z'),
+  (119, 's', 47, '${D_OLDER}', '${D_OLDER}', NULL, NULL, '${D_MID}', 'law_unsigned', '119-2',
+   '${D_MID}', 'Became Public Law No: 119-2 without signature. (local sample)', '${D_MID}T00:00:00.000Z'),
+  (119, 'hr', 22, '${D_OLDER}', '${D_RECENT}', NULL, NULL, NULL, NULL, NULL,
+   '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z');
 SQL
 
 generate_roster_sql() {

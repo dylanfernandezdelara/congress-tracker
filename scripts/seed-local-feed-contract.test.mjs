@@ -26,8 +26,12 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   const sql = printSql()
   assert.match(sql, /CREATE TABLE IF NOT EXISTS votes/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_digests/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_lifecycle/)
   assert.match(sql, /INSERT OR REPLACE INTO votes/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_digests/)
+  assert.match(sql, /INSERT OR REPLACE INTO bill_lifecycle/)
+  assert.match(sql, /'signed'/)
+  assert.match(sql, /'law_unsigned'/)
 })
 
 test('seeded votes use recent (lookback-window) dates, not stale literals', () => {

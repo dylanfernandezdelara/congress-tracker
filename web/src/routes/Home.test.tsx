@@ -16,6 +16,7 @@ function SearchParamsProbe() {
 const {
   fetchFeed,
   fetchNotableVotes,
+  fetchRecentLaws,
   fetchDefectors,
   fetchMemberProfile,
   fetchSessionStats,
@@ -24,6 +25,7 @@ const {
 } = vi.hoisted(() => ({
   fetchFeed: vi.fn(),
   fetchNotableVotes: vi.fn(),
+  fetchRecentLaws: vi.fn(),
   fetchDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
   fetchSessionStats: vi.fn(),
@@ -34,6 +36,7 @@ const {
 vi.mock('../api/client', () => ({
   fetchFeed,
   fetchNotableVotes,
+  fetchRecentLaws,
   fetchSessionStats,
   fetchPulseStats,
   fetchDefectors,
@@ -128,6 +131,28 @@ describe('Home', () => {
           why_it_matters: 'Bipartisan coalition carried the vote',
           defectors: [],
           member_votes_available: false,
+        },
+      ],
+    })
+    fetchRecentLaws.mockResolvedValue({
+      congress: 119,
+      session: 2,
+      as_of: '2026-06-14T00:00:00.000Z',
+      laws: [
+        {
+          congress: 119,
+          bill_type: 'S',
+          bill_number: 2,
+          title: 'Sample Act',
+          policy_area: 'Energy',
+          headline: 'Sample law headline',
+          became_law_date: '2026-06-10',
+          law_kind: 'signed',
+          public_law: '119-5',
+          signed_date: '2026-06-10',
+          presented_date: '2026-06-05',
+          latest_action_date: '2026-06-10',
+          latest_action_text: 'Became Public Law No: 119-5.',
         },
       ],
     })
@@ -255,10 +280,13 @@ describe('Home', () => {
     expect(screen.queryByRole('heading', { name: 'Congressional passage votes' })).not.toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'New laws' })).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
     expect(screen.getByLabelText('Legislative pulse')).toBeInTheDocument()
     expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'New laws' })).toBeInTheDocument()
+    expect(screen.getByText('Sample law headline')).toBeInTheDocument()
     expect(container.querySelector('.home-mobile-rails')).toBeNull()
     expect(container.querySelector('.home-rail--left')).not.toBeNull()
     expect(container.querySelector('.home-rail--right')).not.toBeNull()
@@ -301,6 +329,7 @@ describe('Home', () => {
     expect(screen.getAllByRole('region', { name: 'Federal Control' })).toHaveLength(1)
     await waitFor(() => {
       expect(fetchNotableVotes).toHaveBeenCalledTimes(1)
+      expect(fetchRecentLaws).toHaveBeenCalledTimes(1)
       expect(fetchDefectors).toHaveBeenCalledTimes(2)
     })
   })
@@ -510,6 +539,7 @@ describe('Home', () => {
     expect(fetchPulseStats).not.toHaveBeenCalled()
     expect(fetchDefectors).not.toHaveBeenCalled()
     expect(fetchNotableVotes).not.toHaveBeenCalled()
+    expect(fetchRecentLaws).not.toHaveBeenCalled()
     expect(screen.getByText('Loading control…')).toBeInTheDocument()
 
     resolveFeed(
@@ -526,6 +556,7 @@ describe('Home', () => {
       expect(fetchPulseStats).toHaveBeenCalled()
       expect(fetchDefectors).toHaveBeenCalled()
       expect(fetchNotableVotes).toHaveBeenCalled()
+      expect(fetchRecentLaws).toHaveBeenCalled()
     })
   })
 
@@ -539,6 +570,7 @@ describe('Home', () => {
       expect(fetchPulseStats).toHaveBeenCalled()
       expect(fetchDefectors).toHaveBeenCalled()
       expect(fetchNotableVotes).toHaveBeenCalled()
+      expect(fetchRecentLaws).toHaveBeenCalled()
     })
     // Gate must not stick closed — session rail content can still render.
     expect(await screen.findByText('Federal Control')).toBeInTheDocument()
