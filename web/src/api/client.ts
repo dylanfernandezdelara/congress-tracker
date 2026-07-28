@@ -3,6 +3,7 @@ import type { IngestMonitorPayload } from '@congress-tracker/shared/ingest-api-t
 import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
+  FeedBillResponse,
   FeedPageResponse,
   MemberProfileResponse,
   NotableVotesResponse,
@@ -59,6 +60,19 @@ export async function fetchFeed(options: {
     params.set('q', q)
   }
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
+}
+
+export async function fetchFeedBill(params: {
+  congress: number
+  type: string
+  number: number
+}): Promise<FeedBillResponse> {
+  const search = new URLSearchParams({
+    congress: String(params.congress),
+    type: params.type,
+    number: String(params.number),
+  })
+  return fetchJson<FeedBillResponse>(`/feed/bill.json?${search}`)
 }
 
 export async function fetchSessionStats(): Promise<SessionStatsResponse> {

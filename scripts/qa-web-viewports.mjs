@@ -364,6 +364,18 @@ async function installApiMocks(page) {
     })
   })
 
+  await page.route('**/feed/bill.json**', async (route) => {
+    const item = MOCK_FEED.items[0] ?? null
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        item,
+        as_of: '2026-06-14T00:00:00.000Z',
+      }),
+    })
+  })
+
   await page.route('**/stats/session.json', async (route) => {
     await route.fulfill({
       status: 200,
