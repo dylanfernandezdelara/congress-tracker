@@ -14,6 +14,8 @@ import { PassageVoteDetails } from './PassageVoteDetails'
 
 type FeedRowDetailProps = {
   item: FeedItem
+  /** Override for the footer "Copy link" target; defaults to the timeline deep link. */
+  shareUrl?: string
 }
 
 function ExecutiveContextSection({ item }: { item: FeedItem }) {
@@ -43,7 +45,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
   )
 }
 
-export function FeedRowDetail({ item }: FeedRowDetailProps) {
+export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
   const summary = getFeedSummaryContent(item)
@@ -62,7 +64,7 @@ export function FeedRowDetail({ item }: FeedRowDetailProps) {
   }, [copied])
 
   const handleCopyLink = async () => {
-    const ok = await copyTextToClipboard(buildBillShareUrl(item))
+    const ok = await copyTextToClipboard(shareUrl ?? buildBillShareUrl(item))
     if (ok) setCopied(true)
   }
 

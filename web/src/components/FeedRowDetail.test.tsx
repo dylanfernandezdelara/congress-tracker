@@ -301,4 +301,25 @@ describe('FeedRowDetail', () => {
     expect(copied).toContain('bill=119-s-2')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
+
+  it('copies an explicit shareUrl when provided', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    render(
+      <FeedRowDetail
+        item={makeFeedItem()}
+        shareUrl="https://www.congress.gov/bill/119th-congress/senate-bill/2"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        'https://www.congress.gov/bill/119th-congress/senate-bill/2',
+      )
+    })
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
 })

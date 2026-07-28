@@ -37,7 +37,14 @@ export interface BillLifecycleStagesResult {
   stages: BillLifecycleStage[]
 }
 
-function mapLawKind(kind: BillLawKind): Exclude<BillTerminalStatus, null> {
+export function mapLawKind(
+  kind: BillLawKind,
+):
+  | 'became_law_signed'
+  | 'became_law_unsigned'
+  | 'enacted_over_veto'
+  | 'vetoed'
+  | 'pocket_vetoed' {
   switch (kind) {
     case 'signed':
       return 'became_law_signed'

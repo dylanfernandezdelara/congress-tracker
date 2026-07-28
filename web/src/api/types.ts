@@ -47,3 +47,8 @@ export type {
   VoteDefectorEntry,
   VoteDefectorsResponse,
 } from '../../../shared/stats-api-types'
+
+export type {
+  RecentLawItem,
+  RecentLawsResponse,
+} from '@congress-tracker/shared/laws-api-types'

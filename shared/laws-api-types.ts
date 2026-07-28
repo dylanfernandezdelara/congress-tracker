@@ -1,0 +1,32 @@
+/** Shared JSON contracts for /stats/recent-laws.json — worker + web. */
+
+import type { FeedItem } from './feed-api-types'
+import type { BillLawKind } from './lifecycle-api-types'
+
+export interface RecentLawItem {
+  congress: number
+  bill_type: string
+  bill_number: number
+  title: string | null
+  policy_area: string | null
+  /** Plain-English digest headline when available. */
+  headline: string | null
+  became_law_date: string
+  law_kind: BillLawKind | null
+  public_law: string | null
+  signed_date: string | null
+  presented_date: string | null
+  latest_action_date: string | null
+  latest_action_text: string | null
+  /** Latest passage-vote date for this bill, if any are stored. */
+  latest_passage_vote_date: string | null
+  /** Full feed item for expand-in-place detail; null when no digest/votes/lifecycle data. */
+  item: FeedItem | null
+}
+
+export interface RecentLawsResponse {
+  congress: number
+  session: number
+  laws: RecentLawItem[]
+  as_of: string
+}

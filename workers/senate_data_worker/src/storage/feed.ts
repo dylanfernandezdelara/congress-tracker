@@ -5,16 +5,18 @@ import {
   getExecutivePostBillsForBills,
   getExecutivePostBillsForPosts,
   toExecutiveSignal,
+  type ExecutivePostForBill,
 } from "../d1/executive";
 import {
   billTextChangesMapKey,
   getBillTextChangesForBills,
   rowToBillTextChanges,
 } from "../d1/bill-text-changes";
-import { digestMapKey, getDigestsForBills, parseStoredDigest } from "../d1/digests";
+import { digestMapKey, getDigestsForBills, parseStoredDigest, type DigestRow } from "../d1/digests";
 import {
   getLifecyclesForBills,
   lifecycleMapKey,
+  type LifecycleRow,
 } from "../d1/lifecycle";
 import { ensureSchema } from "../d1/schema";
 import {
@@ -23,6 +25,8 @@ import {
   getCompanionVotesForBills,
   getPassageVotesForBills,
   selectFeedBills,
+  type FeedBillRow,
+  type VoteRow,
 } from "../d1/votes";
 import { lifecycleRowToApi } from "../lifecycle/to-api";
 import { lookbackStartIso } from "../sources/congress-client";
@@ -41,30 +45,31 @@ export interface FeedPageOptions {
   now?: Date | string;
 }
 
-export async function buildFeedPage(
+type ExecutivePostLinks = Awaited<ReturnType<typeof getExecutivePostBillsForPosts>>;
+
+interface FeedItemAssemblyContext {
+  lifecycles: Map<string, LifecycleRow>;
+  digests: Map<string, DigestRow>;
+  votesByBill: Map<string, VoteRow[]>;
+  executiveByBill: Map<string, ExecutivePostForBill[]>;
+  textChangesByBill: Awaited<ReturnType<typeof getBillTextChangesForBills>>;
+  companionVotesByBill: Map<string, VoteRow[]>;
+  linksByPost: ExecutivePostLinks;
+}
+
+function latestPassageDateFromVotes(votes: VoteRow[]): string | null {
+  if (votes.length === 0) return null;
+  return votes.reduce(
+    (latest, vote) => (vote.vote_date > latest ? vote.vote_date : latest),
+    votes[0]!.vote_date
+  );
+}
+
+async function loadFeedItemAssemblyContext(
   env: Env,
-  options: FeedPageOptions
-): Promise<FeedPageResponse> {
-  await ensureSchema(env.DB);
-  const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
-  const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
-  const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
-  const offset = Math.max(0, options.offset);
-  const chamber = options.chamber;
-  const q = options.q;
-  const now = options.now ?? new Date();
-  const [total, bills] = await Promise.all([
-    countFeedBills(env.DB, lookback, executiveSince, chamber, q),
-    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber, q),
-  ]);
-  const cappedTotal = Math.min(total, FEED_MAX_BILLS);
-
-  const billKeys = bills.map((row) => ({
-    congress: row.bill_congress,
-    billType: row.bill_type,
-    billNumber: row.bill_number,
-  }));
-
+  billKeys: Array<{ congress: number; billType: string; billNumber: number }>,
+  executiveSince: string
+): Promise<FeedItemAssemblyContext> {
   const [
     lifecycles,
     digests,
@@ -127,63 +132,98 @@ export async function buildFeedPage(
     digests.set(key, row);
   }
 
-  const items: FeedItem[] = [];
+  return {
+    lifecycles,
+    digests,
+    votesByBill,
+    executiveByBill,
+    textChangesByBill,
+    companionVotesByBill,
+    linksByPost,
+  };
+}
 
-  for (const row of bills) {
-    const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
-    const digestRow = digests.get(key) ?? null;
-    const votes = votesByBill.get(key) ?? [];
-    const executivePosts = executiveByBill.get(key) ?? [];
-    const executive_signals = executivePosts
-      .filter((post) => post.summary)
-      .map((post) => ({
-        ...toExecutiveSignal(post),
-        role: post.role as ExecutiveBillRole,
-        rationale: post.rationale ?? undefined,
-      }));
+function assembleFeedItem(
+  row: FeedBillRow,
+  ctx: FeedItemAssemblyContext,
+  now: Date | string
+): FeedItem {
+  const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
+  const digestRow = ctx.digests.get(key) ?? null;
+  const votes = ctx.votesByBill.get(key) ?? [];
+  const executivePosts = ctx.executiveByBill.get(key) ?? [];
+  const executive_signals = executivePosts
+    .filter((post) => post.summary)
+    .map((post) => ({
+      ...toExecutiveSignal(post),
+      role: post.role as ExecutiveBillRole,
+      rationale: post.rationale ?? undefined,
+    }));
 
-    const related_executive_bills: RelatedExecutiveBill[] = [];
-    const relatedKeys = new Set<string>();
-    for (const signal of executive_signals) {
-      const links = linksByPost.get(signal.post_id) ?? [];
-      for (const link of links) {
-        if (
-          link.bill_congress === row.bill_congress &&
-          link.bill_type.toUpperCase() === row.bill_type.toUpperCase() &&
-          link.bill_number === row.bill_number
-        ) {
-          continue;
-        }
-        const relatedKey = `${link.bill_congress}:${link.bill_type.toUpperCase()}:${link.bill_number}`;
-        if (relatedKeys.has(relatedKey)) continue;
-        relatedKeys.add(relatedKey);
-        const otherDigest =
-          digests.get(
-            digestMapKey(link.bill_congress, link.bill_type, link.bill_number)
-          ) ?? null;
-        const otherParsed = parseStoredDigest(otherDigest?.digest_json ?? null);
-        related_executive_bills.push({
-          congress: link.bill_congress,
-          type: link.bill_type,
-          number: link.bill_number,
-          title: otherDigest?.title ?? null,
-          headline: otherParsed?.headline ?? null,
-          role: link.role as RelatedExecutiveBill["role"],
-          reason: link.rationale ?? "mentioned_in_same_post",
-        });
+  const related_executive_bills: RelatedExecutiveBill[] = [];
+  const relatedKeys = new Set<string>();
+  for (const signal of executive_signals) {
+    const links = ctx.linksByPost.get(signal.post_id) ?? [];
+    for (const link of links) {
+      if (
+        link.bill_congress === row.bill_congress &&
+        link.bill_type.toUpperCase() === row.bill_type.toUpperCase() &&
+        link.bill_number === row.bill_number
+      ) {
+        continue;
       }
+      const relatedKey = `${link.bill_congress}:${link.bill_type.toUpperCase()}:${link.bill_number}`;
+      if (relatedKeys.has(relatedKey)) continue;
+      relatedKeys.add(relatedKey);
+      const otherDigest =
+        ctx.digests.get(
+          digestMapKey(link.bill_congress, link.bill_type, link.bill_number)
+        ) ?? null;
+      const otherParsed = parseStoredDigest(otherDigest?.digest_json ?? null);
+      related_executive_bills.push({
+        congress: link.bill_congress,
+        type: link.bill_type,
+        number: link.bill_number,
+        title: otherDigest?.title ?? null,
+        headline: otherParsed?.headline ?? null,
+        role: link.role as RelatedExecutiveBill["role"],
+        reason: link.rationale ?? "mentioned_in_same_post",
+      });
     }
+  }
 
-    const lifecycleRow = lifecycles.get(
-      lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number)
-    );
+  const lifecycleRow = ctx.lifecycles.get(
+    lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number)
+  );
 
-    const textChangesRow = textChangesByBill.get(
-      billTextChangesMapKey(row.bill_congress, row.bill_type, row.bill_number)
-    );
-    const text_changes = textChangesRow ? rowToBillTextChanges(textChangesRow) : null;
+  const textChangesRow = ctx.textChangesByBill.get(
+    billTextChangesMapKey(row.bill_congress, row.bill_type, row.bill_number)
+  );
+  const text_changes = textChangesRow ? rowToBillTextChanges(textChangesRow) : null;
 
-    const companion_votes = (companionVotesByBill.get(key) ?? []).map((v) => ({
+  const companion_votes = (ctx.companionVotesByBill.get(key) ?? []).map((v) => ({
+    chamber: v.chamber as Chamber,
+    congress: v.congress,
+    session: v.session,
+    roll_number: v.roll_number,
+    question: v.question,
+    result: v.result,
+    yeas: v.yeas,
+    nays: v.nays,
+    date: v.vote_date,
+  }));
+
+  return {
+    bill: {
+      congress: row.bill_congress,
+      type: row.bill_type,
+      number: row.bill_number,
+      title: digestRow?.title ?? null,
+    },
+    policy_area: digestRow?.policy_area ?? null,
+    digest: parseStoredDigest(digestRow?.digest_json ?? null),
+    raw_summary_text: digestRow?.raw_summary_text ?? null,
+    passage_votes: votes.map((v) => ({
       chamber: v.chamber as Chamber,
       congress: v.congress,
       session: v.session,
@@ -193,48 +233,59 @@ export async function buildFeedPage(
       yeas: v.yeas,
       nays: v.nays,
       date: v.vote_date,
-    }));
+    })),
+    // Prefer SQL vote-only max; fall back to loaded votes (e.g. outside lookback
+    // but attached because an executive signal kept the bill feed-visible).
+    // Treat empty string like null — D1/SQLite MAX of all-NULL CASE arms is NULL.
+    latest_passage_date: row.latest_passage_date || latestPassageDateFromVotes(votes),
+    latest_activity_date: row.latest_activity_date,
+    lifecycle: lifecycleRow ? lifecycleRowToApi(lifecycleRow, now) : null,
+    executive_signals,
+    related_executive_bills,
+    ...(text_changes ? { text_changes } : {}),
+    ...(companion_votes.length > 0 ? { companion_votes } : {}),
+  };
+}
 
-    items.push({
-      bill: {
-        congress: row.bill_congress,
-        type: row.bill_type,
-        number: row.bill_number,
-        title: digestRow?.title ?? null,
-      },
-      policy_area: digestRow?.policy_area ?? null,
-      digest: parseStoredDigest(digestRow?.digest_json ?? null),
-      raw_summary_text: digestRow?.raw_summary_text ?? null,
-      passage_votes: votes.map((v) => ({
-        chamber: v.chamber as Chamber,
-        congress: v.congress,
-        session: v.session,
-        roll_number: v.roll_number,
-        question: v.question,
-        result: v.result,
-        yeas: v.yeas,
-        nays: v.nays,
-        date: v.vote_date,
-      })),
-      // Prefer SQL vote-only max; fall back to loaded votes (e.g. outside lookback
-      // but attached because an executive signal kept the bill feed-visible).
-      // Treat empty string like null — D1/SQLite MAX of all-NULL CASE arms is NULL.
-      latest_passage_date:
-        row.latest_passage_date ||
-        (votes.length === 0
-          ? null
-          : votes.reduce(
-              (latest, vote) => (vote.vote_date > latest ? vote.vote_date : latest),
-              votes[0]!.vote_date
-            )),
-      latest_activity_date: row.latest_activity_date,
-      lifecycle: lifecycleRow ? lifecycleRowToApi(lifecycleRow, now) : null,
-      executive_signals,
-      related_executive_bills,
-      ...(text_changes ? { text_changes } : {}),
-      ...(companion_votes.length > 0 ? { companion_votes } : {}),
-    });
-  }
+/**
+ * Assemble FeedItems for pre-selected bill rows (shared by feed page + recent-laws batch assembly).
+ * `latest_passage_date` / `latest_activity_date` come from each row.
+ */
+export async function buildFeedItemsForBills(
+  env: Env,
+  rows: FeedBillRow[],
+  options: { now: Date | string; executiveSince: string }
+): Promise<FeedItem[]> {
+  if (rows.length === 0) return [];
+
+  const billKeys = rows.map((row) => ({
+    congress: row.bill_congress,
+    billType: row.bill_type,
+    billNumber: row.bill_number,
+  }));
+  const ctx = await loadFeedItemAssemblyContext(env, billKeys, options.executiveSince);
+  return rows.map((row) => assembleFeedItem(row, ctx, options.now));
+}
+
+export async function buildFeedPage(
+  env: Env,
+  options: FeedPageOptions
+): Promise<FeedPageResponse> {
+  await ensureSchema(env.DB);
+  const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
+  const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
+  const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
+  const offset = Math.max(0, options.offset);
+  const chamber = options.chamber;
+  const q = options.q;
+  const now = options.now ?? new Date();
+  const [total, bills] = await Promise.all([
+    countFeedBills(env.DB, lookback, executiveSince, chamber, q),
+    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber, q),
+  ]);
+  const cappedTotal = Math.min(total, FEED_MAX_BILLS);
+
+  const items = await buildFeedItemsForBills(env, bills, { now, executiveSince });
 
   return {
     items,

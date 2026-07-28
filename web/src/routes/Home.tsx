@@ -2,14 +2,15 @@ import { useCallback, useState } from 'react'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 
-import { fetchNotableVotes } from '../api/client'
-import type { NotableVotesResponse } from '../api/types'
+import { fetchNotableVotes, fetchRecentLaws } from '../api/client'
+import type { NotableVotesResponse, RecentLawsResponse } from '../api/types'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { NotableVotesSection } from '../components/NotableVotesSection'
+import { RecentLawsSection } from '../components/RecentLawsSection'
 import { RightRail } from '../components/RightRail'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
@@ -86,11 +87,19 @@ export default function Home() {
     mapError: () => "Couldn't load notable votes.",
   })
 
+  const recentLaws = useAsyncData<RecentLawsResponse>({
+    deps: [railRetryKey],
+    enabled: feedSettled,
+    load: () => fetchRecentLaws(5),
+    mapError: () => "Couldn't load new laws.",
+  })
+
   const showFeed = items.length > 0
   const showSkeleton = isInitialLoading && items.length === 0
   const listRefreshing = isInitialLoading && items.length > 0
   const inFlight = isInitialLoading || isLoadingMore
   const notableLoading = !feedSettled || notableVotes.isLoading
+  const recentLawsLoading = !feedSettled || recentLaws.isLoading
 
   const federalControl = (
     <FederalControlCompact
@@ -172,6 +181,13 @@ export default function Home() {
             </button>
           </div>
         ) : null}
+
+        <RecentLawsSection
+          laws={recentLaws.data?.laws ?? null}
+          loading={recentLawsLoading}
+          error={recentLaws.error}
+          onRetry={handleReloadFeed}
+        />
 
         {showSkeleton ? <FeedSkeleton /> : null}
 

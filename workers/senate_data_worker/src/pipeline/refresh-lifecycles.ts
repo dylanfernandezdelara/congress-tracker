@@ -1,20 +1,18 @@
 import { LIFECYCLE_MAX_REFRESHES_PER_RUN } from "../constants";
-import type { Env } from "../config";
+import { congressNumber, type Env } from "../config";
 import {
   getLifecyclesForBills,
   lifecycleMapKey,
+  selectPresentedPendingLifecycleBills,
   upsertLifecycle,
+  type LifecycleBillRow,
   type LifecycleRow,
 } from "../d1/lifecycle";
 import { isTerminalLifecycle } from "../lifecycle/parse-actions";
 import { fetchBillLifecycleSource } from "../sources/congress-client";
 import { billLabel } from "./bill-label";
 
-export interface LifecycleBillRow {
-  bill_congress: number;
-  bill_type: string;
-  bill_number: number;
-}
+export type { LifecycleBillRow };
 
 export interface RefreshLifecyclesResult {
   refreshed: number;
@@ -30,10 +28,34 @@ export function lifecycleRefreshPriority(stored: LifecycleRow | undefined): numb
 }
 
 /**
- * Refresh congress.gov lifecycle milestones for the given feed bills.
- * Terminal rows (became law) are skipped. Candidates are ordered so missing
- * and presidential-tracking rows win when the refresh cap binds. Per-bill
- * failures are collected as warnings and never fail the caller.
+ * Merge recent-voted bills with presented-but-not-terminal lifecycle rows.
+ * Vote lookback alone misses bills still awaiting signature after passage ages out.
+ */
+export function mergeLifecycleRefreshCandidates(
+  votedBills: LifecycleBillRow[],
+  presentedPending: LifecycleBillRow[]
+): LifecycleBillRow[] {
+  const seen = new Set<string>();
+  const out: LifecycleBillRow[] = [];
+  for (const row of [...votedBills, ...presentedPending]) {
+    const key = lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      bill_congress: row.bill_congress,
+      bill_type: row.bill_type,
+      bill_number: row.bill_number,
+    });
+  }
+  return out;
+}
+
+/**
+ * Refresh congress.gov lifecycle milestones for the given feed bills, plus any
+ * presented-but-not-terminal rows still awaiting enactment. Terminal rows are
+ * skipped. Candidates are ordered so missing and presidential-tracking rows win
+ * when the refresh cap binds. Per-bill failures are collected as warnings and
+ * never fail the caller.
  */
 export async function refreshBillLifecycles(
   env: Env,
@@ -44,16 +66,23 @@ export async function refreshBillLifecycles(
   let skipped = 0;
   const warnings: string[] = [];
 
+  const presentedPending = await selectPresentedPendingLifecycleBills(
+    env.DB,
+    congressNumber(env),
+    LIFECYCLE_MAX_REFRESHES_PER_RUN
+  );
+  const candidates = mergeLifecycleRefreshCandidates(bills, presentedPending);
+
   const existing = await getLifecyclesForBills(
     env.DB,
-    bills.map((row) => ({
+    candidates.map((row) => ({
       congress: row.bill_congress,
       billType: row.bill_type,
       billNumber: row.bill_number,
     }))
   );
 
-  const ranked = bills
+  const ranked = candidates
     .map((row, index) => {
       const key = lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number);
       const stored = existing.get(key);

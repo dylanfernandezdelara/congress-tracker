@@ -16,6 +16,7 @@ const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 const mockGetLifecyclesForBills = vi.fn();
 const mockUpsertLifecycle = vi.fn();
+const mockSelectPresentedPendingLifecycleBills = vi.fn();
 const mockRefreshBillTextChanges = vi.fn(async (..._args: unknown[]) => ({
   refreshed: 0,
   skipped: 0,
@@ -45,6 +46,8 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
     ...actual,
     getLifecyclesForBills: (...args: unknown[]) => mockGetLifecyclesForBills(...args),
     upsertLifecycle: (...args: unknown[]) => mockUpsertLifecycle(...args),
+    selectPresentedPendingLifecycleBills: (...args: unknown[]) =>
+      mockSelectPresentedPendingLifecycleBills(...args),
   };
 });
 
@@ -141,6 +144,7 @@ describe("runFeedPipeline digest retry", () => {
     });
     mockGetLifecyclesForBills.mockResolvedValue(new Map());
     mockUpsertLifecycle.mockResolvedValue(undefined);
+    mockSelectPresentedPendingLifecycleBills.mockResolvedValue([]);
     mockRewriteSummary.mockResolvedValue({
       headline: "Rewritten headline",
       what_it_does: "Does things",

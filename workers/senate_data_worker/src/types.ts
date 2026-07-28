@@ -83,6 +83,11 @@ export type {
   ThisWeekSummary,
 } from "../../../shared/stats-api-types";
 
+export type {
+  RecentLawItem,
+  RecentLawsResponse,
+} from "../../../shared/laws-api-types";
+
 export interface MemberRecord {
   bioguideId: string;
   name: string;
