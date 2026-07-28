@@ -315,6 +315,44 @@ const MOCK_PORTFOLIOS = {
   as_of: '2026-06-14T00:00:00.000Z',
 }
 
+const MOCK_RECENT_LAWS = {
+  congress: 119,
+  session: 2,
+  as_of: '2026-06-14T00:00:00.000Z',
+  laws: [
+    {
+      congress: 119,
+      bill_type: 'HR',
+      bill_number: 1,
+      title: 'Lower Energy Costs Act',
+      policy_area: 'Energy',
+      headline: 'Energy permitting package becomes law',
+      became_law_date: '2026-06-12',
+      law_kind: 'signed',
+      public_law: '119-1',
+      signed_date: '2026-06-12',
+      presented_date: '2026-06-08',
+      latest_action_date: '2026-06-12',
+      latest_action_text: 'Became Public Law No: 119-1.',
+    },
+    {
+      congress: 119,
+      bill_type: 'S',
+      bill_number: 47,
+      title: 'Public Lands Protection Act',
+      policy_area: 'Public Lands and Natural Resources',
+      headline: 'Public lands bill becomes law without signature',
+      became_law_date: '2026-06-10',
+      law_kind: 'law_unsigned',
+      public_law: '119-2',
+      signed_date: null,
+      presented_date: '2026-05-28',
+      latest_action_date: '2026-06-10',
+      latest_action_text: 'Became Public Law No: 119-2 without signature.',
+    },
+  ],
+}
+
 async function installApiMocks(page) {
   await page.route('**/feed/latest.json**', async (route) => {
     await route.fulfill({
@@ -337,6 +375,14 @@ async function installApiMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_NOTABLE_VOTES),
+    })
+  })
+
+  await page.route('**/stats/recent-laws.json**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_RECENT_LAWS),
     })
   })
 
