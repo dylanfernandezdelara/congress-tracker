@@ -30,7 +30,6 @@ import {
 } from "../d1/votes";
 import { lifecycleRowToApi } from "../lifecycle/to-api";
 import { lookbackStartIso } from "../sources/congress-client";
-import { normalizeBillType } from "../sources/bill-type";
 import type { RelatedExecutiveBill } from "../../../../shared/executive-api-types";
 import type { ExecutiveBillRole } from "../../../../shared/executive-api-types";
 import type { Chamber, FeedItem, FeedPageResponse } from "../types";
@@ -46,14 +45,6 @@ export interface FeedPageOptions {
   now?: Date | string;
 }
 
-export interface FeedItemForBillOptions {
-  congress: number;
-  billType: string;
-  billNumber: number;
-  /** Injectable clock for ten-day derivation tests. */
-  now?: Date | string;
-}
-
 type ExecutivePostLinks = Awaited<ReturnType<typeof getExecutivePostBillsForPosts>>;
 
 interface FeedItemAssemblyContext {
@@ -64,15 +55,6 @@ interface FeedItemAssemblyContext {
   textChangesByBill: Awaited<ReturnType<typeof getBillTextChangesForBills>>;
   companionVotesByBill: Map<string, VoteRow[]>;
   linksByPost: ExecutivePostLinks;
-}
-
-function maxDateString(...dates: Array<string | null | undefined>): string | null {
-  let best: string | null = null;
-  for (const date of dates) {
-    if (!date) continue;
-    if (best === null || date > best) best = date;
-  }
-  return best;
 }
 
 function latestPassageDateFromVotes(votes: VoteRow[]): string | null {
@@ -255,14 +237,7 @@ function assembleFeedItem(
     // Prefer SQL vote-only max; fall back to loaded votes (e.g. outside lookback
     // but attached because an executive signal kept the bill feed-visible).
     // Treat empty string like null — D1/SQLite MAX of all-NULL CASE arms is NULL.
-    latest_passage_date:
-      row.latest_passage_date ||
-      (votes.length === 0
-        ? null
-        : votes.reduce(
-            (latest, vote) => (vote.vote_date > latest ? vote.vote_date : latest),
-            votes[0]!.vote_date
-          )),
+    latest_passage_date: row.latest_passage_date || latestPassageDateFromVotes(votes),
     latest_activity_date: row.latest_activity_date,
     lifecycle: lifecycleRow ? lifecycleRowToApi(lifecycleRow, now) : null,
     executive_signals,
@@ -319,49 +294,4 @@ export async function buildFeedPage(
     offset,
     has_more: offset + items.length < cappedTotal,
   };
-}
-
-/**
- * Full FeedItem for one bill, including passage votes outside the feed lookback.
- * Returns null when there is no digest, no votes, and no lifecycle row.
- */
-export async function buildFeedItemForBill(
-  env: Env,
-  options: FeedItemForBillOptions
-): Promise<FeedItem | null> {
-  await ensureSchema(env.DB);
-  const congress = options.congress;
-  const billType = normalizeBillType(options.billType);
-  const billNumber = options.billNumber;
-  const now = options.now ?? new Date();
-  const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
-  const billKeys = [{ congress, billType, billNumber }];
-  const ctx = await loadFeedItemAssemblyContext(env, billKeys, executiveSince);
-
-  const key = billLookupKey(congress, billType, billNumber);
-  const digestRow = ctx.digests.get(key) ?? null;
-  const votes = ctx.votesByBill.get(key) ?? [];
-  const lifecycleRow = ctx.lifecycles.get(lifecycleMapKey(congress, billType, billNumber));
-
-  if (!digestRow && votes.length === 0 && !lifecycleRow) {
-    return null;
-  }
-
-  const latest_passage_date = latestPassageDateFromVotes(votes);
-  // Single-bill path has no selectFeedBills activity column: use max of passage
-  // date and lifecycle latest_action_date (not executive timestamps).
-  const latest_activity_date =
-    maxDateString(latest_passage_date, lifecycleRow?.latest_action_date) ??
-    latest_passage_date ??
-    lifecycleRow?.latest_action_date ??
-    "";
-
-  const row: FeedBillRow = {
-    bill_congress: congress,
-    bill_type: billType,
-    bill_number: billNumber,
-    latest_passage_date,
-    latest_activity_date,
-  };
-  return assembleFeedItem(row, ctx, now);
 }

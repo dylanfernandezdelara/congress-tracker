@@ -85,10 +85,9 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `stale` | `failed` | `unknown`)
 - `GET /debug/ingest.json` — detailed ingest monitor payload
 - `GET /feed/latest.json?limit=&offset=&chamber=House|Senate&q=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; optional `chamber` filters to bills with a passage vote in that chamber; optional `q` case-insensitive substring search on title, policy area, digest headline, and normalized bill id; **not** a bare array)
-- `GET /feed/bill.json?congress=&type=&number=` — single-bill feed item (`{ item, as_of }`; works outside the feed lookback)
 - `GET /stats/session.json` — per-chamber passage vote aggregates
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
-- `GET /stats/recent-laws.json?limit=` — recently enacted bills (default 5, cap 10)
+- `GET /stats/recent-laws.json?limit=` — recently enacted bills (default 5, cap 10); each law embeds its full feed `item` (`FeedItem | null`) for expand-in-place detail
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
 - `POST /__pipeline/run/feed` (cron also runs feed + member-votes daily at 10:00 UTC)

@@ -1,6 +1,14 @@
+import type { RecentLawItem } from "../../../../shared/laws-api-types";
 import type { BillLawKind } from "../../../../shared/lifecycle-api-types";
 import { normalizeBillType } from "../sources/bill-type";
 import { ensureSchema } from "./schema";
+
+/** Bill identity for lifecycle refresh / presented-pending selection. */
+export interface LifecycleBillRow {
+  bill_congress: number;
+  bill_type: string;
+  bill_number: number;
+}
 
 export interface LifecycleRow {
   congress: number;
@@ -222,33 +230,17 @@ export function lifecycleMapKey(
   return billKey(congress, billType, billNumber);
 }
 
-export interface RecentlyEnactedBillRow {
-  congress: number;
-  bill_type: string;
-  bill_number: number;
-  title: string | null;
-  policy_area: string | null;
-  headline: string | null;
-  became_law_date: string;
-  law_kind: BillLawKind | null;
-  public_law: string | null;
-  signed_date: string | null;
-  presented_date: string | null;
-  latest_action_date: string | null;
-  latest_action_text: string | null;
-  latest_passage_vote_date: string | null;
-}
-
 /**
  * Bills that became law in the given congress, newest first.
  * Joins digest title/policy/headline when present. Excludes veto outcomes.
  * Attaches the latest passage-vote date from `votes` when recorded.
+ * `item` is left null here; the recent-laws read model attaches feed items.
  */
 export async function selectRecentlyEnactedBills(
   db: D1Database,
   congress: number,
   limit: number
-): Promise<RecentlyEnactedBillRow[]> {
+): Promise<RecentLawItem[]> {
   await ensureSchema(db);
   const capped = Math.max(0, Math.floor(limit));
   if (capped === 0) return [];
@@ -316,13 +308,8 @@ export async function selectRecentlyEnactedBills(
     latest_action_date: row.latest_action_date,
     latest_action_text: row.latest_action_text,
     latest_passage_vote_date: row.latest_passage_vote_date,
+    item: null,
   }));
-}
-
-export interface PresentedPendingLifecycleBill {
-  bill_congress: number;
-  bill_type: string;
-  bill_number: number;
 }
 
 /**
@@ -334,7 +321,7 @@ export async function selectPresentedPendingLifecycleBills(
   db: D1Database,
   congress: number,
   limit: number
-): Promise<PresentedPendingLifecycleBill[]> {
+): Promise<LifecycleBillRow[]> {
   await ensureSchema(db);
   const capped = Math.max(0, Math.floor(limit));
   if (capped === 0) return [];

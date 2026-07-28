@@ -5,18 +5,14 @@ import {
   lifecycleMapKey,
   selectPresentedPendingLifecycleBills,
   upsertLifecycle,
+  type LifecycleBillRow,
   type LifecycleRow,
-  type PresentedPendingLifecycleBill,
 } from "../d1/lifecycle";
 import { isTerminalLifecycle } from "../lifecycle/parse-actions";
 import { fetchBillLifecycleSource } from "../sources/congress-client";
 import { billLabel } from "./bill-label";
 
-export interface LifecycleBillRow {
-  bill_congress: number;
-  bill_type: string;
-  bill_number: number;
-}
+export type { LifecycleBillRow };
 
 export interface RefreshLifecyclesResult {
   refreshed: number;
@@ -37,7 +33,7 @@ export function lifecycleRefreshPriority(stored: LifecycleRow | undefined): numb
  */
 export function mergeLifecycleRefreshCandidates(
   votedBills: LifecycleBillRow[],
-  presentedPending: PresentedPendingLifecycleBill[]
+  presentedPending: LifecycleBillRow[]
 ): LifecycleBillRow[] {
   const seen = new Set<string>();
   const out: LifecycleBillRow[] = [];

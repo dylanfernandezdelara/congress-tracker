@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Env } from "../config";
 import { resetSchemaFlag } from "../d1/schema";
 import { buildRecentLaws } from "./recent-laws";
+
+const mockBuildFeedItemsForBills = vi.fn();
+
+vi.mock("./feed", () => ({
+  buildFeedItemsForBills: (...args: unknown[]) => mockBuildFeedItemsForBills(...args),
+}));
 
 type LawFixture = {
   congress: number;
@@ -29,7 +36,9 @@ function createRecentLawsDb(rows: LawFixture[]): D1Database {
           const results = rows
             .filter((row) => row.congress === congress)
             .filter(
-              (row) => row.law_kind == null || (row.law_kind !== "vetoed" && row.law_kind !== "pocket_vetoed")
+              (row) =>
+                row.law_kind == null ||
+                (row.law_kind !== "vetoed" && row.law_kind !== "pocket_vetoed")
             )
             .sort((a, b) => {
               const byLaw = b.became_law_date.localeCompare(a.became_law_date);
@@ -53,12 +62,36 @@ function createRecentLawsDb(rows: LawFixture[]): D1Database {
   } as unknown as D1Database;
 }
 
+function createEnv(db: D1Database): Env {
+  return { DB: db } as Env;
+}
+
 describe("buildRecentLaws", () => {
   beforeEach(() => {
     resetSchemaFlag();
+    mockBuildFeedItemsForBills.mockReset();
+    mockBuildFeedItemsForBills.mockImplementation(async (_env: Env, rows: Array<{ bill_number: number }>) =>
+      rows.map((row) => ({
+        bill: {
+          congress: 119,
+          type: "HR",
+          number: row.bill_number,
+          title: `Item ${row.bill_number}`,
+        },
+        policy_area: null,
+        digest: null,
+        raw_summary_text: null,
+        passage_votes: [],
+        latest_passage_date: null,
+        latest_activity_date: "",
+        lifecycle: null,
+        executive_signals: [],
+        related_executive_bills: [],
+      }))
+    );
   });
 
-  it("returns the typed envelope with laws ordered newest first", async () => {
+  it("returns the typed envelope with laws ordered newest first and attached items", async () => {
     const db = createRecentLawsDb([
       {
         congress: 119,
@@ -94,7 +127,13 @@ describe("buildRecentLaws", () => {
       },
     ]);
 
-    const body = await buildRecentLaws(db, 119, 2, 5, "2026-07-28T12:00:00.000Z");
+    const body = await buildRecentLaws(
+      createEnv(db),
+      119,
+      2,
+      5,
+      "2026-07-28T12:00:00.000Z"
+    );
     expect(body).toMatchObject({
       congress: 119,
       session: 2,
@@ -104,7 +143,39 @@ describe("buildRecentLaws", () => {
     expect(body.laws[0]?.bill_number).toBe(50);
     expect(body.laws[0]?.headline).toBe("Newer headline");
     expect(body.laws[0]?.latest_passage_vote_date).toBeNull();
+    expect(body.laws[0]?.item?.bill.number).toBe(50);
     expect(body.laws[1]?.bill_number).toBe(100);
     expect(body.laws[1]?.latest_passage_vote_date).toBe("2026-04-15");
+    expect(body.laws[1]?.item?.bill.number).toBe(100);
+
+    expect(mockBuildFeedItemsForBills).toHaveBeenCalledTimes(1);
+    expect(mockBuildFeedItemsForBills).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        expect.objectContaining({
+          bill_congress: 119,
+          bill_type: "S",
+          bill_number: 50,
+          latest_passage_date: null,
+        }),
+        expect.objectContaining({
+          bill_congress: 119,
+          bill_type: "HR",
+          bill_number: 100,
+          latest_passage_date: "2026-04-15",
+          latest_activity_date: "2026-05-01",
+        }),
+      ],
+      expect.objectContaining({
+        now: "2026-07-28T12:00:00.000Z",
+        executiveSince: expect.any(String),
+      })
+    );
+  });
+
+  it("skips feed assembly when there are no laws", async () => {
+    const body = await buildRecentLaws(createEnv(createRecentLawsDb([])), 119, 2, 5);
+    expect(body.laws).toEqual([]);
+    expect(mockBuildFeedItemsForBills).not.toHaveBeenCalled();
   });
 });

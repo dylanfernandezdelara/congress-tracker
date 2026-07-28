@@ -27,7 +27,6 @@ vi.mock("../pipeline/run-member-votes", () => ({
 }));
 
 const mockBuildFeedPage = vi.fn();
-const mockBuildFeedItemForBill = vi.fn();
 
 vi.mock("../storage/feed", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../storage/feed")>();
@@ -35,8 +34,6 @@ vi.mock("../storage/feed", async (importOriginal) => {
     ...actual,
     buildFeedPage: (...args: Parameters<typeof actual.buildFeedPage>) =>
       mockBuildFeedPage(...args),
-    buildFeedItemForBill: (...args: Parameters<typeof actual.buildFeedItemForBill>) =>
-      mockBuildFeedItemForBill(...args),
   };
 });
 
@@ -251,11 +248,9 @@ describe("HTTP API", () => {
     mockWithPipelineLease.mockImplementation(async (_db, fn) => fn());
     mockBuildFeedPage.mockReset();
     mockBuildFeedPage.mockImplementation(async (_env, options) => emptyFeedPage(options));
-    mockBuildFeedItemForBill.mockReset();
-    mockBuildFeedItemForBill.mockResolvedValue(null);
     mockBuildRecentLaws.mockReset();
     mockBuildRecentLaws.mockImplementation(
-      async (_db, congress: number, session: number, limit: number, asOf?: string) => ({
+      async (_env, congress: number, session: number, limit: number, asOf?: string) => ({
         congress,
         session,
         laws: Array.from({ length: Math.min(limit, 3) }, (_, i) => ({
@@ -273,6 +268,7 @@ describe("HTTP API", () => {
           latest_action_date: null,
           latest_action_text: null,
           latest_passage_vote_date: null,
+          item: null,
         })),
         as_of: asOf ?? "2026-07-28T00:00:00.000Z",
       })
@@ -704,57 +700,6 @@ describe("HTTP API", () => {
       createMockEnv() as any
     );
     expect(response.status).toBe(400);
-  });
-
-  it("requires congress, type, and number for feed bill", async () => {
-    const response = await handlePublicFetch(
-      new Request("https://worker.example.com/feed/bill.json?congress=119"),
-      createMockEnv() as any
-    );
-    expect(response.status).toBe(400);
-    expect(mockBuildFeedItemForBill).not.toHaveBeenCalled();
-  });
-
-  it("returns feed bill envelope with item from builder", async () => {
-    mockBuildFeedItemForBill.mockResolvedValueOnce({
-      bill: { congress: 119, type: "HR", number: 1, title: "Test Bill" },
-      policy_area: "Housing",
-      digest: null,
-      raw_summary_text: null,
-      passage_votes: [],
-      latest_passage_date: "2026-01-05",
-      latest_activity_date: "2026-02-01",
-      lifecycle: null,
-      executive_signals: [],
-      related_executive_bills: [],
-    });
-    const response = await handlePublicFetch(
-      new Request("https://worker.example.com/feed/bill.json?congress=119&type=HR&number=1"),
-      createMockEnv() as any
-    );
-    expect(response.status).toBe(200);
-    expect(mockBuildFeedItemForBill).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ congress: 119, billType: "HR", billNumber: 1 })
-    );
-    const body = await response.json();
-    expect(body).toMatchObject({
-      item: {
-        bill: { congress: 119, type: "HR", number: 1, title: "Test Bill" },
-        latest_passage_date: "2026-01-05",
-      },
-      as_of: expect.any(String),
-    });
-  });
-
-  it("returns item null for unknown feed bill", async () => {
-    const response = await handlePublicFetch(
-      new Request("https://worker.example.com/feed/bill.json?congress=119&type=S&number=99999"),
-      createMockEnv() as any
-    );
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({ item: null, as_of: expect.any(String) });
   });
 
   it("returns empty vote defectors for a roll call", async () => {

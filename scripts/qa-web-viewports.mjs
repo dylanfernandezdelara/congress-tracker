@@ -335,6 +335,7 @@ const MOCK_RECENT_LAWS = {
       latest_action_date: '2026-06-12',
       latest_action_text: 'Became Public Law No: 119-1.',
       latest_passage_vote_date: '2026-06-05',
+      item: MOCK_FEED.items[0] ?? null,
     },
     {
       congress: 119,
@@ -351,6 +352,7 @@ const MOCK_RECENT_LAWS = {
       latest_action_date: '2026-06-10',
       latest_action_text: 'Became Public Law No: 119-2 without signature.',
       latest_passage_vote_date: '2026-05-20',
+      item: MOCK_FEED.items[0] ?? null,
     },
   ],
 }
@@ -361,18 +363,6 @@ async function installApiMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_FEED),
-    })
-  })
-
-  await page.route('**/feed/bill.json**', async (route) => {
-    const item = MOCK_FEED.items[0] ?? null
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        item,
-        as_of: '2026-06-14T00:00:00.000Z',
-      }),
     })
   })
 

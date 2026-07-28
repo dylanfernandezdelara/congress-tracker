@@ -302,12 +302,14 @@ describe("selectRecentlyEnactedBills", () => {
       law_kind: "signed",
       public_law: "119-20",
       latest_passage_vote_date: "2026-07-01",
+      item: null,
     });
 
     const all = await selectRecentlyEnactedBills(db, 119, 10);
     expect(all.map((r) => r.bill_number)).toEqual([50, 100]);
     expect(all.every((r) => r.law_kind !== "vetoed")).toBe(true);
     expect(all.every((r) => r.became_law_date != null)).toBe(true);
+    expect(all.every((r) => r.item === null)).toBe(true);
     expect(all.find((r) => r.bill_number === 100)?.latest_passage_vote_date).toBeNull();
   });
 });

@@ -1,15 +1,14 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 import type { BillLawKind } from '@congress-tracker/shared/lifecycle-api-types'
 import { daysAgoLookbackStartIso } from '@congress-tracker/shared/lookback'
 
-import { fetchFeedBill } from '../api/client'
-import type { FeedItem, RecentLawItem } from '../api/types'
-import { assertNever } from '../utils/assertNever'
+import type { RecentLawItem } from '../api/types'
 import { formatBillQueryParam } from '../utils/billDeepLink'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import { mapLawKind } from '../utils/billLifecycleStages'
 import { TERMINAL_STATUS_PRESENTATION } from '../utils/terminalStatusPresentation'
 import { FeedRowDetail } from './FeedRowDetail'
 
@@ -20,28 +19,9 @@ type RecentLawsSectionProps = {
   onRetry?: () => void
 }
 
-type DetailCacheEntry =
-  | { status: 'loading' }
-  | { status: 'ready'; item: FeedItem }
-  | { status: 'missing' }
-  | { status: 'error'; message: string }
-
 function recentLawOutcomeLabel(lawKind: BillLawKind | null): string {
   if (!lawKind) return TERMINAL_STATUS_PRESENTATION.became_law.pipelineLabel
-  switch (lawKind) {
-    case 'signed':
-      return TERMINAL_STATUS_PRESENTATION.became_law_signed.pipelineLabel
-    case 'law_unsigned':
-      return TERMINAL_STATUS_PRESENTATION.became_law_unsigned.pipelineLabel
-    case 'enacted_over_veto':
-      return TERMINAL_STATUS_PRESENTATION.enacted_over_veto.pipelineLabel
-    case 'vetoed':
-      return TERMINAL_STATUS_PRESENTATION.vetoed.pipelineLabel
-    case 'pocket_vetoed':
-      return TERMINAL_STATUS_PRESENTATION.pocket_vetoed.pipelineLabel
-    default:
-      return assertNever(lawKind)
-  }
+  return TERMINAL_STATUS_PRESENTATION[mapLawKind(lawKind)].pipelineLabel
 }
 
 function formatPublicLawLabel(publicLaw: string): string {
@@ -51,16 +31,15 @@ function formatPublicLawLabel(publicLaw: string): string {
 }
 
 function lawItemKey(law: RecentLawItem): string {
-  return `${law.congress}-${law.bill_type}-${law.bill_number}`
-}
-
-function billDeepLinkTo(law: RecentLawItem): string {
-  const bill = formatBillQueryParam({
+  return formatBillQueryParam({
     congress: law.congress,
     type: law.bill_type,
     number: law.bill_number,
   })
-  return `/?bill=${bill}`
+}
+
+function billDeepLinkTo(law: RecentLawItem): string {
+  return `/?bill=${lawItemKey(law)}`
 }
 
 /** True when a passage vote is still inside the feed lookback window. */
@@ -91,18 +70,10 @@ function ExpandChevron() {
 type RecentLawItemRowProps = {
   law: RecentLawItem
   isExpanded: boolean
-  detail: DetailCacheEntry | undefined
   onToggle: (key: string) => void
-  onRetryDetail: (law: RecentLawItem) => void
 }
 
-function RecentLawItemRow({
-  law,
-  isExpanded,
-  detail,
-  onToggle,
-  onRetryDetail,
-}: RecentLawItemRowProps) {
+function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) {
   const detailId = useId()
   const key = lawItemKey(law)
   const billId = formatShortBillId(law.bill_type, law.bill_number)
@@ -153,50 +124,31 @@ function RecentLawItemRow({
           hidden={!isExpanded}
         >
           {isExpanded ? (
-            <>
-              {detail?.status === 'loading' || !detail ? (
-                <p className="text-[12px] text-faint">Loading bill details…</p>
-              ) : null}
-              {detail?.status === 'error' || detail?.status === 'missing' ? (
-                <div className="recent-laws-detail-fallback">
-                  <p className="text-[13px] text-secondary">
-                    {detail.status === 'missing'
-                      ? "Couldn't find bill details."
-                      : detail.message}
+            law.item ? (
+              <>
+                <FeedRowDetail
+                  item={law.item}
+                  shareUrl={showTimelineLink ? undefined : sourceUrl}
+                />
+                {showTimelineLink ? (
+                  <p className="recent-laws-timeline-link">
+                    <Link to={billDeepLinkTo(law)}>View in timeline</Link>
                   </p>
-                  <div className="recent-laws-detail-fallback-actions">
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() => onRetryDetail(law)}
-                    >
-                      Retry
-                    </button>
-                    <a
-                      href={sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="congress-link"
-                    >
-                      Read on congress.gov ↗
-                    </a>
-                  </div>
-                </div>
-              ) : null}
-              {detail?.status === 'ready' ? (
-                <>
-                  <FeedRowDetail
-                    item={detail.item}
-                    shareUrl={showTimelineLink ? undefined : sourceUrl}
-                  />
-                  {showTimelineLink ? (
-                    <p className="recent-laws-timeline-link">
-                      <Link to={billDeepLinkTo(law)}>View in timeline</Link>
-                    </p>
-                  ) : null}
-                </>
-              ) : null}
-            </>
+                ) : null}
+              </>
+            ) : (
+              <div className="recent-laws-detail-fallback">
+                <p className="text-[13px] text-secondary">Couldn&apos;t find bill details.</p>
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="congress-link"
+                >
+                  Read on congress.gov ↗
+                </a>
+              </div>
+            )
           ) : null}
         </div>
       </article>
@@ -211,52 +163,9 @@ export function RecentLawsSection({
   onRetry,
 }: RecentLawsSectionProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
-  const [detailCache, setDetailCache] = useState<Record<string, DetailCacheEntry>>({})
-  const detailCacheRef = useRef(detailCache)
-  detailCacheRef.current = detailCache
-
-  const loadDetail = (law: RecentLawItem) => {
-    const key = lawItemKey(law)
-    setDetailCache((prev) => ({ ...prev, [key]: { status: 'loading' } }))
-    return fetchFeedBill({
-      congress: law.congress,
-      type: law.bill_type,
-      number: law.bill_number,
-    })
-      .then((response) => {
-        const item = response.item
-        if (!item) {
-          setDetailCache((prev) => ({ ...prev, [key]: { status: 'missing' } }))
-          return
-        }
-        setDetailCache((prev) => ({ ...prev, [key]: { status: 'ready', item } }))
-      })
-      .catch(() => {
-        setDetailCache((prev) => ({
-          ...prev,
-          [key]: { status: 'error', message: "Couldn't load bill details." },
-        }))
-      })
-  }
-
-  useEffect(() => {
-    if (!expandedKey || !laws) return
-    const law = laws.find((entry) => lawItemKey(entry) === expandedKey)
-    if (!law) return
-
-    const cached = detailCacheRef.current[expandedKey]
-    if (cached?.status === 'ready' || cached?.status === 'loading') return
-
-    void loadDetail(law)
-  }, [expandedKey, laws])
 
   const handleToggle = (key: string) => {
     setExpandedKey((prev) => (prev === key ? null : key))
-  }
-
-  const handleRetryDetail = (law: RecentLawItem) => {
-    setExpandedKey(lawItemKey(law))
-    void loadDetail(law)
   }
 
   if (error) {
@@ -295,9 +204,7 @@ export function RecentLawsSection({
               key={key}
               law={law}
               isExpanded={expandedKey === key}
-              detail={detailCache[key]}
               onToggle={handleToggle}
-              onRetryDetail={handleRetryDetail}
             />
           )
         })}

@@ -1,5 +1,6 @@
 /** Shared JSON contracts for /stats/recent-laws.json — worker + web. */
 
+import type { FeedItem } from './feed-api-types'
 import type { BillLawKind } from './lifecycle-api-types'
 
 export interface RecentLawItem {
@@ -19,6 +20,8 @@ export interface RecentLawItem {
   latest_action_text: string | null
   /** Latest passage-vote date for this bill, if any are stored. */
   latest_passage_vote_date: string | null
+  /** Full feed item for expand-in-place detail; null when no digest/votes/lifecycle data. */
+  item: FeedItem | null
 }
 
 export interface RecentLawsResponse {

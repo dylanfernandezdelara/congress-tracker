@@ -53,7 +53,6 @@ export type { BillDigestContent, BillLifecycle };
 
 export type {
   FeedBill,
-  FeedBillResponse,
   FeedItem,
   FeedPageResponse,
   FeedPassageVote,
