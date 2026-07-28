@@ -35,6 +35,7 @@ import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
 import { buildPulseStats } from "../storage/pulse-stats";
+import { buildRecentLaws } from "../storage/recent-laws";
 import { buildNotableVotes } from "../analytics/notable-votes";
 import { buildSessionStats } from "../storage/session-stats";
 import type {
@@ -44,6 +45,7 @@ import type {
   NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
+  RecentLawsResponse,
   SessionStatsResponse,
   VoteDefectorsResponse,
 } from "../types";
@@ -170,9 +172,9 @@ function parseChamber(value: string | null): Chamber | null {
   return null;
 }
 
-function parseStatsLimit(url: URL, fallback = 5): number {
+function parseStatsLimit(url: URL, fallback = 5, max = 20): number {
   return Math.min(
-    20,
+    max,
     Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? String(fallback), 10) || fallback)
   );
 }
@@ -472,6 +474,17 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
         return { chamber, congress, session, ...movers, as_of: asOf };
       },
       "portfolio stats unavailable"
+    );
+  },
+  "/stats/recent-laws.json": ({ env, url, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
+    const limit = parseStatsLimit(url, 5, 10);
+    return handleStatsJson(
+      json,
+      async (): Promise<RecentLawsResponse> => buildRecentLaws(env.DB, congress, session, limit, asOf),
+      "recent laws unavailable"
     );
   },
 };

@@ -37,6 +37,17 @@ vi.mock("../storage/feed", async (importOriginal) => {
   };
 });
 
+const mockBuildRecentLaws = vi.fn();
+
+vi.mock("../storage/recent-laws", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../storage/recent-laws")>();
+  return {
+    ...actual,
+    buildRecentLaws: (...args: Parameters<typeof actual.buildRecentLaws>) =>
+      mockBuildRecentLaws(...args),
+  };
+});
+
 const mockWithPipelineLease = vi.fn(
   async <T>(_db: D1Database, fn: () => Promise<T>, _options?: unknown) => fn()
 );
@@ -237,6 +248,29 @@ describe("HTTP API", () => {
     mockWithPipelineLease.mockImplementation(async (_db, fn) => fn());
     mockBuildFeedPage.mockReset();
     mockBuildFeedPage.mockImplementation(async (_env, options) => emptyFeedPage(options));
+    mockBuildRecentLaws.mockReset();
+    mockBuildRecentLaws.mockImplementation(
+      async (_db, congress: number, session: number, limit: number, asOf?: string) => ({
+        congress,
+        session,
+        laws: Array.from({ length: Math.min(limit, 3) }, (_, i) => ({
+          congress,
+          bill_type: "HR",
+          bill_number: i + 1,
+          title: `Law ${i + 1}`,
+          policy_area: null,
+          headline: `Headline ${i + 1}`,
+          became_law_date: `2026-07-${String(15 - i).padStart(2, "0")}`,
+          law_kind: "signed" as const,
+          public_law: `119-${i + 1}`,
+          signed_date: `2026-07-${String(15 - i).padStart(2, "0")}`,
+          presented_date: null,
+          latest_action_date: null,
+          latest_action_text: null,
+        })),
+        as_of: asOf ?? "2026-07-28T00:00:00.000Z",
+      })
+    );
   });
 
   it("returns health", async () => {
@@ -605,6 +639,57 @@ describe("HTTP API", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({ chamber: "House", defectors: [] });
+  });
+
+  it("returns recent laws envelope with default limit 5", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/recent-laws.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildRecentLaws).toHaveBeenCalledWith(
+      expect.anything(),
+      119,
+      2,
+      5,
+      expect.any(String)
+    );
+    const body = await response.json();
+    expect(body).toMatchObject({
+      congress: 119,
+      session: 2,
+      laws: expect.any(Array),
+      as_of: expect.any(String),
+    });
+    expect(Array.isArray((body as { laws: unknown[] }).laws)).toBe(true);
+  });
+
+  it("respects recent-laws limit and caps at 10", async () => {
+    const limited = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/recent-laws.json?limit=3"),
+      createMockEnv() as any
+    );
+    expect(limited.status).toBe(200);
+    expect(mockBuildRecentLaws).toHaveBeenLastCalledWith(
+      expect.anything(),
+      119,
+      2,
+      3,
+      expect.any(String)
+    );
+
+    const capped = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/recent-laws.json?limit=99"),
+      createMockEnv() as any
+    );
+    expect(capped.status).toBe(200);
+    expect(mockBuildRecentLaws).toHaveBeenLastCalledWith(
+      expect.anything(),
+      119,
+      2,
+      10,
+      expect.any(String)
+    );
   });
 
   it("requires roll call params for vote defectors", async () => {

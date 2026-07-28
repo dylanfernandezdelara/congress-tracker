@@ -221,3 +221,122 @@ export function lifecycleMapKey(
 ): string {
   return billKey(congress, billType, billNumber);
 }
+
+export interface RecentlyEnactedBillRow {
+  congress: number;
+  bill_type: string;
+  bill_number: number;
+  title: string | null;
+  policy_area: string | null;
+  headline: string | null;
+  became_law_date: string;
+  law_kind: BillLawKind | null;
+  public_law: string | null;
+  signed_date: string | null;
+  presented_date: string | null;
+  latest_action_date: string | null;
+  latest_action_text: string | null;
+}
+
+/**
+ * Bills that became law in the given congress, newest first.
+ * Joins digest title/policy/headline when present. Excludes veto outcomes.
+ */
+export async function selectRecentlyEnactedBills(
+  db: D1Database,
+  congress: number,
+  limit: number
+): Promise<RecentlyEnactedBillRow[]> {
+  await ensureSchema(db);
+  const capped = Math.max(0, Math.floor(limit));
+  if (capped === 0) return [];
+
+  const { results } = await db
+    .prepare(
+      `SELECT l.congress, l.bill_type, l.bill_number,
+              d.title, d.policy_area,
+              json_extract(d.digest_json, '$.headline') AS headline,
+              l.became_law_date, l.law_kind, l.public_law,
+              l.signed_date, l.presented_date,
+              l.latest_action_date, l.latest_action_text
+       FROM bill_lifecycle l
+       LEFT JOIN bill_digests d
+         ON d.congress = l.congress
+        AND UPPER(d.bill_type) = UPPER(l.bill_type)
+        AND d.number = l.bill_number
+       WHERE l.congress = ?
+         AND l.became_law_date IS NOT NULL
+         AND (l.law_kind IS NULL OR l.law_kind NOT IN ('vetoed', 'pocket_vetoed'))
+       ORDER BY l.became_law_date DESC, l.latest_action_date DESC
+       LIMIT ?`
+    )
+    .bind(congress, capped)
+    .all<{
+      congress: number;
+      bill_type: string;
+      bill_number: number;
+      title: string | null;
+      policy_area: string | null;
+      headline: string | null;
+      became_law_date: string;
+      law_kind: string | null;
+      public_law: string | null;
+      signed_date: string | null;
+      presented_date: string | null;
+      latest_action_date: string | null;
+      latest_action_text: string | null;
+    }>();
+
+  return (results ?? []).map((row) => ({
+    congress: row.congress,
+    bill_type: normalizeBillType(row.bill_type),
+    bill_number: row.bill_number,
+    title: row.title,
+    policy_area: row.policy_area,
+    headline: row.headline,
+    became_law_date: row.became_law_date,
+    law_kind: parseLawKind(row.law_kind),
+    public_law: row.public_law,
+    signed_date: row.signed_date,
+    presented_date: row.presented_date,
+    latest_action_date: row.latest_action_date,
+    latest_action_text: row.latest_action_text,
+  }));
+}
+
+export interface PresentedPendingLifecycleBill {
+  bill_congress: number;
+  bill_type: string;
+  bill_number: number;
+}
+
+/**
+ * Lifecycle rows presented to the President that are not yet terminal.
+ * Used so enactment can be recorded after the passage-vote lookback expires.
+ */
+export async function selectPresentedPendingLifecycleBills(
+  db: D1Database
+): Promise<PresentedPendingLifecycleBill[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT congress AS bill_congress, bill_type, bill_number
+       FROM bill_lifecycle
+       WHERE presented_date IS NOT NULL
+         AND (
+           became_law_date IS NULL
+           OR (law_kind = 'law_unsigned' AND (public_law IS NULL OR public_law = ''))
+         )`
+    )
+    .all<{
+      bill_congress: number;
+      bill_type: string;
+      bill_number: number;
+    }>();
+
+  return (results ?? []).map((row) => ({
+    bill_congress: row.bill_congress,
+    bill_type: normalizeBillType(row.bill_type),
+    bill_number: row.bill_number,
+  }));
+}
