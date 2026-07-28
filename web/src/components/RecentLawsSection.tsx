@@ -185,7 +185,10 @@ function RecentLawItemRow({
               ) : null}
               {detail?.status === 'ready' ? (
                 <>
-                  <FeedRowDetail item={detail.item} />
+                  <FeedRowDetail
+                    item={detail.item}
+                    shareUrl={showTimelineLink ? undefined : sourceUrl}
+                  />
                   {showTimelineLink ? (
                     <p className="recent-laws-timeline-link">
                       <Link to={billDeepLinkTo(law)}>View in timeline</Link>

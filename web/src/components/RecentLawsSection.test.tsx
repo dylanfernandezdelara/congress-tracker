@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -93,6 +93,7 @@ describe('RecentLawsSection', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
     clearRollDefectorsCache()
   })
 
@@ -259,6 +260,45 @@ describe('RecentLawsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand details for H.R. 1' }))
     expect(await screen.findByRole('heading', { name: 'What it does' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'View in timeline' })).not.toBeInTheDocument()
+  })
+
+  it('copies the timeline share URL for in-window laws', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    renderSection(<RecentLawsSection laws={[sampleLaw()]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Expand details for H.R. 1' }))
+    expect(await screen.findByRole('heading', { name: 'What it does' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalled()
+    })
+    const copied = String(writeText.mock.calls[0]?.[0] ?? '')
+    expect(copied).toContain('bill=119-hr-1')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+
+  it('copies the congress.gov URL for aged-out laws', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    renderSection(
+      <RecentLawsSection
+        laws={[sampleLaw({ latest_passage_vote_date: isoDaysAgo(VOTE_LOOKBACK_DAYS + 5) })]}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Expand details for H.R. 1' }))
+    expect(await screen.findByRole('heading', { name: 'What it does' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalled()
+    })
+    const copied = String(writeText.mock.calls[0]?.[0] ?? '')
+    expect(copied).toContain('/bill/119th-congress/house-bill/1')
+    expect(copied).not.toContain('bill=')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
 
   it('falls back to Became law when law_kind is null', () => {
