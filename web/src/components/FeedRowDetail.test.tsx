@@ -82,9 +82,9 @@ describe('FeedRowDetail', () => {
     expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
   })
 
-  it('shows a short CRS lead when no digest exists and keeps the full CRS in disclosure', () => {
+  it('shows the full CRS summary when no digest exists', () => {
     const crs =
-      'This concurrent resolution establishes the congressional budget for the federal government for FY2027, sets forth budgetary levels for FY2028-FY2036, and provides reconciliation instructions for legislation that increases the deficit. The resolution recommends levels and amounts for many accounts across the federal government.'
+      'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted. Congress retains the power to authorize force.'
     render(
       <FeedRowDetail
         item={makeFeedItem({ digest: null, raw_summary_text: crs })}
@@ -92,14 +92,10 @@ describe('FeedRowDetail', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
-    const lead = document.querySelector('.feed-row-detail-section .feed-row-summary-body')
-    expect(lead).toHaveTextContent(/This concurrent resolution establishes/)
-    expect(lead?.textContent?.endsWith('…')).toBe(true)
-    expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
-    const crsDetails = screen.getByText('Official CRS summary').closest('details')
-    expect(crsDetails).toBeTruthy()
-    expect(crsDetails?.querySelector('.feed-row-summary-body--scrollable')).toBeInTheDocument()
-    expect(crsDetails).toHaveTextContent(crs)
+    const body = document.querySelector('.feed-row-detail-section .feed-row-summary-body')
+    expect(body).toHaveTextContent(crs)
+    expect(body?.textContent?.endsWith('…')).toBe(false)
+    expect(screen.queryByText('Official CRS summary')).not.toBeInTheDocument()
   })
 
   it('shows CRS only in the disclosure when digest key points exist without a lead', () => {

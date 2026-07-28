@@ -260,10 +260,9 @@ export function getFeedSummarySectionsModel(
   if (content.whatItDoes) {
     primary = { kind: 'what_it_does', text: content.whatItDoes }
   } else if (!hasDigestSummary && content.crsSummary) {
-    // Glanceable lead only — full official CRS stays in the disclosure panel.
-    const crsLead = formatCollapsedDigestLead(content.crsSummary)
-    primary = { kind: 'crs', text: crsLead }
-    crsDisclosure = content.crsSummary.length > crsLead.length ? content.crsSummary : null
+    // Expanded detail shows the full CRS. The collapsed row still uses the
+    // ~25-word teaser via getCollapsedSummaryLead — do not re-apply that cap here.
+    primary = { kind: 'crs', text: content.crsSummary }
   } else {
     primary = { kind: 'none' }
   }

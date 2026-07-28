@@ -169,23 +169,18 @@ describe('FeedRow', () => {
     expect(screen.getByText('Plain-English summary coming soon.')).toBeInTheDocument()
   })
 
-  it('shows a short CRS lead when expanded without a digest and keeps full CRS in disclosure', () => {
+  it('shows the full CRS summary when expanded without a digest', () => {
     const item = makeFeedItem({ digest: null, raw_summary_text: longCrsSummary })
 
     render(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
 
     const detailPanel = screen.getByRole('region', { name: /Details for Sample Act/ })
     expect(within(detailPanel).getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
-    const lead = detailPanel.querySelector('.feed-row-detail-section .feed-row-summary-body')
-    expect(lead).toHaveTextContent(/Ukraine Support Act/)
-    expect((lead?.textContent ?? '').length).toBeLessThan(longCrsSummary.length)
-    const crsDetails = within(detailPanel).getByText('Official CRS summary').closest('details')
-    expect(crsDetails).not.toBeNull()
-    const scrollable = crsDetails?.querySelector('.feed-row-summary-body--scrollable')
-    expect(scrollable).toBeInTheDocument()
-    expect(scrollable?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+    const body = detailPanel.querySelector('.feed-row-detail-section .feed-row-summary-body')
+    expect(body?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
       longCrsSummary.replace(/\s+/g, ' ').trim(),
     )
+    expect(within(detailPanel).queryByText('Official CRS summary')).not.toBeInTheDocument()
   })
 
   it('tucks the official CRS summary behind a disclosure when a digest exists', () => {
