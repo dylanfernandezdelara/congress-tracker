@@ -248,7 +248,7 @@ function assembleFeedItem(
 }
 
 /**
- * Assemble FeedItems for pre-selected bill rows (shared by feed page + single-bill).
+ * Assemble FeedItems for pre-selected bill rows (shared by feed page + recent-laws batch assembly).
  * `latest_passage_date` / `latest_activity_date` come from each row.
  */
 export async function buildFeedItemsForBills(
