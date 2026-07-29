@@ -204,13 +204,6 @@
     margin: 0 0 1.5rem;
   }
 
-  .recent-confirmations-role {
-    margin: 0.35rem 0 0;
-    font-size: 12px;
-    line-height: 1.35;
-    color: hsl(var(--twc-secondary));
-  }
-
   .recent-confirmations-detail {
     display: flex;
     flex-direction: column;

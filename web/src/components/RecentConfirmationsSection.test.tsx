@@ -39,7 +39,7 @@ describe('RecentConfirmationsSection', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows confirmation headline and expands background detail', () => {
+  it('shows confirmation headline, org chip, and background teaser without a duplicate role header', () => {
     render(
       <RecentConfirmationsSection
         confirmations={[sampleConfirmation()]}
@@ -51,13 +51,29 @@ describe('RecentConfirmationsSection', () => {
     expect(screen.getByRole('heading', { name: 'Recent confirmations' })).toBeInTheDocument()
     expect(screen.getByText('Jane Doe confirmed as Energy Secretary')).toBeInTheDocument()
     expect(screen.getByText('Confirmed')).toBeInTheDocument()
-    expect(screen.getByText('Secretary of Energy · Department of Energy')).toBeInTheDocument()
+    expect(screen.getByText('Department of Energy')).toBeInTheDocument()
+    expect(
+      screen.getByText('Jane Doe of California was nominated to lead the Department of Energy.'),
+    ).toBeInTheDocument()
+    // Role was previously a second header that restated the headline ("Secretary of Energy · …").
+    expect(screen.queryByText('Secretary of Energy · Department of Energy')).not.toBeInTheDocument()
+  })
+
+  it('expands background detail without restating the confirmation as a second header', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[sampleConfirmation()]}
+        loading={false}
+        error={null}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: /Expand details for PN100/i }))
-    expect(screen.getByText('What was confirmed')).toBeInTheDocument()
+    expect(screen.queryByText('What was confirmed')).not.toBeInTheDocument()
     expect(
-      screen.getByText('The Senate confirmed Jane Doe as Secretary of Energy.'),
-    ).toBeInTheDocument()
+      screen.queryByText('The Senate confirmed Jane Doe as Secretary of Energy.'),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('Background')).toBeInTheDocument()
     expect(
       screen.getByText('Jane Doe of California was nominated to lead the Department of Energy.'),
     ).toBeInTheDocument()
