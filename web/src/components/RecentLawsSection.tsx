@@ -9,6 +9,7 @@ import type { RecentLawItem } from '../api/types'
 import { formatBillQueryParam } from '../utils/billDeepLink'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { mapLawKind } from '../utils/billLifecycleStages'
+import { TERMINAL_STATUS_PRESENTATION } from '../utils/terminalStatusPresentation'
 import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
 
@@ -19,26 +20,9 @@ type RecentLawsSectionProps = {
   onRetry?: () => void
 }
 
-/** Short status labels for the New laws meta row (no em dashes). */
 function recentLawOutcomeLabel(lawKind: BillLawKind | null): string {
-  if (!lawKind) return 'Became law'
-  const status = mapLawKind(lawKind)
-  switch (status) {
-    case 'became_law_signed':
-      return 'Signed into law'
-    case 'became_law_unsigned':
-      return 'Law without signature'
-    case 'enacted_over_veto':
-      return 'Enacted over veto'
-    case 'vetoed':
-      return 'Vetoed'
-    case 'pocket_vetoed':
-      return 'Pocket vetoed'
-    default: {
-      const _exhaustive: never = status
-      return _exhaustive
-    }
-  }
+  if (!lawKind) return TERMINAL_STATUS_PRESENTATION.became_law.metaLabel
+  return TERMINAL_STATUS_PRESENTATION[mapLawKind(lawKind)].metaLabel
 }
 
 function formatPublicLawLabel(publicLaw: string): string {
@@ -70,7 +54,7 @@ export function isPassageVoteInFeedWindow(
 
 function ExpandChevron() {
   return (
-    <span className="recent-laws-chevron" aria-hidden="true">
+    <span className="feed-row-chevron" aria-hidden="true">
       <svg viewBox="0 0 16 16" fill="none" focusable="false">
         <path
           d="M6 3.5 10.5 8 6 12.5"
@@ -102,33 +86,31 @@ function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) 
 
   return (
     <li className={`recent-laws-item${isExpanded ? ' is-expanded' : ''}`}>
-      <article className="recent-laws-article" aria-labelledby={headlineId}>
+      <article className="feed-row-article" aria-labelledby={headlineId}>
         <button
           type="button"
-          className="recent-laws-toggle"
+          className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
           aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${billId}`}
           onClick={() => onToggle(key)}
         >
-          <div className="recent-laws-main">
-            <div className="recent-laws-header">
-              <h3 id={headlineId} className="recent-laws-headline">
+          <div className="feed-row-main">
+            <div className="feed-row-header">
+              <h3 id={headlineId} className="feed-row-topic">
                 {headline}
               </h3>
-              <span className="recent-laws-date-wrap">
-                <time className="recent-laws-date" dateTime={law.became_law_date}>
+              <span className="feed-row-date-wrap">
+                <time className="feed-row-date" dateTime={law.became_law_date}>
                   {formatVoteDate(law.became_law_date)}
                 </time>
                 <ExpandChevron />
               </span>
             </div>
-            <div className="recent-laws-meta-row">
-              <span className="recent-laws-badge text-law">{outcome}</span>
+            <div className="feed-row-meta-row">
+              <span className="feed-row-badge feed-row-badge--law text-law">{outcome}</span>
               {law.public_law ? (
-                <span className="recent-laws-meta-chip">
-                  {formatPublicLawLabel(law.public_law)}
-                </span>
+                <span className="feed-row-chip">{formatPublicLawLabel(law.public_law)}</span>
               ) : null}
               <BillIdChip type={law.bill_type} number={law.bill_number} />
             </div>

@@ -126,16 +126,16 @@ describe('RecentLawsSection', () => {
     const firstHeadline = screen.getByRole('heading', {
       name: 'House passes a broad energy permitting package',
     })
-    expect(firstHeadline).toHaveClass('recent-laws-headline')
-    expect(screen.getByText('Signed into law')).toHaveClass('recent-laws-badge', 'text-law')
+    expect(firstHeadline).toHaveClass('feed-row-topic')
+    expect(screen.getByText('Signed into law')).toHaveClass('feed-row-badge', 'text-law')
     expect(screen.getByText('Public Law 119-1')).toBeInTheDocument()
     expect(screen.getByLabelText('House bill 1')).toBeInTheDocument()
     expect(screen.getByText('Jul 15')).toBeInTheDocument()
 
     expect(screen.getByRole('heading', { name: 'Public Lands Protection Act' })).toHaveClass(
-      'recent-laws-headline',
+      'feed-row-topic',
     )
-    expect(screen.getByText('Law without signature')).toHaveClass('recent-laws-badge', 'text-law')
+    expect(screen.getByText('Law without signature')).toHaveClass('feed-row-badge', 'text-law')
     expect(screen.getByText('Public Law 119-2')).toBeInTheDocument()
     expect(screen.getByLabelText('Senate bill 47')).toBeInTheDocument()
     expect(screen.getByText('Jul 10')).toBeInTheDocument()
@@ -304,7 +304,7 @@ describe('RecentLawsSection', () => {
       />,
     )
 
-    expect(screen.getByText('Became law')).toHaveClass('recent-laws-badge')
+    expect(screen.getByText('Became law')).toHaveClass('feed-row-badge')
     expect(screen.queryByText(/Public Law/)).not.toBeInTheDocument()
   })
 

@@ -3,7 +3,8 @@
     width: 100%;
   }
 
-  .feed-list {
+  .feed-list,
+  .recent-laws-list {
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -23,12 +24,14 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .feed-list {
+    .feed-list,
+    .recent-laws-list {
       transition: none;
     }
   }
 
-  .feed-row {
+  .feed-row,
+  .recent-laws-item {
     border: none;
     border-radius: 0;
     background-color: transparent;
@@ -36,7 +39,8 @@
     border-bottom: 1px solid hsl(var(--twc-border));
   }
 
-  .feed-row:last-child {
+  .feed-row:last-child,
+  .recent-laws-item:last-child {
     border-bottom: none;
   }
 
@@ -51,21 +55,23 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .feed-row:not(.is-expanded):hover {
+    .feed-row:not(.is-expanded):hover,
+    .recent-laws-item:not(.is-expanded):hover {
       background-color: hsl(var(--twc-row-hover));
     }
 
-    .feed-row:not(.is-expanded):hover .feed-row-chevron {
-      color: hsl(var(--twc-secondary));
-    }
-
-    .feed-row:not(.is-expanded):hover .feed-row-date {
+    .feed-row:not(.is-expanded):hover .feed-row-chevron,
+    .feed-row:not(.is-expanded):hover .feed-row-date,
+    .recent-laws-item:not(.is-expanded):hover .feed-row-chevron,
+    .recent-laws-item:not(.is-expanded):hover .feed-row-date {
       color: hsl(var(--twc-secondary));
     }
   }
 
   .feed-row:has(.feed-row-toggle:active),
-  .feed-row.is-expanded {
+  .feed-row.is-expanded,
+  .recent-laws-item:has(.feed-row-toggle:active),
+  .recent-laws-item.is-expanded {
     background-color: hsl(var(--twc-row-hover));
   }
 
@@ -94,7 +100,9 @@
   }
 
   .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-chevron,
-  .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-date {
+  .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-date,
+  .recent-laws-item:has(.feed-row-toggle:focus-visible) .feed-row-chevron,
+  .recent-laws-item:has(.feed-row-toggle:focus-visible) .feed-row-date {
     color: hsl(var(--twc-secondary));
   }
 
@@ -473,7 +481,8 @@
     height: 100%;
   }
 
-  .feed-row.is-expanded .feed-row-chevron {
+  .feed-row.is-expanded .feed-row-chevron,
+  .recent-laws-item.is-expanded .feed-row-chevron {
     transform: rotate(90deg);
     color: hsl(var(--twc-secondary));
   }
