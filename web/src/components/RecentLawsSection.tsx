@@ -9,7 +9,7 @@ import type { RecentLawItem } from '../api/types'
 import { formatBillQueryParam } from '../utils/billDeepLink'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { mapLawKind } from '../utils/billLifecycleStages'
-import { TERMINAL_STATUS_PRESENTATION } from '../utils/terminalStatusPresentation'
+import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
 
 type RecentLawsSectionProps = {
@@ -19,11 +19,28 @@ type RecentLawsSectionProps = {
   onRetry?: () => void
 }
 
+/** Short status labels for the New laws meta row (no em dashes). */
 function recentLawOutcomeLabel(lawKind: BillLawKind | null): string {
-  if (!lawKind) return TERMINAL_STATUS_PRESENTATION.became_law.pipelineLabel
+  if (!lawKind) return 'Became law'
   const status = mapLawKind(lawKind)
-  if (status === 'became_law_unsigned') return 'Became law without signature'
-  return TERMINAL_STATUS_PRESENTATION[status].pipelineLabel
+  switch (status) {
+    case 'became_law_signed':
+      return 'Signed into law'
+    case 'became_law_unsigned':
+      return 'Law without signature'
+    case 'enacted_over_veto':
+      return 'Enacted over veto'
+    case 'became_law':
+      return 'Became law'
+    case 'vetoed':
+      return 'Vetoed'
+    case 'pocket_vetoed':
+      return 'Pocket vetoed'
+    default: {
+      const _exhaustive: never = status
+      return _exhaustive
+    }
+  }
 }
 
 function formatPublicLawLabel(publicLaw: string): string {
@@ -77,19 +94,17 @@ type RecentLawItemRowProps = {
 
 function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) {
   const detailId = useId()
+  const headlineId = useId()
   const key = lawItemKey(law)
   const billId = formatShortBillId(law.bill_type, law.bill_number)
   const headline = law.headline?.trim() || law.title?.trim() || billId
   const outcome = recentLawOutcomeLabel(law.law_kind)
   const sourceUrl = congressGovBillUrl(law.congress, law.bill_type, law.bill_number)
   const showTimelineLink = isPassageVoteInFeedWindow(law.latest_passage_vote_date)
-  const metaParts = [outcome]
-  if (law.public_law) metaParts.push(formatPublicLawLabel(law.public_law))
-  metaParts.push(formatVoteDate(law.became_law_date))
 
   return (
     <li className={`recent-laws-item${isExpanded ? ' is-expanded' : ''}`}>
-      <article className="recent-laws-article">
+      <article className="recent-laws-article" aria-labelledby={headlineId}>
         <button
           type="button"
           className="recent-laws-toggle"
@@ -98,26 +113,29 @@ function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) 
           aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${billId}`}
           onClick={() => onToggle(key)}
         >
-          <div className="recent-laws-toggle-main">
-            <div className="recent-laws-headline-block">
-              {headline !== billId ? (
-                <p className="recent-laws-bill-id">{billId}</p>
-              ) : null}
-              <p className="recent-laws-headline">{headline}</p>
+          <div className="recent-laws-main">
+            <div className="recent-laws-header">
+              <h3 id={headlineId} className="recent-laws-headline">
+                {headline}
+              </h3>
+              <span className="recent-laws-date-wrap">
+                <time className="recent-laws-date" dateTime={law.became_law_date}>
+                  {formatVoteDate(law.became_law_date)}
+                </time>
+                <ExpandChevron />
+              </span>
             </div>
-            <ExpandChevron />
+            <div className="recent-laws-meta-row">
+              <span className="recent-laws-badge text-law">{outcome}</span>
+              {law.public_law ? (
+                <span className="recent-laws-meta-chip">
+                  {formatPublicLawLabel(law.public_law)}
+                </span>
+              ) : null}
+              <BillIdChip type={law.bill_type} number={law.bill_number} />
+            </div>
           </div>
-          <p className="recent-laws-meta">{metaParts.join(' · ')}</p>
         </button>
-
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="recent-laws-congress-link congress-link"
-        >
-          congress.gov ↗
-        </a>
 
         <div
           id={detailId}

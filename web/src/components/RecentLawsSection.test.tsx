@@ -98,8 +98,8 @@ describe('RecentLawsSection', () => {
     clearRollDefectorsCache()
   })
 
-  it('renders bill id, outcome copy, public law, and enactment date', () => {
-    renderSection(
+  it('renders feed-style rows with headline, law meta, bill id, and date', () => {
+    const { container } = renderSection(
       <RecentLawsSection
         laws={[
           sampleLaw(),
@@ -121,26 +121,30 @@ describe('RecentLawsSection', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'New laws' })).toBeInTheDocument()
-    const firstBillId = screen.getByText('H.R. 1')
-    const firstHeadline = screen.getByText('House passes a broad energy permitting package')
-    expect(firstBillId).toHaveClass('recent-laws-bill-id')
+    expect(container.querySelector('.recent-laws-list')).not.toBeNull()
+
+    const firstHeadline = screen.getByRole('heading', {
+      name: 'House passes a broad energy permitting package',
+    })
     expect(firstHeadline).toHaveClass('recent-laws-headline')
-    expect(firstBillId.compareDocumentPosition(firstHeadline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByText(/H\.R\. 1\s*—/)).not.toBeInTheDocument()
-    expect(screen.getByText(/Signed into law · Public Law 119-1 · Jul 15/)).toBeInTheDocument()
-    expect(screen.getByText('S. 47')).toHaveClass('recent-laws-bill-id')
-    expect(screen.getByText('Public Lands Protection Act')).toHaveClass('recent-laws-headline')
-    expect(
-      screen.getByText(/Became law without signature · Public Law 119-2 · Jul 10/),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Signed into law')).toHaveClass('recent-laws-badge', 'text-law')
+    expect(screen.getByText('Public Law 119-1')).toBeInTheDocument()
+    expect(screen.getByLabelText('House bill 1')).toBeInTheDocument()
+    expect(screen.getByText('Jul 15')).toBeInTheDocument()
+
+    expect(screen.getByRole('heading', { name: 'Public Lands Protection Act' })).toHaveClass(
+      'recent-laws-headline',
+    )
+    expect(screen.getByText('Law without signature')).toHaveClass('recent-laws-badge', 'text-law')
+    expect(screen.getByText('Public Law 119-2')).toBeInTheDocument()
+    expect(screen.getByLabelText('Senate bill 47')).toBeInTheDocument()
+    expect(screen.getByText('Jul 10')).toBeInTheDocument()
+
     expect(screen.queryByText(/—/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /congress\.gov/i })).not.toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Expand details for H.R. 1' }),
     ).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getAllByRole('link', { name: /congress\.gov/i })[0]).toHaveAttribute(
-      'href',
-      expect.stringContaining('/bill/119th-congress/house-bill/1'),
-    )
   })
 
   it('expands an item and renders FeedRowDetail synchronously from the payload', () => {
@@ -154,6 +158,10 @@ describe('RecentLawsSection', () => {
     )
     expect(screen.getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
     expect(screen.getByText('Speeds up energy permitting in plain language.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Read on congress\.gov/i })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/bill/119th-congress/house-bill/1'),
+    )
     expect(screen.getByRole('link', { name: 'View in timeline' })).toHaveAttribute(
       'href',
       '/?bill=119-hr-1',
@@ -226,10 +234,11 @@ describe('RecentLawsSection', () => {
   it('does not toggle expansion when the congress.gov link is clicked', () => {
     renderSection(<RecentLawsSection laws={[sampleLaw()]} />)
 
-    fireEvent.click(screen.getByRole('link', { name: /congress\.gov/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand details for H.R. 1' }))
+    fireEvent.click(screen.getByRole('link', { name: /Read on congress\.gov/i }))
     expect(
-      screen.getByRole('button', { name: 'Expand details for H.R. 1' }),
-    ).toHaveAttribute('aria-expanded', 'false')
+      screen.getByRole('button', { name: 'Collapse details for H.R. 1' }),
+    ).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('omits View in timeline when the passage vote is outside the feed window', () => {
@@ -295,7 +304,8 @@ describe('RecentLawsSection', () => {
       />,
     )
 
-    expect(screen.getByText(/Became law · Jul 15/)).toBeInTheDocument()
+    expect(screen.getByText('Became law')).toHaveClass('recent-laws-badge')
+    expect(screen.queryByText(/Public Law/)).not.toBeInTheDocument()
   })
 
   it('renders nothing when there are no laws', () => {
