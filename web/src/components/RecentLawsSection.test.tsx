@@ -99,7 +99,7 @@ describe('RecentLawsSection', () => {
   })
 
   it('renders feed-style rows with headline, law meta, bill id, and date', () => {
-    const { container } = renderSection(
+    renderSection(
       <RecentLawsSection
         laws={[
           sampleLaw(),
@@ -120,14 +120,20 @@ describe('RecentLawsSection', () => {
       />,
     )
 
+    const section = screen.getByRole('region', { name: 'New laws' })
     expect(screen.getByRole('heading', { name: 'New laws' })).toBeInTheDocument()
-    expect(container.querySelector('.recent-laws-list')).not.toBeNull()
+    expect(section.querySelector('.feed-list')).not.toBeNull()
+    expect(section.querySelectorAll('.feed-row')).toHaveLength(2)
 
     const firstHeadline = screen.getByRole('heading', {
       name: 'House passes a broad energy permitting package',
     })
     expect(firstHeadline).toHaveClass('feed-row-topic')
-    expect(screen.getByText('Signed into law')).toHaveClass('feed-row-badge', 'text-law')
+    expect(screen.getByText('Signed into law')).toHaveClass(
+      'feed-row-badge',
+      'feed-row-badge--law',
+      'text-law',
+    )
     expect(screen.getByText('Public Law 119-1')).toBeInTheDocument()
     expect(screen.getByLabelText('House bill 1')).toBeInTheDocument()
     expect(screen.getByText('Jul 15')).toBeInTheDocument()
@@ -135,7 +141,11 @@ describe('RecentLawsSection', () => {
     expect(screen.getByRole('heading', { name: 'Public Lands Protection Act' })).toHaveClass(
       'feed-row-topic',
     )
-    expect(screen.getByText('Law without signature')).toHaveClass('feed-row-badge', 'text-law')
+    expect(screen.getByText('Law without signature')).toHaveClass(
+      'feed-row-badge',
+      'feed-row-badge--law_unsigned',
+      'text-law',
+    )
     expect(screen.getByText('Public Law 119-2')).toBeInTheDocument()
     expect(screen.getByLabelText('Senate bill 47')).toBeInTheDocument()
     expect(screen.getByText('Jul 10')).toBeInTheDocument()

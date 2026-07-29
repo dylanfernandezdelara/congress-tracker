@@ -93,11 +93,11 @@ async function auditHomePage(page) {
     const viewportHeight = window.innerHeight
     const heading = document.querySelector('h1')
     const membersSidebar = document.querySelector('[aria-label="Members in Congress"]')
-    const feedRow = document.querySelector('.feed-row')
-    const topic = document.querySelector('[data-feed-topic]')
-    const policyArea = document.querySelector('[data-feed-policy-area]')
-    const eventLine = document.querySelector('.feed-row-event:not([hidden])')
-    const summary = document.querySelector('[data-feed-summary]')
+    const feedRow = document.querySelector('#feed-top .feed-row')
+    const topic = document.querySelector('#feed-top [data-feed-topic]')
+    const policyArea = document.querySelector('#feed-top [data-feed-policy-area]')
+    const eventLine = document.querySelector('#feed-top .feed-row-event:not([hidden])')
+    const summary = document.querySelector('#feed-top [data-feed-summary]')
     const issues = []
 
     const collectHorizontalClipping = (rect, label) => {
@@ -175,7 +175,7 @@ async function auditHomePage(page) {
         issues.push('feed event line not visible in viewport')
       }
     } else {
-      const marginChip = document.querySelector('.feed-row-chip--margin')
+      const marginChip = document.querySelector('#feed-top .feed-row-chip--margin')
       if (marginChip) {
         collectHorizontalClipping(marginChip.getBoundingClientRect(), 'feed vote margin')
       } else {
