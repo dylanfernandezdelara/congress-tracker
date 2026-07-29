@@ -293,12 +293,12 @@ describe('Home', () => {
     expect(container.querySelector('.home-rail--left')).not.toBeNull()
     expect(container.querySelector('.home-rail--right')).not.toBeNull()
 
-    const feedList = container.querySelector('.feed-list')
+    const feedList = container.querySelector('#feed-top .feed-list')
     expect(feedList).not.toBeNull()
     expect(feedList?.tagName).toBe('UL')
     expect(within(feedList as HTMLElement).getByText('Passed')).toBeInTheDocument()
     expect(screen.queryByText('Flip for vote details ↺')).not.toBeInTheDocument()
-    expect(container.querySelector('.feed-row')).not.toBeNull()
+    expect(container.querySelector('#feed-top .feed-row')).not.toBeNull()
   })
 
   it('stacks rail content below the feed on narrow viewports without duplicate fetches', async () => {

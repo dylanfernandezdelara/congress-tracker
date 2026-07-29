@@ -10,6 +10,7 @@ import { formatBillQueryParam } from '../utils/billDeepLink'
 import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { mapLawKind } from '../utils/billLifecycleStages'
 import { TERMINAL_STATUS_PRESENTATION } from '../utils/terminalStatusPresentation'
+import { BillIdChip } from './BillIdChip'
 import { FeedRowDetail } from './FeedRowDetail'
 
 type RecentLawsSectionProps = {
@@ -19,9 +20,25 @@ type RecentLawsSectionProps = {
   onRetry?: () => void
 }
 
-function recentLawOutcomeLabel(lawKind: BillLawKind | null): string {
-  if (!lawKind) return TERMINAL_STATUS_PRESENTATION.became_law.pipelineLabel
-  return TERMINAL_STATUS_PRESENTATION[mapLawKind(lawKind)].pipelineLabel
+function recentLawOutcome(lawKind: BillLawKind | null): {
+  feedKind: 'law' | 'law_unsigned' | 'vetoed'
+  label: string
+  badgeToneClass: string
+} {
+  if (!lawKind) {
+    const presentation = TERMINAL_STATUS_PRESENTATION.became_law
+    return {
+      feedKind: presentation.feedKind,
+      label: presentation.pipelineLabel,
+      badgeToneClass: ' text-law',
+    }
+  }
+  const status = mapLawKind(lawKind)
+  const presentation = TERMINAL_STATUS_PRESENTATION[status]
+  const label =
+    status === 'became_law_unsigned' ? 'Law without signature' : presentation.pipelineLabel
+  const badgeToneClass = presentation.feedKind === 'vetoed' ? ' text-fail' : ' text-law'
+  return { feedKind: presentation.feedKind, label, badgeToneClass }
 }
 
 function formatPublicLawLabel(publicLaw: string): string {
@@ -53,7 +70,7 @@ export function isPassageVoteInFeedWindow(
 
 function ExpandChevron() {
   return (
-    <span className="recent-laws-chevron" aria-hidden="true">
+    <span className="feed-row-chevron" aria-hidden="true">
       <svg viewBox="0 0 16 16" fill="none" focusable="false">
         <path
           d="M6 3.5 10.5 8 6 12.5"
@@ -75,50 +92,54 @@ type RecentLawItemRowProps = {
 
 function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) {
   const detailId = useId()
+  const headlineId = useId()
   const key = lawItemKey(law)
   const billId = formatShortBillId(law.bill_type, law.bill_number)
   const headline = law.headline?.trim() || law.title?.trim() || billId
-  const outcome = recentLawOutcomeLabel(law.law_kind)
+  const outcome = recentLawOutcome(law.law_kind)
   const sourceUrl = congressGovBillUrl(law.congress, law.bill_type, law.bill_number)
   const showTimelineLink = isPassageVoteInFeedWindow(law.latest_passage_vote_date)
-  const metaParts = [outcome]
-  if (law.public_law) metaParts.push(formatPublicLawLabel(law.public_law))
-  metaParts.push(formatVoteDate(law.became_law_date))
 
   return (
-    <li className={`recent-laws-item${isExpanded ? ' is-expanded' : ''}`}>
-      <article className="recent-laws-article">
+    <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
+      <article className="feed-row-article" aria-labelledby={headlineId}>
         <button
           type="button"
-          className="recent-laws-toggle"
+          className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
           aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${billId}`}
           onClick={() => onToggle(key)}
         >
-          <div className="recent-laws-toggle-main">
-            <p className="recent-laws-headline">
-              <span className="recent-laws-bill-id">{billId}</span>
-              <span className="recent-laws-headline-sep"> — </span>
-              <span className="recent-laws-headline-text">{headline}</span>
-            </p>
-            <ExpandChevron />
+          <div className="feed-row-main">
+            <div className="feed-row-header">
+              <h3 id={headlineId} className="feed-row-topic">
+                {headline}
+              </h3>
+              <span className="feed-row-date-wrap">
+                <time className="feed-row-date" dateTime={law.became_law_date}>
+                  {formatVoteDate(law.became_law_date)}
+                </time>
+                <ExpandChevron />
+              </span>
+            </div>
+            <div className="feed-row-meta-row">
+              <span
+                className={`feed-row-badge feed-row-badge--${outcome.feedKind}${outcome.badgeToneClass}`}
+              >
+                {outcome.label}
+              </span>
+              {law.public_law ? (
+                <span className="feed-row-chip">{formatPublicLawLabel(law.public_law)}</span>
+              ) : null}
+              <BillIdChip type={law.bill_type} number={law.bill_number} />
+            </div>
           </div>
-          <p className="recent-laws-meta">{metaParts.join(' · ')}</p>
         </button>
-
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="recent-laws-congress-link congress-link"
-        >
-          congress.gov ↗
-        </a>
 
         <div
           id={detailId}
-          className="recent-laws-detail-panel feed-row-detail-panel"
+          className="feed-row-detail-panel"
           role="region"
           aria-label={`Details for ${billId}`}
           hidden={!isExpanded}
@@ -196,7 +217,7 @@ export function RecentLawsSection({
   return (
     <section className="recent-laws" aria-label="New laws">
       <h2 className="recent-laws-title">New laws</h2>
-      <ul className="recent-laws-list">
+      <ul className="feed-list">
         {laws.map((law) => {
           const key = lawItemKey(law)
           return (

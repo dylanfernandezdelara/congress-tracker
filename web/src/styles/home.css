@@ -203,132 +203,14 @@
     margin: 0 0 1.5rem;
   }
 
-  .recent-laws-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .recent-laws-item {
-    border: 1px solid hsl(var(--twc-border));
-    border-radius: 12px;
-    background: hsl(var(--twc-card));
-  }
-
-  .recent-laws-article {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .recent-laws-toggle {
-    display: block;
-    width: 100%;
-    margin: 0;
-    padding: 0.75rem 0.875rem 0.35rem;
-    border: 0;
-    background: transparent;
-    text-align: left;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .recent-laws-toggle:focus-visible {
-    outline: 2px solid hsl(var(--twc-foreground));
-    outline-offset: -2px;
-    border-radius: 12px;
-  }
-
-  .recent-laws-toggle-main {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .recent-laws-headline {
-    margin: 0;
-    flex: 1;
-    min-width: 0;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.35;
-    letter-spacing: -0.15px;
-    color: hsl(var(--twc-foreground));
-  }
-
-  .recent-laws-bill-id {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .recent-laws-meta {
-    margin: 0.25rem 0 0;
-    font-size: 12px;
-    line-height: 1.4;
-    font-variant-numeric: tabular-nums;
-    color: hsl(var(--twc-faint));
-  }
-
-  .recent-laws-chevron {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 14px;
-    height: 14px;
-    margin-top: 0.15rem;
-    color: hsl(var(--twc-faint));
-    transition:
-      transform 0.25s var(--motion-ease-out),
-      color 0.15s ease;
-  }
-
-  .recent-laws-chevron svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-
-  .recent-laws-item.is-expanded .recent-laws-chevron {
-    transform: rotate(90deg);
-    color: hsl(var(--twc-secondary));
-  }
-
-  .recent-laws-congress-link {
-    align-self: flex-start;
-    margin: 0 0.875rem 0.75rem;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  .recent-laws-item.is-expanded .recent-laws-congress-link {
-    margin-bottom: 0.5rem;
-  }
-
-  .recent-laws-detail-panel.feed-row-detail-panel {
-    border-radius: 0 0 12px 12px;
-  }
-
   .recent-laws-detail-fallback {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
 
-  .recent-laws-detail-fallback-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
   .recent-laws-timeline-link {
-    margin: 0.75rem 0 0;
+    margin: 0.25rem 0 0;
     font-size: 12px;
     font-weight: 500;
   }
