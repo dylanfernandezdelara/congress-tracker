@@ -385,12 +385,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 0 1rem 0.75rem;
   }
 
   .recent-laws-timeline-link {
-    margin: 0;
-    padding: 0 1rem 0.75rem;
+    margin: 0.25rem 0 0;
     font-size: 12px;
     font-weight: 500;
   }
