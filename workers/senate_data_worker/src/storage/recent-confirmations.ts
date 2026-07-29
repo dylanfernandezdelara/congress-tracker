@@ -66,8 +66,9 @@ export async function buildRecentConfirmations(
         ? `The Senate confirmed the nomination for ${row.position_title.trim()}.`
         : row.description?.trim() || null);
 
-    const backgroundText =
-      background?.background?.trim() || row.raw_background_text?.trim() || row.description?.trim() || null;
+    // Display background is rewritten prose only. raw_background_text is LLM prompt
+    // scaffolding (Position:/Nominee(s): lines) and must not surface in the UI.
+    const backgroundText = background?.background?.trim() || null;
 
     return {
       chamber: "Senate",

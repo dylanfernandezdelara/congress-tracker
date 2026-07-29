@@ -59,23 +59,19 @@ describe('RecentConfirmationsSection', () => {
     expect(screen.queryByText('Secretary of Energy · Department of Energy')).not.toBeInTheDocument()
   })
 
-  it('omits teaser when background is raw nomination scaffolding (org chip remains)', () => {
+  it('omits teaser when API background is null (org chip remains)', () => {
     render(
       <RecentConfirmationsSection
-        confirmations={[
-          sampleConfirmation({
-            background:
-              'Jane Doe, of California, to be Secretary of Energy.\nPosition: Secretary of Energy (Department of Energy)\nNominee(s): Jane Doe (CA)',
-          }),
-        ]}
+        confirmations={[sampleConfirmation({ background: null })]}
         loading={false}
         error={null}
       />,
     )
 
     expect(screen.getByText('Department of Energy')).toBeInTheDocument()
-    expect(screen.queryByText(/Position: Secretary of Energy/)).not.toBeInTheDocument()
-    expect(screen.queryByText('Secretary of Energy · Department of Energy')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Jane Doe of California was nominated to lead the Department of Energy.'),
+    ).not.toBeInTheDocument()
   })
 
   it('expands background detail without restating the confirmation as a second header', () => {

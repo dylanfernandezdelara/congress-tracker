@@ -26,21 +26,10 @@ function nomineeLabel(item: RecentConfirmationItem): string {
   return `${item.nominee_names[0]!.display_name} +${item.nominee_names.length - 1}`
 }
 
-/** Raw nomination scaffolding (pre-rewrite) restates position/org — skip as a teaser. */
-function isRawNominationScaffolding(text: string): boolean {
-  return /^(Position|Organization|Nominee\(s\)):/m.test(text)
-}
-
 type ConfirmationItemRowProps = {
   item: RecentConfirmationItem
   isExpanded: boolean
   onToggle: (key: string) => void
-}
-
-function readableBackground(item: RecentConfirmationItem): string | null {
-  const background = item.background?.trim()
-  if (!background || isRawNominationScaffolding(background)) return null
-  return background
 }
 
 function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRowProps) {
@@ -49,7 +38,7 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
   const summaryId = useId()
   const key = confirmationKey(item)
   const headline = item.headline?.trim() || nomineeLabel(item)
-  const background = readableBackground(item)
+  const background = item.background?.trim() || null
   const teaser = background ? formatCollapsedDigestLead(background) : null
   const organization = item.organization?.trim() || null
   const margin = item.yeas - item.nays
