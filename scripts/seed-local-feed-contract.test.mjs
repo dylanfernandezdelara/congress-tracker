@@ -27,11 +27,16 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /CREATE TABLE IF NOT EXISTS votes/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_digests/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_lifecycle/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS nominations/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS confirmation_votes/)
   assert.match(sql, /INSERT OR REPLACE INTO votes/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_digests/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_lifecycle/)
+  assert.match(sql, /INSERT OR REPLACE INTO nominations/)
+  assert.match(sql, /INSERT OR REPLACE INTO confirmation_votes/)
   assert.match(sql, /'signed'/)
   assert.match(sql, /'law_unsigned'/)
+  assert.match(sql, /On the Nomination/)
 })
 
 test('seeded votes use recent (lookback-window) dates, not stale literals', () => {
@@ -53,14 +58,31 @@ test('seeded votes use recent (lookback-window) dates, not stale literals', () =
 
 test('seed digests are valid JSON matching the feed digest contract', () => {
   const sql = printSql()
-  const digests = [...sql.matchAll(/'(\{"headline".*?\})'/g)].map((m) => m[1])
+  const digests = [...sql.matchAll(/'(\{"headline".*?\})'/g)]
+    .map((m) => m[1])
+    .map((raw) => JSON.parse(raw))
+    .filter((digest) => typeof digest.what_it_does === 'string')
   assert.ok(digests.length >= 3, 'expected at least three seeded digests')
-  for (const raw of digests) {
-    const digest = JSON.parse(raw)
+  for (const digest of digests) {
     assert.equal(typeof digest.headline, 'string')
     assert.equal(typeof digest.what_it_does, 'string')
     assert.ok(Array.isArray(digest.key_points))
     assert.ok(Array.isArray(digest.terms_explained))
+  }
+})
+
+test('seed confirmations include background JSON matching the confirmations contract', () => {
+  const sql = printSql()
+  const backgrounds = [...sql.matchAll(/'(\{"headline".*?\})'/g)]
+    .map((m) => m[1])
+    .map((raw) => JSON.parse(raw))
+    .filter((digest) => typeof digest.what_was_confirmed === 'string')
+  assert.ok(backgrounds.length >= 2, 'expected at least two seeded confirmation backgrounds')
+  for (const background of backgrounds) {
+    assert.equal(typeof background.headline, 'string')
+    assert.equal(typeof background.what_was_confirmed, 'string')
+    assert.equal(typeof background.background, 'string')
+    assert.ok(Array.isArray(background.key_points))
   }
 })
 

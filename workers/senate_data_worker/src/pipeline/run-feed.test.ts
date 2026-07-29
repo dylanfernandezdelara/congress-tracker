@@ -77,6 +77,16 @@ vi.mock("./refresh-bill-text-changes", () => ({
   refreshBillTextChanges: (...args: unknown[]) => mockRefreshBillTextChanges(...args),
 }));
 
+vi.mock("./refresh-confirmations", () => ({
+  persistConfirmationVotes: vi.fn(async (_db: D1Database, votes: unknown[]) => votes.length),
+  refreshConfirmationEnrichment: vi.fn(async () => ({
+    nominationsFetched: 0,
+    backgroundsRewritten: 0,
+    skipped: 0,
+    warnings: [] as string[],
+  })),
+}));
+
 import { runFeedPipeline } from "./run-feed";
 
 function createEnv(): Env {
@@ -119,7 +129,7 @@ describe("runFeedPipeline digest retry", () => {
     mockSelectExistingVoteKeys.mockResolvedValue(new Set());
     mockIngestPassageVotesByChamber.mockResolvedValue({
       house: { votes: [], skipped: 0 },
-      senate: { votes: [], skipped: 0 },
+      senate: { votes: [], skipped: 0, confirmationVotes: [] },
       chamberWarnings: [],
     });
     mockSelectRecentVotedBills.mockResolvedValue([billRow]);

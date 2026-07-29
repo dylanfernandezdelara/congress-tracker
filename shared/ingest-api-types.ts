@@ -17,6 +17,10 @@ export interface FeedPipelineRunRecord {
   textChangesRefreshed?: number;
   textChangesWithAddedProvisions?: number;
   text_changes_warnings?: string[];
+  confirmationVotesUpserted?: number;
+  confirmationNominationsFetched?: number;
+  confirmationBackgroundsRewritten?: number;
+  confirmation_warnings?: string[];
 }
 
 export interface FeedPipelineFailureRecord {

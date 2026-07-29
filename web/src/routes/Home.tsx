@@ -2,14 +2,19 @@ import { useCallback, useState } from 'react'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 
-import { fetchNotableVotes, fetchRecentLaws } from '../api/client'
-import type { NotableVotesResponse, RecentLawsResponse } from '../api/types'
+import { fetchNotableVotes, fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
+import type {
+  NotableVotesResponse,
+  RecentConfirmationsResponse,
+  RecentLawsResponse,
+} from '../api/types'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { NotableVotesSection } from '../components/NotableVotesSection'
+import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
 import { RecentLawsSection } from '../components/RecentLawsSection'
 import { RightRail } from '../components/RightRail'
 import { useAsyncData } from '../hooks/useAsyncData'
@@ -94,12 +99,20 @@ export default function Home() {
     mapError: () => "Couldn't load new laws.",
   })
 
+  const recentConfirmations = useAsyncData<RecentConfirmationsResponse>({
+    deps: [railRetryKey],
+    enabled: feedSettled,
+    load: () => fetchRecentConfirmations(5),
+    mapError: () => "Couldn't load confirmations.",
+  })
+
   const showFeed = items.length > 0
   const showSkeleton = isInitialLoading && items.length === 0
   const listRefreshing = isInitialLoading && items.length > 0
   const inFlight = isInitialLoading || isLoadingMore
   const notableLoading = !feedSettled || notableVotes.isLoading
   const recentLawsLoading = !feedSettled || recentLaws.isLoading
+  const recentConfirmationsLoading = !feedSettled || recentConfirmations.isLoading
 
   const federalControl = (
     <FederalControlCompact
@@ -181,6 +194,13 @@ export default function Home() {
             </button>
           </div>
         ) : null}
+
+        <RecentConfirmationsSection
+          confirmations={recentConfirmations.data?.confirmations ?? null}
+          loading={recentConfirmationsLoading}
+          error={recentConfirmations.error}
+          onRetry={handleReloadFeed}
+        />
 
         <RecentLawsSection
           laws={recentLaws.data?.laws ?? null}

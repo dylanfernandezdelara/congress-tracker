@@ -21,6 +21,10 @@ import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
+import {
+  persistConfirmationVotes,
+  refreshConfirmationEnrichment,
+} from "./refresh-confirmations";
 import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
 import { resolveOpenRouterModel } from "../synthesis/model";
@@ -40,6 +44,10 @@ export interface RunFeedResult {
   textChangesRefreshed: number;
   textChangesWithAddedProvisions: number;
   textChangesWarnings: string[];
+  confirmationVotesUpserted: number;
+  confirmationNominationsFetched: number;
+  confirmationBackgroundsRewritten: number;
+  confirmationWarnings: string[];
 }
 
 export async function runFeedPipeline(
@@ -88,6 +96,25 @@ export async function runFeedPipeline(
       ...(senateResult.nonPassageStubs ?? []),
     ]) {
       await upsertNonPassageVoteStub(env.DB, stub);
+    }
+
+    const confirmationVotesUpserted = await persistConfirmationVotes(
+      env.DB,
+      senateResult.confirmationVotes
+    );
+    const confirmationEnrichment = await refreshConfirmationEnrichment(
+      env,
+      lookback,
+      trigger
+    );
+    if (confirmationEnrichment.warnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_confirmation_enrichment",
+          trigger,
+          warnings: confirmationEnrichment.warnings,
+        })
+      );
     }
 
     const bills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
@@ -219,6 +246,10 @@ export async function runFeedPipeline(
       textChangesRefreshed: textChanges.refreshed,
       textChangesWithAddedProvisions: textChanges.withAddedProvisions,
       textChangesWarnings: textChanges.warnings,
+      confirmationVotesUpserted,
+      confirmationNominationsFetched: confirmationEnrichment.nominationsFetched,
+      confirmationBackgroundsRewritten: confirmationEnrichment.backgroundsRewritten,
+      confirmationWarnings: confirmationEnrichment.warnings,
     };
 
     try {
@@ -238,6 +269,12 @@ export async function runFeedPipeline(
         textChangesWithAddedProvisions: result.textChangesWithAddedProvisions,
         ...(textChanges.warnings.length > 0
           ? { text_changes_warnings: textChanges.warnings }
+          : {}),
+        confirmationVotesUpserted: result.confirmationVotesUpserted,
+        confirmationNominationsFetched: result.confirmationNominationsFetched,
+        confirmationBackgroundsRewritten: result.confirmationBackgroundsRewritten,
+        ...(confirmationEnrichment.warnings.length > 0
+          ? { confirmation_warnings: confirmationEnrichment.warnings }
           : {}),
       });
     } catch (err: unknown) {

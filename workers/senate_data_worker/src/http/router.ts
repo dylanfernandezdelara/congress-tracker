@@ -35,6 +35,7 @@ import { buildIngestMonitorPayload } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
 import { buildPulseStats } from "../storage/pulse-stats";
+import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
 import { buildNotableVotes } from "../analytics/notable-votes";
 import { buildSessionStats } from "../storage/session-stats";
@@ -45,6 +46,7 @@ import type {
   NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
+  RecentConfirmationsResponse,
   RecentLawsResponse,
   SessionStatsResponse,
   VoteDefectorsResponse,
@@ -485,6 +487,18 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       json,
       async (): Promise<RecentLawsResponse> => buildRecentLaws(env, congress, session, limit, asOf),
       "recent laws unavailable"
+    );
+  },
+  "/stats/recent-confirmations.json": ({ env, url, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
+    const limit = parseStatsLimit(url, 5, 10);
+    return handleStatsJson(
+      json,
+      async (): Promise<RecentConfirmationsResponse> =>
+        buildRecentConfirmations(env, congress, session, limit, asOf),
+      "recent confirmations unavailable"
     );
   },
 };

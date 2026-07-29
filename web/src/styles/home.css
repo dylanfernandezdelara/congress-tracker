@@ -196,11 +196,55 @@
     gap: 0.75rem;
   }
 
-  .recent-laws {
+  .recent-laws,
+  .recent-confirmations {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     margin: 0 0 1.5rem;
+  }
+
+  .recent-confirmations-role {
+    margin: 0.35rem 0 0;
+    font-size: 12px;
+    line-height: 1.35;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .recent-confirmations-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .recent-confirmations-detail-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .recent-confirmations-detail-label {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: hsl(var(--twc-faint));
+  }
+
+  .recent-confirmations-detail-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .recent-confirmations-detail-points {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 13px;
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
   }
 
   .recent-laws-detail-fallback {
@@ -277,6 +321,7 @@
   .federal-compact-title,
   .notable-compact-title,
   .recent-laws-title,
+  .recent-confirmations-title,
   .sidebar-section-title {
     margin: 0;
     font-size: 14px;
