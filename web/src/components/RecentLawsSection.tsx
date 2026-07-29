@@ -97,11 +97,12 @@ function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) 
           onClick={() => onToggle(key)}
         >
           <div className="recent-laws-toggle-main">
-            <p className="recent-laws-headline">
-              <span className="recent-laws-bill-id">{billId}</span>
-              <span className="recent-laws-headline-sep"> — </span>
-              <span className="recent-laws-headline-text">{headline}</span>
-            </p>
+            <div className="recent-laws-headline-block">
+              {headline !== billId ? (
+                <p className="recent-laws-bill-id">{billId}</p>
+              ) : null}
+              <p className="recent-laws-headline">{headline}</p>
+            </div>
             <ExpandChevron />
           </div>
           <p className="recent-laws-meta">{metaParts.join(' · ')}</p>

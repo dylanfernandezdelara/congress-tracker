@@ -251,19 +251,30 @@
     gap: 0.5rem;
   }
 
-  .recent-laws-headline {
-    margin: 0;
+  .recent-laws-headline-block {
+    display: flex;
     flex: 1;
     min-width: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .recent-laws-bill-id {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+    color: hsl(var(--twc-faint));
+  }
+
+  .recent-laws-headline {
+    margin: 0;
     font-size: 13px;
     font-weight: 500;
     line-height: 1.35;
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
-  }
-
-  .recent-laws-bill-id {
-    font-variant-numeric: tabular-nums;
   }
 
   .recent-laws-meta {

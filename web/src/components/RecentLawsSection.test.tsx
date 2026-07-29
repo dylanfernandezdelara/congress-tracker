@@ -121,11 +121,15 @@ describe('RecentLawsSection', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'New laws' })).toBeInTheDocument()
-    expect(screen.getByText('H.R. 1')).toBeInTheDocument()
-    expect(screen.getByText('House passes a broad energy permitting package')).toBeInTheDocument()
+    const firstBillId = screen.getByText('H.R. 1')
+    const firstHeadline = screen.getByText('House passes a broad energy permitting package')
+    expect(firstBillId).toHaveClass('recent-laws-bill-id')
+    expect(firstHeadline).toHaveClass('recent-laws-headline')
+    expect(firstBillId.compareDocumentPosition(firstHeadline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText(/H\.R\. 1\s*—/)).not.toBeInTheDocument()
     expect(screen.getByText(/Signed into law · Public Law 119-1 · Jul 15/)).toBeInTheDocument()
-    expect(screen.getByText('S. 47')).toBeInTheDocument()
-    expect(screen.getByText('Public Lands Protection Act')).toBeInTheDocument()
+    expect(screen.getByText('S. 47')).toHaveClass('recent-laws-bill-id')
+    expect(screen.getByText('Public Lands Protection Act')).toHaveClass('recent-laws-headline')
     expect(screen.getByText(/Became law — unsigned · Public Law 119-2 · Jul 10/)).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Expand details for H.R. 1' }),
