@@ -257,7 +257,14 @@
         flex: none;
       }
 
-      /* —— A: Current (lumped card) —— */
+      .head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        align-items: flex-start;
+      }
+
+      /* A: Current card */
       .fmt-current .list {
         border: 1px solid var(--border);
         border-radius: 16px;
@@ -269,59 +276,36 @@
         border-top: 1px solid var(--border);
       }
 
-      .fmt-current .head {
-        display: flex;
-        justify-content: space-between;
-        gap: 0.75rem;
-        align-items: flex-start;
-      }
-
-      /* —— B: Open stream —— */
-      .fmt-open .list {
+      /* Shared open-list chrome (B / C / D) */
+      .fmt-open .list,
+      .fmt-daterail .list,
+      .fmt-compact .list {
         border: 0;
         background: transparent;
       }
 
-      .fmt-open .row {
+      .fmt-open .row,
+      .fmt-daterail .row,
+      .fmt-compact .row {
         border-bottom: 1px solid var(--border);
       }
 
-      .fmt-open .row:first-child {
+      .fmt-open .row:first-child,
+      .fmt-daterail .row:first-child,
+      .fmt-compact .row:first-child {
         border-top: 1px solid var(--border);
       }
 
+      /* B: Open stream */
       .fmt-open .row-btn {
         padding: 0.9rem 0.15rem;
-      }
-
-      .fmt-open .row-btn:hover {
-        background: transparent;
       }
 
       .fmt-open .row:hover {
         background: var(--row-hover);
       }
 
-      .fmt-open .head {
-        display: flex;
-        justify-content: space-between;
-        gap: 0.75rem;
-      }
-
-      /* —— C: Date rail —— */
-      .fmt-daterail .list {
-        border: 0;
-        background: transparent;
-      }
-
-      .fmt-daterail .row {
-        border-bottom: 1px solid var(--border);
-      }
-
-      .fmt-daterail .row:first-child {
-        border-top: 1px solid var(--border);
-      }
-
+      /* C: Date rail */
       .fmt-daterail .row-btn {
         display: grid;
         grid-template-columns: 4.5rem minmax(0, 1fr) 1rem;
@@ -343,20 +327,7 @@
         margin-bottom: 0.15rem;
       }
 
-      /* —— D: Compact scanner —— */
-      .fmt-compact .list {
-        border: 0;
-        background: transparent;
-      }
-
-      .fmt-compact .row {
-        border-bottom: 1px solid var(--border);
-      }
-
-      .fmt-compact .row:first-child {
-        border-top: 1px solid var(--border);
-      }
-
+      /* D: Compact scanner */
       .fmt-compact .row-btn {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -387,7 +358,7 @@
         display: none;
       }
 
-      /* —— E: Soft bands —— */
+      /* E: Soft bands */
       .fmt-bands .list {
         border: 0;
         background: transparent;
@@ -433,18 +404,7 @@
         background: rgb(255 255 255 / 0.06);
       }
 
-      .fmt-bands .head {
-        display: flex;
-        justify-content: space-between;
-        gap: 0.75rem;
-      }
-
-      .panel {
-        display: none;
-      }
-
-      .panel.is-active {
-        display: block;
+      .feed-panel {
         animation: enter 0.28s var(--ease);
       }
 
@@ -460,7 +420,7 @@
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .panel.is-active {
+        .feed-panel {
           animation: none;
         }
       }
@@ -542,59 +502,9 @@
 
         <main class="feed-column">
           <p class="section-label">Timeline</p>
-
-          <section
-            class="panel is-active fmt-current"
-            data-panel="current"
-            aria-label="Current card format"
-          >
-            <p class="format-note">
-              <strong>Current.</strong> One 16px rounded card wraps the whole list. On desktop
-              between two rails this reads as a floating slab — the clunky “semi-card” feel.
-            </p>
-            <ul class="list" id="list-current"></ul>
-          </section>
-
-          <section class="panel fmt-open" data-panel="open" aria-label="Open stream format">
-            <p class="format-note">
-              <strong>Open stream.</strong> Drop the outer card entirely. Rows sit on the page
-              background with full-width hairline dividers. Closest fix to the lumpiness without
-              changing information density.
-            </p>
-            <ul class="list" id="list-open"></ul>
-          </section>
-
-          <section
-            class="panel fmt-daterail"
-            data-panel="daterail"
-            aria-label="Date rail format"
-          >
-            <p class="format-note">
-              <strong>Date rail.</strong> Still open (no card), but dates move into a left gutter.
-              Scannable like a wire/AP timeline; topic + meta get more horizontal room.
-            </p>
-            <ul class="list" id="list-daterail"></ul>
-          </section>
-
-          <section
-            class="panel fmt-compact"
-            data-panel="compact"
-            aria-label="Compact scanner format"
-          >
-            <p class="format-note">
-              <strong>Compact scanner.</strong> Two-line rows (headline + meta only). No teaser
-              until expand. Highest throughput; best if the feed feels too tall/chatty on desktop.
-            </p>
-            <ul class="list" id="list-compact"></ul>
-          </section>
-
-          <section class="panel fmt-bands" data-panel="bands" aria-label="Soft bands format">
-            <p class="format-note">
-              <strong>Soft bands.</strong> No outer card; light alternating row wash + inset
-              hairlines. Slightly more “list of moments” than “one panel.” Keep if you want a
-              little surface without the big rounded box.
-            </p>
-            <ul class="list" id="list-bands"></ul>
+          <section class="feed-panel fmt-current" id="feedPanel" aria-label="Feed format preview">
+            <p class="format-note" id="formatNote"></p>
+            <ul class="list" id="feedList"></ul>
           </section>
         </main>
 
@@ -671,67 +581,95 @@
         },
       ];
 
+      const NOTES = {
+        current:
+          "<strong>Current.</strong> One 16px rounded card wraps the whole list. On desktop between two rails this reads as a floating slab — the clunky “semi-card” feel.",
+        open: "<strong>Open stream.</strong> Drop the outer card entirely. Rows sit on the page background with full-width hairline dividers. Closest fix to the lumpiness without changing information density.",
+        daterail:
+          "<strong>Date rail.</strong> Still open (no card), but dates move into a left gutter. Scannable like a wire/AP timeline; topic + meta get more horizontal room.",
+        compact:
+          "<strong>Compact scanner.</strong> Two-line rows (headline + meta only). No teaser until expand. Highest throughput; best if the feed feels too tall/chatty on desktop.",
+        bands:
+          "<strong>Soft bands.</strong> No outer card; light alternating row wash + inset hairlines. Slightly more “list of moments” than “one panel.” Keep if you want a little surface without the big rounded box.",
+      };
+
+      const CHEV =
+        '<svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
       function rowHtml(item, variant) {
-        const outcome = `<span class="${item.tone}">${item.outcome}</span>`;
-        const meta = item.meta.replace(item.outcome, outcome);
-        const chev = `<svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const topic = escapeHtml(item.topic);
+        const date = escapeHtml(item.date);
+        const teaser = escapeHtml(item.teaser);
+        const outcome = `<span class="${escapeHtml(item.tone)}">${escapeHtml(item.outcome)}</span>`;
+        const meta = escapeHtml(item.meta).replace(escapeHtml(item.outcome), outcome);
 
         if (variant === "daterail") {
           return `<li class="row"><button type="button" class="row-btn">
-            <time class="date">${item.date}</time>
+            <time class="date">${date}</time>
             <div>
-              <h3 class="topic">${item.topic}</h3>
+              <h3 class="topic">${topic}</h3>
               <p class="meta">${meta}</p>
-              <p class="teaser">${item.teaser}</p>
+              <p class="teaser">${teaser}</p>
             </div>
-            ${chev}
+            ${CHEV}
           </button></li>`;
         }
 
         if (variant === "compact") {
           return `<li class="row"><button type="button" class="row-btn">
-            <h3 class="topic">${item.topic}</h3>
-            <time class="date">${item.date}</time>
+            <h3 class="topic">${topic}</h3>
+            <time class="date">${date}</time>
             <p class="meta">${meta}</p>
           </button></li>`;
         }
 
         return `<li class="row"><button type="button" class="row-btn">
           <div class="head">
-            <h3 class="topic">${item.topic}</h3>
+            <h3 class="topic">${topic}</h3>
             <span style="display:inline-flex;align-items:center;gap:0.35rem">
-              <time class="date">${item.date}</time>
-              ${chev}
+              <time class="date">${date}</time>
+              ${CHEV}
             </span>
           </div>
           <p class="meta">${meta}</p>
-          <p class="teaser">${item.teaser}</p>
+          <p class="teaser">${teaser}</p>
         </button></li>`;
       }
 
-      for (const id of ["current", "open", "daterail", "compact", "bands"]) {
-        const el = document.getElementById(`list-${id}`);
-        el.innerHTML = ITEMS.map((item) => rowHtml(item, id)).join("");
+      const panel = document.getElementById("feedPanel");
+      const noteEl = document.getElementById("formatNote");
+      const listEl = document.getElementById("feedList");
+      const tabs = [...document.querySelectorAll(".tab")];
+
+      function setFormat(format) {
+        panel.className = `feed-panel fmt-${format}`;
+        noteEl.innerHTML = NOTES[format] ?? "";
+        listEl.innerHTML = ITEMS.map((item) => rowHtml(item, format)).join("");
+        tabs.forEach((tab) => {
+          tab.setAttribute("aria-selected", String(tab.dataset.format === format));
+        });
       }
 
-      const tabs = [...document.querySelectorAll(".tab")];
-      const panels = [...document.querySelectorAll("[data-panel]")];
-
       tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-          const format = tab.dataset.format;
-          tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-          panels.forEach((p) => p.classList.toggle("is-active", p.dataset.panel === format));
-        });
+        tab.addEventListener("click", () => setFormat(tab.dataset.format));
       });
 
-      const themeToggle = document.getElementById("themeToggle");
-      themeToggle.addEventListener("click", () => {
+      document.getElementById("themeToggle").addEventListener("click", (event) => {
         const root = document.documentElement;
         const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
         root.setAttribute("data-theme", next);
-        themeToggle.textContent = next === "dark" ? "Light" : "Dark";
+        event.currentTarget.textContent = next === "dark" ? "Light" : "Dark";
       });
+
+      setFormat("current");
     </script>
   </body>
 </html>
