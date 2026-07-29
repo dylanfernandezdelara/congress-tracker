@@ -1,10 +1,11 @@
 import type { ConfirmationBackgroundContent } from "../../../../shared/confirmations-api-types";
 import type { ConfirmationNominee } from "../../../../shared/confirmations-api-types";
-import { ensureSchema } from "./schema";
+import { isConfirmedResult } from "../sources/confirmation";
 import {
   nominationCitation,
   type NominationRef,
 } from "../sources/nomination-ref";
+import { ensureSchema } from "./schema";
 
 export type { ConfirmationBackgroundContent, ConfirmationNominee };
 
@@ -198,6 +199,7 @@ export async function selectNominationsNeedingEnrichment(
   const seen = new Set<string>();
   const candidates: NominationEnrichmentCandidate[] = [];
   for (const row of results ?? []) {
+    if (!isConfirmedResult(row.result)) continue;
     const key = `${row.congress}:${row.nomination_number}:${row.part_number}`;
     if (seen.has(key)) continue;
     seen.add(key);

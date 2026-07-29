@@ -13,7 +13,6 @@ import {
 } from "../d1/nominations";
 import { upsertConfirmationVote } from "../d1/confirmation-votes";
 import type { ConfirmationVote } from "../types";
-import { isConfirmedResult } from "../sources/confirmation";
 import { fetchNominationBundle } from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import { resolveOpenRouterModel } from "../synthesis/model";
@@ -57,16 +56,15 @@ export async function refreshConfirmationEnrichment(
     lookbackDate,
     CONFIRMATION_NOMINATION_FETCHES_PER_RUN
   );
-  const confirmed = candidates.filter((c) => isConfirmedResult(c.result));
 
-  if (confirmed.length === 0) {
+  if (candidates.length === 0) {
     return { nominationsFetched, backgroundsRewritten, skipped, warnings };
   }
 
   const model = await resolveOpenRouterModel(env);
 
   // Phase 1: Congress.gov metadata for nominations missing raw text.
-  for (const candidate of confirmed) {
+  for (const candidate of candidates) {
     if (!candidate.needsRaw) continue;
     if (nominationsFetched >= CONFIRMATION_NOMINATION_FETCHES_PER_RUN) break;
 
@@ -102,7 +100,7 @@ export async function refreshConfirmationEnrichment(
   }
 
   // Phase 2: OpenRouter rewrite for nominations with raw text but no background.
-  for (const candidate of confirmed) {
+  for (const candidate of candidates) {
     if (!candidate.needsBackground && !candidate.needsRaw) continue;
     if (backgroundsRewritten >= CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES) break;
 
