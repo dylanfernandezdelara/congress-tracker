@@ -205,7 +205,9 @@ export async function selectNominationsNeedingEnrichment(
     seen.add(key);
     // null = never fetched; empty string = fetched but no usable text.
     const needsRaw = row.raw_background_text === null;
-    const needsBackground = parseStoredBackground(row.background_json) === null;
+    const hasUsableRaw = Boolean(row.raw_background_text?.trim());
+    const needsBackground =
+      hasUsableRaw && parseStoredBackground(row.background_json) === null;
     if (!needsRaw && !needsBackground) continue;
     candidates.push({
       ref: {
