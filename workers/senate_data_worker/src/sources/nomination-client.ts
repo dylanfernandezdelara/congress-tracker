@@ -1,3 +1,4 @@
+import { congressOrdinal } from "../../../../shared/bill-id";
 import type { ConfirmationNominee } from "../../../../shared/confirmations-api-types";
 import type { Env } from "../config";
 import {
@@ -153,6 +154,6 @@ export async function fetchNominationBundle(
 }
 
 export function congressGovNominationUrl(ref: NominationRef): string {
-  const numberPath = nominationApiNumber(ref);
-  return `https://www.congress.gov/nomination/${ref.congress}/PN${numberPath}`;
+  const base = `https://www.congress.gov/nomination/${congressOrdinal(ref.congress)}-congress/${ref.number}`;
+  return ref.partNumber > 0 ? `${base}/${ref.partNumber}` : base;
 }

@@ -203,7 +203,8 @@ export async function selectNominationsNeedingEnrichment(
     const key = `${row.congress}:${row.nomination_number}:${row.part_number}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const needsRaw = !row.raw_background_text?.trim();
+    // null = never fetched; empty string = fetched but no usable text.
+    const needsRaw = row.raw_background_text === null;
     const needsBackground = parseStoredBackground(row.background_json) === null;
     if (!needsRaw && !needsBackground) continue;
     candidates.push({

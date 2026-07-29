@@ -310,7 +310,7 @@ describe("HTTP API", () => {
           what_was_confirmed: "The Senate confirmed the nominee.",
           background: "A short background for local tests.",
           key_points: [],
-          congress_gov_url: `https://www.congress.gov/nomination/${congress}/PN${100 + i}`,
+          congress_gov_url: `https://www.congress.gov/nomination/${congress}th-congress/${100 + i}`,
         })),
         as_of: asOf ?? "2026-07-28T00:00:00.000Z",
       })

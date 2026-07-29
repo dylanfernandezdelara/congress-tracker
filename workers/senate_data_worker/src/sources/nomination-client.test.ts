@@ -58,10 +58,10 @@ describe("buildRawBackgroundText", () => {
 describe("congressGovNominationUrl", () => {
   it("builds partitioned and plain URLs", () => {
     expect(congressGovNominationUrl({ congress: 119, number: 100, partNumber: 0 })).toBe(
-      "https://www.congress.gov/nomination/119/PN100"
+      "https://www.congress.gov/nomination/119th-congress/100"
     );
     expect(congressGovNominationUrl({ congress: 119, number: 851, partNumber: 4 })).toBe(
-      "https://www.congress.gov/nomination/119/PN851-4"
+      "https://www.congress.gov/nomination/119th-congress/851/4"
     );
   });
 });

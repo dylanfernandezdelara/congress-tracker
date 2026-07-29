@@ -47,7 +47,7 @@ describe("buildRecentConfirmations", () => {
       background: "Jane Doe of California was nominated to lead the Department of Energy.",
       yeas: 58,
       nays: 40,
-      congress_gov_url: "https://www.congress.gov/nomination/119/PN100",
+      congress_gov_url: "https://www.congress.gov/nomination/119th-congress/100",
     });
   });
 });

@@ -50,6 +50,7 @@ export async function refreshConfirmationEnrichment(
   let nominationsFetched = 0;
   let backgroundsRewritten = 0;
   let skipped = 0;
+  let model: string | null = null;
 
   const candidates = await selectNominationsNeedingEnrichment(
     env.DB,
@@ -57,88 +58,83 @@ export async function refreshConfirmationEnrichment(
     CONFIRMATION_NOMINATION_FETCHES_PER_RUN
   );
 
-  if (candidates.length === 0) {
-    return { nominationsFetched, backgroundsRewritten, skipped, warnings };
-  }
-
-  const model = await resolveOpenRouterModel(env);
-
-  // Phase 1: Congress.gov metadata for nominations missing raw text.
   for (const candidate of candidates) {
-    if (!candidate.needsRaw) continue;
-    if (nominationsFetched >= CONFIRMATION_NOMINATION_FETCHES_PER_RUN) break;
-
     try {
-      const bundle = await fetchNominationBundle(env, candidate.ref);
-      nominationsFetched += 1;
+      if (candidate.needsRaw && nominationsFetched < CONFIRMATION_NOMINATION_FETCHES_PER_RUN) {
+        const bundle = await fetchNominationBundle(env, candidate.ref);
+        nominationsFetched += 1;
+        const existing = await getNomination(env.DB, candidate.ref);
+        // Empty string marks "fetched, no content" so we do not re-fetch forever.
+        await upsertNominationMetadata(env.DB, {
+          ref: candidate.ref,
+          description: bundle.description,
+          organization: bundle.organization,
+          positionTitle: bundle.positionTitle,
+          nominees: bundle.nominees,
+          receivedDate: bundle.receivedDate,
+          rawBackgroundText: bundle.rawBackgroundText ?? "",
+          backgroundJson: existing?.background_json ?? null,
+        });
+      }
+
+      if (backgroundsRewritten >= CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES) {
+        continue;
+      }
+
       const existing = await getNomination(env.DB, candidate.ref);
+      if (!existing?.raw_background_text?.trim()) {
+        skipped += 1;
+        continue;
+      }
+      if (parseStoredBackground(existing.background_json) !== null) {
+        continue;
+      }
+
+      if (model === null) {
+        model = await resolveOpenRouterModel(env);
+      }
+
+      const background = await rewriteConfirmationBackground(
+        env,
+        {
+          citation: nominationCitation(candidate.ref),
+          description: existing.description,
+          positionTitle: existing.position_title,
+          organization: existing.organization,
+          rawBackground: existing.raw_background_text,
+        },
+        model
+      );
+
       await upsertNominationMetadata(env.DB, {
         ref: candidate.ref,
-        description: bundle.description,
-        organization: bundle.organization,
-        positionTitle: bundle.positionTitle,
-        nominees: bundle.nominees,
-        receivedDate: bundle.receivedDate,
-        rawBackgroundText: bundle.rawBackgroundText,
-        backgroundJson: existing?.background_json ?? null,
+        description: existing.description,
+        organization: existing.organization,
+        positionTitle: existing.position_title,
+        nominees: parseNomineesJson(existing.nominees_json),
+        receivedDate: existing.received_date,
+        rawBackgroundText: existing.raw_background_text,
+        backgroundJson: background ? JSON.stringify(background) : existing.background_json,
       });
+
+      if (background) {
+        backgroundsRewritten += 1;
+      } else {
+        skipped += 1;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       warnings.push(
-        `Nomination ${nominationCitation(candidate.ref)} fetch failed: ${message}`
+        `Nomination ${nominationCitation(candidate.ref)} enrichment failed: ${message}`
       );
       console.warn(
         JSON.stringify({
-          event: "confirmation_nomination_fetch_failed",
+          event: "confirmation_enrichment_failed",
           trigger,
           citation: nominationCitation(candidate.ref),
           error: message,
         })
       );
-      skipped += 1;
-    }
-  }
-
-  // Phase 2: OpenRouter rewrite for nominations with raw text but no background.
-  for (const candidate of candidates) {
-    if (!candidate.needsBackground && !candidate.needsRaw) continue;
-    if (backgroundsRewritten >= CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES) break;
-
-    const existing = await getNomination(env.DB, candidate.ref);
-    if (!existing?.raw_background_text?.trim()) {
-      skipped += 1;
-      continue;
-    }
-    if (parseStoredBackground(existing.background_json) !== null) {
-      continue;
-    }
-
-    const background = await rewriteConfirmationBackground(
-      env,
-      {
-        citation: nominationCitation(candidate.ref),
-        description: existing.description,
-        positionTitle: existing.position_title,
-        organization: existing.organization,
-        rawBackground: existing.raw_background_text,
-      },
-      model
-    );
-
-    await upsertNominationMetadata(env.DB, {
-      ref: candidate.ref,
-      description: existing.description,
-      organization: existing.organization,
-      positionTitle: existing.position_title,
-      nominees: parseNomineesJson(existing.nominees_json),
-      receivedDate: existing.received_date,
-      rawBackgroundText: existing.raw_background_text,
-      backgroundJson: background ? JSON.stringify(background) : existing.background_json,
-    });
-
-    if (background) {
-      backgroundsRewritten += 1;
-    } else {
       skipped += 1;
     }
   }

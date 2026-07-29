@@ -26,7 +26,7 @@ function sampleConfirmation(overrides: Partial<RecentConfirmationItem> = {}): Re
     what_was_confirmed: 'The Senate confirmed Jane Doe as Secretary of Energy.',
     background: 'Jane Doe of California was nominated to lead the Department of Energy.',
     key_points: ['Cabinet-level confirmation'],
-    congress_gov_url: 'https://www.congress.gov/nomination/119/PN100',
+    congress_gov_url: 'https://www.congress.gov/nomination/119th-congress/100',
     ...overrides,
   }
 }
@@ -63,7 +63,7 @@ describe('RecentConfirmationsSection', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Read on congress.gov/i })).toHaveAttribute(
       'href',
-      'https://www.congress.gov/nomination/119/PN100',
+      'https://www.congress.gov/nomination/119th-congress/100',
     )
   })
 })
