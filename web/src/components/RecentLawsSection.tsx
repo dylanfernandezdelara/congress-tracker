@@ -21,7 +21,9 @@ type RecentLawsSectionProps = {
 
 function recentLawOutcomeLabel(lawKind: BillLawKind | null): string {
   if (!lawKind) return TERMINAL_STATUS_PRESENTATION.became_law.pipelineLabel
-  return TERMINAL_STATUS_PRESENTATION[mapLawKind(lawKind)].pipelineLabel
+  const status = mapLawKind(lawKind)
+  if (status === 'became_law_unsigned') return 'Became law without signature'
+  return TERMINAL_STATUS_PRESENTATION[status].pipelineLabel
 }
 
 function formatPublicLawLabel(publicLaw: string): string {

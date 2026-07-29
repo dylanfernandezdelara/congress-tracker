@@ -130,7 +130,10 @@ describe('RecentLawsSection', () => {
     expect(screen.getByText(/Signed into law · Public Law 119-1 · Jul 15/)).toBeInTheDocument()
     expect(screen.getByText('S. 47')).toHaveClass('recent-laws-bill-id')
     expect(screen.getByText('Public Lands Protection Act')).toHaveClass('recent-laws-headline')
-    expect(screen.getByText(/Became law — unsigned · Public Law 119-2 · Jul 10/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Became law without signature · Public Law 119-2 · Jul 10/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/—/)).not.toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Expand details for H.R. 1' }),
     ).toHaveAttribute('aria-expanded', 'false')
