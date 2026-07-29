@@ -30,8 +30,6 @@ function recentLawOutcomeLabel(lawKind: BillLawKind | null): string {
       return 'Law without signature'
     case 'enacted_over_veto':
       return 'Enacted over veto'
-    case 'became_law':
-      return 'Became law'
     case 'vetoed':
       return 'Vetoed'
     case 'pocket_vetoed':
