@@ -8,6 +8,7 @@ import type {
   NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
+  RecentConfirmationsResponse,
   RecentLawsResponse,
   SessionStatsResponse,
   VoteDefectorsResponse,
@@ -73,6 +74,13 @@ export async function fetchNotableVotes(limit = 3): Promise<NotableVotesResponse
 export async function fetchRecentLaws(limit = 5): Promise<RecentLawsResponse> {
   const params = new URLSearchParams({ limit: String(limit) })
   return fetchJson<RecentLawsResponse>(`/stats/recent-laws.json?${params}`)
+}
+
+export async function fetchRecentConfirmations(
+  limit = 5,
+): Promise<RecentConfirmationsResponse> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  return fetchJson<RecentConfirmationsResponse>(`/stats/recent-confirmations.json?${params}`)
 }
 
 export async function fetchPulseStats(): Promise<PulseStatsResponse> {

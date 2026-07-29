@@ -52,3 +52,10 @@ export type {
   RecentLawItem,
   RecentLawsResponse,
 } from '@congress-tracker/shared/laws-api-types'
+
+export type {
+  ConfirmationBackgroundContent,
+  ConfirmationNominee,
+  RecentConfirmationItem,
+  RecentConfirmationsResponse,
+} from '@congress-tracker/shared/confirmations-api-types'

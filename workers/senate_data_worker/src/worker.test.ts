@@ -136,6 +136,10 @@ describe("worker", () => {
       textChangesRefreshed: 0,
       textChangesWithAddedProvisions: 0,
       textChangesWarnings: [],
+      confirmationVotesUpserted: 0,
+      confirmationNominationsFetched: 0,
+      confirmationBackgroundsRewritten: 0,
+      confirmationWarnings: [],
       memberVotes: {
         rollsProcessed: 1,
         rollsSkipped: 0,

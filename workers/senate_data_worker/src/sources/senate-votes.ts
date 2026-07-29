@@ -1,8 +1,15 @@
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
-import type { IngestVotesResult, NonPassageVoteStub, PassageVote } from "../types";
+import type {
+  ConfirmationVote,
+  IngestVotesResult,
+  NonPassageVoteStub,
+  PassageVote,
+} from "../types";
 import { voteKey } from "../vote-key";
 import { parseSenateIssue } from "./bill-ref";
+import { isConfirmationVote } from "./confirmation";
+import { parseSenateNominationIssue } from "./nomination-ref";
 import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
@@ -160,12 +167,14 @@ export function parseSenateVoteDate(
 export interface ParsedSenateVoteMenu {
   votes: PassageVote[];
   nonPassageStubs: NonPassageVoteStub[];
+  confirmationVotes: ConfirmationVote[];
 }
 
 /**
- * Parse the session vote menu into passage votes plus non-passage companion
- * rolls (cloture, amendments, motions). The menu already carries question,
- * result, and tally for every roll, so companion votes cost no extra request.
+ * Parse the session vote menu into passage votes, non-passage companion rolls
+ * (cloture, amendments, motions), and nomination confirmation rolls. The menu
+ * already carries question, result, and tally for every roll, so companion and
+ * confirmation votes cost no extra request.
  */
 export function parseSenateVoteMenuXml(
   xml: string,
@@ -176,6 +185,7 @@ export function parseSenateVoteMenuXml(
   const congressYear = getTag(xml, "congress_year") || String(now.getUTCFullYear());
   const votes: PassageVote[] = [];
   const nonPassageStubs: NonPassageVoteStub[] = [];
+  const confirmationVotes: ConfirmationVote[] = [];
   const blocks = xml.match(/<vote>[\s\S]*?<\/vote>/gi) ?? [];
 
   for (const block of blocks) {
@@ -183,6 +193,39 @@ export function parseSenateVoteMenuXml(
     const title = getTag(block, "title");
 
     const issue = getTag(block, "issue");
+    const nomination = parseSenateNominationIssue(issue, congress);
+    if (nomination) {
+      const voteNumber = Number.parseInt(getTag(block, "vote_number"), 10);
+      if (Number.isNaN(voteNumber)) continue;
+
+      const confirmationQuestion = (question.trim() || title).replace(/\s+/g, " ").trim();
+      if (!confirmationQuestion || !isConfirmationVote(confirmationQuestion)) {
+        continue;
+      }
+
+      const yeas = Number.parseInt(getTag(block, "yeas"), 10) || 0;
+      const nays = Number.parseInt(getTag(block, "nays"), 10) || 0;
+      const tallyBlock = block.match(/<vote_tally>[\s\S]*?<\/vote_tally>/i)?.[0] ?? block;
+      const yeasT = Number.parseInt(getTag(tallyBlock, "yeas"), 10) || yeas;
+      const naysT = Number.parseInt(getTag(tallyBlock, "nays"), 10) || nays;
+      const voteDate = parseSenateVoteDate(getTag(block, "vote_date"), congressYear, now);
+      const result = getTag(block, "result");
+
+      confirmationVotes.push({
+        chamber: "Senate",
+        congress,
+        session,
+        rollNumber: voteNumber,
+        nomination,
+        question: confirmationQuestion,
+        result,
+        yeas: yeasT,
+        nays: naysT,
+        voteDate,
+      });
+      continue;
+    }
+
     const bill = parseSenateIssue(issue, congress);
     if (!bill) continue;
 
@@ -235,7 +278,7 @@ export function parseSenateVoteMenuXml(
     });
   }
 
-  return { votes, nonPassageStubs };
+  return { votes, nonPassageStubs, confirmationVotes };
 }
 
 export async function ingestSenatePassageVotes(
@@ -266,10 +309,18 @@ export async function ingestSenatePassageVotes(
     nonPassageStubs.push(stub);
   }
 
+  const confirmationVotes: ConfirmationVote[] = [];
+  for (const vote of parsed.confirmationVotes) {
+    if (lookbackStart && vote.voteDate < lookbackStart) continue;
+    if (knownKeys.has(voteKey(vote))) continue;
+    confirmationVotes.push(vote);
+  }
+
   return {
     votes,
     skipped,
     warnings: warnings.length > 0 ? warnings : undefined,
     nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
+    confirmationVotes: confirmationVotes.length > 0 ? confirmationVotes : undefined,
   };
 }

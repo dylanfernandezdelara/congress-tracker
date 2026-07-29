@@ -93,7 +93,7 @@ describe("parseSenateVoteMenuXml", () => {
       new Date("2026-06-30T00:00:00Z")
     );
 
-    // The nomination roll (PN851-4) has no bill reference, so it is not a companion.
+    // Cloture on a nomination (PN851-4) is not a companion bill stub.
     expect(nonPassageStubs).toHaveLength(1);
     expect(nonPassageStubs[0]).toMatchObject({
       chamber: "Senate",
@@ -106,6 +106,29 @@ describe("parseSenateVoteMenuXml", () => {
       yeas: 60,
       nays: 39,
       voteDate: "2026-06-04",
+    });
+  });
+
+  it("returns On the Nomination PN rolls as confirmation votes and skips cloture on nominations", () => {
+    const { confirmationVotes } = parseSenateVoteMenuXml(
+      sample,
+      119,
+      2,
+      new Date("2026-06-30T00:00:00Z")
+    );
+
+    expect(confirmationVotes).toHaveLength(1);
+    expect(confirmationVotes[0]).toMatchObject({
+      chamber: "Senate",
+      congress: 119,
+      session: 2,
+      rollNumber: 165,
+      nomination: { congress: 119, number: 100, partNumber: 0 },
+      question: "On the Nomination",
+      result: "Confirmed",
+      yeas: 58,
+      nays: 40,
+      voteDate: "2026-06-05",
     });
   });
 

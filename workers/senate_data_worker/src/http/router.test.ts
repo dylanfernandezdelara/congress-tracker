@@ -48,6 +48,17 @@ vi.mock("../storage/recent-laws", async (importOriginal) => {
   };
 });
 
+const mockBuildRecentConfirmations = vi.fn();
+
+vi.mock("../storage/recent-confirmations", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../storage/recent-confirmations")>();
+  return {
+    ...actual,
+    buildRecentConfirmations: (...args: Parameters<typeof actual.buildRecentConfirmations>) =>
+      mockBuildRecentConfirmations(...args),
+  };
+});
+
 const mockWithPipelineLease = vi.fn(
   async <T>(_db: D1Database, fn: () => Promise<T>, _options?: unknown) => fn()
 );
@@ -269,6 +280,37 @@ describe("HTTP API", () => {
           latest_action_text: null,
           latest_passage_vote_date: null,
           item: null,
+        })),
+        as_of: asOf ?? "2026-07-28T00:00:00.000Z",
+      })
+    );
+    mockBuildRecentConfirmations.mockReset();
+    mockBuildRecentConfirmations.mockImplementation(
+      async (_env, congress: number, session: number, limit: number, asOf?: string) => ({
+        congress,
+        session,
+        confirmations: Array.from({ length: Math.min(limit, 2) }, (_, i) => ({
+          chamber: "Senate" as const,
+          congress,
+          session,
+          roll_number: 9000 + i,
+          citation: `PN${100 + i}`,
+          nomination_number: 100 + i,
+          part_number: 0,
+          nominee_names: [{ display_name: `Nominee ${i + 1}`, state: "CA" }],
+          position_title: "Secretary of Energy",
+          organization: "Department of Energy",
+          description: `Nominee ${i + 1} confirmation sample`,
+          question: "On the Nomination",
+          result: "Confirmed",
+          yeas: 58,
+          nays: 40,
+          vote_date: `2026-07-${String(14 - i).padStart(2, "0")}`,
+          headline: `Nominee ${i + 1} confirmed as Energy Secretary`,
+          what_was_confirmed: "The Senate confirmed the nominee.",
+          background: "A short background for local tests.",
+          key_points: [],
+          congress_gov_url: `https://www.congress.gov/nomination/${congress}/PN${100 + i}`,
         })),
         as_of: asOf ?? "2026-07-28T00:00:00.000Z",
       })
@@ -686,6 +728,56 @@ describe("HTTP API", () => {
     );
     expect(capped.status).toBe(200);
     expect(mockBuildRecentLaws).toHaveBeenLastCalledWith(
+      expect.anything(),
+      119,
+      2,
+      10,
+      expect.any(String)
+    );
+  });
+
+  it("returns recent confirmations envelope with default limit 5", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/recent-confirmations.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildRecentConfirmations).toHaveBeenCalledWith(
+      expect.anything(),
+      119,
+      2,
+      5,
+      expect.any(String)
+    );
+    const body = await response.json();
+    expect(body).toMatchObject({
+      congress: 119,
+      session: 2,
+      confirmations: expect.any(Array),
+      as_of: expect.any(String),
+    });
+  });
+
+  it("respects recent-confirmations limit and caps at 10", async () => {
+    const limited = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/recent-confirmations.json?limit=3"),
+      createMockEnv() as any
+    );
+    expect(limited.status).toBe(200);
+    expect(mockBuildRecentConfirmations).toHaveBeenLastCalledWith(
+      expect.anything(),
+      119,
+      2,
+      3,
+      expect.any(String)
+    );
+
+    const capped = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/recent-confirmations.json?limit=99"),
+      createMockEnv() as any
+    );
+    expect(capped.status).toBe(200);
+    expect(mockBuildRecentConfirmations).toHaveBeenLastCalledWith(
       expect.anything(),
       119,
       2,

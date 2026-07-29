@@ -141,6 +141,37 @@ CREATE TABLE IF NOT EXISTS bill_lifecycle (
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, bill_number)
 );
+CREATE TABLE IF NOT EXISTS nominations (
+  congress INTEGER NOT NULL,
+  nomination_number INTEGER NOT NULL,
+  part_number INTEGER NOT NULL DEFAULT 0,
+  citation TEXT NOT NULL,
+  description TEXT,
+  organization TEXT,
+  position_title TEXT,
+  nominees_json TEXT,
+  received_date TEXT,
+  raw_background_text TEXT,
+  background_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, nomination_number, part_number)
+);
+CREATE TABLE IF NOT EXISTS confirmation_votes (
+  chamber TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  roll_number INTEGER NOT NULL,
+  nomination_congress INTEGER NOT NULL,
+  nomination_number INTEGER NOT NULL,
+  part_number INTEGER NOT NULL DEFAULT 0,
+  question TEXT NOT NULL,
+  result TEXT NOT NULL,
+  yeas INTEGER NOT NULL,
+  nays INTEGER NOT NULL,
+  vote_date TEXT NOT NULL,
+  PRIMARY KEY (chamber, congress, session, roll_number)
+);
 
 INSERT OR REPLACE INTO votes
   (chamber, congress, session, roll_number, bill_congress, bill_type, bill_number, question, result, yeas, nays, vote_date, is_passage)
@@ -174,6 +205,38 @@ VALUES
    '${D_MID}', 'Became Public Law No: 119-2 without signature. (local sample)', '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, '${D_OLDER}', '${D_RECENT}', NULL, NULL, NULL, NULL, NULL,
    '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO nominations
+  (congress, nomination_number, part_number, citation, description, organization, position_title,
+   nominees_json, received_date, raw_background_text, background_json, created_at, updated_at)
+VALUES
+  (119, 100, 0, 'PN100',
+   'Jane Doe, of California, to be Secretary of Energy. (local sample)',
+   'Department of Energy', 'Secretary of Energy',
+   '[{"display_name":"Jane Doe","state":"CA"}]',
+   '${D_OLDER}',
+   'Jane Doe, of California, to be Secretary of Energy. (local sample)
+Position: Secretary of Energy (Department of Energy)
+Nominee(s): Jane Doe (CA)',
+   '{"headline":"Jane Doe confirmed as Energy Secretary (local sample)","what_was_confirmed":"The Senate confirmed Jane Doe as Secretary of Energy.","background":"Jane Doe of California was nominated to lead the Department of Energy.","key_points":["Cabinet-level confirmation","Local seed sample for offline development"]}',
+   '${D_RECENT}T00:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
+  (119, 101, 0, 'PN101',
+   'Alex Rivera, of Texas, to be an Assistant Secretary of State. (local sample)',
+   'Department of State', 'Assistant Secretary of State',
+   '[{"display_name":"Alex Rivera","state":"TX"}]',
+   '${D_MID}',
+   'Alex Rivera, of Texas, to be an Assistant Secretary of State. (local sample)
+Position: Assistant Secretary of State (Department of State)
+Nominee(s): Alex Rivera (TX)',
+   '{"headline":"Alex Rivera confirmed for State Department post (local sample)","what_was_confirmed":"The Senate confirmed Alex Rivera as an Assistant Secretary of State.","background":"Alex Rivera of Texas was nominated for a senior State Department role.","key_points":["Senate advise-and-consent confirmation","Local seed sample"]}',
+   '${D_MID}T00:00:00.000Z', '${D_MID}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO confirmation_votes
+  (chamber, congress, session, roll_number, nomination_congress, nomination_number, part_number,
+   question, result, yeas, nays, vote_date)
+VALUES
+  ('Senate', 119, 2, 9101, 119, 100, 0, 'On the Nomination', 'Confirmed', 58, 40, '${D_RECENT}'),
+  ('Senate', 119, 2, 9102, 119, 101, 0, 'On the Nomination', 'Confirmed', 62, 35, '${D_MID}');
 SQL
 
 generate_roster_sql() {

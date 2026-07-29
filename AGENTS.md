@@ -88,6 +88,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/session.json` — per-chamber passage vote aggregates
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
 - `GET /stats/recent-laws.json?limit=` — recently enacted bills (default 5, cap 10); each law embeds its full feed `item` (`FeedItem | null`) for expand-in-place detail
+- `GET /stats/recent-confirmations.json?limit=` — recent Senate nomination confirmations (default 5, cap 10); each item includes nominee, position/org, tally, and plain-English background when available
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
 - `POST /__pipeline/run/feed` (cron also runs feed + member-votes daily at 10:00 UTC)

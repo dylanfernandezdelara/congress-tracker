@@ -77,6 +77,22 @@ vi.mock("./refresh-bill-text-changes", () => ({
   refreshBillTextChanges: (...args: unknown[]) => mockRefreshBillTextChanges(...args),
 }));
 
+vi.mock("../d1/confirmation-votes", () => ({
+  selectExistingConfirmationVoteKeys: vi.fn(async () => new Set()),
+  upsertConfirmationVote: vi.fn(async () => undefined),
+  selectRecentConfirmationVotes: vi.fn(async () => []),
+}));
+
+vi.mock("./refresh-confirmations", () => ({
+  persistConfirmationVotes: vi.fn(async (_db: D1Database, votes: unknown[]) => votes.length),
+  refreshConfirmationEnrichment: vi.fn(async () => ({
+    nominationsFetched: 0,
+    backgroundsRewritten: 0,
+    skipped: 0,
+    warnings: [] as string[],
+  })),
+}));
+
 import { runFeedPipeline } from "./run-feed";
 
 function createEnv(): Env {

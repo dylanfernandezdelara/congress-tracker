@@ -28,6 +28,18 @@
       <title>Nomination</title>
     </vote>
     <vote>
+      <vote_number>00165</vote_number>
+      <vote_date>05-Jun</vote_date>
+      <issue>PN100</issue>
+      <question>On the Nomination</question>
+      <result>Confirmed</result>
+      <vote_tally>
+        <yeas>58</yeas>
+        <nays>40</nays>
+      </vote_tally>
+      <title>Nomination</title>
+    </vote>
+    <vote>
       <vote_number>00162</vote_number>
       <vote_date>04-Jun</vote_date>
       <issue>S. 2</issue>

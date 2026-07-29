@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -176,6 +176,39 @@ const SCHEMA_DDL = [
   `CREATE INDEX IF NOT EXISTS idx_member_session_stats_session ON member_session_stats (congress, session)`,
   `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_bioguide ON member_cross_votes (bioguide_id, congress, session, vote_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_member_cross_votes_roll ON member_cross_votes (chamber, congress, session, roll_number)`,
+  `CREATE TABLE IF NOT EXISTS nominations (
+  congress INTEGER NOT NULL,
+  nomination_number INTEGER NOT NULL,
+  part_number INTEGER NOT NULL DEFAULT 0,
+  citation TEXT NOT NULL,
+  description TEXT,
+  organization TEXT,
+  position_title TEXT,
+  nominees_json TEXT,
+  received_date TEXT,
+  raw_background_text TEXT,
+  background_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, nomination_number, part_number)
+)`,
+  `CREATE TABLE IF NOT EXISTS confirmation_votes (
+  chamber TEXT NOT NULL,
+  congress INTEGER NOT NULL,
+  session INTEGER NOT NULL,
+  roll_number INTEGER NOT NULL,
+  nomination_congress INTEGER NOT NULL,
+  nomination_number INTEGER NOT NULL,
+  part_number INTEGER NOT NULL DEFAULT 0,
+  question TEXT NOT NULL,
+  result TEXT NOT NULL,
+  yeas INTEGER NOT NULL,
+  nays INTEGER NOT NULL,
+  vote_date TEXT NOT NULL,
+  PRIMARY KEY (chamber, congress, session, roll_number)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_confirmation_votes_date ON confirmation_votes (vote_date DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_confirmation_votes_nomination ON confirmation_votes (nomination_congress, nomination_number, part_number)`,
 ];
 
 /**

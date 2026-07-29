@@ -1,3 +1,10 @@
+import type { BillDigestContent } from "../../../shared/digest-api-types";
+import type { BillLifecycle } from "../../../shared/lifecycle-api-types";
+import type { NominationRef } from "./sources/nomination-ref";
+
+export type { NominationRef };
+export type { BillDigestContent, BillLifecycle };
+
 export type Chamber = "House" | "Senate";
 
 export interface BillRef {
@@ -38,18 +45,28 @@ export interface NonPassageVoteStub {
   voteDate: string;
 }
 
+/** Senate advise-and-consent confirmation roll (presidential nomination). */
+export interface ConfirmationVote {
+  chamber: "Senate";
+  congress: number;
+  session: number;
+  rollNumber: number;
+  nomination: NominationRef;
+  question: string;
+  result: string;
+  yeas: number;
+  nays: number;
+  voteDate: string;
+}
+
 export interface IngestVotesResult {
   votes: PassageVote[];
   skipped: number;
   truncated?: boolean;
   warnings?: string[];
   nonPassageStubs?: NonPassageVoteStub[];
+  confirmationVotes?: ConfirmationVote[];
 }
-
-import type { BillDigestContent } from "../../../shared/digest-api-types";
-import type { BillLifecycle } from "../../../shared/lifecycle-api-types";
-
-export type { BillDigestContent, BillLifecycle };
 
 export type {
   FeedBill,
@@ -87,6 +104,13 @@ export type {
   RecentLawItem,
   RecentLawsResponse,
 } from "../../../shared/laws-api-types";
+
+export type {
+  ConfirmationBackgroundContent,
+  ConfirmationNominee,
+  RecentConfirmationItem,
+  RecentConfirmationsResponse,
+} from "../../../shared/confirmations-api-types";
 
 export interface MemberRecord {
   bioguideId: string;

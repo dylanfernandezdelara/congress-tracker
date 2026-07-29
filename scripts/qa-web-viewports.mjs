@@ -315,6 +315,37 @@ const MOCK_PORTFOLIOS = {
   as_of: '2026-06-14T00:00:00.000Z',
 }
 
+const MOCK_RECENT_CONFIRMATIONS = {
+  congress: 119,
+  session: 2,
+  as_of: '2026-06-14T00:00:00.000Z',
+  confirmations: [
+    {
+      chamber: 'Senate',
+      congress: 119,
+      session: 2,
+      roll_number: 165,
+      citation: 'PN100',
+      nomination_number: 100,
+      part_number: 0,
+      nominee_names: [{ display_name: 'Jane Doe', state: 'CA' }],
+      position_title: 'Secretary of Energy',
+      organization: 'Department of Energy',
+      description: 'Jane Doe, of California, to be Secretary of Energy.',
+      question: 'On the Nomination',
+      result: 'Confirmed',
+      yeas: 58,
+      nays: 40,
+      vote_date: '2026-06-12',
+      headline: 'Jane Doe confirmed as Energy Secretary',
+      what_was_confirmed: 'The Senate confirmed Jane Doe as Secretary of Energy.',
+      background: 'Jane Doe of California was nominated to lead the Department of Energy.',
+      key_points: ['Cabinet-level confirmation'],
+      congress_gov_url: 'https://www.congress.gov/nomination/119/PN100',
+    },
+  ],
+}
+
 const MOCK_RECENT_LAWS = {
   congress: 119,
   session: 2,
@@ -387,6 +418,14 @@ async function installApiMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_RECENT_LAWS),
+    })
+  })
+
+  await page.route('**/stats/recent-confirmations.json**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_RECENT_CONFIRMATIONS),
     })
   })
 
