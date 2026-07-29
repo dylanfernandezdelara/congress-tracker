@@ -100,7 +100,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
           href={sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="congress-link feed-row-cta"
+          className="congress-link"
         >
           Read on congress.gov ↗
         </a>

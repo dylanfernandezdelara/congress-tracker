@@ -714,23 +714,6 @@
     padding-top: 1rem;
   }
 
-  .feed-row-cta {
-    display: inline-flex;
-    align-items: center;
-    font-size: 13px;
-    font-weight: 400;
-    color: hsl(var(--twc-foreground));
-    text-decoration: none;
-    border-radius: 9999px;
-    border: 1px solid hsl(var(--twc-border));
-    padding: 0.375rem 0.875rem;
-  }
-
-  .feed-row-cta:hover {
-    border-color: hsl(var(--twc-border-hover));
-    background-color: hsl(var(--twc-row-hover));
-  }
-
   .feed-row-copy-link {
     margin: 0;
     padding: 0;
