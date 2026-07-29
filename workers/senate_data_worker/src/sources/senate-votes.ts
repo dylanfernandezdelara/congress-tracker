@@ -2,9 +2,9 @@ import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import type {
   ConfirmationVote,
-  IngestVotesResult,
   NonPassageVoteStub,
   PassageVote,
+  SenateIngestVotesResult,
 } from "../types";
 import { voteKey } from "../vote-key";
 import { parseSenateIssue } from "./bill-ref";
@@ -14,6 +14,44 @@ import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
 import { ensureSchema } from "../d1/schema";
+
+/** Shared fields every Senate menu `<vote>` block carries for stored rolls. */
+function parseMenuVoteFields(
+  block: string,
+  congressYear: string,
+  now: Date
+): {
+  voteNumber: number;
+  yeas: number;
+  nays: number;
+  voteDate: string;
+  result: string;
+  question: string;
+  title: string;
+} | null {
+  const voteNumber = Number.parseInt(getTag(block, "vote_number"), 10);
+  if (Number.isNaN(voteNumber)) return null;
+
+  const question = getTag(block, "question");
+  const title = getTag(block, "title");
+  const yeas = Number.parseInt(getTag(block, "yeas"), 10) || 0;
+  const nays = Number.parseInt(getTag(block, "nays"), 10) || 0;
+  const tallyBlock = block.match(/<vote_tally>[\s\S]*?<\/vote_tally>/i)?.[0] ?? block;
+  const yeasT = Number.parseInt(getTag(tallyBlock, "yeas"), 10) || yeas;
+  const naysT = Number.parseInt(getTag(tallyBlock, "nays"), 10) || nays;
+  const voteDate = parseSenateVoteDate(getTag(block, "vote_date"), congressYear, now);
+  const result = getTag(block, "result");
+
+  return {
+    voteNumber,
+    yeas: yeasT,
+    nays: naysT,
+    voteDate,
+    result,
+    question,
+    title,
+  };
+}
 
 const SENATE_VOTE_MENU_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -189,27 +227,23 @@ export function parseSenateVoteMenuXml(
   const blocks = xml.match(/<vote>[\s\S]*?<\/vote>/gi) ?? [];
 
   for (const block of blocks) {
-    const question = getTag(block, "question");
-    const title = getTag(block, "title");
+    // En-bloc nomination rolls nest many <matter> issues under one roll call.
+    // Current confirmation_votes PK is one row per roll, so ingesting the first
+    // <issue> would mis-attribute the shared tally. Skip until multi-nominee
+    // storage exists.
+    if (/<en_bloc[\s>]/i.test(block)) continue;
 
+    const fields = parseMenuVoteFields(block, congressYear, now);
+    if (!fields) continue;
+
+    const { voteNumber, yeas, nays, voteDate, result, question, title } = fields;
     const issue = getTag(block, "issue");
     const nomination = parseSenateNominationIssue(issue, congress);
     if (nomination) {
-      const voteNumber = Number.parseInt(getTag(block, "vote_number"), 10);
-      if (Number.isNaN(voteNumber)) continue;
-
       const confirmationQuestion = (question.trim() || title).replace(/\s+/g, " ").trim();
       if (!confirmationQuestion || !isConfirmationVote(confirmationQuestion)) {
         continue;
       }
-
-      const yeas = Number.parseInt(getTag(block, "yeas"), 10) || 0;
-      const nays = Number.parseInt(getTag(block, "nays"), 10) || 0;
-      const tallyBlock = block.match(/<vote_tally>[\s\S]*?<\/vote_tally>/i)?.[0] ?? block;
-      const yeasT = Number.parseInt(getTag(tallyBlock, "yeas"), 10) || yeas;
-      const naysT = Number.parseInt(getTag(tallyBlock, "nays"), 10) || nays;
-      const voteDate = parseSenateVoteDate(getTag(block, "vote_date"), congressYear, now);
-      const result = getTag(block, "result");
 
       confirmationVotes.push({
         chamber: "Senate",
@@ -219,8 +253,8 @@ export function parseSenateVoteMenuXml(
         nomination,
         question: confirmationQuestion,
         result,
-        yeas: yeasT,
-        nays: naysT,
+        yeas,
+        nays,
         voteDate,
       });
       continue;
@@ -228,17 +262,6 @@ export function parseSenateVoteMenuXml(
 
     const bill = parseSenateIssue(issue, congress);
     if (!bill) continue;
-
-    const voteNumber = Number.parseInt(getTag(block, "vote_number"), 10);
-    if (Number.isNaN(voteNumber)) continue;
-
-    const yeas = Number.parseInt(getTag(block, "yeas"), 10) || 0;
-    const nays = Number.parseInt(getTag(block, "nays"), 10) || 0;
-    const tallyBlock = block.match(/<vote_tally>[\s\S]*?<\/vote_tally>/i)?.[0] ?? block;
-    const yeasT = Number.parseInt(getTag(tallyBlock, "yeas"), 10) || yeas;
-    const naysT = Number.parseInt(getTag(tallyBlock, "nays"), 10) || nays;
-    const voteDate = parseSenateVoteDate(getTag(block, "vote_date"), congressYear, now);
-    const result = getTag(block, "result");
 
     if (!isPassageVote(question) && !isPassageVote(title)) {
       // Some rolls carry only a title. Storing an empty question would make the
@@ -254,8 +277,8 @@ export function parseSenateVoteMenuXml(
           bill,
           question: stubQuestion,
           result,
-          yeas: yeasT,
-          nays: naysT,
+          yeas,
+          nays,
           voteDate,
         });
       }
@@ -272,8 +295,8 @@ export function parseSenateVoteMenuXml(
       bill,
       question: displayQuestion.replace(/\s+/g, " ").trim(),
       result,
-      yeas: yeasT,
-      nays: naysT,
+      yeas,
+      nays,
       voteDate,
     });
   }
@@ -285,7 +308,7 @@ export async function ingestSenatePassageVotes(
   env: Env,
   lookbackStart: string | null,
   knownKeys: ReadonlySet<string> = new Set()
-): Promise<IngestVotesResult> {
+): Promise<SenateIngestVotesResult> {
   const congress = congressNumber(env);
   const session = sessionNumber(env);
   const { xml, warnings } = await fetchSenateVoteMenuXml(env, congress, session);
@@ -309,10 +332,11 @@ export async function ingestSenatePassageVotes(
     nonPassageStubs.push(stub);
   }
 
+  // Confirmations are upserted idempotently; do not share knownKeys with
+  // passage/companion roll skip state.
   const confirmationVotes: ConfirmationVote[] = [];
   for (const vote of parsed.confirmationVotes) {
     if (lookbackStart && vote.voteDate < lookbackStart) continue;
-    if (knownKeys.has(voteKey(vote))) continue;
     confirmationVotes.push(vote);
   }
 
@@ -321,6 +345,6 @@ export async function ingestSenatePassageVotes(
     skipped,
     warnings: warnings.length > 0 ? warnings : undefined,
     nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
-    confirmationVotes: confirmationVotes.length > 0 ? confirmationVotes : undefined,
+    confirmationVotes,
   };
 }

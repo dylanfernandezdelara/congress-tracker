@@ -17,6 +17,7 @@ const {
   fetchFeed,
   fetchNotableVotes,
   fetchRecentLaws,
+  fetchRecentConfirmations,
   fetchDefectors,
   fetchMemberProfile,
   fetchSessionStats,
@@ -26,6 +27,7 @@ const {
   fetchFeed: vi.fn(),
   fetchNotableVotes: vi.fn(),
   fetchRecentLaws: vi.fn(),
+  fetchRecentConfirmations: vi.fn(),
   fetchDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
   fetchSessionStats: vi.fn(),
@@ -37,6 +39,7 @@ vi.mock('../api/client', () => ({
   fetchFeed,
   fetchNotableVotes,
   fetchRecentLaws,
+  fetchRecentConfirmations,
   fetchSessionStats,
   fetchPulseStats,
   fetchDefectors,
@@ -155,6 +158,36 @@ describe('Home', () => {
           latest_action_text: 'Became Public Law No: 119-5.',
           latest_passage_vote_date: '2026-06-05',
           item: null,
+        },
+      ],
+    })
+    fetchRecentConfirmations.mockResolvedValue({
+      congress: 119,
+      session: 2,
+      as_of: '2026-06-14T00:00:00.000Z',
+      confirmations: [
+        {
+          chamber: 'Senate',
+          congress: 119,
+          session: 2,
+          roll_number: 165,
+          citation: 'PN100',
+          nomination_number: 100,
+          part_number: 0,
+          nominee_names: [{ display_name: 'Jane Doe', state: 'CA' }],
+          position_title: 'Secretary of Energy',
+          organization: 'Department of Energy',
+          description: 'Jane Doe, of California, to be Secretary of Energy.',
+          question: 'On the Nomination',
+          result: 'Confirmed',
+          yeas: 58,
+          nays: 40,
+          vote_date: '2026-06-12',
+          headline: 'Jane Doe confirmed as Energy Secretary',
+          what_was_confirmed: 'The Senate confirmed Jane Doe as Secretary of Energy.',
+          background: 'Jane Doe of California was nominated to lead the Department of Energy.',
+          key_points: ['Cabinet-level confirmation'],
+          congress_gov_url: 'https://www.congress.gov/nomination/119/PN100',
         },
       ],
     })
@@ -287,6 +320,8 @@ describe('Home', () => {
     expect(screen.getByLabelText('Legislative pulse')).toBeInTheDocument()
     expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Recent confirmations' })).toBeInTheDocument()
+    expect(screen.getByText('Jane Doe confirmed as Energy Secretary')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'New laws' })).toBeInTheDocument()
     expect(screen.getByText('Sample law headline')).toBeInTheDocument()
     expect(container.querySelector('.home-mobile-rails')).toBeNull()
@@ -542,6 +577,7 @@ describe('Home', () => {
     expect(fetchDefectors).not.toHaveBeenCalled()
     expect(fetchNotableVotes).not.toHaveBeenCalled()
     expect(fetchRecentLaws).not.toHaveBeenCalled()
+    expect(fetchRecentConfirmations).not.toHaveBeenCalled()
     expect(screen.getByText('Loading control…')).toBeInTheDocument()
 
     resolveFeed(
@@ -559,6 +595,7 @@ describe('Home', () => {
       expect(fetchDefectors).toHaveBeenCalled()
       expect(fetchNotableVotes).toHaveBeenCalled()
       expect(fetchRecentLaws).toHaveBeenCalled()
+      expect(fetchRecentConfirmations).toHaveBeenCalled()
     })
   })
 
@@ -573,6 +610,7 @@ describe('Home', () => {
       expect(fetchDefectors).toHaveBeenCalled()
       expect(fetchNotableVotes).toHaveBeenCalled()
       expect(fetchRecentLaws).toHaveBeenCalled()
+      expect(fetchRecentConfirmations).toHaveBeenCalled()
     })
     // Gate must not stick closed — session rail content can still render.
     expect(await screen.findByText('Federal Control')).toBeInTheDocument()

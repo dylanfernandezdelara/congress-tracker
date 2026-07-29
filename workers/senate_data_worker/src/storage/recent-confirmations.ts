@@ -5,6 +5,7 @@ import {
   parseStoredBackground,
 } from "../d1/nominations";
 import { selectRecentConfirmationVotes } from "../d1/confirmation-votes";
+import { isConfirmedResult } from "../sources/confirmation";
 import { congressGovNominationUrl } from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import { lookbackStartIso } from "../sources/congress-client";
@@ -40,7 +41,9 @@ export async function buildRecentConfirmations(
   asOf: string = new Date().toISOString()
 ): Promise<RecentConfirmationsResponse> {
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
-  const rows = await selectRecentConfirmationVotes(env.DB, lookback, limit);
+  const rows = (await selectRecentConfirmationVotes(env.DB, lookback, limit)).filter((row) =>
+    isConfirmedResult(row.result)
+  ).slice(0, limit);
 
   const confirmations: RecentConfirmationItem[] = rows.map((row) => {
     const background = parseStoredBackground(row.background_json);

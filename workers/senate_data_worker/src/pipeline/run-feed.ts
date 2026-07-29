@@ -11,7 +11,6 @@ import {
   recordFeedPipelineSuccess,
 } from "../d1/pipeline-state";
 import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
-import { selectExistingConfirmationVoteKeys } from "../d1/confirmation-votes";
 import {
   selectExistingVoteKeys,
   upsertNonPassageVoteStub,
@@ -74,14 +73,6 @@ export async function runFeedPipeline(
     const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
     const congress = congressNumber(env);
     const knownVoteKeys = await selectExistingVoteKeys(env.DB, lookback, congress);
-    const knownConfirmationKeys = await selectExistingConfirmationVoteKeys(
-      env.DB,
-      lookback,
-      congress
-    );
-    for (const key of knownConfirmationKeys) {
-      knownVoteKeys.add(key);
-    }
 
     const { house: houseResult, senate: senateResult, chamberWarnings } =
       await ingestPassageVotesByChamber(env, lookback, knownVoteKeys);
@@ -107,13 +98,9 @@ export async function runFeedPipeline(
       await upsertNonPassageVoteStub(env.DB, stub);
     }
 
-    const newConfirmationVotes = [
-      ...(houseResult.confirmationVotes ?? []),
-      ...(senateResult.confirmationVotes ?? []),
-    ];
     const confirmationVotesUpserted = await persistConfirmationVotes(
       env.DB,
-      newConfirmationVotes
+      senateResult.confirmationVotes
     );
     const confirmationEnrichment = await refreshConfirmationEnrichment(
       env,

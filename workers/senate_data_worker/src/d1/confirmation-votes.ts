@@ -1,40 +1,5 @@
 import type { ConfirmationVote } from "../types";
-import { voteKey } from "../vote-key";
 import { ensureSchema } from "./schema";
-import type { ExistingVoteKeyRow } from "./votes";
-
-function toVoteKeys(rows: ExistingVoteKeyRow[] | null | undefined): Set<string> {
-  const keys = new Set<string>();
-  for (const row of rows ?? []) {
-    keys.add(
-      voteKey({
-        chamber: row.chamber as ConfirmationVote["chamber"],
-        congress: row.congress,
-        session: row.session,
-        rollNumber: row.roll_number,
-      })
-    );
-  }
-  return keys;
-}
-
-export async function selectExistingConfirmationVoteKeys(
-  db: D1Database,
-  lookbackDate: string,
-  congress: number
-): Promise<Set<string>> {
-  await ensureSchema(db);
-  const { results } = await db
-    .prepare(
-      `SELECT chamber, congress, session, roll_number
-       FROM confirmation_votes
-       WHERE vote_date >= ? AND congress = ?`
-    )
-    .bind(lookbackDate, congress)
-    .all<ExistingVoteKeyRow>();
-
-  return toVoteKeys(results);
-}
 
 export async function upsertConfirmationVote(
   db: D1Database,
@@ -98,7 +63,8 @@ export interface ConfirmationVoteJoinRow {
 }
 
 /**
- * Recent confirmed nomination rolls (approved results only), newest first.
+ * Recent nomination confirmation rolls in the lookback window (newest first).
+ * Callers should filter with {@link isConfirmedResult} for approved outcomes.
  */
 export async function selectRecentConfirmationVotes(
   db: D1Database,
@@ -106,6 +72,8 @@ export async function selectRecentConfirmationVotes(
   limit: number
 ): Promise<ConfirmationVoteJoinRow[]> {
   await ensureSchema(db);
+  // Over-fetch so callers can drop rejected rolls while still filling `limit`.
+  const fetchLimit = Math.max(limit * 3, limit);
   const { results } = await db
     .prepare(
       `SELECT
@@ -120,15 +88,10 @@ export async function selectRecentConfirmationVotes(
         AND n.nomination_number = cv.nomination_number
         AND n.part_number = cv.part_number
        WHERE cv.vote_date >= ?
-         AND (
-           LOWER(TRIM(cv.result)) LIKE 'confirmed%'
-           OR LOWER(TRIM(cv.result)) LIKE 'agreed to%'
-         )
-         AND LOWER(TRIM(cv.result)) NOT LIKE 'not confirmed%'
        ORDER BY cv.vote_date DESC, cv.roll_number DESC
        LIMIT ?`
     )
-    .bind(lookbackDate, limit)
+    .bind(lookbackDate, fetchLimit)
     .all<ConfirmationVoteJoinRow>();
 
   return results ?? [];

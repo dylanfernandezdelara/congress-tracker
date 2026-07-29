@@ -132,6 +132,19 @@ describe("parseSenateVoteMenuXml", () => {
     });
   });
 
+  it("skips en-bloc nomination rolls rather than attributing one PN to the shared tally", () => {
+    const { confirmationVotes, votes, nonPassageStubs } = parseSenateVoteMenuXml(
+      sample,
+      119,
+      2,
+      new Date("2026-06-30T00:00:00Z")
+    );
+
+    expect(confirmationVotes.every((v) => v.rollNumber !== 125)).toBe(true);
+    expect(votes.every((v) => v.rollNumber !== 125)).toBe(true);
+    expect(nonPassageStubs.every((v) => v.rollNumber !== 125)).toBe(true);
+  });
+
   it("falls back to the title when a companion roll has no question", () => {
     const xml = `<vote_summary><congress_year>2026</congress_year><votes>
       <vote>

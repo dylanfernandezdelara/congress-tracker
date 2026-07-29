@@ -77,12 +77,6 @@ vi.mock("./refresh-bill-text-changes", () => ({
   refreshBillTextChanges: (...args: unknown[]) => mockRefreshBillTextChanges(...args),
 }));
 
-vi.mock("../d1/confirmation-votes", () => ({
-  selectExistingConfirmationVoteKeys: vi.fn(async () => new Set()),
-  upsertConfirmationVote: vi.fn(async () => undefined),
-  selectRecentConfirmationVotes: vi.fn(async () => []),
-}));
-
 vi.mock("./refresh-confirmations", () => ({
   persistConfirmationVotes: vi.fn(async (_db: D1Database, votes: unknown[]) => votes.length),
   refreshConfirmationEnrichment: vi.fn(async () => ({
@@ -135,7 +129,7 @@ describe("runFeedPipeline digest retry", () => {
     mockSelectExistingVoteKeys.mockResolvedValue(new Set());
     mockIngestPassageVotesByChamber.mockResolvedValue({
       house: { votes: [], skipped: 0 },
-      senate: { votes: [], skipped: 0 },
+      senate: { votes: [], skipped: 0, confirmationVotes: [] },
       chamberWarnings: [],
     });
     mockSelectRecentVotedBills.mockResolvedValue([billRow]);

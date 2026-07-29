@@ -2,28 +2,13 @@ import { useId, useState } from 'react'
 
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
+import { ExpandChevron } from './ExpandChevron'
 
 type RecentConfirmationsSectionProps = {
   confirmations: RecentConfirmationItem[] | null
   loading?: boolean
   error?: string | null
   onRetry?: () => void
-}
-
-function ExpandChevron() {
-  return (
-    <span className="feed-row-chevron" aria-hidden="true">
-      <svg viewBox="0 0 16 16" fill="none" focusable="false">
-        <path
-          d="M6 3.5 10.5 8 6 12.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  )
 }
 
 function confirmationKey(item: RecentConfirmationItem): string {

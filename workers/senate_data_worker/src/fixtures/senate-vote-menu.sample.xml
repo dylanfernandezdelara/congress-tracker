@@ -40,6 +40,27 @@
       <title>Nomination</title>
     </vote>
     <vote>
+      <vote_number>00125</vote_number>
+      <vote_date>04-Jun</vote_date>
+      <en_bloc>
+        <matter>
+          <issue>PN726-1</issue>
+          <question>On the Nomination</question>
+          <result>Confirmed</result>
+        </matter>
+        <matter>
+          <issue>PN727-1</issue>
+          <question>On the Nomination</question>
+          <result>Confirmed</result>
+        </matter>
+      </en_bloc>
+      <vote_tally>
+        <yeas>53</yeas>
+        <nays>43</nays>
+      </vote_tally>
+      <title>Nominations</title>
+    </vote>
+    <vote>
       <vote_number>00162</vote_number>
       <vote_date>04-Jun</vote_date>
       <issue>S. 2</issue>

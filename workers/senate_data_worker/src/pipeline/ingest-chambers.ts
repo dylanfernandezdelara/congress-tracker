@@ -1,5 +1,5 @@
 import type { Env } from "../config";
-import type { IngestVotesResult } from "../types";
+import type { IngestVotesResult, SenateIngestVotesResult } from "../types";
 import { ingestHousePassageVotes } from "../sources/house-votes";
 import { ingestSenatePassageVotes } from "../sources/senate-votes";
 
@@ -7,13 +7,17 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function emptyChamberResult(): IngestVotesResult {
+function emptyHouseResult(): IngestVotesResult {
   return { votes: [], skipped: 0 };
+}
+
+function emptySenateResult(): SenateIngestVotesResult {
+  return { votes: [], skipped: 0, confirmationVotes: [] };
 }
 
 export interface ChamberIngestResult {
   house: IngestVotesResult;
-  senate: IngestVotesResult;
+  senate: SenateIngestVotesResult;
   chamberWarnings: string[];
 }
 
@@ -45,7 +49,7 @@ export async function ingestPassageVotesByChamber(
         error: message,
       })
     );
-    house = emptyChamberResult();
+    house = emptyHouseResult();
   } else {
     house = houseSettled.value;
     if (house.warnings?.length) {
@@ -53,7 +57,7 @@ export async function ingestPassageVotesByChamber(
     }
   }
 
-  let senate: IngestVotesResult;
+  let senate: SenateIngestVotesResult;
   if (senateSettled.status === "rejected") {
     const message = errorMessage(senateSettled.reason);
     chamberWarnings.push(`Senate ingest skipped: ${message}`);
@@ -63,7 +67,7 @@ export async function ingestPassageVotesByChamber(
         error: message,
       })
     );
-    senate = emptyChamberResult();
+    senate = emptySenateResult();
   } else {
     senate = senateSettled.value;
     if (senate.warnings?.length) {

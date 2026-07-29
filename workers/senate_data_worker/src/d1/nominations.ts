@@ -106,16 +106,13 @@ export async function upsertNominationMetadata(
     nominees: ConfirmationNominee[];
     receivedDate: string | null;
     rawBackgroundText: string | null;
-    background: ConfirmationBackgroundContent | null;
-    preserveBackgroundJson?: string | null;
+    /** Serialized background JSON to persist (null clears). */
+    backgroundJson: string | null;
   }
 ): Promise<void> {
   await ensureSchema(db);
   const now = new Date().toISOString();
   const citation = nominationCitation(params.ref);
-  const backgroundJson = params.background
-    ? JSON.stringify(params.background)
-    : (params.preserveBackgroundJson ?? null);
   await db
     .prepare(
       `INSERT INTO nominations (
@@ -146,48 +143,78 @@ export async function upsertNominationMetadata(
       params.nominees.length > 0 ? JSON.stringify(params.nominees) : null,
       params.receivedDate,
       params.rawBackgroundText,
-      backgroundJson,
+      params.backgroundJson,
       now,
       now
     )
     .run();
 }
 
-/** Nominations that have a confirmation vote but are missing metadata or rewrite. */
+export interface NominationEnrichmentCandidate {
+  ref: NominationRef;
+  result: string;
+  needsRaw: boolean;
+  needsBackground: boolean;
+}
+
+/**
+ * Confirmed nominations in the lookback window that still need Congress.gov
+ * metadata and/or a plain-English background rewrite.
+ */
 export async function selectNominationsNeedingEnrichment(
   db: D1Database,
   lookbackDate: string,
   limit: number
-): Promise<NominationRef[]> {
+): Promise<NominationEnrichmentCandidate[]> {
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT DISTINCT
+      `SELECT
          cv.nomination_congress AS congress,
          cv.nomination_number AS nomination_number,
-         cv.part_number AS part_number
+         cv.part_number AS part_number,
+         cv.result AS result,
+         n.raw_background_text AS raw_background_text,
+         n.background_json AS background_json
        FROM confirmation_votes cv
        LEFT JOIN nominations n
          ON n.congress = cv.nomination_congress
         AND n.nomination_number = cv.nomination_number
         AND n.part_number = cv.part_number
        WHERE cv.vote_date >= ?
-         AND (
-           n.congress IS NULL
-           OR n.raw_background_text IS NULL
-           OR TRIM(n.raw_background_text) = ''
-           OR n.background_json IS NULL
-           OR TRIM(n.background_json) = ''
-         )
        ORDER BY cv.vote_date DESC
        LIMIT ?`
     )
-    .bind(lookbackDate, limit)
-    .all<{ congress: number; nomination_number: number; part_number: number }>();
+    .bind(lookbackDate, Math.max(limit * 3, limit))
+    .all<{
+      congress: number;
+      nomination_number: number;
+      part_number: number;
+      result: string;
+      raw_background_text: string | null;
+      background_json: string | null;
+    }>();
 
-  return (results ?? []).map((row) => ({
-    congress: row.congress,
-    number: row.nomination_number,
-    partNumber: row.part_number,
-  }));
+  const seen = new Set<string>();
+  const candidates: NominationEnrichmentCandidate[] = [];
+  for (const row of results ?? []) {
+    const key = `${row.congress}:${row.nomination_number}:${row.part_number}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const needsRaw = !row.raw_background_text?.trim();
+    const needsBackground = parseStoredBackground(row.background_json) === null;
+    if (!needsRaw && !needsBackground) continue;
+    candidates.push({
+      ref: {
+        congress: row.congress,
+        number: row.nomination_number,
+        partNumber: row.part_number,
+      },
+      result: row.result,
+      needsRaw,
+      needsBackground,
+    });
+    if (candidates.length >= limit) break;
+  }
+  return candidates;
 }

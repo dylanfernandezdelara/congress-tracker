@@ -65,7 +65,11 @@ export interface IngestVotesResult {
   truncated?: boolean;
   warnings?: string[];
   nonPassageStubs?: NonPassageVoteStub[];
-  confirmationVotes?: ConfirmationVote[];
+}
+
+/** Senate ingest also surfaces nomination confirmation rolls (House never does). */
+export interface SenateIngestVotesResult extends IngestVotesResult {
+  confirmationVotes: ConfirmationVote[];
 }
 
 export type {

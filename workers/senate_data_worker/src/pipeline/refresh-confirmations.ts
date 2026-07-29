@@ -13,6 +13,7 @@ import {
 } from "../d1/nominations";
 import { upsertConfirmationVote } from "../d1/confirmation-votes";
 import type { ConfirmationVote } from "../types";
+import { isConfirmedResult } from "../sources/confirmation";
 import { fetchNominationBundle } from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import { resolveOpenRouterModel } from "../synthesis/model";
@@ -51,109 +52,90 @@ export async function refreshConfirmationEnrichment(
   let backgroundsRewritten = 0;
   let skipped = 0;
 
-  const refs = await selectNominationsNeedingEnrichment(
+  const candidates = await selectNominationsNeedingEnrichment(
     env.DB,
     lookbackDate,
     CONFIRMATION_NOMINATION_FETCHES_PER_RUN
   );
+  const confirmed = candidates.filter((c) => isConfirmedResult(c.result));
 
-  if (refs.length === 0) {
+  if (confirmed.length === 0) {
     return { nominationsFetched, backgroundsRewritten, skipped, warnings };
   }
 
   const model = await resolveOpenRouterModel(env);
 
-  for (const ref of refs) {
+  // Phase 1: Congress.gov metadata for nominations missing raw text.
+  for (const candidate of confirmed) {
+    if (!candidate.needsRaw) continue;
     if (nominationsFetched >= CONFIRMATION_NOMINATION_FETCHES_PER_RUN) break;
 
-    const existing = await getNomination(env.DB, ref);
-    const hasBackground = parseStoredBackground(existing?.background_json ?? null) !== null;
-    const hasRaw = Boolean(existing?.raw_background_text?.trim());
-
-    let description = existing?.description ?? null;
-    let organization = existing?.organization ?? null;
-    let positionTitle = existing?.position_title ?? null;
-    let nominees = parseNomineesJson(existing?.nominees_json ?? null);
-    let receivedDate = existing?.received_date ?? null;
-    let rawBackgroundText = existing?.raw_background_text ?? null;
-
-    if (!hasRaw) {
-      try {
-        const bundle = await fetchNominationBundle(env, ref);
-        nominationsFetched += 1;
-        description = bundle.description;
-        organization = bundle.organization;
-        positionTitle = bundle.positionTitle;
-        receivedDate = bundle.receivedDate;
-        rawBackgroundText = bundle.rawBackgroundText;
-        nominees = bundle.nominees;
-
-        await upsertNominationMetadata(env.DB, {
-          ref,
-          description,
-          organization,
-          positionTitle,
-          nominees,
-          receivedDate,
-          rawBackgroundText,
-          background: null,
-          preserveBackgroundJson: existing?.background_json ?? null,
-        });
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        warnings.push(`Nomination ${nominationCitation(ref)} fetch failed: ${message}`);
-        console.warn(
-          JSON.stringify({
-            event: "confirmation_nomination_fetch_failed",
-            trigger,
-            citation: nominationCitation(ref),
-            error: message,
-          })
-        );
-        skipped += 1;
-        continue;
-      }
-    } else {
+    try {
+      const bundle = await fetchNominationBundle(env, candidate.ref);
       nominationsFetched += 1;
+      const existing = await getNomination(env.DB, candidate.ref);
+      await upsertNominationMetadata(env.DB, {
+        ref: candidate.ref,
+        description: bundle.description,
+        organization: bundle.organization,
+        positionTitle: bundle.positionTitle,
+        nominees: bundle.nominees,
+        receivedDate: bundle.receivedDate,
+        rawBackgroundText: bundle.rawBackgroundText,
+        backgroundJson: existing?.background_json ?? null,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `Nomination ${nominationCitation(candidate.ref)} fetch failed: ${message}`
+      );
+      console.warn(
+        JSON.stringify({
+          event: "confirmation_nomination_fetch_failed",
+          trigger,
+          citation: nominationCitation(candidate.ref),
+          error: message,
+        })
+      );
+      skipped += 1;
     }
+  }
 
-    if (hasBackground) {
+  // Phase 2: OpenRouter rewrite for nominations with raw text but no background.
+  for (const candidate of confirmed) {
+    if (!candidate.needsBackground && !candidate.needsRaw) continue;
+    if (backgroundsRewritten >= CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES) break;
+
+    const existing = await getNomination(env.DB, candidate.ref);
+    if (!existing?.raw_background_text?.trim()) {
       skipped += 1;
       continue;
     }
-
-    if (backgroundsRewritten >= CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES) {
-      skipped += 1;
-      continue;
-    }
-
-    if (!rawBackgroundText?.trim()) {
-      skipped += 1;
+    if (parseStoredBackground(existing.background_json) !== null) {
       continue;
     }
 
     const background = await rewriteConfirmationBackground(
       env,
       {
-        citation: nominationCitation(ref),
-        description,
-        positionTitle,
-        organization,
-        rawBackground: rawBackgroundText,
+        citation: nominationCitation(candidate.ref),
+        description: existing.description,
+        positionTitle: existing.position_title,
+        organization: existing.organization,
+        rawBackground: existing.raw_background_text,
       },
       model
     );
 
     await upsertNominationMetadata(env.DB, {
-      ref,
-      description,
-      organization,
-      positionTitle,
-      nominees,
-      receivedDate,
-      rawBackgroundText,
-      background,
-      preserveBackgroundJson: background === null ? existing?.background_json ?? null : null,
+      ref: candidate.ref,
+      description: existing.description,
+      organization: existing.organization,
+      positionTitle: existing.position_title,
+      nominees: parseNomineesJson(existing.nominees_json),
+      receivedDate: existing.received_date,
+      rawBackgroundText: existing.raw_background_text,
+      backgroundJson: background ? JSON.stringify(background) : existing.background_json,
     });
 
     if (background) {
