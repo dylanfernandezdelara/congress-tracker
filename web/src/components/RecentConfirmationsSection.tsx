@@ -1,5 +1,7 @@
 import { useId, useState } from 'react'
 
+import { formatCollapsedDigestLead } from '@congress-tracker/shared/feed-content'
+
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import { ExpandChevron } from './ExpandChevron'
@@ -24,13 +26,6 @@ function nomineeLabel(item: RecentConfirmationItem): string {
   return `${item.nominee_names[0]!.display_name} +${item.nominee_names.length - 1}`
 }
 
-function roleLine(item: RecentConfirmationItem): string | null {
-  if (item.position_title?.trim() && item.organization?.trim()) {
-    return `${item.position_title.trim()} · ${item.organization.trim()}`
-  }
-  return item.position_title?.trim() || item.organization?.trim() || null
-}
-
 type ConfirmationItemRowProps = {
   item: RecentConfirmationItem
   isExpanded: boolean
@@ -40,9 +35,12 @@ type ConfirmationItemRowProps = {
 function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRowProps) {
   const detailId = useId()
   const headlineId = useId()
+  const summaryId = useId()
   const key = confirmationKey(item)
   const headline = item.headline?.trim() || nomineeLabel(item)
-  const role = roleLine(item)
+  const background = item.background?.trim() || null
+  const teaser = background ? formatCollapsedDigestLead(background) : null
+  const organization = item.organization?.trim() || null
   const margin = item.yeas - item.nays
 
   return (
@@ -54,6 +52,7 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
           aria-expanded={isExpanded}
           aria-controls={detailId}
           aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${item.citation}`}
+          aria-describedby={!isExpanded && teaser ? summaryId : undefined}
           onClick={() => onToggle(key)}
         >
           <div className="feed-row-main">
@@ -76,8 +75,13 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
                 {margin !== 0 ? ` · ${margin > 0 ? '+' : ''}${margin}` : ''}
               </span>
               <span className="feed-row-chip">{item.citation}</span>
+              {organization ? <span className="feed-row-chip">{organization}</span> : null}
             </div>
-            {role ? <p className="recent-confirmations-role">{role}</p> : null}
+            {!isExpanded && teaser ? (
+              <div id={summaryId} className="feed-row-summary">
+                <p className="feed-row-teaser">{teaser}</p>
+              </div>
+            ) : null}
           </div>
         </button>
 
@@ -90,16 +94,10 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
         >
           {isExpanded ? (
             <div className="recent-confirmations-detail">
-              {item.what_was_confirmed ? (
-                <section className="recent-confirmations-detail-block">
-                  <h4 className="recent-confirmations-detail-label">What was confirmed</h4>
-                  <p className="recent-confirmations-detail-text">{item.what_was_confirmed}</p>
-                </section>
-              ) : null}
-              {item.background ? (
+              {background ? (
                 <section className="recent-confirmations-detail-block">
                   <h4 className="recent-confirmations-detail-label">Background</h4>
-                  <p className="recent-confirmations-detail-text">{item.background}</p>
+                  <p className="recent-confirmations-detail-text">{background}</p>
                 </section>
               ) : null}
               {item.key_points.length > 0 ? (
@@ -112,7 +110,7 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
                   </ul>
                 </section>
               ) : null}
-              {!item.what_was_confirmed && !item.background ? (
+              {!background && item.key_points.length === 0 ? (
                 <p className="text-[13px] text-secondary">
                   Confirmation details are still being prepared.
                 </p>
