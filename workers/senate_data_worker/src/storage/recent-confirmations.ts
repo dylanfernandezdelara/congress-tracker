@@ -1,4 +1,5 @@
 import { buildOfficialConfirmationAbout } from "../../../../shared/confirmation-about";
+import type { RollPartySplit } from "../../../../shared/stats-api-types";
 import { VOTE_LOOKBACK_DAYS } from "../constants";
 import type { Env } from "../config";
 import {
@@ -6,10 +7,14 @@ import {
   parseStoredBackground,
 } from "../d1/nominations";
 import { selectRecentConfirmationVotes } from "../d1/confirmation-votes";
+import { selectMemberVotesForRollKeys } from "../d1/member-votes";
+import { isLocalSampleMemberId } from "../../../../shared/member-id";
+import { hasRealMemberRoster } from "../d1/members";
 import { isConfirmedResult } from "../sources/confirmation";
 import { congressGovNominationUrl } from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import { lookbackStartIso } from "../sources/congress-client";
+import { rollPartySplits } from "../analytics/roll-party-stats";
 import type {
   RecentConfirmationItem,
   RecentConfirmationsResponse,
@@ -34,6 +39,10 @@ function displayHeadline(item: {
   return item.citation;
 }
 
+function rollKey(chamber: string, rollNumber: number): string {
+  return `${chamber}:${rollNumber}`;
+}
+
 export async function buildRecentConfirmations(
   env: Env,
   congress: number,
@@ -45,6 +54,28 @@ export async function buildRecentConfirmations(
   const rows = (await selectRecentConfirmationVotes(env.DB, lookback, limit)).filter((row) =>
     isConfirmedResult(row.result)
   ).slice(0, limit);
+
+  const partySplitsByRoll = new Map<string, RollPartySplit[]>();
+  if (rows.length > 0) {
+    const voteRows = await selectMemberVotesForRollKeys(
+      env.DB,
+      congress,
+      session,
+      rows.map((row) => ({ chamber: row.chamber, roll_number: row.roll_number }))
+    );
+    const excludeLocalSample = await hasRealMemberRoster(env.DB);
+    const byRoll = new Map<string, Array<{ party: string | null; position: string }>>();
+    for (const vote of voteRows) {
+      if (excludeLocalSample && isLocalSampleMemberId(vote.bioguide_id)) continue;
+      const key = rollKey(vote.chamber, vote.roll_number);
+      const list = byRoll.get(key) ?? [];
+      list.push({ party: vote.party, position: vote.position });
+      byRoll.set(key, list);
+    }
+    for (const [key, positions] of byRoll) {
+      partySplitsByRoll.set(key, rollPartySplits(positions));
+    }
+  }
 
   const confirmations: RecentConfirmationItem[] = rows.map((row) => {
     const background = parseStoredBackground(row.background_json);
@@ -67,9 +98,8 @@ export async function buildRecentConfirmations(
         ? `The Senate confirmed the nomination for ${row.position_title.trim()}.`
         : row.description?.trim() || null);
 
-    // Primary About is official rewrite, else honest Congress.gov identity fallback.
-    // raw_background_text scaffolding and Wikipedia extracts must not become the
-    // primary About — Wikipedia is exposed separately as wikipedia_extract.
+    // Official rewrite, else honest Congress.gov identity fallback.
+    // Wikipedia person extracts are preferred in the UI (see selectConfirmationAbout).
     const officialAbout =
       background?.background?.trim() ||
       buildOfficialConfirmationAbout({
@@ -118,6 +148,7 @@ export async function buildRecentConfirmations(
       congress_gov_url: congressGovNominationUrl(ref),
       wikipedia_url: wikipediaUrl,
       wikipedia_extract: wikipediaExtract,
+      party_splits: partySplitsByRoll.get(rollKey(row.chamber, row.roll_number)) ?? [],
     };
   });
 

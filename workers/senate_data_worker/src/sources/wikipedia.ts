@@ -71,6 +71,26 @@ const PERSON_ROLE_CUE =
 const TITLE_PERSON_DISAMBIG =
   /\((politician|judge|diplomat|lawyer|attorney|admiral|general|ambassador|official|business|academic)s?\)/i;
 
+/** Office / role pages (e.g. "United States Secretary of Energy") — never person bios. */
+const OFFICE_PAGE_TITLE =
+  /^(List of |United States (Secretary|Deputy Secretary|Under Secretary|Assistant Secretary|Attorney General|Ambassador|Administrator|Director|Surgeon General)\b|Secretary of |Deputy Secretary of |Under Secretary of |Assistant Secretary of |United States Senate|Cabinet of the)/i;
+
+/** Role-definition boilerplate common on office pages, not nominee biographies. */
+const OFFICE_EXTRACT_CUE =
+  /\b(is the head of|heads the|is a cabinet-level|cabinet-level position|member of the (United States )?Cabinet|is a federal executive department)\b/i;
+
+function extractMentionsPerson(extract: string, displayName: string): boolean {
+  const surname = lastName(displayName);
+  if (!surname) return false;
+  // Person bios almost always open with the subject's name.
+  const head = extract.slice(0, Math.min(160, extract.length)).toLowerCase();
+  if (!head.includes(surname.toLowerCase())) return false;
+  const tokens = nameTokens(displayName);
+  if (tokens.length <= 1) return true;
+  const given = tokens[0]!.toLowerCase();
+  return head.includes(given) || head.includes(`${given[0]}.`);
+}
+
 function buildSearchQuery(params: {
   displayName: string;
   positionTitle: string | null;
@@ -129,7 +149,17 @@ export function acceptWikipediaSummary(
   const extract = summary.extract?.trim();
   const pageUrl = summary.content_urls?.desktop?.page?.trim();
   if (!title || !extract || !pageUrl) return null;
+  // Reject office/role pages even when a search query included the nominee name.
+  if (OFFICE_PAGE_TITLE.test(title)) return null;
   if (!titleMatchesPersonName(title, displayName)) return null;
+  if (!extractMentionsPerson(extract, displayName)) return null;
+  // Role-definition boilerplate without person-biography cues.
+  if (
+    OFFICE_EXTRACT_CUE.test(extract) &&
+    !/\b(born|served as|previously|graduated|nominated)\b/i.test(extract)
+  ) {
+    return null;
+  }
   const description = summary.description ?? "";
   const personCue =
     PERSON_ROLE_CUE.test(`${description} ${extract}`) ||

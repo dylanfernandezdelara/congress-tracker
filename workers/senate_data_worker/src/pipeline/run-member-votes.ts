@@ -14,9 +14,11 @@ import {
   countMemberVotesForRoll,
   countLisMemberVotesForRoll,
   deleteMemberVotesForRoll,
+  selectConfirmationRollCalls,
   selectMemberVotesForRoll,
   selectPassageRollCalls,
   upsertMemberVotesBatch,
+  type RollCallKey,
 } from "../d1/member-votes";
 import { refreshMemberSessionStatsForBioguides } from "../d1/member-session-stats";
 import { getVoteRollMeta } from "../d1/votes";
@@ -58,10 +60,14 @@ async function refreshStatsForBioguides(
 }
 
 /**
- * Backfill per-member positions for passage roll calls. Writes are batched
- * (one atomic D1 batch per roll) and capped at
+ * Backfill per-member positions for passage + confirmation roll calls. Writes
+ * are batched (one atomic D1 batch per roll) and capped at
  * MEMBER_VOTES_MAX_ROLLS_PER_RUN upstream fetches per invocation to stay under
  * the Worker subrequest limit. Re-invoke until `rollsRemaining` is 0.
+ *
+ * Passage rolls also update session-stats / cross-vote tallies. Confirmation
+ * rolls store member_votes only (for party-split display) — they are not
+ * bill passage votes and must not touch member_session_stats.
  *
  * Syncs the Congress.gov member roster first when the D1 members table lacks a
  * full real roster (needed for Senate LIS → bioguide resolution and photos).
@@ -76,7 +82,12 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
   }
 
   const senateBioguideLookup = await buildSenateBioguideLookup(env.DB);
-  const rolls = await selectPassageRollCalls(env.DB, congress, session);
+  const passageRolls = await selectPassageRollCalls(env.DB, congress, session);
+  const confirmationRolls = await selectConfirmationRollCalls(env.DB, congress, session);
+  const rolls: Array<RollCallKey & { kind: "passage" | "confirmation" }> = [
+    ...passageRolls.map((roll) => ({ ...roll, kind: "passage" as const })),
+    ...confirmationRolls.map((roll) => ({ ...roll, kind: "confirmation" as const })),
+  ];
 
   let rollsProcessed = 0;
   let rollsSkipped = 0;
@@ -89,7 +100,14 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
   let index = 0;
   for (; index < rolls.length; index += 1) {
     if (rollsAttempted >= MEMBER_VOTES_MAX_ROLLS_PER_RUN) break;
-    const roll = rolls[index];
+    const queued = rolls[index];
+    const roll: RollCallKey = {
+      chamber: queued.chamber,
+      congress: queued.congress,
+      session: queued.session,
+      roll_number: queued.roll_number,
+    };
+    const kind = queued.kind;
 
     const existing = await countMemberVotesForRoll(env.DB, roll);
     const lisUnresolved =
@@ -131,38 +149,40 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
       continue;
     }
 
-    // Resolve bill metadata before any member_votes write so a missing/failed
-    // lookup cannot leave an "already ingested" roll without session stats.
-    let rollMeta: Awaited<ReturnType<typeof getVoteRollMeta>>;
-    try {
-      rollMeta = await getVoteRollMeta(env.DB, roll);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(
-        JSON.stringify({
-          event: "member_session_stats_roll_meta_failed",
-          chamber: roll.chamber,
-          congress: roll.congress,
-          session: roll.session,
-          roll_number: roll.roll_number,
-          error: message,
-        })
-      );
-      rollsSkipped += 1;
-      continue;
-    }
-    if (!rollMeta) {
-      console.error(
-        JSON.stringify({
-          event: "member_session_stats_missing_roll_meta",
-          chamber: roll.chamber,
-          congress: roll.congress,
-          session: roll.session,
-          roll_number: roll.roll_number,
-        })
-      );
-      rollsSkipped += 1;
-      continue;
+    // Passage rolls need bill metadata for session-stats. Confirmation rolls
+    // only need member_votes (party splits) and skip that path entirely.
+    let rollMeta: Awaited<ReturnType<typeof getVoteRollMeta>> | null = null;
+    if (kind === "passage") {
+      try {
+        rollMeta = await getVoteRollMeta(env.DB, roll);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(
+          JSON.stringify({
+            event: "member_session_stats_roll_meta_failed",
+            chamber: roll.chamber,
+            congress: roll.congress,
+            session: roll.session,
+            roll_number: roll.roll_number,
+            error: message,
+          })
+        );
+        rollsSkipped += 1;
+        continue;
+      }
+      if (!rollMeta) {
+        console.error(
+          JSON.stringify({
+            event: "member_session_stats_missing_roll_meta",
+            chamber: roll.chamber,
+            congress: roll.congress,
+            session: roll.session,
+            roll_number: roll.roll_number,
+          })
+        );
+        rollsSkipped += 1;
+        continue;
+      }
     }
 
     // Capture prior voters before a LIS rewrite so their tallies can be
@@ -192,31 +212,38 @@ export async function runMemberVotesPipeline(env: Env): Promise<RunMemberVotesRe
       // and it is safely retried on the next run.
       await upsertMembersBatch(env.DB, newMembers, { preserveNames: true });
       await upsertMemberVotesBatch(env.DB, fetched.votes);
-      await applyRollToMemberSessionStats(
-        env.DB,
-        rollMeta,
-        fetched.votes.map((vote) => ({
-          bioguideId: vote.bioguideId,
-          position: vote.position,
-        })),
-        parties
-      );
-      // Drop inflated tallies for bioguides removed by an LIS → bioguide rewrite.
-      const kept = new Set(fetchedBioguideIds);
-      const orphans = previousBioguideIds.filter((id) => !kept.has(id));
-      await refreshStatsForBioguides(env.DB, congress, session, orphans);
+      if (kind === "passage" && rollMeta) {
+        await applyRollToMemberSessionStats(
+          env.DB,
+          rollMeta,
+          fetched.votes.map((vote) => ({
+            bioguideId: vote.bioguideId,
+            position: vote.position,
+          })),
+          parties
+        );
+        // Drop inflated tallies for bioguides removed by an LIS → bioguide rewrite.
+        const kept = new Set(fetchedBioguideIds);
+        const orphans = previousBioguideIds.filter((id) => !kept.has(id));
+        await refreshStatsForBioguides(env.DB, congress, session, orphans);
+      }
     } catch (err: unknown) {
       // Any failure after the LIS delete / vote write must leave the roll empty
       // so the next run retries ingest + stats (skip check uses existing>0).
       await deleteMemberVotesForRoll(env.DB, roll);
-      await refreshStatsForBioguides(env.DB, congress, session, [
-        ...previousBioguideIds,
-        ...fetchedBioguideIds,
-      ]);
+      if (kind === "passage") {
+        await refreshStatsForBioguides(env.DB, congress, session, [
+          ...previousBioguideIds,
+          ...fetchedBioguideIds,
+        ]);
+      }
       const message = err instanceof Error ? err.message : String(err);
       console.error(
         JSON.stringify({
-          event: "member_session_stats_apply_failed",
+          event:
+            kind === "passage"
+              ? "member_session_stats_apply_failed"
+              : "confirmation_member_votes_apply_failed",
           chamber: roll.chamber,
           congress: roll.congress,
           session: roll.session,

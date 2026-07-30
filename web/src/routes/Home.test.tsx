@@ -191,6 +191,10 @@ describe('Home', () => {
           congress_gov_url: 'https://www.congress.gov/nomination/119th-congress/100',
           wikipedia_url: null,
           wikipedia_extract: null,
+          party_splits: [
+            { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
+            { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
+          ],
         },
       ],
     })

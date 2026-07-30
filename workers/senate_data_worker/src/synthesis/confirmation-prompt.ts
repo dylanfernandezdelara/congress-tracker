@@ -24,13 +24,14 @@ Return ONLY valid JSON:
 {
   "headline": "8-12 words naming the person and the role (e.g. Jane Doe confirmed as Energy Secretary)",
   "what_was_confirmed": "Exactly one short sentence, max ${FEED_LEAD_MAX_WORDS} words, stating what the Senate confirmed",
-  "background": "1-2 short sentences, max ${FEED_LEAD_MAX_WORDS * 2} words, grounded in official nomination fields (name, state, office, agency, intro text). This is the primary About blurb.",
+  "background": "1-2 short sentences, max ${FEED_LEAD_MAX_WORDS * 2} words, about the PERSON — prior roles, experience, or qualifications stated in the source. Do not define the office.",
   "key_points": ["up to ${FEED_COLLAPSED_MAX_BULLETS} bullets only if they add facts beyond the headline/background; otherwise []"]
 }
 
 Rules:
 - Official-only source: use Congress.gov nomination metadata (description, position, organization, nominee name/state, intro text). Do not invent biography, prior jobs, education, or politics.
-- If official facts are thin, write a plain identity line (name, state, office/agency). Example: "Jane Doe of California was confirmed as Secretary of Energy at the Department of Energy."
+- Prefer person facts from the source (prior titles, career notes in the nomination text). Never write a generic definition of the office or agency.
+- If official facts are thin (only name + office), write a plain identity line. Example: "Jane Doe of California was confirmed as Secretary of Energy at the Department of Energy."
 - Never mention PN numbers, nomination citations, or roll-call numbers in any field.
 - Keep language neutral and concise (grade 7-8).
 - "what_was_confirmed" must be a single sentence ending with . ! or ?

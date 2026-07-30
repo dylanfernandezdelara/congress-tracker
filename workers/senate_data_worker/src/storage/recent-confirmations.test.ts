@@ -1,12 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { selectRecentConfirmationVotes } from "../d1/confirmation-votes";
+import { selectMemberVotesForRollKeys } from "../d1/member-votes";
+import { hasRealMemberRoster } from "../d1/members";
 import { buildRecentConfirmations } from "./recent-confirmations";
 
 vi.mock("../d1/confirmation-votes", () => ({
   selectRecentConfirmationVotes: vi.fn(),
 }));
+vi.mock("../d1/member-votes", () => ({
+  selectMemberVotesForRollKeys: vi.fn(),
+}));
+vi.mock("../d1/members", () => ({
+  hasRealMemberRoster: vi.fn(),
+}));
 
 const mockSelect = vi.mocked(selectRecentConfirmationVotes);
+const mockMemberVotes = vi.mocked(selectMemberVotesForRollKeys);
+const mockHasRoster = vi.mocked(hasRealMemberRoster);
 
 function sampleRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -45,7 +55,11 @@ function sampleRow(overrides: Record<string, unknown> = {}) {
 describe("buildRecentConfirmations", () => {
   beforeEach(() => {
     mockSelect.mockReset();
+    mockMemberVotes.mockReset();
+    mockHasRoster.mockReset();
     mockSelect.mockResolvedValue([sampleRow()] as never);
+    mockMemberVotes.mockResolvedValue([]);
+    mockHasRoster.mockResolvedValue(false);
   });
 
   it("maps joined rows into the public confirmations envelope", async () => {
@@ -66,7 +80,56 @@ describe("buildRecentConfirmations", () => {
       congress_gov_url: "https://www.congress.gov/nomination/119th-congress/100",
       wikipedia_url: null,
       wikipedia_extract: null,
+      party_splits: [],
     });
+  });
+
+  it("attaches party splits from member votes on the confirmation roll", async () => {
+    mockMemberVotes.mockResolvedValue([
+      {
+        bioguide_id: "S000001",
+        party: "R",
+        position: "Yea",
+        chamber: "Senate",
+        congress: 119,
+        session: 2,
+        roll_number: 165,
+      },
+      {
+        bioguide_id: "S000002",
+        party: "R",
+        position: "Yea",
+        chamber: "Senate",
+        congress: 119,
+        session: 2,
+        roll_number: 165,
+      },
+      {
+        bioguide_id: "S000003",
+        party: "D",
+        position: "Nay",
+        chamber: "Senate",
+        congress: 119,
+        session: 2,
+        roll_number: 165,
+      },
+      {
+        bioguide_id: "S000004",
+        party: "D",
+        position: "Yea",
+        chamber: "Senate",
+        congress: 119,
+        session: 2,
+        roll_number: 165,
+      },
+    ]);
+
+    const env = { DB: {} as D1Database } as import("../config").Env;
+    const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(body.confirmations[0]?.party_splits).toEqual([
+      { party: "D", yeas: 1, nays: 1, party_line: "yea" },
+      { party: "R", yeas: 2, nays: 0, party_line: "yea" },
+    ]);
   });
 
   it("surfaces Wikipedia as secondary extract without replacing official About", async () => {

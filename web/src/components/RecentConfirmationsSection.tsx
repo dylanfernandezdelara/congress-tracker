@@ -1,9 +1,13 @@
 import { useId, useState } from 'react'
 
-import { wikipediaExtractAddsDetail } from '@congress-tracker/shared/confirmation-about'
+import {
+  confirmationOppositionNote,
+  selectConfirmationAbout,
+} from '@congress-tracker/shared/confirmation-about'
 
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
+import { formatPartySplits } from '../utils/partySplit'
 import { ExpandChevron } from './ExpandChevron'
 import { FeedRowDate } from './FeedRowDate'
 
@@ -53,11 +57,14 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
   const headlineId = useId()
   const key = confirmationKey(item)
   const headline = confirmationHeadline(item)
-  const officialAbout = item.background?.trim() || null
-  const wikiExtract = item.wikipedia_extract?.trim() || null
-  const showWikiExtract = wikipediaExtractAddsDetail(officialAbout, wikiExtract)
+  const about = selectConfirmationAbout({
+    officialAbout: item.background,
+    wikipediaExtract: item.wikipedia_extract,
+  })
+  const opposition = confirmationOppositionNote(item.party_splits ?? [])
   const organization = item.organization?.trim() || null
   const margin = item.yeas - item.nays
+  const partySplitLabel = formatPartySplits(item.party_splits ?? [])
   const wikiArticleUrl = item.wikipedia_url?.trim() || null
   const accessibleName = primaryNomineeName(item) || headline
 
@@ -86,6 +93,11 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
                 {item.yeas}–{item.nays}
                 {margin !== 0 ? ` · ${margin > 0 ? '+' : ''}${margin}` : ''}
               </span>
+              {partySplitLabel ? (
+                <span className="feed-row-chip feed-row-chip--margin" data-confirmation-party-split>
+                  {partySplitLabel}
+                </span>
+              ) : null}
               {organization ? <span className="feed-row-chip">{organization}</span> : null}
             </div>
           </div>
@@ -100,44 +112,51 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
         >
           {isExpanded ? (
             <div className="recent-confirmations-detail">
-              {officialAbout ? (
+              {about.text ? (
                 <section className="recent-confirmations-detail-block">
                   <h4 className="recent-confirmations-detail-label">About</h4>
-                  <p className="recent-confirmations-detail-text">{officialAbout}</p>
+                  <p className="recent-confirmations-detail-text">{about.text}</p>
+                  {about.source === 'wikipedia' ? (
+                    <p className="recent-confirmations-detail-source">From Wikipedia</p>
+                  ) : null}
                 </section>
               ) : null}
-              {showWikiExtract && wikiExtract ? (
+              {opposition ? (
                 <section className="recent-confirmations-detail-block">
-                  <h4 className="recent-confirmations-detail-label">More background</h4>
-                  <p className="recent-confirmations-detail-text">{wikiExtract}</p>
-                  <p className="recent-confirmations-detail-source">From Wikipedia</p>
+                  <h4 className="recent-confirmations-detail-label">Vote</h4>
+                  <p className="recent-confirmations-detail-text">{opposition}</p>
                 </section>
               ) : null}
-              {!officialAbout && !showWikiExtract ? (
+              {!about.text && !opposition ? (
                 <p className="text-[13px] text-secondary">
                   Confirmation details are still being prepared.
                 </p>
               ) : null}
-              <div className="recent-confirmations-links">
+              <p className="recent-confirmations-sources">
                 <a
                   href={item.congress_gov_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="congress-link"
+                  className="recent-confirmations-source-link"
                 >
-                  Congress.gov ↗
+                  Congress.gov
                 </a>
                 {wikiArticleUrl ? (
-                  <a
-                    href={wikiArticleUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="congress-link"
-                  >
-                    Wikipedia ↗
-                  </a>
+                  <>
+                    <span className="recent-confirmations-source-sep" aria-hidden="true">
+                      ·
+                    </span>
+                    <a
+                      href={wikiArticleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="recent-confirmations-source-link"
+                    >
+                      Wikipedia
+                    </a>
+                  </>
                 ) : null}
-              </div>
+              </p>
             </div>
           ) : null}
         </div>

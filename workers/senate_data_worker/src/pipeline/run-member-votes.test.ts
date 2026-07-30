@@ -4,6 +4,7 @@ import type { RollCallKey } from "../d1/member-votes";
 
 const {
   selectPassageRollCalls,
+  selectConfirmationRollCalls,
   countMemberVotesForRoll,
   countLisMemberVotesForRoll,
   deleteMemberVotesForRoll,
@@ -18,6 +19,11 @@ const {
   refreshMemberSessionStatsForBioguides,
 } = vi.hoisted(() => ({
   selectPassageRollCalls: vi.fn(),
+  selectConfirmationRollCalls: vi.fn(
+    async (): Promise<
+      Array<{ chamber: string; congress: number; session: number; roll_number: number }>
+    > => []
+  ),
   countMemberVotesForRoll: vi.fn(),
   countLisMemberVotesForRoll: vi.fn(async () => 0),
   deleteMemberVotesForRoll: vi.fn(async () => {}),
@@ -40,6 +46,7 @@ const {
 vi.mock("../d1/schema", () => ({ ensureSchema: vi.fn(async () => {}) }));
 vi.mock("../d1/member-votes", () => ({
   selectPassageRollCalls,
+  selectConfirmationRollCalls,
   countMemberVotesForRoll,
   countLisMemberVotesForRoll,
   deleteMemberVotesForRoll,
@@ -109,6 +116,7 @@ function fakeFetch(memberIds: string[]) {
 describe("runMemberVotesPipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    selectConfirmationRollCalls.mockResolvedValue([]);
     countMemberVotesForRoll.mockResolvedValue(0);
     countLisMemberVotesForRoll.mockResolvedValue(0);
     fetchHouseMemberVotes.mockImplementation(fakeFetch(["A", "B"]));
@@ -134,6 +142,21 @@ describe("runMemberVotesPipeline", () => {
     });
     selectMemberVotesForRoll.mockResolvedValue([]);
     refreshMemberSessionStatsForBioguides.mockResolvedValue(undefined);
+  });
+
+  it("ingests confirmation rolls into member_votes without session stats", async () => {
+    selectPassageRollCalls.mockResolvedValue([]);
+    selectConfirmationRollCalls.mockResolvedValue([
+      { chamber: "Senate", congress: 119, session: 2, roll_number: 9101 },
+    ]);
+    fetchSenateMemberVotes.mockImplementation(fakeFetch(["S000001", "S000002"]));
+
+    const result = await runMemberVotesPipeline(env);
+
+    expect(result.rollsProcessed).toBe(1);
+    expect(upsertMemberVotesBatch).toHaveBeenCalledTimes(1);
+    expect(getVoteRollMeta).not.toHaveBeenCalled();
+    expect(applyRollToMemberSessionStats).not.toHaveBeenCalled();
   });
 
   it("batches writes and dedupes members across rolls", async () => {

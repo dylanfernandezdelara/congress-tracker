@@ -77,4 +77,38 @@ describe("acceptWikipediaSummary", () => {
     );
     expect(hit).toBeNull();
   });
+
+  it("rejects office/role pages even when they mention secretary", () => {
+    const hit = acceptWikipediaSummary(
+      {
+        type: "standard",
+        title: "United States Secretary of Energy",
+        description: "U.S. cabinet position",
+        extract:
+          "The United States secretary of energy is the head of the U.S. Department of Energy and a member of the president's cabinet.",
+        content_urls: {
+          desktop: { page: "https://en.wikipedia.org/wiki/United_States_Secretary_of_Energy" },
+        },
+      },
+      "Jane Doe"
+    );
+    expect(hit).toBeNull();
+  });
+
+  it("rejects extracts that define the office without naming the person", () => {
+    const hit = acceptWikipediaSummary(
+      {
+        type: "standard",
+        title: "Jane Doe (energy official)",
+        description: "American official",
+        extract:
+          "The secretary of energy is the head of the U.S. Department of Energy and a member of the president's cabinet.",
+        content_urls: {
+          desktop: { page: "https://en.wikipedia.org/wiki/Jane_Doe_(energy_official)" },
+        },
+      },
+      "Jane Doe"
+    );
+    expect(hit).toBeNull();
+  });
 });
