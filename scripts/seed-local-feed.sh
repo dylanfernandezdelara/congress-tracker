@@ -218,7 +218,7 @@ VALUES
    'Jane Doe, of California, to be Secretary of Energy. (local sample)
 Position: Secretary of Energy (Department of Energy)
 Nominee(s): Jane Doe (CA)',
-   '{"headline":"Jane Doe confirmed as Energy Secretary (local sample)","what_was_confirmed":"The Senate confirmed Jane Doe as Secretary of Energy.","background":"Jane Doe of California was nominated to lead the Department of Energy.","key_points":["Cabinet-level confirmation","Local seed sample for offline development"]}',
+   '{"headline":"Jane Doe confirmed as Energy Secretary (local sample)","what_was_confirmed":"The Senate confirmed Jane Doe as Secretary of Energy.","background":"Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.","key_points":[],"wikipedia_url":"https://en.wikipedia.org/wiki/Jane_Doe","wikipedia_extract":"Jane Doe is an American energy executive and former California energy commissioner who led statewide grid reliability and clean-power programs before her nomination."}',
    '${D_RECENT}T00:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
   (119, 101, 0, 'PN101',
    'Alex Rivera, of Texas, to be an Assistant Secretary of State. (local sample)',
@@ -228,7 +228,7 @@ Nominee(s): Jane Doe (CA)',
    'Alex Rivera, of Texas, to be an Assistant Secretary of State. (local sample)
 Position: Assistant Secretary of State (Department of State)
 Nominee(s): Alex Rivera (TX)',
-   '{"headline":"Alex Rivera confirmed for State Department post (local sample)","what_was_confirmed":"The Senate confirmed Alex Rivera as an Assistant Secretary of State.","background":"Alex Rivera of Texas was nominated for a senior State Department role.","key_points":["Senate advise-and-consent confirmation","Local seed sample"]}',
+   '{"headline":"Alex Rivera confirmed for State Department post (local sample)","what_was_confirmed":"The Senate confirmed Alex Rivera as an Assistant Secretary of State.","background":"Alex Rivera of TX was confirmed as Assistant Secretary of State at the Department of State.","key_points":[],"wikipedia_url":"https://en.wikipedia.org/wiki/Alex_Rivera","wikipedia_extract":"Alex Rivera is an American diplomat and former Texas foreign-affairs adviser who worked on Western Hemisphere policy before joining the State Department."}',
    '${D_MID}T00:00:00.000Z', '${D_MID}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO confirmation_votes
@@ -236,7 +236,7 @@ INSERT OR REPLACE INTO confirmation_votes
    question, result, yeas, nays, vote_date)
 VALUES
   ('Senate', 119, 2, 9101, 119, 100, 0, 'On the Nomination', 'Confirmed', 58, 40, '${D_RECENT}'),
-  ('Senate', 119, 2, 9102, 119, 101, 0, 'On the Nomination', 'Confirmed', 62, 35, '${D_MID}');
+  ('Senate', 119, 2, 9102, 119, 101, 0, 'On the Nomination', 'Confirmed', 62, 36, '${D_MID}');
 SQL
 
 generate_roster_sql() {
@@ -292,6 +292,25 @@ for bid, _, chamber, _, _, _, _ in spotlight_members:
     else:
         position = "Nay" if bid == "LOCAL:S001" else "Yea"
         vote_rows.append(f"  ('Senate', 119, 2, 9002, '{bid}', '{position}')")
+
+# Confirmation rolls 9101 (58–40) and 9102 (62–35): party-line contested confirms.
+# R all Yea; most D Nay; Independents present but not counted in yea/nay tallies below.
+senate_voters = [("LOCAL:S001", "R"), ("LOCAL:S002", "R")]
+for idx, party in enumerate(senate_rest, start=1):
+    senate_voters.append((f"LOCAL:SR{idx:03d}", party))
+
+r_voters = [bid for bid, party in senate_voters if party == "R"]
+d_voters = [bid for bid, party in senate_voters if party == "D"]
+# 9101: R 53–0 · D 5–40  → 58–40
+for bid in r_voters:
+    vote_rows.append(f"  ('Senate', 119, 2, 9101, '{bid}', 'Yea')")
+for i, bid in enumerate(d_voters):
+    vote_rows.append(f"  ('Senate', 119, 2, 9101, '{bid}', '{'Yea' if i < 5 else 'Nay'}')")
+# 9102: R 53–0 · D 9–36 → 62–36
+for bid in r_voters:
+    vote_rows.append(f"  ('Senate', 119, 2, 9102, '{bid}', 'Yea')")
+for i, bid in enumerate(d_voters):
+    vote_rows.append(f"  ('Senate', 119, 2, 9102, '{bid}', '{'Yea' if i < 9 else 'Nay'}')")
 
 print("INSERT OR REPLACE INTO members (bioguide_id, name, chamber, party, state, district, updated_at) VALUES")
 print(",\n".join(member_rows) + ";")

@@ -262,10 +262,16 @@ export async function countMemberVotesInSession(
   session: number
 ): Promise<number> {
   await ensureSchema(db);
+  // Passage rolls only — confirmation member_votes must not inflate session tallies.
   const row = await db
     .prepare(
-      `SELECT COUNT(*) AS count FROM member_votes
-       WHERE congress = ? AND session = ?`
+      `SELECT COUNT(*) AS count
+       FROM member_votes mv
+       JOIN votes v
+         ON v.chamber = mv.chamber AND v.congress = mv.congress
+        AND v.session = mv.session AND v.roll_number = mv.roll_number
+        AND v.is_passage = 1
+       WHERE mv.congress = ? AND mv.session = ?`
     )
     .bind(congress, session)
     .first<{ count: number }>();
@@ -339,10 +345,18 @@ export async function selectDriftedSessionRolls(
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `WITH vote_counts AS (
+      `WITH passage_votes AS (
+         SELECT mv.bioguide_id, mv.chamber, mv.roll_number
+         FROM member_votes mv
+         JOIN votes v
+           ON v.chamber = mv.chamber AND v.congress = mv.congress
+          AND v.session = mv.session AND v.roll_number = mv.roll_number
+          AND v.is_passage = 1
+         WHERE mv.congress = ?1 AND mv.session = ?2
+       ),
+       vote_counts AS (
          SELECT bioguide_id, COUNT(*) AS votes_cast
-         FROM member_votes
-         WHERE congress = ?1 AND session = ?2
+         FROM passage_votes
          GROUP BY bioguide_id
        ),
        drifted_members AS (
@@ -357,27 +371,22 @@ export async function selectDriftedSessionRolls(
          FROM member_session_stats mss
          WHERE mss.congress = ?1 AND mss.session = ?2
            AND NOT EXISTS (
-             SELECT 1 FROM member_votes mv
-             WHERE mv.bioguide_id = mss.bioguide_id
-               AND mv.congress = mss.congress
-               AND mv.session = mss.session
+             SELECT 1 FROM passage_votes pv
+             WHERE pv.bioguide_id = mss.bioguide_id
            )
        ),
        drifted_rolls AS (
-         SELECT DISTINCT mv.chamber AS chamber, mv.roll_number AS roll_number
-         FROM member_votes mv
-         WHERE mv.congress = ?1 AND mv.session = ?2
-           AND mv.bioguide_id IN (SELECT bioguide_id FROM drifted_members)
+         SELECT DISTINCT pv.chamber AS chamber, pv.roll_number AS roll_number
+         FROM passage_votes pv
+         WHERE pv.bioguide_id IN (SELECT bioguide_id FROM drifted_members)
          UNION
          SELECT mcv.chamber, mcv.roll_number
          FROM member_cross_votes mcv
          WHERE mcv.congress = ?1 AND mcv.session = ?2
            AND NOT EXISTS (
-             SELECT 1 FROM member_votes mv
-             WHERE mv.chamber = mcv.chamber
-               AND mv.congress = mcv.congress
-               AND mv.session = mcv.session
-               AND mv.roll_number = mcv.roll_number
+             SELECT 1 FROM passage_votes pv
+             WHERE pv.chamber = mcv.chamber
+               AND pv.roll_number = mcv.roll_number
            )
        )
        SELECT chamber, roll_number
@@ -389,7 +398,7 @@ export async function selectDriftedSessionRolls(
   return results ?? [];
 }
 
-/** Bioguides with session stats rows but no member_votes (orphans). */
+/** Bioguides with session stats rows but no passage member_votes (orphans). */
 export async function selectOrphanSessionStatsBioguides(
   db: D1Database,
   congress: number,
@@ -403,6 +412,10 @@ export async function selectOrphanSessionStatsBioguides(
        WHERE mss.congress = ? AND mss.session = ?
          AND NOT EXISTS (
            SELECT 1 FROM member_votes mv
+           JOIN votes v
+             ON v.chamber = mv.chamber AND v.congress = mv.congress
+            AND v.session = mv.session AND v.roll_number = mv.roll_number
+            AND v.is_passage = 1
            WHERE mv.bioguide_id = mss.bioguide_id
              AND mv.congress = mss.congress
              AND mv.session = mss.session
@@ -432,10 +445,14 @@ async function tallyPositionsForBioguides(
     const placeholders = chunk.map(() => "?").join(", ");
     const { results } = await db
       .prepare(
-        `SELECT bioguide_id, position
-         FROM member_votes
-         WHERE congress = ? AND session = ?
-           AND bioguide_id IN (${placeholders})`
+        `SELECT mv.bioguide_id, mv.position
+         FROM member_votes mv
+         JOIN votes v
+           ON v.chamber = mv.chamber AND v.congress = mv.congress
+          AND v.session = mv.session AND v.roll_number = mv.roll_number
+          AND v.is_passage = 1
+         WHERE mv.congress = ? AND mv.session = ?
+           AND mv.bioguide_id IN (${placeholders})`
       )
       .bind(congress, session, ...chunk)
       .all<{ bioguide_id: string; position: string }>();

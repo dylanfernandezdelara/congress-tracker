@@ -185,9 +185,16 @@ describe('Home', () => {
           vote_date: '2026-06-12',
           headline: 'Jane Doe confirmed as Energy Secretary',
           what_was_confirmed: 'The Senate confirmed Jane Doe as Secretary of Energy.',
-          background: 'Jane Doe of California was nominated to lead the Department of Energy.',
-          key_points: ['Cabinet-level confirmation'],
+          background:
+            'Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.',
+          key_points: [],
           congress_gov_url: 'https://www.congress.gov/nomination/119th-congress/100',
+          wikipedia_url: null,
+          wikipedia_extract: null,
+          party_splits: [
+            { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
+            { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
+          ],
         },
       ],
     })

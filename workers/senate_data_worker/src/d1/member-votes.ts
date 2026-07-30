@@ -58,6 +58,25 @@ export async function selectPassageRollCalls(
   return results ?? [];
 }
 
+/** Nomination confirmation rolls for member-vote ingest (party splits only; no bill stats). */
+export async function selectConfirmationRollCalls(
+  db: D1Database,
+  congress: number,
+  session: number
+): Promise<RollCallKey[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT chamber, congress, session, roll_number
+       FROM confirmation_votes
+       WHERE congress = ? AND session = ?
+       ORDER BY vote_date DESC, roll_number DESC`
+    )
+    .bind(congress, session)
+    .all<RollCallKey>();
+  return results ?? [];
+}
+
 export async function countMemberVotesForRoll(
   db: D1Database,
   roll: RollCallKey

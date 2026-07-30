@@ -24,9 +24,15 @@ function sampleConfirmation(overrides: Partial<RecentConfirmationItem> = {}): Re
     vote_date: '2026-06-12',
     headline: 'Jane Doe confirmed as Energy Secretary',
     what_was_confirmed: 'The Senate confirmed Jane Doe as Secretary of Energy.',
-    background: 'Jane Doe of California was nominated to lead the Department of Energy.',
-    key_points: ['Cabinet-level confirmation'],
+    background: 'Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.',
+    key_points: [],
     congress_gov_url: 'https://www.congress.gov/nomination/119th-congress/100',
+    wikipedia_url: null,
+    wikipedia_extract: null,
+    party_splits: [
+      { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
+      { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
+    ],
     ...overrides,
   }
 }
@@ -39,7 +45,7 @@ describe('RecentConfirmationsSection', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows confirmation headline, org chip, and background teaser without a duplicate role header', () => {
+  it('shows a single party-split vote chip without duplicate totals or PN', () => {
     render(
       <RecentConfirmationsSection
         confirmations={[sampleConfirmation()]}
@@ -52,29 +58,80 @@ describe('RecentConfirmationsSection', () => {
     expect(screen.getByText('Jane Doe confirmed as Energy Secretary')).toBeInTheDocument()
     expect(screen.getByText('Confirmed')).toBeInTheDocument()
     expect(screen.getByText('Department of Energy')).toBeInTheDocument()
+    expect(screen.getByText('R 53–0 · D 5–40')).toBeInTheDocument()
+    // One vote story only — no separate total/margin chip alongside party splits.
+    expect(screen.queryByText(/58–40/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\+18/)).not.toBeInTheDocument()
+    expect(screen.queryByText('PN100')).not.toBeInTheDocument()
     expect(
-      screen.getByText('Jane Doe of California was nominated to lead the Department of Energy.'),
-    ).toBeInTheDocument()
-    // Role was previously a second header that restated the headline ("Secretary of Energy · …").
-    expect(screen.queryByText('Secretary of Energy · Department of Energy')).not.toBeInTheDocument()
+      screen.queryByText(
+        'Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.',
+      ),
+    ).not.toBeInTheDocument()
   })
 
-  it('omits teaser when API background is null (org chip remains)', () => {
+  it('falls back to yeas–nays when party splits are unavailable', () => {
     render(
       <RecentConfirmationsSection
-        confirmations={[sampleConfirmation({ background: null })]}
+        confirmations={[sampleConfirmation({ party_splits: [] })]}
         loading={false}
         error={null}
       />,
     )
 
-    expect(screen.getByText('Department of Energy')).toBeInTheDocument()
-    expect(
-      screen.queryByText('Jane Doe of California was nominated to lead the Department of Energy.'),
-    ).not.toBeInTheDocument()
+    expect(screen.getByText('58–40 · +18')).toBeInTheDocument()
+    expect(screen.queryByText(/R 53–0/)).not.toBeInTheDocument()
   })
 
-  it('expands background detail without restating the confirmation as a second header', () => {
+  it('prefers person Wikipedia About and shows opposition plus compact sources', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            wikipedia_url: 'https://en.wikipedia.org/wiki/Jane_Doe_(politician)',
+            wikipedia_extract:
+              'Jane Doe is an American energy official who previously led state clean-energy programs.',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    expect(screen.getByText('About')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Jane Doe is an American energy official who previously led state clean-energy programs.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText('From Wikipedia')).toBeInTheDocument()
+    expect(
+      screen.queryByText(
+        'Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.',
+      ),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('Vote')).toBeInTheDocument()
+    expect(
+      screen.getByText('Most Democrats voted against confirmation (D 5–40).'),
+    ).toBeInTheDocument()
+
+    const congressLink = screen.getByRole('link', { name: 'Congress.gov' })
+    const wikiLink = screen.getByRole('link', { name: 'Wikipedia' })
+    expect(congressLink).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/nomination/119th-congress/100',
+    )
+    expect(wikiLink).toHaveAttribute(
+      'href',
+      'https://en.wikipedia.org/wiki/Jane_Doe_(politician)',
+    )
+    expect(
+      congressLink.compareDocumentPosition(wikiLink) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('does not show a Wikipedia link without a confident article', () => {
     render(
       <RecentConfirmationsSection
         confirmations={[sampleConfirmation()]}
@@ -83,18 +140,8 @@ describe('RecentConfirmationsSection', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Expand details for PN100/i }))
-    expect(screen.queryByText('What was confirmed')).not.toBeInTheDocument()
-    expect(
-      screen.queryByText('The Senate confirmed Jane Doe as Secretary of Energy.'),
-    ).not.toBeInTheDocument()
-    expect(screen.getByText('Background')).toBeInTheDocument()
-    expect(
-      screen.getByText('Jane Doe of California was nominated to lead the Department of Energy.'),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Read on congress.gov/i })).toHaveAttribute(
-      'href',
-      'https://www.congress.gov/nomination/119th-congress/100',
-    )
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    expect(screen.queryByRole('link', { name: 'Wikipedia' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Congress.gov' })).toBeInTheDocument()
   })
 })

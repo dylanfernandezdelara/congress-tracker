@@ -1,6 +1,7 @@
 import {
   normalizeDigestBullets,
   normalizeDigestLead,
+  truncateAtSentenceBoundary,
 } from "../../../../shared/feed-content";
 import type { ConfirmationBackgroundContent } from "../../../../shared/confirmations-api-types";
 import type { Env } from "../config";
@@ -12,6 +13,12 @@ interface ChatResponse {
 }
 
 const MAX_TOKENS = 768;
+/** Person blurbs may be 1–2 sentences; keep more than a single lead sentence. */
+const BACKGROUND_MAX_CHARS = 320;
+
+function normalizePersonBackground(text: string): string {
+  return truncateAtSentenceBoundary(text.trim(), BACKGROUND_MAX_CHARS);
+}
 
 export function parseConfirmationBackgroundJson(
   text: string
@@ -24,10 +31,11 @@ export function parseConfirmationBackgroundJson(
     if (!parsed.headline || !parsed.what_was_confirmed || !parsed.background) {
       return null;
     }
+    // wikipedia_url is owned by enrichment, never by the model.
     return {
       headline: parsed.headline.trim(),
       what_was_confirmed: normalizeDigestLead(parsed.what_was_confirmed),
-      background: normalizeDigestLead(parsed.background),
+      background: normalizePersonBackground(parsed.background),
       key_points: normalizeDigestBullets(
         Array.isArray(parsed.key_points) ? parsed.key_points : []
       ),

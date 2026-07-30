@@ -1,9 +1,13 @@
 import { useId, useState } from 'react'
 
-import { formatCollapsedDigestLead } from '@congress-tracker/shared/feed-content'
+import {
+  confirmationOppositionNote,
+  selectConfirmationAbout,
+} from '@congress-tracker/shared/confirmation-about'
 
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
+import { formatPartySplits } from '../utils/partySplit'
 import { ExpandChevron } from './ExpandChevron'
 import { FeedRowDate } from './FeedRowDate'
 
@@ -18,31 +22,37 @@ function confirmationKey(item: RecentConfirmationItem): string {
   return `${item.chamber}:${item.congress}:${item.session}:${item.roll_number}`
 }
 
-function nomineeLabel(item: RecentConfirmationItem): string {
-  if (item.nominee_names.length === 0) return item.citation
-  if (item.nominee_names.length === 1) {
-    const nominee = item.nominee_names[0]!
-    return nominee.state ? `${nominee.display_name} (${nominee.state})` : nominee.display_name
-  }
-  return `${item.nominee_names[0]!.display_name} +${item.nominee_names.length - 1}`
+function voteChipLabel(item: RecentConfirmationItem): string {
+  const party = formatPartySplits(item.party_splits ?? [])
+  if (party) return party
+  const margin = item.yeas - item.nays
+  return margin === 0
+    ? `${item.yeas}–${item.nays}`
+    : `${item.yeas}–${item.nays} · ${margin > 0 ? '+' : ''}${margin}`
 }
 
-type ConfirmationItemRowProps = {
+function ConfirmationItemRow({
+  item,
+  isExpanded,
+  onToggle,
+}: {
   item: RecentConfirmationItem
   isExpanded: boolean
   onToggle: (key: string) => void
-}
-
-function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRowProps) {
+}) {
   const detailId = useId()
   const headlineId = useId()
-  const summaryId = useId()
   const key = confirmationKey(item)
-  const headline = item.headline?.trim() || nomineeLabel(item)
-  const background = item.background?.trim() || null
-  const teaser = background ? formatCollapsedDigestLead(background) : null
+  const headline = item.headline?.trim() || 'Senate confirmation'
+  const accessibleName = item.nominee_names[0]?.display_name?.trim() || headline
+  const about = selectConfirmationAbout({
+    officialAbout: item.background,
+    wikipediaExtract: item.wikipedia_extract,
+  })
+  const opposition = confirmationOppositionNote(item.party_splits ?? [])
   const organization = item.organization?.trim() || null
-  const margin = item.yeas - item.nays
+  const voteLabel = voteChipLabel(item)
+  const wikiArticleUrl = item.wikipedia_url?.trim() || null
 
   return (
     <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
@@ -52,8 +62,7 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${item.citation}`}
-          aria-describedby={!isExpanded && teaser ? summaryId : undefined}
+          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${accessibleName}`}
           onClick={() => onToggle(key)}
         >
           <FeedRowDate dateTime={item.vote_date} primary={formatVoteDate(item.vote_date)} />
@@ -66,19 +75,9 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
             </div>
             <div className="feed-row-meta-row">
               <span className="feed-row-badge feed-row-badge--passed text-pass">Confirmed</span>
-              <span className="feed-row-chip">Senate</span>
-              <span className="feed-row-chip feed-row-chip--margin">
-                {item.yeas}–{item.nays}
-                {margin !== 0 ? ` · ${margin > 0 ? '+' : ''}${margin}` : ''}
-              </span>
-              <span className="feed-row-chip">{item.citation}</span>
+              <span className="feed-row-chip feed-row-chip--margin">{voteLabel}</span>
               {organization ? <span className="feed-row-chip">{organization}</span> : null}
             </div>
-            {!isExpanded && teaser ? (
-              <div id={summaryId} className="feed-row-summary">
-                <p className="feed-row-teaser">{teaser}</p>
-              </div>
-            ) : null}
           </div>
         </button>
 
@@ -86,40 +85,56 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
           id={detailId}
           className="feed-row-detail-panel"
           role="region"
-          aria-label={`Details for ${item.citation}`}
+          aria-label={`Details for ${accessibleName}`}
           hidden={!isExpanded}
         >
           {isExpanded ? (
             <div className="recent-confirmations-detail">
-              {background ? (
+              {about.text ? (
                 <section className="recent-confirmations-detail-block">
-                  <h4 className="recent-confirmations-detail-label">Background</h4>
-                  <p className="recent-confirmations-detail-text">{background}</p>
+                  <h4 className="recent-confirmations-detail-label">About</h4>
+                  <p className="recent-confirmations-detail-text">{about.text}</p>
+                  {about.source === 'wikipedia' ? (
+                    <p className="recent-confirmations-detail-source">From Wikipedia</p>
+                  ) : null}
                 </section>
               ) : null}
-              {item.key_points.length > 0 ? (
+              {opposition ? (
                 <section className="recent-confirmations-detail-block">
-                  <h4 className="recent-confirmations-detail-label">Key points</h4>
-                  <ul className="recent-confirmations-detail-points">
-                    {item.key_points.map((point) => (
-                      <li key={point}>{point}</li>
-                    ))}
-                  </ul>
+                  <h4 className="recent-confirmations-detail-label">Vote</h4>
+                  <p className="recent-confirmations-detail-text">{opposition}</p>
                 </section>
               ) : null}
-              {!background && item.key_points.length === 0 ? (
+              {!about.text && !opposition ? (
                 <p className="text-[13px] text-secondary">
                   Confirmation details are still being prepared.
                 </p>
               ) : null}
-              <a
-                href={item.congress_gov_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="congress-link"
-              >
-                Read on congress.gov ↗
-              </a>
+              <p className="recent-confirmations-sources">
+                <a
+                  href={item.congress_gov_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="recent-confirmations-source-link"
+                >
+                  Congress.gov
+                </a>
+                {wikiArticleUrl ? (
+                  <>
+                    <span className="recent-confirmations-source-sep" aria-hidden="true">
+                      ·
+                    </span>
+                    <a
+                      href={wikiArticleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="recent-confirmations-source-link"
+                    >
+                      Wikipedia
+                    </a>
+                  </>
+                ) : null}
+              </p>
             </div>
           ) : null}
         </div>
@@ -135,10 +150,6 @@ export function RecentConfirmationsSection({
   onRetry,
 }: RecentConfirmationsSectionProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
-
-  const handleToggle = (key: string) => {
-    setExpandedKey((prev) => (prev === key ? null : key))
-  }
 
   if (error) {
     return (
@@ -161,9 +172,7 @@ export function RecentConfirmationsSection({
     )
   }
 
-  if (!confirmations || confirmations.length === 0) {
-    return null
-  }
+  if (!confirmations || confirmations.length === 0) return null
 
   return (
     <section className="recent-confirmations" aria-label="Recent confirmations">
@@ -176,7 +185,7 @@ export function RecentConfirmationsSection({
               key={key}
               item={item}
               isExpanded={expandedKey === key}
-              onToggle={handleToggle}
+              onToggle={(next) => setExpandedKey((prev) => (prev === next ? null : next))}
             />
           )
         })}

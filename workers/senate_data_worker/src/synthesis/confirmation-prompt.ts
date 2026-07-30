@@ -1,5 +1,4 @@
 import {
-  FEED_BULLET_MAX_WORDS,
   FEED_COLLAPSED_MAX_BULLETS,
   FEED_LEAD_MAX_WORDS,
 } from "../../../../shared/feed-content";
@@ -18,21 +17,23 @@ OFFICIAL DESCRIPTION: ${params.description ?? "N/A"}
 POSITION: ${params.positionTitle ?? "N/A"}
 ORGANIZATION: ${params.organization ?? "N/A"}
 
-SOURCE TEXT:
+SOURCE TEXT (Congress.gov nomination metadata only):
 ${params.rawBackground}
 
 Return ONLY valid JSON:
 {
-  "headline": "8-12 words naming the person and role when possible",
+  "headline": "8-12 words naming the person and the role (e.g. Jane Doe confirmed as Energy Secretary)",
   "what_was_confirmed": "Exactly one short sentence, max ${FEED_LEAD_MAX_WORDS} words, stating what the Senate confirmed",
-  "background": "1-2 short sentences, max ${FEED_LEAD_MAX_WORDS * 2} words total, on who the person is and the role/agency — grade 7-8 reading level",
-  "key_points": ["up to ${FEED_COLLAPSED_MAX_BULLETS} bullets, max ${FEED_BULLET_MAX_WORDS} words each"]
+  "background": "1-2 short sentences, max ${FEED_LEAD_MAX_WORDS * 2} words, about the PERSON — prior roles, experience, or qualifications stated in the source. Do not define the office.",
+  "key_points": ["up to ${FEED_COLLAPSED_MAX_BULLETS} bullets only if they add facts beyond the headline/background; otherwise []"]
 }
 
 Rules:
-- Use only facts from the source text and metadata above. Do not invent biography, prior jobs, or politics.
-- If the source is thin, keep "background" to what is known (name, state, office) and do not speculate.
-- Keep language neutral and concise.
+- Official-only source: use Congress.gov nomination metadata (description, position, organization, nominee name/state, intro text). Do not invent biography, prior jobs, education, or politics.
+- Prefer person facts from the source (prior titles, career notes in the nomination text). Never write a generic definition of the office or agency.
+- If official facts are thin (only name + office), write a plain identity line. Example: "Jane Doe of California was confirmed as Secretary of Energy at the Department of Energy."
+- Never mention PN numbers, nomination citations, or roll-call numbers in any field.
+- Keep language neutral and concise (grade 7-8).
 - "what_was_confirmed" must be a single sentence ending with . ! or ?
 - Prefer the nominee's name in the headline when present.`;
 }
