@@ -110,7 +110,7 @@ describe('App routing', () => {
     window.history.pushState({}, '', '/unknown-path')
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'Congress Tracker' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Track Congress' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
   })
