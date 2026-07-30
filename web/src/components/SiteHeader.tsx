@@ -7,7 +7,7 @@ export function SiteHeader() {
       <div className="site-header-inner">
         <div className="site-header-brand">
           <BrandFlagIcon />
-          <h1 className="site-header-title">Congress Tracker</h1>
+          <h1 className="site-header-title">Track Congress</h1>
         </div>
 
         <div className="site-header-actions">

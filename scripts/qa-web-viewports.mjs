@@ -113,8 +113,8 @@ async function auditHomePage(page) {
     }
 
     if (!heading) issues.push('page heading missing')
-    if (heading && heading.textContent?.trim() !== 'Congress Tracker') {
-      issues.push('page heading should read Congress Tracker')
+    if (heading && heading.textContent?.trim() !== 'Track Congress') {
+      issues.push('page heading should read Track Congress')
     }
     // Below the desktop rail breakpoint, Home stacks former rail content under the feed
     // (.home-mobile-rails). Desktop keeps sticky .home-rail columns instead.

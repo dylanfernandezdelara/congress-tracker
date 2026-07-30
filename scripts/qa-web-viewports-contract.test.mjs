@@ -81,7 +81,7 @@ test('qa:web covers home across the viewport/theme matrix', () => {
   // Home checks remain (feed row + brand heading).
   assert.match(qa, /Plain headline for readers/)
   assert.match(qa, /\.feed-row/)
-  assert.match(qa, /Congress Tracker/)
+  assert.match(qa, /Track Congress/)
 })
 
 test('viewport QA rule expects home matrix coverage', () => {
