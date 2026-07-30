@@ -42,11 +42,34 @@ function lastName(displayName: string): string | null {
   return parts[parts.length - 1] ?? null;
 }
 
-function nameLooksRelated(pageTitle: string, displayName: string): boolean {
-  const surname = lastName(displayName);
-  if (!surname || surname.length < 2) return false;
-  return pageTitle.toLowerCase().includes(surname.toLowerCase());
+function nameTokens(displayName: string): string[] {
+  return displayName
+    .trim()
+    .split(/\s+/)
+    .map((p) => p.replace(/[.,()'"]/g, ""))
+    .filter((p) => p.length >= 2);
 }
+
+function titleMatchesPersonName(pageTitle: string, displayName: string): boolean {
+  const tokens = nameTokens(displayName);
+  if (tokens.length === 0) return false;
+  const title = pageTitle.toLowerCase();
+  const surname = lastName(displayName);
+  if (!surname || !title.includes(surname.toLowerCase())) return false;
+  // Require first name (or first initial match) when available — surname alone is not enough.
+  if (tokens.length === 1) return true;
+  const given = tokens[0]!.toLowerCase();
+  if (title.includes(given)) return true;
+  // Allow "J. Doe" style titles for "Jane Doe".
+  if (given.length > 0 && title.includes(`${given[0]}.`)) return true;
+  return false;
+}
+
+const PERSON_ROLE_CUE =
+  /\b(politician|diplomat|judge|attorney|lawyer|governor|senator|representative|ambassador|secretary|admiral|general|professor|physician|business(?:person|man|woman)?|executive|official|nominee|cabinet|jurist|prosecutor|administrator)\b/i;
+
+const TITLE_PERSON_DISAMBIG =
+  /\((politician|judge|diplomat|lawyer|attorney|admiral|general|ambassador|official|business|academic)s?\)/i;
 
 function buildSearchQuery(params: {
   displayName: string;
@@ -88,7 +111,7 @@ async function fetchSummary(title: string): Promise<WikipediaSummaryResponse | n
   }
 }
 
-function acceptSummary(
+export function acceptWikipediaSummary(
   summary: WikipediaSummaryResponse,
   displayName: string
 ): WikipediaPersonHit | null {
@@ -97,14 +120,11 @@ function acceptSummary(
   const extract = summary.extract?.trim();
   const pageUrl = summary.content_urls?.desktop?.page?.trim();
   if (!title || !extract || !pageUrl) return null;
-  if (!nameLooksRelated(title, displayName)) return null;
-  // Prefer people pages; description often looks like "American politician".
-  const description = summary.description?.toLowerCase() ?? "";
-  const extractLower = extract.toLowerCase();
+  if (!titleMatchesPersonName(title, displayName)) return null;
+  const description = summary.description ?? "";
   const personCue =
-    /\b(politician|diplomat|judge|attorney|lawyer|governor|senator|representative|ambassador|secretary|admiral|general|professor|physician|business|executive|official|nominee|cabinet)\b/.test(
-      `${description} ${extractLower}`
-    ) || extractLower.includes(displayName.split(/\s+/).slice(-1)[0]?.toLowerCase() ?? "");
+    PERSON_ROLE_CUE.test(`${description} ${extract}`) ||
+    TITLE_PERSON_DISAMBIG.test(title);
   if (!personCue) return null;
   return { url: pageUrl, title, extract };
 }
@@ -140,7 +160,7 @@ export async function lookupNomineeWikipedia(params: {
       seen.add(key);
       const summary = await fetchSummary(title);
       if (!summary) continue;
-      const hit = acceptSummary(summary, displayName);
+      const hit = acceptWikipediaSummary(summary, displayName);
       if (hit) return hit;
     }
   }

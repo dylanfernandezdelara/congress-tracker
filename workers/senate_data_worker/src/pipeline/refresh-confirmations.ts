@@ -12,10 +12,14 @@ import {
   upsertNominationMetadata,
   upsertNominationStub,
   type ConfirmationBackgroundContent,
+  type NominationRow,
 } from "../d1/nominations";
 import { upsertConfirmationVote } from "../d1/confirmation-votes";
 import type { ConfirmationVote } from "../types";
-import { fetchNominationBundle } from "../sources/nomination-client";
+import {
+  buildRawBackgroundText,
+  fetchNominationBundle,
+} from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import {
   lookupNomineeWikipedia,
@@ -44,28 +48,45 @@ export async function persistConfirmationVotes(
   return votes.length;
 }
 
-function withWikipediaUrl(
-  background: ConfirmationBackgroundContent,
-  wikipediaUrl: string | null
-): ConfirmationBackgroundContent {
-  return { ...background, wikipedia_url: wikipediaUrl };
+/** True when raw text already records a Wikipedia attempt (hit or miss). */
+function rawMarksWikipediaAttempt(raw: string | null): boolean {
+  if (!raw) return false;
+  return (
+    raw.includes("\nBiography:") ||
+    raw.startsWith("Biography:") ||
+    raw.includes("\nWikipediaLookup: none")
+  );
 }
 
-function preferPersonBlurb(
-  current: string,
-  wikipediaExtract: string
-): string {
-  const blurb = truncateWikipediaExtract(wikipediaExtract);
-  if (!blurb) return current;
-  const currentTrimmed = current.trim();
-  // Replace thin "was nominated / confirmed as" restatements with the wiki blurb.
-  const restatesConfirmation =
-    /\b(was nominated|confirmed as|to lead|to be)\b/i.test(currentTrimmed) &&
-    currentTrimmed.split(/\s+/).length <= 28;
-  if (!currentTrimmed || restatesConfirmation || blurb.length > currentTrimmed.length + 20) {
-    return blurb;
-  }
-  return currentTrimmed;
+function wikipediaAttempted(background: ConfirmationBackgroundContent | null): boolean {
+  return Boolean(background && "wikipedia_url" in background);
+}
+
+function applyWikipediaToBackground(
+  background: ConfirmationBackgroundContent,
+  hit: { url: string; extract: string } | null
+): ConfirmationBackgroundContent {
+  if (!hit) return { ...background, wikipedia_url: null };
+  return {
+    ...background,
+    wikipedia_url: hit.url,
+    background: truncateWikipediaExtract(hit.extract) || background.background,
+  };
+}
+
+function nominationFieldsFromRow(row: NominationRow) {
+  return {
+    ref: {
+      congress: row.congress,
+      number: row.nomination_number,
+      partNumber: row.part_number,
+    },
+    description: row.description,
+    organization: row.organization,
+    positionTitle: row.position_title,
+    nominees: parseNomineesJson(row.nominees_json),
+    receivedDate: row.received_date,
+  };
 }
 
 /**
@@ -85,19 +106,28 @@ export async function refreshConfirmationEnrichment(
   let skipped = 0;
   let model: string | null = null;
 
+  const selectLimit = Math.max(
+    CONFIRMATION_NOMINATION_FETCHES_PER_RUN,
+    CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES,
+    CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN
+  );
+
   const candidates = await selectNominationsNeedingEnrichment(
     env.DB,
     lookbackDate,
-    CONFIRMATION_NOMINATION_FETCHES_PER_RUN
+    selectLimit
   );
 
   for (const candidate of candidates) {
     try {
-      if (candidate.needsRaw && nominationsFetched < CONFIRMATION_NOMINATION_FETCHES_PER_RUN) {
+      // 1) Ensure Congress.gov metadata when needed.
+      if (
+        candidate.needsRaw &&
+        nominationsFetched < CONFIRMATION_NOMINATION_FETCHES_PER_RUN
+      ) {
         const bundle = await fetchNominationBundle(env, candidate.ref);
         nominationsFetched += 1;
         const existing = await getNomination(env.DB, candidate.ref);
-        // Empty string marks "fetched, no content" so we do not re-fetch forever.
         await upsertNominationMetadata(env.DB, {
           ref: candidate.ref,
           description: bundle.description,
@@ -105,144 +135,139 @@ export async function refreshConfirmationEnrichment(
           positionTitle: bundle.positionTitle,
           nominees: bundle.nominees,
           receivedDate: bundle.receivedDate,
+          // Empty string marks "fetched, no content" so we do not re-fetch forever.
           rawBackgroundText: bundle.rawBackgroundText ?? "",
           backgroundJson: existing?.background_json ?? null,
         });
       }
 
-      const existing = await getNomination(env.DB, candidate.ref);
-      if (!existing) {
+      // 2) Load once, enrich in memory, persist once.
+      const row = await getNomination(env.DB, candidate.ref);
+      if (!row) {
         skipped += 1;
         continue;
       }
 
-      let background = parseStoredBackground(existing.background_json);
-      let rawBackground = existing.raw_background_text;
-      let wikipediaUrl: string | null | undefined =
-        background && "wikipedia_url" in background ? background.wikipedia_url : undefined;
+      let background = parseStoredBackground(row.background_json);
+      let rawBackground = row.raw_background_text;
+      let dirty = false;
+      /** Set only when a Wikipedia lookup actually ran this pass. */
+      let wikiLookupResult: { url: string; extract: string } | null | undefined;
 
-      // Wikipedia enrichment for new rewrites and for older rows that lack wikipedia_url.
-      const needsWiki =
+      const needsWikiLookup =
         wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
-        (candidate.needsWikipedia ||
-          (candidate.needsBackground && wikipediaUrl === undefined));
+        !wikipediaAttempted(background) &&
+        !rawMarksWikipediaAttempt(rawBackground);
 
-      if (needsWiki) {
-        const nominees = parseNomineesJson(existing.nominees_json);
+      if (needsWikiLookup) {
+        const nominees = parseNomineesJson(row.nominees_json);
         const primary = nominees[0];
         if (primary?.display_name) {
           const hit = await lookupNomineeWikipedia({
             displayName: primary.display_name,
-            positionTitle: existing.position_title,
-            organization: existing.organization,
+            positionTitle: row.position_title,
+            organization: row.organization,
           });
           wikipediaLookups += 1;
-          wikipediaUrl = hit?.url ?? null;
-          if (hit?.extract) {
-            // Fold bio into LLM source text when we still need a rewrite.
-            if (!background && rawBackground?.trim()) {
-              rawBackground = `${rawBackground.trim()}\nBiography: ${hit.extract}`;
-            }
+          wikiLookupResult = hit
+            ? { url: hit.url, extract: hit.extract }
+            : null;
+
+          if (hit) {
             if (background) {
-              background = withWikipediaUrl(
-                {
-                  ...background,
-                  background: preferPersonBlurb(background.background, hit.extract),
-                },
-                wikipediaUrl
-              );
-              await upsertNominationMetadata(env.DB, {
-                ref: candidate.ref,
-                description: existing.description,
-                organization: existing.organization,
-                positionTitle: existing.position_title,
+              background = applyWikipediaToBackground(background, hit);
+              dirty = true;
+            } else if (rawBackground?.trim()) {
+              rawBackground = buildRawBackgroundText({
+                description: row.description,
+                organization: row.organization,
+                positionTitle: row.position_title,
+                introText: null,
                 nominees,
-                receivedDate: existing.received_date,
-                rawBackgroundText: existing.raw_background_text,
-                backgroundJson: JSON.stringify(background),
+                wikipediaExtract: hit.extract,
               });
+              dirty = true;
             }
           } else if (background) {
-            background = withWikipediaUrl(background, null);
-            await upsertNominationMetadata(env.DB, {
-              ref: candidate.ref,
-              description: existing.description,
-              organization: existing.organization,
-              positionTitle: existing.position_title,
-              nominees,
-              receivedDate: existing.received_date,
-              rawBackgroundText: existing.raw_background_text,
-              backgroundJson: JSON.stringify(background),
-            });
+            background = applyWikipediaToBackground(background, null);
+            dirty = true;
+          } else if (rawBackground?.trim()) {
+            // Persist a miss marker so we do not re-query forever.
+            rawBackground = `${rawBackground.trim()}\nWikipediaLookup: none`;
+            dirty = true;
           }
-        } else if (background) {
-          background = withWikipediaUrl(background, null);
-          await upsertNominationMetadata(env.DB, {
-            ref: candidate.ref,
-            description: existing.description,
-            organization: existing.organization,
-            positionTitle: existing.position_title,
-            nominees: parseNomineesJson(existing.nominees_json),
-            receivedDate: existing.received_date,
-            rawBackgroundText: existing.raw_background_text,
-            backgroundJson: JSON.stringify(background),
-          });
+        } else {
+          // No nominee name to look up — mark as attempted so we do not loop.
+          wikiLookupResult = null;
+          if (background) {
+            background = { ...background, wikipedia_url: null };
+            dirty = true;
+          } else if (rawBackground?.trim()) {
+            rawBackground = `${rawBackground.trim()}\nWikipediaLookup: none`;
+            dirty = true;
+          }
         }
       }
 
-      if (backgroundsRewritten >= CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES) {
-        continue;
+      const canRewrite =
+        backgroundsRewritten < CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES &&
+        Boolean(rawBackground?.trim()) &&
+        background === null;
+
+      if (canRewrite) {
+        if (model === null) {
+          model = await resolveOpenRouterModel(env);
+        }
+        const rewritten = await rewriteConfirmationBackground(
+          env,
+          {
+            citation: nominationCitation(candidate.ref),
+            description: row.description,
+            positionTitle: row.position_title,
+            organization: row.organization,
+            rawBackground: rawBackground!,
+          },
+          model
+        );
+
+        if (rewritten) {
+          // Only attach wikipedia_url when we know the lookup outcome.
+          // Never write null just because lookup was skipped (quota / deferred).
+          if (wikiLookupResult !== undefined) {
+            background = {
+              ...rewritten,
+              wikipedia_url: wikiLookupResult?.url ?? null,
+              background: wikiLookupResult?.extract
+                ? truncateWikipediaExtract(wikiLookupResult.extract) ||
+                  rewritten.background
+                : rewritten.background,
+            };
+          } else if (rawBackground?.includes("WikipediaLookup: none")) {
+            // Prior miss marker — seal null so we do not re-query forever.
+            background = { ...rewritten, wikipedia_url: null };
+          } else {
+            // Omit wikipedia_url so a later run can still look it up.
+            background = rewritten;
+          }
+          backgroundsRewritten += 1;
+          dirty = true;
+        } else {
+          skipped += 1;
+        }
       }
 
-      const refreshed = await getNomination(env.DB, candidate.ref);
-      if (!refreshed?.raw_background_text?.trim() && !rawBackground?.trim()) {
+      if (dirty) {
+        const fields = nominationFieldsFromRow(row);
+        await upsertNominationMetadata(env.DB, {
+          ...fields,
+          rawBackgroundText: rawBackground,
+          backgroundJson: background
+            ? JSON.stringify(background)
+            : row.background_json,
+        });
+      } else if (!candidate.needsRaw && !canRewrite && !needsWikiLookup) {
         skipped += 1;
-        continue;
       }
-      if (parseStoredBackground(refreshed?.background_json ?? null) !== null) {
-        continue;
-      }
-
-      if (model === null) {
-        model = await resolveOpenRouterModel(env);
-      }
-
-      const rewritten = await rewriteConfirmationBackground(
-        env,
-        {
-          citation: nominationCitation(candidate.ref),
-          description: refreshed?.description ?? existing.description,
-          positionTitle: refreshed?.position_title ?? existing.position_title,
-          organization: refreshed?.organization ?? existing.organization,
-          rawBackground: rawBackground?.trim() || refreshed!.raw_background_text!,
-        },
-        model
-      );
-
-      if (!rewritten) {
-        skipped += 1;
-        continue;
-      }
-
-      const stored = withWikipediaUrl(
-        rewritten,
-        wikipediaUrl === undefined ? null : wikipediaUrl
-      );
-
-      await upsertNominationMetadata(env.DB, {
-        ref: candidate.ref,
-        description: refreshed?.description ?? existing.description,
-        organization: refreshed?.organization ?? existing.organization,
-        positionTitle: refreshed?.position_title ?? existing.position_title,
-        nominees: parseNomineesJson(
-          refreshed?.nominees_json ?? existing.nominees_json
-        ),
-        receivedDate: refreshed?.received_date ?? existing.received_date,
-        rawBackgroundText:
-          refreshed?.raw_background_text ?? existing.raw_background_text,
-        backgroundJson: JSON.stringify(stored),
-      });
-      backgroundsRewritten += 1;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       warnings.push(

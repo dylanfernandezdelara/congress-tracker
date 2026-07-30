@@ -27,13 +27,12 @@ export function parseConfirmationBackgroundJson(
   const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fence) raw = fence[1].trim();
   try {
-    const parsed = JSON.parse(raw) as ConfirmationBackgroundContent & {
-      wikipedia_url?: string | null;
-    };
+    const parsed = JSON.parse(raw) as ConfirmationBackgroundContent;
     if (!parsed.headline || !parsed.what_was_confirmed || !parsed.background) {
       return null;
     }
-    const content: ConfirmationBackgroundContent = {
+    // wikipedia_url is owned by enrichment, never by the model.
+    return {
       headline: parsed.headline.trim(),
       what_was_confirmed: normalizeDigestLead(parsed.what_was_confirmed),
       background: normalizePersonBackground(parsed.background),
@@ -41,13 +40,6 @@ export function parseConfirmationBackgroundJson(
         Array.isArray(parsed.key_points) ? parsed.key_points : []
       ),
     };
-    if ("wikipedia_url" in parsed) {
-      content.wikipedia_url =
-        typeof parsed.wikipedia_url === "string" && parsed.wikipedia_url.trim()
-          ? parsed.wikipedia_url.trim()
-          : null;
-    }
-    return content;
   } catch {
     return null;
   }
