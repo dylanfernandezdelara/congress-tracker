@@ -75,6 +75,42 @@ const STAR_VERTICES = [
 const STAR_PATH = `M${STAR_VERTICES.map(([x, y]) => `${x},${y}`).join(' ')}Z`
 
 /**
+ * Raster PNG assets derived from the shared flag geometry.
+ * One row drives render, write, hashes, and contract sync checks.
+ *
+ * @typedef {{
+ *   id: string,
+ *   file: string,
+ *   size: number,
+ *   htmlRel?: 'icon' | 'apple-touch-icon',
+ *   htmlSizes?: string,
+ * }} FaviconPngAsset
+ */
+
+/** @type {ReadonlyArray<FaviconPngAsset>} */
+export const FAVICON_PNG_ASSETS = Object.freeze([
+  { id: 'favicon32', file: 'favicon-32x32.png', size: 32, htmlRel: 'icon', htmlSizes: '32x32' },
+  { id: 'favicon48', file: 'favicon-48x48.png', size: 48, htmlRel: 'icon', htmlSizes: '48x48' },
+  { id: 'favicon192', file: 'favicon-192x192.png', size: 192, htmlRel: 'icon', htmlSizes: '192x192' },
+  { id: 'favicon512', file: 'favicon-512x512.png', size: 512, htmlRel: 'icon', htmlSizes: '512x512' },
+  {
+    id: 'appleTouch',
+    file: 'apple-touch-icon.png',
+    size: 180,
+    htmlRel: 'apple-touch-icon',
+    htmlSizes: '180x180',
+  },
+])
+
+const SUPERSAMPLE = 4
+
+/** Format a viewBox coordinate without float binary noise. */
+function fmtCoord(n) {
+  const rounded = Math.round(n * 1e6) / 1e6
+  return String(rounded)
+}
+
+/**
  * @param {number} px
  * @param {number} py
  * @param {number} cx
@@ -98,16 +134,6 @@ function pointInStar(px, py, cx, cy, radius) {
   }
   return inside
 }
-
-export const FAVICON_PNG_SIZES = Object.freeze({
-  favicon32: 32,
-  favicon48: 48,
-  favicon192: 192,
-  favicon512: 512,
-  appleTouch: 180,
-})
-
-const SUPERSAMPLE = 4
 
 /**
  * Sample the favicon flag at a point in viewBox coordinates.
@@ -186,6 +212,35 @@ function writePng(width, height, pixels) {
 }
 
 /**
+ * Straight (non-premultiplied) coverage composite used by the rasterizer.
+ * Averages opaque sample RGB only, then sets alpha from coverage fraction.
+ *
+ * @param {ReadonlyArray<readonly [number, number, number] | null>} sampleColors
+ * @returns {readonly [number, number, number, number]}
+ */
+export function compositeCoveragePixel(sampleColors) {
+  let r = 0
+  let g = 0
+  let b = 0
+  let opaque = 0
+  for (const color of sampleColors) {
+    if (!color) continue
+    r += color[0]
+    g += color[1]
+    b += color[2]
+    opaque += 1
+  }
+  const n = sampleColors.length
+  if (opaque === 0 || n === 0) return [0, 0, 0, 0]
+  return [
+    Math.round(r / opaque),
+    Math.round(g / opaque),
+    Math.round(b / opaque),
+    Math.round((opaque / n) * 255),
+  ]
+}
+
+/**
  * @param {number} size
  * @param {number} [samples]
  */
@@ -196,57 +251,27 @@ export function renderFaviconPng(size, samples = SUPERSAMPLE) {
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      let r = 0
-      let g = 0
-      let b = 0
-      let opaque = 0
+      /** @type {Array<readonly [number, number, number] | null>} */
+      const sampleColors = []
       for (let sy = 0; sy < samples; sy += 1) {
         for (let sx = 0; sx < samples; sx += 1) {
           const vx = (x + (sx + 0.5) / samples) * scale
           const vy = (y + (sy + 0.5) / samples) * scale
-          const color = sampleFaviconColor(vx, vy)
-          if (!color) continue
-          r += color[0]
-          g += color[1]
-          b += color[2]
-          opaque += 1
+          sampleColors.push(sampleFaviconColor(vx, vy))
         }
       }
-      const n = samples * samples
-      if (opaque === 0) {
-        pixels.push([0, 0, 0, 0])
-        continue
-      }
-      pixels.push([
-        Math.round(r / opaque),
-        Math.round(g / opaque),
-        Math.round(b / opaque),
-        Math.round((opaque / n) * 255),
-      ])
+      pixels.push(compositeCoveragePixel(sampleColors))
     }
   }
 
   return writePng(size, size, pixels)
 }
 
-export function renderFavicon32() {
-  return renderFaviconPng(FAVICON_PNG_SIZES.favicon32)
-}
-
-export function renderFavicon48() {
-  return renderFaviconPng(FAVICON_PNG_SIZES.favicon48)
-}
-
-export function renderFavicon192() {
-  return renderFaviconPng(FAVICON_PNG_SIZES.favicon192)
-}
-
-export function renderFavicon512() {
-  return renderFaviconPng(FAVICON_PNG_SIZES.favicon512)
-}
-
-export function renderAppleTouchIcon() {
-  return renderFaviconPng(FAVICON_PNG_SIZES.appleTouch)
+/** @param {string} id */
+export function renderFaviconAsset(id) {
+  const asset = FAVICON_PNG_ASSETS.find((a) => a.id === id)
+  if (!asset) throw new Error(`Unknown favicon asset id: ${id}`)
+  return renderFaviconPng(asset.size)
 }
 
 /** SVG markup matching sampleFaviconColor geometry (for sync checks / rewrite). */
@@ -254,61 +279,56 @@ export function renderFaviconSvg() {
   const whiteStripes = [1, 3, 5, 7, 9, 11]
     .map((i) => {
       const y = FLAG_Y + i * STRIPE_H
-      return `  <rect x="${FLAG_X}" y="${y}" width="${FLAG_W}" height="${STRIPE_H}" fill="#FFFFFF"/>`
+      return `  <rect x="${fmtCoord(FLAG_X)}" y="${fmtCoord(y)}" width="${fmtCoord(FLAG_W)}" height="${fmtCoord(STRIPE_H)}" fill="#FFFFFF"/>`
     })
     .join('\n')
   const stars = STAR_CENTERS.map(
     ([cx, cy]) =>
-      `  <path d="${STAR_PATH}" fill="#FFFFFF" fill-rule="evenodd" transform="translate(${cx} ${cy}) scale(${STAR_R})"/>`,
+      `  <path d="${STAR_PATH}" fill="#FFFFFF" fill-rule="evenodd" transform="translate(${fmtCoord(cx)} ${fmtCoord(cy)}) scale(${fmtCoord(STAR_R)})"/>`,
   ).join('\n')
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${FAVICON_VIEWBOX} ${FAVICON_VIEWBOX}" role="img" aria-label="Track Congress">
   <!-- Favicon-optimized flag (simplified stars, full-bleed square canvas).
        Separate from web/src/components/BrandFlagIcon.tsx (header logo).
        Keep geometry in sync with scripts/generate-favicons.mjs; run npm run generate:favicons. -->
-  <rect x="${FLAG_X}" y="${FLAG_Y}" width="${FLAG_W}" height="${FLAG_H}" fill="#B22234"/>
+  <rect x="${fmtCoord(FLAG_X)}" y="${fmtCoord(FLAG_Y)}" width="${fmtCoord(FLAG_W)}" height="${fmtCoord(FLAG_H)}" fill="#B22234"/>
 ${whiteStripes}
-  <rect x="${FLAG_X}" y="${FLAG_Y}" width="${CANTON_W}" height="${CANTON_H}" fill="#3C3B6E"/>
+  <rect x="${fmtCoord(FLAG_X)}" y="${fmtCoord(FLAG_Y)}" width="${fmtCoord(CANTON_W)}" height="${fmtCoord(CANTON_H)}" fill="#3C3B6E"/>
 ${stars}
 </svg>
 `
 }
 
 export function generateFavicons({ outDir = publicDir } = {}) {
-  const favicon32 = renderFavicon32()
-  const favicon48 = renderFavicon48()
-  const favicon192 = renderFavicon192()
-  const favicon512 = renderFavicon512()
-  const appleTouch = renderAppleTouchIcon()
-  const faviconSvg = renderFaviconSvg()
   fs.mkdirSync(outDir, { recursive: true })
-  fs.writeFileSync(path.join(outDir, 'favicon-32x32.png'), favicon32)
-  fs.writeFileSync(path.join(outDir, 'favicon-48x48.png'), favicon48)
-  fs.writeFileSync(path.join(outDir, 'favicon-192x192.png'), favicon192)
-  fs.writeFileSync(path.join(outDir, 'favicon-512x512.png'), favicon512)
-  fs.writeFileSync(path.join(outDir, 'apple-touch-icon.png'), appleTouch)
-  fs.writeFileSync(path.join(outDir, 'favicon.svg'), faviconSvg)
+  /** @type {Record<string, string>} */
+  const paths = {}
+  /** @type {Record<string, string>} */
+  const shas = {}
+
+  for (const asset of FAVICON_PNG_ASSETS) {
+    const png = renderFaviconPng(asset.size)
+    const filePath = path.join(outDir, asset.file)
+    fs.writeFileSync(filePath, png)
+    paths[`${asset.id}Path`] = filePath
+    shas[`${asset.id}Sha256`] = createHash('sha256').update(png).digest('hex')
+  }
+
+  const faviconSvg = renderFaviconSvg()
+  const faviconSvgPath = path.join(outDir, 'favicon.svg')
+  fs.writeFileSync(faviconSvgPath, faviconSvg)
+
   return {
-    favicon32Path: path.join(outDir, 'favicon-32x32.png'),
-    favicon48Path: path.join(outDir, 'favicon-48x48.png'),
-    favicon192Path: path.join(outDir, 'favicon-192x192.png'),
-    favicon512Path: path.join(outDir, 'favicon-512x512.png'),
-    appleTouchPath: path.join(outDir, 'apple-touch-icon.png'),
-    faviconSvgPath: path.join(outDir, 'favicon.svg'),
-    favicon32Sha256: createHash('sha256').update(favicon32).digest('hex'),
-    favicon48Sha256: createHash('sha256').update(favicon48).digest('hex'),
-    favicon192Sha256: createHash('sha256').update(favicon192).digest('hex'),
-    favicon512Sha256: createHash('sha256').update(favicon512).digest('hex'),
-    appleTouchSha256: createHash('sha256').update(appleTouch).digest('hex'),
+    ...paths,
+    faviconSvgPath,
+    ...shas,
   }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const result = generateFavicons()
-  console.log(`Wrote ${result.favicon32Path}`)
-  console.log(`Wrote ${result.favicon48Path}`)
-  console.log(`Wrote ${result.favicon192Path}`)
-  console.log(`Wrote ${result.favicon512Path}`)
-  console.log(`Wrote ${result.appleTouchPath}`)
+  for (const asset of FAVICON_PNG_ASSETS) {
+    console.log(`Wrote ${result[`${asset.id}Path`]}`)
+  }
   console.log(`Wrote ${result.faviconSvgPath}`)
 }

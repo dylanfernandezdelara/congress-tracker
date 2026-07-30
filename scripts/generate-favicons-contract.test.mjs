@@ -6,14 +6,12 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import zlib from 'node:zlib'
 import {
-  FAVICON_PNG_SIZES,
+  FAVICON_PNG_ASSETS,
   FAVICON_VIEWBOX,
+  compositeCoveragePixel,
   generateFavicons,
-  renderAppleTouchIcon,
-  renderFavicon192,
-  renderFavicon32,
-  renderFavicon48,
-  renderFavicon512,
+  renderFaviconAsset,
+  renderFaviconPng,
   renderFaviconSvg,
   sampleFaviconColor,
 } from './generate-favicons.mjs'
@@ -65,6 +63,17 @@ function rgbaAt(raw, width, x, y) {
   return [raw[i], raw[i + 1], raw[i + 2], raw[i + 3]]
 }
 
+/** Midpoint of the first white stripe in viewBox units. */
+function stripeSampleY() {
+  return (FAVICON_VIEWBOX / 13) * 1.5
+}
+
+function firstStarCenter() {
+  const cantonW = FAVICON_VIEWBOX * (2 / 5)
+  const cantonH = (7 / 13) * FAVICON_VIEWBOX
+  return [cantonW / 4, cantonH / 4]
+}
+
 test('generate-favicons script exists', () => {
   assert.ok(fs.statSync(scriptPath).isFile())
 })
@@ -91,17 +100,12 @@ test('generateFavicons writes full-bleed high-res PNGs + SVG', () => {
   const tmpDir = fs.mkdtempSync(path.join(rootDir, '.favicon-gen-'))
   try {
     const result = generateFavicons({ outDir: tmpDir })
-    const checks = [
-      [result.favicon32Path, FAVICON_PNG_SIZES.favicon32],
-      [result.favicon48Path, FAVICON_PNG_SIZES.favicon48],
-      [result.favicon192Path, FAVICON_PNG_SIZES.favicon192],
-      [result.favicon512Path, FAVICON_PNG_SIZES.favicon512],
-      [result.appleTouchPath, FAVICON_PNG_SIZES.appleTouch],
-    ]
-    for (const [filePath, size] of checks) {
+    for (const asset of FAVICON_PNG_ASSETS) {
+      const filePath = result[`${asset.id}Path`]
+      assert.equal(filePath, path.join(tmpDir, asset.file))
       const meta = readPngMeta(fs.readFileSync(filePath))
-      assert.equal(meta.width, size)
-      assert.equal(meta.height, size)
+      assert.equal(meta.width, asset.size)
+      assert.equal(meta.height, asset.size)
       assert.equal(meta.colorType, 6)
     }
     assert.equal(FAVICON_VIEWBOX, 512)
@@ -110,26 +114,19 @@ test('generateFavicons writes full-bleed high-res PNGs + SVG', () => {
     assert.match(svg, /fill-rule="evenodd"/)
     assert.match(svg, /<path\b[^>]*scale\(/)
     assert.doesNotMatch(svg, /crispEdges|shape-rendering/)
+    assert.doesNotMatch(svg, /0000000/)
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 })
 
 test('checked-in favicon assets match generator output', () => {
-  /** @type {Array<[() => Buffer, string]>} */
-  const assets = [
-    [renderFavicon32, 'favicon-32x32.png'],
-    [renderFavicon48, 'favicon-48x48.png'],
-    [renderFavicon192, 'favicon-192x192.png'],
-    [renderFavicon512, 'favicon-512x512.png'],
-    [renderAppleTouchIcon, 'apple-touch-icon.png'],
-  ]
-  for (const [render, filename] of assets) {
-    const expectedSha = createHash('sha256').update(render()).digest('hex')
+  for (const asset of FAVICON_PNG_ASSETS) {
+    const expectedSha = createHash('sha256').update(renderFaviconAsset(asset.id)).digest('hex')
     const committedSha = createHash('sha256')
-      .update(fs.readFileSync(path.join(publicDir, filename)))
+      .update(fs.readFileSync(path.join(publicDir, asset.file)))
       .digest('hex')
-    assert.equal(expectedSha, committedSha, `${filename} out of sync with generator`)
+    assert.equal(expectedSha, committedSha, `${asset.file} out of sync with generator`)
   }
   assert.equal(
     fs.readFileSync(faviconSvgPath, 'utf8'),
@@ -137,44 +134,35 @@ test('checked-in favicon assets match generator output', () => {
   )
 })
 
-test('index.html links SVG plus high-res PNG favicons', () => {
+test('index.html links SVG plus high-res PNG favicons from asset table', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8')
   assert.match(html, /rel="icon"[^>]*href="\/favicon\.svg"/)
-  assert.match(html, /rel="icon"[^>]*href="\/favicon-32x32\.png"[^>]*sizes="32x32"/)
-  assert.match(html, /rel="icon"[^>]*href="\/favicon-48x48\.png"[^>]*sizes="48x48"/)
-  assert.match(html, /rel="icon"[^>]*href="\/favicon-192x192\.png"[^>]*sizes="192x192"/)
-  assert.match(html, /rel="icon"[^>]*href="\/favicon-512x512\.png"[^>]*sizes="512x512"/)
-  assert.match(html, /rel="apple-touch-icon"[^>]*href="\/apple-touch-icon\.png"/)
+  for (const asset of FAVICON_PNG_ASSETS) {
+    if (!asset.htmlRel || !asset.htmlSizes) continue
+    const escapedFile = asset.file.replace(/\./g, '\\.')
+    const escapedSizes = asset.htmlSizes.replace(/x/g, 'x')
+    assert.match(
+      html,
+      new RegExp(
+        `rel="${asset.htmlRel}"[^>]*href="/${escapedFile}"[^>]*sizes="${escapedSizes}"`,
+      ),
+      `missing link for ${asset.file}`,
+    )
+  }
 })
 
 test('sampleFaviconColor covers flag stripes, canton, and stars', () => {
-  // Outside the square canvas → transparent
   assert.equal(sampleFaviconColor(-1, -1), null)
   assert.equal(sampleFaviconColor(FAVICON_VIEWBOX + 1, 10), null)
-  // Red stripe near top-right of flag (full-bleed)
   assert.deepEqual(sampleFaviconColor(400, 10), [178, 34, 52])
-  // White stripe (stripe index 1)
-  assert.deepEqual(sampleFaviconColor(400, STRIPE_SAMPLE_Y()), [255, 255, 255])
-  // Canton blue
+  assert.deepEqual(sampleFaviconColor(400, stripeSampleY()), [255, 255, 255])
   assert.deepEqual(sampleFaviconColor(20, 40), [60, 59, 110])
-  // First star center
-  const [sx, sy] = FIRST_STAR_CENTER()
+  const [sx, sy] = firstStarCenter()
   assert.deepEqual(sampleFaviconColor(sx, sy), [255, 255, 255])
 })
 
-/** Midpoint of the first white stripe in viewBox units. */
-function STRIPE_SAMPLE_Y() {
-  return (FAVICON_VIEWBOX / 13) * 1.5
-}
-
-function FIRST_STAR_CENTER() {
-  const cantonW = FAVICON_VIEWBOX * (2 / 5)
-  const cantonH = (7 / 13) * FAVICON_VIEWBOX
-  return [cantonW / 4, cantonH / 4]
-}
-
 test('full-bleed favicon has no black/transparent letterboxing', () => {
-  const png = renderFavicon32()
+  const png = renderFaviconPng(32)
   const width = png.readUInt32BE(16)
   const height = png.readUInt32BE(20)
   assert.equal(width, 32)
@@ -191,37 +179,38 @@ test('full-bleed favicon has no black/transparent letterboxing', () => {
   ]) {
     const [r, g, b, a] = rgbaAt(raw, width, x, y)
     assert.equal(a, 255, `corner/edge (${x},${y}) must be opaque, got alpha ${a}`)
-    // Must not be black filler
     assert.ok(r + g + b > 0, `corner/edge (${x},${y}) must not be black`)
   }
 })
 
-test('stripe boundary pixels keep straight (non-premultiplied) RGB', () => {
+test('coverage compositing keeps straight (non-premultiplied) RGB', () => {
+  const red = /** @type {const} */ ([178, 34, 52])
+  // Half miss / half red → straight red RGB at 50% alpha (not premultiplied 89/17/26).
+  assert.deepEqual(
+    compositeCoveragePixel([null, null, null, null, red, red, red, red]),
+    [178, 34, 52, 128],
+  )
+  assert.deepEqual(compositeCoveragePixel([null, null, null, null]), [0, 0, 0, 0])
+  assert.deepEqual(compositeCoveragePixel([red, red, red, red]), [178, 34, 52, 255])
+})
+
+test('stripe boundary pixels antialias between red and white', () => {
   // First white stripe starts at y = viewBox/13. On a 32px raster that is ~2.46,
-  // so row 2 is a partial cover of red → white.
-  const png = renderFavicon32()
+  // so row 2 is a blend of red → white.
+  const png = renderFaviconPng(32)
   const width = png.readUInt32BE(16)
   const raw = inflatePngRgba(png)
   const [r, g, b, a] = rgbaAt(raw, width, 28, 2)
   assert.equal(a, 255)
-  // Antialiased blend between red and white — both channels elevated vs pure red.
   assert.ok(r >= 178 && g >= 34 && b >= 52)
   assert.ok(g > 34 || b > 52 || r > 178, 'expected blend toward white stripe')
 })
 
 test('generator output is deterministic', () => {
-  const pairs = [
-    [renderFavicon32, renderFavicon32],
-    [renderFavicon48, renderFavicon48],
-    [renderFavicon192, renderFavicon192],
-    [renderFavicon512, renderFavicon512],
-    [renderAppleTouchIcon, renderAppleTouchIcon],
-  ]
-  for (const [a, b] of pairs) {
-    assert.equal(
-      createHash('sha256').update(a()).digest('hex'),
-      createHash('sha256').update(b()).digest('hex'),
-    )
+  for (const asset of FAVICON_PNG_ASSETS) {
+    const a = createHash('sha256').update(renderFaviconAsset(asset.id)).digest('hex')
+    const b = createHash('sha256').update(renderFaviconAsset(asset.id)).digest('hex')
+    assert.equal(a, b, `${asset.id} not deterministic`)
   }
   assert.equal(renderFaviconSvg(), renderFaviconSvg())
 })
