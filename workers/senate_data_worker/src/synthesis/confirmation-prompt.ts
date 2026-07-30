@@ -31,8 +31,7 @@ Return ONLY valid JSON:
 Rules:
 - Official-only source: use Congress.gov nomination metadata (description, position, organization, nominee name/state, intro text). Do not invent biography, prior jobs, education, or politics.
 - If official facts are thin, write a plain identity line (name, state, office/agency). Example: "Jane Doe of California was confirmed as Secretary of Energy at the Department of Energy."
-- Ignore any encyclopedia/Biography lines if they appear in source text; encyclopedia enrichment is handled separately.
-- Never mention PN numbers, nomination citations, roll-call numbers, or Wikipedia in any field.
+- Never mention PN numbers, nomination citations, or roll-call numbers in any field.
 - Keep language neutral and concise (grade 7-8).
 - "what_was_confirmed" must be a single sentence ending with . ! or ?
 - Prefer the nominee's name in the headline when present.`;

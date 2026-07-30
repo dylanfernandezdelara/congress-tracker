@@ -106,14 +106,10 @@ export function buildRawBackgroundText(params: {
   positionTitle: string | null;
   introText: string | null;
   nominees: ConfirmationNominee[];
-  wikipediaExtract?: string | null;
 }): string | null {
   const lines: string[] = [];
   if (params.description?.trim()) lines.push(params.description.trim());
   if (params.introText?.trim()) lines.push(params.introText.trim());
-  if (params.wikipediaExtract?.trim()) {
-    lines.push(`Biography: ${params.wikipediaExtract.trim()}`);
-  }
   if (params.positionTitle?.trim()) {
     const org = params.organization?.trim();
     lines.push(
