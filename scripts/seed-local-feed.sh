@@ -236,7 +236,7 @@ INSERT OR REPLACE INTO confirmation_votes
    question, result, yeas, nays, vote_date)
 VALUES
   ('Senate', 119, 2, 9101, 119, 100, 0, 'On the Nomination', 'Confirmed', 58, 40, '${D_RECENT}'),
-  ('Senate', 119, 2, 9102, 119, 101, 0, 'On the Nomination', 'Confirmed', 62, 35, '${D_MID}');
+  ('Senate', 119, 2, 9102, 119, 101, 0, 'On the Nomination', 'Confirmed', 62, 36, '${D_MID}');
 SQL
 
 generate_roster_sql() {
@@ -306,7 +306,7 @@ for bid in r_voters:
     vote_rows.append(f"  ('Senate', 119, 2, 9101, '{bid}', 'Yea')")
 for i, bid in enumerate(d_voters):
     vote_rows.append(f"  ('Senate', 119, 2, 9101, '{bid}', '{'Yea' if i < 5 else 'Nay'}')")
-# 9102: R 53–0 · D 9–35 → 62–35
+# 9102: R 53–0 · D 9–36 → 62–36
 for bid in r_voters:
     vote_rows.append(f"  ('Senate', 119, 2, 9102, '{bid}', 'Yea')")
 for i, bid in enumerate(d_voters):

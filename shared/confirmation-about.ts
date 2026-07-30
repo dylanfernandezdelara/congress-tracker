@@ -55,7 +55,10 @@ export function buildOfficialConfirmationAbout(params: {
 export function isRedundantConfirmationAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return true
-  // Identity scaffolding from Congress.gov fields — not person background.
+  // Multi-sentence blurbs that include an identity clause still carry person facts.
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
+  if (sentences.length > 1) return false
+  // Single-sentence identity scaffolding from Congress.gov fields.
   if (/\bwas confirmed as\b/i.test(text)) return true
   if (/\bwas confirmed by the Senate\b/i.test(text)) return true
   if (/^Confirmed as\b/i.test(text)) return true

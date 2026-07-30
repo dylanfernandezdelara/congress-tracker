@@ -50,6 +50,14 @@ describe('isRedundantConfirmationAbout', () => {
       ),
     ).toBe(false)
   })
+
+  it('keeps multi-sentence official About that includes an identity clause', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Jane Doe was confirmed as Secretary of Energy. She previously led California grid programs.',
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('selectConfirmationAbout', () => {
