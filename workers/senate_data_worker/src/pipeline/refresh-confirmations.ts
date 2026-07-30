@@ -81,19 +81,51 @@ function appendWikipediaToRaw(
   return `${base}\n${WIKI_MISS_MARKER}`;
 }
 
+/** Recover a Wikipedia extract previously appended as `Biography: …`. */
+export function wikipediaExtractFromRaw(raw: string | null): string | null {
+  if (!raw) return null;
+  const line = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.startsWith("Biography:"));
+  if (!line) return null;
+  const extract = line.slice("Biography:".length).trim();
+  return extract || null;
+}
+
 function wikipediaAttempted(background: ConfirmationBackgroundContent | null): boolean {
   return Boolean(background && "wikipedia_url" in background);
 }
 
+/** Attach Wikipedia as secondary enrichment — never overwrite official About text. */
 function applyWikipediaToBackground(
   background: ConfirmationBackgroundContent,
   hit: { url: string; extract: string } | null
 ): ConfirmationBackgroundContent {
-  if (!hit) return { ...background, wikipedia_url: null };
+  if (!hit) {
+    return { ...background, wikipedia_url: null, wikipedia_extract: null };
+  }
   return {
     ...background,
     wikipedia_url: hit.url,
-    background: truncateWikipediaExtract(hit.extract) || background.background,
+    wikipedia_extract: truncateWikipediaExtract(hit.extract) || null,
+  };
+}
+
+function sealWikipediaOnRewrite(
+  rewritten: ConfirmationBackgroundContent,
+  hit: { url: string; extract: string } | null | undefined,
+  rawBackground: string | null
+): ConfirmationBackgroundContent {
+  if (hit !== undefined) {
+    return applyWikipediaToBackground(rewritten, hit);
+  }
+  const sealedUrl = wikipediaUrlFromRaw(rawBackground);
+  if (sealedUrl === undefined) return rewritten;
+  return {
+    ...rewritten,
+    wikipedia_url: sealedUrl,
+    wikipedia_extract: sealedUrl ? wikipediaExtractFromRaw(rawBackground) : null,
   };
 }
 
@@ -113,9 +145,8 @@ function nominationFieldsFromRow(row: NominationRow) {
 }
 
 /**
- * Fetch Congress.gov nomination metadata, Wikipedia person blurbs, and rewrite
- * plain-English backgrounds for recently confirmed nominations that still need
- * enrichment.
+ * Fetch Congress.gov nomination metadata, rewrite official About blurbs, and
+ * attach Wikipedia as secondary enrichment (URL + extract) when confident.
  */
 export async function refreshConfirmationEnrichment(
   env: Env,
@@ -251,23 +282,12 @@ export async function refreshConfirmationEnrichment(
         );
 
         if (rewritten) {
-          // Seal wikipedia_url from this-pass lookup or a durable raw marker.
-          // Omit the key only when lookup was deferred (quota) with no prior marker.
-          const sealedFromRaw = wikipediaUrlFromRaw(rawBackground);
-          if (wikiLookupResult !== undefined) {
-            background = {
-              ...rewritten,
-              wikipedia_url: wikiLookupResult?.url ?? null,
-              background: wikiLookupResult?.extract
-                ? truncateWikipediaExtract(wikiLookupResult.extract) ||
-                  rewritten.background
-                : rewritten.background,
-            };
-          } else if (sealedFromRaw !== undefined) {
-            background = { ...rewritten, wikipedia_url: sealedFromRaw };
-          } else {
-            background = rewritten;
-          }
+          // Official rewrite stays primary; Wikipedia seals as secondary fields only.
+          background = sealWikipediaOnRewrite(
+            rewritten,
+            wikiLookupResult,
+            rawBackground
+          );
           backgroundsRewritten += 1;
           dirty = true;
         } else {

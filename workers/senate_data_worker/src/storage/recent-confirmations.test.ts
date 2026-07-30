@@ -33,9 +33,10 @@ function sampleRow(overrides: Record<string, unknown> = {}) {
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
       background:
-        "Jane Doe is an energy policy expert from California who previously led state clean-energy programs.",
+        "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
       key_points: [],
       wikipedia_url: null,
+      wikipedia_extract: null,
     }),
     ...overrides,
   };
@@ -59,35 +60,43 @@ describe("buildRecentConfirmations", () => {
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
       background:
-        "Jane Doe is an energy policy expert from California who previously led state clean-energy programs.",
+        "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
       yeas: 58,
       nays: 40,
       congress_gov_url: "https://www.congress.gov/nomination/119th-congress/100",
       wikipedia_url: null,
+      wikipedia_extract: null,
     });
   });
 
-  it("surfaces a stored Wikipedia article URL", async () => {
+  it("surfaces Wikipedia as secondary extract without replacing official About", async () => {
     mockSelect.mockResolvedValue([
       sampleRow({
         background_json: JSON.stringify({
           headline: "Jane Doe confirmed as Energy Secretary",
           what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-          background: "Jane Doe is an energy policy expert from California.",
+          background:
+            "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
           key_points: [],
           wikipedia_url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+          wikipedia_extract:
+            "Jane Doe is an American energy official who previously led state programs.",
         }),
       }),
     ] as never);
 
     const env = { DB: {} as D1Database } as import("../config").Env;
     const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(body.confirmations[0]?.background).toBe(
+      "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy."
+    );
     expect(body.confirmations[0]?.wikipedia_url).toBe(
       "https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
     );
+    expect(body.confirmations[0]?.wikipedia_extract).toContain("American energy official");
   });
 
-  it("does not expose raw nomination scaffolding as display background", async () => {
+  it("falls back to an official identity About when rewrite JSON is missing", async () => {
     mockSelect.mockResolvedValue([
       sampleRow({
         background_json: null,
@@ -96,8 +105,11 @@ describe("buildRecentConfirmations", () => {
 
     const env = { DB: {} as D1Database } as import("../config").Env;
     const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
-    expect(body.confirmations[0]?.background).toBeNull();
+    expect(body.confirmations[0]?.background).toBe(
+      "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy."
+    );
     expect(body.confirmations[0]?.wikipedia_url).toBeNull();
+    expect(body.confirmations[0]?.wikipedia_extract).toBeNull();
     expect(body.confirmations[0]?.headline).toBe("Jane Doe confirmed as Secretary of Energy");
   });
 });

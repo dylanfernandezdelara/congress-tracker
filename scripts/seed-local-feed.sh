@@ -218,7 +218,7 @@ VALUES
    'Jane Doe, of California, to be Secretary of Energy. (local sample)
 Position: Secretary of Energy (Department of Energy)
 Nominee(s): Jane Doe (CA)',
-   '{"headline":"Jane Doe confirmed as Energy Secretary (local sample)","what_was_confirmed":"The Senate confirmed Jane Doe as Secretary of Energy.","background":"Jane Doe is an energy policy expert from California who previously led state clean-energy programs.","key_points":[],"wikipedia_url":null}',
+   '{"headline":"Jane Doe confirmed as Energy Secretary (local sample)","what_was_confirmed":"The Senate confirmed Jane Doe as Secretary of Energy.","background":"Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.","key_points":[],"wikipedia_url":null,"wikipedia_extract":null}',
    '${D_RECENT}T00:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
   (119, 101, 0, 'PN101',
    'Alex Rivera, of Texas, to be an Assistant Secretary of State. (local sample)',
@@ -228,7 +228,7 @@ Nominee(s): Jane Doe (CA)',
    'Alex Rivera, of Texas, to be an Assistant Secretary of State. (local sample)
 Position: Assistant Secretary of State (Department of State)
 Nominee(s): Alex Rivera (TX)',
-   '{"headline":"Alex Rivera confirmed for State Department post (local sample)","what_was_confirmed":"The Senate confirmed Alex Rivera as an Assistant Secretary of State.","background":"Alex Rivera is a career foreign-service officer from Texas with experience in regional diplomacy.","key_points":[],"wikipedia_url":null}',
+   '{"headline":"Alex Rivera confirmed for State Department post (local sample)","what_was_confirmed":"The Senate confirmed Alex Rivera as an Assistant Secretary of State.","background":"Alex Rivera of TX was confirmed as Assistant Secretary of State at the Department of State.","key_points":[],"wikipedia_url":null,"wikipedia_extract":null}',
    '${D_MID}T00:00:00.000Z', '${D_MID}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO confirmation_votes

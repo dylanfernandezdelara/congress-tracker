@@ -3,7 +3,10 @@
 export interface ConfirmationBackgroundContent {
   headline: string
   what_was_confirmed: string
-  /** Short person blurb (who they are), not a restatement of the confirmation. */
+  /**
+   * Official-sourced About blurb (Congress.gov nomination identity / rewrite).
+   * Must not be replaced by encyclopedia text — Wikipedia belongs in wikipedia_extract.
+   */
   background: string
   key_points: string[]
   /**
@@ -11,6 +14,8 @@ export interface ConfirmationBackgroundContent {
    * `null` means looked up with no match; omit/undefined means not looked up yet.
    */
   wikipedia_url?: string | null
+  /** Optional Wikipedia extract kept as secondary enrichment, not the primary About. */
+  wikipedia_extract?: string | null
 }
 
 export interface ConfirmationNominee {
@@ -37,12 +42,17 @@ export interface RecentConfirmationItem {
   vote_date: string
   headline: string | null
   what_was_confirmed: string | null
-  /** Short person blurb shown when the row is expanded. */
+  /**
+   * Primary About text: official Congress.gov-sourced blurb (or honest fallback).
+   * Wikipedia content is never the sole source here when official text exists.
+   */
   background: string | null
   key_points: string[]
   congress_gov_url: string
   /** Confident Wikipedia article for the nominee, when enrichment found one. */
   wikipedia_url: string | null
+  /** Secondary enrichment blurb from Wikipedia when a confident article was found. */
+  wikipedia_extract: string | null
 }
 
 export interface RecentConfirmationsResponse {

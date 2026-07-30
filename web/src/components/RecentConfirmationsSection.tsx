@@ -1,5 +1,7 @@
 import { useId, useState } from 'react'
 
+import { wikipediaExtractAddsDetail } from '@congress-tracker/shared/confirmation-about'
+
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import { ExpandChevron } from './ExpandChevron'
@@ -31,13 +33,6 @@ function primaryNomineeName(item: RecentConfirmationItem): string | null {
   return name || null
 }
 
-function wikipediaHref(item: RecentConfirmationItem): string | null {
-  if (item.wikipedia_url?.trim()) return item.wikipedia_url.trim()
-  const name = primaryNomineeName(item)
-  if (!name) return null
-  return `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(name)}`
-}
-
 function confirmationHeadline(item: RecentConfirmationItem): string {
   const fromApi = item.headline?.trim()
   if (fromApi) return fromApi
@@ -58,12 +53,12 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
   const headlineId = useId()
   const key = confirmationKey(item)
   const headline = confirmationHeadline(item)
-  const background = item.background?.trim() || null
+  const officialAbout = item.background?.trim() || null
+  const wikiExtract = item.wikipedia_extract?.trim() || null
+  const showWikiExtract = wikipediaExtractAddsDetail(officialAbout, wikiExtract)
   const organization = item.organization?.trim() || null
-  const positionTitle = item.position_title?.trim() || null
   const margin = item.yeas - item.nays
-  const wikiHref = wikipediaHref(item)
-  const wikiIsDirectArticle = Boolean(item.wikipedia_url?.trim())
+  const wikiArticleUrl = item.wikipedia_url?.trim() || null
   const accessibleName = primaryNomineeName(item) || headline
 
   return (
@@ -105,29 +100,25 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
         >
           {isExpanded ? (
             <div className="recent-confirmations-detail">
-              {background ? (
+              {officialAbout ? (
                 <section className="recent-confirmations-detail-block">
                   <h4 className="recent-confirmations-detail-label">About</h4>
-                  <p className="recent-confirmations-detail-text">{background}</p>
+                  <p className="recent-confirmations-detail-text">{officialAbout}</p>
                 </section>
-              ) : (
+              ) : null}
+              {showWikiExtract && wikiExtract ? (
+                <section className="recent-confirmations-detail-block">
+                  <h4 className="recent-confirmations-detail-label">More background</h4>
+                  <p className="recent-confirmations-detail-text">{wikiExtract}</p>
+                  <p className="recent-confirmations-detail-source">From Wikipedia</p>
+                </section>
+              ) : null}
+              {!officialAbout && !showWikiExtract ? (
                 <p className="text-[13px] text-secondary">
-                  {positionTitle
-                    ? `Confirmed for ${positionTitle}. A short bio is not available yet.`
-                    : 'A short bio is not available yet.'}
+                  Confirmation details are still being prepared.
                 </p>
-              )}
+              ) : null}
               <div className="recent-confirmations-links">
-                {wikiHref ? (
-                  <a
-                    href={wikiHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="congress-link"
-                  >
-                    {wikiIsDirectArticle ? 'Wikipedia ↗' : 'Search Wikipedia ↗'}
-                  </a>
-                ) : null}
                 <a
                   href={item.congress_gov_url}
                   target="_blank"
@@ -136,6 +127,16 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
                 >
                   Congress.gov ↗
                 </a>
+                {wikiArticleUrl ? (
+                  <a
+                    href={wikiArticleUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="congress-link"
+                  >
+                    Wikipedia ↗
+                  </a>
+                ) : null}
               </div>
             </div>
           ) : null}

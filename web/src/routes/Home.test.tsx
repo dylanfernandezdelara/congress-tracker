@@ -186,10 +186,11 @@ describe('Home', () => {
           headline: 'Jane Doe confirmed as Energy Secretary',
           what_was_confirmed: 'The Senate confirmed Jane Doe as Secretary of Energy.',
           background:
-            'Jane Doe is an energy policy expert from California who previously led state clean-energy programs.',
+            'Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.',
           key_points: [],
           congress_gov_url: 'https://www.congress.gov/nomination/119th-congress/100',
           wikipedia_url: null,
+          wikipedia_extract: null,
         },
       ],
     })

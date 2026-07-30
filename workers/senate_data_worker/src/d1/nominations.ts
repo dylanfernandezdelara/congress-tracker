@@ -44,6 +44,12 @@ export function parseStoredBackground(
           ? parsed.wikipedia_url.trim()
           : null;
     }
+    if ("wikipedia_extract" in parsed) {
+      content.wikipedia_extract =
+        typeof parsed.wikipedia_extract === "string" && parsed.wikipedia_extract.trim()
+          ? parsed.wikipedia_extract.trim()
+          : null;
+    }
     return content;
   } catch {
     return null;

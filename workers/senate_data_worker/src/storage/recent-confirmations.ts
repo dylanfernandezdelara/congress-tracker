@@ -1,3 +1,4 @@
+import { buildOfficialConfirmationAbout } from "../../../../shared/confirmation-about";
 import { VOTE_LOOKBACK_DAYS } from "../constants";
 import type { Env } from "../config";
 import {
@@ -66,12 +67,25 @@ export async function buildRecentConfirmations(
         ? `The Senate confirmed the nomination for ${row.position_title.trim()}.`
         : row.description?.trim() || null);
 
-    // Display background is rewritten prose only. raw_background_text is LLM prompt
-    // scaffolding (Position:/Nominee(s): lines) and must not surface in the UI.
-    const backgroundText = background?.background?.trim() || null;
+    // Primary About is official rewrite, else honest Congress.gov identity fallback.
+    // raw_background_text scaffolding and Wikipedia extracts must not become the
+    // primary About — Wikipedia is exposed separately as wikipedia_extract.
+    const officialAbout =
+      background?.background?.trim() ||
+      buildOfficialConfirmationAbout({
+        nominees,
+        positionTitle: row.position_title,
+        organization: row.organization,
+        description: row.description,
+      });
     const wikipediaUrl =
       typeof background?.wikipedia_url === "string" && background.wikipedia_url.trim()
         ? background.wikipedia_url.trim()
+        : null;
+    const wikipediaExtract =
+      typeof background?.wikipedia_extract === "string" &&
+      background.wikipedia_extract.trim()
+        ? background.wikipedia_extract.trim()
         : null;
 
     return {
@@ -99,10 +113,11 @@ export async function buildRecentConfirmations(
         description: row.description,
       }),
       what_was_confirmed: whatWasConfirmed,
-      background: backgroundText,
+      background: officialAbout,
       key_points: background?.key_points ?? [],
       congress_gov_url: congressGovNominationUrl(ref),
       wikipedia_url: wikipediaUrl,
+      wikipedia_extract: wikipediaExtract,
     };
   });
 

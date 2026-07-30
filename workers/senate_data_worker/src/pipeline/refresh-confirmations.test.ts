@@ -104,7 +104,7 @@ describe("refreshConfirmationEnrichment", () => {
     upsertNominationMetadata.mockResolvedValue(undefined);
   });
 
-  it("persists Wikipedia extract on raw and attaches URL when rewrite succeeds", async () => {
+  it("keeps official About primary and stores Wikipedia as secondary enrichment", async () => {
     lookupNomineeWikipedia.mockResolvedValue({
       status: "hit",
       hit: {
@@ -116,7 +116,8 @@ describe("refreshConfirmationEnrichment", () => {
     rewriteConfirmationBackground.mockResolvedValue({
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-      background: "Jane Doe is an energy policy expert from California.",
+      background:
+        "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
       key_points: [],
     });
 
@@ -137,13 +138,16 @@ describe("refreshConfirmationEnrichment", () => {
     // Congress.gov scaffolding must survive append (not a full rebuild).
     expect(saved.rawBackgroundText).toContain("Position: Secretary of Energy");
     const parsed = JSON.parse(saved.backgroundJson);
+    expect(parsed.background).toBe(
+      "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy."
+    );
     expect(parsed.wikipedia_url).toBe(
       "https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
     );
-    expect(parsed.background).toContain("American energy official");
+    expect(parsed.wikipedia_extract).toContain("American energy official");
   });
 
-  it("seals wikipedia_url from a prior raw hit marker on a later rewrite pass", async () => {
+  it("seals wikipedia URL + extract from a prior raw hit marker on a later rewrite pass", async () => {
     getNomination.mockResolvedValue(
       nominationRow({
         raw_background_text:
@@ -153,7 +157,8 @@ describe("refreshConfirmationEnrichment", () => {
     rewriteConfirmationBackground.mockResolvedValue({
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-      background: "Jane Doe is an energy policy expert from California.",
+      background:
+        "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
       key_points: [],
     });
 
@@ -165,9 +170,11 @@ describe("refreshConfirmationEnrichment", () => {
       backgroundJson: string;
     };
     const parsed = JSON.parse(saved.backgroundJson);
+    expect(parsed.background).toContain("confirmed as Secretary of Energy");
     expect(parsed.wikipedia_url).toBe(
       "https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
     );
+    expect(parsed.wikipedia_extract).toBe("Jane Doe is an American energy official.");
   });
 
   it("seals wikipedia_url null from a prior miss marker without re-querying", async () => {
