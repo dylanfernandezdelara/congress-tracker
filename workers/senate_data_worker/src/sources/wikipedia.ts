@@ -99,15 +99,24 @@ async function searchTitles(query: string, limit = 5): Promise<string[]> {
     .filter((title): title is string => Boolean(title));
 }
 
-async function fetchSummary(title: string): Promise<WikipediaSummaryResponse | null> {
+async function fetchSummary(
+  title: string
+): Promise<
+  | { status: "ok"; summary: WikipediaSummaryResponse }
+  | { status: "unavailable"; error: string }
+> {
   const encoded = encodeURIComponent(title.replace(/ /g, "_"));
   const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`;
   try {
-    return await fetchJson<WikipediaSummaryResponse>(url, {
+    const summary = await fetchJson<WikipediaSummaryResponse>(url, {
       headers: wikipediaHeaders(),
     });
-  } catch {
-    return null;
+    return { status: "ok", summary };
+  } catch (err: unknown) {
+    return {
+      status: "unavailable",
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -154,6 +163,7 @@ export async function lookupNomineeWikipedia(params: {
   ];
   const seen = new Set<string>();
   let sawSuccessfulSearch = false;
+  let sawSuccessfulSummary = false;
   let lastError: string | null = null;
 
   for (const query of queries) {
@@ -169,17 +179,21 @@ export async function lookupNomineeWikipedia(params: {
       const key = title.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      const summary = await fetchSummary(title);
-      if (!summary) continue;
-      const hit = acceptWikipediaSummary(summary, displayName);
+      const summaryResult = await fetchSummary(title);
+      if (summaryResult.status === "unavailable") {
+        lastError = summaryResult.error;
+        continue;
+      }
+      sawSuccessfulSummary = true;
+      const hit = acceptWikipediaSummary(summaryResult.summary, displayName);
       if (hit) return { status: "hit", hit };
     }
   }
 
-  if (!sawSuccessfulSearch) {
+  if (!sawSuccessfulSearch || (seen.size > 0 && !sawSuccessfulSummary)) {
     return {
       status: "unavailable",
-      error: lastError ?? "Wikipedia search unavailable",
+      error: lastError ?? "Wikipedia lookup unavailable",
     };
   }
   return { status: "miss" };
