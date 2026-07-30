@@ -5,6 +5,7 @@ import { formatCollapsedDigestLead } from '@congress-tracker/shared/feed-content
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import { ExpandChevron } from './ExpandChevron'
+import { FeedRowDate } from './FeedRowDate'
 
 type RecentConfirmationsSectionProps = {
   confirmations: RecentConfirmationItem[] | null
@@ -55,17 +56,13 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
           aria-describedby={!isExpanded && teaser ? summaryId : undefined}
           onClick={() => onToggle(key)}
         >
+          <FeedRowDate dateTime={item.vote_date} primary={formatVoteDate(item.vote_date)} />
           <div className="feed-row-main">
             <div className="feed-row-header">
               <h3 id={headlineId} className="feed-row-topic">
                 {headline}
               </h3>
-              <span className="feed-row-date-wrap">
-                <time className="feed-row-date" dateTime={item.vote_date}>
-                  {formatVoteDate(item.vote_date)}
-                </time>
-                <ExpandChevron />
-              </span>
+              <ExpandChevron />
             </div>
             <div className="feed-row-meta-row">
               <span className="feed-row-badge feed-row-badge--passed text-pass">Confirmed</span>

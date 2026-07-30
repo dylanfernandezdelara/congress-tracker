@@ -12,6 +12,8 @@ import {
   getFeedTopic,
 } from '../utils/feedRowLabels'
 import { BillIdChip } from './BillIdChip'
+import { ExpandChevron } from './ExpandChevron'
+import { FeedRowDate } from './FeedRowDate'
 import { FeedRowDetail } from './FeedRowDetail'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
@@ -61,28 +63,18 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
           aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
+          <FeedRowDate
+            dateTime={displayDate.iso}
+            primary={formatVoteDate(displayDate.iso)}
+            secondary={displayDate.kind === 'signal' ? `${PRESIDENT_LAST_NAME} post` : undefined}
+          />
+
           <div className="feed-row-main">
             <div className="feed-row-header">
               <h3 id={topicId} data-feed-topic className="feed-row-topic">
                 {topic}
               </h3>
-              <span className="feed-row-date-wrap">
-                <time className="feed-row-date" dateTime={displayDate.iso}>
-                  {formatVoteDate(displayDate.iso)}
-                  {displayDate.kind === 'signal' ? ` · ${PRESIDENT_LAST_NAME} post` : ''}
-                </time>
-                <span className="feed-row-chevron" aria-hidden="true">
-                  <svg viewBox="0 0 16 16" fill="none" focusable="false">
-                    <path
-                      d="M6 3.5 10.5 8 6 12.5"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-              </span>
+              <ExpandChevron />
             </div>
 
             <div className="feed-row-meta-row">
