@@ -1,22 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Track Congress">
-  <!-- Favicon-optimized flag (simplified stars, square canvas).
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Track Congress">
+  <!-- Favicon-optimized flag (simplified stars, full-bleed square canvas).
        Separate from web/src/components/BrandFlagIcon.tsx (header logo).
        Keep geometry in sync with scripts/generate-favicons.mjs; run npm run generate:favicons. -->
-  <rect x="1" y="7.5" width="30" height="17" fill="#B22234"/>
-  <rect x="1" y="8.807692307692308" width="30" height="1.3076923076923077" fill="#FFFFFF"/>
-  <rect x="1" y="11.423076923076923" width="30" height="1.3076923076923077" fill="#FFFFFF"/>
-  <rect x="1" y="14.038461538461538" width="30" height="1.3076923076923077" fill="#FFFFFF"/>
-  <rect x="1" y="16.653846153846153" width="30" height="1.3076923076923077" fill="#FFFFFF"/>
-  <rect x="1" y="19.26923076923077" width="30" height="1.3076923076923077" fill="#FFFFFF"/>
-  <rect x="1" y="21.884615384615387" width="30" height="1.3076923076923077" fill="#FFFFFF"/>
-  <rect x="1" y="7.5" width="12" height="9.153846153846153" fill="#3C3B6E"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(3.5 9.3) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(7 9.3) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(10.5 9.3) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(3.5 12.05) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(7 12.05) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(10.5 12.05) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(3.5 14.8) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(7 14.8) scale(0.95)"/>
-  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(10.5 14.8) scale(0.95)"/>
+  <rect x="0" y="0" width="512" height="512" fill="#B22234"/>
+  <rect x="0" y="39.38461538461539" width="512" height="39.38461538461539" fill="#FFFFFF"/>
+  <rect x="0" y="118.15384615384616" width="512" height="39.38461538461539" fill="#FFFFFF"/>
+  <rect x="0" y="196.92307692307693" width="512" height="39.38461538461539" fill="#FFFFFF"/>
+  <rect x="0" y="275.69230769230774" width="512" height="39.38461538461539" fill="#FFFFFF"/>
+  <rect x="0" y="354.46153846153845" width="512" height="39.38461538461539" fill="#FFFFFF"/>
+  <rect x="0" y="433.2307692307693" width="512" height="39.38461538461539" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="204.8" height="275.6923076923077" fill="#3C3B6E"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(51.2 68.92307692307692) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(102.4 68.92307692307692) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(153.60000000000002 68.92307692307692) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(51.2 137.84615384615384) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(102.4 137.84615384615384) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(153.60000000000002 137.84615384615384) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(51.2 206.76923076923077) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(102.4 206.76923076923077) scale(14.336)"/>
+  <path d="M0,-1 0.2245,-0.309 0.9511,-0.309 0.3633,0.118 0.5878,0.809 0,0.382 -0.5878,0.809 -0.3633,0.118 -0.9511,-0.309 -0.2245,-0.309Z" fill="#FFFFFF" fill-rule="evenodd" transform="translate(153.60000000000002 206.76923076923077) scale(14.336)"/>
 </svg>

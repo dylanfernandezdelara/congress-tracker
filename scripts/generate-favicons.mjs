@@ -5,6 +5,10 @@
  * web/public/favicon.svg. The in-app header mark is a separate high-detail
  * vector: web/src/components/BrandFlagIcon.tsx — do not force those to match.
  *
+ * The flag fills the entire square canvas (no letterboxing). Transparent
+ * padding previously rendered as a black background in browser tabs and on
+ * Apple touch icons.
+ *
  * Usage: npm run generate:favicons
  */
 import { createHash } from 'node:crypto'
@@ -23,29 +27,35 @@ const WHITE = [255, 255, 255]
 /** @type {readonly [number, number, number]} */
 const BLUE = [60, 59, 110]
 
-/** Logical favicon canvas (matches favicon.svg viewBox). */
-export const FAVICON_VIEWBOX = 32
-const FLAG_X = 1
-const FLAG_Y = 7.5
-const FLAG_W = 30
-const FLAG_H = 17
+/**
+ * Logical favicon canvas (matches favicon.svg viewBox).
+ * Large viewBox keeps SVG geometry crisp when browsers scale the icon.
+ */
+export const FAVICON_VIEWBOX = 512
+/** Full-bleed flag — edge to edge, no transparent letterboxing. */
+const FLAG_X = 0
+const FLAG_Y = 0
+const FLAG_W = FAVICON_VIEWBOX
+const FLAG_H = FAVICON_VIEWBOX
 const STRIPE_H = FLAG_H / 13
-const CANTON_W = 12
+/** Canton is 2/5 of the hoist width (US flag convention, adapted to square). */
+const CANTON_W = FLAG_W * (2 / 5)
 const CANTON_H = (7 / 13) * FLAG_H
 /** Outer radius of each favicon star in viewBox units. */
-const STAR_R = 0.95
+const STAR_R = FLAG_W * 0.028
 /** @type {ReadonlyArray<readonly [number, number]>} */
-const STAR_CENTERS = [
-  [3.5, 9.3],
-  [7, 9.3],
-  [10.5, 9.3],
-  [3.5, 12.05],
-  [7, 12.05],
-  [10.5, 12.05],
-  [3.5, 14.8],
-  [7, 14.8],
-  [10.5, 14.8],
-]
+const STAR_CENTERS = (() => {
+  /** @type {Array<readonly [number, number]>} */
+  const centers = []
+  const hGap = CANTON_W / 4
+  const vGap = CANTON_H / 4
+  for (let row = 0; row < 3; row += 1) {
+    for (let col = 0; col < 3; col += 1) {
+      centers.push([hGap * (col + 1), vGap * (row + 1)])
+    }
+  }
+  return centers
+})()
 
 /** @type {ReadonlyArray<readonly [number, number]>} */
 const STAR_VERTICES = [
@@ -89,8 +99,14 @@ function pointInStar(px, py, cx, cy, radius) {
   return inside
 }
 
-const FAVICON_SIZE = 32
-const APPLE_SIZE = 180
+export const FAVICON_PNG_SIZES = Object.freeze({
+  favicon32: 32,
+  favicon48: 48,
+  favicon192: 192,
+  favicon512: 512,
+  appleTouch: 180,
+})
+
 const SUPERSAMPLE = 4
 
 /**
@@ -173,7 +189,7 @@ function writePng(width, height, pixels) {
  * @param {number} size
  * @param {number} [samples]
  */
-export function renderFaviconPng(size = FAVICON_SIZE, samples = SUPERSAMPLE) {
+export function renderFaviconPng(size, samples = SUPERSAMPLE) {
   /** @type {Array<readonly [number, number, number, number]>} */
   const pixels = []
   const scale = FAVICON_VIEWBOX / size
@@ -214,11 +230,23 @@ export function renderFaviconPng(size = FAVICON_SIZE, samples = SUPERSAMPLE) {
 }
 
 export function renderFavicon32() {
-  return renderFaviconPng(FAVICON_SIZE)
+  return renderFaviconPng(FAVICON_PNG_SIZES.favicon32)
+}
+
+export function renderFavicon48() {
+  return renderFaviconPng(FAVICON_PNG_SIZES.favicon48)
+}
+
+export function renderFavicon192() {
+  return renderFaviconPng(FAVICON_PNG_SIZES.favicon192)
+}
+
+export function renderFavicon512() {
+  return renderFaviconPng(FAVICON_PNG_SIZES.favicon512)
 }
 
 export function renderAppleTouchIcon() {
-  return renderFaviconPng(APPLE_SIZE)
+  return renderFaviconPng(FAVICON_PNG_SIZES.appleTouch)
 }
 
 /** SVG markup matching sampleFaviconColor geometry (for sync checks / rewrite). */
@@ -235,7 +263,7 @@ export function renderFaviconSvg() {
   ).join('\n')
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${FAVICON_VIEWBOX} ${FAVICON_VIEWBOX}" role="img" aria-label="Track Congress">
-  <!-- Favicon-optimized flag (simplified stars, square canvas).
+  <!-- Favicon-optimized flag (simplified stars, full-bleed square canvas).
        Separate from web/src/components/BrandFlagIcon.tsx (header logo).
        Keep geometry in sync with scripts/generate-favicons.mjs; run npm run generate:favicons. -->
   <rect x="${FLAG_X}" y="${FLAG_Y}" width="${FLAG_W}" height="${FLAG_H}" fill="#B22234"/>
@@ -248,17 +276,29 @@ ${stars}
 
 export function generateFavicons({ outDir = publicDir } = {}) {
   const favicon32 = renderFavicon32()
+  const favicon48 = renderFavicon48()
+  const favicon192 = renderFavicon192()
+  const favicon512 = renderFavicon512()
   const appleTouch = renderAppleTouchIcon()
   const faviconSvg = renderFaviconSvg()
   fs.mkdirSync(outDir, { recursive: true })
   fs.writeFileSync(path.join(outDir, 'favicon-32x32.png'), favicon32)
+  fs.writeFileSync(path.join(outDir, 'favicon-48x48.png'), favicon48)
+  fs.writeFileSync(path.join(outDir, 'favicon-192x192.png'), favicon192)
+  fs.writeFileSync(path.join(outDir, 'favicon-512x512.png'), favicon512)
   fs.writeFileSync(path.join(outDir, 'apple-touch-icon.png'), appleTouch)
   fs.writeFileSync(path.join(outDir, 'favicon.svg'), faviconSvg)
   return {
     favicon32Path: path.join(outDir, 'favicon-32x32.png'),
+    favicon48Path: path.join(outDir, 'favicon-48x48.png'),
+    favicon192Path: path.join(outDir, 'favicon-192x192.png'),
+    favicon512Path: path.join(outDir, 'favicon-512x512.png'),
     appleTouchPath: path.join(outDir, 'apple-touch-icon.png'),
     faviconSvgPath: path.join(outDir, 'favicon.svg'),
     favicon32Sha256: createHash('sha256').update(favicon32).digest('hex'),
+    favicon48Sha256: createHash('sha256').update(favicon48).digest('hex'),
+    favicon192Sha256: createHash('sha256').update(favicon192).digest('hex'),
+    favicon512Sha256: createHash('sha256').update(favicon512).digest('hex'),
     appleTouchSha256: createHash('sha256').update(appleTouch).digest('hex'),
   }
 }
@@ -266,6 +306,9 @@ export function generateFavicons({ outDir = publicDir } = {}) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const result = generateFavicons()
   console.log(`Wrote ${result.favicon32Path}`)
+  console.log(`Wrote ${result.favicon48Path}`)
+  console.log(`Wrote ${result.favicon192Path}`)
+  console.log(`Wrote ${result.favicon512Path}`)
   console.log(`Wrote ${result.appleTouchPath}`)
   console.log(`Wrote ${result.faviconSvgPath}`)
 }
