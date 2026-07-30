@@ -10,6 +10,18 @@ const longCrsSummary = `Ukraine Support Act
 ${'This bill provides support to Ukraine and allied countries through security assistance, financing, and oversight. '.repeat(4)}`
 
 describe('FeedRow', () => {
+  it('places the vote date in a left rail ahead of the topic column', () => {
+    const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+
+    const toggle = container.querySelector('.feed-row-toggle')
+    const date = container.querySelector('.feed-row-date')
+    const main = container.querySelector('.feed-row-main')
+    expect(toggle?.firstElementChild).toBe(date)
+    expect(date?.nextElementSibling).toBe(main)
+    expect(date?.querySelector('.feed-row-date-primary')?.textContent).toMatch(/Jun/)
+    expect(container.querySelector('.feed-row-date-wrap')).toBeNull()
+  })
+
   it('shows topic, policy area, and digest lead without expanding; bullets wait for detail', () => {
     const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 

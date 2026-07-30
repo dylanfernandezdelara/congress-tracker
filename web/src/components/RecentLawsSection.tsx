@@ -96,17 +96,15 @@ function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) 
           aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${billId}`}
           onClick={() => onToggle(key)}
         >
+          <time className="feed-row-date" dateTime={law.became_law_date}>
+            <span className="feed-row-date-primary">{formatVoteDate(law.became_law_date)}</span>
+          </time>
           <div className="feed-row-main">
             <div className="feed-row-header">
               <h3 id={headlineId} className="feed-row-topic">
                 {headline}
               </h3>
-              <span className="feed-row-date-wrap">
-                <time className="feed-row-date" dateTime={law.became_law_date}>
-                  {formatVoteDate(law.became_law_date)}
-                </time>
-                <ExpandChevron />
-              </span>
+              <ExpandChevron />
             </div>
             <div className="feed-row-meta-row">
               <span

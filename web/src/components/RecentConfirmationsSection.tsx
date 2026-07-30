@@ -55,17 +55,15 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
           aria-describedby={!isExpanded && teaser ? summaryId : undefined}
           onClick={() => onToggle(key)}
         >
+          <time className="feed-row-date" dateTime={item.vote_date}>
+            <span className="feed-row-date-primary">{formatVoteDate(item.vote_date)}</span>
+          </time>
           <div className="feed-row-main">
             <div className="feed-row-header">
               <h3 id={headlineId} className="feed-row-topic">
                 {headline}
               </h3>
-              <span className="feed-row-date-wrap">
-                <time className="feed-row-date" dateTime={item.vote_date}>
-                  {formatVoteDate(item.vote_date)}
-                </time>
-                <ExpandChevron />
-              </span>
+              <ExpandChevron />
             </div>
             <div className="feed-row-meta-row">
               <span className="feed-row-badge feed-row-badge--passed text-pass">Confirmed</span>
