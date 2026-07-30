@@ -34,9 +34,6 @@ export interface RefreshConfirmationsResult {
   warnings: string[];
 }
 
-const WIKI_MISS_MARKER = "WikipediaLookup: none";
-const WIKI_URL_PREFIX = "WikipediaLookup: ";
-
 export async function persistConfirmationVotes(
   db: D1Database,
   votes: ConfirmationVote[]
@@ -46,51 +43,6 @@ export async function persistConfirmationVotes(
     await upsertNominationStub(db, vote.nomination);
   }
   return votes.length;
-}
-
-/** True when raw text already records a Wikipedia attempt (hit or miss). */
-export function rawMarksWikipediaAttempt(raw: string | null): boolean {
-  if (!raw) return false;
-  return raw.includes(`\n${WIKI_URL_PREFIX}`) || raw.startsWith(WIKI_URL_PREFIX);
-}
-
-/** Recover a sealed Wikipedia URL (or null miss) from raw prompt text. */
-export function wikipediaUrlFromRaw(raw: string | null): string | null | undefined {
-  if (!raw) return undefined;
-  const line = raw
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.startsWith(WIKI_URL_PREFIX));
-  if (!line) return undefined;
-  const value = line.slice(WIKI_URL_PREFIX.length).trim();
-  if (!value || value === "none") return null;
-  if (value.startsWith("https://")) return value;
-  return null;
-}
-
-function appendWikipediaToRaw(
-  raw: string,
-  hit: { url: string; extract: string } | null
-): string {
-  const base = raw.trim();
-  if (hit) {
-    const blurb = truncateWikipediaExtract(hit.extract);
-    const biography = blurb ? `\nBiography: ${blurb}` : "";
-    return `${base}\n${WIKI_URL_PREFIX}${hit.url}${biography}`;
-  }
-  return `${base}\n${WIKI_MISS_MARKER}`;
-}
-
-/** Recover a Wikipedia extract previously appended as `Biography: …`. */
-export function wikipediaExtractFromRaw(raw: string | null): string | null {
-  if (!raw) return null;
-  const line = raw
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.startsWith("Biography:"));
-  if (!line) return null;
-  const extract = line.slice("Biography:".length).trim();
-  return extract || null;
 }
 
 function wikipediaAttempted(background: ConfirmationBackgroundContent | null): boolean {
@@ -112,23 +64,6 @@ function applyWikipediaToBackground(
   };
 }
 
-function sealWikipediaOnRewrite(
-  rewritten: ConfirmationBackgroundContent,
-  hit: { url: string; extract: string } | null | undefined,
-  rawBackground: string | null
-): ConfirmationBackgroundContent {
-  if (hit !== undefined) {
-    return applyWikipediaToBackground(rewritten, hit);
-  }
-  const sealedUrl = wikipediaUrlFromRaw(rawBackground);
-  if (sealedUrl === undefined) return rewritten;
-  return {
-    ...rewritten,
-    wikipedia_url: sealedUrl,
-    wikipedia_extract: sealedUrl ? wikipediaExtractFromRaw(rawBackground) : null,
-  };
-}
-
 function nominationFieldsFromRow(row: NominationRow) {
   return {
     ref: {
@@ -145,8 +80,13 @@ function nominationFieldsFromRow(row: NominationRow) {
 }
 
 /**
- * Fetch Congress.gov nomination metadata, rewrite official About blurbs, and
- * attach Wikipedia as secondary enrichment (URL + extract) when confident.
+ * Official-first confirmation enrichment:
+ * 1) Congress.gov metadata
+ * 2) Official About rewrite from Congress.gov source text
+ * 3) Wikipedia URL/extract attached only after an official About exists
+ *
+ * Wikipedia is never written into raw_background_text (keeps the LLM source
+ * channel official-only).
  */
 export async function refreshConfirmationEnrichment(
   env: Env,
@@ -195,7 +135,7 @@ export async function refreshConfirmationEnrichment(
         });
       }
 
-      // 2) Load once, enrich in memory, persist once.
+      // 2) Load once → official rewrite → Wikipedia enrichment → persist once.
       const row = await getNomination(env.DB, candidate.ref);
       if (!row) {
         skipped += 1;
@@ -203,62 +143,8 @@ export async function refreshConfirmationEnrichment(
       }
 
       let background = parseStoredBackground(row.background_json);
-      let rawBackground = row.raw_background_text;
+      const rawBackground = row.raw_background_text;
       let dirty = false;
-      /** Set only when a Wikipedia lookup actually ran this pass. */
-      let wikiLookupResult: { url: string; extract: string } | null | undefined;
-
-      const needsWikiLookup =
-        wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
-        !wikipediaAttempted(background) &&
-        !rawMarksWikipediaAttempt(rawBackground);
-
-      if (needsWikiLookup) {
-        const nominees = parseNomineesJson(row.nominees_json);
-        const primary = nominees[0];
-        if (primary?.display_name) {
-          const lookup = await lookupNomineeWikipedia({
-            displayName: primary.display_name,
-            positionTitle: row.position_title,
-            organization: row.organization,
-          });
-          wikipediaLookups += 1;
-
-          if (lookup.status === "unavailable") {
-            // Soft failure — do not seal a miss; retry on a later run.
-            warnings.push(
-              `Nomination ${nominationCitation(candidate.ref)} Wikipedia lookup unavailable: ${lookup.error}`
-            );
-          } else {
-            const hit =
-              lookup.status === "hit"
-                ? { url: lookup.hit.url, extract: lookup.hit.extract }
-                : null;
-            wikiLookupResult = hit;
-
-            if (background) {
-              background = applyWikipediaToBackground(background, hit);
-              dirty = true;
-            }
-            if (rawBackground?.trim()) {
-              // Append URL (+ extract) without rebuilding — keep Congress.gov intro text.
-              rawBackground = appendWikipediaToRaw(rawBackground, hit);
-              dirty = true;
-            }
-          }
-        } else {
-          // No nominee name to look up — mark as attempted so we do not loop.
-          wikiLookupResult = null;
-          if (background) {
-            background = { ...background, wikipedia_url: null };
-            dirty = true;
-          }
-          if (rawBackground?.trim()) {
-            rawBackground = appendWikipediaToRaw(rawBackground, null);
-            dirty = true;
-          }
-        }
-      }
 
       const canRewrite =
         backgroundsRewritten < CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES &&
@@ -282,16 +168,47 @@ export async function refreshConfirmationEnrichment(
         );
 
         if (rewritten) {
-          // Official rewrite stays primary; Wikipedia seals as secondary fields only.
-          background = sealWikipediaOnRewrite(
-            rewritten,
-            wikiLookupResult,
-            rawBackground
-          );
+          // Omit wikipedia_* so a later (or same-pass) wiki step can enrich.
+          background = rewritten;
           backgroundsRewritten += 1;
           dirty = true;
         } else {
           skipped += 1;
+        }
+      }
+
+      // 3) Wikipedia only after an official About exists.
+      const needsWikiLookup =
+        wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
+        background !== null &&
+        !wikipediaAttempted(background);
+
+      if (needsWikiLookup && background) {
+        const nominees = parseNomineesJson(row.nominees_json);
+        const primary = nominees[0];
+        if (primary?.display_name) {
+          const lookup = await lookupNomineeWikipedia({
+            displayName: primary.display_name,
+            positionTitle: row.position_title,
+            organization: row.organization,
+          });
+          wikipediaLookups += 1;
+
+          if (lookup.status === "unavailable") {
+            warnings.push(
+              `Nomination ${nominationCitation(candidate.ref)} Wikipedia lookup unavailable: ${lookup.error}`
+            );
+          } else {
+            const hit =
+              lookup.status === "hit"
+                ? { url: lookup.hit.url, extract: lookup.hit.extract }
+                : null;
+            background = applyWikipediaToBackground(background, hit);
+            dirty = true;
+          }
+        } else {
+          background = applyWikipediaToBackground(background, null);
+          dirty = true;
         }
       }
 

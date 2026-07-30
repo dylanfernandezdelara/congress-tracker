@@ -63,11 +63,7 @@ vi.mock("../synthesis/model", () => ({
   resolveOpenRouterModel,
 }));
 
-import {
-  rawMarksWikipediaAttempt,
-  refreshConfirmationEnrichment,
-  wikipediaUrlFromRaw,
-} from "./refresh-confirmations";
+import { refreshConfirmationEnrichment } from "./refresh-confirmations";
 
 function nominationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -104,7 +100,7 @@ describe("refreshConfirmationEnrichment", () => {
     upsertNominationMetadata.mockResolvedValue(undefined);
   });
 
-  it("keeps official About primary and stores Wikipedia as secondary enrichment", async () => {
+  it("rewrites official About first, then attaches Wikipedia as secondary fields", async () => {
     lookupNomineeWikipedia.mockResolvedValue({
       status: "hit",
       hit: {
@@ -131,11 +127,9 @@ describe("refreshConfirmationEnrichment", () => {
       rawBackgroundText: string;
       backgroundJson: string;
     };
-    expect(saved.rawBackgroundText).toContain(
-      "WikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
-    );
-    expect(saved.rawBackgroundText).toContain("Biography:");
-    // Congress.gov scaffolding must survive append (not a full rebuild).
+    // Official raw source stays Congress.gov-only (no Wikipedia markers).
+    expect(saved.rawBackgroundText).not.toContain("WikipediaLookup:");
+    expect(saved.rawBackgroundText).not.toContain("Biography:");
     expect(saved.rawBackgroundText).toContain("Position: Secretary of Energy");
     const parsed = JSON.parse(saved.backgroundJson);
     expect(parsed.background).toBe(
@@ -147,63 +141,71 @@ describe("refreshConfirmationEnrichment", () => {
     expect(parsed.wikipedia_extract).toContain("American energy official");
   });
 
-  it("seals wikipedia URL + extract from a prior raw hit marker on a later rewrite pass", async () => {
-    getNomination.mockResolvedValue(
-      nominationRow({
-        raw_background_text:
-          "Jane Doe, of California, to be Secretary of Energy.\nWikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe_(politician)\nBiography: Jane Doe is an American energy official.",
-      })
-    );
-    rewriteConfirmationBackground.mockResolvedValue({
+  it("attaches Wikipedia to an existing official About without rewriting", async () => {
+    const existing = {
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
       background:
         "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
       key_points: [],
+    };
+    getNomination.mockResolvedValue(
+      nominationRow({
+        background_json: JSON.stringify(existing),
+      })
+    );
+    lookupNomineeWikipedia.mockResolvedValue({
+      status: "hit",
+      hit: {
+        url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+        title: "Jane Doe (politician)",
+        extract: "Jane Doe is an American energy official.",
+      },
     });
 
     const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
     await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
 
-    expect(lookupNomineeWikipedia).not.toHaveBeenCalled();
+    expect(rewriteConfirmationBackground).not.toHaveBeenCalled();
     const saved = upsertNominationMetadata.mock.calls[0]![1] as {
       backgroundJson: string;
+      rawBackgroundText: string;
     };
     const parsed = JSON.parse(saved.backgroundJson);
-    expect(parsed.background).toContain("confirmed as Secretary of Energy");
+    expect(parsed.background).toBe(existing.background);
     expect(parsed.wikipedia_url).toBe(
       "https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
     );
     expect(parsed.wikipedia_extract).toBe("Jane Doe is an American energy official.");
+    expect(saved.rawBackgroundText).not.toContain("WikipediaLookup:");
   });
 
-  it("seals wikipedia_url null from a prior miss marker without re-querying", async () => {
+  it("seals wikipedia_url null on a definitive miss", async () => {
     getNomination.mockResolvedValue(
       nominationRow({
-        raw_background_text:
-          "Jane Doe, of California, to be Secretary of Energy.\nWikipediaLookup: none",
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background:
+            "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
+          key_points: [],
+        }),
       })
     );
-    rewriteConfirmationBackground.mockResolvedValue({
-      headline: "Jane Doe confirmed as Energy Secretary",
-      what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-      background: "Jane Doe of California was named to lead the Department of Energy.",
-      key_points: [],
-    });
+    lookupNomineeWikipedia.mockResolvedValue({ status: "miss" });
 
     const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
     await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
 
-    expect(lookupNomineeWikipedia).not.toHaveBeenCalled();
     const saved = upsertNominationMetadata.mock.calls[0]![1] as {
       backgroundJson: string;
     };
     const parsed = JSON.parse(saved.backgroundJson);
     expect(parsed.wikipedia_url).toBeNull();
+    expect(parsed.wikipedia_extract).toBeNull();
   });
 
   it("omits wikipedia_url when lookup was deferred by quota so a later pass can enrich", async () => {
-    // Burn the Wikipedia budget on rows that already have backgrounds, then rewrite one fresh row.
     const existingBackground = JSON.stringify({
       headline: "Prior headline",
       what_was_confirmed: "Prior confirmation.",
@@ -256,32 +258,21 @@ describe("refreshConfirmationEnrichment", () => {
     expect("wikipedia_url" in parsed).toBe(false);
   });
 
-  it("persists a miss marker when Wikipedia has no match and rewrite is unavailable", async () => {
-    lookupNomineeWikipedia.mockResolvedValue({ status: "miss" });
-    rewriteConfirmationBackground.mockResolvedValue(null);
-
-    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
-    const result = await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
-
-    expect(result.wikipediaLookups).toBe(1);
-    const saved = upsertNominationMetadata.mock.calls[0]![1] as {
-      rawBackgroundText: string;
-      backgroundJson: string | null;
-    };
-    expect(saved.rawBackgroundText).toContain("WikipediaLookup: none");
-    expect(saved.backgroundJson).toBeNull();
-  });
-
   it("does not seal a miss when Wikipedia is temporarily unavailable", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background:
+            "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
+          key_points: [],
+        }),
+      })
+    );
     lookupNomineeWikipedia.mockResolvedValue({
       status: "unavailable",
       error: "HTTP 503",
-    });
-    rewriteConfirmationBackground.mockResolvedValue({
-      headline: "Jane Doe confirmed as Energy Secretary",
-      what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-      background: "Jane Doe is from California.",
-      key_points: [],
     });
 
     const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
@@ -291,29 +282,6 @@ describe("refreshConfirmationEnrichment", () => {
     expect(result.warnings.some((w) => w.includes("Wikipedia lookup unavailable"))).toBe(
       true
     );
-    const saved = upsertNominationMetadata.mock.calls[0]![1] as {
-      rawBackgroundText: string;
-      backgroundJson: string;
-    };
-    expect(saved.rawBackgroundText).not.toContain("WikipediaLookup:");
-    const parsed = JSON.parse(saved.backgroundJson);
-    expect("wikipedia_url" in parsed).toBe(false);
-  });
-});
-
-describe("wikipedia raw markers", () => {
-  it("parses hit and miss markers", () => {
-    expect(rawMarksWikipediaAttempt("x\nWikipediaLookup: none")).toBe(true);
-    expect(
-      rawMarksWikipediaAttempt(
-        "x\nWikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe"
-      )
-    ).toBe(true);
-    expect(rawMarksWikipediaAttempt("no marker here")).toBe(false);
-    expect(wikipediaUrlFromRaw("x\nWikipediaLookup: none")).toBeNull();
-    expect(
-      wikipediaUrlFromRaw("x\nWikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe")
-    ).toBe("https://en.wikipedia.org/wiki/Jane_Doe");
-    expect(wikipediaUrlFromRaw("plain")).toBeUndefined();
+    expect(upsertNominationMetadata).not.toHaveBeenCalled();
   });
 });
