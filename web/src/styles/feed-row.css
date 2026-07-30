@@ -6,6 +6,10 @@
   .feed-list {
     --feed-date-rail: 4.25rem;
     --feed-date-gap: 0.85rem;
+    --feed-row-pad-x: 0.1rem;
+    --feed-content-inset: calc(
+      var(--feed-date-rail) + var(--feed-date-gap) + var(--feed-row-pad-x)
+    );
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -60,10 +64,6 @@
     .feed-row:not(.is-expanded):hover .feed-row-chevron {
       color: hsl(var(--twc-secondary));
     }
-
-    .feed-row:not(.is-expanded):hover .feed-row-date {
-      color: hsl(var(--twc-secondary));
-    }
   }
 
   .feed-row:has(.feed-row-toggle:active),
@@ -81,7 +81,7 @@
     column-gap: var(--feed-date-gap);
     align-items: start;
     width: 100%;
-    padding: 0.85rem 0.1rem;
+    padding: 0.85rem var(--feed-row-pad-x);
     border: 0;
     background: transparent;
     text-align: left;
@@ -98,8 +98,7 @@
     background-color: hsl(var(--twc-row-hover));
   }
 
-  .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-chevron,
-  .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-date {
+  .feed-row:has(.feed-row-toggle:focus-visible) .feed-row-chevron {
     color: hsl(var(--twc-secondary));
   }
 
@@ -381,7 +380,7 @@
   }
 
   .feed-row-executive-quote-wrap {
-    padding: 0 0.1rem 0.75rem calc(var(--feed-date-rail) + var(--feed-date-gap) + 0.1rem);
+    padding: 0 var(--feed-row-pad-x) 0.75rem var(--feed-content-inset);
   }
 
   .feed-row-executive-quote {
@@ -496,7 +495,7 @@
 
   .feed-row-detail-panel {
     border-top: 1px solid hsl(var(--twc-border));
-    padding: 1rem 0.1rem 1rem calc(var(--feed-date-rail) + var(--feed-date-gap) + 0.1rem);
+    padding: 1rem var(--feed-row-pad-x) 1rem var(--feed-content-inset);
     animation: feed-row-detail-enter 0.3s var(--motion-ease-out) both;
   }
 

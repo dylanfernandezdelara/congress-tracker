@@ -13,6 +13,7 @@ import {
 } from '../utils/feedRowLabels'
 import { BillIdChip } from './BillIdChip'
 import { ExpandChevron } from './ExpandChevron'
+import { FeedRowDate } from './FeedRowDate'
 import { FeedRowDetail } from './FeedRowDetail'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
@@ -62,12 +63,11 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
           aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
-          <time className="feed-row-date" dateTime={displayDate.iso}>
-            <span className="feed-row-date-primary">{formatVoteDate(displayDate.iso)}</span>
-            {displayDate.kind === 'signal' ? (
-              <span className="feed-row-date-secondary">{PRESIDENT_LAST_NAME} post</span>
-            ) : null}
-          </time>
+          <FeedRowDate
+            dateTime={displayDate.iso}
+            primary={formatVoteDate(displayDate.iso)}
+            secondary={displayDate.kind === 'signal' ? `${PRESIDENT_LAST_NAME} post` : undefined}
+          />
 
           <div className="feed-row-main">
             <div className="feed-row-header">

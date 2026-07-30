@@ -12,6 +12,7 @@ import { mapLawKind } from '../utils/billLifecycleStages'
 import { TERMINAL_STATUS_PRESENTATION } from '../utils/terminalStatusPresentation'
 import { BillIdChip } from './BillIdChip'
 import { ExpandChevron } from './ExpandChevron'
+import { FeedRowDate } from './FeedRowDate'
 import { FeedRowDetail } from './FeedRowDetail'
 
 type RecentLawsSectionProps = {
@@ -96,9 +97,10 @@ function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) 
           aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${billId}`}
           onClick={() => onToggle(key)}
         >
-          <time className="feed-row-date" dateTime={law.became_law_date}>
-            <span className="feed-row-date-primary">{formatVoteDate(law.became_law_date)}</span>
-          </time>
+          <FeedRowDate
+            dateTime={law.became_law_date}
+            primary={formatVoteDate(law.became_law_date)}
+          />
           <div className="feed-row-main">
             <div className="feed-row-header">
               <h3 id={headlineId} className="feed-row-topic">
