@@ -11,10 +11,6 @@ type FederalControlCompactProps = {
   onRetry?: () => void
 }
 
-function formatSeatLine(seats: PartySeatCount[]): string {
-  return seats.map((entry) => `${partyShortLabel(entry.party)} ${entry.seats}`).join(' · ')
-}
-
 function SeatBar({ seats, total }: { seats: PartySeatCount[]; total: number }) {
   if (total <= 0) return null
 
@@ -40,7 +36,6 @@ function ChamberRow({
 }) {
   const seats = sortPartySeatCounts(composition.seats)
   const total = composition.total || seats.reduce((sum, entry) => sum + entry.seats, 0)
-  const seatLine = formatSeatLine(seats)
   const control =
     composition.control_label ||
     (composition.majority_party
@@ -48,9 +43,10 @@ function ChamberRow({
       : 'No clear majority')
 
   return (
-    <li className="federal-compact-row" aria-label={`${chamber}: ${control}. ${seatLine}`}>
+    <li className="federal-compact-row">
       <div className="federal-compact-row-head">
         <span className="federal-compact-label">{chamber}</span>
+        <span className="visually-hidden">{control}.</span>
         <p className="federal-compact-seats">
           {seats.map((entry, index) => (
             <span key={entry.party}>
@@ -96,7 +92,6 @@ export function FederalControlCompact({
 
   if (!composition) return null
 
-  const presidentParty = partyShortLabel(CURRENT_PRESIDENT.party)
   const presidentPartyName = partyDisplayName(CURRENT_PRESIDENT.party)
 
   return (
@@ -105,17 +100,15 @@ export function FederalControlCompact({
       <ul className="federal-compact-list">
         <ChamberRow chamber="House" composition={composition.house} />
         <ChamberRow chamber="Senate" composition={composition.senate} />
-        <li
-          className="federal-compact-row federal-compact-row--president"
-          aria-label={`President: ${CURRENT_PRESIDENT.name}, ${presidentPartyName}`}
-        >
+        <li className="federal-compact-row">
           <div className="federal-compact-row-head">
             <span className="federal-compact-label">President</span>
             <p className="federal-compact-president">
               <span className="federal-compact-president-name">{CURRENT_PRESIDENT.name}</span>
               <span className={`federal-compact-president-party ${partyCssClass(CURRENT_PRESIDENT.party)}`}>
-                {presidentParty}
+                {partyShortLabel(CURRENT_PRESIDENT.party)}
               </span>
+              <span className="visually-hidden">, {presidentPartyName}</span>
             </p>
           </div>
         </li>

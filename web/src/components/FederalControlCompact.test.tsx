@@ -45,20 +45,21 @@ describe('FederalControlCompact', () => {
     expect(within(region).getByText('President')).toBeInTheDocument()
     expect(within(region).getByText('Donald Trump')).toBeInTheDocument()
 
-    // Seat counts remain; spelled-out majority labels are dropped from the visible UI.
+    // Seat counts remain; spelled-out majority labels are not shown as visible row text.
     expect(within(region).getByText(/D 212/)).toBeInTheDocument()
     expect(within(region).getByText(/R 218/)).toBeInTheDocument()
     expect(within(region).getByText(/D 45/)).toBeInTheDocument()
     expect(within(region).getByText(/R 53/)).toBeInTheDocument()
-    expect(within(region).queryByText('Republican')).not.toBeInTheDocument()
+    expect(region.querySelectorAll('.federal-compact-majority')).toHaveLength(0)
 
-    // Control still announced to assistive tech.
-    expect(
-      within(region).getByLabelText(/House: Republican control\. D 212 · I 1 · R 218/),
-    ).toBeInTheDocument()
-    expect(
-      within(region).getByLabelText(/President: Donald Trump, Republican/),
-    ).toBeInTheDocument()
+    // Control details are available to assistive tech via visually-hidden text, not aria-label copies.
+    const hiddenControl = within(region).getAllByText('Republican control.')
+    expect(hiddenControl).toHaveLength(2)
+    for (const node of hiddenControl) {
+      expect(node).toHaveClass('visually-hidden')
+    }
+    const hiddenPresidentParty = within(region).getByText(', Republican')
+    expect(hiddenPresidentParty).toHaveClass('visually-hidden')
   })
 
   it('shows loading and error states', () => {
