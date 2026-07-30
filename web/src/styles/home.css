@@ -407,34 +407,27 @@
     color: hsl(var(--twc-secondary));
   }
 
-  .federal-compact-seats .party-r,
-  .federal-compact-seats .party-d,
-  .federal-compact-seats .party-i,
-  .federal-compact-seats .party-other,
-  .federal-compact-president-party.party-r,
-  .federal-compact-president-party.party-d,
-  .federal-compact-president-party.party-i,
-  .federal-compact-president-party.party-other {
+  /* Text colors in the label row only — bar segments keep chrome.css backgrounds. */
+  .federal-compact-row-head .party-r,
+  .federal-compact-row-head .party-d,
+  .federal-compact-row-head .party-i,
+  .federal-compact-row-head .party-other {
     background: transparent;
   }
 
-  .federal-compact-seats .party-r,
-  .federal-compact-president-party.party-r {
+  .federal-compact-row-head .party-r {
     color: hsl(var(--twc-party-r));
   }
 
-  .federal-compact-seats .party-d,
-  .federal-compact-president-party.party-d {
+  .federal-compact-row-head .party-d {
     color: hsl(var(--twc-party-d));
   }
 
-  .federal-compact-seats .party-i,
-  .federal-compact-president-party.party-i {
+  .federal-compact-row-head .party-i {
     color: hsl(var(--twc-party-i));
   }
 
-  .federal-compact-seats .party-other,
-  .federal-compact-president-party.party-other {
+  .federal-compact-row-head .party-other {
     color: hsl(var(--twc-party-other));
   }
 
@@ -461,10 +454,6 @@
   .federal-compact-president-party {
     flex-shrink: 0;
     font-weight: 500;
-  }
-
-  .federal-compact-row--president .federal-compact-row-head {
-    align-items: baseline;
   }
 
   .notable-compact {

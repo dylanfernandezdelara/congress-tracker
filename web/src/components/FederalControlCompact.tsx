@@ -1,6 +1,6 @@
 import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
 
-import type { ChamberComposition, SessionStatsResponse } from '../api/types'
+import type { ChamberComposition, PartySeatCount, SessionStatsResponse } from '../api/types'
 import { sortPartySeatCounts } from '../utils/chamberSeats'
 import { CURRENT_PRESIDENT } from '../constants/president'
 
@@ -11,20 +11,16 @@ type FederalControlCompactProps = {
   onRetry?: () => void
 }
 
-function formatSeatLine(composition: ChamberComposition): string {
-  return sortPartySeatCounts(composition.seats)
-    .map((entry) => `${partyShortLabel(entry.party)} ${entry.seats}`)
-    .join(' · ')
+function formatSeatLine(seats: PartySeatCount[]): string {
+  return seats.map((entry) => `${partyShortLabel(entry.party)} ${entry.seats}`).join(' · ')
 }
 
-function SeatBar({ composition }: { composition: ChamberComposition }) {
-  const sorted = sortPartySeatCounts(composition.seats)
-  const total = composition.total || sorted.reduce((sum, s) => sum + s.seats, 0)
+function SeatBar({ seats, total }: { seats: PartySeatCount[]; total: number }) {
   if (total <= 0) return null
 
   return (
     <div className="federal-compact-bar" aria-hidden="true">
-      {sorted.map((entry) => (
+      {seats.map((entry) => (
         <span
           key={entry.party}
           className={`federal-compact-bar-seg ${partyCssClass(entry.party)}`}
@@ -42,8 +38,9 @@ function ChamberRow({
   chamber: 'House' | 'Senate'
   composition: ChamberComposition
 }) {
-  const sorted = sortPartySeatCounts(composition.seats)
-  const seatLine = formatSeatLine(composition)
+  const seats = sortPartySeatCounts(composition.seats)
+  const total = composition.total || seats.reduce((sum, entry) => sum + entry.seats, 0)
+  const seatLine = formatSeatLine(seats)
   const control =
     composition.control_label ||
     (composition.majority_party
@@ -55,7 +52,7 @@ function ChamberRow({
       <div className="federal-compact-row-head">
         <span className="federal-compact-label">{chamber}</span>
         <p className="federal-compact-seats">
-          {sorted.map((entry, index) => (
+          {seats.map((entry, index) => (
             <span key={entry.party}>
               {index > 0 ? ' · ' : ''}
               <span className={partyCssClass(entry.party)}>
@@ -65,7 +62,7 @@ function ChamberRow({
           ))}
         </p>
       </div>
-      <SeatBar composition={composition} />
+      <SeatBar seats={seats} total={total} />
     </li>
   )
 }
