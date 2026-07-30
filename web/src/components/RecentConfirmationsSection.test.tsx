@@ -45,7 +45,7 @@ describe('RecentConfirmationsSection', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows headline, vote chips, and party split without PN or redundant identity About', () => {
+  it('shows a single party-split vote chip without duplicate totals or PN', () => {
     render(
       <RecentConfirmationsSection
         confirmations={[sampleConfirmation()]}
@@ -59,12 +59,28 @@ describe('RecentConfirmationsSection', () => {
     expect(screen.getByText('Confirmed')).toBeInTheDocument()
     expect(screen.getByText('Department of Energy')).toBeInTheDocument()
     expect(screen.getByText('R 53–0 · D 5–40')).toBeInTheDocument()
+    // One vote story only — no separate total/margin chip alongside party splits.
+    expect(screen.queryByText(/58–40/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\+18/)).not.toBeInTheDocument()
     expect(screen.queryByText('PN100')).not.toBeInTheDocument()
     expect(
       screen.queryByText(
         'Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.',
       ),
     ).not.toBeInTheDocument()
+  })
+
+  it('falls back to yeas–nays when party splits are unavailable', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[sampleConfirmation({ party_splits: [] })]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    expect(screen.getByText('58–40 · +18')).toBeInTheDocument()
+    expect(screen.queryByText(/R 53–0/)).not.toBeInTheDocument()
   })
 
   it('prefers person Wikipedia About and shows opposition plus compact sources', () => {

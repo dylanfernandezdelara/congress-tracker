@@ -89,15 +89,16 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
             </div>
             <div className="feed-row-meta-row">
               <span className="feed-row-badge feed-row-badge--passed text-pass">Confirmed</span>
-              <span className="feed-row-chip feed-row-chip--margin">
-                {item.yeas}–{item.nays}
-                {margin !== 0 ? ` · ${margin > 0 ? '+' : ''}${margin}` : ''}
+              <span
+                className="feed-row-chip feed-row-chip--margin"
+                data-confirmation-vote={partySplitLabel ? 'party' : 'total'}
+              >
+                {partySplitLabel
+                  ? partySplitLabel
+                  : `${item.yeas}–${item.nays}${
+                      margin !== 0 ? ` · ${margin > 0 ? '+' : ''}${margin}` : ''
+                    }`}
               </span>
-              {partySplitLabel ? (
-                <span className="feed-row-chip feed-row-chip--margin" data-confirmation-party-split>
-                  {partySplitLabel}
-                </span>
-              ) : null}
               {organization ? <span className="feed-row-chip">{organization}</span> : null}
             </div>
           </div>
