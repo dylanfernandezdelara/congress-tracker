@@ -16,10 +16,7 @@ import {
 } from "../d1/nominations";
 import { upsertConfirmationVote } from "../d1/confirmation-votes";
 import type { ConfirmationVote } from "../types";
-import {
-  buildRawBackgroundText,
-  fetchNominationBundle,
-} from "../sources/nomination-client";
+import { fetchNominationBundle } from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import {
   lookupNomineeWikipedia,
@@ -37,6 +34,9 @@ export interface RefreshConfirmationsResult {
   warnings: string[];
 }
 
+const WIKI_MISS_MARKER = "WikipediaLookup: none";
+const WIKI_URL_PREFIX = "WikipediaLookup: ";
+
 export async function persistConfirmationVotes(
   db: D1Database,
   votes: ConfirmationVote[]
@@ -49,13 +49,36 @@ export async function persistConfirmationVotes(
 }
 
 /** True when raw text already records a Wikipedia attempt (hit or miss). */
-function rawMarksWikipediaAttempt(raw: string | null): boolean {
+export function rawMarksWikipediaAttempt(raw: string | null): boolean {
   if (!raw) return false;
-  return (
-    raw.includes("\nBiography:") ||
-    raw.startsWith("Biography:") ||
-    raw.includes("\nWikipediaLookup: none")
-  );
+  return raw.includes(`\n${WIKI_URL_PREFIX}`) || raw.startsWith(WIKI_URL_PREFIX);
+}
+
+/** Recover a sealed Wikipedia URL (or null miss) from raw prompt text. */
+export function wikipediaUrlFromRaw(raw: string | null): string | null | undefined {
+  if (!raw) return undefined;
+  const line = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.startsWith(WIKI_URL_PREFIX));
+  if (!line) return undefined;
+  const value = line.slice(WIKI_URL_PREFIX.length).trim();
+  if (!value || value === "none") return null;
+  if (value.startsWith("https://")) return value;
+  return null;
+}
+
+function appendWikipediaToRaw(
+  raw: string,
+  hit: { url: string; extract: string } | null
+): string {
+  const base = raw.trim();
+  if (hit) {
+    const blurb = truncateWikipediaExtract(hit.extract);
+    const biography = blurb ? `\nBiography: ${blurb}` : "";
+    return `${base}\n${WIKI_URL_PREFIX}${hit.url}${biography}`;
+  }
+  return `${base}\n${WIKI_MISS_MARKER}`;
 }
 
 function wikipediaAttempted(background: ConfirmationBackgroundContent | null): boolean {
@@ -173,27 +196,13 @@ export async function refreshConfirmationEnrichment(
             ? { url: hit.url, extract: hit.extract }
             : null;
 
-          if (hit) {
-            if (background) {
-              background = applyWikipediaToBackground(background, hit);
-              dirty = true;
-            } else if (rawBackground?.trim()) {
-              rawBackground = buildRawBackgroundText({
-                description: row.description,
-                organization: row.organization,
-                positionTitle: row.position_title,
-                introText: null,
-                nominees,
-                wikipediaExtract: hit.extract,
-              });
-              dirty = true;
-            }
-          } else if (background) {
-            background = applyWikipediaToBackground(background, null);
+          if (background) {
+            background = applyWikipediaToBackground(background, hit);
             dirty = true;
-          } else if (rawBackground?.trim()) {
-            // Persist a miss marker so we do not re-query forever.
-            rawBackground = `${rawBackground.trim()}\nWikipediaLookup: none`;
+          }
+          if (rawBackground?.trim()) {
+            // Append URL (+ extract) without rebuilding — keep Congress.gov intro text.
+            rawBackground = appendWikipediaToRaw(rawBackground, hit);
             dirty = true;
           }
         } else {
@@ -202,8 +211,9 @@ export async function refreshConfirmationEnrichment(
           if (background) {
             background = { ...background, wikipedia_url: null };
             dirty = true;
-          } else if (rawBackground?.trim()) {
-            rawBackground = `${rawBackground.trim()}\nWikipediaLookup: none`;
+          }
+          if (rawBackground?.trim()) {
+            rawBackground = appendWikipediaToRaw(rawBackground, null);
             dirty = true;
           }
         }
@@ -231,8 +241,9 @@ export async function refreshConfirmationEnrichment(
         );
 
         if (rewritten) {
-          // Only attach wikipedia_url when we know the lookup outcome.
-          // Never write null just because lookup was skipped (quota / deferred).
+          // Seal wikipedia_url from this-pass lookup or a durable raw marker.
+          // Omit the key only when lookup was deferred (quota) with no prior marker.
+          const sealedFromRaw = wikipediaUrlFromRaw(rawBackground);
           if (wikiLookupResult !== undefined) {
             background = {
               ...rewritten,
@@ -242,11 +253,9 @@ export async function refreshConfirmationEnrichment(
                   rewritten.background
                 : rewritten.background,
             };
-          } else if (rawBackground?.includes("WikipediaLookup: none")) {
-            // Prior miss marker — seal null so we do not re-query forever.
-            background = { ...rewritten, wikipedia_url: null };
+          } else if (sealedFromRaw !== undefined) {
+            background = { ...rewritten, wikipedia_url: sealedFromRaw };
           } else {
-            // Omit wikipedia_url so a later run can still look it up.
             background = rewritten;
           }
           backgroundsRewritten += 1;

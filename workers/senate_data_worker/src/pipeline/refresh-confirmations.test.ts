@@ -63,7 +63,11 @@ vi.mock("../synthesis/model", () => ({
   resolveOpenRouterModel,
 }));
 
-import { refreshConfirmationEnrichment } from "./refresh-confirmations";
+import {
+  rawMarksWikipediaAttempt,
+  refreshConfirmationEnrichment,
+  wikipediaUrlFromRaw,
+} from "./refresh-confirmations";
 
 function nominationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -123,12 +127,44 @@ describe("refreshConfirmationEnrichment", () => {
       rawBackgroundText: string;
       backgroundJson: string;
     };
+    expect(saved.rawBackgroundText).toContain(
+      "WikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
+    );
     expect(saved.rawBackgroundText).toContain("Biography:");
+    // Congress.gov scaffolding must survive append (not a full rebuild).
+    expect(saved.rawBackgroundText).toContain("Position: Secretary of Energy");
     const parsed = JSON.parse(saved.backgroundJson);
     expect(parsed.wikipedia_url).toBe(
       "https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
     );
     expect(parsed.background).toContain("American energy official");
+  });
+
+  it("seals wikipedia_url from a prior raw hit marker on a later rewrite pass", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        raw_background_text:
+          "Jane Doe, of California, to be Secretary of Energy.\nWikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe_(politician)\nBiography: Jane Doe is an American energy official.",
+      })
+    );
+    rewriteConfirmationBackground.mockResolvedValue({
+      headline: "Jane Doe confirmed as Energy Secretary",
+      what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+      background: "Jane Doe is an energy policy expert from California.",
+      key_points: [],
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(lookupNomineeWikipedia).not.toHaveBeenCalled();
+    const saved = upsertNominationMetadata.mock.calls[0]![1] as {
+      backgroundJson: string;
+    };
+    const parsed = JSON.parse(saved.backgroundJson);
+    expect(parsed.wikipedia_url).toBe(
+      "https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
+    );
   });
 
   it("seals wikipedia_url null from a prior miss marker without re-querying", async () => {
@@ -224,5 +260,22 @@ describe("refreshConfirmationEnrichment", () => {
     };
     expect(saved.rawBackgroundText).toContain("WikipediaLookup: none");
     expect(saved.backgroundJson).toBeNull();
+  });
+});
+
+describe("wikipedia raw markers", () => {
+  it("parses hit and miss markers", () => {
+    expect(rawMarksWikipediaAttempt("x\nWikipediaLookup: none")).toBe(true);
+    expect(
+      rawMarksWikipediaAttempt(
+        "x\nWikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe"
+      )
+    ).toBe(true);
+    expect(rawMarksWikipediaAttempt("no marker here")).toBe(false);
+    expect(wikipediaUrlFromRaw("x\nWikipediaLookup: none")).toBeNull();
+    expect(
+      wikipediaUrlFromRaw("x\nWikipediaLookup: https://en.wikipedia.org/wiki/Jane_Doe")
+    ).toBe("https://en.wikipedia.org/wiki/Jane_Doe");
+    expect(wikipediaUrlFromRaw("plain")).toBeUndefined();
   });
 });
