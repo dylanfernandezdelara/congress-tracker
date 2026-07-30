@@ -84,7 +84,7 @@ describe("buildRecentConfirmations", () => {
     });
   });
 
-  it("attaches party splits from member votes on the confirmation roll", async () => {
+  it("attaches party splits from member votes on the confirmation's congress/session", async () => {
     mockMemberVotes.mockResolvedValue([
       {
         bioguide_id: "S000001",
@@ -126,9 +126,55 @@ describe("buildRecentConfirmations", () => {
 
     const env = { DB: {} as D1Database } as import("../config").Env;
     const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(mockMemberVotes).toHaveBeenCalledWith(
+      env.DB,
+      119,
+      2,
+      [{ chamber: "Senate", roll_number: 165 }]
+    );
     expect(body.confirmations[0]?.party_splits).toEqual([
       { party: "D", yeas: 1, nays: 1, party_line: "yea" },
       { party: "R", yeas: 2, nays: 0, party_line: "yea" },
+    ]);
+  });
+
+  it("loads party splits using each confirmation row's session, not only env session", async () => {
+    mockSelect.mockResolvedValue([
+      sampleRow({ congress: 119, session: 1, roll_number: 10 }),
+    ] as never);
+    mockMemberVotes.mockResolvedValue([
+      {
+        bioguide_id: "S000001",
+        party: "R",
+        position: "Yea",
+        chamber: "Senate",
+        congress: 119,
+        session: 1,
+        roll_number: 10,
+      },
+      {
+        bioguide_id: "S000002",
+        party: "D",
+        position: "Nay",
+        chamber: "Senate",
+        congress: 119,
+        session: 1,
+        roll_number: 10,
+      },
+    ]);
+
+    const env = { DB: {} as D1Database } as import("../config").Env;
+    // Env session is 2, but the confirmation is session 1.
+    const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(mockMemberVotes).toHaveBeenCalledWith(
+      env.DB,
+      119,
+      1,
+      [{ chamber: "Senate", roll_number: 10 }]
+    );
+    expect(body.confirmations[0]?.party_splits).toEqual([
+      { party: "D", yeas: 0, nays: 1, party_line: "nay" },
+      { party: "R", yeas: 1, nays: 0, party_line: "yea" },
     ]);
   });
 

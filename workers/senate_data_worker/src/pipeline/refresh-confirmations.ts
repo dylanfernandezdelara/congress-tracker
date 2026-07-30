@@ -5,6 +5,7 @@ import {
 } from "../constants";
 import type { Env } from "../config";
 import {
+  backgroundNeedsWikipedia,
   getNomination,
   parseNomineesJson,
   parseStoredBackground,
@@ -43,10 +44,6 @@ export async function persistConfirmationVotes(
     await upsertNominationStub(db, vote.nomination);
   }
   return votes.length;
-}
-
-function wikipediaAttempted(background: ConfirmationBackgroundContent | null): boolean {
-  return Boolean(background && "wikipedia_url" in background);
 }
 
 /** Attach Wikipedia as secondary enrichment — never overwrite official About text. */
@@ -180,8 +177,7 @@ export async function refreshConfirmationEnrichment(
       // 3) Wikipedia only after an official About exists.
       const needsWikiLookup =
         wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
-        background !== null &&
-        !wikipediaAttempted(background);
+        backgroundNeedsWikipedia(background);
 
       if (needsWikiLookup && background) {
         const nominees = parseNomineesJson(row.nominees_json);

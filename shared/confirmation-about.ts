@@ -39,7 +39,6 @@ export function buildOfficialConfirmationAbout(params: {
     return `${name}${state ? ` of ${state}` : ''} was confirmed by the Senate.`
   }
   if (params.description?.trim()) {
-    // Strip trailing local-sample markers; keep the official nomination sentence.
     return params.description
       .trim()
       .replace(/\s*\(local sample\)\s*$/i, '')
@@ -51,18 +50,21 @@ export function buildOfficialConfirmationAbout(params: {
   return null
 }
 
+const PERSON_BIO_CUE =
+  /\b(previously|served|led|leading|graduated|born|former|worked|director|commissioner|professor|attorney|judge|ambassador|executive|advisor|adviser)\b/i
+
 /** True when official About only restates the headline (name + role confirmed). */
 export function isRedundantConfirmationAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return true
-  // Multi-sentence blurbs that include an identity clause still carry person facts.
+  // Multi-sentence or bio-cue sentences still carry person facts.
   const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
-  if (sentences.length > 1) return false
-  // Single-sentence identity scaffolding from Congress.gov fields.
-  if (/\bwas confirmed as\b/i.test(text)) return true
-  if (/\bwas confirmed by the Senate\b/i.test(text)) return true
-  if (/^Confirmed as\b/i.test(text)) return true
-  return false
+  if (sentences.length > 1 || PERSON_BIO_CUE.test(text)) return false
+  return (
+    /\bwas confirmed as\b/i.test(text) ||
+    /\bwas confirmed by the Senate\b/i.test(text) ||
+    /^Confirmed as\b/i.test(text)
+  )
 }
 
 /**
@@ -83,21 +85,21 @@ export function selectConfirmationAbout(params: {
   return { text: null, source: null }
 }
 
-/** True when a Wikipedia extract adds substance beyond the official About line. */
-export function wikipediaExtractAddsDetail(
-  officialAbout: string | null,
-  wikipediaExtract: string | null,
-): boolean {
-  const wiki = wikipediaExtract?.trim()
-  if (!wiki) return false
-  const official = officialAbout?.trim()
-  if (!official) return true
-  if (wiki === official) return false
-  // Skip if wiki is basically a longer restatement of the same short official line.
-  if (wiki.toLowerCase().includes(official.toLowerCase().replace(/\.$/, ''))) {
-    return wiki.length > official.length + 40
-  }
-  return true
+/** Card headline from stored rewrite or nomination identity. */
+export function confirmationHeadline(params: {
+  storedHeadline: string | null
+  nominees: ConfirmationNominee[]
+  positionTitle: string | null
+  description: string | null
+  citation: string
+}): string {
+  if (params.storedHeadline?.trim()) return params.storedHeadline.trim()
+  const name = params.nominees[0]?.display_name?.trim()
+  const role = params.positionTitle?.trim()
+  if (name && role) return `${name} confirmed as ${role}`
+  if (name) return `${name} confirmed`
+  if (params.description?.trim()) return params.description.trim()
+  return params.citation
 }
 
 function partyNounPlural(party: string): string {
@@ -118,11 +120,9 @@ export function confirmationOppositionNote(splits: RollPartySplit[]): string | n
   const primary = opposing[0]
   if (!primary) return null
 
-  const label = partyShortLabel(primary.party)
-  const tally = `${label} ${primary.yeas}–${primary.nays}`
+  const tally = `${partyShortLabel(primary.party)} ${primary.yeas}–${primary.nays}`
   const noun = partyNounPlural(primary.party)
-  if (primary.yeas === 0) {
-    return `${noun} voted against confirmation (${tally}).`
-  }
-  return `Most ${noun} voted against confirmation (${tally}).`
+  return primary.yeas === 0
+    ? `${noun} voted against confirmation (${tally}).`
+    : `Most ${noun} voted against confirmation (${tally}).`
 }

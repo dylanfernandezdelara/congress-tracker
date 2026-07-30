@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  acceptWikipediaSummary,
-  truncateWikipediaExtract,
-  wikipediaSearchUrl,
-} from "./wikipedia";
+import { acceptWikipediaSummary, truncateWikipediaExtract } from "./wikipedia";
 
 describe("truncateWikipediaExtract", () => {
   it("keeps short extracts intact", () => {
@@ -18,14 +14,6 @@ describe("truncateWikipediaExtract", () => {
     const out = truncateWikipediaExtract(extract, 90);
     expect(out.endsWith(".")).toBe(true);
     expect(out.length).toBeLessThanOrEqual(90);
-  });
-});
-
-describe("wikipediaSearchUrl", () => {
-  it("builds a Special:Search URL", () => {
-    expect(wikipediaSearchUrl("Jane Doe")).toBe(
-      "https://en.wikipedia.org/wiki/Special:Search?search=Jane%20Doe"
-    );
   });
 });
 

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildOfficialConfirmationAbout,
+  confirmationHeadline,
   confirmationOppositionNote,
   isRedundantConfirmationAbout,
   selectConfirmationAbout,
-  wikipediaExtractAddsDetail,
 } from './confirmation-about'
 
 describe('buildOfficialConfirmationAbout', () => {
@@ -58,6 +58,14 @@ describe('isRedundantConfirmationAbout', () => {
       ),
     ).toBe(false)
   })
+
+  it('keeps a single sentence that mixes identity with bio cues', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Jane Doe was confirmed as Secretary of Energy after leading California’s grid programs.',
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('selectConfirmationAbout', () => {
@@ -86,6 +94,32 @@ describe('selectConfirmationAbout', () => {
   })
 })
 
+describe('confirmationHeadline', () => {
+  it('prefers stored rewrite headline', () => {
+    expect(
+      confirmationHeadline({
+        storedHeadline: 'Jane Doe confirmed as Energy Secretary',
+        nominees: [{ display_name: 'Jane Doe', state: 'CA' }],
+        positionTitle: 'Secretary of Energy',
+        description: null,
+        citation: 'PN100',
+      }),
+    ).toBe('Jane Doe confirmed as Energy Secretary')
+  })
+
+  it('falls back to name + role', () => {
+    expect(
+      confirmationHeadline({
+        storedHeadline: null,
+        nominees: [{ display_name: 'Jane Doe', state: 'CA' }],
+        positionTitle: 'Secretary of Energy',
+        description: null,
+        citation: 'PN100',
+      }),
+    ).toBe('Jane Doe confirmed as Secretary of Energy')
+  })
+})
+
 describe('confirmationOppositionNote', () => {
   it('summarizes the largest opposing caucus', () => {
     expect(
@@ -103,25 +137,5 @@ describe('confirmationOppositionNote', () => {
         { party: 'D', yeas: 40, nays: 5, party_line: 'yea' },
       ]),
     ).toBeNull()
-  })
-})
-
-describe('wikipediaExtractAddsDetail', () => {
-  it('hides redundant wiki text', () => {
-    expect(
-      wikipediaExtractAddsDetail(
-        'Jane Doe of CA was confirmed as Secretary of Energy.',
-        'Jane Doe of CA was confirmed as Secretary of Energy.',
-      ),
-    ).toBe(false)
-  })
-
-  it('keeps wiki text that adds substance', () => {
-    expect(
-      wikipediaExtractAddsDetail(
-        'Jane Doe of CA was confirmed as Secretary of Energy.',
-        'Jane Doe is an American energy official who previously led state programs.',
-      ),
-    ).toBe(true)
   })
 })

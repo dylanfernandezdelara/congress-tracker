@@ -32,37 +32,23 @@ function wikipediaHeaders(): HeadersInit {
   };
 }
 
-function lastName(displayName: string): string | null {
-  const parts = displayName
-    .trim()
-    .split(/\s+/)
-    .map((p) => p.replace(/[.,]/g, ""))
-    .filter(Boolean);
-  if (parts.length === 0) return null;
-  return parts[parts.length - 1] ?? null;
-}
-
-function nameTokens(displayName: string): string[] {
+function nameParts(displayName: string): string[] {
   return displayName
     .trim()
     .split(/\s+/)
     .map((p) => p.replace(/[.,()'"]/g, ""))
-    .filter((p) => p.length >= 2);
+    .filter(Boolean);
 }
 
 function titleMatchesPersonName(pageTitle: string, displayName: string): boolean {
-  const tokens = nameTokens(displayName);
+  const tokens = nameParts(displayName).filter((p) => p.length >= 2);
   if (tokens.length === 0) return false;
   const title = pageTitle.toLowerCase();
-  const surname = lastName(displayName);
-  if (!surname || !title.includes(surname.toLowerCase())) return false;
-  // Require first name (or first initial match) when available — surname alone is not enough.
+  const surname = tokens[tokens.length - 1]!;
+  if (!title.includes(surname.toLowerCase())) return false;
   if (tokens.length === 1) return true;
   const given = tokens[0]!.toLowerCase();
-  if (title.includes(given)) return true;
-  // Allow "J. Doe" style titles for "Jane Doe".
-  if (given.length > 0 && title.includes(`${given[0]}.`)) return true;
-  return false;
+  return title.includes(given) || title.includes(`${given[0]}.`);
 }
 
 const PERSON_ROLE_CUE =
@@ -75,18 +61,18 @@ const TITLE_PERSON_DISAMBIG =
 const OFFICE_PAGE_TITLE =
   /^(List of |United States (Secretary|Deputy Secretary|Under Secretary|Assistant Secretary|Attorney General|Ambassador|Administrator|Director|Surgeon General)\b|Secretary of |Deputy Secretary of |Under Secretary of |Assistant Secretary of |United States Senate|Cabinet of the)/i;
 
-/** Role-definition boilerplate common on office pages, not nominee biographies. */
 const OFFICE_EXTRACT_CUE =
   /\b(is the head of|heads the|is a cabinet-level|cabinet-level position|member of the (United States )?Cabinet|is a federal executive department)\b/i;
 
+const PERSON_BIO_CUE = /\b(born|served as|previously|graduated|nominated)\b/i;
+
 function extractMentionsPerson(extract: string, displayName: string): boolean {
-  const surname = lastName(displayName);
-  if (!surname) return false;
-  // Person bios almost always open with the subject's name.
+  const tokens = nameParts(displayName).filter((p) => p.length >= 2);
+  if (tokens.length === 0) return false;
   const head = extract.slice(0, Math.min(160, extract.length)).toLowerCase();
-  if (!head.includes(surname.toLowerCase())) return false;
-  const tokens = nameTokens(displayName);
-  if (tokens.length <= 1) return true;
+  const surname = tokens[tokens.length - 1]!.toLowerCase();
+  if (!head.includes(surname)) return false;
+  if (tokens.length === 1) return true;
   const given = tokens[0]!.toLowerCase();
   return head.includes(given) || head.includes(`${given[0]}.`);
 }
@@ -149,21 +135,13 @@ export function acceptWikipediaSummary(
   const extract = summary.extract?.trim();
   const pageUrl = summary.content_urls?.desktop?.page?.trim();
   if (!title || !extract || !pageUrl) return null;
-  // Reject office/role pages even when a search query included the nominee name.
   if (OFFICE_PAGE_TITLE.test(title)) return null;
   if (!titleMatchesPersonName(title, displayName)) return null;
   if (!extractMentionsPerson(extract, displayName)) return null;
-  // Role-definition boilerplate without person-biography cues.
-  if (
-    OFFICE_EXTRACT_CUE.test(extract) &&
-    !/\b(born|served as|previously|graduated|nominated)\b/i.test(extract)
-  ) {
-    return null;
-  }
+  if (OFFICE_EXTRACT_CUE.test(extract) && !PERSON_BIO_CUE.test(extract)) return null;
   const description = summary.description ?? "";
   const personCue =
-    PERSON_ROLE_CUE.test(`${description} ${extract}`) ||
-    TITLE_PERSON_DISAMBIG.test(title);
+    PERSON_ROLE_CUE.test(`${description} ${extract}`) || TITLE_PERSON_DISAMBIG.test(title);
   if (!personCue) return null;
   return { url: pageUrl, title, extract };
 }
@@ -187,10 +165,7 @@ export async function lookupNomineeWikipedia(params: {
   const displayName = params.displayName.trim();
   if (!displayName) return { status: "miss" };
 
-  const queries = [
-    buildSearchQuery(params),
-    `"${displayName}"`,
-  ];
+  const queries = [buildSearchQuery(params), `"${displayName}"`];
   const seen = new Set<string>();
   let sawSuccessfulSearch = false;
   let sawSuccessfulSummary = false;
@@ -232,22 +207,16 @@ export async function lookupNomineeWikipedia(params: {
 /** Truncate a Wikipedia extract to a short person blurb for the feed UI. */
 export function truncateWikipediaExtract(extract: string, maxChars = 320): string {
   const collapsed = extract.replace(/\s+/g, " ").trim();
-  if (!collapsed) return collapsed;
-  if (collapsed.length <= maxChars) return collapsed;
+  if (!collapsed || collapsed.length <= maxChars) return collapsed;
 
   const window = collapsed.slice(0, maxChars);
-  const markers = [". ", "! ", "? "];
-  const sentenceAt = Math.max(...markers.map((m) => window.lastIndexOf(m)));
+  const sentenceAt = Math.max(
+    ...[". ", "! ", "? "].map((m) => window.lastIndexOf(m))
+  );
   if (sentenceAt >= Math.floor(maxChars * 0.45)) {
     return window.slice(0, sentenceAt + 1).trimEnd();
   }
   const lastSpace = window.lastIndexOf(" ");
   if (lastSpace <= 0) return `${window.trimEnd()}…`;
   return `${window.slice(0, lastSpace).trimEnd()}…`;
-}
-
-/** Fallback search URL when no confident article was stored. */
-export function wikipediaSearchUrl(displayName: string): string {
-  const q = displayName.trim();
-  return `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(q)}`;
 }
