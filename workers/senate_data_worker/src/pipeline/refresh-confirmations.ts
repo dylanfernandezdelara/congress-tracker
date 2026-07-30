@@ -186,24 +186,34 @@ export async function refreshConfirmationEnrichment(
         const nominees = parseNomineesJson(row.nominees_json);
         const primary = nominees[0];
         if (primary?.display_name) {
-          const hit = await lookupNomineeWikipedia({
+          const lookup = await lookupNomineeWikipedia({
             displayName: primary.display_name,
             positionTitle: row.position_title,
             organization: row.organization,
           });
           wikipediaLookups += 1;
-          wikiLookupResult = hit
-            ? { url: hit.url, extract: hit.extract }
-            : null;
 
-          if (background) {
-            background = applyWikipediaToBackground(background, hit);
-            dirty = true;
-          }
-          if (rawBackground?.trim()) {
-            // Append URL (+ extract) without rebuilding — keep Congress.gov intro text.
-            rawBackground = appendWikipediaToRaw(rawBackground, hit);
-            dirty = true;
+          if (lookup.status === "unavailable") {
+            // Soft failure — do not seal a miss; retry on a later run.
+            warnings.push(
+              `Nomination ${nominationCitation(candidate.ref)} Wikipedia lookup unavailable: ${lookup.error}`
+            );
+          } else {
+            const hit =
+              lookup.status === "hit"
+                ? { url: lookup.hit.url, extract: lookup.hit.extract }
+                : null;
+            wikiLookupResult = hit;
+
+            if (background) {
+              background = applyWikipediaToBackground(background, hit);
+              dirty = true;
+            }
+            if (rawBackground?.trim()) {
+              // Append URL (+ extract) without rebuilding — keep Congress.gov intro text.
+              rawBackground = appendWikipediaToRaw(rawBackground, hit);
+              dirty = true;
+            }
           }
         } else {
           // No nominee name to look up — mark as attempted so we do not loop.

@@ -129,29 +129,40 @@ export function acceptWikipediaSummary(
   return { url: pageUrl, title, extract };
 }
 
+export type WikipediaLookupResult =
+  | { status: "hit"; hit: WikipediaPersonHit }
+  | { status: "miss" }
+  | { status: "unavailable"; error: string };
+
 /**
  * Best-effort Wikipedia person lookup for a Senate nominee.
- * Returns null when there is no confident match (never guess a wrong person).
+ * - hit: confident person page
+ * - miss: searched successfully, no confident match (safe to seal)
+ * - unavailable: transport/API failure (do not seal; retry next run)
  */
 export async function lookupNomineeWikipedia(params: {
   displayName: string;
   positionTitle: string | null;
   organization: string | null;
-}): Promise<WikipediaPersonHit | null> {
+}): Promise<WikipediaLookupResult> {
   const displayName = params.displayName.trim();
-  if (!displayName) return null;
+  if (!displayName) return { status: "miss" };
 
   const queries = [
     buildSearchQuery(params),
     `"${displayName}"`,
   ];
   const seen = new Set<string>();
+  let sawSuccessfulSearch = false;
+  let lastError: string | null = null;
 
   for (const query of queries) {
     let titles: string[] = [];
     try {
       titles = await searchTitles(query);
-    } catch {
+      sawSuccessfulSearch = true;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
       continue;
     }
     for (const title of titles) {
@@ -161,11 +172,17 @@ export async function lookupNomineeWikipedia(params: {
       const summary = await fetchSummary(title);
       if (!summary) continue;
       const hit = acceptWikipediaSummary(summary, displayName);
-      if (hit) return hit;
+      if (hit) return { status: "hit", hit };
     }
   }
 
-  return null;
+  if (!sawSuccessfulSearch) {
+    return {
+      status: "unavailable",
+      error: lastError ?? "Wikipedia search unavailable",
+    };
+  }
+  return { status: "miss" };
 }
 
 /** Truncate a Wikipedia extract to a short person blurb for the feed UI. */
