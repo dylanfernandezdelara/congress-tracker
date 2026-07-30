@@ -32,15 +32,30 @@ export function parseStoredBackground(
     if (!parsed.headline || !parsed.what_was_confirmed || !parsed.background) {
       return null;
     }
-    return {
+    const content: ConfirmationBackgroundContent = {
       headline: parsed.headline,
       what_was_confirmed: parsed.what_was_confirmed,
       background: parsed.background,
       key_points: Array.isArray(parsed.key_points) ? parsed.key_points : [],
     };
+    if ("wikipedia_url" in parsed) {
+      content.wikipedia_url =
+        typeof parsed.wikipedia_url === "string" && parsed.wikipedia_url.trim()
+          ? parsed.wikipedia_url.trim()
+          : null;
+    }
+    return content;
   } catch {
     return null;
   }
+}
+
+/** True when background JSON exists but Wikipedia enrichment has not been attempted. */
+export function backgroundNeedsWikipedia(
+  background: ConfirmationBackgroundContent | null
+): boolean {
+  if (!background) return false;
+  return !("wikipedia_url" in background);
 }
 
 export function parseNomineesJson(json: string | null): ConfirmationNominee[] {
@@ -156,11 +171,12 @@ export interface NominationEnrichmentCandidate {
   result: string;
   needsRaw: boolean;
   needsBackground: boolean;
+  needsWikipedia: boolean;
 }
 
 /**
  * Confirmed nominations in the lookback window that still need Congress.gov
- * metadata and/or a plain-English background rewrite.
+ * metadata, a plain-English background rewrite, and/or Wikipedia enrichment.
  */
 export async function selectNominationsNeedingEnrichment(
   db: D1Database,
@@ -206,9 +222,10 @@ export async function selectNominationsNeedingEnrichment(
     // null = never fetched; empty string = fetched but no usable text.
     const needsRaw = row.raw_background_text === null;
     const hasUsableRaw = Boolean(row.raw_background_text?.trim());
-    const needsBackground =
-      hasUsableRaw && parseStoredBackground(row.background_json) === null;
-    if (!needsRaw && !needsBackground) continue;
+    const background = parseStoredBackground(row.background_json);
+    const needsBackground = hasUsableRaw && background === null;
+    const needsWikipedia = backgroundNeedsWikipedia(background);
+    if (!needsRaw && !needsBackground && !needsWikipedia) continue;
     candidates.push({
       ref: {
         congress: row.congress,
@@ -218,6 +235,7 @@ export async function selectNominationsNeedingEnrichment(
       result: row.result,
       needsRaw,
       needsBackground,
+      needsWikipedia,
     });
     if (candidates.length >= limit) break;
   }

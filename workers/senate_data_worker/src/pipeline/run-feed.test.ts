@@ -82,6 +82,7 @@ vi.mock("./refresh-confirmations", () => ({
   refreshConfirmationEnrichment: vi.fn(async () => ({
     nominationsFetched: 0,
     backgroundsRewritten: 0,
+    wikipediaLookups: 0,
     skipped: 0,
     warnings: [] as string[],
   })),

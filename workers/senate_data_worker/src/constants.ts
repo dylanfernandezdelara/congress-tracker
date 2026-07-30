@@ -22,6 +22,8 @@ export const DIGEST_REFRESH_MAX_BILLS = 25;
 export const CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES = 10;
 /** Max nomination metadata fetches (Congress.gov) per feed pipeline run. */
 export const CONFIRMATION_NOMINATION_FETCHES_PER_RUN = 15;
+/** Max Wikipedia person lookups per feed pipeline run. */
+export const CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN = 15;
 
 /**
  * Bill text-version comparisons per feed pipeline run. Each candidate costs two

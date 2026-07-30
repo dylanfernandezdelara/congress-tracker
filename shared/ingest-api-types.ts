@@ -20,6 +20,7 @@ export interface FeedPipelineRunRecord {
   confirmationVotesUpserted?: number;
   confirmationNominationsFetched?: number;
   confirmationBackgroundsRewritten?: number;
+  confirmationWikipediaLookups?: number;
   confirmation_warnings?: string[];
 }
 

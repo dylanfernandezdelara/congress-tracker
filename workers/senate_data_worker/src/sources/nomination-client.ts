@@ -39,6 +39,7 @@ export interface NominationBundle {
   description: string | null;
   organization: string | null;
   positionTitle: string | null;
+  introText: string | null;
   nominees: ConfirmationNominee[];
   receivedDate: string | null;
   rawBackgroundText: string | null;
@@ -65,10 +66,16 @@ function formatNomineeName(nominee: CongressNominee): string | null {
 
 function collectNominees(
   positions: CongressNomineePosition[]
-): { nominees: ConfirmationNominee[]; organization: string | null; positionTitle: string | null } {
+): {
+  nominees: ConfirmationNominee[];
+  organization: string | null;
+  positionTitle: string | null;
+  introText: string | null;
+} {
   const nominees: ConfirmationNominee[] = [];
   let organization: string | null = null;
   let positionTitle: string | null = null;
+  let introText: string | null = null;
 
   for (const position of positions) {
     if (!organization && position.organization?.trim()) {
@@ -76,6 +83,9 @@ function collectNominees(
     }
     if (!positionTitle && position.positionTitle?.trim()) {
       positionTitle = position.positionTitle.trim();
+    }
+    if (!introText && position.introText?.trim()) {
+      introText = position.introText.trim();
     }
     for (const nominee of asArray(position.nominees?.item)) {
       const displayName = formatNomineeName(nominee);
@@ -87,17 +97,23 @@ function collectNominees(
     }
   }
 
-  return { nominees, organization, positionTitle };
+  return { nominees, organization, positionTitle, introText };
 }
 
 export function buildRawBackgroundText(params: {
   description: string | null;
   organization: string | null;
   positionTitle: string | null;
+  introText: string | null;
   nominees: ConfirmationNominee[];
+  wikipediaExtract?: string | null;
 }): string | null {
   const lines: string[] = [];
   if (params.description?.trim()) lines.push(params.description.trim());
+  if (params.introText?.trim()) lines.push(params.introText.trim());
+  if (params.wikipediaExtract?.trim()) {
+    lines.push(`Biography: ${params.wikipediaExtract.trim()}`);
+  }
   if (params.positionTitle?.trim()) {
     const org = params.organization?.trim();
     lines.push(
@@ -122,13 +138,14 @@ export function parseNominationDetail(data: CongressNominationDetail): Nominatio
   const nomination = data.nomination;
   const description = nomination?.description?.trim() || null;
   const positions = asArray(nomination?.nominees?.item);
-  const { nominees, organization, positionTitle } = collectNominees(positions);
+  const { nominees, organization, positionTitle, introText } = collectNominees(positions);
   const org = organization ?? nomination?.organization?.trim() ?? null;
   const receivedDate = nomination?.receivedDate?.slice(0, 10) || null;
   const rawBackgroundText = buildRawBackgroundText({
     description,
     organization: org,
     positionTitle,
+    introText,
     nominees,
   });
 
@@ -136,6 +153,7 @@ export function parseNominationDetail(data: CongressNominationDetail): Nominatio
     description,
     organization: org,
     positionTitle,
+    introText,
     nominees,
     receivedDate,
     rawBackgroundText,

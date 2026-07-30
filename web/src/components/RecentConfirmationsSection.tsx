@@ -1,7 +1,5 @@
 import { useId, useState } from 'react'
 
-import { formatCollapsedDigestLead } from '@congress-tracker/shared/feed-content'
-
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
 import { ExpandChevron } from './ExpandChevron'
@@ -19,12 +17,34 @@ function confirmationKey(item: RecentConfirmationItem): string {
 }
 
 function nomineeLabel(item: RecentConfirmationItem): string {
-  if (item.nominee_names.length === 0) return item.citation
+  if (item.nominee_names.length === 0) {
+    return item.position_title?.trim() || 'Senate confirmation'
+  }
   if (item.nominee_names.length === 1) {
-    const nominee = item.nominee_names[0]!
-    return nominee.state ? `${nominee.display_name} (${nominee.state})` : nominee.display_name
+    return item.nominee_names[0]!.display_name
   }
   return `${item.nominee_names[0]!.display_name} +${item.nominee_names.length - 1}`
+}
+
+function primaryNomineeName(item: RecentConfirmationItem): string | null {
+  const name = item.nominee_names[0]?.display_name?.trim()
+  return name || null
+}
+
+function wikipediaHref(item: RecentConfirmationItem): string | null {
+  if (item.wikipedia_url?.trim()) return item.wikipedia_url.trim()
+  const name = primaryNomineeName(item)
+  if (!name) return null
+  return `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(name)}`
+}
+
+function confirmationHeadline(item: RecentConfirmationItem): string {
+  const fromApi = item.headline?.trim()
+  if (fromApi) return fromApi
+  const name = nomineeLabel(item)
+  const role = item.position_title?.trim()
+  if (role && item.nominee_names.length > 0) return `${name} confirmed as ${role}`
+  return name
 }
 
 type ConfirmationItemRowProps = {
@@ -36,13 +56,15 @@ type ConfirmationItemRowProps = {
 function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRowProps) {
   const detailId = useId()
   const headlineId = useId()
-  const summaryId = useId()
   const key = confirmationKey(item)
-  const headline = item.headline?.trim() || nomineeLabel(item)
+  const headline = confirmationHeadline(item)
   const background = item.background?.trim() || null
-  const teaser = background ? formatCollapsedDigestLead(background) : null
   const organization = item.organization?.trim() || null
+  const positionTitle = item.position_title?.trim() || null
   const margin = item.yeas - item.nays
+  const wikiHref = wikipediaHref(item)
+  const wikiIsDirectArticle = Boolean(item.wikipedia_url?.trim())
+  const accessibleName = primaryNomineeName(item) || headline
 
   return (
     <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
@@ -52,8 +74,7 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${item.citation}`}
-          aria-describedby={!isExpanded && teaser ? summaryId : undefined}
+          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${accessibleName}`}
           onClick={() => onToggle(key)}
         >
           <FeedRowDate dateTime={item.vote_date} primary={formatVoteDate(item.vote_date)} />
@@ -66,19 +87,12 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
             </div>
             <div className="feed-row-meta-row">
               <span className="feed-row-badge feed-row-badge--passed text-pass">Confirmed</span>
-              <span className="feed-row-chip">Senate</span>
               <span className="feed-row-chip feed-row-chip--margin">
                 {item.yeas}–{item.nays}
                 {margin !== 0 ? ` · ${margin > 0 ? '+' : ''}${margin}` : ''}
               </span>
-              <span className="feed-row-chip">{item.citation}</span>
               {organization ? <span className="feed-row-chip">{organization}</span> : null}
             </div>
-            {!isExpanded && teaser ? (
-              <div id={summaryId} className="feed-row-summary">
-                <p className="feed-row-teaser">{teaser}</p>
-              </div>
-            ) : null}
           </div>
         </button>
 
@@ -86,40 +100,43 @@ function ConfirmationItemRow({ item, isExpanded, onToggle }: ConfirmationItemRow
           id={detailId}
           className="feed-row-detail-panel"
           role="region"
-          aria-label={`Details for ${item.citation}`}
+          aria-label={`Details for ${accessibleName}`}
           hidden={!isExpanded}
         >
           {isExpanded ? (
             <div className="recent-confirmations-detail">
               {background ? (
                 <section className="recent-confirmations-detail-block">
-                  <h4 className="recent-confirmations-detail-label">Background</h4>
+                  <h4 className="recent-confirmations-detail-label">About</h4>
                   <p className="recent-confirmations-detail-text">{background}</p>
                 </section>
-              ) : null}
-              {item.key_points.length > 0 ? (
-                <section className="recent-confirmations-detail-block">
-                  <h4 className="recent-confirmations-detail-label">Key points</h4>
-                  <ul className="recent-confirmations-detail-points">
-                    {item.key_points.map((point) => (
-                      <li key={point}>{point}</li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-              {!background && item.key_points.length === 0 ? (
+              ) : (
                 <p className="text-[13px] text-secondary">
-                  Confirmation details are still being prepared.
+                  {positionTitle
+                    ? `Confirmed for ${positionTitle}. A short bio is not available yet.`
+                    : 'A short bio is not available yet.'}
                 </p>
-              ) : null}
-              <a
-                href={item.congress_gov_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="congress-link"
-              >
-                Read on congress.gov ↗
-              </a>
+              )}
+              <div className="recent-confirmations-links">
+                {wikiHref ? (
+                  <a
+                    href={wikiHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="congress-link"
+                  >
+                    {wikiIsDirectArticle ? 'Wikipedia ↗' : 'Search Wikipedia ↗'}
+                  </a>
+                ) : null}
+                <a
+                  href={item.congress_gov_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="congress-link"
+                >
+                  Congress.gov ↗
+                </a>
+              </div>
             </div>
           ) : null}
         </div>

@@ -139,6 +139,7 @@ describe("worker", () => {
       confirmationVotesUpserted: 0,
       confirmationNominationsFetched: 0,
       confirmationBackgroundsRewritten: 0,
+      confirmationWikipediaLookups: 0,
       confirmationWarnings: [],
       memberVotes: {
         rollsProcessed: 1,

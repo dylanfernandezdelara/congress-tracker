@@ -32,8 +32,10 @@ function sampleRow(overrides: Record<string, unknown> = {}) {
     background_json: JSON.stringify({
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-      background: "Jane Doe of California was nominated to lead the Department of Energy.",
-      key_points: ["Cabinet-level confirmation"],
+      background:
+        "Jane Doe is an energy policy expert from California who previously led state clean-energy programs.",
+      key_points: [],
+      wikipedia_url: null,
     }),
     ...overrides,
   };
@@ -56,11 +58,33 @@ describe("buildRecentConfirmations", () => {
       citation: "PN100",
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-      background: "Jane Doe of California was nominated to lead the Department of Energy.",
+      background:
+        "Jane Doe is an energy policy expert from California who previously led state clean-energy programs.",
       yeas: 58,
       nays: 40,
       congress_gov_url: "https://www.congress.gov/nomination/119th-congress/100",
+      wikipedia_url: null,
     });
+  });
+
+  it("surfaces a stored Wikipedia article URL", async () => {
+    mockSelect.mockResolvedValue([
+      sampleRow({
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background: "Jane Doe is an energy policy expert from California.",
+          key_points: [],
+          wikipedia_url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+        }),
+      }),
+    ] as never);
+
+    const env = { DB: {} as D1Database } as import("../config").Env;
+    const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(body.confirmations[0]?.wikipedia_url).toBe(
+      "https://en.wikipedia.org/wiki/Jane_Doe_(politician)"
+    );
   });
 
   it("does not expose raw nomination scaffolding as display background", async () => {
@@ -73,6 +97,7 @@ describe("buildRecentConfirmations", () => {
     const env = { DB: {} as D1Database } as import("../config").Env;
     const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
     expect(body.confirmations[0]?.background).toBeNull();
+    expect(body.confirmations[0]?.wikipedia_url).toBeNull();
     expect(body.confirmations[0]?.headline).toBe("Jane Doe confirmed as Secretary of Energy");
   });
 });

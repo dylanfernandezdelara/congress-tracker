@@ -83,6 +83,7 @@ test('seed confirmations include background JSON matching the confirmations cont
     assert.equal(typeof background.what_was_confirmed, 'string')
     assert.equal(typeof background.background, 'string')
     assert.ok(Array.isArray(background.key_points))
+    assert.ok('wikipedia_url' in background)
   }
 })
 

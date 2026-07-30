@@ -24,9 +24,11 @@ function sampleConfirmation(overrides: Partial<RecentConfirmationItem> = {}): Re
     vote_date: '2026-06-12',
     headline: 'Jane Doe confirmed as Energy Secretary',
     what_was_confirmed: 'The Senate confirmed Jane Doe as Secretary of Energy.',
-    background: 'Jane Doe of California was nominated to lead the Department of Energy.',
+    background:
+      'Jane Doe is an energy policy expert from California who previously led state clean-energy programs.',
     key_points: ['Cabinet-level confirmation'],
     congress_gov_url: 'https://www.congress.gov/nomination/119th-congress/100',
+    wikipedia_url: null,
     ...overrides,
   }
 }
@@ -39,7 +41,7 @@ describe('RecentConfirmationsSection', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows confirmation headline, org chip, and background teaser without a duplicate role header', () => {
+  it('shows headline and vote chips without PN citation or collapsed bio teaser', () => {
     render(
       <RecentConfirmationsSection
         confirmations={[sampleConfirmation()]}
@@ -52,29 +54,17 @@ describe('RecentConfirmationsSection', () => {
     expect(screen.getByText('Jane Doe confirmed as Energy Secretary')).toBeInTheDocument()
     expect(screen.getByText('Confirmed')).toBeInTheDocument()
     expect(screen.getByText('Department of Energy')).toBeInTheDocument()
+    expect(screen.queryByText('PN100')).not.toBeInTheDocument()
+    expect(screen.queryByText('Senate')).not.toBeInTheDocument()
+    // Collapsed row should not repeat the person blurb under the title.
     expect(
-      screen.getByText('Jane Doe of California was nominated to lead the Department of Energy.'),
-    ).toBeInTheDocument()
-    // Role was previously a second header that restated the headline ("Secretary of Energy · …").
-    expect(screen.queryByText('Secretary of Energy · Department of Energy')).not.toBeInTheDocument()
-  })
-
-  it('omits teaser when API background is null (org chip remains)', () => {
-    render(
-      <RecentConfirmationsSection
-        confirmations={[sampleConfirmation({ background: null })]}
-        loading={false}
-        error={null}
-      />,
-    )
-
-    expect(screen.getByText('Department of Energy')).toBeInTheDocument()
-    expect(
-      screen.queryByText('Jane Doe of California was nominated to lead the Department of Energy.'),
+      screen.queryByText(
+        'Jane Doe is an energy policy expert from California who previously led state clean-energy programs.',
+      ),
     ).not.toBeInTheDocument()
   })
 
-  it('expands background detail without restating the confirmation as a second header', () => {
+  it('expands to an About blurb with Wikipedia search and Congress.gov links', () => {
     render(
       <RecentConfirmationsSection
         confirmations={[sampleConfirmation()]}
@@ -83,18 +73,57 @@ describe('RecentConfirmationsSection', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Expand details for PN100/i }))
-    expect(screen.queryByText('What was confirmed')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    expect(screen.getByText('About')).toBeInTheDocument()
     expect(
-      screen.queryByText('The Senate confirmed Jane Doe as Secretary of Energy.'),
-    ).not.toBeInTheDocument()
-    expect(screen.getByText('Background')).toBeInTheDocument()
-    expect(
-      screen.getByText('Jane Doe of California was nominated to lead the Department of Energy.'),
+      screen.getByText(
+        'Jane Doe is an energy policy expert from California who previously led state clean-energy programs.',
+      ),
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Read on congress.gov/i })).toHaveAttribute(
+    expect(screen.queryByText('Key points')).not.toBeInTheDocument()
+    expect(screen.queryByText('What was confirmed')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Search Wikipedia/i })).toHaveAttribute(
+      'href',
+      'https://en.wikipedia.org/wiki/Special:Search?search=Jane%20Doe',
+    )
+    expect(screen.getByRole('link', { name: /Congress\.gov/i })).toHaveAttribute(
       'href',
       'https://www.congress.gov/nomination/119th-congress/100',
     )
+  })
+
+  it('links a stored Wikipedia article when enrichment found one', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            wikipedia_url: 'https://en.wikipedia.org/wiki/Jane_Doe_(politician)',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    expect(screen.getByRole('link', { name: /^Wikipedia/i })).toHaveAttribute(
+      'href',
+      'https://en.wikipedia.org/wiki/Jane_Doe_(politician)',
+    )
+  })
+
+  it('shows a fallback when no person blurb is available', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[sampleConfirmation({ background: null })]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    expect(
+      screen.getByText('Confirmed for Secretary of Energy. A short bio is not available yet.'),
+    ).toBeInTheDocument()
   })
 })

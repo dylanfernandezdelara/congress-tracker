@@ -69,6 +69,10 @@ export async function buildRecentConfirmations(
     // Display background is rewritten prose only. raw_background_text is LLM prompt
     // scaffolding (Position:/Nominee(s): lines) and must not surface in the UI.
     const backgroundText = background?.background?.trim() || null;
+    const wikipediaUrl =
+      typeof background?.wikipedia_url === "string" && background.wikipedia_url.trim()
+        ? background.wikipedia_url.trim()
+        : null;
 
     return {
       chamber: "Senate",
@@ -98,6 +102,7 @@ export async function buildRecentConfirmations(
       background: backgroundText,
       key_points: background?.key_points ?? [],
       congress_gov_url: congressGovNominationUrl(ref),
+      wikipedia_url: wikipediaUrl,
     };
   });
 

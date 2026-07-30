@@ -49,9 +49,23 @@ describe("buildRawBackgroundText", () => {
         description: null,
         organization: null,
         positionTitle: null,
+        introText: null,
         nominees: [],
       })
     ).toBeNull();
+  });
+
+  it("includes intro text and Wikipedia extract when present", () => {
+    const text = buildRawBackgroundText({
+      description: "Jane Doe, of California, to be Secretary of Energy.",
+      organization: "Department of Energy",
+      positionTitle: "Secretary of Energy",
+      introText: "A nomination for cabinet leadership.",
+      wikipediaExtract: "Jane Doe is an American energy official.",
+      nominees: [{ display_name: "Jane Doe", state: "CA" }],
+    });
+    expect(text).toContain("A nomination for cabinet leadership.");
+    expect(text).toContain("Biography: Jane Doe is an American energy official.");
   });
 });
 
