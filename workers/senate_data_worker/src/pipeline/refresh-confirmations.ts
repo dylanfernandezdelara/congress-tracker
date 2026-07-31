@@ -126,6 +126,17 @@ export async function refreshConfirmationEnrichment(
         const bundle = await fetchNominationBundle(env, candidate.ref);
         nominationsFetched += 1;
         const existing = await getNomination(env.DB, candidate.ref);
+        const existingBackground = parseStoredBackground(
+          existing?.background_json ?? null
+        );
+        // Description-echo About was often sealed before nominee names existed.
+        // Clear it so the same pass can rewrite + wiki with real metadata.
+        const clearEchoBackground =
+          existingBackground !== null &&
+          isNominationDescriptionEcho(
+            existingBackground.background,
+            bundle.description ?? existing?.description ?? null
+          );
         await upsertNominationMetadata(env.DB, {
           ref: candidate.ref,
           description: bundle.description,
@@ -135,7 +146,9 @@ export async function refreshConfirmationEnrichment(
           receivedDate: bundle.receivedDate,
           // Empty string marks "fetched, no content" so we do not re-fetch forever.
           rawBackgroundText: bundle.rawBackgroundText ?? "",
-          backgroundJson: existing?.background_json ?? null,
+          backgroundJson: clearEchoBackground
+            ? null
+            : (existing?.background_json ?? null),
         });
       }
 
@@ -159,7 +172,8 @@ export async function refreshConfirmationEnrichment(
         backgroundsRewritten < CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES &&
         Boolean(rawBackground?.trim()) &&
         !priorWikiExtract?.trim() &&
-        (background === null || descriptionEcho);
+        (background === null ||
+          (descriptionEcho && !("wikipedia_url" in (background ?? {}))));
 
       if (canRewrite) {
         if (model === null) {
@@ -196,7 +210,7 @@ export async function refreshConfirmationEnrichment(
       // a nominee name. Never seal a miss when names are still missing.
       const needsWikiLookup =
         wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
-        backgroundNeedsWikipedia(background, row.description);
+        backgroundNeedsWikipedia(background);
 
       if (needsWikiLookup && background) {
         const nominees = parseNomineesJson(row.nominees_json);

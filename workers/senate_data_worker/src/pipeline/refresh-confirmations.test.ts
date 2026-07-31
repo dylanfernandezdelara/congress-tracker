@@ -383,7 +383,7 @@ describe("refreshConfirmationEnrichment", () => {
     );
   });
 
-  it("rewrites thin description-echo About and attaches Wikipedia", async () => {
+  it("rewrites unsealed description-echo About and attaches Wikipedia", async () => {
     const description =
       "Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.";
     getNomination.mockResolvedValue(
@@ -395,13 +395,12 @@ describe("refreshConfirmationEnrichment", () => {
           { display_name: "Walter Clayton", state: "NY" },
         ]),
         raw_background_text: `${description}\nPosition: Director of National Intelligence\nNominee(s): Walter Clayton (NY)`,
+        // Echo About without wikipedia_* keys (unsealed) — eligible for rewrite.
         background_json: JSON.stringify({
           headline: description,
           what_was_confirmed: description,
           background: description,
           key_points: [],
-          wikipedia_url: null,
-          wikipedia_extract: null,
         }),
       })
     );
@@ -442,6 +441,85 @@ describe("refreshConfirmationEnrichment", () => {
     };
     const parsed = JSON.parse(saved.backgroundJson);
     expect(parsed.wikipedia_extract).toContain("chaired the SEC");
+  });
+
+  it("clears sealed description-echo About when repairing incomplete metadata", async () => {
+    const description =
+      "Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.";
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: true,
+        needsBackground: true,
+        needsWikipedia: true,
+      },
+    ]);
+    getNomination
+      .mockResolvedValueOnce(
+        nominationRow({
+          description,
+          nominees_json: null,
+          background_json: JSON.stringify({
+            headline: description,
+            what_was_confirmed: description,
+            background: description,
+            key_points: [],
+            wikipedia_url: null,
+            wikipedia_extract: null,
+          }),
+        })
+      )
+      .mockResolvedValueOnce(
+        nominationRow({
+          description,
+          position_title: "Director of National Intelligence",
+          organization: "Office of the Director of National Intelligence",
+          nominees_json: JSON.stringify([
+            { display_name: "Walter Clayton", state: "NY" },
+          ]),
+          raw_background_text: `${description}\nPosition: Director of National Intelligence\nNominee(s): Walter Clayton (NY)`,
+          background_json: null,
+        })
+      );
+    fetchNominationBundle.mockResolvedValue({
+      description,
+      organization: "Office of the Director of National Intelligence",
+      positionTitle: "Director of National Intelligence",
+      introText: null,
+      nominees: [{ display_name: "Walter Clayton", state: "NY" }],
+      receivedDate: "2026-06-01",
+      rawBackgroundText: `${description}\nPosition: Director of National Intelligence\nNominee(s): Walter Clayton (NY)`,
+    });
+    rewriteConfirmationBackground.mockResolvedValue({
+      headline: "Walter Clayton confirmed as DNI",
+      what_was_confirmed:
+        "The Senate confirmed Walter Clayton as Director of National Intelligence.",
+      background:
+        "Walter Clayton of NY was confirmed as Director of National Intelligence.",
+      key_points: [],
+    });
+    lookupNomineeWikipedia.mockResolvedValue({
+      status: "hit",
+      hit: {
+        url: "https://en.wikipedia.org/wiki/Jay_Clayton_(attorney)",
+        title: "Jay Clayton (attorney)",
+        extract: 'Walter Joseph "Jay" Clayton III previously chaired the SEC.',
+      },
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    const result = await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(result.nominationsFetched).toBe(1);
+    const metaSave = upsertNominationMetadata.mock.calls[0]![1] as {
+      backgroundJson: string | null;
+      nominees: Array<{ display_name: string }>;
+    };
+    expect(metaSave.backgroundJson).toBeNull();
+    expect(metaSave.nominees[0]?.display_name).toBe("Walter Clayton");
+    expect(result.backgroundsRewritten).toBe(1);
+    expect(result.wikipediaLookups).toBe(1);
   });
 
   it("does not seal a miss when Wikipedia is temporarily unavailable", async () => {

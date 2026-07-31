@@ -59,18 +59,16 @@ export function parseStoredBackground(
 
 /**
  * True when background JSON exists but Wikipedia enrichment has not been
- * attempted, or a sealed miss should be reopened when About is still a
- * nomination-description echo (often sealed before nominee names existed).
+ * attempted. A sealed miss (`wikipedia_url: null`) is terminal — reopen happens
+ * only when rewrite drops those keys (e.g. after metadata repair clears an
+ * echo About for a fresh rewrite).
  */
 export function backgroundNeedsWikipedia(
-  background: ConfirmationBackgroundContent | null,
-  description?: string | null
+  background: ConfirmationBackgroundContent | null
 ): boolean {
   if (!background) return false;
   if (background.wikipedia_extract?.trim()) return false;
-  if (!("wikipedia_url" in background)) return true;
-  if (background.wikipedia_url !== null) return false;
-  return isNominationDescriptionEcho(background.background, description ?? null);
+  return !("wikipedia_url" in background);
 }
 
 export function parseNomineesJson(json: string | null): ConfirmationNominee[] {
@@ -254,13 +252,15 @@ export async function selectNominationsNeedingEnrichment(
     const descriptionEcho =
       background !== null &&
       isNominationDescriptionEcho(background.background, row.description);
-    // Rewrite only missing/echo About — not every identity "was confirmed as"
-    // line (those would never converge and burn OpenRouter quota daily).
+    // Rewrite missing About, or description-echo About that has not yet been
+    // wiki-sealed. Sealed echoes are left alone (UI hides them); metadata
+    // repair clears echo JSON so a fresh rewrite can run once.
     const needsBackground =
       hasUsableRaw &&
-      (background === null || descriptionEcho) &&
-      !background?.wikipedia_extract?.trim();
-    const needsWikipedia = backgroundNeedsWikipedia(background, row.description);
+      !background?.wikipedia_extract?.trim() &&
+      (background === null ||
+        (descriptionEcho && !("wikipedia_url" in background)));
+    const needsWikipedia = backgroundNeedsWikipedia(background);
     if (!needsRaw && !needsBackground && !needsWikipedia) continue;
     candidates.push({
       ref: {
