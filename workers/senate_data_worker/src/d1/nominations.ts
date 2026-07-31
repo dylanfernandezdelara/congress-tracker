@@ -1,3 +1,4 @@
+import { isNominationDescriptionEcho } from "../../../../shared/confirmation-about";
 import type { ConfirmationBackgroundContent } from "../../../../shared/confirmations-api-types";
 import type { ConfirmationNominee } from "../../../../shared/confirmations-api-types";
 import { isConfirmedResult } from "../sources/confirmation";
@@ -56,11 +57,17 @@ export function parseStoredBackground(
   }
 }
 
-/** True when background JSON exists but Wikipedia enrichment has not been attempted. */
+/**
+ * True when background JSON exists but Wikipedia enrichment has not been
+ * attempted. A sealed miss (`wikipedia_url: null`) is terminal — reopen happens
+ * only when rewrite drops those keys (e.g. after metadata repair clears an
+ * echo About for a fresh rewrite).
+ */
 export function backgroundNeedsWikipedia(
   background: ConfirmationBackgroundContent | null
 ): boolean {
   if (!background) return false;
+  if (background.wikipedia_extract?.trim()) return false;
   return !("wikipedia_url" in background);
 }
 
@@ -125,7 +132,12 @@ export async function upsertNominationMetadata(
     description: string | null;
     organization: string | null;
     positionTitle: string | null;
-    nominees: ConfirmationNominee[];
+    /**
+     * `null` = never populated (keep incomplete-meta reopen open).
+     * `[]` = fetched with no people (terminal).
+     * non-empty = known nominees.
+     */
+    nominees: ConfirmationNominee[] | null;
     receivedDate: string | null;
     rawBackgroundText: string | null;
     /** Serialized background JSON to persist (null clears). */
@@ -162,7 +174,7 @@ export async function upsertNominationMetadata(
       params.description,
       params.organization,
       params.positionTitle,
-      params.nominees.length > 0 ? JSON.stringify(params.nominees) : null,
+      params.nominees === null ? null : JSON.stringify(params.nominees),
       params.receivedDate,
       params.rawBackgroundText,
       params.backgroundJson,
@@ -198,7 +210,9 @@ export async function selectNominationsNeedingEnrichment(
          cv.part_number AS part_number,
          cv.result AS result,
          n.raw_background_text AS raw_background_text,
-         n.background_json AS background_json
+         n.background_json AS background_json,
+         n.description AS description,
+         n.nominees_json AS nominees_json
        FROM confirmation_votes cv
        LEFT JOIN nominations n
          ON n.congress = cv.nomination_congress
@@ -216,6 +230,8 @@ export async function selectNominationsNeedingEnrichment(
       result: string;
       raw_background_text: string | null;
       background_json: string | null;
+      description: string | null;
+      nominees_json: string | null;
     }>();
 
   const seen = new Set<string>();
@@ -226,10 +242,24 @@ export async function selectNominationsNeedingEnrichment(
     if (seen.has(key)) continue;
     seen.add(key);
     // null = never fetched; empty string = fetched but no usable text.
-    const needsRaw = row.raw_background_text === null;
+    // nominees_json null = never populated (re-fetch once for ordinal names).
+    // nominees_json "[]" = fetched, no people — terminal, do not loop.
+    const incompleteMeta =
+      row.nominees_json === null && Boolean(row.description?.trim());
+    const needsRaw = row.raw_background_text === null || incompleteMeta;
     const hasUsableRaw = Boolean(row.raw_background_text?.trim());
     const background = parseStoredBackground(row.background_json);
-    const needsBackground = hasUsableRaw && background === null;
+    const descriptionEcho =
+      background !== null &&
+      isNominationDescriptionEcho(background.background, row.description);
+    // Rewrite missing About, or description-echo About that has not yet been
+    // wiki-sealed. Sealed echoes are left alone (UI hides them); metadata
+    // repair clears echo JSON so a fresh rewrite can run once.
+    const needsBackground =
+      hasUsableRaw &&
+      !background?.wikipedia_extract?.trim() &&
+      (background === null ||
+        (descriptionEcho && !("wikipedia_url" in background)));
     const needsWikipedia = backgroundNeedsWikipedia(background);
     if (!needsRaw && !needsBackground && !needsWikipedia) continue;
     candidates.push({

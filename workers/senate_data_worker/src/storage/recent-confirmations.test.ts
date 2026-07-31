@@ -221,4 +221,43 @@ describe("buildRecentConfirmations", () => {
     expect(body.confirmations[0]?.wikipedia_extract).toBeNull();
     expect(body.confirmations[0]?.headline).toBe("Jane Doe confirmed as Secretary of Energy");
   });
+
+  it("derives nominee identity from description when nominees_json is empty", async () => {
+    const description =
+      "Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.";
+    mockSelect.mockResolvedValue([
+      sampleRow({
+        citation: "PN1092",
+        nomination_number: 1092,
+        description,
+        organization: null,
+        position_title: null,
+        nominees_json: null,
+        background_json: JSON.stringify({
+          headline: description,
+          what_was_confirmed: description,
+          background: description,
+          key_points: [],
+          wikipedia_url: null,
+          wikipedia_extract: null,
+        }),
+      }),
+    ] as never);
+
+    const env = { DB: {} as D1Database } as import("../config").Env;
+    const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(body.confirmations[0]?.nominee_names).toEqual([
+      { display_name: "Walter Clayton", state: "New York" },
+    ]);
+    expect(body.confirmations[0]?.position_title).toBe(
+      "Director of National Intelligence"
+    );
+    expect(body.confirmations[0]?.headline).toBe(
+      "Walter Clayton confirmed as Director of National Intelligence"
+    );
+    // Description-echo About is not useful; fall back to identity line.
+    expect(body.confirmations[0]?.background).toBe(
+      "Walter Clayton of New York was confirmed as Director of National Intelligence."
+    );
+  });
 });

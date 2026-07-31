@@ -136,8 +136,14 @@ export function acceptWikipediaSummary(
   const pageUrl = summary.content_urls?.desktop?.page?.trim();
   if (!title || !extract || !pageUrl) return null;
   if (OFFICE_PAGE_TITLE.test(title)) return null;
-  if (!titleMatchesPersonName(title, displayName)) return null;
+  // Extract must name the nominee. Title may use a nickname (Walter → "Jay Clayton").
   if (!extractMentionsPerson(extract, displayName)) return null;
+  const titleOk = titleMatchesPersonName(title, displayName);
+  if (!titleOk) {
+    const tokens = nameParts(displayName).filter((p) => p.length >= 2);
+    const surname = tokens[tokens.length - 1]?.toLowerCase();
+    if (!surname || !title.toLowerCase().includes(surname)) return null;
+  }
   if (OFFICE_EXTRACT_CUE.test(extract) && !PERSON_BIO_CUE.test(extract)) return null;
   const description = summary.description ?? "";
   const personCue =

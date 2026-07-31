@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildRawBackgroundText,
   congressGovNominationUrl,
+  parseNominationDescription,
   parseNominationDetail,
 } from "./nomination-client";
 
@@ -39,6 +40,50 @@ describe("parseNominationDetail", () => {
     });
     expect(bundle.rawBackgroundText).toContain("Secretary of Energy");
     expect(bundle.rawBackgroundText).toContain("Jane Doe (CA)");
+  });
+
+  it("reads Congress.gov array position batches and derives names from description", () => {
+    const bundle = parseNominationDetail({
+      nomination: {
+        number: 1092,
+        citation: "PN1092",
+        description:
+          "Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.",
+        receivedDate: "2026-06-01",
+        nominees: [
+          {
+            nomineeCount: 1,
+            ordinal: 1,
+            organization: "Office of the Director of National Intelligence",
+            positionTitle: "Director of National Intelligence",
+            url: "https://api.congress.gov/v3/nomination/119/1092/1?format=json",
+          },
+        ],
+      },
+    });
+
+    expect(bundle.organization).toBe(
+      "Office of the Director of National Intelligence"
+    );
+    expect(bundle.positionTitle).toBe("Director of National Intelligence");
+    expect(bundle.nominees).toEqual([
+      { display_name: "Walter Clayton", state: "New York" },
+    ]);
+    expect(bundle.rawBackgroundText).toContain("Nominee(s): Walter Clayton");
+  });
+});
+
+describe("parseNominationDescription", () => {
+  it("parses name, state, and role from a nomination description", () => {
+    expect(
+      parseNominationDescription(
+        "Antonio M. Pozos, of Pennsylvania, to be United States District Judge for the Eastern District of Pennsylvania, vice Mitchell S. Goldberg, retired."
+      )
+    ).toEqual({
+      nominees: [{ display_name: "Antonio M. Pozos", state: "Pennsylvania" }],
+      positionTitle:
+        "United States District Judge for the Eastern District of Pennsylvania",
+    });
   });
 });
 

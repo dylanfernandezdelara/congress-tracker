@@ -1,3 +1,4 @@
+import { isNominationDescriptionEcho } from "../../../../shared/confirmation-about";
 import {
   CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES,
   CONFIRMATION_NOMINATION_FETCHES_PER_RUN,
@@ -17,7 +18,10 @@ import {
 } from "../d1/nominations";
 import { upsertConfirmationVote } from "../d1/confirmation-votes";
 import type { ConfirmationVote } from "../types";
-import { fetchNominationBundle } from "../sources/nomination-client";
+import {
+  fetchNominationBundle,
+  parseNominationDescription,
+} from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import {
   lookupNomineeWikipedia,
@@ -71,7 +75,10 @@ function nominationFieldsFromRow(row: NominationRow) {
     description: row.description,
     organization: row.organization,
     positionTitle: row.position_title,
-    nominees: parseNomineesJson(row.nominees_json),
+    // Preserve SQL null ("never populated") across rewrite/wiki-only saves so
+    // incomplete-meta reopen is not sealed when the fetch budget was exhausted.
+    nominees:
+      row.nominees_json === null ? null : parseNomineesJson(row.nominees_json),
     receivedDate: row.received_date,
   };
 }
@@ -119,6 +126,17 @@ export async function refreshConfirmationEnrichment(
         const bundle = await fetchNominationBundle(env, candidate.ref);
         nominationsFetched += 1;
         const existing = await getNomination(env.DB, candidate.ref);
+        const existingBackground = parseStoredBackground(
+          existing?.background_json ?? null
+        );
+        // Description-echo About was often sealed before nominee names existed.
+        // Clear it so the same pass can rewrite + wiki with real metadata.
+        const clearEchoBackground =
+          existingBackground !== null &&
+          isNominationDescriptionEcho(
+            existingBackground.background,
+            bundle.description ?? existing?.description ?? null
+          );
         await upsertNominationMetadata(env.DB, {
           ref: candidate.ref,
           description: bundle.description,
@@ -128,7 +146,9 @@ export async function refreshConfirmationEnrichment(
           receivedDate: bundle.receivedDate,
           // Empty string marks "fetched, no content" so we do not re-fetch forever.
           rawBackgroundText: bundle.rawBackgroundText ?? "",
-          backgroundJson: existing?.background_json ?? null,
+          backgroundJson: clearEchoBackground
+            ? null
+            : (existing?.background_json ?? null),
         });
       }
 
@@ -142,11 +162,18 @@ export async function refreshConfirmationEnrichment(
       let background = parseStoredBackground(row.background_json);
       const rawBackground = row.raw_background_text;
       let dirty = false;
+      const priorWikiUrl = background?.wikipedia_url;
+      const priorWikiExtract = background?.wikipedia_extract;
+      const descriptionEcho =
+        background !== null &&
+        isNominationDescriptionEcho(background.background, row.description);
 
       const canRewrite =
         backgroundsRewritten < CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES &&
         Boolean(rawBackground?.trim()) &&
-        background === null;
+        !priorWikiExtract?.trim() &&
+        (background === null ||
+          (descriptionEcho && !("wikipedia_url" in (background ?? {}))));
 
       if (canRewrite) {
         if (model === null) {
@@ -165,27 +192,40 @@ export async function refreshConfirmationEnrichment(
         );
 
         if (rewritten) {
-          // Omit wikipedia_* so a later (or same-pass) wiki step can enrich.
-          background = rewritten;
+          // Keep a prior wiki hit if present. Drop a sealed miss (null) so the
+          // same-pass wiki step can reopen now that names may exist.
+          background = { ...rewritten };
+          if (priorWikiExtract?.trim()) {
+            background.wikipedia_url = priorWikiUrl ?? null;
+            background.wikipedia_extract = priorWikiExtract;
+          }
           backgroundsRewritten += 1;
           dirty = true;
-        } else {
+        } else if (background === null) {
           skipped += 1;
         }
       }
 
-      // 3) Wikipedia only after an official About exists.
+      // 3) Wikipedia only after an official About exists, and only when we have
+      // a nominee name. Never seal a miss when names are still missing.
       const needsWikiLookup =
         wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
         backgroundNeedsWikipedia(background);
 
       if (needsWikiLookup && background) {
         const nominees = parseNomineesJson(row.nominees_json);
-        const primary = nominees[0];
+        const fromDescription =
+          nominees.length === 0
+            ? parseNominationDescription(row.description)
+            : null;
+        const primary =
+          nominees[0] ?? fromDescription?.nominees[0] ?? null;
+        const positionTitle =
+          row.position_title?.trim() || fromDescription?.positionTitle || null;
         if (primary?.display_name) {
           const lookup = await lookupNomineeWikipedia({
             displayName: primary.display_name,
-            positionTitle: row.position_title,
+            positionTitle,
             organization: row.organization,
           });
           wikipediaLookups += 1;
@@ -202,10 +242,8 @@ export async function refreshConfirmationEnrichment(
             background = applyWikipediaToBackground(background, hit);
             dirty = true;
           }
-        } else {
-          background = applyWikipediaToBackground(background, null);
-          dirty = true;
         }
+        // No nominee name yet — leave wikipedia_* unset so a later pass can try.
       }
 
       if (dirty) {

@@ -66,6 +66,23 @@ describe("acceptWikipediaSummary", () => {
     expect(hit).toBeNull();
   });
 
+  it("accepts nickname titles when the extract names the nominee", () => {
+    const hit = acceptWikipediaSummary(
+      {
+        type: "standard",
+        title: "Jay Clayton (attorney)",
+        description: "American attorney (born 1966)",
+        extract:
+          'Walter Joseph "Jay" Clayton III is an American attorney who is the designate director of national intelligence.',
+        content_urls: {
+          desktop: { page: "https://en.wikipedia.org/wiki/Jay_Clayton_(attorney)" },
+        },
+      },
+      "Walter Clayton"
+    );
+    expect(hit?.url).toBe("https://en.wikipedia.org/wiki/Jay_Clayton_(attorney)");
+  });
+
   it("rejects office/role pages even when they mention secretary", () => {
     const hit = acceptWikipediaSummary(
       {

@@ -4,7 +4,9 @@ import {
   buildOfficialConfirmationAbout,
   confirmationHeadline,
   confirmationOppositionNote,
+  isNominationDescriptionEcho,
   isRedundantConfirmationAbout,
+  isThinConfirmationBackground,
   selectConfirmationAbout,
 } from './confirmation-about'
 
@@ -43,6 +45,14 @@ describe('isRedundantConfirmationAbout', () => {
     ).toBe(true)
   })
 
+  it('flags Congress.gov nomination boilerplate', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.',
+      ),
+    ).toBe(true)
+  })
+
   it('keeps substantive person background', () => {
     expect(
       isRedundantConfirmationAbout(
@@ -63,6 +73,40 @@ describe('isRedundantConfirmationAbout', () => {
     expect(
       isRedundantConfirmationAbout(
         'Jane Doe was confirmed as Secretary of Energy after leading California’s grid programs.',
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('isNominationDescriptionEcho', () => {
+  it('treats description echoes as rewrite-worthy', () => {
+    const description =
+      'Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.'
+    expect(isNominationDescriptionEcho(description, description)).toBe(true)
+  })
+
+  it('does not treat identity confirmed-as lines as description echoes', () => {
+    expect(
+      isNominationDescriptionEcho(
+        'Walter Clayton of NY was confirmed as Director of National Intelligence.',
+        'Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.',
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('isThinConfirmationBackground', () => {
+  it('treats description echoes as thin', () => {
+    const description =
+      'Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.'
+    expect(isThinConfirmationBackground(description, description)).toBe(true)
+  })
+
+  it('keeps a real person blurb', () => {
+    expect(
+      isThinConfirmationBackground(
+        'Walter Joseph "Jay" Clayton III previously chaired the SEC.',
+        'Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.',
       ),
     ).toBe(false)
   })
