@@ -53,10 +53,28 @@ export function buildOfficialConfirmationAbout(params: {
 const PERSON_BIO_CUE =
   /\b(previously|served|led|leading|graduated|born|former|worked|director|commissioner|professor|attorney|judge|ambassador|executive|advisor|adviser)\b/i
 
+function normalizeAboutText(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+/**
+ * Congress.gov nomination description style — names the office, not the person's
+ * background ("Jane Doe, of California, to be Secretary of Energy, vice …").
+ */
+export function isNominationBoilerplateAbout(about: string | null): boolean {
+  const text = about?.trim()
+  if (!text) return false
+  if (PERSON_BIO_CUE.test(text) && text.split(/(?<=[.!?])\s+/).filter(Boolean).length > 1) {
+    return false
+  }
+  return /,\s*of\s+[^,]+,\s*to be\s+/i.test(text)
+}
+
 /** True when official About only restates the headline (name + role confirmed). */
 export function isRedundantConfirmationAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return true
+  if (isNominationBoilerplateAbout(text)) return true
   // Multi-sentence or bio-cue sentences still carry person facts.
   const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
   if (sentences.length > 1 || PERSON_BIO_CUE.test(text)) return false
@@ -65,6 +83,21 @@ export function isRedundantConfirmationAbout(about: string | null): boolean {
     /\bwas confirmed by the Senate\b/i.test(text) ||
     /^Confirmed as\b/i.test(text)
   )
+}
+
+/**
+ * True when a stored/rewritten About is not a useful person blurb (empty,
+ * restates the nomination description, or is identity/boilerplate only).
+ */
+export function isThinConfirmationBackground(
+  about: string | null | undefined,
+  description: string | null | undefined,
+): boolean {
+  const text = about?.trim() ?? ''
+  if (!text) return true
+  const desc = description?.trim() ?? ''
+  if (desc && normalizeAboutText(text) === normalizeAboutText(desc)) return true
+  return isRedundantConfirmationAbout(text)
 }
 
 /**

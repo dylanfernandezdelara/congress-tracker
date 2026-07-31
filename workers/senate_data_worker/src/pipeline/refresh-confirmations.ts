@@ -1,3 +1,4 @@
+import { isThinConfirmationBackground } from "../../../../shared/confirmation-about";
 import {
   CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES,
   CONFIRMATION_NOMINATION_FETCHES_PER_RUN,
@@ -142,11 +143,14 @@ export async function refreshConfirmationEnrichment(
       let background = parseStoredBackground(row.background_json);
       const rawBackground = row.raw_background_text;
       let dirty = false;
+      const thinBackground =
+        background !== null &&
+        isThinConfirmationBackground(background.background, row.description);
 
       const canRewrite =
         backgroundsRewritten < CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES &&
         Boolean(rawBackground?.trim()) &&
-        background === null;
+        (background === null || thinBackground);
 
       if (canRewrite) {
         if (model === null) {
@@ -169,15 +173,19 @@ export async function refreshConfirmationEnrichment(
           background = rewritten;
           backgroundsRewritten += 1;
           dirty = true;
-        } else {
+        } else if (background === null) {
           skipped += 1;
         }
       }
 
-      // 3) Wikipedia only after an official About exists.
+      // 3) Wikipedia only after an official About exists, and only when we have
+      // a nominee name. Never seal a miss when names are still missing.
       const needsWikiLookup =
         wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
-        backgroundNeedsWikipedia(background);
+        backgroundNeedsWikipedia(background, {
+          description: row.description,
+          reopenThinSealedMiss: true,
+        });
 
       if (needsWikiLookup && background) {
         const nominees = parseNomineesJson(row.nominees_json);
@@ -202,10 +210,8 @@ export async function refreshConfirmationEnrichment(
             background = applyWikipediaToBackground(background, hit);
             dirty = true;
           }
-        } else {
-          background = applyWikipediaToBackground(background, null);
-          dirty = true;
         }
+        // No nominee name yet — leave wikipedia_* unset so a later pass can try.
       }
 
       if (dirty) {

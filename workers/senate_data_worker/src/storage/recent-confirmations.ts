@@ -1,6 +1,7 @@
 import {
   buildOfficialConfirmationAbout,
   confirmationHeadline,
+  isThinConfirmationBackground,
 } from "../../../../shared/confirmation-about";
 import type { RollPartySplit } from "../../../../shared/stats-api-types";
 import { isLocalSampleMemberId } from "../../../../shared/member-id";
@@ -14,7 +15,10 @@ import { selectRecentConfirmationVotes } from "../d1/confirmation-votes";
 import { selectMemberVotesForRollKeys } from "../d1/member-votes";
 import { hasRealMemberRoster } from "../d1/members";
 import { isConfirmedResult } from "../sources/confirmation";
-import { congressGovNominationUrl } from "../sources/nomination-client";
+import {
+  congressGovNominationUrl,
+  parseNominationDescription,
+} from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import { lookbackStartIso } from "../sources/congress-client";
 import { rollPartySplits } from "../analytics/roll-party-stats";
@@ -94,7 +98,17 @@ export async function buildRecentConfirmations(
 
   const confirmations: RecentConfirmationItem[] = rows.map((row) => {
     const background = parseStoredBackground(row.background_json);
-    const nominees = parseNomineesJson(row.nominees_json);
+    const storedNominees = parseNomineesJson(row.nominees_json);
+    const fromDescription =
+      storedNominees.length === 0
+        ? parseNominationDescription(row.description)
+        : null;
+    const nominees =
+      storedNominees.length > 0
+        ? storedNominees
+        : (fromDescription?.nominees ?? []);
+    const positionTitle =
+      row.position_title?.trim() || fromDescription?.positionTitle || null;
     const citation =
       row.citation?.trim() ||
       nominationCitation({
@@ -108,19 +122,34 @@ export async function buildRecentConfirmations(
     };
 
     const whatWasConfirmed =
-      background?.what_was_confirmed?.trim() ||
-      (row.position_title?.trim()
-        ? `The Senate confirmed the nomination for ${row.position_title.trim()}.`
-        : row.description?.trim() || null);
+      background?.what_was_confirmed?.trim() &&
+      !isThinConfirmationBackground(
+        background.what_was_confirmed,
+        row.description
+      )
+        ? background.what_was_confirmed.trim()
+        : positionTitle
+          ? `The Senate confirmed the nomination for ${positionTitle}.`
+          : row.description?.trim() || null;
 
+    const storedAbout = background?.background?.trim() || null;
     const officialAbout =
-      background?.background?.trim() ||
+      (storedAbout &&
+      !isThinConfirmationBackground(storedAbout, row.description)
+        ? storedAbout
+        : null) ||
       buildOfficialConfirmationAbout({
         nominees,
-        positionTitle: row.position_title,
+        positionTitle,
         organization: row.organization,
         description: row.description,
       });
+
+    const storedHeadline =
+      background?.headline?.trim() &&
+      !isThinConfirmationBackground(background.headline, row.description)
+        ? background.headline.trim()
+        : null;
 
     return {
       chamber: "Senate",
@@ -131,7 +160,7 @@ export async function buildRecentConfirmations(
       nomination_number: row.nomination_number,
       part_number: row.part_number,
       nominee_names: nominees,
-      position_title: row.position_title,
+      position_title: positionTitle,
       organization: row.organization,
       description: row.description,
       question: row.question,
@@ -140,9 +169,9 @@ export async function buildRecentConfirmations(
       nays: row.nays,
       vote_date: row.vote_date,
       headline: confirmationHeadline({
-        storedHeadline: background?.headline ?? null,
+        storedHeadline,
         nominees,
-        positionTitle: row.position_title,
+        positionTitle,
         description: row.description,
         citation,
       }),

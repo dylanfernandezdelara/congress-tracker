@@ -87,6 +87,8 @@ describe("refreshConfirmationEnrichment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resolveOpenRouterModel.mockResolvedValue("test-model");
+    rewriteConfirmationBackground.mockResolvedValue(null);
+    lookupNomineeWikipedia.mockResolvedValue({ status: "miss" });
     selectNominationsNeedingEnrichment.mockResolvedValue([
       {
         ref: { congress: 119, number: 100, partNumber: 0 },
@@ -146,7 +148,7 @@ describe("refreshConfirmationEnrichment", () => {
       headline: "Jane Doe confirmed as Energy Secretary",
       what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
       background:
-        "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
+        "Jane Doe previously led California energy commission programs.",
       key_points: [],
     };
     getNomination.mockResolvedValue(
@@ -187,7 +189,7 @@ describe("refreshConfirmationEnrichment", () => {
           headline: "Jane Doe confirmed as Energy Secretary",
           what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
           background:
-            "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
+            "Jane Doe previously led California energy commission programs.",
           key_points: [],
         }),
       })
@@ -258,6 +260,99 @@ describe("refreshConfirmationEnrichment", () => {
     expect("wikipedia_url" in parsed).toBe(false);
   });
 
+  it("does not seal Wikipedia when nominee names are missing", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        nominees_json: null,
+        // Non-thin About, wiki not attempted yet — needs lookup but has no name.
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background:
+            "Jane Doe previously led California energy commission programs.",
+          key_points: [],
+        }),
+      })
+    );
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: false,
+        needsWikipedia: true,
+      },
+    ]);
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    const result = await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(result.wikipediaLookups).toBe(0);
+    expect(lookupNomineeWikipedia).not.toHaveBeenCalled();
+    expect(upsertNominationMetadata).not.toHaveBeenCalled();
+  });
+
+  it("rewrites thin description-echo About and attaches Wikipedia", async () => {
+    const description =
+      "Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.";
+    getNomination.mockResolvedValue(
+      nominationRow({
+        description,
+        position_title: "Director of National Intelligence",
+        organization: "Office of the Director of National Intelligence",
+        nominees_json: JSON.stringify([
+          { display_name: "Walter Clayton", state: "NY" },
+        ]),
+        raw_background_text: `${description}\nPosition: Director of National Intelligence\nNominee(s): Walter Clayton (NY)`,
+        background_json: JSON.stringify({
+          headline: description,
+          what_was_confirmed: description,
+          background: description,
+          key_points: [],
+          wikipedia_url: null,
+          wikipedia_extract: null,
+        }),
+      })
+    );
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: true,
+        needsWikipedia: true,
+      },
+    ]);
+    rewriteConfirmationBackground.mockResolvedValue({
+      headline: "Walter Clayton confirmed as DNI",
+      what_was_confirmed:
+        "The Senate confirmed Walter Clayton as Director of National Intelligence.",
+      background:
+        "Walter Clayton of NY was confirmed as Director of National Intelligence.",
+      key_points: [],
+    });
+    lookupNomineeWikipedia.mockResolvedValue({
+      status: "hit",
+      hit: {
+        url: "https://en.wikipedia.org/wiki/Jay_Clayton_(attorney)",
+        title: "Jay Clayton (attorney)",
+        extract:
+          'Walter Joseph "Jay" Clayton III is an American attorney who previously chaired the SEC.',
+      },
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    const result = await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(result.backgroundsRewritten).toBe(1);
+    expect(result.wikipediaLookups).toBe(1);
+    const saved = upsertNominationMetadata.mock.calls[0]![1] as {
+      backgroundJson: string;
+    };
+    const parsed = JSON.parse(saved.backgroundJson);
+    expect(parsed.wikipedia_extract).toContain("chaired the SEC");
+  });
+
   it("does not seal a miss when Wikipedia is temporarily unavailable", async () => {
     getNomination.mockResolvedValue(
       nominationRow({
@@ -265,7 +360,7 @@ describe("refreshConfirmationEnrichment", () => {
           headline: "Jane Doe confirmed as Energy Secretary",
           what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
           background:
-            "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
+            "Jane Doe previously led California energy commission programs.",
           key_points: [],
         }),
       })

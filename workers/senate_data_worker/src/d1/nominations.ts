@@ -1,3 +1,4 @@
+import { isThinConfirmationBackground } from "../../../../shared/confirmation-about";
 import type { ConfirmationBackgroundContent } from "../../../../shared/confirmations-api-types";
 import type { ConfirmationNominee } from "../../../../shared/confirmations-api-types";
 import { isConfirmedResult } from "../sources/confirmation";
@@ -56,12 +57,21 @@ export function parseStoredBackground(
   }
 }
 
-/** True when background JSON exists but Wikipedia enrichment has not been attempted. */
+/**
+ * True when background JSON exists but Wikipedia enrichment has not been
+ * attempted, or a sealed miss should be reopened after a thin/description-echo
+ * About (often sealed before nominee names were available).
+ */
 export function backgroundNeedsWikipedia(
-  background: ConfirmationBackgroundContent | null
+  background: ConfirmationBackgroundContent | null,
+  options?: { description?: string | null; reopenThinSealedMiss?: boolean }
 ): boolean {
   if (!background) return false;
-  return !("wikipedia_url" in background);
+  if (background.wikipedia_extract?.trim()) return false;
+  if (!("wikipedia_url" in background)) return true;
+  if (!options?.reopenThinSealedMiss) return false;
+  if (background.wikipedia_url !== null) return false;
+  return isThinConfirmationBackground(background.background, options.description ?? null);
 }
 
 export function parseNomineesJson(json: string | null): ConfirmationNominee[] {
@@ -198,7 +208,9 @@ export async function selectNominationsNeedingEnrichment(
          cv.part_number AS part_number,
          cv.result AS result,
          n.raw_background_text AS raw_background_text,
-         n.background_json AS background_json
+         n.background_json AS background_json,
+         n.description AS description,
+         n.nominees_json AS nominees_json
        FROM confirmation_votes cv
        LEFT JOIN nominations n
          ON n.congress = cv.nomination_congress
@@ -216,6 +228,8 @@ export async function selectNominationsNeedingEnrichment(
       result: string;
       raw_background_text: string | null;
       background_json: string | null;
+      description: string | null;
+      nominees_json: string | null;
     }>();
 
   const seen = new Set<string>();
@@ -226,11 +240,21 @@ export async function selectNominationsNeedingEnrichment(
     if (seen.has(key)) continue;
     seen.add(key);
     // null = never fetched; empty string = fetched but no usable text.
-    const needsRaw = row.raw_background_text === null;
+    // Also re-fetch when person names never made it into nominees_json (older
+    // parser missed Congress.gov ordinal nominee endpoints).
+    const incompleteMeta =
+      !row.nominees_json?.trim() && Boolean(row.description?.trim());
+    const needsRaw = row.raw_background_text === null || incompleteMeta;
     const hasUsableRaw = Boolean(row.raw_background_text?.trim());
     const background = parseStoredBackground(row.background_json);
-    const needsBackground = hasUsableRaw && background === null;
-    const needsWikipedia = backgroundNeedsWikipedia(background);
+    const thinBackground =
+      background !== null &&
+      isThinConfirmationBackground(background.background, row.description);
+    const needsBackground = hasUsableRaw && (background === null || thinBackground);
+    const needsWikipedia = backgroundNeedsWikipedia(background, {
+      description: row.description,
+      reopenThinSealedMiss: true,
+    });
     if (!needsRaw && !needsBackground && !needsWikipedia) continue;
     candidates.push({
       ref: {
