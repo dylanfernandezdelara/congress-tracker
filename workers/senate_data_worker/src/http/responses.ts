@@ -4,7 +4,12 @@ import { SECURITY_HEADERS } from "../../../../shared/security-headers";
 export type JsonResponseBuilder = (body: unknown, init?: ResponseInit) => Response;
 
 export const cacheHealth = "s-maxage=60, max-age=0, must-revalidate";
-export const cacheLatest = "s-maxage=300, stale-while-revalidate=86400";
+/**
+ * Edge TTL for public feed/stats JSON.
+ * Keep this short: D1 writes do not invalidate CDN copies. Pipeline success
+ * also purges the zone cache when CACHE_PURGE_TOKEN is configured.
+ */
+export const cacheLatest = "s-maxage=60, stale-while-revalidate=30";
 export const cacheNoStore = "no-store";
 
 /** Baseline hardening for Worker JSON responses (static assets use web/public/_headers). */

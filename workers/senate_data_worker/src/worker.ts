@@ -5,6 +5,7 @@
 import type { Env } from "./config";
 import { isPipelineBusyError, withPipelineLease } from "./d1/pipeline-lease";
 import { recordFeedPipelineSkipped } from "./d1/pipeline-state";
+import { purgePublicApiCache } from "./http/cache-purge";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
@@ -24,7 +25,7 @@ export default {
         withPipelineLease(env.DB, () =>
           runExecutivePostsPipeline(env, { trigger: "scheduled" })
         )
-          .then((result) => {
+          .then(async (result) => {
             console.log(
               JSON.stringify({
                 event: "executive_posts_pipeline_complete",
@@ -33,6 +34,7 @@ export default {
                 ...result,
               }),
             );
+            await purgePublicApiCache(env);
           })
           .catch((err: unknown) => {
             if (isPipelineBusyError(err)) {
@@ -68,7 +70,7 @@ export default {
       withPipelineLease(env.DB, () =>
         runFeedWithMemberVotes(env, { trigger: "scheduled" })
       )
-        .then((result) => {
+        .then(async (result) => {
           const { memberVotes: _memberVotes, memberVotesError: _memberVotesError, ...feed } =
             result;
           console.log(
@@ -79,6 +81,7 @@ export default {
               ...feed,
             }),
           );
+          await purgePublicApiCache(env);
         })
         .catch(async (err: unknown) => {
           if (isPipelineBusyError(err)) {

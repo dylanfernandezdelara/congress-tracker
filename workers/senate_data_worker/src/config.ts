@@ -19,6 +19,16 @@ export interface Env {
   OPENROUTER_API_KEY: string;
   OPENROUTER_MODEL?: string;
   PIPELINE_ADMIN_TOKEN?: string;
+  /**
+   * Cloudflare zone ID for trackcongress.org (public). Used with
+   * CACHE_PURGE_TOKEN to invalidate edge-cached feed/stats JSON after writes.
+   */
+  CF_ZONE_ID?: string;
+  /**
+   * API token with Zone.Cache Purge permission. Optional; purge is skipped when
+   * unset (local/preview). Never commit; set via `wrangler secret put`.
+   */
+  CACHE_PURGE_TOKEN?: string;
 }
 
 export function parseIntSafe(value: string | undefined, fallback: number): number {

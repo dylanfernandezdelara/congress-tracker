@@ -27,6 +27,8 @@ CONGRESS = "119"
 SESSION = "2"
 # Production custom domains (do not use "*" publicly). Comma-separated allowlist.
 ALLOWED_ORIGIN = "https://trackcongress.org,https://www.trackcongress.org"
+# Zone for edge cache purge after pipeline writes (pair with CACHE_PURGE_TOKEN secret).
+CF_ZONE_ID = "86b690387ae840600f5f3341aa154cce"
 
 [[routes]]
 pattern = "trackcongress.org"

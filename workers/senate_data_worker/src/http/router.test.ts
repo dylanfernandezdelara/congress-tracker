@@ -864,6 +864,43 @@ describe("HTTP API", () => {
     expect(body).toMatchObject({ ok: false, error: "pipeline_failed" });
   });
 
+  it("purges edge cache via admin route when credentials are configured", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    const response = await handlePublicFetch(
+      pipelineRequest("/__pipeline/purge-cache"),
+      createMockEnv({
+        CF_ZONE_ID: "zone-123",
+        CACHE_PURGE_TOKEN: "purge-token",
+      }) as any
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      purged: true,
+      mode: "everything",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.cloudflare.com/client/v4/zones/zone-123/purge_cache",
+      expect.objectContaining({ method: "POST" })
+    );
+    fetchMock.mockRestore();
+  });
+
+  it("returns 503 from purge-cache when token is unset", async () => {
+    const response = await handlePublicFetch(
+      pipelineRequest("/__pipeline/purge-cache"),
+      createMockEnv({ CF_ZONE_ID: "zone-123" }) as any
+    );
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      skipped: true,
+      reason: "CACHE_PURGE_TOKEN unset",
+    });
+  });
+
   it("requires a matching Bearer token when PIPELINE_ADMIN_TOKEN is set", async () => {
     const env = createMockEnv({
       ALLOWED_ORIGIN: "https://congress.example",

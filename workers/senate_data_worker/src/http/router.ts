@@ -52,6 +52,10 @@ import type {
   VoteDefectorsResponse,
 } from "../types";
 import { isPipelineBusyError, withPipelineLease } from "../d1/pipeline-lease";
+import {
+  purgePublicApiCache,
+  schedulePublicApiCachePurge,
+} from "./cache-purge";
 import { authorizePipeline, isPreviewWorkerHost } from "./pipeline-auth";
 import {
   buildCorsHeaders,
@@ -227,7 +231,8 @@ async function handlePipelineRoute<T extends object>(
   request: Request,
   env: Env,
   json: JsonFn,
-  run: () => Promise<T>
+  run: () => Promise<T>,
+  ctx?: Pick<ExecutionContext, "waitUntil">
 ): Promise<Response> {
   const adminHeaders = { "Cache-Control": cacheNoStore };
   if (request.method !== "POST") {
@@ -243,6 +248,8 @@ async function handlePipelineRoute<T extends object>(
   }
   try {
     const result = await withPipelineLease(env.DB, run);
+    // D1 writes do not invalidate CDN-cached feed/stats JSON.
+    schedulePublicApiCachePurge(env, ctx);
     return json({ ok: true, ...result }, { headers: adminHeaders });
   } catch (err: unknown) {
     if (isPipelineBusyError(err)) {
@@ -254,6 +261,39 @@ async function handlePipelineRoute<T extends object>(
     console.error("pipeline_route_error", err);
     return json({ ok: false, error: "pipeline_failed" }, { status: 500, headers: adminHeaders });
   }
+}
+
+async function handlePurgeCacheRoute(
+  request: Request,
+  env: Env,
+  json: JsonFn
+): Promise<Response> {
+  const adminHeaders = { "Cache-Control": cacheNoStore };
+  if (request.method !== "POST") {
+    return json({ error: "method_not_allowed" }, { status: 405, headers: adminHeaders });
+  }
+  if (!authorizePipeline(request, env)) {
+    const hostname = new URL(request.url).hostname;
+    const error =
+      isPreviewWorkerHost(hostname) && env.DEV_OPEN_PIPELINE?.trim() !== "1"
+        ? "preview_pipeline_writes_disabled"
+        : "unauthorized";
+    return json({ error }, { status: 401, headers: adminHeaders });
+  }
+  const result = await purgePublicApiCache(env);
+  if (result.ok) {
+    return json({ ok: true, purged: true, mode: result.mode }, { headers: adminHeaders });
+  }
+  if (result.skipped) {
+    return json(
+      { ok: false, purged: false, skipped: true, reason: result.reason },
+      { status: 503, headers: adminHeaders }
+    );
+  }
+  return json(
+    { ok: false, purged: false, reason: result.reason },
+    { status: 502, headers: adminHeaders }
+  );
 }
 
 const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = {
@@ -524,9 +564,13 @@ export async function handlePublicFetch(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  if (pathname === "/__pipeline/purge-cache") {
+    return handlePurgeCacheRoute(request, env, json);
+  }
+
   const pipeline = PIPELINE_ROUTES[pathname];
   if (pipeline) {
-    return handlePipelineRoute(request, env, json, () => pipeline(routeCtx));
+    return handlePipelineRoute(request, env, json, () => pipeline(routeCtx), ctx);
   }
 
   if (request.method !== "GET") {
