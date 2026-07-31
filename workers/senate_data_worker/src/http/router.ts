@@ -52,6 +52,10 @@ import type {
   VoteDefectorsResponse,
 } from "../types";
 import { isPipelineBusyError, withPipelineLease } from "../d1/pipeline-lease";
+import {
+  purgeZoneEdgeCache,
+  scheduleZoneEdgeCachePurge,
+} from "./cache-purge";
 import { authorizePipeline, isPreviewWorkerHost } from "./pipeline-auth";
 import {
   buildCorsHeaders,
@@ -223,15 +227,19 @@ async function handleStatsJson<T>(
   }
 }
 
-async function handlePipelineRoute<T extends object>(
+const PIPELINE_ADMIN_HEADERS = { "Cache-Control": cacheNoStore };
+
+/** Shared POST + auth gate for admin pipeline routes. Returns an error Response or null. */
+function rejectUnauthorizedPipelinePost(
   request: Request,
   env: Env,
-  json: JsonFn,
-  run: () => Promise<T>
-): Promise<Response> {
-  const adminHeaders = { "Cache-Control": cacheNoStore };
+  json: JsonFn
+): Response | null {
   if (request.method !== "POST") {
-    return json({ error: "method_not_allowed" }, { status: 405, headers: adminHeaders });
+    return json(
+      { error: "method_not_allowed" },
+      { status: 405, headers: PIPELINE_ADMIN_HEADERS }
+    );
   }
   if (!authorizePipeline(request, env)) {
     const hostname = new URL(request.url).hostname;
@@ -239,21 +247,64 @@ async function handlePipelineRoute<T extends object>(
       isPreviewWorkerHost(hostname) && env.DEV_OPEN_PIPELINE?.trim() !== "1"
         ? "preview_pipeline_writes_disabled"
         : "unauthorized";
-    return json({ error }, { status: 401, headers: adminHeaders });
+    return json({ error }, { status: 401, headers: PIPELINE_ADMIN_HEADERS });
   }
+  return null;
+}
+
+async function handlePipelineRoute<T extends object>(
+  request: Request,
+  env: Env,
+  json: JsonFn,
+  run: () => Promise<T>,
+  ctx?: Pick<ExecutionContext, "waitUntil">
+): Promise<Response> {
+  const denied = rejectUnauthorizedPipelinePost(request, env, json);
+  if (denied) return denied;
   try {
     const result = await withPipelineLease(env.DB, run);
-    return json({ ok: true, ...result }, { headers: adminHeaders });
+    // D1 writes do not invalidate CDN-cached feed/stats JSON.
+    scheduleZoneEdgeCachePurge(env, ctx);
+    return json({ ok: true, ...result }, { headers: PIPELINE_ADMIN_HEADERS });
   } catch (err: unknown) {
     if (isPipelineBusyError(err)) {
       return json(
         { ok: false, error: "pipeline_busy", message: "Another pipeline run is in progress" },
-        { status: 409, headers: adminHeaders }
+        { status: 409, headers: PIPELINE_ADMIN_HEADERS }
       );
     }
     console.error("pipeline_route_error", err);
-    return json({ ok: false, error: "pipeline_failed" }, { status: 500, headers: adminHeaders });
+    return json(
+      { ok: false, error: "pipeline_failed" },
+      { status: 500, headers: PIPELINE_ADMIN_HEADERS }
+    );
   }
+}
+
+async function handlePurgeCacheRoute(
+  request: Request,
+  env: Env,
+  json: JsonFn
+): Promise<Response> {
+  const denied = rejectUnauthorizedPipelinePost(request, env, json);
+  if (denied) return denied;
+  const result = await purgeZoneEdgeCache(env);
+  if (result.ok) {
+    return json(
+      { ok: true, purged: true, mode: result.mode },
+      { headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+  if (result.skipped) {
+    return json(
+      { ok: false, purged: false, skipped: true, reason: result.reason },
+      { status: 503, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+  return json(
+    { ok: false, purged: false, reason: result.reason },
+    { status: 502, headers: PIPELINE_ADMIN_HEADERS }
+  );
 }
 
 const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = {
@@ -524,9 +575,13 @@ export async function handlePublicFetch(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  if (pathname === "/__pipeline/purge-cache") {
+    return handlePurgeCacheRoute(request, env, json);
+  }
+
   const pipeline = PIPELINE_ROUTES[pathname];
   if (pipeline) {
-    return handlePipelineRoute(request, env, json, () => pipeline(routeCtx));
+    return handlePipelineRoute(request, env, json, () => pipeline(routeCtx), ctx);
   }
 
   if (request.method !== "GET") {

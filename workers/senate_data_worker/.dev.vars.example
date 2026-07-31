@@ -17,3 +17,7 @@ ENABLE_SAMPLE_DISCLOSURES=1
 # When unset, the worker picks the highest Artificial Analysis intelligence_index free model.
 # OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 # PIPELINE_ADMIN_TOKEN=  # when set, POST with Authorization: Bearer <token>
+# Optional: purge trackcongress.org edge cache after local pipeline runs that
+# somehow target prod (normally unset locally; production uses wrangler secret).
+# CACHE_PURGE_TOKEN=
+# CF_ZONE_ID=  # defaults from wrangler.toml [vars] in production

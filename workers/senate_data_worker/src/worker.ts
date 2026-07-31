@@ -5,6 +5,7 @@
 import type { Env } from "./config";
 import { isPipelineBusyError, withPipelineLease } from "./d1/pipeline-lease";
 import { recordFeedPipelineSkipped } from "./d1/pipeline-state";
+import { scheduleZoneEdgeCachePurge } from "./http/cache-purge";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
@@ -33,6 +34,7 @@ export default {
                 ...result,
               }),
             );
+            scheduleZoneEdgeCachePurge(env, ctx);
           })
           .catch((err: unknown) => {
             if (isPipelineBusyError(err)) {
@@ -79,6 +81,7 @@ export default {
               ...feed,
             }),
           );
+          scheduleZoneEdgeCachePurge(env, ctx);
         })
         .catch(async (err: unknown) => {
           if (isPipelineBusyError(err)) {

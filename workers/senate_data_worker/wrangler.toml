@@ -34,6 +34,8 @@ CONGRESS = "119"
 SESSION = "2"
 # Production custom domains (do not use "*" publicly). Comma-separated allowlist.
 ALLOWED_ORIGIN = "https://trackcongress.org,https://www.trackcongress.org"
+# Zone for edge cache purge after pipeline writes (pair with CACHE_PURGE_TOKEN secret).
+CF_ZONE_ID = "86b690387ae840600f5f3341aa154cce"
 
 # Apex + www Custom Domains (Cloudflare manages DNS + certs on the zone).
 [[routes]]
@@ -60,6 +62,8 @@ routes = []
 CONGRESS = "119"
 SESSION = "2"
 ALLOWED_ORIGIN = "*"
+# Do not inherit production zone — preview must never purge trackcongress.org.
+CF_ZONE_ID = ""
 
 [[env.preview.d1_databases]]
 binding = "DB"
