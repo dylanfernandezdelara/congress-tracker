@@ -1,4 +1,4 @@
-import { isThinConfirmationBackground } from "../../../../shared/confirmation-about";
+import { isNominationDescriptionEcho } from "../../../../shared/confirmation-about";
 import type { ConfirmationBackgroundContent } from "../../../../shared/confirmations-api-types";
 import type { ConfirmationNominee } from "../../../../shared/confirmations-api-types";
 import { isConfirmedResult } from "../sources/confirmation";
@@ -59,19 +59,18 @@ export function parseStoredBackground(
 
 /**
  * True when background JSON exists but Wikipedia enrichment has not been
- * attempted, or a sealed miss should be reopened after a thin/description-echo
- * About (often sealed before nominee names were available).
+ * attempted, or a sealed miss should be reopened when About is still a
+ * nomination-description echo (often sealed before nominee names existed).
  */
 export function backgroundNeedsWikipedia(
   background: ConfirmationBackgroundContent | null,
-  options?: { description?: string | null; reopenThinSealedMiss?: boolean }
+  description?: string | null
 ): boolean {
   if (!background) return false;
   if (background.wikipedia_extract?.trim()) return false;
   if (!("wikipedia_url" in background)) return true;
-  if (!options?.reopenThinSealedMiss) return false;
   if (background.wikipedia_url !== null) return false;
-  return isThinConfirmationBackground(background.background, options.description ?? null);
+  return isNominationDescriptionEcho(background.background, description ?? null);
 }
 
 export function parseNomineesJson(json: string | null): ConfirmationNominee[] {
@@ -172,7 +171,9 @@ export async function upsertNominationMetadata(
       params.description,
       params.organization,
       params.positionTitle,
-      params.nominees.length > 0 ? JSON.stringify(params.nominees) : null,
+      // Persist [] when fetched with no people so incomplete-meta reopen stops.
+      // null remains "never populated" (stubs / pre-fetch).
+      JSON.stringify(params.nominees),
       params.receivedDate,
       params.rawBackgroundText,
       params.backgroundJson,
@@ -240,21 +241,23 @@ export async function selectNominationsNeedingEnrichment(
     if (seen.has(key)) continue;
     seen.add(key);
     // null = never fetched; empty string = fetched but no usable text.
-    // Also re-fetch when person names never made it into nominees_json (older
-    // parser missed Congress.gov ordinal nominee endpoints).
+    // nominees_json null = never populated (re-fetch once for ordinal names).
+    // nominees_json "[]" = fetched, no people — terminal, do not loop.
     const incompleteMeta =
-      !row.nominees_json?.trim() && Boolean(row.description?.trim());
+      row.nominees_json === null && Boolean(row.description?.trim());
     const needsRaw = row.raw_background_text === null || incompleteMeta;
     const hasUsableRaw = Boolean(row.raw_background_text?.trim());
     const background = parseStoredBackground(row.background_json);
-    const thinBackground =
+    const descriptionEcho =
       background !== null &&
-      isThinConfirmationBackground(background.background, row.description);
-    const needsBackground = hasUsableRaw && (background === null || thinBackground);
-    const needsWikipedia = backgroundNeedsWikipedia(background, {
-      description: row.description,
-      reopenThinSealedMiss: true,
-    });
+      isNominationDescriptionEcho(background.background, row.description);
+    // Rewrite only missing/echo About — not every identity "was confirmed as"
+    // line (those would never converge and burn OpenRouter quota daily).
+    const needsBackground =
+      hasUsableRaw &&
+      (background === null || descriptionEcho) &&
+      !background?.wikipedia_extract?.trim();
+    const needsWikipedia = backgroundNeedsWikipedia(background, row.description);
     if (!needsRaw && !needsBackground && !needsWikipedia) continue;
     candidates.push({
       ref: {

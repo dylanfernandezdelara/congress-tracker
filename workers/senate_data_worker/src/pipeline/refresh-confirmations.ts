@@ -1,4 +1,4 @@
-import { isThinConfirmationBackground } from "../../../../shared/confirmation-about";
+import { isNominationDescriptionEcho } from "../../../../shared/confirmation-about";
 import {
   CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES,
   CONFIRMATION_NOMINATION_FETCHES_PER_RUN,
@@ -18,7 +18,10 @@ import {
 } from "../d1/nominations";
 import { upsertConfirmationVote } from "../d1/confirmation-votes";
 import type { ConfirmationVote } from "../types";
-import { fetchNominationBundle } from "../sources/nomination-client";
+import {
+  fetchNominationBundle,
+  parseNominationDescription,
+} from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import {
   lookupNomineeWikipedia,
@@ -143,14 +146,17 @@ export async function refreshConfirmationEnrichment(
       let background = parseStoredBackground(row.background_json);
       const rawBackground = row.raw_background_text;
       let dirty = false;
-      const thinBackground =
+      const priorWikiUrl = background?.wikipedia_url;
+      const priorWikiExtract = background?.wikipedia_extract;
+      const descriptionEcho =
         background !== null &&
-        isThinConfirmationBackground(background.background, row.description);
+        isNominationDescriptionEcho(background.background, row.description);
 
       const canRewrite =
         backgroundsRewritten < CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES &&
         Boolean(rawBackground?.trim()) &&
-        (background === null || thinBackground);
+        !priorWikiExtract?.trim() &&
+        (background === null || descriptionEcho);
 
       if (canRewrite) {
         if (model === null) {
@@ -169,8 +175,13 @@ export async function refreshConfirmationEnrichment(
         );
 
         if (rewritten) {
-          // Omit wikipedia_* so a later (or same-pass) wiki step can enrich.
-          background = rewritten;
+          // Keep a prior wiki hit if present. Drop a sealed miss (null) so the
+          // same-pass wiki step can reopen now that names may exist.
+          background = { ...rewritten };
+          if (priorWikiExtract?.trim()) {
+            background.wikipedia_url = priorWikiUrl ?? null;
+            background.wikipedia_extract = priorWikiExtract;
+          }
           backgroundsRewritten += 1;
           dirty = true;
         } else if (background === null) {
@@ -182,18 +193,22 @@ export async function refreshConfirmationEnrichment(
       // a nominee name. Never seal a miss when names are still missing.
       const needsWikiLookup =
         wikipediaLookups < CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN &&
-        backgroundNeedsWikipedia(background, {
-          description: row.description,
-          reopenThinSealedMiss: true,
-        });
+        backgroundNeedsWikipedia(background, row.description);
 
       if (needsWikiLookup && background) {
         const nominees = parseNomineesJson(row.nominees_json);
-        const primary = nominees[0];
+        const fromDescription =
+          nominees.length === 0
+            ? parseNominationDescription(row.description)
+            : null;
+        const primary =
+          nominees[0] ?? fromDescription?.nominees[0] ?? null;
+        const positionTitle =
+          row.position_title?.trim() || fromDescription?.positionTitle || null;
         if (primary?.display_name) {
           const lookup = await lookupNomineeWikipedia({
             displayName: primary.display_name,
-            positionTitle: row.position_title,
+            positionTitle,
             organization: row.organization,
           });
           wikipediaLookups += 1;

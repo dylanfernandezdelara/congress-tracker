@@ -264,12 +264,13 @@ describe("refreshConfirmationEnrichment", () => {
     getNomination.mockResolvedValue(
       nominationRow({
         nominees_json: null,
+        // Description is not parseable into a name — no wiki attempt, no seal.
+        description: "A nomination for a federal post.",
         // Non-thin About, wiki not attempted yet — needs lookup but has no name.
         background_json: JSON.stringify({
-          headline: "Jane Doe confirmed as Energy Secretary",
-          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
-          background:
-            "Jane Doe previously led California energy commission programs.",
+          headline: "Confirmation pending details",
+          what_was_confirmed: "The Senate confirmed the nomination.",
+          background: "Background details are still being prepared for this nominee.",
           key_points: [],
         }),
       })
@@ -290,6 +291,52 @@ describe("refreshConfirmationEnrichment", () => {
     expect(result.wikipediaLookups).toBe(0);
     expect(lookupNomineeWikipedia).not.toHaveBeenCalled();
     expect(upsertNominationMetadata).not.toHaveBeenCalled();
+  });
+
+  it("uses description-derived nominee names for Wikipedia when nominees_json is empty", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        nominees_json: "[]",
+        description:
+          "Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.",
+        position_title: null,
+        background_json: JSON.stringify({
+          headline: "Walter Clayton confirmed as DNI",
+          what_was_confirmed:
+            "The Senate confirmed Walter Clayton as Director of National Intelligence.",
+          background:
+            "Walter Clayton of NY was confirmed as Director of National Intelligence.",
+          key_points: [],
+        }),
+      })
+    );
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: false,
+        needsWikipedia: true,
+      },
+    ]);
+    lookupNomineeWikipedia.mockResolvedValue({
+      status: "hit",
+      hit: {
+        url: "https://en.wikipedia.org/wiki/Jay_Clayton_(attorney)",
+        title: "Jay Clayton (attorney)",
+        extract: 'Walter Joseph "Jay" Clayton III previously chaired the SEC.',
+      },
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(lookupNomineeWikipedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        displayName: "Walter Clayton",
+        positionTitle: "Director of National Intelligence",
+      })
+    );
   });
 
   it("rewrites thin description-echo About and attaches Wikipedia", async () => {

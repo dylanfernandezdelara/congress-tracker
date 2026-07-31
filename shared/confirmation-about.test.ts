@@ -4,6 +4,7 @@ import {
   buildOfficialConfirmationAbout,
   confirmationHeadline,
   confirmationOppositionNote,
+  isNominationDescriptionEcho,
   isRedundantConfirmationAbout,
   isThinConfirmationBackground,
   selectConfirmationAbout,
@@ -72,6 +73,23 @@ describe('isRedundantConfirmationAbout', () => {
     expect(
       isRedundantConfirmationAbout(
         'Jane Doe was confirmed as Secretary of Energy after leading California’s grid programs.',
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('isNominationDescriptionEcho', () => {
+  it('treats description echoes as rewrite-worthy', () => {
+    const description =
+      'Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.'
+    expect(isNominationDescriptionEcho(description, description)).toBe(true)
+  })
+
+  it('does not treat identity confirmed-as lines as description echoes', () => {
+    expect(
+      isNominationDescriptionEcho(
+        'Walter Clayton of NY was confirmed as Director of National Intelligence.',
+        'Walter Clayton, of New York, to be Director of National Intelligence, vice Tulsi Gabbard.',
       ),
     ).toBe(false)
   })

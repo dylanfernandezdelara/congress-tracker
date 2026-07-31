@@ -86,10 +86,11 @@ export function isRedundantConfirmationAbout(about: string | null): boolean {
 }
 
 /**
- * True when a stored/rewritten About is not a useful person blurb (empty,
- * restates the nomination description, or is identity/boilerplate only).
+ * True when text is an empty/echo of the Congress.gov nomination description
+ * (including ", of State, to be Role" boilerplate). Used to reopen enrichment
+ * write-paths — not every identity "was confirmed as" line.
  */
-export function isThinConfirmationBackground(
+export function isNominationDescriptionEcho(
   about: string | null | undefined,
   description: string | null | undefined,
 ): boolean {
@@ -97,6 +98,21 @@ export function isThinConfirmationBackground(
   if (!text) return true
   const desc = description?.trim() ?? ''
   if (desc && normalizeAboutText(text) === normalizeAboutText(desc)) return true
+  return isNominationBoilerplateAbout(text)
+}
+
+/**
+ * True when a stored/rewritten About is not a useful person blurb (empty,
+ * restates the nomination description, or is identity/boilerplate only).
+ * Used by the read/UI path to hide non-person copy.
+ */
+export function isThinConfirmationBackground(
+  about: string | null | undefined,
+  description: string | null | undefined,
+): boolean {
+  const text = about?.trim() ?? ''
+  if (!text) return true
+  if (isNominationDescriptionEcho(text, description)) return true
   return isRedundantConfirmationAbout(text)
 }
 
