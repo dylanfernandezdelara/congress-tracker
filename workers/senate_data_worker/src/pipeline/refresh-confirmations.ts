@@ -75,7 +75,10 @@ function nominationFieldsFromRow(row: NominationRow) {
     description: row.description,
     organization: row.organization,
     positionTitle: row.position_title,
-    nominees: parseNomineesJson(row.nominees_json),
+    // Preserve SQL null ("never populated") across rewrite/wiki-only saves so
+    // incomplete-meta reopen is not sealed when the fetch budget was exhausted.
+    nominees:
+      row.nominees_json === null ? null : parseNomineesJson(row.nominees_json),
     receivedDate: row.received_date,
   };
 }

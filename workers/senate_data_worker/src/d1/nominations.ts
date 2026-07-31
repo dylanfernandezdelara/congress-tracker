@@ -134,7 +134,12 @@ export async function upsertNominationMetadata(
     description: string | null;
     organization: string | null;
     positionTitle: string | null;
-    nominees: ConfirmationNominee[];
+    /**
+     * `null` = never populated (keep incomplete-meta reopen open).
+     * `[]` = fetched with no people (terminal).
+     * non-empty = known nominees.
+     */
+    nominees: ConfirmationNominee[] | null;
     receivedDate: string | null;
     rawBackgroundText: string | null;
     /** Serialized background JSON to persist (null clears). */
@@ -171,9 +176,7 @@ export async function upsertNominationMetadata(
       params.description,
       params.organization,
       params.positionTitle,
-      // Persist [] when fetched with no people so incomplete-meta reopen stops.
-      // null remains "never populated" (stubs / pre-fetch).
-      JSON.stringify(params.nominees),
+      params.nominees === null ? null : JSON.stringify(params.nominees),
       params.receivedDate,
       params.rawBackgroundText,
       params.backgroundJson,
