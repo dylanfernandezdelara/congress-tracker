@@ -43,9 +43,9 @@ Admin runs update `last_success` only; they do not satisfy scheduled freshness.
 ## Edge cache (feed / stats JSON)
 
 Public JSON uses `Cache-Control: s-maxage=60, stale-while-revalidate=30`.
-Successful pipeline runs (admin + cron) also purge the Cloudflare zone when
-`CF_ZONE_ID` + `CACHE_PURGE_TOKEN` are set, so D1 updates are not stuck behind
-a stale CDN copy.
+Successful pipeline runs (admin + cron) also call Cloudflare
+`purge_everything` for the production zone when `CF_ZONE_ID` +
+`CACHE_PURGE_TOKEN` are set (free plans cannot prefix-purge only `/stats/*`).
 
 After a manual D1 repair (or any write outside the pipeline), purge explicitly:
 
@@ -55,7 +55,7 @@ curl -fsS -X POST https://trackcongress.org/__pipeline/purge-cache \
 ```
 
 `CACHE_PURGE_TOKEN` is a Worker secret (`wrangler secret put CACHE_PURGE_TOKEN`)
-with Zone → Cache Purge permission.
+with Zone → Cache Purge permission. Preview sets `CF_ZONE_ID=""`.
 
 ## D1 keys (`pipeline_state`)
 

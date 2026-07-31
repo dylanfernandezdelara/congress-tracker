@@ -6,15 +6,16 @@ export type CachePurgeResult =
   | { ok: false; skipped: false; reason: string };
 
 /**
- * Best-effort purge of Cloudflare edge cache for the production zone.
+ * Best-effort Cloudflare **zone-wide** edge cache purge (`purge_everything`).
  *
  * Public feed/stats JSON uses Cache-Control s-maxage; D1 writes do not
- * invalidate that CDN copy. Call after successful pipeline runs (and after
- * manual data repairs via POST /__pipeline/purge-cache).
+ * invalidate that CDN copy. Call after successful pipeline runs (and via
+ * POST /__pipeline/purge-cache after manual data repairs).
  *
- * No-ops when CF_ZONE_ID or CACHE_PURGE_TOKEN is unset (local/preview).
+ * Free-plan zones cannot prefix-purge only `/stats/*`, so this clears the
+ * whole zone. No-ops when CF_ZONE_ID or CACHE_PURGE_TOKEN is unset.
  */
-export async function purgePublicApiCache(env: Env): Promise<CachePurgeResult> {
+export async function purgeZoneEdgeCache(env: Env): Promise<CachePurgeResult> {
   const zoneId = env.CF_ZONE_ID?.trim();
   const token = env.CACHE_PURGE_TOKEN?.trim();
   if (!zoneId || !token) {
@@ -62,20 +63,15 @@ export async function purgePublicApiCache(env: Env): Promise<CachePurgeResult> {
   }
 }
 
-/** Fire-and-forget purge; never throws into the pipeline success path. */
-export function schedulePublicApiCachePurge(
+/** Schedule a zone purge without blocking the caller; never throws. */
+export function scheduleZoneEdgeCachePurge(
   env: Env,
   ctx?: Pick<ExecutionContext, "waitUntil">
 ): void {
-  const task = purgePublicApiCache(env).then((result) => {
-    if (!result.ok && !result.skipped) {
-      // Already logged in purgePublicApiCache.
-    }
-  });
+  const task = purgeZoneEdgeCache(env);
   if (ctx?.waitUntil) {
     ctx.waitUntil(task);
     return;
   }
-  // No ExecutionContext (unit tests / unusual hosts): still run, ignore result.
   void task;
 }

@@ -54,6 +54,8 @@ routes = []
 CONGRESS = "119"
 SESSION = "2"
 ALLOWED_ORIGIN = "*"
+# Do not inherit production zone — preview must never purge trackcongress.org.
+CF_ZONE_ID = ""
 
 [[env.preview.d1_databases]]
 binding = "DB"

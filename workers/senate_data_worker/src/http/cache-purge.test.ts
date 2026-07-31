@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { purgePublicApiCache, schedulePublicApiCachePurge } from "./cache-purge";
+import { purgeZoneEdgeCache, scheduleZoneEdgeCachePurge } from "./cache-purge";
 
-describe("purgePublicApiCache", () => {
+describe("purgeZoneEdgeCache", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
   it("skips when zone or token is missing", async () => {
-    await expect(purgePublicApiCache({} as never)).resolves.toEqual({
+    await expect(purgeZoneEdgeCache({} as never)).resolves.toEqual({
       ok: false,
       skipped: true,
       reason: "CF_ZONE_ID unset",
     });
     await expect(
-      purgePublicApiCache({ CF_ZONE_ID: "zone" } as never)
+      purgeZoneEdgeCache({ CF_ZONE_ID: "zone" } as never)
     ).resolves.toEqual({
       ok: false,
       skipped: true,
@@ -29,7 +29,7 @@ describe("purgePublicApiCache", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      purgePublicApiCache({
+      purgeZoneEdgeCache({
         CF_ZONE_ID: "zone-123",
         CACHE_PURGE_TOKEN: "token-abc",
       } as never)
@@ -55,7 +55,7 @@ describe("purgePublicApiCache", () => {
     );
 
     await expect(
-      purgePublicApiCache({
+      purgeZoneEdgeCache({
         CF_ZONE_ID: "zone-123",
         CACHE_PURGE_TOKEN: "token-abc",
       } as never)
@@ -67,7 +67,7 @@ describe("purgePublicApiCache", () => {
   });
 });
 
-describe("schedulePublicApiCachePurge", () => {
+describe("scheduleZoneEdgeCachePurge", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -80,7 +80,7 @@ describe("schedulePublicApiCachePurge", () => {
     vi.stubGlobal("fetch", fetchMock);
     const waitUntil = vi.fn((p: Promise<unknown>) => p);
 
-    schedulePublicApiCachePurge(
+    scheduleZoneEdgeCachePurge(
       { CF_ZONE_ID: "zone-123", CACHE_PURGE_TOKEN: "token-abc" } as never,
       { waitUntil }
     );

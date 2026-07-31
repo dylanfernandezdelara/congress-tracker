@@ -21,7 +21,8 @@ export interface Env {
   PIPELINE_ADMIN_TOKEN?: string;
   /**
    * Cloudflare zone ID for trackcongress.org (public). Used with
-   * CACHE_PURGE_TOKEN to invalidate edge-cached feed/stats JSON after writes.
+   * CACHE_PURGE_TOKEN for zone-wide edge cache purge after pipeline writes.
+   * Preview overrides this to empty so it cannot target production.
    */
   CF_ZONE_ID?: string;
   /**
