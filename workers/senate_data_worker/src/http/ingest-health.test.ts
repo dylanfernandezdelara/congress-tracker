@@ -226,6 +226,81 @@ describe("buildIngestMonitorPayload", () => {
     expect(payload.message).toContain("Senate ingest skipped");
   });
 
+  it("uses newer admin success chamber_warnings so menu refresh clears sticky hard-skip failed", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: ["Senate ingest skipped: HTTP 403"],
+    };
+    const lastAdmin = {
+      completed_at: "2026-06-23T11:30:00.000Z",
+      trigger: "admin" as const,
+      votesUpserted: 2,
+      votesSkipped: 8,
+      billsSelected: 5,
+      digestsWritten: 1,
+      digestsSkipped: 4,
+      chamber_warnings: [
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+      ],
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 0,
+      lastSuccess: lastAdmin,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("degraded");
+    expect(payload.message).toContain("served from D1 cache");
+    expect(payload.last_scheduled_success?.completed_at).toBe(lastScheduled.completed_at);
+  });
+
+  it("clears to ok when newer admin success has no chamber_warnings", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: ["House ingest skipped: Congress API down"],
+    };
+    const lastAdmin = {
+      completed_at: "2026-06-23T11:30:00.000Z",
+      trigger: "admin" as const,
+      votesUpserted: 2,
+      votesSkipped: 8,
+      billsSelected: 5,
+      digestsWritten: 1,
+      digestsSkipped: 4,
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 0,
+      lastSuccess: lastAdmin,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("ok");
+  });
+
   it("surfaces last_skipped without changing status fields", () => {
     const skipped = {
       skipped_at: "2026-06-23T10:00:35.000Z",

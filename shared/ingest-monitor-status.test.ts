@@ -42,6 +42,7 @@ describe("ingest monitor status helpers", () => {
         "House ingest skipped: Congress API down",
       ])
     ).toBe("failed");
+    expect(classifyChamberWarningSeverity(["some other soft warning"])).toBe("failed");
     expect(isSenateCacheFallbackWarning("Senate vote menu served from D1 cache after live fetch failed: x")).toBe(
       true
     );

@@ -29,12 +29,13 @@ export function isSenateCacheFallbackWarning(warning: string): boolean {
 
 /**
  * Classify chamber_warnings for monitor status when the run would otherwise be ok.
- * Hard skips page as failed; cache-fallback (and other soft warnings) stay degraded.
+ * Hard skips page as failed; cache-fallback-only stays degraded; unknown shapes page.
  */
 export function classifyChamberWarningSeverity(
   warnings: readonly string[]
 ): "none" | "degraded" | "failed" {
   if (warnings.length === 0) return "none";
   if (warnings.some(isChamberHardSkipWarning)) return "failed";
-  return "degraded";
+  if (warnings.every(isSenateCacheFallbackWarning)) return "degraded";
+  return "failed";
 }

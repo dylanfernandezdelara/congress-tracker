@@ -87,7 +87,9 @@ checks and `CHECK_HEALTH=1` still page.
      `stale` / `unknown`, fetch errors, or admin upload failures). Note:
      ingest stays **`degraded`** while Worker→Senate.gov is 403 even after a
      successful cache refresh — that alone is not an automation failure
-     (`CHECK_HEALTH` accepts `ok` | `degraded`).
+     (`CHECK_HEALTH` accepts `ok` | `degraded`). A newer admin feed success
+     (e.g. `RUN_FEED=1`) supplies chamber_warnings for severity, so a prior
+     scheduled hard-skip `failed` clears after a successful remediation.
 
    Suggested automation prompt:
 

@@ -127,12 +127,16 @@ export function buildIngestMonitorPayload(params: {
     params.lastScheduledSuccess,
     params.lastSuccess
   );
+  // Prefer chamber_warnings from the newest success (often an admin remediation
+  // after menu refresh). Scheduled freshness still comes from scheduledSuccess;
+  // sticky scheduled hard-skip warnings must not keep paging after a newer clean run.
+  const newestSuccess = params.lastSuccess ?? scheduledSuccess;
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
     scheduledSuccess,
     lastFailure: params.lastFailure,
-    chamberWarnings: scheduledSuccess?.chamber_warnings ?? [],
+    chamberWarnings: newestSuccess?.chamber_warnings ?? [],
   });
 
   let message = evaluated.message;
