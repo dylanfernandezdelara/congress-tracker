@@ -13,11 +13,15 @@ test("refresh-production-senate-menu script exists", () => {
 });
 
 test("REFRESH_PRINT_ONLY documents admin route and modes without network", () => {
-  const out = execFileSync(process.execPath, [script], {
-    cwd: rootDir,
-    encoding: "utf8",
-    env: { ...process.env, REFRESH_PRINT_ONLY: "1" },
-  });
+  const out = execFileSync(
+    process.execPath,
+    ["--experimental-strip-types", script],
+    {
+      cwd: rootDir,
+      encoding: "utf8",
+      env: { ...process.env, REFRESH_PRINT_ONLY: "1" },
+    }
+  );
   assert.match(out, /refresh-production-senate-menu/);
   assert.match(out, /vote_menu_119_2\.xml/);
   assert.match(out, /senate_vote_menu_cache_119_2/);
@@ -25,4 +29,6 @@ test("REFRESH_PRINT_ONLY documents admin route and modes without network", () =>
   assert.match(out, /RUN_FEED/);
   assert.match(out, /CHECK_HEALTH/);
   assert.match(out, /REFRESH_VIA/);
+  assert.match(out, /CONGRESS/);
+  assert.match(out, /SESSION/);
 });

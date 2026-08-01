@@ -14,6 +14,13 @@ import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
 import { ensureSchema } from "../d1/schema";
+import {
+  isSenateVoteMenuXml,
+  senateVoteMenuCacheKey,
+  senateVoteMenuUrl,
+} from "../../../../shared/senate-vote-menu";
+
+export { isSenateVoteMenuXml, senateVoteMenuCacheKey, senateVoteMenuUrl };
 
 /** Shared fields every Senate menu `<vote>` block carries for stored rolls. */
 function parseMenuVoteFields(
@@ -54,10 +61,6 @@ function parseMenuVoteFields(
 }
 
 const SENATE_VOTE_MENU_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-
-function senateVoteMenuCacheKey(congress: number, session: number): string {
-  return `senate_vote_menu_cache_${congress}_${session}`;
-}
 
 async function readSenateVoteMenuCache(
   db: D1Database,
@@ -110,22 +113,12 @@ export async function writeSenateVoteMenuCache(
   return fetchedAt;
 }
 
-/** Basic structural check before accepting admin-uploaded menu XML. */
-export function isSenateVoteMenuXml(xml: string): boolean {
-  const trimmed = xml.trim();
-  return (
-    trimmed.includes("<vote_summary>") &&
-    trimmed.includes("</vote_summary>") &&
-    trimmed.includes("<vote>")
-  );
-}
-
 async function fetchSenateVoteMenuXml(
   env: Env,
   congress: number,
   session: number
 ): Promise<{ xml: string; warnings: string[] }> {
-  const url = `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${congress}_${session}.xml`;
+  const url = senateVoteMenuUrl(congress, session);
   try {
     const xml = await fetchSenateLegislativeText(url);
     try {

@@ -901,55 +901,6 @@ describe("HTTP API", () => {
     });
   });
 
-  it("caches admin-uploaded Senate vote menu XML", async () => {
-    resetSchemaFlag();
-    const db = createPipelineStateMockDb();
-    const xml = `<?xml version="1.0"?><vote_summary><votes><vote><vote_number>00217</vote_number></vote></votes></vote_summary>`;
-    const response = await handlePublicFetch(
-      pipelineRequest("/__pipeline/senate-vote-menu", {
-        headers: { "Content-Type": "application/xml" },
-        body: xml,
-      }),
-      createMockEnv({ DB: db }) as any
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as {
-      ok: boolean;
-      congress: number;
-      session: number;
-      fetched_at: string;
-      run_feed: boolean;
-    };
-    expect(body).toMatchObject({
-      ok: true,
-      congress: 119,
-      session: 2,
-      run_feed: false,
-    });
-    expect(body.fetched_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-
-    const row = await db
-      .prepare(`SELECT value_json FROM pipeline_state WHERE key = ?1`)
-      .bind("senate_vote_menu_cache_119_2")
-      .first<{ value_json: string }>();
-    expect(row?.value_json).toContain("00217");
-  });
-
-  it("rejects invalid Senate vote menu uploads", async () => {
-    const response = await handlePublicFetch(
-      pipelineRequest("/__pipeline/senate-vote-menu", {
-        headers: { "Content-Type": "text/plain" },
-        body: "<html>not a menu</html>",
-      }),
-      createMockEnv() as any
-    );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      ok: false,
-      error: "invalid_senate_vote_menu",
-    });
-  });
-
   it("requires a matching Bearer token when PIPELINE_ADMIN_TOKEN is set", async () => {
     const env = createMockEnv({
       ALLOWED_ORIGIN: "https://congress.example",

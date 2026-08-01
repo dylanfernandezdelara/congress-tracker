@@ -31,7 +31,7 @@ import {
   EXECUTIVE_POSTS_CRON_UTC,
 } from "../constants";
 import { normalizeFeedSearchQuery } from "../d1/feed-search";
-import { buildIngestMonitorPayload } from "./ingest-health";
+import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
 import { buildPulseStats } from "../storage/pulse-stats";
@@ -135,14 +135,7 @@ async function healthResponse(env: Env, json: JsonFn): Promise<Response> {
 
   return json(
     {
-      status:
-        ingest &&
-        (ingest.status === "failed" ||
-          ingest.status === "stale" ||
-          ingest.status === "unknown" ||
-          ingest.status === "degraded")
-          ? "degraded"
-          : "ok",
+      status: ingest && !isIngestMonitorHealthy(ingest.status) ? "degraded" : "ok",
       timestamp: new Date().toISOString(),
       congress: env.CONGRESS,
       session: env.SESSION,
@@ -327,9 +320,6 @@ async function handleSenateVoteMenuRoute(
   json: JsonFn,
   ctx?: Pick<ExecutionContext, "waitUntil">
 ): Promise<Response> {
-  const denied = rejectUnauthorizedPipelinePost(request, env, json);
-  if (denied) return denied;
-
   const contentType = request.headers.get("content-type") ?? "";
   let xml = "";
   try {
@@ -346,55 +336,35 @@ async function handleSenateVoteMenuRoute(
     );
   }
 
-  if (!isSenateVoteMenuXml(xml)) {
+  const congress = congressNumber(env);
+  const session = sessionNumber(env);
+  if (!isSenateVoteMenuXml(xml, { congress, session })) {
     return json(
       {
         ok: false,
         error: "invalid_senate_vote_menu",
-        message: "Body must be Senate LIS vote_menu XML (vote_summary with votes).",
+        message:
+          "Body must be Senate LIS vote_menu XML for this Worker's congress/session (vote_summary with vote_number rows).",
       },
       { status: 400, headers: PIPELINE_ADMIN_HEADERS }
     );
   }
 
-  const congress = congressNumber(env);
-  const session = sessionNumber(env);
   const runFeed = url.searchParams.get("run_feed") === "1";
-
-  try {
-    const result = await withPipelineLease(env.DB, async () => {
+  return handlePipelineRoute(
+    request,
+    env,
+    json,
+    async () => {
       const fetchedAt = await writeSenateVoteMenuCache(env.DB, congress, session, xml);
       if (!runFeed) {
-        return { fetched_at: fetchedAt, feed: null as object | null };
+        return { congress, session, fetched_at: fetchedAt, run_feed: false };
       }
       const feed = await runFeedWithMemberVotes(env, { trigger: "admin" });
-      return { fetched_at: fetchedAt, feed };
-    });
-    scheduleZoneEdgeCachePurge(env, ctx);
-    return json(
-      {
-        ok: true,
-        congress,
-        session,
-        fetched_at: result.fetched_at,
-        run_feed: runFeed,
-        ...(result.feed ? { feed: result.feed } : {}),
-      },
-      { headers: PIPELINE_ADMIN_HEADERS }
-    );
-  } catch (err: unknown) {
-    if (isPipelineBusyError(err)) {
-      return json(
-        { ok: false, error: "pipeline_busy", message: "Another pipeline run is in progress" },
-        { status: 409, headers: PIPELINE_ADMIN_HEADERS }
-      );
-    }
-    console.error("senate_vote_menu_route_error", err);
-    return json(
-      { ok: false, error: "senate_vote_menu_failed" },
-      { status: 500, headers: PIPELINE_ADMIN_HEADERS }
-    );
-  }
+      return { congress, session, fetched_at: fetchedAt, run_feed: true, feed };
+    },
+    ctx
+  );
 }
 
 const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = {

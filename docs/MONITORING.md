@@ -69,7 +69,10 @@ REFRESH_VIA=d1 npm run refresh:senate-menu
 4. **Cursor Automation (recommended)** — schedule a daily cloud agent that:
    - Fetches the live Senate vote menu (this environment can reach senate.gov)
    - Runs `PIPELINE_ADMIN_TOKEN=... RUN_FEED=1 CHECK_HEALTH=1 npm run refresh:senate-menu`
-   - Notifies you when the script exits non-zero (`degraded` / `failed` / fetch errors)
+   - Notifies you when the script exits non-zero (true blockers: `failed` /
+     `stale` / `unknown`, fetch errors, or admin upload failures). Note:
+     ingest stays **`degraded`** while Worker→Senate.gov is 403 even after a
+     successful cache refresh — that alone is not an automation failure.
 
    Suggested automation prompt:
 
@@ -77,9 +80,11 @@ REFRESH_VIA=d1 npm run refresh:senate-menu
    > `PIPELINE_ADMIN_TOKEN=$PIPELINE_ADMIN_TOKEN RUN_FEED=1 CHECK_HEALTH=1 npm run refresh:senate-menu`
    > using workers.dev (not trackcongress.org). If exit code ≠ 0, treat as a
    > production ingest blocker and notify me with `/health` JSON and the script
-   > logs. Do not open a PR unless code changes are required to clear the blocker.
-   > Ensure secrets `PIPELINE_ADMIN_TOKEN`, `CLOUDFLARE_API_TOKEN`, and
-   > `CLOUDFLARE_ACCOUNT_ID` are available to the automation environment.
+   > logs. `degraded` with Senate cache-fallback warnings is expected until
+   > Worker egress can reach senate.gov; still refresh the cache daily. Do not
+   > open a PR unless code changes are required to clear a true blocker.
+   > Ensure secret `PIPELINE_ADMIN_TOKEN` is available to the automation
+   > environment (plus `CLOUDFLARE_*` if using `REFRESH_VIA=d1`).
 
 ## Edge cache (feed / stats JSON)
 

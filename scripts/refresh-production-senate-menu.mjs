@@ -3,28 +3,31 @@
  * Refresh production's Senate LIS vote-menu cache from a host that can reach
  * senate.gov (Cloudflare Worker egress is often HTTP 403 / Akamai-blocked).
  *
- * Modes:
- * 1) Preferred — POST XML to the Worker admin route (needs PIPELINE_ADMIN_TOKEN):
- *      PIPELINE_ADMIN_TOKEN=... node scripts/refresh-production-senate-menu.mjs
- * 2) Fallback — write D1 `pipeline_state` directly (needs CLOUDFLARE_API_TOKEN):
- *      REFRESH_VIA=d1 node scripts/refresh-production-senate-menu.mjs
+ * Preferred — POST XML to the Worker admin route (needs PIPELINE_ADMIN_TOKEN):
+ *   PIPELINE_ADMIN_TOKEN=... node --experimental-strip-types scripts/refresh-production-senate-menu.mjs
+ *
+ * Break-glass — write D1 `pipeline_state` directly (needs CLOUDFLARE_API_TOKEN):
+ *   REFRESH_VIA=d1 node --experimental-strip-types scripts/refresh-production-senate-menu.mjs
+ *   (RUN_FEED is not supported in D1 mode; exits 2 if set.)
  *
  * Optional:
- *   RUN_FEED=1          — chain feed ingest after cache write (admin mode only)
- *   WORKER_BASE_URL=... — default https://congress-tracker-api.fernandezdelaradylan.workers.dev
- *                         (custom domain Bot Fight Mode challenges non-browser clients)
- *   CHECK_HEALTH=1      — GET /health and exit 1 when data.ingest.status !== ok
+ *   CONGRESS / SESSION   — default 119 / 2 (must match Worker vars)
+ *   RUN_FEED=1           — chain feed ingest after cache write (admin mode only)
+ *   WORKER_BASE_URL=...  — default workers.dev (custom domain Bot Fight challenges curl)
+ *   CHECK_HEALTH=1       — fail on failed/stale/unknown (degraded is expected while
+ *                          Worker→Senate.gov stays 403, even after a good cache refresh)
  *
  * Exit codes: 0 success, 1 blocker / unhealthy, 2 misuse / missing secrets.
  */
-import { writeFileSync } from "node:fs";
+import {
+  isSenateVoteMenuXml,
+  senateVoteMenuCacheKey,
+  senateVoteMenuUrl,
+} from "../shared/senate-vote-menu.ts";
 
-const SENATE_MENU_URL =
-  "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.xml";
 const DEFAULT_WORKER_BASE =
   "https://congress-tracker-api.fernandezdelaradylan.workers.dev";
 const D1_DATABASE_ID = "e21fa2df-1c7d-4a83-8044-f28803c80a26";
-const CACHE_KEY = "senate_vote_menu_cache_119_2";
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();
@@ -35,17 +38,19 @@ function requireEnv(name) {
   return value;
 }
 
-function isSenateVoteMenuXml(xml) {
-  const trimmed = xml.trim();
-  return (
-    trimmed.includes("<vote_summary>") &&
-    trimmed.includes("</vote_summary>") &&
-    trimmed.includes("<vote>")
-  );
+function resolveCongressSession() {
+  const congress = Number.parseInt(process.env.CONGRESS?.trim() || "119", 10);
+  const session = Number.parseInt(process.env.SESSION?.trim() || "2", 10);
+  if (!Number.isFinite(congress) || !Number.isFinite(session)) {
+    console.error("CONGRESS and SESSION must be integers");
+    process.exit(2);
+  }
+  return { congress, session };
 }
 
-async function fetchSenateMenuXml() {
-  const res = await fetch(SENATE_MENU_URL, {
+async function fetchSenateMenuXml(congress, session) {
+  const url = senateVoteMenuUrl(congress, session);
+  const res = await fetch(url, {
     headers: {
       "User-Agent": "congress-tracker-ops/1.0",
       Accept: "application/xml,text/xml,*/*;q=0.8",
@@ -53,16 +58,16 @@ async function fetchSenateMenuXml() {
     },
   });
   if (!res.ok) {
-    throw new Error(`Senate menu HTTP ${res.status} for ${SENATE_MENU_URL}`);
+    throw new Error(`Senate menu HTTP ${res.status} for ${url}`);
   }
   const xml = await res.text();
-  if (!isSenateVoteMenuXml(xml)) {
-    throw new Error("Senate menu response was not vote_summary XML");
+  if (!isSenateVoteMenuXml(xml, { congress, session })) {
+    throw new Error("Senate menu response failed structural/congress validation");
   }
   return xml;
 }
 
-async function refreshViaAdmin(xml) {
+async function refreshViaAdmin(xml, congress, session) {
   const token = requireEnv("PIPELINE_ADMIN_TOKEN");
   const base = (process.env.WORKER_BASE_URL || DEFAULT_WORKER_BASE).replace(/\/$/, "");
   const runFeed = process.env.RUN_FEED === "1";
@@ -90,6 +95,8 @@ async function refreshViaAdmin(xml) {
     JSON.stringify({
       event: "senate_vote_menu_refreshed",
       mode: "admin",
+      congress,
+      session,
       fetched_at: body.fetched_at,
       run_feed: Boolean(body.run_feed),
       votesUpserted: body.feed?.votesUpserted,
@@ -98,11 +105,18 @@ async function refreshViaAdmin(xml) {
   return base;
 }
 
-async function refreshViaD1(xml) {
+async function refreshViaD1(xml, congress, session) {
+  if (process.env.RUN_FEED === "1") {
+    console.error(
+      "RUN_FEED=1 is not supported with REFRESH_VIA=d1. Use admin mode (PIPELINE_ADMIN_TOKEN) or trigger feed separately."
+    );
+    process.exit(2);
+  }
   const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = requireEnv("CLOUDFLARE_API_TOKEN");
   const fetchedAt = new Date().toISOString();
   const valueJson = JSON.stringify({ fetched_at: fetchedAt, xml });
+  const cacheKey = senateVoteMenuCacheKey(congress, session);
   const sql =
     "INSERT INTO pipeline_state (key, value_json, updated_at) VALUES (?1, ?2, ?3) " +
     "ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at";
@@ -116,7 +130,7 @@ async function refreshViaD1(xml) {
       },
       body: JSON.stringify({
         sql,
-        params: [CACHE_KEY, valueJson, fetchedAt],
+        params: [cacheKey, valueJson, fetchedAt],
       }),
     }
   );
@@ -129,6 +143,9 @@ async function refreshViaD1(xml) {
     JSON.stringify({
       event: "senate_vote_menu_refreshed",
       mode: "d1",
+      congress,
+      session,
+      cache_key: cacheKey,
       fetched_at: fetchedAt,
       note: "Cache updated; trigger POST /__pipeline/run/feed (or wait for daily cron) to ingest new rolls.",
     })
@@ -150,32 +167,45 @@ async function checkHealth(base) {
       message: body?.data?.ingest?.message,
     })
   );
-  if (!res.ok || ingestStatus !== "ok") {
+  // `degraded` is the steady state while Worker egress cannot reach Senate.gov
+  // (chamber_warnings on cache fallback). True blockers are failed/stale/unknown.
+  const blocker =
+    !res.ok ||
+    ingestStatus === "failed" ||
+    ingestStatus === "stale" ||
+    ingestStatus === "unknown" ||
+    ingestStatus == null;
+  if (blocker) {
     process.exit(1);
   }
 }
 
 async function main() {
+  const { congress, session } = resolveCongressSession();
+
   if (process.env.REFRESH_PRINT_ONLY === "1") {
-    // Contract-test helper: no network.
     process.stdout.write(
       [
         "refresh-production-senate-menu",
-        SENATE_MENU_URL,
-        CACHE_KEY,
+        senateVoteMenuUrl(congress, session),
+        senateVoteMenuCacheKey(congress, session),
         "/__pipeline/senate-vote-menu",
         "RUN_FEED",
         "CHECK_HEALTH",
         "REFRESH_VIA",
+        "CONGRESS",
+        "SESSION",
       ].join("\n") + "\n"
     );
     return;
   }
 
-  const xml = await fetchSenateMenuXml();
+  const xml = await fetchSenateMenuXml(congress, session);
   const mode = (process.env.REFRESH_VIA || "admin").toLowerCase();
   const base =
-    mode === "d1" ? await refreshViaD1(xml) : await refreshViaAdmin(xml);
+    mode === "d1"
+      ? await refreshViaD1(xml, congress, session)
+      : await refreshViaAdmin(xml, congress, session);
 
   if (process.env.CHECK_HEALTH === "1") {
     await checkHealth(base);
