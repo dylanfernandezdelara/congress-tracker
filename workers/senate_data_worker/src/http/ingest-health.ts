@@ -118,7 +118,7 @@ export function buildIngestMonitorPayload(params: {
   let message = evaluated.message;
   const warnings = scheduledSuccess?.chamber_warnings ?? [];
   // Cache/fallback chamber warnings mean the cron "succeeded" on stale Senate
-  // data — surface as degraded so uptime monitors and automations alert.
+  // data — surface as degraded (tracked/known; page on failed|stale|unknown).
   if (warnings.length > 0 && status === "ok") {
     status = "degraded";
     message = `Partial chamber ingest: ${warnings.join("; ")}`;

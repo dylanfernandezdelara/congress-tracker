@@ -158,7 +158,7 @@ async function ingestMonitorResponse(env: Env, json: JsonFn): Promise<Response> 
         alerting: {
           cloudflare_logs: "Filter Workers Observability for event feed_pipeline_failed or origin scheduled.",
           external_monitor:
-            "Poll GET /health or /debug/ingest.json and alert when data.ingest.status is not ok.",
+            "Poll GET /health or /debug/ingest.json and page on failed|stale|unknown. Treat sustained degraded (Senate cache fallback) as a known tracked condition, not a pager storm.",
         },
       },
       { status: 200, headers: { "Cache-Control": cacheNoStore } }

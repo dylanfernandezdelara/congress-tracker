@@ -157,6 +157,15 @@ describe("buildIngestMonitorPayload", () => {
     expect(payload.message).toContain("1 bill(s) missing digests");
   });
 
+  it("exposes isIngestMonitorHealthy for top-level /health mapping", async () => {
+    const { isIngestMonitorHealthy, isIngestMonitorOpsAcceptable } = await import(
+      "./ingest-health"
+    );
+    expect(isIngestMonitorHealthy("ok")).toBe(true);
+    expect(isIngestMonitorHealthy("degraded")).toBe(false);
+    expect(isIngestMonitorOpsAcceptable("degraded")).toBe(true);
+  });
+
   it("surfaces last_skipped without changing status fields", () => {
     const skipped = {
       skipped_at: "2026-06-23T10:00:35.000Z",

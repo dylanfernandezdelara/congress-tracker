@@ -7,7 +7,6 @@ import { resetSchemaFlag } from "../d1/schema";
 import { runMembersRosterPipeline } from "../pipeline/run-members-roster";
 import { handlePublicFetch } from "./router";
 import {
-  createMockDb,
   createMockEnv,
   createPipelineStateMockDb,
   pipelineRequest,
