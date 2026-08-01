@@ -57,13 +57,23 @@ REFRESH_VIA=d1 npm run refresh:senate-menu
 
 ## Alerting
 
+Severity split (important while Senate.gov 403 persists):
+
+| Severity | Status | Action |
+|----------|--------|--------|
+| Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken or no scheduled success |
+| Tracked / known | `degraded` (Senate cache fallback) | Keep daily menu refresh; do **not** page forever |
+| Clear | `ok` | No action |
+
 1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
    `last_skipped` (lease skips leave no failure log). Alert only when
    `last_skipped` exists and
    `last_scheduled_success.completed_at` is missing or not after
    `skipped_at` — the field is sticky and non-null alone is not an alarm.
-2. **Uptime** — poll workers.dev `/health` or `/debug/ingest.json` and alert when
-   `data.ingest.status` is not `ok` (or top-level `degraded`).
+2. **Uptime** — poll workers.dev `/health` or `/debug/ingest.json` and **page**
+   when `data.ingest.status` is `failed` | `stale` | `unknown`. Treat sustained
+   `degraded` + Senate cache-fallback as a known condition (daily refresh), not
+   a pager storm; optional notify only on transition *into* `degraded`.
 3. **Manual** — `POST /__pipeline/run/feed` with
    `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 4. **Cursor Automation (recommended)** — schedule a daily cloud agent that:
@@ -72,7 +82,8 @@ REFRESH_VIA=d1 npm run refresh:senate-menu
    - Notifies you when the script exits non-zero (true blockers: `failed` /
      `stale` / `unknown`, fetch errors, or admin upload failures). Note:
      ingest stays **`degraded`** while Worker→Senate.gov is 403 even after a
-     successful cache refresh — that alone is not an automation failure.
+     successful cache refresh — that alone is not an automation failure
+     (`CHECK_HEALTH` accepts `ok` | `degraded`).
 
    Suggested automation prompt:
 

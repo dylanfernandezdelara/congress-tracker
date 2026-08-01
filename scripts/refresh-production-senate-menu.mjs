@@ -14,20 +14,24 @@
  *   CONGRESS / SESSION   — default 119 / 2 (must match Worker vars)
  *   RUN_FEED=1           — chain feed ingest after cache write (admin mode only)
  *   WORKER_BASE_URL=...  — default workers.dev (custom domain Bot Fight challenges curl)
+ *   D1_DATABASE_ID=...   — override production D1 id (defaults to wrangler.toml id)
  *   CHECK_HEALTH=1       — fail on failed/stale/unknown (degraded is expected while
  *                          Worker→Senate.gov stays 403, even after a good cache refresh)
  *
  * Exit codes: 0 success, 1 blocker / unhealthy, 2 misuse / missing secrets.
  */
+import { isIngestMonitorOpsAcceptable } from "../shared/ingest-monitor-status.mjs";
 import {
+  encodeSenateVoteMenuCacheValue,
   isSenateVoteMenuXml,
+  PRODUCTION_D1_DATABASE_ID,
+  SENATE_VOTE_MENU_CACHE_UPSERT_SQL,
   senateVoteMenuCacheKey,
   senateVoteMenuUrl,
 } from "../shared/senate-vote-menu.mjs";
 
 const DEFAULT_WORKER_BASE =
   "https://congress-tracker-api.fernandezdelaradylan.workers.dev";
-const D1_DATABASE_ID = "e21fa2df-1c7d-4a83-8044-f28803c80a26";
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();
@@ -46,6 +50,10 @@ function resolveCongressSession() {
     process.exit(2);
   }
   return { congress, session };
+}
+
+function resolveD1DatabaseId() {
+  return process.env.D1_DATABASE_ID?.trim() || PRODUCTION_D1_DATABASE_ID;
 }
 
 async function fetchSenateMenuXml(congress, session) {
@@ -114,14 +122,11 @@ async function refreshViaD1(xml, congress, session) {
   }
   const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = requireEnv("CLOUDFLARE_API_TOKEN");
-  const fetchedAt = new Date().toISOString();
-  const valueJson = JSON.stringify({ fetched_at: fetchedAt, xml });
+  const databaseId = resolveD1DatabaseId();
+  const { fetchedAt, valueJson } = encodeSenateVoteMenuCacheValue(xml);
   const cacheKey = senateVoteMenuCacheKey(congress, session);
-  const sql =
-    "INSERT INTO pipeline_state (key, value_json, updated_at) VALUES (?1, ?2, ?3) " +
-    "ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at";
   const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${D1_DATABASE_ID}/query`,
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
     {
       method: "POST",
       headers: {
@@ -129,7 +134,7 @@ async function refreshViaD1(xml, congress, session) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        sql,
+        sql: SENATE_VOTE_MENU_CACHE_UPSERT_SQL,
         params: [cacheKey, valueJson, fetchedAt],
       }),
     }
@@ -145,6 +150,7 @@ async function refreshViaD1(xml, congress, session) {
       mode: "d1",
       congress,
       session,
+      database_id: databaseId,
       cache_key: cacheKey,
       fetched_at: fetchedAt,
       note: "Cache updated; trigger POST /__pipeline/run/feed (or wait for daily cron) to ingest new rolls.",
@@ -167,15 +173,8 @@ async function checkHealth(base) {
       message: body?.data?.ingest?.message,
     })
   );
-  // `degraded` is the steady state while Worker egress cannot reach Senate.gov
-  // (chamber_warnings on cache fallback). True blockers are failed/stale/unknown.
-  const blocker =
-    !res.ok ||
-    ingestStatus === "failed" ||
-    ingestStatus === "stale" ||
-    ingestStatus === "unknown" ||
-    ingestStatus == null;
-  if (blocker) {
+  // Accept ok | degraded; page on failed/stale/unknown (see docs/MONITORING.md).
+  if (!res.ok || !isIngestMonitorOpsAcceptable(ingestStatus)) {
     process.exit(1);
   }
 }
@@ -189,12 +188,14 @@ async function main() {
         "refresh-production-senate-menu",
         senateVoteMenuUrl(congress, session),
         senateVoteMenuCacheKey(congress, session),
+        PRODUCTION_D1_DATABASE_ID,
         "/__pipeline/senate-vote-menu",
         "RUN_FEED",
         "CHECK_HEALTH",
         "REFRESH_VIA",
         "CONGRESS",
         "SESSION",
+        "D1_DATABASE_ID",
       ].join("\n") + "\n"
     );
     return;

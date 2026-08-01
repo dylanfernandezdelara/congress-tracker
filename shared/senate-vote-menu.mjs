@@ -1,11 +1,30 @@
 /** Shared Senate LIS vote-menu helpers (Worker + ops refresh script). */
 
+/** Production D1 id from wrangler.toml `[[d1_databases]].database_id`. */
+export const PRODUCTION_D1_DATABASE_ID = "e21fa2df-1c7d-4a83-8044-f28803c80a26";
+
+export const SENATE_VOTE_MENU_CACHE_UPSERT_SQL =
+  "INSERT INTO pipeline_state (key, value_json, updated_at) VALUES (?1, ?2, ?3) " +
+  "ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at";
+
 export function senateVoteMenuUrl(congress, session) {
   return `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${congress}_${session}.xml`;
 }
 
 export function senateVoteMenuCacheKey(congress, session) {
   return `senate_vote_menu_cache_${congress}_${session}`;
+}
+
+/**
+ * Encode the D1 `pipeline_state.value_json` blob for a Senate vote menu cache row.
+ * @param {string} xml
+ * @param {string} [fetchedAt]
+ */
+export function encodeSenateVoteMenuCacheValue(xml, fetchedAt = new Date().toISOString()) {
+  return {
+    fetchedAt,
+    valueJson: JSON.stringify({ fetched_at: fetchedAt, xml }),
+  };
 }
 
 /**

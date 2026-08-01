@@ -86,7 +86,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 
 ## API
 
-- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `stale` | `failed` | `unknown`)
+- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`); top-level `status` is `ok` only when ingest is healthy
 - `GET /debug/ingest.json` — detailed ingest monitor payload
 - `GET /feed/latest.json?limit=&offset=&chamber=House|Senate&q=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; optional `chamber` filters to bills with a passage vote in that chamber; optional `q` case-insensitive substring search on title, policy area, digest headline, and normalized bill id; **not** a bare array)
 - `GET /stats/session.json` — per-chamber passage vote aggregates

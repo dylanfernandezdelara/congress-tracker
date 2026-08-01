@@ -186,6 +186,7 @@ function buildExecutiveIngestMonitorPayload(params: {
   };
 }
 
-export function isIngestMonitorHealthy(status: IngestMonitorStatus): boolean {
-  return status === "ok";
-}
+export {
+  isIngestMonitorHealthy,
+  isIngestMonitorOpsAcceptable,
+} from "../../../../shared/ingest-monitor-status.mjs";
