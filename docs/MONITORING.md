@@ -28,9 +28,9 @@ clients. Prefer the workers.dev hostname for automation:
 | Status | Meaning |
 |--------|---------|
 | `ok` | Last scheduled success within 26h, no chamber source warnings |
-| `degraded` | Scheduled success within window, but a chamber used stale fallback (today: Senate.gov 403 → D1 menu cache) |
+| `degraded` | Scheduled success within window with Senate D1 menu **cache fallback** only |
 | `stale` | Last scheduled success older than 26h |
-| `failed` | Failure newer than last scheduled success |
+| `failed` | Failure newer than last scheduled success, **or** hard chamber soft-skip (`* ingest skipped:`) |
 | `unknown` | No scheduled success yet |
 
 Admin runs update `last_success` only; they do not satisfy scheduled freshness.
@@ -61,9 +61,13 @@ Severity split (important while Senate.gov 403 persists):
 
 | Severity | Status | Action |
 |----------|--------|--------|
-| Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken or no scheduled success |
-| Tracked / known | `degraded` (Senate cache fallback) | Keep daily menu refresh; do **not** page forever |
+| Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken, no scheduled success, **or** hard chamber skip (`House/Senate ingest skipped`) |
+| Tracked / known | `degraded` (Senate **cache fallback** only) | Keep daily menu refresh; do **not** page forever |
 | Clear | `ok` | No action |
+
+`degraded` is reserved for expected Worker→Senate.gov 403 → D1 menu cache fallback.
+A soft-fail that skips an entire chamber (`* ingest skipped:`) is **`failed`** so uptime
+checks and `CHECK_HEALTH=1` still page.
 
 1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
    `last_skipped` (lease skips leave no failure log). Alert only when

@@ -6,7 +6,7 @@ import {
   SENATE_VOTE_MENU_CACHE_UPSERT_SQL,
   senateVoteMenuCacheKey,
   senateVoteMenuUrl,
-} from "./senate-vote-menu.mjs";
+} from "./senate-vote-menu";
 
 const sample = `<?xml version="1.0"?><vote_summary>
   <congress>119</congress>

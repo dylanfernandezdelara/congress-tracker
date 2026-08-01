@@ -8,6 +8,7 @@ import type {
   IngestMonitorPayload,
   IngestMonitorStatus,
 } from "../../../../shared/ingest-api-types";
+import { classifyChamberWarningSeverity } from "../../../../shared/ingest-monitor-status";
 import { sanitizePipelineErrorPublic } from "./pipeline-error";
 
 function sanitizeFailureRecord(
@@ -36,6 +37,8 @@ export function evaluateIngestMonitorStatus<
   /** Resolved scheduled-success candidate (dedicated key or latest fallback). */
   scheduledSuccess: T | null;
   lastFailure: FeedPipelineFailureRecord | null;
+  /** Chamber warnings from the resolved scheduled-success record (feed only). */
+  chamberWarnings?: readonly string[] | null;
 }): {
   status: IngestMonitorStatus;
   message: string;
@@ -78,6 +81,23 @@ export function evaluateIngestMonitorStatus<
     };
   }
 
+  const warnings = params.chamberWarnings ?? [];
+  const warningSeverity = classifyChamberWarningSeverity(warnings);
+  if (warningSeverity === "failed") {
+    return {
+      status: "failed",
+      message: `Partial chamber ingest: ${warnings.join("; ")}`,
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+  if (warningSeverity === "degraded") {
+    return {
+      status: "degraded",
+      message: `Partial chamber ingest: ${warnings.join("; ")}`,
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+
   return {
     status: "ok",
     message: "Scheduled ingest completed within the expected window.",
@@ -112,18 +132,14 @@ export function buildIngestMonitorPayload(params: {
     staleAfterHours: params.staleAfterHours,
     scheduledSuccess,
     lastFailure: params.lastFailure,
+    chamberWarnings: scheduledSuccess?.chamber_warnings ?? [],
   });
 
-  let status = evaluated.status;
   let message = evaluated.message;
-  const warnings = scheduledSuccess?.chamber_warnings ?? [];
-  // Cache/fallback chamber warnings mean the cron "succeeded" on stale Senate
-  // data — surface as degraded (tracked/known; page on failed|stale|unknown).
-  if (warnings.length > 0 && status === "ok") {
-    status = "degraded";
-    message = `Partial chamber ingest: ${warnings.join("; ")}`;
-  }
-  if (params.missingDigestCount > 0 && (status === "ok" || status === "degraded")) {
+  if (
+    params.missingDigestCount > 0 &&
+    (evaluated.status === "ok" || evaluated.status === "degraded")
+  ) {
     message = `${message} ${params.missingDigestCount} bill(s) missing digests.`;
   }
 
@@ -139,7 +155,7 @@ export function buildIngestMonitorPayload(params: {
     : undefined;
 
   return {
-    status,
+    status: evaluated.status,
     message,
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,
@@ -189,4 +205,4 @@ function buildExecutiveIngestMonitorPayload(params: {
 export {
   isIngestMonitorHealthy,
   isIngestMonitorOpsAcceptable,
-} from "../../../../shared/ingest-monitor-status.mjs";
+} from "../../../../shared/ingest-monitor-status";

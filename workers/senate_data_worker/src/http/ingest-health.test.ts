@@ -103,6 +103,48 @@ describe("evaluateIngestMonitorStatus", () => {
     });
     expect(result.status).toBe("unknown");
   });
+
+  it("marks degraded for Senate cache-fallback chamber warnings", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 5,
+        digestsWritten: 2,
+        digestsSkipped: 3,
+      },
+      lastFailure: null,
+      chamberWarnings: [
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+      ],
+    });
+    expect(result.status).toBe("degraded");
+    expect(result.message).toContain("Partial chamber ingest");
+  });
+
+  it("marks failed for hard chamber skip warnings (page-worthy)", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 5,
+        digestsWritten: 2,
+        digestsSkipped: 3,
+      },
+      lastFailure: null,
+      chamberWarnings: ["House ingest skipped: Congress API down"],
+    });
+    expect(result.status).toBe("failed");
+    expect(result.message).toContain("House ingest skipped");
+  });
 });
 
 describe("buildIngestMonitorPayload", () => {
@@ -127,7 +169,7 @@ describe("buildIngestMonitorPayload", () => {
     skipped: 0,
   };
 
-  it("marks degraded when scheduled success carried chamber_warnings", () => {
+  it("marks degraded when scheduled success carried cache-fallback chamber_warnings", () => {
     const lastScheduled = {
       completed_at: "2026-06-23T10:05:00.000Z",
       trigger: "scheduled" as const,
@@ -157,13 +199,31 @@ describe("buildIngestMonitorPayload", () => {
     expect(payload.message).toContain("1 bill(s) missing digests");
   });
 
-  it("exposes isIngestMonitorHealthy for top-level /health mapping", async () => {
-    const { isIngestMonitorHealthy, isIngestMonitorOpsAcceptable } = await import(
-      "./ingest-health"
-    );
-    expect(isIngestMonitorHealthy("ok")).toBe(true);
-    expect(isIngestMonitorHealthy("degraded")).toBe(false);
-    expect(isIngestMonitorOpsAcceptable("degraded")).toBe(true);
+  it("marks failed when scheduled success carried hard chamber skip warnings", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: ["Senate ingest skipped: HTTP 403"],
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 0,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("failed");
+    expect(payload.message).toContain("Senate ingest skipped");
   });
 
   it("surfaces last_skipped without changing status fields", () => {

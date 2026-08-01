@@ -20,7 +20,7 @@ import {
   SENATE_VOTE_MENU_CACHE_UPSERT_SQL,
   senateVoteMenuCacheKey,
   senateVoteMenuUrl,
-} from "../../../../shared/senate-vote-menu.mjs";
+} from "../../../../shared/senate-vote-menu";
 
 export { isSenateVoteMenuXml, senateVoteMenuCacheKey, senateVoteMenuUrl };
 
