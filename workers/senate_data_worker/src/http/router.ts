@@ -320,6 +320,11 @@ async function handleSenateVoteMenuRoute(
   json: JsonFn,
   ctx?: Pick<ExecutionContext, "waitUntil">
 ): Promise<Response> {
+  // Auth/method gate before buffering the (potentially large) menu body.
+  // handlePipelineRoute re-checks auth; that double-check is intentional.
+  const denied = rejectUnauthorizedPipelinePost(request, env, json);
+  if (denied) return denied;
+
   const contentType = request.headers.get("content-type") ?? "";
   let xml = "";
   try {

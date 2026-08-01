@@ -166,4 +166,29 @@ describe("POST /__pipeline/senate-vote-menu", () => {
     );
     expect(response.status).toBe(400);
   });
+
+  it("rejects GET before body validation", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/__pipeline/senate-vote-menu", {
+        method: "GET",
+      }),
+      createMockEnv() as never
+    );
+    expect(response.status).toBe(405);
+  });
+
+  it("rejects unauthenticated posts before body validation", async () => {
+    const response = await handlePublicFetch(
+      pipelineRequest("/__pipeline/senate-vote-menu", {
+        headers: { "Content-Type": "text/plain" },
+        body: "not xml",
+      }),
+      createMockEnv({
+        DEV_OPEN_PIPELINE: undefined,
+        PIPELINE_ADMIN_TOKEN: "s3cret",
+      }) as never
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ error: "unauthorized" });
+  });
 });
