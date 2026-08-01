@@ -3,7 +3,7 @@ import {
   isSenateVoteMenuXml,
   senateVoteMenuCacheKey,
   senateVoteMenuUrl,
-} from "./senate-vote-menu";
+} from "./senate-vote-menu.mjs";
 
 const sample = `<?xml version="1.0"?><vote_summary>
   <congress>119</congress>

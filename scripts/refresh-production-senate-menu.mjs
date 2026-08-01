@@ -4,10 +4,10 @@
  * senate.gov (Cloudflare Worker egress is often HTTP 403 / Akamai-blocked).
  *
  * Preferred — POST XML to the Worker admin route (needs PIPELINE_ADMIN_TOKEN):
- *   PIPELINE_ADMIN_TOKEN=... node --experimental-strip-types scripts/refresh-production-senate-menu.mjs
+ *   PIPELINE_ADMIN_TOKEN=... npm run refresh:senate-menu
  *
  * Break-glass — write D1 `pipeline_state` directly (needs CLOUDFLARE_API_TOKEN):
- *   REFRESH_VIA=d1 node --experimental-strip-types scripts/refresh-production-senate-menu.mjs
+ *   REFRESH_VIA=d1 npm run refresh:senate-menu
  *   (RUN_FEED is not supported in D1 mode; exits 2 if set.)
  *
  * Optional:
@@ -23,7 +23,7 @@ import {
   isSenateVoteMenuXml,
   senateVoteMenuCacheKey,
   senateVoteMenuUrl,
-} from "../shared/senate-vote-menu.ts";
+} from "../shared/senate-vote-menu.mjs";
 
 const DEFAULT_WORKER_BASE =
   "https://congress-tracker-api.fernandezdelaradylan.workers.dev";

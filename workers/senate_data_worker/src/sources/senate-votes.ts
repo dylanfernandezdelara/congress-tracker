@@ -18,7 +18,7 @@ import {
   isSenateVoteMenuXml,
   senateVoteMenuCacheKey,
   senateVoteMenuUrl,
-} from "../../../../shared/senate-vote-menu";
+} from "../../../../shared/senate-vote-menu.mjs";
 
 export { isSenateVoteMenuXml, senateVoteMenuCacheKey, senateVoteMenuUrl };
 

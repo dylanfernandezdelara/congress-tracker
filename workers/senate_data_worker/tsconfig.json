@@ -9,9 +9,17 @@
     "isolatedModules": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowJs": true,
+    "maxNodeModuleJsDepth": 0
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "../../shared/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "../../shared/**/*.ts",
+    "../../shared/**/*.d.ts",
+    "../../shared/senate-vote-menu.mjs"
+  ],
   "exclude": ["node_modules", "../../shared/**/*.test.ts"]
 }
 
