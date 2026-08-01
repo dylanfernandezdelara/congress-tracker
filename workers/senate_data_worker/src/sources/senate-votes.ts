@@ -81,14 +81,18 @@ async function readSenateVoteMenuCache(
   }
 }
 
-async function writeSenateVoteMenuCache(
+/**
+ * Persist a Senate LIS vote-menu XML blob for 403 fallback (and admin refresh).
+ * Returns the `fetched_at` timestamp written to D1.
+ */
+export async function writeSenateVoteMenuCache(
   db: D1Database,
   congress: number,
   session: number,
-  xml: string
-): Promise<void> {
+  xml: string,
+  fetchedAt: string = new Date().toISOString()
+): Promise<string> {
   await ensureSchema(db);
-  const fetchedAt = new Date().toISOString();
   await db
     .prepare(
       `INSERT INTO pipeline_state (key, value_json, updated_at)
@@ -103,6 +107,17 @@ async function writeSenateVoteMenuCache(
       fetchedAt
     )
     .run();
+  return fetchedAt;
+}
+
+/** Basic structural check before accepting admin-uploaded menu XML. */
+export function isSenateVoteMenuXml(xml: string): boolean {
+  const trimmed = xml.trim();
+  return (
+    trimmed.includes("<vote_summary>") &&
+    trimmed.includes("</vote_summary>") &&
+    trimmed.includes("<vote>")
+  );
 }
 
 async function fetchSenateVoteMenuXml(

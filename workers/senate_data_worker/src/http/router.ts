@@ -64,6 +64,10 @@ import {
   cacheLatest,
   cacheNoStore,
 } from "./responses";
+import {
+  isSenateVoteMenuXml,
+  writeSenateVoteMenuCache,
+} from "../sources/senate-votes";
 
 type JsonFn = (body: unknown, init?: ResponseInit) => Response;
 
@@ -135,7 +139,8 @@ async function healthResponse(env: Env, json: JsonFn): Promise<Response> {
         ingest &&
         (ingest.status === "failed" ||
           ingest.status === "stale" ||
-          ingest.status === "unknown")
+          ingest.status === "unknown" ||
+          ingest.status === "degraded")
           ? "degraded"
           : "ok",
       timestamp: new Date().toISOString(),
@@ -305,6 +310,91 @@ async function handlePurgeCacheRoute(
     { ok: false, purged: false, reason: result.reason },
     { status: 502, headers: PIPELINE_ADMIN_HEADERS }
   );
+}
+
+/**
+ * Admin refresh for the Senate LIS vote menu cache.
+ * Senate.gov Akamai often 403s Cloudflare Worker egress; Cursor/ops hosts can
+ * still fetch the XML and POST it here so cron fallback stays current.
+ *
+ * Body: raw XML (`application/xml` / `text/xml` / `text/plain`) or JSON `{ "xml": "..." }`.
+ * Query: `run_feed=1` to chain a feed ingest after the cache write.
+ */
+async function handleSenateVoteMenuRoute(
+  request: Request,
+  env: Env,
+  url: URL,
+  json: JsonFn,
+  ctx?: Pick<ExecutionContext, "waitUntil">
+): Promise<Response> {
+  const denied = rejectUnauthorizedPipelinePost(request, env, json);
+  if (denied) return denied;
+
+  const contentType = request.headers.get("content-type") ?? "";
+  let xml = "";
+  try {
+    if (contentType.includes("application/json")) {
+      const body = (await request.json()) as { xml?: unknown };
+      if (typeof body.xml === "string") xml = body.xml;
+    } else {
+      xml = await request.text();
+    }
+  } catch {
+    return json(
+      { ok: false, error: "invalid_body", message: "Could not read request body." },
+      { status: 400, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+
+  if (!isSenateVoteMenuXml(xml)) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_senate_vote_menu",
+        message: "Body must be Senate LIS vote_menu XML (vote_summary with votes).",
+      },
+      { status: 400, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+
+  const congress = congressNumber(env);
+  const session = sessionNumber(env);
+  const runFeed = url.searchParams.get("run_feed") === "1";
+
+  try {
+    const result = await withPipelineLease(env.DB, async () => {
+      const fetchedAt = await writeSenateVoteMenuCache(env.DB, congress, session, xml);
+      if (!runFeed) {
+        return { fetched_at: fetchedAt, feed: null as object | null };
+      }
+      const feed = await runFeedWithMemberVotes(env, { trigger: "admin" });
+      return { fetched_at: fetchedAt, feed };
+    });
+    scheduleZoneEdgeCachePurge(env, ctx);
+    return json(
+      {
+        ok: true,
+        congress,
+        session,
+        fetched_at: result.fetched_at,
+        run_feed: runFeed,
+        ...(result.feed ? { feed: result.feed } : {}),
+      },
+      { headers: PIPELINE_ADMIN_HEADERS }
+    );
+  } catch (err: unknown) {
+    if (isPipelineBusyError(err)) {
+      return json(
+        { ok: false, error: "pipeline_busy", message: "Another pipeline run is in progress" },
+        { status: 409, headers: PIPELINE_ADMIN_HEADERS }
+      );
+    }
+    console.error("senate_vote_menu_route_error", err);
+    return json(
+      { ok: false, error: "senate_vote_menu_failed" },
+      { status: 500, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
 }
 
 const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = {
@@ -577,6 +667,10 @@ export async function handlePublicFetch(
 
   if (pathname === "/__pipeline/purge-cache") {
     return handlePurgeCacheRoute(request, env, json);
+  }
+
+  if (pathname === "/__pipeline/senate-vote-menu") {
+    return handleSenateVoteMenuRoute(request, env, url, json, ctx);
   }
 
   const pipeline = PIPELINE_ROUTES[pathname];

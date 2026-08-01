@@ -16,6 +16,7 @@ import { isSameRun, isSkipSuperseded, type RunIdentity } from '../utils/ingestMo
 
 const STATUS_LABEL: Record<IngestMonitorStatus, string> = {
   ok: 'Healthy',
+  degraded: 'Degraded',
   stale: 'Stale',
   failed: 'Failed',
   unknown: 'Unknown',
@@ -30,7 +31,7 @@ type RunMetric = { label: string; value: string | number }
 
 function statusClass(status: IngestMonitorStatus): string {
   if (status === 'ok') return 'text-pass'
-  if (status === 'failed') return 'text-fail'
+  if (status === 'failed' || status === 'degraded') return 'text-fail'
   return 'text-secondary'
 }
 

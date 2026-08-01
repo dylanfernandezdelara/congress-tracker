@@ -114,12 +114,16 @@ export function buildIngestMonitorPayload(params: {
     lastFailure: params.lastFailure,
   });
 
+  let status = evaluated.status;
   let message = evaluated.message;
   const warnings = scheduledSuccess?.chamber_warnings ?? [];
-  if (warnings.length > 0 && evaluated.status === "ok") {
-    message = `${message} Partial chamber ingest: ${warnings.join("; ")}`;
+  // Cache/fallback chamber warnings mean the cron "succeeded" on stale Senate
+  // data — surface as degraded so uptime monitors and automations alert.
+  if (warnings.length > 0 && status === "ok") {
+    status = "degraded";
+    message = `Partial chamber ingest: ${warnings.join("; ")}`;
   }
-  if (params.missingDigestCount > 0 && evaluated.status === "ok") {
+  if (params.missingDigestCount > 0 && (status === "ok" || status === "degraded")) {
     message = `${message} ${params.missingDigestCount} bill(s) missing digests.`;
   }
 
@@ -135,7 +139,7 @@ export function buildIngestMonitorPayload(params: {
     : undefined;
 
   return {
-    status: evaluated.status,
+    status,
     message,
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,

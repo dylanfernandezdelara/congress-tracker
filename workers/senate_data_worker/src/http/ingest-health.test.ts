@@ -127,6 +127,36 @@ describe("buildIngestMonitorPayload", () => {
     skipped: 0,
   };
 
+  it("marks degraded when scheduled success carried chamber_warnings", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: [
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+      ],
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 1,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("degraded");
+    expect(payload.message).toContain("Partial chamber ingest");
+    expect(payload.message).toContain("1 bill(s) missing digests");
+  });
+
   it("surfaces last_skipped without changing status fields", () => {
     const skipped = {
       skipped_at: "2026-06-23T10:00:35.000Z",

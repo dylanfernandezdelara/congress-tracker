@@ -37,7 +37,7 @@ export interface FeedPipelineSkipRecord {
   reason: "pipeline_busy";
 }
 
-export type IngestMonitorStatus = "ok" | "stale" | "failed" | "unknown";
+export type IngestMonitorStatus = "ok" | "degraded" | "stale" | "failed" | "unknown";
 
 export interface IngestMonitorPayload {
   status: IngestMonitorStatus;
