@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# Seed the LOCAL D1 database with sample passage votes + digests so the feed
-# renders without any API keys or network access.
+# Seed the LOCAL D1 database with sample passage votes, digests, and left-rail
+# member spotlights (defectors + portfolios) so the UI matches production shape
+# without any API keys or network access.
 #
 # This only ever touches the local Miniflare D1 store under
 # workers/senate_data_worker/.wrangler/state (via `wrangler d1 execute --local`).
 # It never reaches production/preview D1.
+#
+# Re-running seed restores offline sample mode even after a real roster sync
+# (members-roster / member-votes): real bioguide rows are cleared so LOCAL:*
+# spotlights are not filtered out by hasRealMemberRoster.
 #
 # Usage:
 #   npm run seed                 # write sample data into local D1
@@ -172,6 +177,18 @@ CREATE TABLE IF NOT EXISTS confirmation_votes (
   vote_date TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number)
 );
+
+-- Offline sample mode: drop real-roster rows so hasRealMemberRoster stays false
+-- and LOCAL:* defectors/portfolios remain visible in /stats/defectors.json and
+-- /stats/portfolios.json (left-rail House/Senate spotlights).
+DELETE FROM member_votes WHERE bioguide_id NOT LIKE 'LOCAL:%';
+DELETE FROM member_session_stats WHERE bioguide_id NOT LIKE 'LOCAL:%';
+DELETE FROM member_cross_votes WHERE bioguide_id NOT LIKE 'LOCAL:%';
+DELETE FROM financial_transactions WHERE bioguide_id NOT LIKE 'LOCAL:%';
+DELETE FROM portfolio_snapshots WHERE bioguide_id NOT LIKE 'LOCAL:%';
+DELETE FROM members WHERE bioguide_id NOT LIKE 'LOCAL:%';
+-- Idempotent re-seed of LOCAL disclosure rows (unique idx_financial_tx_dedup).
+DELETE FROM financial_transactions WHERE bioguide_id LIKE 'LOCAL:%';
 
 INSERT OR REPLACE INTO votes
   (chamber, congress, session, roll_number, bill_congress, bill_type, bill_number, question, result, yeas, nays, vote_date, is_passage)
@@ -396,18 +413,21 @@ trap 'rm -f "${SEED_FILE}"' EXIT
   printf '%s\n' "${SEED_TAIL}"
 } >"${SEED_FILE}"
 
-echo "Seeding local D1 (${DB_NAME}) with sample passage votes, digests, and sidebar stats..."
+echo "Seeding local D1 (${DB_NAME}) with sample passage votes, digests, and left-rail member spotlights..."
 # Run from the worker dir so --local resolves the same .wrangler/state store
 # that `npm run dev:worker` (wrangler dev) uses.
 ( cd "${WORKER_DIR}" && npx wrangler d1 execute "${DB_NAME}" --local --file "${SEED_FILE}" )
 
 cat <<'DONE'
 
-Local feed seeded. Next:
+Local feed + House/Senate left-rail spotlights seeded. Next:
   npm run dev:worker   # http://127.0.0.1:8787
   npm run dev:web      # http://127.0.0.1:5173
   curl -fsS http://127.0.0.1:8787/feed/latest.json
-  curl -fsS http://127.0.0.1:8787/stats/session.json
+  curl -fsS 'http://127.0.0.1:8787/stats/defectors.json?chamber=House&limit=5'
+  curl -fsS 'http://127.0.0.1:8787/stats/portfolios.json?chamber=House&limit=5'
 
 Seeded rows are clearly marked "(local sample)" and contain no live data.
+Re-run npm run seed after members-roster / member-votes if the left rail goes empty
+(those pipelines load a real roster that hides LOCAL:* sample spotlights).
 DONE

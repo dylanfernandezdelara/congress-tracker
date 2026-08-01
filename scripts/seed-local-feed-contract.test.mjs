@@ -39,6 +39,19 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /On the Nomination/)
 })
 
+test('seed clears real roster so LOCAL left-rail spotlights stay visible', () => {
+  const sql = printSql()
+  assert.match(sql, /DELETE FROM members WHERE bioguide_id NOT LIKE 'LOCAL:%'/)
+  assert.match(sql, /DELETE FROM member_cross_votes WHERE bioguide_id NOT LIKE 'LOCAL:%'/)
+  assert.match(sql, /DELETE FROM financial_transactions WHERE bioguide_id LIKE 'LOCAL:%'/)
+  assert.match(sql, /INSERT OR REPLACE INTO member_cross_votes/)
+  assert.match(sql, /INSERT OR REPLACE INTO portfolio_snapshots/)
+  assert.match(sql, /LOCAL:H001/)
+  assert.match(sql, /LOCAL:S001/)
+  assert.match(sql, /LOCAL:H003/)
+  assert.match(sql, /LOCAL:H004/)
+})
+
 test('seeded votes use recent (lookback-window) dates, not stale literals', () => {
   const sql = printSql()
   const dates = [...sql.matchAll(/'(\d{4}-\d{2}-\d{2})'/g)].map((m) => m[1])

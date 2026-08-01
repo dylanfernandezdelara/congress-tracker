@@ -4,9 +4,13 @@ Cloudflare-native app that surfaces **recent U.S. Congress bills with official p
 
 ## Developer quick start
 
+Local D1 starts empty. **Run `npm run seed` before (or right after) starting the
+dev servers** so the feed and House/Senate left rail have sample data — no API
+keys required.
+
 ```bash
 npm run setup        # install deps + Playwright, scaffold .dev.vars
-npm run seed         # offline: fill local D1 with sample bills (no API keys)
+npm run seed         # required for local UI data (feed + left-rail spotlights)
 npm run verify:local # optional preflight check
 ```
 
@@ -17,8 +21,9 @@ npm run dev:worker   # http://127.0.0.1:8787
 npm run dev:web      # http://127.0.0.1:5173
 ```
 
-Then open `http://127.0.0.1:5173` for the scrollable action-row feed — the
-seeded sample bills appear immediately, no keys required.
+Then open `http://127.0.0.1:5173` — seeded sample bills and member spotlights
+appear immediately. Re-run `npm run seed` anytime the left rail goes empty
+(e.g. after a local `members-roster` sync).
 
 To pull **real** data instead of the sample, add `CONGRESS_API_KEY` and
 `OPENROUTER_API_KEY` to `workers/senate_data_worker/.dev.vars`, then run live
