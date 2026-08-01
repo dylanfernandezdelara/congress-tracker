@@ -37,7 +37,7 @@ export function evaluateIngestMonitorStatus<
   /** Resolved scheduled-success candidate (dedicated key or latest fallback). */
   scheduledSuccess: T | null;
   lastFailure: FeedPipelineFailureRecord | null;
-  /** Chamber warnings from the resolved scheduled-success record (feed only). */
+  /** Chamber warnings from the newest feed success (admin remediation may clear sticky scheduled hard-skips). */
   chamberWarnings?: readonly string[] | null;
 }): {
   status: IngestMonitorStatus;
