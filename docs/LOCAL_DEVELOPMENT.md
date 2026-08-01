@@ -9,19 +9,20 @@ behave the same way so you can move between the two without surprises.
 
 ```bash
 npm run setup        # install all deps + Playwright + scaffold .dev.vars
-npm run seed         # offline: fill local D1 with sample bills/votes (no keys)
+npm run seed         # required: fill local D1 with sample feed + left-rail data
 npm run verify:local # preflight check that everything is wired up
 ```
 
-Then, in two terminals:
+Local D1 starts empty — **without `npm run seed`**, the feed and House/Senate
+left rail have nothing to show. Then, in two terminals:
 
 ```bash
 npm run dev:worker   # http://127.0.0.1:8787  (API + ingestion)
 npm run dev:web      # http://127.0.0.1:5173  (React feed UI)
 ```
 
-Open `http://127.0.0.1:5173` — the feed shows the seeded sample bills
-immediately, no API keys required.
+Open `http://127.0.0.1:5173` — the seeded sample bills and member spotlights
+appear immediately, no API keys required.
 
 The Vite dev server proxies `/feed`, `/stats`, `/health`, and `/debug`
 to the worker on `:8787`, so the UI uses same-origin API URLs (matching
@@ -50,12 +51,19 @@ The local D1 database starts empty, so a fresh clone would otherwise show
 npm run seed
 ```
 
-This writes a few clearly-labeled `(local sample)` bills, passage votes, and
-plain-English digests directly into the **local** D1 store
+This writes clearly-labeled `(local sample)` bills, passage votes, plain-English
+digests, and **left-rail House/Senate member spotlights** (defectors +
+portfolios) into the **local** D1 store
 (`workers/senate_data_worker/.wrangler/state`, via `wrangler d1 execute --local`).
 It never touches production/preview D1, needs no network, and is idempotent
 (safe to re-run). Vote dates are generated relative to today so they always
 fall inside the feed's 45-day lookback window.
+
+`npm run seed` also clears any previously synced **real** member roster from
+local D1. That matters because a full real roster hides `LOCAL:*` sample
+spotlights in `/stats/defectors.json` and `/stats/portfolios.json` — the APIs
+the left rail uses. Prefer seed for UI work; use real ingestion only when you
+need live Congress data.
 
 ### 2. Real ingestion (needs API keys)
 
@@ -83,11 +91,19 @@ Then, with the worker running:
 curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed
 curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/members-roster
 curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/member-votes
+# Full-session left-rail spotlights also need (admin):
+# curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/session-backfill
+# then re-run member-votes
 ```
 
 This mirrors what the daily cron does in production. Senate votes come from a
 public XML endpoint (no key); House votes and CRS summaries need
 `CONGRESS_API_KEY`; digest rewrites need `OPENROUTER_API_KEY`.
+
+**UI note:** `members-roster` / `member-votes` replace sample members with a real
+roster. Until real `member_cross_votes` exist (after session backfill + member
+votes), the left House/Senate rail will look empty. Re-run `npm run seed` to
+restore offline sample spotlights for UI work.
 
 ## Local architecture notes
 

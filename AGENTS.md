@@ -19,13 +19,17 @@ Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONG
 
 `npm run setup` also installs root Playwright tooling used by `npm run qa:web`.
 
-Local ↔ Cursor Cloud parity: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md). Quick check: `npm run verify:local`. Seed local feed (offline, no keys): `npm run seed`.
+Local ↔ Cursor Cloud parity: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md). Quick check: `npm run verify:local`.
+
+**Local data:** Local D1 starts empty. Run `npm run seed` for offline sample
+feed + House/Senate left-rail spotlights (no API keys). Do this before UI work;
+re-run after `members-roster` / `member-votes` if those rails go empty.
 
 ### Local development
 
+- **Seed sample data (required for local UI):** `npm run seed`
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
-- Seed sample feed (offline, no keys): `npm run seed`
 - Trigger live ingestion (needs API keys): `curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed`
 - Feed JSON: `http://127.0.0.1:8787/feed/latest.json?limit=50&offset=0` (paginated object; read `items`)
 
@@ -103,7 +107,9 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 deploy, still run `session-backfill` (then re-run `member-votes` if needed) against the
 **production** Worker before expecting full-session left-rail member spotlights. Preview
 Workers block admin writes and use a separate empty D1; local offline: `npm run seed`
-populates sample sidebar data.
+populates sample sidebar data (and clears any local real roster so `LOCAL:*` spotlights
+are not hidden). After local `members-roster` / `member-votes`, re-run `npm run seed` if
+the House/Senate left rail goes empty during UI work.
 
 **Daily ingest (production):** Cloudflare cron runs `runFeedWithMemberVotes` (feed then
 best-effort `member-votes`) at **10:00 UTC**, and `runExecutivePostsPipeline` hourly at **:20**
