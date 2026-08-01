@@ -158,8 +158,7 @@ async function checkHealth(base) {
 async function main() {
   if (process.env.REFRESH_PRINT_ONLY === "1") {
     // Contract-test helper: no network.
-    writeFileSync(
-      0,
+    process.stdout.write(
       [
         "refresh-production-senate-menu",
         SENATE_MENU_URL,
@@ -168,7 +167,7 @@ async function main() {
         "RUN_FEED",
         "CHECK_HEALTH",
         "REFRESH_VIA",
-      ].join("\n")
+      ].join("\n") + "\n"
     );
     return;
   }
