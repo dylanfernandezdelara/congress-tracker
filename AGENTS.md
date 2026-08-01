@@ -86,7 +86,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 
 ## API
 
-- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `stale` | `failed` | `unknown`)
+- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`); top-level `status` is `ok` only when ingest is healthy
 - `GET /debug/ingest.json` — detailed ingest monitor payload
 - `GET /feed/latest.json?limit=&offset=&chamber=House|Senate&q=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; optional `chamber` filters to bills with a passage vote in that chamber; optional `q` case-insensitive substring search on title, policy area, digest headline, and normalized bill id; **not** a bare array)
 - `GET /stats/session.json` — per-chamber passage vote aggregates
@@ -96,6 +96,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
 - `POST /__pipeline/run/feed` (cron also runs feed + member-votes daily at 10:00 UTC)
+- `POST /__pipeline/senate-vote-menu` — admin upload of Senate LIS vote-menu XML into D1 cache (`?run_feed=1` to chain ingest); use when Worker egress gets Senate.gov 403s. Ops script: `npm run refresh:senate-menu`
 - `POST /__pipeline/purge-cache` — zone-wide Cloudflare edge cache purge (admin; also runs automatically after successful pipeline writes when `CACHE_PURGE_TOKEN` is set)
 - `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
 - `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)

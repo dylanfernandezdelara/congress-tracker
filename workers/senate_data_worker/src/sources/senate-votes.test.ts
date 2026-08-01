@@ -212,4 +212,34 @@ describe("parseSenateVoteMenuXml", () => {
 
     fetchSenate.mockRestore();
   });
+
+  it("falls back to D1 cache when live menu fails structural validation", async () => {
+    const fetchSenate = vi
+      .spyOn(senateFetch, "fetchSenateLegislativeText")
+      .mockResolvedValue("<html>akamai challenge</html>");
+
+    const cachedPayload = JSON.stringify({
+      fetched_at: new Date().toISOString(),
+      xml: sample,
+    });
+    const env = {
+      CONGRESS: "119",
+      SESSION: "2",
+      DB: {
+        prepare: () => ({
+          bind: () => ({
+            first: async () => ({ value_json: cachedPayload }),
+            run: async () => ({ success: true, meta: { duration: 0 } }),
+          }),
+          run: async () => ({ success: true, meta: { duration: 0 } }),
+        }),
+      },
+    } as unknown as Env;
+
+    const result = await ingestSenatePassageVotes(env, "2026-01-01", new Set());
+    expect(result.warnings?.some((w) => w.includes("structural validation"))).toBe(true);
+    expect(result.votes.some((v) => v.rollNumber === 163)).toBe(true);
+
+    fetchSenate.mockRestore();
+  });
 });

@@ -103,6 +103,48 @@ describe("evaluateIngestMonitorStatus", () => {
     });
     expect(result.status).toBe("unknown");
   });
+
+  it("marks degraded for Senate cache-fallback chamber warnings", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 5,
+        digestsWritten: 2,
+        digestsSkipped: 3,
+      },
+      lastFailure: null,
+      chamberWarnings: [
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+      ],
+    });
+    expect(result.status).toBe("degraded");
+    expect(result.message).toContain("Partial chamber ingest");
+  });
+
+  it("marks failed for hard chamber skip warnings (page-worthy)", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 5,
+        digestsWritten: 2,
+        digestsSkipped: 3,
+      },
+      lastFailure: null,
+      chamberWarnings: ["House ingest skipped: Congress API down"],
+    });
+    expect(result.status).toBe("failed");
+    expect(result.message).toContain("House ingest skipped");
+  });
 });
 
 describe("buildIngestMonitorPayload", () => {
@@ -126,6 +168,138 @@ describe("buildIngestMonitorPayload", () => {
     hydrated: 0,
     skipped: 0,
   };
+
+  it("marks degraded when scheduled success carried cache-fallback chamber_warnings", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: [
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+      ],
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 1,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("degraded");
+    expect(payload.message).toContain("Partial chamber ingest");
+    expect(payload.message).toContain("1 bill(s) missing digests");
+  });
+
+  it("marks failed when scheduled success carried hard chamber skip warnings", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: ["Senate ingest skipped: HTTP 403"],
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 0,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("failed");
+    expect(payload.message).toContain("Senate ingest skipped");
+  });
+
+  it("uses newer admin success chamber_warnings so menu refresh clears sticky hard-skip failed", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: ["Senate ingest skipped: HTTP 403"],
+    };
+    const lastAdmin = {
+      completed_at: "2026-06-23T11:30:00.000Z",
+      trigger: "admin" as const,
+      votesUpserted: 2,
+      votesSkipped: 8,
+      billsSelected: 5,
+      digestsWritten: 1,
+      digestsSkipped: 4,
+      chamber_warnings: [
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+      ],
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 0,
+      lastSuccess: lastAdmin,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("degraded");
+    expect(payload.message).toContain("served from D1 cache");
+    expect(payload.last_scheduled_success?.completed_at).toBe(lastScheduled.completed_at);
+  });
+
+  it("clears to ok when newer admin success has no chamber_warnings", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: ["House ingest skipped: Congress API down"],
+    };
+    const lastAdmin = {
+      completed_at: "2026-06-23T11:30:00.000Z",
+      trigger: "admin" as const,
+      votesUpserted: 2,
+      votesSkipped: 8,
+      billsSelected: 5,
+      digestsWritten: 1,
+      digestsSkipped: 4,
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-20",
+      missingDigestCount: 0,
+      lastSuccess: lastAdmin,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("ok");
+  });
 
   it("surfaces last_skipped without changing status fields", () => {
     const skipped = {

@@ -14,6 +14,15 @@ import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
 import { ensureSchema } from "../d1/schema";
+import {
+  encodeSenateVoteMenuCacheValue,
+  isSenateVoteMenuXml,
+  SENATE_VOTE_MENU_CACHE_UPSERT_SQL,
+  senateVoteMenuCacheKey,
+  senateVoteMenuUrl,
+} from "../../../../shared/senate-vote-menu";
+
+export { isSenateVoteMenuXml, senateVoteMenuCacheKey, senateVoteMenuUrl };
 
 /** Shared fields every Senate menu `<vote>` block carries for stored rolls. */
 function parseMenuVoteFields(
@@ -55,10 +64,6 @@ function parseMenuVoteFields(
 
 const SENATE_VOTE_MENU_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-function senateVoteMenuCacheKey(congress: number, session: number): string {
-  return `senate_vote_menu_cache_${congress}_${session}`;
-}
-
 async function readSenateVoteMenuCache(
   db: D1Database,
   congress: number,
@@ -81,28 +86,51 @@ async function readSenateVoteMenuCache(
   }
 }
 
-async function writeSenateVoteMenuCache(
+/**
+ * Persist a Senate LIS vote-menu XML blob for 403 fallback (and admin refresh).
+ * Returns the `fetched_at` timestamp written to D1.
+ */
+export async function writeSenateVoteMenuCache(
   db: D1Database,
   congress: number,
   session: number,
-  xml: string
-): Promise<void> {
+  xml: string,
+  fetchedAt: string = new Date().toISOString()
+): Promise<string> {
   await ensureSchema(db);
-  const fetchedAt = new Date().toISOString();
+  const encoded = encodeSenateVoteMenuCacheValue(xml, fetchedAt);
   await db
-    .prepare(
-      `INSERT INTO pipeline_state (key, value_json, updated_at)
-       VALUES (?1, ?2, ?3)
-       ON CONFLICT(key) DO UPDATE SET
-         value_json = excluded.value_json,
-         updated_at = excluded.updated_at`
-    )
+    .prepare(SENATE_VOTE_MENU_CACHE_UPSERT_SQL)
     .bind(
       senateVoteMenuCacheKey(congress, session),
-      JSON.stringify({ fetched_at: fetchedAt, xml }),
-      fetchedAt
+      encoded.valueJson,
+      encoded.fetchedAt
     )
     .run();
+  return encoded.fetchedAt;
+}
+
+async function serveSenateVoteMenuFromCache(
+  env: Env,
+  congress: number,
+  session: number,
+  error: unknown
+): Promise<{ xml: string; warnings: string[] }> {
+  const cached = await readSenateVoteMenuCache(env.DB, congress, session);
+  if (!cached) {
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const warning = `Senate vote menu served from D1 cache after live fetch failed: ${message}`;
+  console.warn(
+    JSON.stringify({
+      event: "senate_vote_menu_cache_fallback",
+      congress,
+      session,
+      error: message,
+    })
+  );
+  return { xml: cached, warnings: [warning] };
 }
 
 async function fetchSenateVoteMenuXml(
@@ -110,9 +138,17 @@ async function fetchSenateVoteMenuXml(
   congress: number,
   session: number
 ): Promise<{ xml: string; warnings: string[] }> {
-  const url = `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${congress}_${session}.xml`;
+  const url = senateVoteMenuUrl(congress, session);
   try {
     const xml = await fetchSenateLegislativeText(url);
+    if (!isSenateVoteMenuXml(xml, { congress, session })) {
+      return serveSenateVoteMenuFromCache(
+        env,
+        congress,
+        session,
+        new Error(`Live Senate vote menu failed structural validation for ${url}`)
+      );
+    }
     try {
       await writeSenateVoteMenuCache(env.DB, congress, session, xml);
     } catch (writeErr: unknown) {
@@ -128,21 +164,7 @@ async function fetchSenateVoteMenuXml(
     }
     return { xml, warnings: [] };
   } catch (err: unknown) {
-    const cached = await readSenateVoteMenuCache(env.DB, congress, session);
-    if (cached) {
-      const message = err instanceof Error ? err.message : String(err);
-      const warning = `Senate vote menu served from D1 cache after live fetch failed: ${message}`;
-      console.warn(
-        JSON.stringify({
-          event: "senate_vote_menu_cache_fallback",
-          congress,
-          session,
-          error: message,
-        })
-      );
-      return { xml: cached, warnings: [warning] };
-    }
-    throw err;
+    return serveSenateVoteMenuFromCache(env, congress, session, err);
   }
 }
 

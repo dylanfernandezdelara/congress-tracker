@@ -8,6 +8,7 @@ import type {
   IngestMonitorPayload,
   IngestMonitorStatus,
 } from "../../../../shared/ingest-api-types";
+import { classifyChamberWarningSeverity } from "../../../../shared/ingest-monitor-status";
 import { sanitizePipelineErrorPublic } from "./pipeline-error";
 
 function sanitizeFailureRecord(
@@ -36,6 +37,8 @@ export function evaluateIngestMonitorStatus<
   /** Resolved scheduled-success candidate (dedicated key or latest fallback). */
   scheduledSuccess: T | null;
   lastFailure: FeedPipelineFailureRecord | null;
+  /** Chamber warnings from the newest feed success (admin remediation may clear sticky scheduled hard-skips). */
+  chamberWarnings?: readonly string[] | null;
 }): {
   status: IngestMonitorStatus;
   message: string;
@@ -78,6 +81,23 @@ export function evaluateIngestMonitorStatus<
     };
   }
 
+  const warnings = params.chamberWarnings ?? [];
+  const warningSeverity = classifyChamberWarningSeverity(warnings);
+  if (warningSeverity === "failed") {
+    return {
+      status: "failed",
+      message: `Partial chamber ingest: ${warnings.join("; ")}`,
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+  if (warningSeverity === "degraded") {
+    return {
+      status: "degraded",
+      message: `Partial chamber ingest: ${warnings.join("; ")}`,
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+
   return {
     status: "ok",
     message: "Scheduled ingest completed within the expected window.",
@@ -107,19 +127,23 @@ export function buildIngestMonitorPayload(params: {
     params.lastScheduledSuccess,
     params.lastSuccess
   );
+  // Prefer chamber_warnings from the newest success (often an admin remediation
+  // after menu refresh). Scheduled freshness still comes from scheduledSuccess;
+  // sticky scheduled hard-skip warnings must not keep paging after a newer clean run.
+  const newestSuccess = params.lastSuccess ?? scheduledSuccess;
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
     scheduledSuccess,
     lastFailure: params.lastFailure,
+    chamberWarnings: newestSuccess?.chamber_warnings ?? [],
   });
 
   let message = evaluated.message;
-  const warnings = scheduledSuccess?.chamber_warnings ?? [];
-  if (warnings.length > 0 && evaluated.status === "ok") {
-    message = `${message} Partial chamber ingest: ${warnings.join("; ")}`;
-  }
-  if (params.missingDigestCount > 0 && evaluated.status === "ok") {
+  if (
+    params.missingDigestCount > 0 &&
+    (evaluated.status === "ok" || evaluated.status === "degraded")
+  ) {
     message = `${message} ${params.missingDigestCount} bill(s) missing digests.`;
   }
 
@@ -182,6 +206,7 @@ function buildExecutiveIngestMonitorPayload(params: {
   };
 }
 
-export function isIngestMonitorHealthy(status: IngestMonitorStatus): boolean {
-  return status === "ok";
-}
+export {
+  isIngestMonitorHealthy,
+  isIngestMonitorOpsAcceptable,
+} from "../../../../shared/ingest-monitor-status";

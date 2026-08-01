@@ -31,7 +31,7 @@ import {
   EXECUTIVE_POSTS_CRON_UTC,
 } from "../constants";
 import { normalizeFeedSearchQuery } from "../d1/feed-search";
-import { buildIngestMonitorPayload } from "./ingest-health";
+import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
 import { buildPulseStats } from "../storage/pulse-stats";
@@ -64,6 +64,10 @@ import {
   cacheLatest,
   cacheNoStore,
 } from "./responses";
+import {
+  isSenateVoteMenuXml,
+  writeSenateVoteMenuCache,
+} from "../sources/senate-votes";
 
 type JsonFn = (body: unknown, init?: ResponseInit) => Response;
 
@@ -131,13 +135,7 @@ async function healthResponse(env: Env, json: JsonFn): Promise<Response> {
 
   return json(
     {
-      status:
-        ingest &&
-        (ingest.status === "failed" ||
-          ingest.status === "stale" ||
-          ingest.status === "unknown")
-          ? "degraded"
-          : "ok",
+      status: ingest && !isIngestMonitorHealthy(ingest.status) ? "degraded" : "ok",
       timestamp: new Date().toISOString(),
       congress: env.CONGRESS,
       session: env.SESSION,
@@ -160,7 +158,7 @@ async function ingestMonitorResponse(env: Env, json: JsonFn): Promise<Response> 
         alerting: {
           cloudflare_logs: "Filter Workers Observability for event feed_pipeline_failed or origin scheduled.",
           external_monitor:
-            "Poll GET /health or /debug/ingest.json and alert when data.ingest.status is not ok.",
+            "Poll GET /health or /debug/ingest.json and page on failed|stale|unknown. Treat sustained degraded (Senate cache fallback) as a known tracked condition, not a pager storm.",
         },
       },
       { status: 200, headers: { "Cache-Control": cacheNoStore } }
@@ -304,6 +302,73 @@ async function handlePurgeCacheRoute(
   return json(
     { ok: false, purged: false, reason: result.reason },
     { status: 502, headers: PIPELINE_ADMIN_HEADERS }
+  );
+}
+
+/**
+ * Admin refresh for the Senate LIS vote menu cache.
+ * Senate.gov Akamai often 403s Cloudflare Worker egress; Cursor/ops hosts can
+ * still fetch the XML and POST it here so cron fallback stays current.
+ *
+ * Body: raw XML (`application/xml` / `text/xml` / `text/plain`) or JSON `{ "xml": "..." }`.
+ * Query: `run_feed=1` to chain a feed ingest after the cache write.
+ */
+async function handleSenateVoteMenuRoute(
+  request: Request,
+  env: Env,
+  url: URL,
+  json: JsonFn,
+  ctx?: Pick<ExecutionContext, "waitUntil">
+): Promise<Response> {
+  // Auth/method gate before buffering the (potentially large) menu body.
+  // handlePipelineRoute re-checks auth; that double-check is intentional.
+  const denied = rejectUnauthorizedPipelinePost(request, env, json);
+  if (denied) return denied;
+
+  const contentType = request.headers.get("content-type") ?? "";
+  let xml = "";
+  try {
+    if (contentType.includes("application/json")) {
+      const body = (await request.json()) as { xml?: unknown };
+      if (typeof body.xml === "string") xml = body.xml;
+    } else {
+      xml = await request.text();
+    }
+  } catch {
+    return json(
+      { ok: false, error: "invalid_body", message: "Could not read request body." },
+      { status: 400, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+
+  const congress = congressNumber(env);
+  const session = sessionNumber(env);
+  if (!isSenateVoteMenuXml(xml, { congress, session })) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_senate_vote_menu",
+        message:
+          "Body must be Senate LIS vote_menu XML for this Worker's congress/session (vote_summary with vote_number rows).",
+      },
+      { status: 400, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+
+  const runFeed = url.searchParams.get("run_feed") === "1";
+  return handlePipelineRoute(
+    request,
+    env,
+    json,
+    async () => {
+      const fetchedAt = await writeSenateVoteMenuCache(env.DB, congress, session, xml);
+      if (!runFeed) {
+        return { congress, session, fetched_at: fetchedAt, run_feed: false };
+      }
+      const feed = await runFeedWithMemberVotes(env, { trigger: "admin" });
+      return { congress, session, fetched_at: fetchedAt, run_feed: true, feed };
+    },
+    ctx
   );
 }
 
@@ -577,6 +642,10 @@ export async function handlePublicFetch(
 
   if (pathname === "/__pipeline/purge-cache") {
     return handlePurgeCacheRoute(request, env, json);
+  }
+
+  if (pathname === "/__pipeline/senate-vote-menu") {
+    return handleSenateVoteMenuRoute(request, env, url, json, ctx);
   }
 
   const pipeline = PIPELINE_ROUTES[pathname];

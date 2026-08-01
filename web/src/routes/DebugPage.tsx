@@ -16,6 +16,7 @@ import { isSameRun, isSkipSuperseded, type RunIdentity } from '../utils/ingestMo
 
 const STATUS_LABEL: Record<IngestMonitorStatus, string> = {
   ok: 'Healthy',
+  degraded: 'Degraded',
   stale: 'Stale',
   failed: 'Failed',
   unknown: 'Unknown',
@@ -31,6 +32,7 @@ type RunMetric = { label: string; value: string | number }
 function statusClass(status: IngestMonitorStatus): string {
   if (status === 'ok') return 'text-pass'
   if (status === 'failed') return 'text-fail'
+  // degraded/stale/unknown: visible but not pager-red (degraded is a known tracked state)
   return 'text-secondary'
 }
 
@@ -358,9 +360,13 @@ export default function DebugPage() {
               </li>
               <li>
                 External uptime check: poll{' '}
-                <code className="rounded bg-surface-subtle px-1">/health</code> and alert when{' '}
-                <code className="rounded bg-surface-subtle px-1">data.ingest.status</code> is not{' '}
-                <code className="rounded bg-surface-subtle px-1">ok</code>.
+                <code className="rounded bg-surface-subtle px-1">/health</code> and page when{' '}
+                <code className="rounded bg-surface-subtle px-1">data.ingest.status</code> is{' '}
+                <code className="rounded bg-surface-subtle px-1">failed</code>,{' '}
+                <code className="rounded bg-surface-subtle px-1">stale</code>, or{' '}
+                <code className="rounded bg-surface-subtle px-1">unknown</code>. Sustained{' '}
+                <code className="rounded bg-surface-subtle px-1">degraded</code> (Senate cache
+                fallback) is a known tracked condition — refresh daily; do not page forever.
               </li>
               <li>
                 Busy-skip signal: poll{' '}

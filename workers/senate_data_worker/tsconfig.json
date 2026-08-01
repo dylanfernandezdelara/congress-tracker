@@ -14,4 +14,3 @@
   "include": ["src/**/*.ts", "scripts/**/*.ts", "../../shared/**/*.ts"],
   "exclude": ["node_modules", "../../shared/**/*.test.ts"]
 }
-
