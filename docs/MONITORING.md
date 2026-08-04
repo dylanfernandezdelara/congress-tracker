@@ -23,6 +23,13 @@ clients. Prefer the workers.dev hostname for automation:
 
 `https://congress-tracker-api.fernandezdelaradylan.workers.dev`
 
+`workers_dev = true` must stay set in both `wrangler.toml` files. Custom-domain
+`[[routes]]` make Wrangler infer `workers_dev = false` on deploy unless it is
+explicit — that previously broke ops `/health` and admin pipeline POSTs (HTTP
+1042 / 404) while the custom domain stayed Bot-Fight locked. If workers.dev is
+unreachable, `npm run refresh:senate-menu` falls back to D1 for cache writes and
+`CHECK_HEALTH=1`.
+
 ## Status
 
 | Status | Meaning |
@@ -129,6 +136,11 @@ Executive: `executive_posts_pipeline_last_success`, `…_last_scheduled_success`
 `…_last_failure`.
 
 Senate menu fallback: `senate_vote_menu_cache_{congress}_{session}`.
+
+`/health` and `/debug/ingest.json` also expose `senate_vote_menu_cache`
+(`fetched_at`, `age_hours`, `stale` >48h, `nearing_expiry` >6d, `expired` >7d).
+Nearing expiry / expired pages as **`failed`** so daily refresh cannot silently
+miss until the hard-skip cliff.
 
 Both split last-run vs last-scheduled-run so `status` answers "is the cron
 healthy?" only. Schema is created via `ensureSchema` on first pipeline run.

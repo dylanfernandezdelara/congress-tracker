@@ -7,6 +7,7 @@ import type {
   FeedPipelineTrigger,
   IngestMonitorPayload,
   IngestMonitorStatus,
+  SenateVoteMenuCacheMonitor,
 } from "../../../../shared/ingest-api-types";
 import { classifyChamberWarningSeverity } from "../../../../shared/ingest-monitor-status";
 import { sanitizePipelineErrorPublic } from "./pipeline-error";
@@ -18,6 +19,24 @@ function sanitizeFailureRecord(
   return {
     ...record,
     error: sanitizePipelineErrorPublic(record.error),
+  };
+}
+
+function sanitizeChamberWarnings(
+  warnings: readonly string[] | null | undefined
+): string[] {
+  if (!warnings?.length) return [];
+  return warnings.map((w) => sanitizePipelineErrorPublic(w));
+}
+
+function sanitizeRunRecord(
+  record: FeedPipelineRunRecord | null
+): FeedPipelineRunRecord | null {
+  if (!record) return null;
+  if (!record.chamber_warnings?.length) return record;
+  return {
+    ...record,
+    chamber_warnings: sanitizeChamberWarnings(record.chamber_warnings),
   };
 }
 
@@ -39,6 +58,8 @@ export function evaluateIngestMonitorStatus<
   lastFailure: FeedPipelineFailureRecord | null;
   /** Chamber warnings from the newest feed success (admin remediation may clear sticky scheduled hard-skips). */
   chamberWarnings?: readonly string[] | null;
+  /** Senate D1 menu cache freshness; nearing expiry pages even when cron otherwise looks ok. */
+  senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
 }): {
   status: IngestMonitorStatus;
   message: string;
@@ -90,10 +111,34 @@ export function evaluateIngestMonitorStatus<
       last_scheduled_success: lastScheduledSuccess,
     };
   }
+
+  const menu = params.senateVoteMenuCache;
+  if (menu?.expired || menu?.nearing_expiry) {
+    return {
+      status: "failed",
+      message: menu.expired
+        ? `Senate vote menu D1 cache expired (fetched_at ${menu.fetched_at}); refresh before next cron or Senate ingest will hard-skip.`
+        : `Senate vote menu D1 cache nearing expiry (age ${menu.age_hours}h / max ${menu.max_age_hours}h); run npm run refresh:senate-menu.`,
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+
   if (warningSeverity === "degraded") {
+    let message = `Partial chamber ingest: ${warnings.join("; ")}`;
+    if (menu?.stale) {
+      message = `${message} Senate menu cache is stale (${menu.age_hours}h old); refresh daily while Worker→Senate.gov is 403.`;
+    }
     return {
       status: "degraded",
-      message: `Partial chamber ingest: ${warnings.join("; ")}`,
+      message,
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+
+  if (menu?.stale) {
+    return {
+      status: "degraded",
+      message: `Senate vote menu D1 cache is stale (age ${menu.age_hours}h); refresh with npm run refresh:senate-menu.`,
       last_scheduled_success: lastScheduledSuccess,
     };
   }
@@ -115,6 +160,7 @@ export function buildIngestMonitorPayload(params: {
   lastScheduledSuccess: FeedPipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
   lastSkipped: FeedPipelineSkipRecord | null;
+  senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
   executive?: {
     staleAfterHours: number;
     hourlyCronUtc: string;
@@ -131,12 +177,14 @@ export function buildIngestMonitorPayload(params: {
   // after menu refresh). Scheduled freshness still comes from scheduledSuccess;
   // sticky scheduled hard-skip warnings must not keep paging after a newer clean run.
   const newestSuccess = params.lastSuccess ?? scheduledSuccess;
+  const publicWarnings = sanitizeChamberWarnings(newestSuccess?.chamber_warnings);
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
     scheduledSuccess,
     lastFailure: params.lastFailure,
-    chamberWarnings: newestSuccess?.chamber_warnings ?? [],
+    chamberWarnings: publicWarnings,
+    senateVoteMenuCache: params.senateVoteMenuCache ?? null,
   });
 
   let message = evaluated.message;
@@ -165,10 +213,11 @@ export function buildIngestMonitorPayload(params: {
     stale_after_hours: params.staleAfterHours,
     latest_passage_vote_date: params.latestPassageVoteDate,
     missing_digest_count: params.missingDigestCount,
-    last_success: params.lastSuccess,
+    last_success: sanitizeRunRecord(params.lastSuccess),
     last_failure: sanitizeFailureRecord(params.lastFailure),
-    last_scheduled_success: evaluated.last_scheduled_success,
+    last_scheduled_success: sanitizeRunRecord(evaluated.last_scheduled_success),
     last_skipped: params.lastSkipped,
+    senate_vote_menu_cache: params.senateVoteMenuCache ?? null,
     admin_feed_ingest: "POST /__pipeline/run/feed (Authorization: Bearer <PIPELINE_ADMIN_TOKEN>)",
     executive,
   };

@@ -6,6 +6,11 @@ name = "congress-tracker-api"
 main = "src/worker.ts"
 compatibility_date = "2025-12-10"
 
+# Keep workers.dev enabled even with [[routes]] custom domains. Wrangler infers
+# workers_dev=false when routes are present unless this is explicit — that broke
+# ops automation (health + admin pipeline) behind Bot Fight on trackcongress.org.
+workers_dev = true
+
 # Generate per-version/per-branch preview URLs on workers.dev so a commit/PR
 # can be opened in a browser without touching production traffic.
 # (Top-level key: must appear before any [table] headers in TOML.)

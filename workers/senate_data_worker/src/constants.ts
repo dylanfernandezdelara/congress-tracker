@@ -105,3 +105,24 @@ export const PIPELINE_LEASE_TTL_MS = 30 * 60 * 1000;
 
 /** Single global write lease shared by all mutating pipelines. */
 export const PIPELINE_WRITE_LEASE_NAME = "writes";
+
+/**
+ * Max accepted Senate LIS vote-menu XML body (admin upload). Live menus are
+ * ~100–200KB; 2MB leaves headroom without allowing multi-MB DoS payloads.
+ */
+export const SENATE_VOTE_MENU_MAX_BYTES = 2 * 1024 * 1024;
+
+/** D1 Senate menu cache TTL before fallback is treated as expired (hard-skip). */
+export const SENATE_VOTE_MENU_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Ops should refresh the Senate menu daily while Worker→Senate.gov is 403.
+ * Past this age, /health surfaces the cache as stale (still degraded, not ok).
+ */
+export const SENATE_VOTE_MENU_CACHE_STALE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Within this window of max age, page as failed — cache expiry would skip Senate
+ * ingest on the next cron if not refreshed.
+ */
+export const SENATE_VOTE_MENU_CACHE_EXPIRY_WARN_MS = 6 * 24 * 60 * 60 * 1000;

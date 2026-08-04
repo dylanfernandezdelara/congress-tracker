@@ -29,6 +29,7 @@ import {
   FEED_PIPELINE_STALE_HOURS,
   EXECUTIVE_PIPELINE_STALE_HOURS,
   EXECUTIVE_POSTS_CRON_UTC,
+  SENATE_VOTE_MENU_MAX_BYTES,
 } from "../constants";
 import { normalizeFeedSearchQuery } from "../d1/feed-search";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
@@ -65,6 +66,7 @@ import {
   cacheNoStore,
 } from "./responses";
 import {
+  getSenateVoteMenuCacheMeta,
   isSenateVoteMenuXml,
   writeSenateVoteMenuCache,
 } from "../sources/senate-votes";
@@ -80,6 +82,8 @@ type RouteContext = {
 };
 
 async function loadIngestMonitor(env: Env) {
+  const congress = congressNumber(env);
+  const session = sessionNumber(env);
   const [
     latestPassageVoteDate,
     missingDigestCount,
@@ -90,6 +94,7 @@ async function loadIngestMonitor(env: Env) {
     executiveLastSuccess,
     executiveLastScheduledSuccess,
     executiveLastFailure,
+    senateVoteMenuCache,
   ] = await Promise.all([
     getLatestPassageVoteDate(env),
     getMissingDigestCount(env),
@@ -100,6 +105,7 @@ async function loadIngestMonitor(env: Env) {
     getExecutivePostsPipelineSuccess(env.DB),
     getExecutivePostsPipelineScheduledSuccess(env.DB),
     getExecutivePostsPipelineFailure(env.DB),
+    getSenateVoteMenuCacheMeta(env.DB, congress, session),
   ]);
 
   return buildIngestMonitorPayload({
@@ -112,6 +118,7 @@ async function loadIngestMonitor(env: Env) {
     lastScheduledSuccess,
     lastFailure,
     lastSkipped,
+    senateVoteMenuCache,
     executive: {
       staleAfterHours: EXECUTIVE_PIPELINE_STALE_HOURS,
       hourlyCronUtc: EXECUTIVE_POSTS_CRON_UTC,
@@ -241,10 +248,9 @@ function rejectUnauthorizedPipelinePost(
   }
   if (!authorizePipeline(request, env)) {
     const hostname = new URL(request.url).hostname;
-    const error =
-      isPreviewWorkerHost(hostname) && env.DEV_OPEN_PIPELINE?.trim() !== "1"
-        ? "preview_pipeline_writes_disabled"
-        : "unauthorized";
+    const error = isPreviewWorkerHost(hostname)
+      ? "preview_pipeline_writes_disabled"
+      : "unauthorized";
     return json({ error }, { status: 401, headers: PIPELINE_ADMIN_HEADERS });
   }
   return null;
@@ -325,6 +331,18 @@ async function handleSenateVoteMenuRoute(
   const denied = rejectUnauthorizedPipelinePost(request, env, json);
   if (denied) return denied;
 
+  const declaredLength = Number.parseInt(request.headers.get("content-length") ?? "", 10);
+  if (Number.isFinite(declaredLength) && declaredLength > SENATE_VOTE_MENU_MAX_BYTES) {
+    return json(
+      {
+        ok: false,
+        error: "payload_too_large",
+        message: `Senate vote menu body exceeds ${SENATE_VOTE_MENU_MAX_BYTES} bytes.`,
+      },
+      { status: 413, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+
   const contentType = request.headers.get("content-type") ?? "";
   let xml = "";
   try {
@@ -338,6 +356,17 @@ async function handleSenateVoteMenuRoute(
     return json(
       { ok: false, error: "invalid_body", message: "Could not read request body." },
       { status: 400, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+
+  if (new TextEncoder().encode(xml).byteLength > SENATE_VOTE_MENU_MAX_BYTES) {
+    return json(
+      {
+        ok: false,
+        error: "payload_too_large",
+        message: `Senate vote menu body exceeds ${SENATE_VOTE_MENU_MAX_BYTES} bytes.`,
+      },
+      { status: 413, headers: PIPELINE_ADMIN_HEADERS }
     );
   }
 

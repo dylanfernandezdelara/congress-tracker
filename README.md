@@ -104,4 +104,4 @@ safety notes.
   - Query: `limit` (1–50, default 50), `offset` (default 0; clamped to the 50-bill feed window)
   - Response: `{ items, total, limit, offset, has_more }` where `items` is the bill array and `total` is capped at 50
   - **Breaking change:** this endpoint no longer returns a bare JSON array; consumers must read `items`
-- `POST /__pipeline/run/feed` — trigger ingestion (optional `PIPELINE_ADMIN_TOKEN`; local dev uses `DEV_OPEN_PIPELINE=1`)
+- `POST /__pipeline/run/feed` — trigger ingestion (`PIPELINE_ADMIN_TOKEN` required in production; local dev may use `DEV_OPEN_PIPELINE=1` on non-production hosts)

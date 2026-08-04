@@ -145,6 +145,63 @@ describe("evaluateIngestMonitorStatus", () => {
     expect(result.status).toBe("failed");
     expect(result.message).toContain("House ingest skipped");
   });
+
+  it("marks failed when Senate menu cache is nearing expiry", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 5,
+        digestsWritten: 2,
+        digestsSkipped: 3,
+      },
+      lastFailure: null,
+      chamberWarnings: [
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+      ],
+      senateVoteMenuCache: {
+        fetched_at: "2026-06-17T10:00:00.000Z",
+        age_hours: 146,
+        max_age_hours: 168,
+        stale: true,
+        nearing_expiry: true,
+        expired: false,
+      },
+    });
+    expect(result.status).toBe("failed");
+    expect(result.message).toContain("nearing expiry");
+  });
+
+  it("marks degraded when Senate menu cache is stale without chamber warnings", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 5,
+        digestsWritten: 2,
+        digestsSkipped: 3,
+      },
+      lastFailure: null,
+      senateVoteMenuCache: {
+        fetched_at: "2026-06-20T10:00:00.000Z",
+        age_hours: 74,
+        max_age_hours: 168,
+        stale: true,
+        nearing_expiry: false,
+        expired: false,
+      },
+    });
+    expect(result.status).toBe("degraded");
+    expect(result.message).toContain("stale");
+  });
 });
 
 describe("buildIngestMonitorPayload", () => {

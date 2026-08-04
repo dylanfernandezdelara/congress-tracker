@@ -39,6 +39,16 @@ export interface FeedPipelineSkipRecord {
 
 export type IngestMonitorStatus = "ok" | "degraded" | "stale" | "failed" | "unknown";
 
+/** D1 Senate LIS vote-menu cache freshness (no XML body). */
+export interface SenateVoteMenuCacheMonitor {
+  fetched_at: string;
+  age_hours: number;
+  max_age_hours: number;
+  stale: boolean;
+  nearing_expiry: boolean;
+  expired: boolean;
+}
+
 export interface IngestMonitorPayload {
   status: IngestMonitorStatus;
   message: string;
@@ -50,6 +60,8 @@ export interface IngestMonitorPayload {
   last_failure: FeedPipelineFailureRecord | null;
   last_scheduled_success: FeedPipelineRunRecord | null;
   last_skipped: FeedPipelineSkipRecord | null;
+  /** Present when a Senate menu cache row exists for this congress/session. */
+  senate_vote_menu_cache?: SenateVoteMenuCacheMonitor | null;
   admin_feed_ingest: string;
   executive?: ExecutiveIngestMonitorPayload;
 }

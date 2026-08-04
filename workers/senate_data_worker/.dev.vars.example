@@ -1,10 +1,10 @@
 # CORS: use * for local dev (Vite :5173 -> API :8787); set a specific origin in prod
 ALLOWED_ORIGIN=*
 
-# Local-only: allow POST /__pipeline/run/* without PIPELINE_ADMIN_TOKEN (never set in production).
-# Must be exactly 1 (not true). Restart `npm run dev:worker` after editing .dev.vars — wrangler
-# does not hot-reload this file. If PIPELINE_ADMIN_TOKEN is set below, it takes precedence and
-# DEV_OPEN_PIPELINE is ignored (use Authorization: Bearer <token> instead).
+# Local-only: allow POST /__pipeline/run/* without PIPELINE_ADMIN_TOKEN.
+# Must be exactly 1 (not true). Ignored on production/preview hosts even if leaked.
+# Restart `npm run dev:worker` after editing .dev.vars — wrangler does not hot-reload this file.
+# If PIPELINE_ADMIN_TOKEN is set below, it takes precedence (use Authorization: Bearer <token>).
 DEV_OPEN_PIPELINE=1
 
 # Local-only synthetic disclosure seeding (POST /__pipeline/run/disclosures). Never set in production.

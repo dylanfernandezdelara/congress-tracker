@@ -58,8 +58,16 @@ test("REFRESH_PRINT_ONLY documents admin route and modes without network", () =>
   assert.match(out, /\/__pipeline\/senate-vote-menu/);
   assert.match(out, /RUN_FEED/);
   assert.match(out, /CHECK_HEALTH/);
+  assert.match(out, /ADMIN_FALLBACK_D1/);
   assert.match(out, /REFRESH_VIA/);
   assert.match(out, /CONGRESS/);
   assert.match(out, /SESSION/);
   assert.match(out, /D1_DATABASE_ID/);
+});
+
+test("refresh script documents D1 health fallback and admin→D1 fallback", () => {
+  const src = fs.readFileSync(script, "utf8");
+  assert.match(src, /checkHealthViaD1/);
+  assert.match(src, /adminFallbackD1Enabled/);
+  assert.match(src, /fallback:\s*"d1"/);
 });

@@ -116,4 +116,22 @@ describe("POST /__pipeline/senate-vote-menu", () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({ error: "unauthorized" });
   });
+
+  it("rejects oversized Senate vote menu uploads", async () => {
+    const response = await handlePublicFetch(
+      pipelineRequest("/__pipeline/senate-vote-menu", {
+        headers: {
+          "Content-Type": "application/xml",
+          "Content-Length": String(3 * 1024 * 1024),
+        },
+        body: VALID_SENATE_VOTE_MENU_XML,
+      }),
+      createMockEnv() as never
+    );
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: "payload_too_large",
+    });
+  });
 });

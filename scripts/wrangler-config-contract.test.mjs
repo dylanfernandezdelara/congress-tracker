@@ -16,6 +16,7 @@ function parseWranglerConfig(filePath) {
     return match?.[1]
   }
 
+  const workersDevMatch = content.match(/^workers_dev\s*=\s*(true|false)/m)
   const previewUrlsMatch = content.match(/^preview_urls\s*=\s*(true|false)/m)
   // Anchored so a commented-out `# crons = [...]` above the live array cannot win.
   const cronMatch = content.match(/^crons\s*=\s*\[([^\]]+)\]/m)
@@ -41,6 +42,7 @@ function parseWranglerConfig(filePath) {
     name: getTopLevelString('name'),
     main: getTopLevelString('main'),
     compatibility_date: getTopLevelString('compatibility_date'),
+    workers_dev: workersDevMatch?.[1] === 'true',
     preview_urls: previewUrlsMatch?.[1] === 'true',
     crons,
     congress: congressMatch?.[1],
@@ -107,6 +109,14 @@ test('Workers Logs observability is enabled at full sampling on both configs', (
   assert.equal(root.observabilityHeadSamplingRate, 1)
   assert.equal(worker.observabilityEnabled, true)
   assert.equal(worker.observabilityHeadSamplingRate, 1)
+})
+
+test('workers_dev stays explicitly enabled so ops can reach /health without Bot Fight', () => {
+  // Custom-domain [[routes]] make Wrangler infer workers_dev=false unless set.
+  const root = parseWranglerConfig(rootConfigPath)
+  const worker = parseWranglerConfig(workerConfigPath)
+  assert.equal(root.workers_dev, true)
+  assert.equal(worker.workers_dev, true)
 })
 
 test('preview D1 database is isolated from production', () => {
