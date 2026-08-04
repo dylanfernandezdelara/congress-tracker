@@ -18,9 +18,11 @@
     "baseUrl": ".",
     "paths": {
       "@congress-tracker/shared/*": ["../shared/*"]
-    }
+    },
+    "allowJs": true,
+    "checkJs": false
   },
-  "include": ["src", "../shared/**/*.ts"],
+  "include": ["src", "../shared/**/*.ts", "../shared/**/*.d.ts"],
   "exclude": ["../shared/**/*.test.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

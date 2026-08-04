@@ -90,7 +90,7 @@ export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
 export const EXECUTIVE_POSTS_CRON_UTC = "20 * * * *";
 
 /** Alert if no successful scheduled ingest within this many hours after cron. */
-export const FEED_PIPELINE_STALE_HOURS = 26;
+export { FEED_PIPELINE_STALE_HOURS } from "../../../shared/ingest-monitor-status";
 
 /** Alert if no successful scheduled executive ingest within this many hours. */
 export const EXECUTIVE_PIPELINE_STALE_HOURS = 2;
@@ -112,17 +112,8 @@ export const PIPELINE_WRITE_LEASE_NAME = "writes";
  */
 export const SENATE_VOTE_MENU_MAX_BYTES = 2 * 1024 * 1024;
 
-/** D1 Senate menu cache TTL before fallback is treated as expired (hard-skip). */
-export const SENATE_VOTE_MENU_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-
-/**
- * Ops should refresh the Senate menu daily while Worker→Senate.gov is 403.
- * Past this age, /health surfaces the cache as stale (still degraded, not ok).
- */
-export const SENATE_VOTE_MENU_CACHE_STALE_MS = 48 * 60 * 60 * 1000;
-
-/**
- * Within this window of max age, page as failed — cache expiry would skip Senate
- * ingest on the next cron if not refreshed.
- */
-export const SENATE_VOTE_MENU_CACHE_EXPIRY_WARN_MS = 6 * 24 * 60 * 60 * 1000;
+export {
+  SENATE_VOTE_MENU_CACHE_EXPIRY_WARN_MS,
+  SENATE_VOTE_MENU_CACHE_MAX_AGE_MS,
+  SENATE_VOTE_MENU_CACHE_STALE_MS,
+} from "../../../shared/ingest-monitor-status";

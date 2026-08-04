@@ -34,10 +34,10 @@ unreachable, `npm run refresh:senate-menu` falls back to D1 for cache writes and
 
 | Status | Meaning |
 |--------|---------|
-| `ok` | Last scheduled success within 26h, no chamber source warnings |
-| `degraded` | Scheduled success within window with Senate D1 menu **cache fallback** only |
+| `ok` | Last scheduled success within 26h, no chamber source warnings, menu cache fresh (<48h) |
+| `degraded` | Scheduled success within window with Senate D1 menu **cache fallback**, **and/or** menu cache stale (>48h) |
 | `stale` | Last scheduled success older than 26h |
-| `failed` | Failure newer than last scheduled success, **or** hard chamber soft-skip (`* ingest skipped:`) |
+| `failed` | Failure newer than last scheduled success, hard chamber soft-skip (`* ingest skipped:`), **or** menu cache nearing expiry (>6d) / expired (>7d) |
 | `unknown` | No scheduled success yet |
 
 Admin runs update `last_success` only; they do not satisfy scheduled freshness.
@@ -68,13 +68,14 @@ Severity split (important while Senate.gov 403 persists):
 
 | Severity | Status | Action |
 |----------|--------|--------|
-| Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken, no scheduled success, **or** hard chamber skip (`House/Senate ingest skipped`) |
-| Tracked / known | `degraded` (Senate **cache fallback** only) | Keep daily menu refresh; do **not** page forever |
+| Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken, no scheduled success, hard chamber skip, **or** menu cache nearing expiry / expired |
+| Tracked / known | `degraded` (Senate **cache fallback** and/or menu cache stale >48h) | Keep daily menu refresh; do **not** page forever |
 | Clear | `ok` | No action |
 
-`degraded` is reserved for expected Worker→Senate.gov 403 → D1 menu cache fallback.
-A soft-fail that skips an entire chamber (`* ingest skipped:`) is **`failed`** so uptime
-checks and `CHECK_HEALTH=1` still page.
+`degraded` covers expected Worker→Senate.gov 403 → D1 menu cache fallback and
+stale-but-usable cache (>48h). A soft-fail that skips an entire chamber
+(`* ingest skipped:`) or a menu cache within 24h of the 7d hard expiry is
+**`failed`** so uptime checks and `CHECK_HEALTH=1` still page.
 
 1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
    `last_skipped` (lease skips leave no failure log). Alert only when

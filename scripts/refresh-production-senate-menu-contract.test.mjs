@@ -69,5 +69,33 @@ test("refresh script documents D1 health fallback and admin→D1 fallback", () =
   const src = fs.readFileSync(script, "utf8");
   assert.match(src, /checkHealthViaD1/);
   assert.match(src, /adminFallbackD1Enabled/);
+  assert.match(src, /shouldFallbackAdminToD1/);
   assert.match(src, /fallback:\s*"d1"/);
+  assert.match(src, /ingest-monitor-eval\.mjs/);
+  assert.match(src, /evaluateIngestMonitorStatus/);
+});
+
+test("refresh script shares ingest evaluator with Worker (no forked FSM)", async () => {
+  const evalPath = path.join(rootDir, "shared", "ingest-monitor-eval.mjs");
+  assert.ok(fs.statSync(evalPath).isFile());
+  const { evaluateIngestMonitorStatus, buildSenateVoteMenuCacheMonitor } =
+    await import(evalPath);
+  const now = new Date("2026-06-23T12:00:00.000Z");
+  const result = evaluateIngestMonitorStatus({
+    now,
+    staleAfterHours: 26,
+    scheduledSuccess: {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled",
+    },
+    lastFailure: null,
+    chamberWarnings: [
+      "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+    ],
+    senateVoteMenuCache: buildSenateVoteMenuCacheMonitor(
+      "2026-06-20T10:00:00.000Z",
+      now
+    ),
+  });
+  assert.equal(result.status, "degraded");
 });

@@ -9,8 +9,15 @@
     "isolatedModules": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "../../shared/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "../../shared/**/*.ts",
+    "../../shared/**/*.d.ts"
+  ],
   "exclude": ["node_modules", "../../shared/**/*.test.ts"]
 }

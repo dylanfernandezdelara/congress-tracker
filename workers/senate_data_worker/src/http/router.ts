@@ -331,9 +331,8 @@ async function handleSenateVoteMenuRoute(
   const denied = rejectUnauthorizedPipelinePost(request, env, json);
   if (denied) return denied;
 
-  const declaredLength = Number.parseInt(request.headers.get("content-length") ?? "", 10);
-  if (Number.isFinite(declaredLength) && declaredLength > SENATE_VOTE_MENU_MAX_BYTES) {
-    return json(
+  const payloadTooLarge = () =>
+    json(
       {
         ok: false,
         error: "payload_too_large",
@@ -341,6 +340,10 @@ async function handleSenateVoteMenuRoute(
       },
       { status: 413, headers: PIPELINE_ADMIN_HEADERS }
     );
+
+  const declaredLength = Number.parseInt(request.headers.get("content-length") ?? "", 10);
+  if (Number.isFinite(declaredLength) && declaredLength > SENATE_VOTE_MENU_MAX_BYTES) {
+    return payloadTooLarge();
   }
 
   const contentType = request.headers.get("content-type") ?? "";
@@ -360,14 +363,7 @@ async function handleSenateVoteMenuRoute(
   }
 
   if (new TextEncoder().encode(xml).byteLength > SENATE_VOTE_MENU_MAX_BYTES) {
-    return json(
-      {
-        ok: false,
-        error: "payload_too_large",
-        message: `Senate vote menu body exceeds ${SENATE_VOTE_MENU_MAX_BYTES} bytes.`,
-      },
-      { status: 413, headers: PIPELINE_ADMIN_HEADERS }
-    );
+    return payloadTooLarge();
   }
 
   const congress = congressNumber(env);

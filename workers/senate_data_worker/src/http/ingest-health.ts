@@ -9,8 +9,15 @@ import type {
   IngestMonitorStatus,
   SenateVoteMenuCacheMonitor,
 } from "../../../../shared/ingest-api-types";
-import { classifyChamberWarningSeverity } from "../../../../shared/ingest-monitor-status";
+import {
+  evaluateIngestMonitorStatus as evaluateIngestMonitorStatusShared,
+  resolveScheduledSuccess,
+} from "../../../../shared/ingest-monitor-status";
 import { sanitizePipelineErrorPublic } from "./pipeline-error";
+
+function asIngestStatus(status: IngestMonitorStatus | string): IngestMonitorStatus {
+  return status as IngestMonitorStatus;
+}
 
 function sanitizeFailureRecord(
   record: FeedPipelineFailureRecord | null
@@ -40,113 +47,29 @@ function sanitizeRunRecord(
   };
 }
 
-/** Prefer dedicated scheduled key; fall back to latest (admin-only still yields unknown). */
-function resolveScheduledSuccess<T extends { trigger: FeedPipelineTrigger }>(
-  dedicated: T | null,
-  latest: T | null
-): T | null {
-  return dedicated ?? latest;
-}
-
+/** Worker-facing evaluator: always sanitizes failure text for public monitors. */
 export function evaluateIngestMonitorStatus<
   T extends { trigger: FeedPipelineTrigger; completed_at: string },
 >(params: {
   now: Date;
   staleAfterHours: number;
-  /** Resolved scheduled-success candidate (dedicated key or latest fallback). */
   scheduledSuccess: T | null;
   lastFailure: FeedPipelineFailureRecord | null;
-  /** Chamber warnings from the newest feed success (admin remediation may clear sticky scheduled hard-skips). */
   chamberWarnings?: readonly string[] | null;
-  /** Senate D1 menu cache freshness; nearing expiry pages even when cron otherwise looks ok. */
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
 }): {
   status: IngestMonitorStatus;
   message: string;
   last_scheduled_success: T | null;
 } {
-  const lastScheduledSuccess =
-    params.scheduledSuccess?.trigger === "scheduled" ? params.scheduledSuccess : null;
-  const lastScheduledFailure =
-    params.lastFailure?.trigger === "scheduled" ? params.lastFailure : null;
-
-  if (
-    lastScheduledFailure &&
-    (!lastScheduledSuccess ||
-      Date.parse(lastScheduledFailure.failed_at) >
-        Date.parse(lastScheduledSuccess.completed_at))
-  ) {
-    const publicError = sanitizePipelineErrorPublic(lastScheduledFailure.error);
-    return {
-      status: "failed",
-      message: `Last scheduled ingest failed: ${publicError}`,
-      last_scheduled_success: lastScheduledSuccess,
-    };
-  }
-
-  if (!lastScheduledSuccess) {
-    return {
-      status: "unknown",
-      message: "No successful scheduled ingest recorded yet.",
-      last_scheduled_success: null,
-    };
-  }
-
-  const ageMs = params.now.getTime() - Date.parse(lastScheduledSuccess.completed_at);
-  const staleAfterMs = params.staleAfterHours * 60 * 60 * 1000;
-  if (ageMs > staleAfterMs) {
-    return {
-      status: "stale",
-      message: `Last scheduled ingest was ${lastScheduledSuccess.completed_at}; expected within ${params.staleAfterHours}h of its cron.`,
-      last_scheduled_success: lastScheduledSuccess,
-    };
-  }
-
-  const warnings = params.chamberWarnings ?? [];
-  const warningSeverity = classifyChamberWarningSeverity(warnings);
-  if (warningSeverity === "failed") {
-    return {
-      status: "failed",
-      message: `Partial chamber ingest: ${warnings.join("; ")}`,
-      last_scheduled_success: lastScheduledSuccess,
-    };
-  }
-
-  const menu = params.senateVoteMenuCache;
-  if (menu?.expired || menu?.nearing_expiry) {
-    return {
-      status: "failed",
-      message: menu.expired
-        ? `Senate vote menu D1 cache expired (fetched_at ${menu.fetched_at}); refresh before next cron or Senate ingest will hard-skip.`
-        : `Senate vote menu D1 cache nearing expiry (age ${menu.age_hours}h / max ${menu.max_age_hours}h); run npm run refresh:senate-menu.`,
-      last_scheduled_success: lastScheduledSuccess,
-    };
-  }
-
-  if (warningSeverity === "degraded") {
-    let message = `Partial chamber ingest: ${warnings.join("; ")}`;
-    if (menu?.stale) {
-      message = `${message} Senate menu cache is stale (${menu.age_hours}h old); refresh daily while Worker→Senate.gov is 403.`;
-    }
-    return {
-      status: "degraded",
-      message,
-      last_scheduled_success: lastScheduledSuccess,
-    };
-  }
-
-  if (menu?.stale) {
-    return {
-      status: "degraded",
-      message: `Senate vote menu D1 cache is stale (age ${menu.age_hours}h); refresh with npm run refresh:senate-menu.`,
-      last_scheduled_success: lastScheduledSuccess,
-    };
-  }
-
+  const evaluated = evaluateIngestMonitorStatusShared({
+    ...params,
+    sanitizeFailureError: sanitizePipelineErrorPublic,
+  });
   return {
-    status: "ok",
-    message: "Scheduled ingest completed within the expected window.",
-    last_scheduled_success: lastScheduledSuccess,
+    status: asIngestStatus(evaluated.status),
+    message: evaluated.message,
+    last_scheduled_success: evaluated.last_scheduled_success as T | null,
   };
 }
 

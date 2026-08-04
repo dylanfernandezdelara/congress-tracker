@@ -24,9 +24,18 @@
  *
  * Exit codes: 0 success, 1 blocker / unhealthy, 2 misuse / missing secrets.
  *
- * Menu helpers below are intentionally duplicated from shared/senate-vote-menu.ts so
- * this script stays plain Node 20 (no strip-types / tsx). Keep in sync.
+ * Menu encode/validate helpers are duplicated from shared/senate-vote-menu.ts so
+ * this script stays plain Node 20 (no strip-types / tsx). Ingest status evaluation
+ * is imported from shared/ingest-monitor-eval.mjs (single source with the Worker).
  */
+
+import {
+  buildSenateVoteMenuCacheMonitor,
+  evaluateIngestMonitorStatus,
+  FEED_PIPELINE_STALE_HOURS,
+  isIngestMonitorOpsAcceptable,
+  resolveScheduledSuccess,
+} from "../shared/ingest-monitor-eval.mjs";
 
 const DEFAULT_WORKER_BASE =
   "https://congress-tracker-api.fernandezdelaradylan.workers.dev";
@@ -82,11 +91,6 @@ function isSenateVoteMenuXml(xml, opts) {
   return voteNumbers.length >= 1;
 }
 
-/** Keep in sync with shared/ingest-monitor-status.ts `isIngestMonitorOpsAcceptable`. */
-function isIngestMonitorOpsAcceptable(status) {
-  return status === "ok" || status === "degraded";
-}
-
 function requireEnv(name) {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -133,6 +137,13 @@ function adminFallbackD1Enabled() {
   return process.env.ADMIN_FALLBACK_D1?.trim() !== "0";
 }
 
+function shouldFallbackAdminToD1(res, body) {
+  if (!adminFallbackD1Enabled()) return false;
+  if (res.status === 404 || res.status >= 500) return true;
+  // Non-JSON (Bot Fight HTML, workers.dev error pages, etc.)
+  return typeof body?.raw === "string";
+}
+
 async function refreshViaAdmin(xml, congress, session) {
   const token = requireEnv("PIPELINE_ADMIN_TOKEN");
   const base = (process.env.WORKER_BASE_URL || DEFAULT_WORKER_BASE).replace(/\/$/, "");
@@ -149,15 +160,28 @@ async function refreshViaAdmin(xml, congress, session) {
       body: xml,
     });
   } catch (err) {
-    if (adminFallbackD1Enabled() && !runFeed) {
+    if (adminFallbackD1Enabled()) {
       console.warn(
         JSON.stringify({
           event: "senate_vote_menu_admin_unreachable",
           error: err instanceof Error ? err.message : String(err),
           fallback: "d1",
+          run_feed_skipped: runFeed,
         })
       );
-      return refreshViaD1(xml, congress, session);
+      const d1Base = await refreshViaD1(xml, congress, session, {
+        fromAdminFallback: true,
+      });
+      if (runFeed) {
+        console.warn(
+          JSON.stringify({
+            event: "senate_vote_menu_run_feed_skipped",
+            reason: "admin_unreachable_d1_cache_only",
+            hint: "Cache written via D1; trigger POST /__pipeline/run/feed when workers.dev is reachable, or wait for daily cron.",
+          })
+        );
+      }
+      return d1Base;
     }
     throw err;
   }
@@ -169,16 +193,29 @@ async function refreshViaAdmin(xml, congress, session) {
     body = { raw: text.slice(0, 500) };
   }
   if (!res.ok || body?.ok !== true) {
-    if (adminFallbackD1Enabled() && !runFeed && (res.status === 404 || res.status >= 500 || typeof body?.raw === "string")) {
+    if (shouldFallbackAdminToD1(res, body)) {
       console.warn(
         JSON.stringify({
           event: "senate_vote_menu_admin_failed",
           http_status: res.status,
           body,
           fallback: "d1",
+          run_feed_skipped: runFeed,
         })
       );
-      return refreshViaD1(xml, congress, session);
+      const d1Base = await refreshViaD1(xml, congress, session, {
+        fromAdminFallback: true,
+      });
+      if (runFeed) {
+        console.warn(
+          JSON.stringify({
+            event: "senate_vote_menu_run_feed_skipped",
+            reason: "admin_failed_d1_cache_only",
+            hint: "Cache written via D1; trigger POST /__pipeline/run/feed when the admin route is healthy, or wait for daily cron.",
+          })
+        );
+      }
+      return d1Base;
     }
     console.error("Admin senate-vote-menu failed", res.status, body);
     process.exit(1);
@@ -197,8 +234,10 @@ async function refreshViaAdmin(xml, congress, session) {
   return base;
 }
 
-async function refreshViaD1(xml, congress, session) {
-  if (process.env.RUN_FEED === "1") {
+async function refreshViaD1(xml, congress, session, options = {}) {
+  // Direct REFRESH_VIA=d1 + RUN_FEED=1 is misuse (no HTTP path to chain feed).
+  // Admin→D1 fallback may still write the cache when RUN_FEED was requested.
+  if (process.env.RUN_FEED === "1" && process.env.REFRESH_VIA?.toLowerCase() === "d1" && !options.fromAdminFallback) {
     console.error(
       "RUN_FEED=1 is not supported with REFRESH_VIA=d1. Use admin mode (PIPELINE_ADMIN_TOKEN) or trigger feed separately."
     );
@@ -243,9 +282,6 @@ async function refreshViaD1(xml, congress, session) {
   return (process.env.WORKER_BASE_URL || DEFAULT_WORKER_BASE).replace(/\/$/, "");
 }
 
-/** Keep in sync with workers FEED_PIPELINE_STALE_HOURS. */
-const FEED_PIPELINE_STALE_HOURS = 26;
-
 async function d1Query(sql, params = []) {
   const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = requireEnv("CLOUDFLARE_API_TOKEN");
@@ -271,7 +307,7 @@ async function d1Query(sql, params = []) {
 /**
  * Evaluate feed ingest status from D1 when /health is unreachable
  * (workers.dev disabled or Bot Fight on the custom domain).
- * Keep severity rules aligned with shared/ingest-monitor-status.ts + ingest-health.ts.
+ * Uses the same evaluator as the Worker (`shared/ingest-monitor-eval.mjs`).
  */
 async function checkHealthViaD1(congress, session) {
   const menuKey = senateVoteMenuCacheKey(congress, session);
@@ -297,71 +333,31 @@ async function checkHealthViaD1(congress, session) {
   const scheduled = parse("feed_pipeline_last_scheduled_success");
   const latest = parse("feed_pipeline_last_success");
   const failure = parse("feed_pipeline_last_failure");
-  const menu = parse(menuKey);
-  const now = Date.now();
-
-  let status = "unknown";
-  let message = "No successful scheduled ingest recorded yet.";
-
-  const scheduledOk = scheduled?.trigger === "scheduled" ? scheduled : null;
-  const scheduledFail = failure?.trigger === "scheduled" ? failure : null;
-  if (
-    scheduledFail &&
-    (!scheduledOk || Date.parse(scheduledFail.failed_at) > Date.parse(scheduledOk.completed_at))
-  ) {
-    status = "failed";
-    message = `Last scheduled ingest failed: ${scheduledFail.error}`;
-  } else if (!scheduledOk) {
-    status = "unknown";
-  } else {
-    const ageH = (now - Date.parse(scheduledOk.completed_at)) / (60 * 60 * 1000);
-    if (ageH > FEED_PIPELINE_STALE_HOURS) {
-      status = "stale";
-      message = `Last scheduled ingest was ${scheduledOk.completed_at}`;
-    } else {
-      const warnings = (latest ?? scheduledOk).chamber_warnings ?? [];
-      if (warnings.some((w) => /ingest skipped:/i.test(String(w)))) {
-        status = "failed";
-        message = `Partial chamber ingest: ${warnings.join("; ")}`;
-      } else if (
-        warnings.length > 0 &&
-        warnings.every((w) => /served from D1 cache after live fetch failed/i.test(String(w)))
-      ) {
-        status = "degraded";
-        message = `Partial chamber ingest: ${warnings.join("; ")}`;
-      } else if (warnings.length > 0) {
-        status = "failed";
-        message = `Partial chamber ingest: ${warnings.join("; ")}`;
-      } else {
-        status = "ok";
-        message = "Scheduled ingest completed within the expected window.";
-      }
-    }
-  }
-
-  let menuAgeHours = null;
-  if (menu?.fetched_at) {
-    menuAgeHours = Math.round(((now - Date.parse(menu.fetched_at)) / (60 * 60 * 1000)) * 10) / 10;
-    if (menuAgeHours > 6 * 24 && isIngestMonitorOpsAcceptable(status)) {
-      status = "failed";
-      message = `Senate vote menu D1 cache nearing expiry (age ${menuAgeHours}h)`;
-    } else if (menuAgeHours > 48 && status === "ok") {
-      status = "degraded";
-      message = `Senate vote menu D1 cache is stale (age ${menuAgeHours}h)`;
-    }
-  }
+  const menuRow = parse(menuKey);
+  const now = new Date();
+  const scheduledSuccess = resolveScheduledSuccess(scheduled, latest);
+  const newest = latest ?? scheduledSuccess;
+  const senateVoteMenuCache = buildSenateVoteMenuCacheMonitor(menuRow?.fetched_at, now);
+  const evaluated = evaluateIngestMonitorStatus({
+    now,
+    staleAfterHours: FEED_PIPELINE_STALE_HOURS,
+    scheduledSuccess,
+    lastFailure: failure,
+    chamberWarnings: newest?.chamber_warnings ?? [],
+    senateVoteMenuCache,
+  });
 
   console.log(
     JSON.stringify({
       event: "ingest_health_check",
       mode: "d1",
-      ingest_status: status,
-      message,
+      ingest_status: evaluated.status,
+      message: evaluated.message,
       latest_passage_hint: latest?.completed_at ?? null,
-      senate_menu_cache_age_hours: menuAgeHours,
+      senate_vote_menu_cache: senateVoteMenuCache,
     })
   );
-  if (!isIngestMonitorOpsAcceptable(status)) {
+  if (!isIngestMonitorOpsAcceptable(evaluated.status)) {
     process.exit(1);
   }
 }

@@ -13,12 +13,10 @@ import { parseSenateNominationIssue } from "./nomination-ref";
 import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
-import {
-  SENATE_VOTE_MENU_CACHE_EXPIRY_WARN_MS,
-  SENATE_VOTE_MENU_CACHE_MAX_AGE_MS,
-  SENATE_VOTE_MENU_CACHE_STALE_MS,
-} from "../constants";
+import { SENATE_VOTE_MENU_CACHE_MAX_AGE_MS } from "../constants";
 import { ensureSchema } from "../d1/schema";
+import type { SenateVoteMenuCacheMonitor } from "../../../../shared/ingest-api-types";
+import { buildSenateVoteMenuCacheMonitor } from "../../../../shared/ingest-monitor-status";
 import {
   encodeSenateVoteMenuCacheValue,
   isSenateVoteMenuXml,
@@ -28,6 +26,7 @@ import {
 } from "../../../../shared/senate-vote-menu";
 
 export { isSenateVoteMenuXml, senateVoteMenuCacheKey, senateVoteMenuUrl };
+export type SenateVoteMenuCacheMeta = SenateVoteMenuCacheMonitor;
 
 /** Shared fields every Senate menu `<vote>` block carries for stored rolls. */
 function parseMenuVoteFields(
@@ -67,18 +66,6 @@ function parseMenuVoteFields(
   };
 }
 
-export type SenateVoteMenuCacheMeta = {
-  fetched_at: string;
-  age_hours: number;
-  max_age_hours: number;
-  /** Older than daily ops refresh window (48h). */
-  stale: boolean;
-  /** Within 24h of hard expiry (6d+). */
-  nearing_expiry: boolean;
-  /** Past max age — fallback would hard-skip. */
-  expired: boolean;
-};
-
 /** Public monitor metadata for the D1 Senate vote-menu cache (no XML). */
 export async function getSenateVoteMenuCacheMeta(
   db: D1Database,
@@ -94,18 +81,7 @@ export async function getSenateVoteMenuCacheMeta(
   if (!row?.value_json) return null;
   try {
     const parsed = JSON.parse(row.value_json) as { fetched_at?: string; xml?: string };
-    if (!parsed.fetched_at || typeof parsed.fetched_at !== "string") return null;
-    const fetchedMs = Date.parse(parsed.fetched_at);
-    if (!Number.isFinite(fetchedMs)) return null;
-    const ageMs = Math.max(0, now.getTime() - fetchedMs);
-    return {
-      fetched_at: parsed.fetched_at,
-      age_hours: Math.round((ageMs / (60 * 60 * 1000)) * 10) / 10,
-      max_age_hours: SENATE_VOTE_MENU_CACHE_MAX_AGE_MS / (60 * 60 * 1000),
-      stale: ageMs > SENATE_VOTE_MENU_CACHE_STALE_MS,
-      nearing_expiry: ageMs > SENATE_VOTE_MENU_CACHE_EXPIRY_WARN_MS,
-      expired: ageMs > SENATE_VOTE_MENU_CACHE_MAX_AGE_MS,
-    };
+    return buildSenateVoteMenuCacheMonitor(parsed.fetched_at, now);
   } catch {
     return null;
   }
