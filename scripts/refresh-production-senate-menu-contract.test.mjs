@@ -70,9 +70,13 @@ test("refresh script documents D1 health fallback and admin→D1 fallback", () =
   assert.match(src, /checkHealthViaD1/);
   assert.match(src, /adminFallbackD1Enabled/);
   assert.match(src, /shouldFallbackAdminToD1/);
+  assert.match(src, /fallbackAdminRefreshToD1/);
   assert.match(src, /fallback:\s*"d1"/);
   assert.match(src, /ingest-monitor-eval\.mjs/);
   assert.match(src, /evaluateIngestMonitorStatus/);
+  assert.match(src, /run_feed_skipped/);
+  // Transport-only fallback — not every HTTP 5xx / JSON pipeline_failed.
+  assert.doesNotMatch(src, /res\.status >= 500/);
 });
 
 test("refresh script shares ingest evaluator with Worker (no forked FSM)", async () => {

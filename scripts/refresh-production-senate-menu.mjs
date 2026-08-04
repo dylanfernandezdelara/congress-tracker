@@ -137,11 +137,42 @@ function adminFallbackD1Enabled() {
   return process.env.ADMIN_FALLBACK_D1?.trim() !== "0";
 }
 
+/**
+ * Fallback only when the admin host is unreachable / not serving the Worker.
+ * Never fall back on parseable JSON application errors (e.g. pipeline_failed
+ * after a menu write) — those are real failures, not transport problems.
+ */
 function shouldFallbackAdminToD1(res, body) {
   if (!adminFallbackD1Enabled()) return false;
-  if (res.status === 404 || res.status >= 500) return true;
+  if (res.status === 404) return true;
   // Non-JSON (Bot Fight HTML, workers.dev error pages, etc.)
   return typeof body?.raw === "string";
+}
+
+async function fallbackAdminRefreshToD1(xml, congress, session, meta) {
+  const runFeed = Boolean(meta.runFeed);
+  console.warn(
+    JSON.stringify({
+      event: meta.event,
+      ...meta.details,
+      fallback: "d1",
+      run_feed_skipped: runFeed,
+    })
+  );
+  const d1Base = await refreshViaD1(xml, congress, session, {
+    fromAdminFallback: true,
+  });
+  if (runFeed) {
+    console.error(
+      JSON.stringify({
+        event: "senate_vote_menu_run_feed_skipped",
+        reason: meta.runFeedSkipReason,
+        hint: "Cache written via D1; trigger POST /__pipeline/run/feed when the admin route is healthy, or wait for daily cron.",
+      })
+    );
+    process.exit(1);
+  }
+  return d1Base;
 }
 
 async function refreshViaAdmin(xml, congress, session) {
@@ -161,27 +192,12 @@ async function refreshViaAdmin(xml, congress, session) {
     });
   } catch (err) {
     if (adminFallbackD1Enabled()) {
-      console.warn(
-        JSON.stringify({
-          event: "senate_vote_menu_admin_unreachable",
-          error: err instanceof Error ? err.message : String(err),
-          fallback: "d1",
-          run_feed_skipped: runFeed,
-        })
-      );
-      const d1Base = await refreshViaD1(xml, congress, session, {
-        fromAdminFallback: true,
+      return fallbackAdminRefreshToD1(xml, congress, session, {
+        event: "senate_vote_menu_admin_unreachable",
+        details: { error: err instanceof Error ? err.message : String(err) },
+        runFeed,
+        runFeedSkipReason: "admin_unreachable_d1_cache_only",
       });
-      if (runFeed) {
-        console.warn(
-          JSON.stringify({
-            event: "senate_vote_menu_run_feed_skipped",
-            reason: "admin_unreachable_d1_cache_only",
-            hint: "Cache written via D1; trigger POST /__pipeline/run/feed when workers.dev is reachable, or wait for daily cron.",
-          })
-        );
-      }
-      return d1Base;
     }
     throw err;
   }
@@ -194,28 +210,12 @@ async function refreshViaAdmin(xml, congress, session) {
   }
   if (!res.ok || body?.ok !== true) {
     if (shouldFallbackAdminToD1(res, body)) {
-      console.warn(
-        JSON.stringify({
-          event: "senate_vote_menu_admin_failed",
-          http_status: res.status,
-          body,
-          fallback: "d1",
-          run_feed_skipped: runFeed,
-        })
-      );
-      const d1Base = await refreshViaD1(xml, congress, session, {
-        fromAdminFallback: true,
+      return fallbackAdminRefreshToD1(xml, congress, session, {
+        event: "senate_vote_menu_admin_failed",
+        details: { http_status: res.status, body },
+        runFeed,
+        runFeedSkipReason: "admin_failed_d1_cache_only",
       });
-      if (runFeed) {
-        console.warn(
-          JSON.stringify({
-            event: "senate_vote_menu_run_feed_skipped",
-            reason: "admin_failed_d1_cache_only",
-            hint: "Cache written via D1; trigger POST /__pipeline/run/feed when the admin route is healthy, or wait for daily cron.",
-          })
-        );
-      }
-      return d1Base;
     }
     console.error("Admin senate-vote-menu failed", res.status, body);
     process.exit(1);
@@ -232,54 +232,6 @@ async function refreshViaAdmin(xml, congress, session) {
     })
   );
   return base;
-}
-
-async function refreshViaD1(xml, congress, session, options = {}) {
-  // Direct REFRESH_VIA=d1 + RUN_FEED=1 is misuse (no HTTP path to chain feed).
-  // Admin→D1 fallback may still write the cache when RUN_FEED was requested.
-  if (process.env.RUN_FEED === "1" && process.env.REFRESH_VIA?.toLowerCase() === "d1" && !options.fromAdminFallback) {
-    console.error(
-      "RUN_FEED=1 is not supported with REFRESH_VIA=d1. Use admin mode (PIPELINE_ADMIN_TOKEN) or trigger feed separately."
-    );
-    process.exit(2);
-  }
-  const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
-  const apiToken = requireEnv("CLOUDFLARE_API_TOKEN");
-  const databaseId = resolveD1DatabaseId();
-  const { fetchedAt, valueJson } = encodeSenateVoteMenuCacheValue(xml);
-  const cacheKey = senateVoteMenuCacheKey(congress, session);
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        sql: SENATE_VOTE_MENU_CACHE_UPSERT_SQL,
-        params: [cacheKey, valueJson, fetchedAt],
-      }),
-    }
-  );
-  const body = await res.json();
-  if (!res.ok || body?.success !== true) {
-    console.error("D1 cache write failed", res.status, body);
-    process.exit(1);
-  }
-  console.log(
-    JSON.stringify({
-      event: "senate_vote_menu_refreshed",
-      mode: "d1",
-      congress,
-      session,
-      database_id: databaseId,
-      cache_key: cacheKey,
-      fetched_at: fetchedAt,
-      note: "Cache updated; trigger POST /__pipeline/run/feed (or wait for daily cron) to ingest new rolls.",
-    })
-  );
-  return (process.env.WORKER_BASE_URL || DEFAULT_WORKER_BASE).replace(/\/$/, "");
 }
 
 async function d1Query(sql, params = []) {
@@ -302,6 +254,39 @@ async function d1Query(sql, params = []) {
     throw new Error(`D1 query failed: ${res.status} ${JSON.stringify(body?.errors ?? body)}`);
   }
   return body.result?.[0]?.results ?? [];
+}
+
+async function refreshViaD1(xml, congress, session, options = {}) {
+  // Direct REFRESH_VIA=d1 + RUN_FEED=1 is misuse (no HTTP path to chain feed).
+  // Admin→D1 fallback may still write the cache when RUN_FEED was requested.
+  if (process.env.RUN_FEED === "1" && process.env.REFRESH_VIA?.toLowerCase() === "d1" && !options.fromAdminFallback) {
+    console.error(
+      "RUN_FEED=1 is not supported with REFRESH_VIA=d1. Use admin mode (PIPELINE_ADMIN_TOKEN) or trigger feed separately."
+    );
+    process.exit(2);
+  }
+  const databaseId = resolveD1DatabaseId();
+  const { fetchedAt, valueJson } = encodeSenateVoteMenuCacheValue(xml);
+  const cacheKey = senateVoteMenuCacheKey(congress, session);
+  try {
+    await d1Query(SENATE_VOTE_MENU_CACHE_UPSERT_SQL, [cacheKey, valueJson, fetchedAt]);
+  } catch (err) {
+    console.error("D1 cache write failed", err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+  console.log(
+    JSON.stringify({
+      event: "senate_vote_menu_refreshed",
+      mode: "d1",
+      congress,
+      session,
+      database_id: databaseId,
+      cache_key: cacheKey,
+      fetched_at: fetchedAt,
+      note: "Cache updated; trigger POST /__pipeline/run/feed (or wait for daily cron) to ingest new rolls.",
+    })
+  );
+  return (process.env.WORKER_BASE_URL || DEFAULT_WORKER_BASE).replace(/\/$/, "");
 }
 
 /**

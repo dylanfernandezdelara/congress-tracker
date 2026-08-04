@@ -341,8 +341,27 @@ async function handleSenateVoteMenuRoute(
       { status: 413, headers: PIPELINE_ADMIN_HEADERS }
     );
 
-  const declaredLength = Number.parseInt(request.headers.get("content-length") ?? "", 10);
-  if (Number.isFinite(declaredLength) && declaredLength > SENATE_VOTE_MENU_MAX_BYTES) {
+  // Require Content-Length so we can reject oversized bodies before buffering.
+  // Chunked/missing length would otherwise force a full read (authenticated DoS).
+  const lengthHeader = request.headers.get("content-length");
+  if (lengthHeader === null || lengthHeader.trim() === "") {
+    return json(
+      {
+        ok: false,
+        error: "content_length_required",
+        message: "Content-Length header is required for Senate vote menu uploads.",
+      },
+      { status: 411, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+  const declaredLength = Number.parseInt(lengthHeader, 10);
+  if (!Number.isFinite(declaredLength) || declaredLength < 0) {
+    return json(
+      { ok: false, error: "invalid_content_length", message: "Content-Length must be a non-negative integer." },
+      { status: 400, headers: PIPELINE_ADMIN_HEADERS }
+    );
+  }
+  if (declaredLength > SENATE_VOTE_MENU_MAX_BYTES) {
     return payloadTooLarge();
   }
 
@@ -362,6 +381,7 @@ async function handleSenateVoteMenuRoute(
     );
   }
 
+  // Defense in depth if Content-Length was understated.
   if (new TextEncoder().encode(xml).byteLength > SENATE_VOTE_MENU_MAX_BYTES) {
     return payloadTooLarge();
   }

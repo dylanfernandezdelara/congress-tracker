@@ -34,7 +34,10 @@ describe("POST /__pipeline/senate-vote-menu", () => {
     const db = createPipelineStateMockDb();
     const response = await handlePublicFetch(
       pipelineRequest("/__pipeline/senate-vote-menu", {
-        headers: { "Content-Type": "application/xml" },
+        headers: {
+          "Content-Type": "application/xml",
+          "Content-Length": String(new TextEncoder().encode(VALID_SENATE_VOTE_MENU_XML).byteLength),
+        },
         body: VALID_SENATE_VOTE_MENU_XML,
       }),
       createMockEnv({ DB: db }) as never
@@ -63,10 +66,14 @@ describe("POST /__pipeline/senate-vote-menu", () => {
   });
 
   it("rejects invalid Senate vote menu uploads", async () => {
+    const body = "<html>not a menu</html>";
     const response = await handlePublicFetch(
       pipelineRequest("/__pipeline/senate-vote-menu", {
-        headers: { "Content-Type": "text/plain" },
-        body: "<html>not a menu</html>",
+        headers: {
+          "Content-Type": "text/plain",
+          "Content-Length": String(new TextEncoder().encode(body).byteLength),
+        },
+        body,
       }),
       createMockEnv() as never
     );
@@ -84,12 +91,30 @@ describe("POST /__pipeline/senate-vote-menu", () => {
     );
     const response = await handlePublicFetch(
       pipelineRequest("/__pipeline/senate-vote-menu", {
-        headers: { "Content-Type": "application/xml" },
+        headers: {
+          "Content-Type": "application/xml",
+          "Content-Length": String(new TextEncoder().encode(xml).byteLength),
+        },
         body: xml,
       }),
       createMockEnv() as never
     );
     expect(response.status).toBe(400);
+  });
+
+  it("requires Content-Length before buffering the menu body", async () => {
+    const response = await handlePublicFetch(
+      pipelineRequest("/__pipeline/senate-vote-menu", {
+        headers: { "Content-Type": "application/xml" },
+        body: VALID_SENATE_VOTE_MENU_XML,
+      }),
+      createMockEnv() as never
+    );
+    expect(response.status).toBe(411);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: "content_length_required",
+    });
   });
 
   it("rejects GET before body validation", async () => {
