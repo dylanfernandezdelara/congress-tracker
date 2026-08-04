@@ -195,20 +195,6 @@ export default function Home() {
           </div>
         ) : null}
 
-        <RecentConfirmationsSection
-          confirmations={recentConfirmations.data?.confirmations ?? null}
-          loading={recentConfirmationsLoading}
-          error={recentConfirmations.error}
-          onRetry={handleReloadFeed}
-        />
-
-        <RecentLawsSection
-          laws={recentLaws.data?.laws ?? null}
-          loading={recentLawsLoading}
-          error={recentLaws.error}
-          onRetry={handleReloadFeed}
-        />
-
         {showSkeleton ? <FeedSkeleton /> : null}
 
         {feedError && items.length === 0 ? (
@@ -301,6 +287,21 @@ export default function Home() {
             ) : null}
           </section>
         ) : null}
+
+        <div className="home-feed-secondary">
+          <RecentConfirmationsSection
+            confirmations={recentConfirmations.data?.confirmations ?? null}
+            loading={recentConfirmationsLoading}
+            error={recentConfirmations.error}
+            onRetry={handleReloadFeed}
+          />
+          <RecentLawsSection
+            laws={recentLaws.data?.laws ?? null}
+            loading={recentLawsLoading}
+            error={recentLaws.error}
+            onRetry={handleReloadFeed}
+          />
+        </div>
 
         {!isDesktop ? (
           <div className="home-mobile-rails">

@@ -204,6 +204,27 @@
     margin: 0 0 1.5rem;
   }
 
+  /* Confirmations and new laws update far less often than the daily timeline,
+     so they stack below the feed instead of pushing it out of the viewport. */
+  .home-feed-secondary {
+    display: flex;
+    flex-direction: column;
+    margin-top: 2rem;
+  }
+
+  .home-feed-secondary:empty {
+    display: none;
+  }
+
+  .home-feed-secondary > section {
+    padding-top: 1.5rem;
+    border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  .home-feed-secondary > section:last-child {
+    margin-bottom: 0;
+  }
+
   .recent-confirmations-detail {
     display: flex;
     flex-direction: column;

@@ -341,6 +341,20 @@ describe('Home', () => {
     expect(within(feedList as HTMLElement).getByText('Passed')).toBeInTheDocument()
     expect(screen.queryByText('Flip for vote details ↺')).not.toBeInTheDocument()
     expect(container.querySelector('#feed-top .feed-row')).not.toBeNull()
+
+    // The daily timeline leads; slower-moving confirmations and laws stack below it.
+    const feedSection = container.querySelector('#feed-top')
+    const secondary = container.querySelector('.home-feed-secondary')
+    expect(secondary).not.toBeNull()
+    expect(
+      feedSection!.compareDocumentPosition(secondary!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      within(secondary as HTMLElement).getByRole('region', { name: 'Recent confirmations' }),
+    ).toBeInTheDocument()
+    expect(
+      within(secondary as HTMLElement).getByRole('region', { name: 'New laws' }),
+    ).toBeInTheDocument()
   })
 
   it('stacks rail content below the feed on narrow viewports without duplicate fetches', async () => {
@@ -360,6 +374,16 @@ describe('Home', () => {
     expect(feedSection).not.toBeNull()
     expect(
       feedSection!.compareDocumentPosition(mobileRails!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    // Confirmations and laws follow the feed but come before the context rails.
+    const secondary = container.querySelector('.home-feed-secondary')
+    expect(secondary).not.toBeNull()
+    expect(
+      feedSection!.compareDocumentPosition(secondary!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      secondary!.compareDocumentPosition(mobileRails!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
 
     const sections = mobileRails!.querySelectorAll(':scope > .home-mobile-rail-section')
