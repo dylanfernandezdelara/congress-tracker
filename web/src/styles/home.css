@@ -216,13 +216,13 @@
     display: none;
   }
 
-  .home-feed-secondary > section {
-    padding-top: 1.5rem;
+  /* Same stack model as .home-mobile-rail-section: dividers via top rules,
+     symmetric padding, no per-section margins to reconcile. */
+  .home-feed-secondary > .recent-laws,
+  .home-feed-secondary > .recent-confirmations {
+    margin: 0;
+    padding: 1.5rem 0;
     border-top: 1px solid hsl(var(--twc-border));
-  }
-
-  .home-feed-secondary > section:last-child {
-    margin-bottom: 0;
   }
 
   .recent-confirmations-detail {
