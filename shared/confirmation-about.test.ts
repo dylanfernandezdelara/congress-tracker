@@ -76,6 +76,22 @@ describe('isRedundantConfirmationAbout', () => {
       ),
     ).toBe(false)
   })
+
+  it('flags single-sentence nominated-identity lines', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Walter Clayton, of New York, was nominated to serve as Director of National Intelligence.',
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps multi-sentence backgrounds that mention the nomination', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Jane Doe was nominated to be Secretary of Energy in 2026. She previously led California grid programs.',
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('isNominationDescriptionEcho', () => {
@@ -161,6 +177,32 @@ describe('confirmationHeadline', () => {
         citation: 'PN100',
       }),
     ).toBe('Jane Doe confirmed as Secretary of Energy')
+  })
+
+  it('ignores stored headlines that mislabel the confirmation as a nomination', () => {
+    expect(
+      confirmationHeadline({
+        storedHeadline: 'Erica Schwartz nominated as CDC Director',
+        nominees: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+        positionTitle: 'Director of the Centers for Disease Control and Prevention',
+        description: null,
+        citation: 'PN932',
+      }),
+    ).toBe(
+      'Erica Schwartz confirmed as Director of the Centers for Disease Control and Prevention',
+    )
+  })
+
+  it('keeps stored headlines that name both nomination and confirmation', () => {
+    expect(
+      confirmationHeadline({
+        storedHeadline: 'Senate confirms nominated CDC Director Erica Schwartz',
+        nominees: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+        positionTitle: 'Director of the Centers for Disease Control and Prevention',
+        description: null,
+        citation: 'PN932',
+      }),
+    ).toBe('Senate confirms nominated CDC Director Erica Schwartz')
   })
 })
 

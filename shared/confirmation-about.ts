@@ -75,8 +75,16 @@ export function isRedundantConfirmationAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return true
   if (isNominationBoilerplateAbout(text)) return true
-  // Multi-sentence or bio-cue sentences still carry person facts.
   const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
+  // Single-sentence nominated-identity lines restate the headline (and mislabel
+  // the vote); role words like "Director" must not count as bio cues here.
+  if (
+    sentences.length === 1 &&
+    /\bwas nominated (?:to serve )?(?:as|to be|for)\b/i.test(text)
+  ) {
+    return true
+  }
+  // Multi-sentence or bio-cue sentences still carry person facts.
   if (sentences.length > 1 || PERSON_BIO_CUE.test(text)) return false
   return (
     /\bwas confirmed as\b/i.test(text) ||
@@ -134,6 +142,15 @@ export function selectConfirmationAbout(params: {
   return { text: null, source: null }
 }
 
+/**
+ * Rewrites drafted from thin nomination-only source text sometimes mislabel a
+ * confirmation as a nomination ("Jane Doe nominated as ..."). Every row here is
+ * a confirmed Senate vote, so never surface nominated-only phrasing.
+ */
+export function isMisleadingConfirmationHeadline(headline: string): boolean {
+  return /\bnominat/i.test(headline) && !/\bconfirm/i.test(headline)
+}
+
 /** Card headline from stored rewrite or nomination identity. */
 export function confirmationHeadline(params: {
   storedHeadline: string | null
@@ -142,7 +159,8 @@ export function confirmationHeadline(params: {
   description: string | null
   citation: string
 }): string {
-  if (params.storedHeadline?.trim()) return params.storedHeadline.trim()
+  const stored = params.storedHeadline?.trim()
+  if (stored && !isMisleadingConfirmationHeadline(stored)) return stored
   const name = params.nominees[0]?.display_name?.trim()
   const role = params.positionTitle?.trim()
   if (name && role) return `${name} confirmed as ${role}`
