@@ -153,15 +153,41 @@ export function isMisleadingConfirmationHeadline(headline: string): boolean {
 }
 
 /**
- * Collapsed-row "who this is" teaser: the first sentence of the About blurb
- * that does not mislabel the confirmed vote as a nomination.
+ * Wikipedia-style lede sentences that only introduce the person and the office
+ * they now hold ("X is an American health official currently serving as
+ * Director of the CDC") repeat what the card headline already says.
+ */
+const ROLE_RESTATEMENT = /\bserv(?:es|ing) as\b|\bwas (?:confirmed|sworn in|appointed) as\b/i
+
+/** Truncated teasers should not end on a dangling connective ("… General from…"). */
+const TRAILING_CONNECTIVE =
+  /\s+(?:a|an|and|as|at|but|by|for|from|in|into|of|on|or|the|to|with)…$/i
+
+function truncateTeaserSentence(sentence: string): string {
+  let teaser = truncateWords(sentence, FEED_LEAD_MAX_WORDS)
+  while (TRAILING_CONNECTIVE.test(teaser)) {
+    teaser = teaser.replace(TRAILING_CONNECTIVE, '…')
+  }
+  return teaser
+}
+
+/**
+ * Collapsed-row "who this is" teaser. Prefer the first career-history sentence
+ * ("previously served as Deputy Surgeon General …") — that is the signal
+ * readers need — over ledes that merely restate the office in the headline.
+ * Never surface nominated-only phrasing; return null when nothing beyond the
+ * headline remains.
  */
 export function confirmationAboutTeaser(about: string | null): string | null {
   if (!about?.trim()) return null
-  const sentence = splitSentences(about).find(
+  const sentences = splitSentences(about).filter(
     (candidate) => !isMisleadingConfirmationHeadline(candidate),
   )
-  return sentence ? truncateWords(sentence, FEED_LEAD_MAX_WORDS) : null
+  const pick =
+    sentences.find((candidate) => PERSON_BIO_CUE.test(candidate)) ??
+    sentences.find((candidate) => !ROLE_RESTATEMENT.test(candidate)) ??
+    null
+  return pick ? truncateTeaserSentence(pick) : null
 }
 
 /** Card headline from stored rewrite or nomination identity. */

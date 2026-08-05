@@ -102,16 +102,16 @@ describe('RecentConfirmationsSection', () => {
       />,
     )
 
-    // Collapsed: first-sentence teaser tells readers who the person is.
+    // Collapsed: the teaser leads with career history, not the vague lede.
     expect(
-      screen.getByText('Erica G. Schwartz is an American health official.'),
+      screen.getByText('She previously served as Deputy Surgeon General.'),
     ).toBeInTheDocument()
     expect(screen.queryByText(extract)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Expand details for Erica Schwartz/i }))
     expect(screen.getByText(extract)).toBeInTheDocument()
     expect(
-      screen.queryByText('Erica G. Schwartz is an American health official.'),
+      screen.queryByText('She previously served as Deputy Surgeon General.'),
     ).not.toBeInTheDocument()
   })
 

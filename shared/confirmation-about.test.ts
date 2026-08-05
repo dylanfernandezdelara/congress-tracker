@@ -172,12 +172,36 @@ describe('selectConfirmationAbout', () => {
 })
 
 describe('confirmationAboutTeaser', () => {
-  it('returns the first sentence of a person blurb', () => {
+  it('prefers the career-history sentence over a lede that restates the office', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American health official currently serving as the Director of the Centers for Disease Control and Prevention (CDC). Before being appointed in 2026, she served as a rear admiral in the U.S. Public Health Service Commissioned Corps and was Deputy Surgeon General from January 2019 to April 2021.',
+      ),
+    ).toBe(
+      'Before being appointed in 2026, she served as a rear admiral in the U.S. Public Health Service Commissioned Corps and was Deputy Surgeon General…',
+    )
+  })
+
+  it('prefers career history even when the lede does not restate the office', () => {
     expect(
       confirmationAboutTeaser(
         'Erica G. Schwartz is an American health official. She previously served as Deputy Surgeon General.',
       ),
-    ).toBe('Erica G. Schwartz is an American health official.')
+    ).toBe('She previously served as Deputy Surgeon General.')
+  })
+
+  it('keeps a profession sentence when no career-history sentence exists', () => {
+    expect(
+      confirmationAboutTeaser('Jane Doe is an American attorney and public-health academic.'),
+    ).toBe('Jane Doe is an American attorney and public-health academic.')
+  })
+
+  it('returns null when the blurb only restates the office in the headline', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American health official currently serving as the Director of the Centers for Disease Control and Prevention (CDC).',
+      ),
+    ).toBeNull()
   })
 
   it('skips sentences that mislabel the confirmation as a nomination', () => {
