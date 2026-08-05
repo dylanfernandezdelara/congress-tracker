@@ -402,6 +402,31 @@ describe('confirmationCrossVoteNote', () => {
   it('returns null when nobody crossed', () => {
     expect(confirmationCrossVoteNote([])).toBeNull()
   })
+
+  it('skips members of a tied caucus — there is no party line to cross', () => {
+    expect(
+      confirmationCrossVoteNote(
+        [{ name: 'Angus King', party: 'I', state: 'ME', position: 'nay', party_line: 'yea' }],
+        [
+          { party: 'R', yeas: 50, nays: 0, party_line: 'yea' },
+          { party: 'I', yeas: 1, nays: 1, party_line: 'yea' },
+        ],
+      ),
+    ).toBeNull()
+    // Non-tied parties still report normally alongside a tied caucus.
+    expect(
+      confirmationCrossVoteNote(
+        [
+          { name: 'Angus King', party: 'I', state: 'ME', position: 'nay', party_line: 'yea' },
+          { name: 'Tim Kaine', party: 'D', state: 'VA', position: 'yea', party_line: 'nay' },
+        ],
+        [
+          { party: 'D', yeas: 1, nays: 42, party_line: 'nay' },
+          { party: 'I', yeas: 1, nays: 1, party_line: 'yea' },
+        ],
+      ),
+    ).toBe('Tim Kaine (D-VA) was the only Democrat to vote yes.')
+  })
 })
 
 describe('confirmationOppositionNote', () => {

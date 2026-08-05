@@ -96,6 +96,8 @@ function nominationFieldsFromRow(row: NominationRow) {
  * 1) Congress.gov metadata
  * 2) Official About rewrite from Congress.gov source text
  * 3) Wikipedia URL/extract attached only after an official About exists
+ * 4) Grounded vote-context rewrite from the Wikipedia article (or a sealed
+ *    null when there is no article / no nomination coverage)
  *
  * Wikipedia is never written into raw_background_text (keeps the LLM source
  * channel official-only).
@@ -109,6 +111,7 @@ export async function refreshConfirmationEnrichment(
   let nominationsFetched = 0;
   let backgroundsRewritten = 0;
   let wikipediaLookups = 0;
+  let voteContextAttempts = 0;
   let voteContextsWritten = 0;
   let skipped = 0;
   let model: string | null = null;
@@ -258,16 +261,14 @@ export async function refreshConfirmationEnrichment(
 
       // 4) Grounded vote context once Wikipedia state is known. A wiki hit
       // gives the grounding article; a sealed miss seals vote_context too
-      // (there is no honest source to explain the vote).
-      if (
-        voteContextsWritten < CONFIRMATION_VOTE_CONTEXT_PER_RUN &&
-        backgroundNeedsVoteContext(background) &&
-        background
-      ) {
+      // (there is no honest source to explain the vote). Every article fetch
+      // counts against the per-run budget, whether or not the LLM runs.
+      if (backgroundNeedsVoteContext(background) && background) {
         if (!background.wikipedia_url) {
           background = { ...background, vote_context: null };
           dirty = true;
-        } else {
+        } else if (voteContextAttempts < CONFIRMATION_VOTE_CONTEXT_PER_RUN) {
+          voteContextAttempts += 1;
           const article = await fetchWikipediaArticlePlainText(
             background.wikipedia_url
           );
@@ -278,6 +279,7 @@ export async function refreshConfirmationEnrichment(
           } else {
             const sourceText = selectVoteContextSource(article.text);
             if (!sourceText) {
+              // Real article with no nomination/hearing coverage — seal.
               background = { ...background, vote_context: null };
               dirty = true;
             } else {

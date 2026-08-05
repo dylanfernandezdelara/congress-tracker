@@ -56,13 +56,13 @@ ${params.sourceText}
 
 Return ONLY valid JSON:
 {
-  "vote_context": "1-2 short sentences (max 50 words) explaining, per the source text, why the nomination was contested, criticized, or notable — e.g. positions taken at the hearing, controversies, or concerns raised by senators. Empty string if the source text does not say."
+  "vote_context": "1-2 short sentences (max 50 words) explaining, per the source text, why the nomination was contested or drew scrutiny — controversies, concerns raised by senators, or positions the nominee took at the confirmation hearing. Empty string if the source text does not say."
 }
 
 Rules:
 - Use ONLY facts stated in the source text. Never invent reasons, motives, or controversies.
 - Do not restate the vote tally, the confirmation itself, or the person's job history — only why the vote was contested or what drew scrutiny.
-- If the source text gives no reason the nomination was contested or scrutinized, return {"vote_context": ""}.
+- General biography or career praise is not vote context. If the source text gives no controversy, criticism, senator concerns, or hearing positions, return {"vote_context": ""}.
 - Keep language neutral and concise (grade 7-8). No editorializing.`;
 }
 
@@ -129,6 +129,8 @@ export type VoteContextResult =
 
 /**
  * Grounded "why the vote was contested" rewrite from Wikipedia source text.
+ * Mirrors the confirmation-rewrite two-attempt loop: reasoning disabled
+ * first, then a large-budget reasoning fallback.
  * - ok/text: grounded summary to store
  * - ok/null: model found nothing grounded (safe to seal)
  * - unavailable: request/parse failure (do not seal; retry next run)

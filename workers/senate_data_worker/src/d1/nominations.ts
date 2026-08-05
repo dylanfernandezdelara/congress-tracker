@@ -215,7 +215,8 @@ export interface NominationEnrichmentCandidate {
 
 /**
  * Confirmed nominations in the lookback window that still need Congress.gov
- * metadata, a plain-English background rewrite, and/or Wikipedia enrichment.
+ * metadata, a plain-English background rewrite, Wikipedia enrichment, and/or
+ * a grounded vote-context rewrite.
  */
 export async function selectNominationsNeedingEnrichment(
   db: D1Database,

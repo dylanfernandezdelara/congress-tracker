@@ -255,6 +255,11 @@ export async function fetchWikipediaArticlePlainText(
     });
     const pages = Object.values(data.query?.pages ?? {});
     const text = pages[0]?.extract?.trim() ?? "";
+    if (!text) {
+      // Missing page / empty extract — do not let callers seal on this;
+      // a later run may see the real article.
+      return { status: "unavailable", error: `Empty extract for ${title}` };
+    }
     return { status: "ok", text };
   } catch (err: unknown) {
     return {

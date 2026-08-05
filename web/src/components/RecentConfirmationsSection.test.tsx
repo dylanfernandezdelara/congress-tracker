@@ -160,6 +160,30 @@ describe('RecentConfirmationsSection', () => {
     ).toBeInTheDocument()
   })
 
+  it('hides "Why it was contested" when no party majority opposed', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            party_splits: [
+              { party: 'R', yeas: 50, nays: 0, party_line: 'yea' },
+              { party: 'D', yeas: 43, nays: 2, party_line: 'yea' },
+            ],
+            vote_context: 'Some hearing note that would overclaim a lopsided vote.',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    expect(screen.queryByText('Why it was contested')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Some hearing note that would overclaim a lopsided vote.'),
+    ).not.toBeInTheDocument()
+  })
+
   it('never teases nominated-only phrasing for a confirmed vote', () => {
     render(
       <RecentConfirmationsSection

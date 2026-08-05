@@ -52,9 +52,14 @@ function ConfirmationItemRow({
     wikipediaExtract: item.wikipedia_extract,
   })
   const opposition = confirmationOppositionNote(item.party_splits ?? [])
-  const crossVoteNote = confirmationCrossVoteNote(item.cross_party_votes ?? [])
+  const crossVoteNote = confirmationCrossVoteNote(
+    item.cross_party_votes ?? [],
+    item.party_splits ?? [],
+  )
   const voteNote = [opposition, crossVoteNote].filter(Boolean).join(' ') || null
-  const voteContext = item.vote_context?.trim() || null
+  // "Why it was contested" must not overclaim: only show the grounded context
+  // when a party majority actually voted against confirmation.
+  const voteContext = opposition ? item.vote_context?.trim() || null : null
   const organization = item.organization?.trim() || null
   const voteLabel = voteChipLabel(item)
   const wikiArticleUrl = item.wikipedia_url?.trim() || null

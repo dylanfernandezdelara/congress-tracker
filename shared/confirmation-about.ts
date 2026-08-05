@@ -274,15 +274,25 @@ function joinNames(names: string[]): string {
  * Named cross-party votes on a confirmation roll — the "who broke ranks"
  * detail behind the party-split note. Groups by party and direction:
  * "Tim Kaine (D-VA) was the only Democrat to vote yes." Returns null when
- * nobody crossed (or no data).
+ * nobody crossed (or no data). Pass party splits so members of a tied caucus
+ * (no majority line to cross) are not described as crossing party lines.
  */
 export function confirmationCrossVoteNote(
   crossVotes: ConfirmationCrossVote[],
+  splits: RollPartySplit[] = [],
 ): string | null {
-  if (crossVotes.length === 0) return null
+  const tiedParties = new Set(
+    splits
+      .filter((split) => split.yeas > 0 && split.yeas === split.nays)
+      .map((split) => normalizePartyCode(split.party)),
+  )
+  const eligible = crossVotes.filter(
+    (vote) => !tiedParties.has(normalizePartyCode(vote.party)),
+  )
+  if (eligible.length === 0) return null
 
   const groups = new Map<string, ConfirmationCrossVote[]>()
-  for (const vote of crossVotes) {
+  for (const vote of eligible) {
     const key = `${normalizePartyCode(vote.party)}:${vote.position}`
     const list = groups.get(key) ?? []
     list.push(vote)

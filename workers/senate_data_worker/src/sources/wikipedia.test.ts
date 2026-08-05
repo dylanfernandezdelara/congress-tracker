@@ -1,5 +1,63 @@
-import { describe, expect, it } from "vitest";
-import { acceptWikipediaSummary, truncateWikipediaExtract } from "./wikipedia";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  acceptWikipediaSummary,
+  fetchWikipediaArticlePlainText,
+  truncateWikipediaExtract,
+  wikipediaTitleFromUrl,
+} from "./wikipedia";
+
+describe("wikipediaTitleFromUrl", () => {
+  it("decodes the article title from a page URL", () => {
+    expect(
+      wikipediaTitleFromUrl("https://en.wikipedia.org/wiki/Erica_Schwartz")
+    ).toBe("Erica Schwartz");
+    expect(
+      wikipediaTitleFromUrl("https://en.wikipedia.org/wiki/Jane_Doe_(politician)#Career")
+    ).toBe("Jane Doe (politician)");
+  });
+
+  it("returns null for non-article URLs", () => {
+    expect(wikipediaTitleFromUrl("https://example.com/not-wikipedia")).toBeNull();
+  });
+});
+
+describe("fetchWikipediaArticlePlainText", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the article plain text", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            query: { pages: { "1": { extract: "Full article text." } } },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    expect(
+      await fetchWikipediaArticlePlainText("https://en.wikipedia.org/wiki/Erica_Schwartz")
+    ).toEqual({ status: "ok", text: "Full article text." });
+  });
+
+  it("treats a missing/empty extract as unavailable so callers never seal on it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ query: { pages: { "-1": {} } } }), {
+          status: 200,
+        })
+      )
+    );
+    const result = await fetchWikipediaArticlePlainText(
+      "https://en.wikipedia.org/wiki/Erica_Schwartz"
+    );
+    expect(result.status).toBe("unavailable");
+  });
+});
 
 describe("truncateWikipediaExtract", () => {
   it("keeps short extracts intact", () => {

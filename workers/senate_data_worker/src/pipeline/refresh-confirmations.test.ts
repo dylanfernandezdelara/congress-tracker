@@ -104,8 +104,12 @@ describe("refreshConfirmationEnrichment", () => {
     resolveOpenRouterModel.mockResolvedValue("test-model");
     rewriteConfirmationBackground.mockResolvedValue(null);
     lookupNomineeWikipedia.mockResolvedValue({ status: "miss" });
-    // No nomination coverage by default — vote context seals null without an LLM call.
-    fetchWikipediaArticlePlainText.mockResolvedValue({ status: "ok", text: "" });
+    // Article fetch unavailable by default — vote context stays unset in
+    // tests that only exercise steps 1–3.
+    fetchWikipediaArticlePlainText.mockResolvedValue({
+      status: "unavailable",
+      error: "no article stub",
+    });
     rewriteVoteContext.mockResolvedValue({ status: "ok", text: null });
     selectNominationsNeedingEnrichment.mockResolvedValue([
       {
@@ -619,6 +623,83 @@ describe("refreshConfirmationEnrichment", () => {
     };
     const parsed = JSON.parse(saved.backgroundJson);
     expect(parsed.vote_context).toBeNull();
+  });
+
+  it("seals vote_context null when a real article has no nomination coverage", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background: "Jane Doe previously led California energy commission programs.",
+          key_points: [],
+          wikipedia_url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+          wikipedia_extract: "Jane Doe is an American energy official.",
+        }),
+      })
+    );
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: false,
+        needsWikipedia: false,
+        needsVoteContext: true,
+      },
+    ]);
+    fetchWikipediaArticlePlainText.mockResolvedValue({
+      status: "ok",
+      text: "Jane Doe grew up in Sacramento and studied engineering before a long career in state utility regulation and public service.",
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    const result = await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(rewriteVoteContext).not.toHaveBeenCalled();
+    expect(result.voteContextsWritten).toBe(0);
+    const saved = upsertNominationMetadata.mock.calls[0]![1] as {
+      backgroundJson: string;
+    };
+    expect(JSON.parse(saved.backgroundJson).vote_context).toBeNull();
+  });
+
+  it("bounds article fetches by the vote-context budget even when nothing is written", async () => {
+    selectNominationsNeedingEnrichment.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => ({
+        ref: { congress: 119, number: 300 + i, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: false,
+        needsWikipedia: false,
+        needsVoteContext: true,
+      }))
+    );
+    getNomination.mockImplementation(async (_db: D1Database, ref: { number: number }) =>
+      nominationRow({
+        nomination_number: ref.number,
+        citation: `PN${ref.number}`,
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background: "Jane Doe previously led California energy commission programs.",
+          key_points: [],
+          wikipedia_url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+          wikipedia_extract: "Jane Doe is an American energy official.",
+        }),
+      })
+    );
+    // Every fetch fails — attempts still consume the budget.
+    fetchWikipediaArticlePlainText.mockResolvedValue({
+      status: "unavailable",
+      error: "HTTP 503",
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(fetchWikipediaArticlePlainText).toHaveBeenCalledTimes(10);
+    expect(rewriteVoteContext).not.toHaveBeenCalled();
   });
 
   it("leaves vote_context unset when the article fetch is unavailable", async () => {
