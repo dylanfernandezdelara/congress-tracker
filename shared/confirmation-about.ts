@@ -157,16 +157,17 @@ export function isMisleadingConfirmationHeadline(headline: string): boolean {
  * Sentences that restate the office on the card: present-tense "serves as /
  * is serving as / currently serving as", present-perfect "has served as …
  * since", and the confirmation event itself ("was confirmed/sworn in as").
- * The "is … serving as" span must not jump a temporal marker — "who, after
- * serving as ambassador, joined …" is career history — and allows "." so
- * abbreviations like "U.S." do not break the match. Past appointments ("was
- * appointed as ambassador in 2015") stay eligible as career history.
+ * The "is … serving as" span must not jump a temporal or characterizing
+ * marker — "who, after serving as ambassador, joined …" and "is best known
+ * for serving as …" are career history — and allows "." so abbreviations
+ * like "U.S." do not break the match. Past appointments ("was appointed as
+ * ambassador in 2015") stay eligible as career history.
  * Tradeoff: a past confirmation to a different office is also skipped — a
  * second "confirmed as" line under a "confirmed as" headline reads as noise,
  * and the expanded About keeps the full text.
  */
 const ROLE_RESTATEMENT =
-  /\bserves as\b|\bis\b(?:(?!\b(?:after|before|prior)\b)[^!?])*?\bserving as\b|\b(?:currently|now) serving as\b|\bhas served as\b[^!?]*?\bsince\b|\bwas (?:confirmed|sworn in) as\b/i
+  /\bserves as\b|\bis\b(?:(?!\b(?:after|before|prior|formerly|previously|known|for)\b)[^!?])*?\bserving as\b|\b(?:currently|now) serving as\b|\bhas served as\b[^!?]*?\bsince\b|\bwas (?:confirmed|sworn in) as\b/i
 
 /**
  * Past-career markers for teaser preference. Narrower than PERSON_BIO_CUE on

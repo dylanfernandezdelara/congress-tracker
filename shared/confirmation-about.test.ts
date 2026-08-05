@@ -239,6 +239,17 @@ describe('confirmationAboutTeaser', () => {
     )
   })
 
+  it('keeps "known for serving as" and "formerly serving as" career idioms', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official currently serving as Secretary of Energy. She is best known for serving as Ambassador to France from 2015 to 2019.',
+      ),
+    ).toBe('She is best known for serving as Ambassador to France from 2015 to 2019.')
+    expect(
+      confirmationAboutTeaser('Jane Doe is a diplomat formerly serving as ambassador to France.'),
+    ).toBe('Jane Doe is a diplomat formerly serving as ambassador to France.')
+  })
+
   it('keeps past-role sentences that use "serving as" or "was appointed as"', () => {
     expect(
       confirmationAboutTeaser(
