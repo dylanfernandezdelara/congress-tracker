@@ -1,10 +1,10 @@
 import { useId, useState } from 'react'
 
 import {
+  confirmationAboutTeaser,
   confirmationOppositionNote,
   selectConfirmationAbout,
 } from '@congress-tracker/shared/confirmation-about'
-import { formatCollapsedDigestLead } from '@congress-tracker/shared/digest-format'
 
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
@@ -54,8 +54,8 @@ function ConfirmationItemRow({
   const organization = item.organization?.trim() || null
   const voteLabel = voteChipLabel(item)
   const wikiArticleUrl = item.wikipedia_url?.trim() || null
-  // "Who this is" without expanding — first sentence of the person blurb.
-  const aboutTeaser = about.text ? formatCollapsedDigestLead(about.text) : null
+  // "Who this is" without expanding — first non-nominated sentence of the blurb.
+  const aboutTeaser = confirmationAboutTeaser(about.text)
 
   return (
     <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>

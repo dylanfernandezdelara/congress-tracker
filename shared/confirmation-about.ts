@@ -1,5 +1,5 @@
 import type { ConfirmationNominee } from './confirmations-api-types'
-import { splitSentences } from './digest-format'
+import { FEED_LEAD_MAX_WORDS, splitSentences, truncateWords } from './digest-format'
 import { normalizePartyCode, partyDisplayName, partyShortLabel } from './party'
 import type { RollPartySplit } from './stats-api-types'
 
@@ -51,8 +51,21 @@ export function buildOfficialConfirmationAbout(params: {
   return null
 }
 
+/**
+ * Career-history cues that mark a sentence as biography. Office titles
+ * ("Director", "Judge", …) are deliberately excluded — identity lines like
+ * "was confirmed as Director of X" name the office, not the person's past.
+ */
 const PERSON_BIO_CUE =
-  /\b(previously|served|led|leading|graduated|born|former|worked|director|commissioner|professor|attorney|judge|ambassador|executive|advisor|adviser)\b/i
+  /\b(previously|served|led|leading|graduated|born|former|worked|chaired)\b/i
+
+/** Identity-only restatements of the card headline (confirmed or nominated). */
+const IDENTITY_ONLY_PATTERNS = [
+  /\bwas nominated (?:to serve )?(?:as|to be|for)\b/i,
+  /\bwas confirmed as\b/i,
+  /\bwas confirmed by the Senate\b/i,
+  /^Confirmed as\b/i,
+]
 
 function normalizeAboutText(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toLowerCase()
@@ -76,22 +89,9 @@ export function isRedundantConfirmationAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return true
   if (isNominationBoilerplateAbout(text)) return true
-  const sentences = splitSentences(text)
-  // Single-sentence nominated-identity lines restate the headline (and mislabel
-  // the vote); role words like "Director" must not count as bio cues here.
-  if (
-    sentences.length === 1 &&
-    /\bwas nominated (?:to serve )?(?:as|to be|for)\b/i.test(text)
-  ) {
-    return true
-  }
-  // Multi-sentence or bio-cue sentences still carry person facts.
-  if (sentences.length > 1 || PERSON_BIO_CUE.test(text)) return false
-  return (
-    /\bwas confirmed as\b/i.test(text) ||
-    /\bwas confirmed by the Senate\b/i.test(text) ||
-    /^Confirmed as\b/i.test(text)
-  )
+  // Multi-sentence or career-cue blurbs still carry person facts.
+  if (splitSentences(text).length > 1 || PERSON_BIO_CUE.test(text)) return false
+  return IDENTITY_ONLY_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 /**
@@ -150,6 +150,18 @@ export function selectConfirmationAbout(params: {
  */
 export function isMisleadingConfirmationHeadline(headline: string): boolean {
   return /\bnominat/i.test(headline) && !/\bconfirm/i.test(headline)
+}
+
+/**
+ * Collapsed-row "who this is" teaser: the first sentence of the About blurb
+ * that does not mislabel the confirmed vote as a nomination.
+ */
+export function confirmationAboutTeaser(about: string | null): string | null {
+  if (!about?.trim()) return null
+  const sentence = splitSentences(about).find(
+    (candidate) => !isMisleadingConfirmationHeadline(candidate),
+  )
+  return sentence ? truncateWords(sentence, FEED_LEAD_MAX_WORDS) : null
 }
 
 /** Card headline from stored rewrite or nomination identity. */

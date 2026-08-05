@@ -26,26 +26,25 @@ function normalizePersonBackground(text: string): string {
 }
 
 /**
- * Last balanced `{...}` block in mixed output. Reasoning models that inline
- * their thinking into `content` still end with the JSON answer.
+ * JSON object at the tail of mixed output. Reasoning models that inline their
+ * thinking into `content` end with the JSON answer, so the object must close
+ * the message — this rejects schema echoes inside truncated reasoning text.
+ * JSON.parse is the oracle; no hand-rolled brace/escape scanning.
  */
 function extractTrailingJsonObject(text: string): string | null {
-  const end = text.lastIndexOf("}");
-  if (end === -1) return null;
-  let depth = 0;
-  let inString = false;
-  for (let i = end; i >= 0; i -= 1) {
-    const ch = text[i];
-    if (inString) {
-      // Walking backwards: a quote ends the string unless escaped from the left.
-      if (ch === '"' && text[i - 1] !== "\\") inString = false;
-      continue;
-    }
-    if (ch === '"') inString = true;
-    else if (ch === "}") depth += 1;
-    else if (ch === "{") {
-      depth -= 1;
-      if (depth === 0) return text.slice(i, end + 1);
+  const trimmed = text.trimEnd();
+  if (!trimmed.endsWith("}")) return null;
+  for (
+    let start = trimmed.indexOf("{");
+    start !== -1;
+    start = trimmed.indexOf("{", start + 1)
+  ) {
+    const candidate = trimmed.slice(start);
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // Not a balanced object from this brace; try the next one.
     }
   }
   return null;

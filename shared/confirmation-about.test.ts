@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildOfficialConfirmationAbout,
+  confirmationAboutTeaser,
   confirmationHeadline,
   confirmationOppositionNote,
   isNominationDescriptionEcho,
@@ -93,6 +94,14 @@ describe('isRedundantConfirmationAbout', () => {
     ).toBe(true)
   })
 
+  it('flags confirmed-identity lines even when the role is an office title', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Erica Schwartz was confirmed as Director of the Centers for Disease Control and Prevention.',
+      ),
+    ).toBe(true)
+  })
+
   it('keeps multi-sentence backgrounds that mention the nomination', () => {
     expect(
       isRedundantConfirmationAbout(
@@ -159,6 +168,35 @@ describe('selectConfirmationAbout', () => {
         wikipediaExtract: null,
       }),
     ).toEqual({ text: null, source: null })
+  })
+})
+
+describe('confirmationAboutTeaser', () => {
+  it('returns the first sentence of a person blurb', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American health official. She previously served as Deputy Surgeon General.',
+      ),
+    ).toBe('Erica G. Schwartz is an American health official.')
+  })
+
+  it('skips sentences that mislabel the confirmation as a nomination', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe was nominated to be Secretary of Energy in 2026. She previously led California grid programs.',
+      ),
+    ).toBe('She previously led California grid programs.')
+  })
+
+  it('returns null when every sentence is nominated-only phrasing', () => {
+    expect(
+      confirmationAboutTeaser('Jane Doe was nominated to be Secretary of Energy in 2026.'),
+    ).toBeNull()
+  })
+
+  it('returns null for empty input', () => {
+    expect(confirmationAboutTeaser(null)).toBeNull()
+    expect(confirmationAboutTeaser('   ')).toBeNull()
   })
 })
 

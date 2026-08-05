@@ -115,6 +115,30 @@ describe('RecentConfirmationsSection', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('never teases nominated-only phrasing for a confirmed vote', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            nominee_names: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+            headline:
+              'Erica Schwartz confirmed as Director of the Centers for Disease Control and Prevention',
+            wikipedia_url: 'https://en.wikipedia.org/wiki/Erica_Schwartz',
+            wikipedia_extract:
+              'Erica Schwartz was nominated to be CDC director in 2026. She previously served as Deputy Surgeon General.',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    expect(screen.queryByText(/was nominated/)).not.toBeInTheDocument()
+    expect(
+      screen.getByText('She previously served as Deputy Surgeon General.'),
+    ).toBeInTheDocument()
+  })
+
   it('prefers person Wikipedia About and shows opposition plus compact sources', () => {
     render(
       <RecentConfirmationsSection

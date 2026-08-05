@@ -43,6 +43,17 @@ ${VALID_JSON}`;
     expect(parseConfirmationBackgroundJson(cutOff)).toBeNull();
   });
 
+  it("ignores a schema echo inside reasoning that was cut off before the answer", () => {
+    const schemaEcho = JSON.stringify({
+      headline: "8-12 words naming the person and confirmed role",
+      what_was_confirmed: "One sentence stating what the Senate confirmed",
+      background: "1-2 sentences on who the person is",
+      key_points: [],
+    });
+    const cutOff = `The output must match the example ${schemaEcho} so let me draft the answer for Erica`;
+    expect(parseConfirmationBackgroundJson(cutOff)).toBeNull();
+  });
+
   it("returns null when required fields are missing", () => {
     expect(
       parseConfirmationBackgroundJson(
