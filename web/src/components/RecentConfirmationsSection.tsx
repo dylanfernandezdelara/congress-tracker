@@ -54,7 +54,8 @@ function ConfirmationItemRow({
   const organization = item.organization?.trim() || null
   const voteLabel = voteChipLabel(item)
   const wikiArticleUrl = item.wikipedia_url?.trim() || null
-  // "Who this is" without expanding — first non-nominated sentence of the blurb.
+  // "Who this is" without expanding — career-history sentence of the blurb,
+  // skipping office restatements and nominated phrasing.
   const aboutTeaser = confirmationAboutTeaser(about.text)
 
   return (

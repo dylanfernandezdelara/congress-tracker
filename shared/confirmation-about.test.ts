@@ -204,6 +204,38 @@ describe('confirmationAboutTeaser', () => {
     ).toBeNull()
   })
 
+  it('skips present-perfect current-office ledes and teases the history sentence', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American physician who has served as the Director of the CDC since January 2026. Before that, she was a rear admiral in the U.S. Public Health Service.',
+      ),
+    ).toBe('Before that, she was a rear admiral in the U.S. Public Health Service.')
+  })
+
+  it('keeps past-role sentences that use "serving as" or "was appointed as"', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official currently serving as Secretary of Energy. After serving as a state regulator, she was appointed as chair of the California Energy Commission in 2018.',
+      ),
+    ).toBe(
+      'After serving as a state regulator, she was appointed as chair of the California Energy Commission in 2018.',
+    )
+  })
+
+  it('does not prefer birth or education lines over a profession lede', () => {
+    expect(
+      confirmationAboutTeaser('Jane Doe is an American attorney. She was born in Tampa.'),
+    ).toBe('Jane Doe is an American attorney.')
+  })
+
+  it('never teases another "confirmed as" line under a confirmed-as headline', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official currently serving as Secretary of Energy. She was confirmed as U.S. Attorney in 2015.',
+      ),
+    ).toBeNull()
+  })
+
   it('skips sentences that mislabel the confirmation as a nomination', () => {
     expect(
       confirmationAboutTeaser(

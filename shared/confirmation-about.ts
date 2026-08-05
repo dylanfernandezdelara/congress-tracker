@@ -153,11 +153,24 @@ export function isMisleadingConfirmationHeadline(headline: string): boolean {
 }
 
 /**
- * Wikipedia-style lede sentences that only introduce the person and the office
- * they now hold ("X is an American health official currently serving as
- * Director of the CDC") repeat what the card headline already says.
+ * Sentences that restate the office on the card: present-tense "serves as /
+ * currently serving as", Wikipedia-lede "is an X serving as", present-perfect
+ * "has served as … since", and the confirmation event itself ("was
+ * confirmed/sworn in as"). Past appointments ("was appointed as ambassador in
+ * 2015") stay eligible as career history. Tradeoff: a past confirmation to a
+ * different office is also skipped — a second "confirmed as" line under a
+ * "confirmed as" headline reads as noise, and the expanded About keeps it.
  */
-const ROLE_RESTATEMENT = /\bserv(?:es|ing) as\b|\bwas (?:confirmed|sworn in|appointed) as\b/i
+const ROLE_RESTATEMENT =
+  /\bserves as\b|\bis (?:a|an|the)\b[^.!?]*\bserving as\b|\b(?:currently|now) serving as\b|\bhas served as\b[^.!?]*\bsince\b|\bwas (?:confirmed|sworn in) as\b/i
+
+/**
+ * Past-career markers for teaser preference. Narrower than PERSON_BIO_CUE on
+ * purpose: "born"/"graduated" make a sentence biographical for redundancy
+ * checks, but they are a weak collapsed teaser next to a profession lede.
+ */
+const CAREER_HISTORY_CUE =
+  /\b(?:previously|formerly|former|earlier|before|after|prior|until)\b|\bserved as\b|\bwas appointed\b|\b(?:led|worked|chaired)\b/i
 
 /** Truncated teasers should not end on a dangling connective ("… General from…"). */
 const TRAILING_CONNECTIVE =
@@ -172,21 +185,21 @@ function truncateTeaserSentence(sentence: string): string {
 }
 
 /**
- * Collapsed-row "who this is" teaser. Prefer the first career-history sentence
- * ("previously served as Deputy Surgeon General …") — that is the signal
- * readers need — over ledes that merely restate the office in the headline.
- * Never surface nominated-only phrasing; return null when nothing beyond the
- * headline remains.
+ * Collapsed-row "who this is" teaser. Sentences that restate the office in the
+ * headline (or mislabel the vote as a nomination) are excluded up front; among
+ * the rest, prefer the first career-history sentence ("previously served as
+ * Deputy Surgeon General …") — that is the signal readers need — then fall
+ * back to the first remaining sentence (e.g. a profession lede). Return null
+ * when nothing beyond the headline remains.
  */
 export function confirmationAboutTeaser(about: string | null): string | null {
   if (!about?.trim()) return null
-  const sentences = splitSentences(about).filter(
-    (candidate) => !isMisleadingConfirmationHeadline(candidate),
+  const candidates = splitSentences(about).filter(
+    (candidate) =>
+      !isMisleadingConfirmationHeadline(candidate) && !ROLE_RESTATEMENT.test(candidate),
   )
   const pick =
-    sentences.find((candidate) => PERSON_BIO_CUE.test(candidate)) ??
-    sentences.find((candidate) => !ROLE_RESTATEMENT.test(candidate)) ??
-    null
+    candidates.find((candidate) => CAREER_HISTORY_CUE.test(candidate)) ?? candidates[0] ?? null
   return pick ? truncateTeaserSentence(pick) : null
 }
 
