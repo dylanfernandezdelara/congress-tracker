@@ -52,9 +52,10 @@ export function buildOfficialConfirmationAbout(params: {
 }
 
 /**
- * Career-history cues that mark a sentence as biography. Office titles
+ * Biographical cues for the redundancy/boilerplate checks. Office titles
  * ("Director", "Judge", …) are deliberately excluded — identity lines like
  * "was confirmed as Director of X" name the office, not the person's past.
+ * Teaser preference uses the narrower CAREER_HISTORY_CUE instead.
  */
 const PERSON_BIO_CUE =
   /\b(previously|served|led|leading|graduated|born|former|worked|chaired)\b/i
@@ -154,15 +155,18 @@ export function isMisleadingConfirmationHeadline(headline: string): boolean {
 
 /**
  * Sentences that restate the office on the card: present-tense "serves as /
- * currently serving as", Wikipedia-lede "is an X serving as", present-perfect
- * "has served as … since", and the confirmation event itself ("was
- * confirmed/sworn in as"). Past appointments ("was appointed as ambassador in
- * 2015") stay eligible as career history. Tradeoff: a past confirmation to a
- * different office is also skipped — a second "confirmed as" line under a
- * "confirmed as" headline reads as noise, and the expanded About keeps it.
+ * is serving as / currently serving as", present-perfect "has served as …
+ * since", and the confirmation event itself ("was confirmed/sworn in as").
+ * The "is … serving as" span must not jump a temporal marker — "who, after
+ * serving as ambassador, joined …" is career history — and allows "." so
+ * abbreviations like "U.S." do not break the match. Past appointments ("was
+ * appointed as ambassador in 2015") stay eligible as career history.
+ * Tradeoff: a past confirmation to a different office is also skipped — a
+ * second "confirmed as" line under a "confirmed as" headline reads as noise,
+ * and the expanded About keeps the full text.
  */
 const ROLE_RESTATEMENT =
-  /\bserves as\b|\bis (?:a|an|the)\b[^.!?]*\bserving as\b|\b(?:currently|now) serving as\b|\bhas served as\b[^.!?]*\bsince\b|\bwas (?:confirmed|sworn in) as\b/i
+  /\bserves as\b|\bis\b(?:(?!\b(?:after|before|prior)\b)[^!?])*?\bserving as\b|\b(?:currently|now) serving as\b|\bhas served as\b[^!?]*?\bsince\b|\bwas (?:confirmed|sworn in) as\b/i
 
 /**
  * Past-career markers for teaser preference. Narrower than PERSON_BIO_CUE on
@@ -171,6 +175,9 @@ const ROLE_RESTATEMENT =
  */
 const CAREER_HISTORY_CUE =
   /\b(?:previously|formerly|former|earlier|before|after|prior|until)\b|\bserved as\b|\bwas appointed\b|\b(?:led|worked|chaired)\b/i
+
+/** Birth/education facts read weak next to a profession lede; never prefer them. */
+const BIRTH_EDUCATION = /\b(?:born|graduated)\b/i
 
 /** Truncated teasers should not end on a dangling connective ("… General from…"). */
 const TRAILING_CONNECTIVE =
@@ -199,7 +206,11 @@ export function confirmationAboutTeaser(about: string | null): string | null {
       !isMisleadingConfirmationHeadline(candidate) && !ROLE_RESTATEMENT.test(candidate),
   )
   const pick =
-    candidates.find((candidate) => CAREER_HISTORY_CUE.test(candidate)) ?? candidates[0] ?? null
+    candidates.find(
+      (candidate) => CAREER_HISTORY_CUE.test(candidate) && !BIRTH_EDUCATION.test(candidate),
+    ) ??
+    candidates[0] ??
+    null
   return pick ? truncateTeaserSentence(pick) : null
 }
 

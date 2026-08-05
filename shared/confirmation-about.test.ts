@@ -212,6 +212,33 @@ describe('confirmationAboutTeaser', () => {
     ).toBe('Before that, she was a rear admiral in the U.S. Public Health Service.')
   })
 
+  it('filters current-office ledes even when an abbreviation sits inside the span', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Dr. Jane Doe has served as the U.S. Secretary of Energy since 2026.',
+      ),
+    ).toBeNull()
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an official at the U.S. Department of Energy serving as Secretary.',
+      ),
+    ).toBeNull()
+  })
+
+  it('filters bare "is serving as" restatements', () => {
+    expect(confirmationAboutTeaser('Jane Doe is serving as Secretary of Energy.')).toBeNull()
+  })
+
+  it('keeps same-sentence career clauses like "who, after serving as ambassador"', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official who, after serving as ambassador, joined the Energy Department.',
+      ),
+    ).toBe(
+      'Jane Doe is an American official who, after serving as ambassador, joined the Energy Department.',
+    )
+  })
+
   it('keeps past-role sentences that use "serving as" or "was appointed as"', () => {
     expect(
       confirmationAboutTeaser(
@@ -225,6 +252,16 @@ describe('confirmationAboutTeaser', () => {
   it('does not prefer birth or education lines over a profession lede', () => {
     expect(
       confirmationAboutTeaser('Jane Doe is an American attorney. She was born in Tampa.'),
+    ).toBe('Jane Doe is an American attorney.')
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American attorney. She was born in Tampa before moving to Miami.',
+      ),
+    ).toBe('Jane Doe is an American attorney.')
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American attorney. She graduated from Yale before joining the Justice Department.',
+      ),
     ).toBe('Jane Doe is an American attorney.')
   })
 

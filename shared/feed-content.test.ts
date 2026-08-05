@@ -116,6 +116,12 @@ The resolution recommends levels and amounts for FY2027-FY2036 for federal reven
       "Jane Doe led U.S. grid programs.",
       "She previously chaired the state commission.",
     ]);
+    expect(
+      splitSentences("Dr. Jane Doe is a physician. She led the county health agency.")
+    ).toEqual([
+      "Dr. Jane Doe is a physician.",
+      "She led the county health agency.",
+    ]);
   });
 
   it("truncates at sentence boundaries without cutting on U.S. abbreviations", () => {

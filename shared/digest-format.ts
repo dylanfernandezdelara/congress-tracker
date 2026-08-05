@@ -27,6 +27,8 @@ function protectAbbreviations(text: string): string {
     // Name initials ("Erica G. Schwartz") — a single capital letter followed by
     // a capitalized word is an initial, not a sentence end.
     .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, '$1§')
+    // Honorifics before a name ("Dr. Jane Doe") are not sentence ends.
+    .replace(/\b(Dr|Mr|Mrs|Ms|Prof|Rev|Hon|Gen|Adm|Gov|Sen|Rep|Lt|Col|Capt|Maj|Sgt)\.(?=\s+[A-Z])/g, '$1§')
 }
 
 function restoreAbbreviations(text: string): string {
