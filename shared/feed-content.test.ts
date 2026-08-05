@@ -93,6 +93,14 @@ The resolution recommends levels and amounts for FY2027-FY2036 for federal reven
     ).toBe("Amends Title 18 U.S.C. Section 401 to add penalties.");
   });
 
+  it("does not cut the first sentence on a name initial", () => {
+    expect(
+      formatCollapsedDigestLead(
+        "Erica G. Schwartz is an American health official. She was Deputy Surgeon General."
+      )
+    ).toBe("Erica G. Schwartz is an American health official.");
+  });
+
   it("truncates at sentence boundaries without cutting on U.S. abbreviations", () => {
     const lead = "Word ".repeat(150).trim();
     const input = `${lead} The act directs the U.S. Department of Energy to publish rules after enactment.`;

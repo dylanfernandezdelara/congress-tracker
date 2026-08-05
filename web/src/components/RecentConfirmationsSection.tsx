@@ -4,6 +4,7 @@ import {
   confirmationOppositionNote,
   selectConfirmationAbout,
 } from '@congress-tracker/shared/confirmation-about'
+import { formatCollapsedDigestLead } from '@congress-tracker/shared/digest-format'
 
 import type { RecentConfirmationItem } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
@@ -53,6 +54,8 @@ function ConfirmationItemRow({
   const organization = item.organization?.trim() || null
   const voteLabel = voteChipLabel(item)
   const wikiArticleUrl = item.wikipedia_url?.trim() || null
+  // "Who this is" without expanding — first sentence of the person blurb.
+  const aboutTeaser = about.text ? formatCollapsedDigestLead(about.text) : null
 
   return (
     <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
@@ -78,6 +81,10 @@ function ConfirmationItemRow({
               <span className="feed-row-chip feed-row-chip--margin">{voteLabel}</span>
               {organization ? <span className="feed-row-chip">{organization}</span> : null}
             </div>
+
+            {!isExpanded && aboutTeaser ? (
+              <p className="feed-row-teaser">{aboutTeaser}</p>
+            ) : null}
           </div>
         </button>
 

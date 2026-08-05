@@ -24,6 +24,9 @@ function protectAbbreviations(text: string): string {
     .replace(/\bH\.R\.\s*\d+/gi, (match) => match.replace(/\./g, '§'))
     .replace(/\bS\.\s*\d+/gi, (match) => match.replace(/\./g, '§'))
     .replace(/\$(\d+)\.(\d+)/g, (_, whole, fraction) => `$${whole}§${fraction}`)
+    // Name initials ("Erica G. Schwartz") — a single capital letter followed by
+    // a capitalized word is an initial, not a sentence end.
+    .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, '$1§')
 }
 
 function restoreAbbreviations(text: string): string {

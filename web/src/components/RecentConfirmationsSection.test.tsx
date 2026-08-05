@@ -83,6 +83,38 @@ describe('RecentConfirmationsSection', () => {
     expect(screen.queryByText(/R 53–0/)).not.toBeInTheDocument()
   })
 
+  it('shows who the nominee is in the collapsed row and moves it to About on expand', () => {
+    const extract =
+      'Erica G. Schwartz is an American health official. She previously served as Deputy Surgeon General.'
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            nominee_names: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+            headline:
+              'Erica Schwartz confirmed as Director of the Centers for Disease Control and Prevention',
+            wikipedia_url: 'https://en.wikipedia.org/wiki/Erica_Schwartz',
+            wikipedia_extract: extract,
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    // Collapsed: first-sentence teaser tells readers who the person is.
+    expect(
+      screen.getByText('Erica G. Schwartz is an American health official.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(extract)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Erica Schwartz/i }))
+    expect(screen.getByText(extract)).toBeInTheDocument()
+    expect(
+      screen.queryByText('Erica G. Schwartz is an American health official.'),
+    ).not.toBeInTheDocument()
+  })
+
   it('prefers person Wikipedia About and shows opposition plus compact sources', () => {
     render(
       <RecentConfirmationsSection
