@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildOfficialConfirmationAbout,
   confirmationAboutTeaser,
+  confirmationCrossVoteNote,
   confirmationHeadline,
   confirmationOppositionNote,
   isNominationDescriptionEcho,
@@ -353,6 +354,53 @@ describe('confirmationHeadline', () => {
         citation: 'PN932',
       }),
     ).toBe('Senate confirms nominated CDC Director Erica Schwartz')
+  })
+})
+
+describe('confirmationCrossVoteNote', () => {
+  it('names a single senator who crossed party lines', () => {
+    expect(
+      confirmationCrossVoteNote([
+        { name: 'Tim Kaine', party: 'D', state: 'VA', position: 'yea', party_line: 'nay' },
+      ]),
+    ).toBe('Tim Kaine (D-VA) was the only Democrat to vote yes.')
+  })
+
+  it('lists a small group of crossing senators', () => {
+    expect(
+      confirmationCrossVoteNote([
+        { name: 'Jane Roe', party: 'R', state: 'ME', position: 'nay', party_line: 'yea' },
+        { name: 'John Poe', party: 'R', state: 'AK', position: 'nay', party_line: 'yea' },
+      ]),
+    ).toBe('Jane Roe (R-ME) and John Poe (R-AK) were the only Republicans to vote no.')
+  })
+
+  it('counts large groups instead of listing names', () => {
+    const votes = Array.from({ length: 5 }, (_, i) => ({
+      name: `Senator ${i + 1}`,
+      party: 'D',
+      state: 'CA',
+      position: 'yea' as const,
+      party_line: 'nay' as const,
+    }))
+    expect(confirmationCrossVoteNote(votes)).toBe(
+      '5 Democrats crossed party lines to vote yes.',
+    )
+  })
+
+  it('covers both directions and omits missing states', () => {
+    expect(
+      confirmationCrossVoteNote([
+        { name: 'Tim Kaine', party: 'D', state: 'VA', position: 'yea', party_line: 'nay' },
+        { name: 'Jane Roe', party: 'R', state: null, position: 'nay', party_line: 'yea' },
+      ]),
+    ).toBe(
+      'Tim Kaine (D-VA) was the only Democrat to vote yes. Jane Roe (R) was the only Republican to vote no.',
+    )
+  })
+
+  it('returns null when nobody crossed', () => {
+    expect(confirmationCrossVoteNote([])).toBeNull()
   })
 })
 

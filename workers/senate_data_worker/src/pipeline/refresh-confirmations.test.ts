@@ -5,7 +5,9 @@ const {
   upsertNominationMetadata,
   selectNominationsNeedingEnrichment,
   lookupNomineeWikipedia,
+  fetchWikipediaArticlePlainText,
   rewriteConfirmationBackground,
+  rewriteVoteContext,
   resolveOpenRouterModel,
   fetchNominationBundle,
 } = vi.hoisted(() => ({
@@ -13,7 +15,9 @@ const {
   upsertNominationMetadata: vi.fn(),
   selectNominationsNeedingEnrichment: vi.fn(),
   lookupNomineeWikipedia: vi.fn(),
+  fetchWikipediaArticlePlainText: vi.fn(),
   rewriteConfirmationBackground: vi.fn(),
+  rewriteVoteContext: vi.fn(),
   resolveOpenRouterModel: vi.fn(),
   fetchNominationBundle: vi.fn(),
 }));
@@ -52,12 +56,23 @@ vi.mock("../sources/wikipedia", async () => {
   return {
     ...actual,
     lookupNomineeWikipedia,
+    fetchWikipediaArticlePlainText,
   };
 });
 
 vi.mock("../synthesis/confirmation-rewrite", () => ({
   rewriteConfirmationBackground,
 }));
+
+vi.mock("../synthesis/confirmation-vote-context", async () => {
+  const actual = await vi.importActual<
+    typeof import("../synthesis/confirmation-vote-context")
+  >("../synthesis/confirmation-vote-context");
+  return {
+    ...actual,
+    rewriteVoteContext,
+  };
+});
 
 vi.mock("../synthesis/model", () => ({
   resolveOpenRouterModel,
@@ -89,6 +104,9 @@ describe("refreshConfirmationEnrichment", () => {
     resolveOpenRouterModel.mockResolvedValue("test-model");
     rewriteConfirmationBackground.mockResolvedValue(null);
     lookupNomineeWikipedia.mockResolvedValue({ status: "miss" });
+    // No nomination coverage by default — vote context seals null without an LLM call.
+    fetchWikipediaArticlePlainText.mockResolvedValue({ status: "ok", text: "" });
+    rewriteVoteContext.mockResolvedValue({ status: "ok", text: null });
     selectNominationsNeedingEnrichment.mockResolvedValue([
       {
         ref: { congress: 119, number: 100, partNumber: 0 },
@@ -520,6 +538,125 @@ describe("refreshConfirmationEnrichment", () => {
     expect(metaSave.nominees[0]?.display_name).toBe("Walter Clayton");
     expect(result.backgroundsRewritten).toBe(1);
     expect(result.wikipediaLookups).toBe(1);
+  });
+
+  it("writes grounded vote context from the Wikipedia article after a wiki hit", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background: "Jane Doe previously led California energy commission programs.",
+          key_points: [],
+          wikipedia_url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+          wikipedia_extract: "Jane Doe is an American energy official.",
+        }),
+      })
+    );
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: false,
+        needsWikipedia: false,
+        needsVoteContext: true,
+      },
+    ]);
+    fetchWikipediaArticlePlainText.mockResolvedValue({
+      status: "ok",
+      text: "At her Senate confirmation hearing, Doe was criticized by senators over her pipeline permitting record and grid reliability plans before the vote.",
+    });
+    rewriteVoteContext.mockResolvedValue({
+      status: "ok",
+      text: "Senators criticized Doe's pipeline permitting record and grid reliability plans at her hearing.",
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    const result = await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(result.voteContextsWritten).toBe(1);
+    const saved = upsertNominationMetadata.mock.calls[0]![1] as {
+      backgroundJson: string;
+    };
+    const parsed = JSON.parse(saved.backgroundJson);
+    expect(parsed.vote_context).toContain("pipeline permitting record");
+    // Wikipedia fields survive untouched.
+    expect(parsed.wikipedia_extract).toBe("Jane Doe is an American energy official.");
+  });
+
+  it("seals vote_context null when Wikipedia was a sealed miss", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background: "Jane Doe previously led California energy commission programs.",
+          key_points: [],
+          wikipedia_url: null,
+          wikipedia_extract: null,
+        }),
+      })
+    );
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: false,
+        needsWikipedia: false,
+        needsVoteContext: true,
+      },
+    ]);
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(fetchWikipediaArticlePlainText).not.toHaveBeenCalled();
+    expect(rewriteVoteContext).not.toHaveBeenCalled();
+    const saved = upsertNominationMetadata.mock.calls[0]![1] as {
+      backgroundJson: string;
+    };
+    const parsed = JSON.parse(saved.backgroundJson);
+    expect(parsed.vote_context).toBeNull();
+  });
+
+  it("leaves vote_context unset when the article fetch is unavailable", async () => {
+    getNomination.mockResolvedValue(
+      nominationRow({
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background: "Jane Doe previously led California energy commission programs.",
+          key_points: [],
+          wikipedia_url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+          wikipedia_extract: "Jane Doe is an American energy official.",
+        }),
+      })
+    );
+    selectNominationsNeedingEnrichment.mockResolvedValue([
+      {
+        ref: { congress: 119, number: 100, partNumber: 0 },
+        result: "Confirmed",
+        needsRaw: false,
+        needsBackground: false,
+        needsWikipedia: false,
+        needsVoteContext: true,
+      },
+    ]);
+    fetchWikipediaArticlePlainText.mockResolvedValue({
+      status: "unavailable",
+      error: "HTTP 503",
+    });
+
+    const env = { DB: {} as D1Database, OPENROUTER_API_KEY: "x" } as import("../config").Env;
+    const result = await refreshConfirmationEnrichment(env, "2026-01-01", "admin");
+
+    expect(rewriteVoteContext).not.toHaveBeenCalled();
+    expect(upsertNominationMetadata).not.toHaveBeenCalled();
+    expect(
+      result.warnings.some((w) => w.includes("Wikipedia article fetch unavailable"))
+    ).toBe(true);
   });
 
   it("does not seal a miss when Wikipedia is temporarily unavailable", async () => {

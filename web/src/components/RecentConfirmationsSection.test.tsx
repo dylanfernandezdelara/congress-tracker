@@ -33,6 +33,8 @@ function sampleConfirmation(overrides: Partial<RecentConfirmationItem> = {}): Re
       { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
       { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
     ],
+    cross_party_votes: [],
+    vote_context: null,
     ...overrides,
   }
 }
@@ -113,6 +115,49 @@ describe('RecentConfirmationsSection', () => {
     expect(
       screen.queryByText('She previously served as Deputy Surgeon General.'),
     ).not.toBeInTheDocument()
+  })
+
+  it('shows who crossed party lines and why the vote was contested', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            nominee_names: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+            headline: 'Erica Schwartz confirmed as CDC Director',
+            party_splits: [
+              { party: 'R', yeas: 50, nays: 0, party_line: 'yea' },
+              { party: 'D', yeas: 1, nays: 42, party_line: 'nay' },
+            ],
+            cross_party_votes: [
+              {
+                name: 'Tim Kaine',
+                party: 'D',
+                state: 'VA',
+                position: 'yea',
+                party_line: 'nay',
+              },
+            ],
+            vote_context:
+              'At her Senate hearing, Schwartz said she supported withdrawing the U.S. from the World Health Organization.',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Erica Schwartz/i }))
+    expect(screen.getByText('Why it was contested')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'At her Senate hearing, Schwartz said she supported withdrawing the U.S. from the World Health Organization.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Most Democrats voted against confirmation (D 1–42). Tim Kaine (D-VA) was the only Democrat to vote yes.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('never teases nominated-only phrasing for a confirmed vote', () => {

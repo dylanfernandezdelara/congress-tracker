@@ -13,7 +13,8 @@ import {
 } from "../d1/nominations";
 import { selectRecentConfirmationVotes } from "../d1/confirmation-votes";
 import { selectMemberVotesForRollKeys } from "../d1/member-votes";
-import { hasRealMemberRoster } from "../d1/members";
+import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
+import { rollCrossVotes } from "../analytics/cross-votes";
 import { isConfirmedResult } from "../sources/confirmation";
 import {
   congressGovNominationUrl,
@@ -23,6 +24,7 @@ import { nominationCitation } from "../sources/nomination-ref";
 import { lookbackStartIso } from "../sources/congress-client";
 import { rollPartySplits } from "../analytics/roll-party-stats";
 import type {
+  ConfirmationCrossVote,
   RecentConfirmationItem,
   RecentConfirmationsResponse,
 } from "../../../../shared/confirmations-api-types";
@@ -38,7 +40,12 @@ function rollKey(
   return `${congress}:${session}:${chamber}:${rollNumber}`;
 }
 
-async function loadPartySplitsByRoll(
+interface RollVoteInsights {
+  partySplits: Map<string, RollPartySplit[]>;
+  crossVotes: Map<string, ConfirmationCrossVote[]>;
+}
+
+async function loadRollVoteInsights(
   db: D1Database,
   rows: Array<{
     congress: number;
@@ -46,9 +53,10 @@ async function loadPartySplitsByRoll(
     chamber: string;
     roll_number: number;
   }>
-): Promise<Map<string, RollPartySplit[]>> {
-  const out = new Map<string, RollPartySplit[]>();
-  if (rows.length === 0) return out;
+): Promise<RollVoteInsights> {
+  const partySplits = new Map<string, RollPartySplit[]>();
+  const crossVotes = new Map<string, ConfirmationCrossVote[]>();
+  if (rows.length === 0) return { partySplits, crossVotes };
 
   const excludeLocalSample = await hasRealMemberRoster(db);
   const groups = new Map<string, typeof rows>();
@@ -59,6 +67,11 @@ async function loadPartySplitsByRoll(
     groups.set(key, list);
   }
 
+  const crossByRoll = new Map<
+    string,
+    Array<{ bioguideId: string; party: string; position: "yea" | "nay"; partyLine: "yea" | "nay" }>
+  >();
+
   for (const group of groups.values()) {
     const first = group[0]!;
     const voteRows = await selectMemberVotesForRollKeys(
@@ -67,19 +80,59 @@ async function loadPartySplitsByRoll(
       first.session,
       group.map((row) => ({ chamber: row.chamber, roll_number: row.roll_number }))
     );
-    const byRoll = new Map<string, Array<{ party: string | null; position: string }>>();
+    const byRoll = new Map<
+      string,
+      Array<{ bioguideId: string; party: string | null; position: string }>
+    >();
     for (const vote of voteRows) {
       if (excludeLocalSample && isLocalSampleMemberId(vote.bioguide_id)) continue;
       const key = rollKey(vote.congress, vote.session, vote.chamber, vote.roll_number);
       const list = byRoll.get(key) ?? [];
-      list.push({ party: vote.party, position: vote.position });
+      list.push({
+        bioguideId: vote.bioguide_id,
+        party: vote.party,
+        position: vote.position,
+      });
       byRoll.set(key, list);
     }
     for (const [key, positions] of byRoll) {
-      out.set(key, rollPartySplits(positions));
+      partySplits.set(key, rollPartySplits(positions));
+      const partyById = new Map(
+        positions.map((p) => [p.bioguideId, p.party] as const)
+      );
+      crossByRoll.set(
+        key,
+        rollCrossVotes(positions).map((cross) => ({
+          bioguideId: cross.bioguideId,
+          party: partyById.get(cross.bioguideId) ?? "",
+          position: cross.position,
+          partyLine: cross.partyLine,
+        }))
+      );
     }
   }
-  return out;
+
+  const crossIds = [...crossByRoll.values()].flatMap((list) =>
+    list.map((cross) => cross.bioguideId)
+  );
+  const members = await getMembersByIds(db, crossIds);
+  for (const [key, list] of crossByRoll) {
+    crossVotes.set(
+      key,
+      list.map((cross) => {
+        const member = members.get(cross.bioguideId);
+        return {
+          name: member?.name ?? cross.bioguideId,
+          party: member?.party ?? cross.party,
+          state: member?.state ?? null,
+          position: cross.position,
+          party_line: cross.partyLine,
+        };
+      })
+    );
+  }
+
+  return { partySplits, crossVotes };
 }
 
 export async function buildRecentConfirmations(
@@ -94,7 +147,7 @@ export async function buildRecentConfirmations(
     .filter((row) => isConfirmedResult(row.result))
     .slice(0, limit);
 
-  const partySplitsByRoll = await loadPartySplitsByRoll(env.DB, rows);
+  const voteInsights = await loadRollVoteInsights(env.DB, rows);
 
   const confirmations: RecentConfirmationItem[] = rows.map((row) => {
     const background = parseStoredBackground(row.background_json);
@@ -182,9 +235,14 @@ export async function buildRecentConfirmations(
       wikipedia_url: background?.wikipedia_url ?? null,
       wikipedia_extract: background?.wikipedia_extract ?? null,
       party_splits:
-        partySplitsByRoll.get(
+        voteInsights.partySplits.get(
           rollKey(row.congress, row.session, row.chamber, row.roll_number)
         ) ?? [],
+      cross_party_votes:
+        voteInsights.crossVotes.get(
+          rollKey(row.congress, row.session, row.chamber, row.roll_number)
+        ) ?? [],
+      vote_context: background?.vote_context ?? null,
     };
   });
 

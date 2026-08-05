@@ -2,10 +2,12 @@ import { isNominationDescriptionEcho } from "../../../../shared/confirmation-abo
 import {
   CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES,
   CONFIRMATION_NOMINATION_FETCHES_PER_RUN,
+  CONFIRMATION_VOTE_CONTEXT_PER_RUN,
   CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN,
 } from "../constants";
 import type { Env } from "../config";
 import {
+  backgroundNeedsVoteContext,
   backgroundNeedsWikipedia,
   getNomination,
   parseNomineesJson,
@@ -24,17 +26,23 @@ import {
 } from "../sources/nomination-client";
 import { nominationCitation } from "../sources/nomination-ref";
 import {
+  fetchWikipediaArticlePlainText,
   lookupNomineeWikipedia,
   truncateWikipediaExtract,
 } from "../sources/wikipedia";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteConfirmationBackground } from "../synthesis/confirmation-rewrite";
+import {
+  rewriteVoteContext,
+  selectVoteContextSource,
+} from "../synthesis/confirmation-vote-context";
 
 export interface RefreshConfirmationsResult {
   votesUpserted: number;
   nominationsFetched: number;
   backgroundsRewritten: number;
   wikipediaLookups: number;
+  voteContextsWritten: number;
   skipped: number;
   warnings: string[];
 }
@@ -101,13 +109,15 @@ export async function refreshConfirmationEnrichment(
   let nominationsFetched = 0;
   let backgroundsRewritten = 0;
   let wikipediaLookups = 0;
+  let voteContextsWritten = 0;
   let skipped = 0;
   let model: string | null = null;
 
   const selectLimit = Math.max(
     CONFIRMATION_NOMINATION_FETCHES_PER_RUN,
     CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES,
-    CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN
+    CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN,
+    CONFIRMATION_VOTE_CONTEXT_PER_RUN
   );
 
   const candidates = await selectNominationsNeedingEnrichment(
@@ -246,6 +256,63 @@ export async function refreshConfirmationEnrichment(
         // No nominee name yet — leave wikipedia_* unset so a later pass can try.
       }
 
+      // 4) Grounded vote context once Wikipedia state is known. A wiki hit
+      // gives the grounding article; a sealed miss seals vote_context too
+      // (there is no honest source to explain the vote).
+      if (
+        voteContextsWritten < CONFIRMATION_VOTE_CONTEXT_PER_RUN &&
+        backgroundNeedsVoteContext(background) &&
+        background
+      ) {
+        if (!background.wikipedia_url) {
+          background = { ...background, vote_context: null };
+          dirty = true;
+        } else {
+          const article = await fetchWikipediaArticlePlainText(
+            background.wikipedia_url
+          );
+          if (article.status === "unavailable") {
+            warnings.push(
+              `Nomination ${nominationCitation(candidate.ref)} Wikipedia article fetch unavailable: ${article.error}`
+            );
+          } else {
+            const sourceText = selectVoteContextSource(article.text);
+            if (!sourceText) {
+              background = { ...background, vote_context: null };
+              dirty = true;
+            } else {
+              const nominees = parseNomineesJson(row.nominees_json);
+              const nomineeName =
+                nominees[0]?.display_name ??
+                parseNominationDescription(row.description)?.nominees[0]
+                  ?.display_name ??
+                "the nominee";
+              if (model === null) {
+                model = await resolveOpenRouterModel(env);
+              }
+              const context = await rewriteVoteContext(
+                env,
+                {
+                  nomineeName,
+                  positionTitle: row.position_title,
+                  sourceText,
+                },
+                model
+              );
+              if (context.status === "ok") {
+                background = { ...background, vote_context: context.text };
+                voteContextsWritten += 1;
+                dirty = true;
+              } else {
+                warnings.push(
+                  `Nomination ${nominationCitation(candidate.ref)} vote-context rewrite unavailable`
+                );
+              }
+            }
+          }
+        }
+      }
+
       if (dirty) {
         const fields = nominationFieldsFromRow(row);
         await upsertNominationMetadata(env.DB, {
@@ -279,6 +346,7 @@ export async function refreshConfirmationEnrichment(
     nominationsFetched,
     backgroundsRewritten,
     wikipediaLookups,
+    voteContextsWritten,
     skipped,
     warnings,
   };

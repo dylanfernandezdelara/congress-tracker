@@ -31,7 +31,7 @@ function normalizePersonBackground(text: string): string {
  * the message — this rejects schema echoes inside truncated reasoning text.
  * JSON.parse is the oracle; no hand-rolled brace/escape scanning.
  */
-function extractTrailingJsonObject(text: string): string | null {
+export function extractTrailingJsonObject(text: string): string | null {
   const trimmed = text.trimEnd();
   if (!trimmed.endsWith("}")) return null;
   for (

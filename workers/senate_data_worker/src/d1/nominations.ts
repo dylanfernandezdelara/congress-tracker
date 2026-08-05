@@ -51,6 +51,12 @@ export function parseStoredBackground(
           ? parsed.wikipedia_extract.trim()
           : null;
     }
+    if ("vote_context" in parsed) {
+      content.vote_context =
+        typeof parsed.vote_context === "string" && parsed.vote_context.trim()
+          ? parsed.vote_context.trim()
+          : null;
+    }
     return content;
   } catch {
     return null;
@@ -69,6 +75,20 @@ export function backgroundNeedsWikipedia(
   if (!background) return false;
   if (background.wikipedia_extract?.trim()) return false;
   return !("wikipedia_url" in background);
+}
+
+/**
+ * True when the grounded vote-context step should run: the background exists,
+ * Wikipedia enrichment has been attempted (a hit gives us the grounding
+ * article; a sealed miss seals vote_context as null too), and vote_context
+ * has not been attempted yet.
+ */
+export function backgroundNeedsVoteContext(
+  background: ConfirmationBackgroundContent | null
+): boolean {
+  if (!background) return false;
+  if (!("wikipedia_url" in background)) return false;
+  return !("vote_context" in background);
 }
 
 export function parseNomineesJson(json: string | null): ConfirmationNominee[] {
@@ -190,6 +210,7 @@ export interface NominationEnrichmentCandidate {
   needsRaw: boolean;
   needsBackground: boolean;
   needsWikipedia: boolean;
+  needsVoteContext: boolean;
 }
 
 /**
@@ -261,7 +282,10 @@ export async function selectNominationsNeedingEnrichment(
       (background === null ||
         (descriptionEcho && !("wikipedia_url" in background)));
     const needsWikipedia = backgroundNeedsWikipedia(background);
-    if (!needsRaw && !needsBackground && !needsWikipedia) continue;
+    const needsVoteContext = backgroundNeedsVoteContext(background);
+    if (!needsRaw && !needsBackground && !needsWikipedia && !needsVoteContext) {
+      continue;
+    }
     candidates.push({
       ref: {
         congress: row.congress,
@@ -272,6 +296,7 @@ export async function selectNominationsNeedingEnrichment(
       needsRaw,
       needsBackground,
       needsWikipedia,
+      needsVoteContext,
     });
     if (candidates.length >= limit) break;
   }

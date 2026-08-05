@@ -1,4 +1,4 @@
-import type { ConfirmationNominee } from './confirmations-api-types'
+import type { ConfirmationCrossVote, ConfirmationNominee } from './confirmations-api-types'
 import { FEED_LEAD_MAX_WORDS, splitSentences, truncateWords } from './digest-format'
 import { normalizePartyCode, partyDisplayName, partyShortLabel } from './party'
 import type { RollPartySplit } from './stats-api-types'
@@ -256,4 +256,55 @@ export function confirmationOppositionNote(splits: RollPartySplit[]): string | n
   return primary.yeas === 0
     ? `${noun} voted against confirmation (${tally}).`
     : `Most ${noun} voted against confirmation (${tally}).`
+}
+
+function crossVoterName(vote: ConfirmationCrossVote): string {
+  const short = partyShortLabel(vote.party)
+  const seat = vote.state ? `${short}-${vote.state}` : short
+  return `${vote.name} (${seat})`
+}
+
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`
+}
+
+/**
+ * Named cross-party votes on a confirmation roll — the "who broke ranks"
+ * detail behind the party-split note. Groups by party and direction:
+ * "Tim Kaine (D-VA) was the only Democrat to vote yes." Returns null when
+ * nobody crossed (or no data).
+ */
+export function confirmationCrossVoteNote(
+  crossVotes: ConfirmationCrossVote[],
+): string | null {
+  if (crossVotes.length === 0) return null
+
+  const groups = new Map<string, ConfirmationCrossVote[]>()
+  for (const vote of crossVotes) {
+    const key = `${normalizePartyCode(vote.party)}:${vote.position}`
+    const list = groups.get(key) ?? []
+    list.push(vote)
+    groups.set(key, list)
+  }
+
+  const sentences: string[] = []
+  const sorted = [...groups.values()].sort((a, b) => b.length - a.length)
+  for (const group of sorted) {
+    const first = group[0]!
+    const verb = first.position === 'yea' ? 'vote yes' : 'vote no'
+    const partyName = partyDisplayName(first.party)
+    if (group.length === 1) {
+      sentences.push(`${crossVoterName(first)} was the only ${partyName} to ${verb}.`)
+    } else if (group.length <= 3) {
+      const names = joinNames(group.map(crossVoterName))
+      sentences.push(`${names} were the only ${partyNounPlural(first.party)} to ${verb}.`)
+    } else {
+      sentences.push(
+        `${group.length} ${partyNounPlural(first.party)} crossed party lines to ${verb}.`,
+      )
+    }
+  }
+  return sentences.join(' ')
 }

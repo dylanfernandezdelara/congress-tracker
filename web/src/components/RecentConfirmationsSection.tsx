@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 
 import {
   confirmationAboutTeaser,
+  confirmationCrossVoteNote,
   confirmationOppositionNote,
   selectConfirmationAbout,
 } from '@congress-tracker/shared/confirmation-about'
@@ -51,6 +52,9 @@ function ConfirmationItemRow({
     wikipediaExtract: item.wikipedia_extract,
   })
   const opposition = confirmationOppositionNote(item.party_splits ?? [])
+  const crossVoteNote = confirmationCrossVoteNote(item.cross_party_votes ?? [])
+  const voteNote = [opposition, crossVoteNote].filter(Boolean).join(' ') || null
+  const voteContext = item.vote_context?.trim() || null
   const organization = item.organization?.trim() || null
   const voteLabel = voteChipLabel(item)
   const wikiArticleUrl = item.wikipedia_url?.trim() || null
@@ -107,13 +111,20 @@ function ConfirmationItemRow({
                   ) : null}
                 </section>
               ) : null}
-              {opposition ? (
+              {voteContext ? (
                 <section className="recent-confirmations-detail-block">
-                  <h4 className="recent-confirmations-detail-label">Vote</h4>
-                  <p className="recent-confirmations-detail-text">{opposition}</p>
+                  <h4 className="recent-confirmations-detail-label">Why it was contested</h4>
+                  <p className="recent-confirmations-detail-text">{voteContext}</p>
+                  <p className="recent-confirmations-detail-source">From Wikipedia</p>
                 </section>
               ) : null}
-              {!about.text && !opposition ? (
+              {voteNote ? (
+                <section className="recent-confirmations-detail-block">
+                  <h4 className="recent-confirmations-detail-label">Vote</h4>
+                  <p className="recent-confirmations-detail-text">{voteNote}</p>
+                </section>
+              ) : null}
+              {!about.text && !voteNote && !voteContext ? (
                 <p className="text-[13px] text-secondary">
                   Confirmation details are still being prepared.
                 </p>

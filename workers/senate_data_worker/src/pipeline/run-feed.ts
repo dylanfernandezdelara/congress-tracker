@@ -48,6 +48,7 @@ export interface RunFeedResult {
   confirmationNominationsFetched: number;
   confirmationBackgroundsRewritten: number;
   confirmationWikipediaLookups: number;
+  confirmationVoteContextsWritten: number;
   confirmationWarnings: string[];
 }
 
@@ -251,6 +252,7 @@ export async function runFeedPipeline(
       confirmationNominationsFetched: confirmationEnrichment.nominationsFetched,
       confirmationBackgroundsRewritten: confirmationEnrichment.backgroundsRewritten,
       confirmationWikipediaLookups: confirmationEnrichment.wikipediaLookups,
+      confirmationVoteContextsWritten: confirmationEnrichment.voteContextsWritten,
       confirmationWarnings: confirmationEnrichment.warnings,
     };
 
