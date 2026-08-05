@@ -34,16 +34,11 @@ function extractTrailingJsonObject(text: string): string | null {
   if (end === -1) return null;
   let depth = 0;
   let inString = false;
-  let escaped = false;
   for (let i = end; i >= 0; i -= 1) {
     const ch = text[i];
     if (inString) {
       // Walking backwards: a quote ends the string unless escaped from the left.
       if (ch === '"' && text[i - 1] !== "\\") inString = false;
-      continue;
-    }
-    if (escaped) {
-      escaped = false;
       continue;
     }
     if (ch === '"') inString = true;

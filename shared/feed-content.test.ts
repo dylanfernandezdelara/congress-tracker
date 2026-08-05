@@ -8,6 +8,7 @@ import {
   truncateAtSentenceBoundary,
   voteIndicatesFailure,
 } from "./feed-content";
+import { splitSentences } from "./digest-format";
 
 describe("feed-content helpers", () => {
   it("classifies vote results", () => {
@@ -99,6 +100,22 @@ The resolution recommends levels and amounts for FY2027-FY2036 for federal reven
         "Erica G. Schwartz is an American health official. She was Deputy Surgeon General."
       )
     ).toBe("Erica G. Schwartz is an American health official.");
+  });
+
+  it("splits sentences without breaking on name initials or abbreviations", () => {
+    expect(
+      splitSentences(
+        "Erica G. Schwartz was nominated to serve as Director of the Centers for Disease Control and Prevention."
+      )
+    ).toHaveLength(1);
+    expect(
+      splitSentences(
+        "Jane Doe led U.S. grid programs. She previously chaired the state commission."
+      )
+    ).toEqual([
+      "Jane Doe led U.S. grid programs.",
+      "She previously chaired the state commission.",
+    ]);
   });
 
   it("truncates at sentence boundaries without cutting on U.S. abbreviations", () => {

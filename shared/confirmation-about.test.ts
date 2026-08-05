@@ -85,6 +85,14 @@ describe('isRedundantConfirmationAbout', () => {
     ).toBe(true)
   })
 
+  it('flags nominated-identity lines with middle initials', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Erica G. Schwartz was nominated to serve as Director of the Centers for Disease Control and Prevention.',
+      ),
+    ).toBe(true)
+  })
+
   it('keeps multi-sentence backgrounds that mention the nomination', () => {
     expect(
       isRedundantConfirmationAbout(

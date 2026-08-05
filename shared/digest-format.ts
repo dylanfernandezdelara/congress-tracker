@@ -37,6 +37,20 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Split into sentences with abbreviation/name-initial protection, so
+ * "Erica G. Schwartz was nominated…" counts as one sentence. Canonical home
+ * for "where does a sentence end?" — reuse instead of splitting on [.!?].
+ */
+export function splitSentences(text: string): string[] {
+  const collapsed = collapseWhitespace(text)
+  if (!collapsed) return []
+  return protectAbbreviations(collapsed)
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean)
+    .map(restoreAbbreviations)
+}
+
 function firstSentence(text: string): string {
   const collapsed = collapseWhitespace(text)
   if (!collapsed) return collapsed

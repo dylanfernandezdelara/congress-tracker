@@ -1,4 +1,5 @@
 import type { ConfirmationNominee } from './confirmations-api-types'
+import { splitSentences } from './digest-format'
 import { normalizePartyCode, partyDisplayName, partyShortLabel } from './party'
 import type { RollPartySplit } from './stats-api-types'
 
@@ -64,7 +65,7 @@ function normalizeAboutText(text: string): string {
 export function isNominationBoilerplateAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return false
-  if (PERSON_BIO_CUE.test(text) && text.split(/(?<=[.!?])\s+/).filter(Boolean).length > 1) {
+  if (PERSON_BIO_CUE.test(text) && splitSentences(text).length > 1) {
     return false
   }
   return /,\s*of\s+[^,]+,\s*to be\s+/i.test(text)
@@ -75,7 +76,7 @@ export function isRedundantConfirmationAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return true
   if (isNominationBoilerplateAbout(text)) return true
-  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
+  const sentences = splitSentences(text)
   // Single-sentence nominated-identity lines restate the headline (and mislabel
   // the vote); role words like "Director" must not count as bio cues here.
   if (
