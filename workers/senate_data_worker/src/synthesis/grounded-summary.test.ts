@@ -37,6 +37,14 @@ describe("selectSourceParagraphs", () => {
       )
     ).toBeNull();
   });
+
+  it("does not skip paragraphs when the cue is global", () => {
+    const globalCue =
+      /\b(?:nominat|confirm|senate|hearing|vote|oppos|controvers|criticiz|testif|committee)/gi;
+    const source = selectSourceParagraphs(ARTICLE, globalCue);
+    expect(source).toContain("Senate nomination hearing");
+    expect(source).toContain("51-44 vote");
+  });
 });
 
 describe("buildContestedVotePrompt", () => {
@@ -50,15 +58,20 @@ describe("buildContestedVotePrompt", () => {
       sourceLabel: "the CRS summary and companion vote questions",
       sourceText: "The amendment fight centered on spending caps.",
       fieldName: "vote_context",
-      fieldDescription: "1-2 sentences on why passage was contested.",
-      excludeGuidance:
+      fieldDescription: '1-2 sentences on why passage was "contested".',
+      extraRules: [
         "Do not restate the tally or rehash the bill summary — only the contest.",
+      ],
     });
 
     expect(prompt).toContain("House passage");
     expect(prompt).toContain("BILL: H.R. 1234");
     expect(prompt).toContain("CRS summary");
     expect(prompt).toContain('"vote_context"');
+    expect(prompt).toContain('why passage was \\"contested\\"');
+    expect(prompt).toContain(
+      "- Do not restate the tally or rehash the bill summary — only the contest."
+    );
     expect(prompt).toContain("Never invent reasons");
   });
 });
@@ -75,6 +88,16 @@ describe("parseGroundedStringField", () => {
     expect(
       parseGroundedStringField('{"vote_context": ""}', "vote_context", 360)
     ).toBe("");
+  });
+
+  it("extracts trailing JSON after a reasoning preamble", () => {
+    expect(
+      parseGroundedStringField(
+        'Let me check the source text for stated reasons.\n\n{"vote_context": "She backed WHO withdrawal at her hearing."}',
+        "vote_context",
+        360
+      )
+    ).toBe("She backed WHO withdrawal at her hearing.");
   });
 
   it("returns null for the wrong field name", () => {

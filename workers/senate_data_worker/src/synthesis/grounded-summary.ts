@@ -15,19 +15,31 @@ import { completeWithReasoningFallback } from "./openrouter-chat";
  * rewrite loop — not product-specific sealing or UI gating.
  */
 
+/** Defaults tuned for Wikipedia-style articles (long paragraphs, `==` headings). */
 const DEFAULT_SOURCE_MAX_CHARS = 4000;
 const DEFAULT_MIN_PARAGRAPH_LENGTH = 60;
-const DEFAULT_MAX_TOKENS = 512;
-const DEFAULT_REASONING_FALLBACK_MAX_TOKENS = 4096;
 
 export type GroundedSummaryResult =
   | { status: "ok"; text: string | null }
   | { status: "unavailable" };
 
+/** Match without mutating a caller's `/g` RegExp `lastIndex`. */
+function paragraphMatchesCue(paragraph: string, cue: RegExp): boolean {
+  const flags = cue.flags.replace(/g/g, "");
+  return new RegExp(cue.source, flags).test(paragraph);
+}
+
+function escapePromptJsonString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 /**
- * Keep paragraphs matching `cue`, drop headings/stubs, cap total chars.
+ * Keep paragraphs matching `cue`, drop wiki headings/stubs, cap total chars.
  * Returns null when nothing relevant remains — callers should seal empty
  * rather than ask the model to invent.
+ *
+ * Default min length / heading strip are Wikipedia-oriented; override via
+ * `options` for denser sources (CRS blurbs, vote questions, …).
  */
 export function selectSourceParagraphs(
   text: string,
@@ -45,7 +57,7 @@ export function selectSourceParagraphs(
     .map((p) => p.trim())
     .filter((p) => p.length >= minLen && !/^=+.*=+$/.test(p));
 
-  const relevant = paragraphs.filter((p) => cue.test(p));
+  const relevant = paragraphs.filter((p) => paragraphMatchesCue(p, cue));
   if (relevant.length === 0) return null;
 
   let out = "";
@@ -72,10 +84,10 @@ export interface ContestedVotePromptParams {
    */
   fieldDescription: string;
   /**
-   * Extra exclusion rules after the shared grounding rules
+   * Extra bullet rules after the shared grounding rule
    * (e.g. "biography is not vote context").
    */
-  excludeGuidance: string;
+  extraRules?: string[];
 }
 
 /**
@@ -89,6 +101,11 @@ export function buildContestedVotePrompt(
   const identity = params.identityLines
     .map((line) => `${line.label}: ${line.value}`)
     .join("\n");
+  const fieldName = escapePromptJsonString(params.fieldName);
+  const fieldDescription = escapePromptJsonString(params.fieldDescription);
+  const extraRules = (params.extraRules ?? [])
+    .map((rule) => `- ${rule}`)
+    .join("\n");
 
   return `You summarize why a ${params.voteKind} vote was contested, for everyday readers.
 
@@ -99,13 +116,12 @@ ${params.sourceText}
 
 Return ONLY valid JSON:
 {
-  "${params.fieldName}": "${params.fieldDescription}"
+  "${fieldName}": "${fieldDescription}"
 }
 
 Rules:
 - Use ONLY facts stated in the source text. Never invent reasons, motives, or controversies.
-- ${params.excludeGuidance}
-- Keep language neutral and concise (grade 7-8). No editorializing.`;
+${extraRules ? `${extraRules}\n` : ""}- Keep language neutral and concise (grade 7-8). No editorializing.`;
 }
 
 /**
@@ -139,6 +155,9 @@ export function parseGroundedStringField(
  * - ok/text: grounded summary to store
  * - ok/null: model found nothing grounded (safe to seal)
  * - unavailable: request/parse failure (do not seal; retry next run)
+ *
+ * Token budgets default in {@link completeWithReasoningFallback}; pass
+ * overrides only when the domain needs a larger first attempt (e.g. About).
  */
 export async function rewriteGroundedStringField(
   env: Env,
@@ -158,10 +177,8 @@ export async function rewriteGroundedStringField(
     (content) =>
       parseGroundedStringField(content, params.fieldName, params.maxChars),
     {
-      maxTokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
-      reasoningFallbackMaxTokens:
-        params.reasoningFallbackMaxTokens ??
-        DEFAULT_REASONING_FALLBACK_MAX_TOKENS,
+      maxTokens: params.maxTokens,
+      reasoningFallbackMaxTokens: params.reasoningFallbackMaxTokens,
     }
   );
 

@@ -10,9 +10,6 @@ import { jsonParseCandidates } from "./llm-json";
 import { resolveOpenRouterModel } from "./model";
 import { completeWithReasoningFallback } from "./openrouter-chat";
 
-/** Re-export for callers/tests that imported the helper from this module. */
-export { extractTrailingJsonObject } from "./llm-json";
-
 const MAX_TOKENS = 768;
 /**
  * Reasoning models stream chain-of-thought before the JSON answer; give the

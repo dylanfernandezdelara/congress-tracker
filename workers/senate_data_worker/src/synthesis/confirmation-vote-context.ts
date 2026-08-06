@@ -1,7 +1,6 @@
 import type { Env } from "../config";
 import {
   buildContestedVotePrompt,
-  parseGroundedStringField,
   rewriteGroundedStringField,
   selectSourceParagraphs,
   type GroundedSummaryResult,
@@ -19,7 +18,7 @@ const CONFIRMATION_CONTEXT_PARAGRAPH_CUE =
  *
  * Source: nominee Wikipedia article (hearing / nomination / vote paragraphs).
  * Storage field: `vote_context` on confirmation `background_json`.
- * Future bill adapters can reuse {@link buildContestedVotePrompt} /
+ * Future bill adapters can call {@link buildContestedVotePrompt} /
  * {@link rewriteGroundedStringField} with a different source + cue.
  */
 
@@ -48,16 +47,12 @@ export function buildVoteContextPrompt(params: {
     fieldName: "vote_context",
     fieldDescription:
       "1-2 short sentences (max 50 words) explaining, per the source text, why the nomination was contested or drew scrutiny — controversies, concerns raised by senators, or positions the nominee took at the confirmation hearing. Empty string if the source text does not say.",
-    excludeGuidance:
-      "Do not restate the vote tally, the confirmation itself, or the person's job history — only why the vote was contested or what drew scrutiny.\n- General biography or career praise is not vote context. If the source text gives no controversy, criticism, senator concerns, or hearing positions, return {\"vote_context\": \"\"}.",
+    extraRules: [
+      "Do not restate the vote tally, the confirmation itself, or the person's job history — only why the vote was contested or what drew scrutiny.",
+      'General biography or career praise is not vote context. If the source text gives no controversy, criticism, senator concerns, or hearing positions, return {"vote_context": ""}.',
+    ],
   });
 }
-
-export function parseVoteContextJson(text: string): string | null {
-  return parseGroundedStringField(text, "vote_context", VOTE_CONTEXT_MAX_CHARS);
-}
-
-export type VoteContextResult = GroundedSummaryResult;
 
 /**
  * Grounded "why the vote was contested" rewrite from Wikipedia source text.
@@ -73,7 +68,7 @@ export async function rewriteVoteContext(
     sourceText: string;
   },
   model: string
-): Promise<VoteContextResult> {
+): Promise<GroundedSummaryResult> {
   return rewriteGroundedStringField(env, {
     model,
     prompt: buildVoteContextPrompt(params),
