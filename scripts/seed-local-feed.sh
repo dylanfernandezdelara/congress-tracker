@@ -68,6 +68,20 @@ CREATE TABLE IF NOT EXISTS bill_digests (
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, number)
 );
+CREATE TABLE IF NOT EXISTS bill_sponsors (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  bioguide_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  full_name TEXT,
+  party TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number, bioguide_id)
+);
+CREATE INDEX IF NOT EXISTS idx_bill_sponsors_state ON bill_sponsors (state, congress, bill_type, bill_number);
+CREATE INDEX IF NOT EXISTS idx_bill_sponsors_bill ON bill_sponsors (congress, bill_type, bill_number);
 CREATE TABLE IF NOT EXISTS members (
   bioguide_id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -212,6 +226,13 @@ VALUES
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"House passes a federal spending oversight bill (local sample)","what_it_does":"Adds reporting requirements for large federal contracts and creates a public dashboard for tracking agency spending.","key_points":["Requires agencies to publish contract performance data","Stands up a public spending dashboard","Adds penalties for repeated reporting failures"],"terms_explained":[{"term":"Federal contract","plain":"An agreement where the government pays a company to provide goods or services."},{"term":"Oversight","plain":"Monitoring done to make sure money and programs are used as intended."}]}',
    '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO bill_sponsors
+  (congress, bill_type, bill_number, bioguide_id, state, full_name, party, is_primary, updated_at)
+VALUES
+  (119, 'hr', 1, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_RECENT}T00:00:00.000Z'),
+  (119, 's', 47, 'LOCAL:S001', 'TX', 'Sen. Sample Crossover (local)', 'R', 1, '${D_MID}T00:00:00.000Z'),
+  (119, 'hr', 22, 'LOCAL:H001', 'CA', 'Rep. Sample Crossover (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO bill_lifecycle
   (congress, bill_type, bill_number, introduced_date, presented_date, signed_date, vetoed_date, became_law_date, law_kind, public_law, latest_action_date, latest_action_text, updated_at)

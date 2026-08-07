@@ -17,6 +17,7 @@ import {
   upsertVote,
   selectRecentVotedBills,
 } from "../d1/votes";
+import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
@@ -37,6 +38,7 @@ export interface RunFeedResult {
   digestsWritten: number;
   digestsSkipped: number;
   digestsRewritten: number;
+  digestWarnings: string[];
   chamberWarnings: string[];
   lifecycleRefreshed: number;
   lifecycleSkipped: number;
@@ -126,86 +128,120 @@ export async function runFeedPipeline(
     let digestsSkipped = 0;
     let digestsRewritten = 0;
     let newRewrites = 0;
+    const digestWarnings: string[] = [];
 
     for (const row of bills) {
-      const existing = await getDigest(
-        env.DB,
-        row.bill_congress,
-        row.bill_type,
-        row.bill_number
-      );
-      if (parseStoredDigest(existing?.digest_json ?? null) !== null) {
-        digestsSkipped += 1;
-        continue;
-      }
+      try {
+        const existing = await getDigest(
+          env.DB,
+          row.bill_congress,
+          row.bill_type,
+          row.bill_number
+        );
+        const hasCompleteDigest = parseStoredDigest(existing?.digest_json ?? null) !== null;
+        const hasSponsors = await billHasSponsors(
+          env.DB,
+          row.bill_congress,
+          row.bill_type,
+          row.bill_number
+        );
 
-      const bundle = await fetchBillSummaryBundle(env, {
-        congress: row.bill_congress,
-        type: row.bill_type,
-        number: row.bill_number,
-      });
-
-      const metadataChanged =
-        !existing?.raw_summary_text ||
-        existing.title !== bundle.title ||
-        existing.policy_area !== bundle.policyArea;
-
-      const canRewrite = newRewrites < DIGEST_MAX_NEW_REWRITES;
-
-      if (!canRewrite) {
-        if (metadataChanged) {
-          await upsertDigest(env.DB, {
-            congress: row.bill_congress,
-            billType: row.bill_type,
-            number: row.bill_number,
-            title: bundle.title,
-            policyArea: bundle.policyArea,
-            rawSummaryText: bundle.rawSummaryText,
-            digest: null,
-            preserveDigestJson: existing?.digest_json ?? null,
-          });
-          digestsWritten += 1;
-        } else {
+        if (hasCompleteDigest && hasSponsors) {
           digestsSkipped += 1;
+          continue;
         }
-        continue;
-      }
 
-      let digest = null;
-      if (bundle.rawSummaryText) {
-        digest = await rewriteSummary(
-          env,
-          {
-            title: bundle.title,
-            billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
-            policyArea: bundle.policyArea,
-            rawSummary: bundle.rawSummaryText,
-          },
-          model
+        const billRef = {
+          congress: row.bill_congress,
+          type: row.bill_type,
+          number: row.bill_number,
+        };
+        const bundle = await fetchBillSummaryBundle(env, billRef);
+        await replaceBillSponsors(env.DB, billRef, bundle.sponsors);
+
+        // Digest already good — only sponsor backfill was needed.
+        if (hasCompleteDigest) {
+          digestsSkipped += 1;
+          continue;
+        }
+
+        const metadataChanged =
+          !existing?.raw_summary_text ||
+          existing.title !== bundle.title ||
+          existing.policy_area !== bundle.policyArea;
+
+        const canRewrite = newRewrites < DIGEST_MAX_NEW_REWRITES;
+
+        if (!canRewrite) {
+          if (metadataChanged) {
+            await upsertDigest(env.DB, {
+              congress: row.bill_congress,
+              billType: row.bill_type,
+              number: row.bill_number,
+              title: bundle.title,
+              policyArea: bundle.policyArea,
+              rawSummaryText: bundle.rawSummaryText,
+              digest: null,
+              preserveDigestJson: existing?.digest_json ?? null,
+            });
+            digestsWritten += 1;
+          } else {
+            digestsSkipped += 1;
+          }
+          continue;
+        }
+
+        let digest = null;
+        if (bundle.rawSummaryText) {
+          digest = await rewriteSummary(
+            env,
+            {
+              title: bundle.title,
+              billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
+              policyArea: bundle.policyArea,
+              rawSummary: bundle.rawSummaryText,
+            },
+            model
+          );
+        }
+
+        if (digest === null && !metadataChanged) {
+          digestsSkipped += 1;
+          continue;
+        }
+
+        await upsertDigest(env.DB, {
+          congress: row.bill_congress,
+          billType: row.bill_type,
+          number: row.bill_number,
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+          digest,
+          preserveDigestJson: digest === null ? existing?.digest_json ?? null : null,
+        });
+        digestsWritten += 1;
+
+        if (digest !== null) {
+          digestsRewritten += 1;
+          newRewrites += 1;
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        digestWarnings.push(
+          `${billLabel(row.bill_type, row.bill_number, row.bill_congress)}: ${message}`
         );
       }
+    }
 
-      if (digest === null && !metadataChanged) {
-        digestsSkipped += 1;
-        continue;
-      }
-
-      await upsertDigest(env.DB, {
-        congress: row.bill_congress,
-        billType: row.bill_type,
-        number: row.bill_number,
-        title: bundle.title,
-        policyArea: bundle.policyArea,
-        rawSummaryText: bundle.rawSummaryText,
-        digest,
-        preserveDigestJson: digest === null ? existing?.digest_json ?? null : null,
-      });
-      digestsWritten += 1;
-
-      if (digest !== null) {
-        digestsRewritten += 1;
-        newRewrites += 1;
-      }
+    if (digestWarnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_digest_refresh",
+          trigger,
+          warnings: digestWarnings,
+        })
+      );
     }
 
     const lifecycleResult = await refreshBillLifecycles(env, bills, trigger);
@@ -241,6 +277,7 @@ export async function runFeedPipeline(
       digestsWritten,
       digestsSkipped,
       digestsRewritten,
+      digestWarnings,
       chamberWarnings,
       lifecycleRefreshed,
       lifecycleSkipped,
@@ -263,6 +300,7 @@ export async function runFeedPipeline(
         billsSelected: result.billsSelected,
         digestsWritten: result.digestsWritten,
         digestsSkipped: result.digestsSkipped,
+        ...(digestWarnings.length > 0 ? { digest_warnings: digestWarnings } : {}),
         ...(chamberWarnings.length > 0 ? { chamber_warnings: chamberWarnings } : {}),
         lifecycleRefreshed: result.lifecycleRefreshed,
         lifecycleSkipped: result.lifecycleSkipped,

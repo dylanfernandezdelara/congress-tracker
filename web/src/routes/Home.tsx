@@ -17,11 +17,13 @@ import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
 import { RecentLawsSection } from '../components/RecentLawsSection'
 import { RightRail } from '../components/RightRail'
+import { StateFilterControl } from '../components/StateFilterControl'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
+import { stateFilterLabel } from '../utils/stateFilter'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -35,19 +37,25 @@ function FeedSkeleton() {
   )
 }
 
-function emptyFeedCopy(chamber: 'House' | 'Senate' | null, searchQuery: string): string {
+function emptyFeedCopy(
+  chamber: 'House' | 'Senate' | null,
+  state: string | null,
+  searchQuery: string,
+): string {
+  const stateScope = state ? ` sponsored by ${stateFilterLabel(state)} members` : ''
   if (searchQuery) {
-    if (chamber) return `No ${chamber} matches for “${searchQuery}”.`
-    return `No matches for “${searchQuery}”.`
+    const chamberScope = chamber ? `${chamber} ` : ''
+    return `No ${chamberScope}matches for “${searchQuery}”${stateScope}.`
   }
-  if (chamber) return `No ${chamber} passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
-  return `No passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
+  const chamberScope = chamber ? `${chamber} ` : ''
+  return `No ${chamberScope}passage votes${stateScope} in the last ${VOTE_LOOKBACK_DAYS} days.`
 }
 
 export default function Home() {
   const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
   const {
     chamber,
+    state,
     searchQuery,
     searchDraft,
     items,
@@ -63,6 +71,7 @@ export default function Home() {
     reloadFeed,
     loadMore,
     setChamberFilter,
+    setStateFilter,
     setSearchDraft,
     submitSearch,
     clearSearch,
@@ -151,10 +160,11 @@ export default function Home() {
     />
   )
 
-  const emptyCopy = emptyFeedCopy(chamber, searchQuery)
+  const emptyCopy = emptyFeedCopy(chamber, state, searchQuery)
 
   const countSuffix = [
     chamber ? chamber : null,
+    state ? stateFilterLabel(state) : null,
     searchQuery ? `“${searchQuery}”` : null,
   ]
     .filter(Boolean)
@@ -173,7 +183,10 @@ export default function Home() {
 
       <main id="content" className="home-feed-column feed-main">
         <div className="home-feed-toolbar">
-          <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
+          <div className="home-feed-filters">
+            <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
+            <StateFilterControl value={state} onChange={setStateFilter} />
+          </div>
           <FeedSearchInput
             value={searchDraft}
             onChange={setSearchDraft}
@@ -221,6 +234,15 @@ export default function Home() {
                 onClick={() => setChamberFilter(null)}
               >
                 Show all chambers
+              </button>
+            ) : null}
+            {state && !searchQuery ? (
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setStateFilter(null)}
+              >
+                Clear sponsor state
               </button>
             ) : null}
           </div>

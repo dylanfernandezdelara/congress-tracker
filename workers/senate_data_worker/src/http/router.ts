@@ -31,6 +31,7 @@ import {
   EXECUTIVE_POSTS_CRON_UTC,
   SENATE_VOTE_MENU_MAX_BYTES,
 } from "../constants";
+import { parseUsStateCode } from "../../../../shared/us-states";
 import { normalizeFeedSearchQuery } from "../d1/feed-search";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
@@ -447,11 +448,26 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       }
       chamber = parsed;
     }
+    const stateParam = url.searchParams.get("state");
+    let state: string | undefined;
+    if (stateParam !== null && stateParam !== "") {
+      const parsedState = parseUsStateCode(stateParam);
+      if (!parsedState) {
+        return json(
+          {
+            error: "bad_request",
+            message: "state must be a 2-letter US state, DC, or territory code",
+          },
+          { status: 400 }
+        );
+      }
+      state = parsedState;
+    }
     try {
       const limit = parseFeedLimit(url);
       const offset = parseFeedOffset(url, limit);
       const q = parseFeedSearchQuery(url);
-      const feed = await buildFeedPage(env, { limit, offset, chamber, q });
+      const feed = await buildFeedPage(env, { limit, offset, chamber, q, state });
       return json(feed, {
         status: 200,
         headers: { "Cache-Control": cacheLatest },

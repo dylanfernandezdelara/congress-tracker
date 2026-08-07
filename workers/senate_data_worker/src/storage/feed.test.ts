@@ -148,8 +148,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "Senate",
-      undefined
+      { chamber: "Senate", q: undefined, state: undefined }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -157,8 +156,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      "Senate",
-      undefined
+      { chamber: "Senate", q: undefined, state: undefined }
     );
   });
 
@@ -174,8 +172,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      undefined,
-      "housing"
+      { chamber: undefined, q: "housing", state: undefined }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -183,8 +180,31 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      undefined,
-      "housing"
+      { chamber: undefined, q: "housing", state: undefined }
+    );
+  });
+
+  it("forwards optional sponsor state to feed bill select and count", async () => {
+    await buildFeedPage(createEnv(), {
+      limit: 50,
+      offset: 0,
+      state: "NY",
+      now: "2026-07-03",
+    });
+
+    expect(mockCountFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      { chamber: undefined, q: undefined, state: "NY" }
+    );
+    expect(mockSelectFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      50,
+      0,
+      { chamber: undefined, q: undefined, state: "NY" }
     );
   });
 

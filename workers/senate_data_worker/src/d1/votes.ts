@@ -1,7 +1,7 @@
 import { COMPANION_VOTES_PER_BILL } from "../constants";
 import type { Chamber, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
-import { buildFeedFilterClause } from "./feed-search";
+import { buildFeedFilterClause, type FeedFilterOptions } from "./feed-search";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
 
@@ -201,11 +201,10 @@ export async function selectFeedBills(
   executiveSinceIso: string,
   limit: number,
   offset = 0,
-  chamber?: Chamber,
-  q?: string
+  filters: FeedFilterOptions = {}
 ): Promise<FeedBillRow[]> {
   await ensureSchema(db);
-  const filter = buildFeedFilterClause({ chamber, q });
+  const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
     voteLookbackDate,
     executiveSinceIso,
@@ -246,11 +245,10 @@ export async function countFeedBills(
   db: D1Database,
   voteLookbackDate: string,
   executiveSinceIso: string,
-  chamber?: Chamber,
-  q?: string
+  filters: FeedFilterOptions = {}
 ): Promise<number> {
   await ensureSchema(db);
-  const filter = buildFeedFilterClause({ chamber, q });
+  const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
     voteLookbackDate,
     executiveSinceIso,

@@ -493,6 +493,73 @@ describe('Home', () => {
     })
   })
 
+  it('filters the feed by sponsor state, resets the list, and updates the URL', async () => {
+    const nyItem = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 1, title: 'NY-sponsored bill' },
+      digest: {
+        headline: 'New York sponsor headline',
+        what_it_does: 'NY summary',
+        key_points: ['Point'],
+        terms_explained: [],
+      },
+    })
+    const otherItem = makeFeedItem({
+      bill: { congress: 119, type: 'S', number: 47, title: 'TX-sponsored bill' },
+      digest: {
+        headline: 'Texas sponsor headline',
+        what_it_does: 'TX summary',
+        key_points: ['Point'],
+        terms_explained: [],
+      },
+    })
+
+    fetchFeed
+      .mockResolvedValueOnce(pageResponse([nyItem, otherItem], { total: 2 }))
+      .mockResolvedValueOnce(pageResponse([nyItem], { total: 1 }))
+
+    renderHome()
+
+    expect(await screen.findByText('New York sponsor headline')).toBeInTheDocument()
+    expect(screen.getByText('Texas sponsor headline')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filter by sponsor state'), {
+      target: { value: 'NY' },
+    })
+
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, state: 'NY' })
+    })
+    expect(await screen.findByText('New York sponsor headline')).toBeInTheDocument()
+    expect(screen.queryByText('Texas sponsor headline')).not.toBeInTheDocument()
+    expect(screen.getByText(/1 of 1 passage vote/)).toBeInTheDocument()
+    expect(screen.getByText(/1 of 1 passage vote · New York/)).toBeInTheDocument()
+    expect(screen.getByTestId('search-params')).toHaveTextContent('state=NY')
+    expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('NY')
+  })
+
+  it('shows a sponsor-state empty state with a clear action', async () => {
+    fetchFeed.mockResolvedValue(pageResponse([], { total: 0 }))
+    renderHome('/?state=NY')
+
+    expect(
+      await screen.findByText(
+        'No passage votes sponsored by New York members in the last 45 days.',
+      ),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear sponsor state' }))
+
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+    })
+  })
+
+  it('treats invalid state query values as All states', async () => {
+    renderHome('/?state=New%20York')
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+    expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0 })
+    expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('')
+  })
+
   it('expands and scrolls to a deep-linked bill, loading further pages if needed', async () => {
     const first = makeFeedItem({
       bill: { congress: 119, type: 'S', number: 2, title: 'First' },

@@ -133,12 +133,18 @@ function filteredFeedPage(options: {
   offset: number;
   chamber?: "House" | "Senate";
   q?: string;
+  state?: string;
 }): FeedPageResponse {
   let filtered = options.chamber
     ? FEED_FIXTURE.filter((item) =>
         item.passage_votes.some((vote) => vote.chamber === options.chamber)
       )
     : FEED_FIXTURE;
+  if (options.state) {
+    // Fixture: bill 1 → NY, bill 2 → TX, bill 3 → CA (mirrors seed sponsor mapping).
+    const byNumber: Record<number, string> = { 1: "NY", 2: "TX", 3: "CA" };
+    filtered = filtered.filter((item) => byNumber[item.bill.number] === options.state);
+  }
   if (options.q) {
     const needle = options.q.toLowerCase();
     filtered = filtered.filter(
@@ -420,6 +426,58 @@ describe("HTTP API", () => {
       error: "bad_request",
       message: "chamber must be House or Senate",
     });
+  });
+
+  it("filters feed by sponsor state=NY", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?state=ny"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ state: "NY" })
+    );
+    const body = (await response.json()) as FeedPageResponse;
+    expect(body.total).toBe(1);
+    expect(body.items.map((item) => item.bill.number)).toEqual([1]);
+  });
+
+  it("rejects invalid feed state values with bad_request", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?state=New%20York"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(400);
+    expect(mockBuildFeedPage).not.toHaveBeenCalled();
+    const body = await response.json();
+    expect(body).toEqual({
+      error: "bad_request",
+      message: "state must be a 2-letter US state, DC, or territory code",
+    });
+  });
+
+  it("omits state filter when state is absent or empty", async () => {
+    mockBuildFeedPage.mockImplementation(async (_env, options) => filteredFeedPage(options));
+    await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json"),
+      createMockEnv() as any
+    );
+    await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?state="),
+      createMockEnv() as any
+    );
+    expect(mockBuildFeedPage).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ state: undefined })
+    );
+    expect(mockBuildFeedPage).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ state: undefined })
+    );
   });
 
   it("omits chamber filter when chamber is absent or empty", async () => {
