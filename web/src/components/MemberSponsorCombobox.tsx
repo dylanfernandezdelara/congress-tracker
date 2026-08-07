@@ -32,12 +32,18 @@ export function MemberSponsorCombobox({
   const focusedRef = useRef(false)
   const blurTimerRef = useRef<number | null>(null)
   /** Local label for the selected sponsor so blur does not demote before cache fills. */
-  const selectedLabelRef = useRef<string | null>(
-    sponsor ? getCachedMemberProfile(sponsor)?.name ?? null : null,
+  const selectedLabelRef = useRef<{ id: string; name: string } | null>(
+    (() => {
+      if (!sponsor) return null
+      const cached = getCachedMemberProfile(sponsor)
+      return cached ? { id: sponsor, name: cached.name } : null
+    })(),
   )
   const [memberDraft, setMemberDraft] = useState(() => {
     if (sponsor) {
-      return getCachedMemberProfile(sponsor)?.name ?? selectedLabelRef.current ?? sponsor
+      const labeled =
+        selectedLabelRef.current?.id === sponsor ? selectedLabelRef.current.name : null
+      return getCachedMemberProfile(sponsor)?.name ?? labeled ?? sponsor
     }
     return sponsorQ
   })
@@ -51,26 +57,35 @@ export function MemberSponsorCombobox({
       if (!focusedRef.current) setMemberDraft(sponsorQ)
       return
     }
+    if (selectedLabelRef.current?.id !== sponsor) {
+      selectedLabelRef.current = null
+    }
     const cached = getCachedMemberProfile(sponsor)
     if (cached) {
-      selectedLabelRef.current = cached.name
+      selectedLabelRef.current = { id: sponsor, name: cached.name }
       if (!focusedRef.current) setMemberDraft(cached.name)
       return
     }
-    if (selectedLabelRef.current && !focusedRef.current) {
-      setMemberDraft(selectedLabelRef.current)
+    if (selectedLabelRef.current?.id === sponsor && !focusedRef.current) {
+      setMemberDraft(selectedLabelRef.current.name)
+    } else if (!focusedRef.current && !selectedLabelRef.current) {
+      setMemberDraft(sponsor)
     }
     let cancelled = false
     void loadMemberProfile(sponsor)
       .then((profile) => {
         if (cancelled) return
-        selectedLabelRef.current = profile.name
+        selectedLabelRef.current = { id: sponsor, name: profile.name }
         if (!focusedRef.current) setMemberDraft(profile.name)
       })
       .catch(() => {
         if (cancelled) return
-        selectedLabelRef.current = selectedLabelRef.current ?? sponsor
-        if (!focusedRef.current) setMemberDraft(selectedLabelRef.current)
+        const fallback =
+          selectedLabelRef.current?.id === sponsor
+            ? selectedLabelRef.current.name
+            : sponsor
+        selectedLabelRef.current = { id: sponsor, name: fallback }
+        if (!focusedRef.current) setMemberDraft(fallback)
       })
     return () => {
       cancelled = true
@@ -121,7 +136,8 @@ export function MemberSponsorCombobox({
     const next = memberDraft.trim()
     if (sponsor) {
       const selectedName =
-        getCachedMemberProfile(sponsor)?.name ?? selectedLabelRef.current
+        getCachedMemberProfile(sponsor)?.name ??
+        (selectedLabelRef.current?.id === sponsor ? selectedLabelRef.current.name : null)
       if (!next) {
         // Keep an exact sponsor selection if the draft is still resolving.
         if (selectedName) {
@@ -142,7 +158,7 @@ export function MemberSponsorCombobox({
   }
 
   const pickMember = (item: { bioguideId: string; name: string }) => {
-    selectedLabelRef.current = item.name
+    selectedLabelRef.current = { id: item.bioguideId, name: item.name }
     prefetchMemberProfile(item.bioguideId)
     onPick(item)
     setMemberDraft(item.name)

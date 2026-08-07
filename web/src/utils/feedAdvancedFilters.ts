@@ -60,13 +60,14 @@ export function advancedFilterSummary(
 /** Write advanced feed filters into URLSearchParams or API query params. */
 export function applyAdvancedFeedParams(
   params: URLSearchParams,
-  filters: AdvancedFeedFilters,
+  filters: Partial<AdvancedFeedFilters>,
 ): void {
+  const sponsor = filters.sponsor ?? null
   const entries: Array<[string, string | null | undefined]> = [
     ['state', filters.state],
     ['sponsor_chamber', filters.sponsorChamber],
-    ['sponsor', filters.sponsor],
-    ['sponsor_q', filters.sponsor ? null : filters.sponsorQ || null],
+    ['sponsor', sponsor],
+    ['sponsor_q', sponsor ? null : filters.sponsorQ || null],
     ['party', filters.party],
     ['policy', filters.policy],
   ]

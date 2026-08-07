@@ -4,7 +4,7 @@ import { parseFeedPartyParam } from '@congress-tracker/shared/feed-filter-params
 import { US_STATE_OPTIONS } from '@congress-tracker/shared/us-states'
 
 import { fetchPolicyAreas } from '../api/client'
-import { getCachedMemberProfile } from '../api/memberProfileCache'
+import { useMemberProfile } from '../hooks/useMemberProfile'
 import {
   advancedFilterCount,
   advancedFilterSummary,
@@ -40,10 +40,8 @@ export function FeedAdvancedFilters({ filters, onChange, onClear }: FeedAdvanced
   const [policyAreas, setPolicyAreas] = useState<string[]>([])
 
   const activeCount = advancedFilterCount(filters)
-  const sponsorName = filters.sponsor
-    ? getCachedMemberProfile(filters.sponsor)?.name ?? null
-    : null
-  const summary = advancedFilterSummary(filters, sponsorName)
+  const { profile: sponsorProfile } = useMemberProfile(filters.sponsor)
+  const summary = advancedFilterSummary(filters, sponsorProfile?.name ?? null)
 
   useEffect(() => {
     let cancelled = false

@@ -22,13 +22,13 @@ import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
-import { getCachedMemberProfile } from '../api/memberProfileCache'
 import { feedRowKey } from '../utils/billDeepLink'
 import {
   advancedFilterCount,
   advancedFilterSummary,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
+import { useMemberProfile } from '../hooks/useMemberProfile'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -89,9 +89,8 @@ export default function Home() {
     toggleRow,
     dismissBillMissingNotice,
   } = useFeedPagination()
-  const sponsorName = advancedFilters.sponsor
-    ? getCachedMemberProfile(advancedFilters.sponsor)?.name ?? null
-    : null
+  const { profile: sponsorProfile } = useMemberProfile(advancedFilters.sponsor)
+  const sponsorName = sponsorProfile?.name ?? null
 
   const [railRetryKey, setRailRetryKey] = useState(0)
   const { reload: reloadStats, session, pulse, defectors, portfolios } = useStatsData({
