@@ -86,3 +86,17 @@ export function emptyAdvancedFilters(): AdvancedFeedFilters {
     policy: null,
   }
 }
+
+/** Drop unset facets before calling fetchFeed / comparing filter objects. */
+export function compactAdvancedFilters(
+  filters: AdvancedFeedFilters,
+): Partial<AdvancedFeedFilters> {
+  return {
+    ...(filters.state ? { state: filters.state } : {}),
+    ...(filters.sponsorChamber ? { sponsorChamber: filters.sponsorChamber } : {}),
+    ...(filters.sponsor ? { sponsor: filters.sponsor } : {}),
+    ...(!filters.sponsor && filters.sponsorQ ? { sponsorQ: filters.sponsorQ } : {}),
+    ...(filters.party ? { party: filters.party } : {}),
+    ...(filters.policy ? { policy: filters.policy } : {}),
+  }
+}

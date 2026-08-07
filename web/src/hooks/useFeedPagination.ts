@@ -12,6 +12,7 @@ import {
 import { parseChamberFilter, type ChamberFilter } from '../utils/chamberFilter'
 import {
   applyAdvancedFeedParams,
+  compactAdvancedFilters,
   emptyAdvancedFilters,
   parseAdvancedFeedFilters,
   type AdvancedFeedFilters,
@@ -160,7 +161,7 @@ export function useFeedPagination() {
           offset,
           ...(chamber ? { chamber } : {}),
           ...(q ? { q } : {}),
-          ...advanced,
+          ...compactAdvancedFilters(advanced),
         })
         if (requestId !== requestIdRef.current) return
 
