@@ -140,6 +140,7 @@ describe("worker", () => {
       confirmationNominationsFetched: 0,
       confirmationBackgroundsRewritten: 0,
       confirmationWikipediaLookups: 0,
+      confirmationVoteContextsWritten: 0,
       confirmationWarnings: [],
       memberVotes: {
         rollsProcessed: 1,

@@ -8,6 +8,7 @@ import {
   truncateAtSentenceBoundary,
   voteIndicatesFailure,
 } from "./feed-content";
+import { splitSentences } from "./digest-format";
 
 describe("feed-content helpers", () => {
   it("classifies vote results", () => {
@@ -91,6 +92,36 @@ The resolution recommends levels and amounts for FY2027-FY2036 for federal reven
     expect(
       normalizeDigestLead("Amends Title 18 U.S.C. Section 401 to add penalties. More follows.")
     ).toBe("Amends Title 18 U.S.C. Section 401 to add penalties.");
+  });
+
+  it("does not cut the first sentence on a name initial", () => {
+    expect(
+      formatCollapsedDigestLead(
+        "Erica G. Schwartz is an American health official. She was Deputy Surgeon General."
+      )
+    ).toBe("Erica G. Schwartz is an American health official.");
+  });
+
+  it("splits sentences without breaking on name initials or abbreviations", () => {
+    expect(
+      splitSentences(
+        "Erica G. Schwartz was nominated to serve as Director of the Centers for Disease Control and Prevention."
+      )
+    ).toHaveLength(1);
+    expect(
+      splitSentences(
+        "Jane Doe led U.S. grid programs. She previously chaired the state commission."
+      )
+    ).toEqual([
+      "Jane Doe led U.S. grid programs.",
+      "She previously chaired the state commission.",
+    ]);
+    expect(
+      splitSentences("Dr. Jane Doe is a physician. She led the county health agency.")
+    ).toEqual([
+      "Dr. Jane Doe is a physician.",
+      "She led the county health agency.",
+    ]);
   });
 
   it("truncates at sentence boundaries without cutting on U.S. abbreviations", () => {

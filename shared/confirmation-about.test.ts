@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildOfficialConfirmationAbout,
+  confirmationAboutTeaser,
+  confirmationCrossVoteNote,
   confirmationHeadline,
   confirmationOppositionNote,
   isNominationDescriptionEcho,
@@ -76,6 +78,38 @@ describe('isRedundantConfirmationAbout', () => {
       ),
     ).toBe(false)
   })
+
+  it('flags single-sentence nominated-identity lines', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Walter Clayton, of New York, was nominated to serve as Director of National Intelligence.',
+      ),
+    ).toBe(true)
+  })
+
+  it('flags nominated-identity lines with middle initials', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Erica G. Schwartz was nominated to serve as Director of the Centers for Disease Control and Prevention.',
+      ),
+    ).toBe(true)
+  })
+
+  it('flags confirmed-identity lines even when the role is an office title', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Erica Schwartz was confirmed as Director of the Centers for Disease Control and Prevention.',
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps multi-sentence backgrounds that mention the nomination', () => {
+    expect(
+      isRedundantConfirmationAbout(
+        'Jane Doe was nominated to be Secretary of Energy in 2026. She previously led California grid programs.',
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('isNominationDescriptionEcho', () => {
@@ -138,6 +172,139 @@ describe('selectConfirmationAbout', () => {
   })
 })
 
+describe('confirmationAboutTeaser', () => {
+  it('prefers the career-history sentence over a lede that restates the office', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American health official currently serving as the Director of the Centers for Disease Control and Prevention (CDC). Before being appointed in 2026, she served as a rear admiral in the U.S. Public Health Service Commissioned Corps and was Deputy Surgeon General from January 2019 to April 2021.',
+      ),
+    ).toBe(
+      'Before being appointed in 2026, she served as a rear admiral in the U.S. Public Health Service Commissioned Corps and was Deputy Surgeon General…',
+    )
+  })
+
+  it('prefers career history even when the lede does not restate the office', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American health official. She previously served as Deputy Surgeon General.',
+      ),
+    ).toBe('She previously served as Deputy Surgeon General.')
+  })
+
+  it('keeps a profession sentence when no career-history sentence exists', () => {
+    expect(
+      confirmationAboutTeaser('Jane Doe is an American attorney and public-health academic.'),
+    ).toBe('Jane Doe is an American attorney and public-health academic.')
+  })
+
+  it('returns null when the blurb only restates the office in the headline', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American health official currently serving as the Director of the Centers for Disease Control and Prevention (CDC).',
+      ),
+    ).toBeNull()
+  })
+
+  it('skips present-perfect current-office ledes and teases the history sentence', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Erica G. Schwartz is an American physician who has served as the Director of the CDC since January 2026. Before that, she was a rear admiral in the U.S. Public Health Service.',
+      ),
+    ).toBe('Before that, she was a rear admiral in the U.S. Public Health Service.')
+  })
+
+  it('filters current-office ledes even when an abbreviation sits inside the span', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Dr. Jane Doe has served as the U.S. Secretary of Energy since 2026.',
+      ),
+    ).toBeNull()
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an official at the U.S. Department of Energy serving as Secretary.',
+      ),
+    ).toBeNull()
+  })
+
+  it('filters bare "is serving as" restatements', () => {
+    expect(confirmationAboutTeaser('Jane Doe is serving as Secretary of Energy.')).toBeNull()
+  })
+
+  it('keeps same-sentence career clauses like "who, after serving as ambassador"', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official who, after serving as ambassador, joined the Energy Department.',
+      ),
+    ).toBe(
+      'Jane Doe is an American official who, after serving as ambassador, joined the Energy Department.',
+    )
+  })
+
+  it('keeps "known for serving as" and "formerly serving as" career idioms', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official currently serving as Secretary of Energy. She is best known for serving as Ambassador to France from 2015 to 2019.',
+      ),
+    ).toBe('She is best known for serving as Ambassador to France from 2015 to 2019.')
+    expect(
+      confirmationAboutTeaser('Jane Doe is a diplomat formerly serving as ambassador to France.'),
+    ).toBe('Jane Doe is a diplomat formerly serving as ambassador to France.')
+  })
+
+  it('keeps past-role sentences that use "serving as" or "was appointed as"', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official currently serving as Secretary of Energy. After serving as a state regulator, she was appointed as chair of the California Energy Commission in 2018.',
+      ),
+    ).toBe(
+      'After serving as a state regulator, she was appointed as chair of the California Energy Commission in 2018.',
+    )
+  })
+
+  it('does not prefer birth or education lines over a profession lede', () => {
+    expect(
+      confirmationAboutTeaser('Jane Doe is an American attorney. She was born in Tampa.'),
+    ).toBe('Jane Doe is an American attorney.')
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American attorney. She was born in Tampa before moving to Miami.',
+      ),
+    ).toBe('Jane Doe is an American attorney.')
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American attorney. She graduated from Yale before joining the Justice Department.',
+      ),
+    ).toBe('Jane Doe is an American attorney.')
+  })
+
+  it('never teases another "confirmed as" line under a confirmed-as headline', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe is an American official currently serving as Secretary of Energy. She was confirmed as U.S. Attorney in 2015.',
+      ),
+    ).toBeNull()
+  })
+
+  it('skips sentences that mislabel the confirmation as a nomination', () => {
+    expect(
+      confirmationAboutTeaser(
+        'Jane Doe was nominated to be Secretary of Energy in 2026. She previously led California grid programs.',
+      ),
+    ).toBe('She previously led California grid programs.')
+  })
+
+  it('returns null when every sentence is nominated-only phrasing', () => {
+    expect(
+      confirmationAboutTeaser('Jane Doe was nominated to be Secretary of Energy in 2026.'),
+    ).toBeNull()
+  })
+
+  it('returns null for empty input', () => {
+    expect(confirmationAboutTeaser(null)).toBeNull()
+    expect(confirmationAboutTeaser('   ')).toBeNull()
+  })
+})
+
 describe('confirmationHeadline', () => {
   it('prefers stored rewrite headline', () => {
     expect(
@@ -161,6 +328,104 @@ describe('confirmationHeadline', () => {
         citation: 'PN100',
       }),
     ).toBe('Jane Doe confirmed as Secretary of Energy')
+  })
+
+  it('ignores stored headlines that mislabel the confirmation as a nomination', () => {
+    expect(
+      confirmationHeadline({
+        storedHeadline: 'Erica Schwartz nominated as CDC Director',
+        nominees: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+        positionTitle: 'Director of the Centers for Disease Control and Prevention',
+        description: null,
+        citation: 'PN932',
+      }),
+    ).toBe(
+      'Erica Schwartz confirmed as Director of the Centers for Disease Control and Prevention',
+    )
+  })
+
+  it('keeps stored headlines that name both nomination and confirmation', () => {
+    expect(
+      confirmationHeadline({
+        storedHeadline: 'Senate confirms nominated CDC Director Erica Schwartz',
+        nominees: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+        positionTitle: 'Director of the Centers for Disease Control and Prevention',
+        description: null,
+        citation: 'PN932',
+      }),
+    ).toBe('Senate confirms nominated CDC Director Erica Schwartz')
+  })
+})
+
+describe('confirmationCrossVoteNote', () => {
+  it('names a single senator who crossed party lines', () => {
+    expect(
+      confirmationCrossVoteNote([
+        { name: 'Tim Kaine', party: 'D', state: 'VA', position: 'yea', party_line: 'nay' },
+      ]),
+    ).toBe('Tim Kaine (D-VA) was the only Democrat to vote yes.')
+  })
+
+  it('lists a small group of crossing senators', () => {
+    expect(
+      confirmationCrossVoteNote([
+        { name: 'Jane Roe', party: 'R', state: 'ME', position: 'nay', party_line: 'yea' },
+        { name: 'John Poe', party: 'R', state: 'AK', position: 'nay', party_line: 'yea' },
+      ]),
+    ).toBe('Jane Roe (R-ME) and John Poe (R-AK) were the only Republicans to vote no.')
+  })
+
+  it('counts large groups instead of listing names', () => {
+    const votes = Array.from({ length: 5 }, (_, i) => ({
+      name: `Senator ${i + 1}`,
+      party: 'D',
+      state: 'CA',
+      position: 'yea' as const,
+      party_line: 'nay' as const,
+    }))
+    expect(confirmationCrossVoteNote(votes)).toBe(
+      '5 Democrats crossed party lines to vote yes.',
+    )
+  })
+
+  it('covers both directions and omits missing states', () => {
+    expect(
+      confirmationCrossVoteNote([
+        { name: 'Tim Kaine', party: 'D', state: 'VA', position: 'yea', party_line: 'nay' },
+        { name: 'Jane Roe', party: 'R', state: null, position: 'nay', party_line: 'yea' },
+      ]),
+    ).toBe(
+      'Tim Kaine (D-VA) was the only Democrat to vote yes. Jane Roe (R) was the only Republican to vote no.',
+    )
+  })
+
+  it('returns null when nobody crossed', () => {
+    expect(confirmationCrossVoteNote([])).toBeNull()
+  })
+
+  it('skips members of a tied caucus — there is no party line to cross', () => {
+    expect(
+      confirmationCrossVoteNote(
+        [{ name: 'Angus King', party: 'I', state: 'ME', position: 'nay', party_line: 'yea' }],
+        [
+          { party: 'R', yeas: 50, nays: 0, party_line: 'yea' },
+          { party: 'I', yeas: 1, nays: 1, party_line: 'yea' },
+        ],
+      ),
+    ).toBeNull()
+    // Non-tied parties still report normally alongside a tied caucus.
+    expect(
+      confirmationCrossVoteNote(
+        [
+          { name: 'Angus King', party: 'I', state: 'ME', position: 'nay', party_line: 'yea' },
+          { name: 'Tim Kaine', party: 'D', state: 'VA', position: 'yea', party_line: 'nay' },
+        ],
+        [
+          { party: 'D', yeas: 1, nays: 42, party_line: 'nay' },
+          { party: 'I', yeas: 1, nays: 1, party_line: 'yea' },
+        ],
+      ),
+    ).toBe('Tim Kaine (D-VA) was the only Democrat to vote yes.')
   })
 })
 

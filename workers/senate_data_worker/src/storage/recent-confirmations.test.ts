@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { selectRecentConfirmationVotes } from "../d1/confirmation-votes";
 import { selectMemberVotesForRollKeys } from "../d1/member-votes";
-import { hasRealMemberRoster } from "../d1/members";
+import { getMembersByIds, hasRealMemberRoster } from "../d1/members";
 import { buildRecentConfirmations } from "./recent-confirmations";
 
 vi.mock("../d1/confirmation-votes", () => ({
@@ -12,11 +12,13 @@ vi.mock("../d1/member-votes", () => ({
 }));
 vi.mock("../d1/members", () => ({
   hasRealMemberRoster: vi.fn(),
+  getMembersByIds: vi.fn(),
 }));
 
 const mockSelect = vi.mocked(selectRecentConfirmationVotes);
 const mockMemberVotes = vi.mocked(selectMemberVotesForRollKeys);
 const mockHasRoster = vi.mocked(hasRealMemberRoster);
+const mockMembersByIds = vi.mocked(getMembersByIds);
 
 function sampleRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -57,9 +59,11 @@ describe("buildRecentConfirmations", () => {
     mockSelect.mockReset();
     mockMemberVotes.mockReset();
     mockHasRoster.mockReset();
+    mockMembersByIds.mockReset();
     mockSelect.mockResolvedValue([sampleRow()] as never);
     mockMemberVotes.mockResolvedValue([]);
     mockHasRoster.mockResolvedValue(false);
+    mockMembersByIds.mockResolvedValue(new Map());
   });
 
   it("maps joined rows into the public confirmations envelope", async () => {
@@ -176,6 +180,70 @@ describe("buildRecentConfirmations", () => {
       { party: "D", yeas: 0, nays: 1, party_line: "nay" },
       { party: "R", yeas: 1, nays: 0, party_line: "yea" },
     ]);
+  });
+
+  it("names senators who crossed party lines on the roll", async () => {
+    const vote = (bioguide_id: string, party: string, position: string) => ({
+      bioguide_id,
+      party,
+      position,
+      chamber: "Senate",
+      congress: 119,
+      session: 2,
+      roll_number: 165,
+    });
+    mockMemberVotes.mockResolvedValue([
+      vote("S000001", "R", "Yea"),
+      vote("S000002", "R", "Yea"),
+      vote("S000003", "D", "Nay"),
+      vote("S000004", "D", "Nay"),
+      vote("S000005", "D", "Yea"),
+    ]);
+    mockMembersByIds.mockResolvedValue(
+      new Map([
+        [
+          "S000005",
+          {
+            bioguideId: "S000005",
+            name: "Tim Kaine",
+            chamber: "Senate",
+            party: "D",
+            state: "VA",
+            district: null,
+          },
+        ],
+      ]) as never
+    );
+
+    const env = { DB: {} as D1Database } as import("../config").Env;
+    const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(mockMembersByIds).toHaveBeenCalledWith(env.DB, ["S000005"]);
+    expect(body.confirmations[0]?.cross_party_votes).toEqual([
+      { name: "Tim Kaine", party: "D", state: "VA", position: "yea", party_line: "nay" },
+    ]);
+  });
+
+  it("passes through a stored grounded vote_context", async () => {
+    mockSelect.mockResolvedValue([
+      sampleRow({
+        background_json: JSON.stringify({
+          headline: "Jane Doe confirmed as Energy Secretary",
+          what_was_confirmed: "The Senate confirmed Jane Doe as Secretary of Energy.",
+          background:
+            "Jane Doe of CA was confirmed as Secretary of Energy at the Department of Energy.",
+          key_points: [],
+          wikipedia_url: "https://en.wikipedia.org/wiki/Jane_Doe_(politician)",
+          wikipedia_extract: "Jane Doe is an American energy official.",
+          vote_context: "Senators questioned her pipeline permitting record.",
+        }),
+      }),
+    ] as never);
+
+    const env = { DB: {} as D1Database } as import("../config").Env;
+    const body = await buildRecentConfirmations(env, 119, 2, 5, "2026-07-28T00:00:00.000Z");
+    expect(body.confirmations[0]?.vote_context).toBe(
+      "Senators questioned her pipeline permitting record."
+    );
   });
 
   it("surfaces Wikipedia as secondary extract without replacing official About", async () => {

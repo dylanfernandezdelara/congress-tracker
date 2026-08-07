@@ -210,6 +210,65 @@ export async function lookupNomineeWikipedia(params: {
   return { status: "miss" };
 }
 
+interface WikipediaExtractResponse {
+  query?: {
+    pages?: Record<string, { extract?: string }>;
+  };
+}
+
+/** Page title from a Wikipedia article URL ("…/wiki/Erica_Schwartz"). */
+export function wikipediaTitleFromUrl(pageUrl: string): string | null {
+  const match = pageUrl.match(/\/wiki\/([^?#]+)/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]!).replace(/_/g, " ").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Full plain-text article body via the MediaWiki extracts API. Used as the
+ * grounding source for the confirmation vote-context rewrite.
+ */
+export async function fetchWikipediaArticlePlainText(
+  pageUrl: string
+): Promise<
+  | { status: "ok"; text: string }
+  | { status: "unavailable"; error: string }
+> {
+  const title = wikipediaTitleFromUrl(pageUrl);
+  if (!title) return { status: "unavailable", error: `Unrecognized Wikipedia URL: ${pageUrl}` };
+
+  const url = new URL("https://en.wikipedia.org/w/api.php");
+  url.searchParams.set("action", "query");
+  url.searchParams.set("prop", "extracts");
+  url.searchParams.set("explaintext", "1");
+  url.searchParams.set("redirects", "1");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("origin", "*");
+  url.searchParams.set("titles", title);
+
+  try {
+    const data = await fetchJson<WikipediaExtractResponse>(url.toString(), {
+      headers: wikipediaHeaders(),
+    });
+    const pages = Object.values(data.query?.pages ?? {});
+    const text = pages[0]?.extract?.trim() ?? "";
+    if (!text) {
+      // Missing page / empty extract — do not let callers seal on this;
+      // a later run may see the real article.
+      return { status: "unavailable", error: `Empty extract for ${title}` };
+    }
+    return { status: "ok", text };
+  } catch (err: unknown) {
+    return {
+      status: "unavailable",
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 /** Truncate a Wikipedia extract to a short person blurb for the feed UI. */
 export function truncateWikipediaExtract(extract: string, maxChars = 320): string {
   const collapsed = extract.replace(/\s+/g, " ").trim();

@@ -24,6 +24,8 @@ export const CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES = 10;
 export const CONFIRMATION_NOMINATION_FETCHES_PER_RUN = 15;
 /** Max Wikipedia person lookups per feed pipeline run. */
 export const CONFIRMATION_WIKIPEDIA_FETCHES_PER_RUN = 15;
+/** Max grounded vote-context attempts (article fetch, plus LLM when relevant) per feed pipeline run. */
+export const CONFIRMATION_VOTE_CONTEXT_PER_RUN = 10;
 
 /**
  * Bill text-version comparisons per feed pipeline run. Each candidate costs two

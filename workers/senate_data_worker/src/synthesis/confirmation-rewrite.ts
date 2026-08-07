@@ -6,13 +6,16 @@ import {
 import type { ConfirmationBackgroundContent } from "../../../../shared/confirmations-api-types";
 import type { Env } from "../config";
 import { buildConfirmationBackgroundPrompt } from "./confirmation-prompt";
+import { jsonParseCandidates } from "./llm-json";
 import { resolveOpenRouterModel } from "./model";
-
-interface ChatResponse {
-  choices?: Array<{ message?: { content?: string } }>;
-}
+import { completeWithReasoningFallback } from "./openrouter-chat";
 
 const MAX_TOKENS = 768;
+/**
+ * Reasoning models stream chain-of-thought before the JSON answer; give the
+ * fallback request enough budget so `finish_reason` is `stop`, not `length`.
+ */
+const REASONING_FALLBACK_MAX_TOKENS = 4096;
 /** Person blurbs may be 1–2 sentences; keep more than a single lead sentence. */
 const BACKGROUND_MAX_CHARS = 320;
 
@@ -23,13 +26,15 @@ function normalizePersonBackground(text: string): string {
 export function parseConfirmationBackgroundJson(
   text: string
 ): ConfirmationBackgroundContent | null {
-  let raw = text.trim();
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) raw = fence[1].trim();
-  try {
-    const parsed = JSON.parse(raw) as ConfirmationBackgroundContent;
+  for (const candidate of jsonParseCandidates(text)) {
+    let parsed: ConfirmationBackgroundContent;
+    try {
+      parsed = JSON.parse(candidate) as ConfirmationBackgroundContent;
+    } catch {
+      continue;
+    }
     if (!parsed.headline || !parsed.what_was_confirmed || !parsed.background) {
-      return null;
+      continue;
     }
     // wikipedia_url is owned by enrichment, never by the model.
     return {
@@ -40,11 +45,16 @@ export function parseConfirmationBackgroundJson(
         Array.isArray(parsed.key_points) ? parsed.key_points : []
       ),
     };
-  } catch {
-    return null;
   }
+  return null;
 }
 
+/**
+ * Reasoning models (default free-tier picks) burn the whole token budget on
+ * chain-of-thought and get cut off before the JSON answer. Ask with reasoning
+ * disabled first; if that request is rejected or unparseable, retry with a
+ * budget large enough for the reasoning trace plus the answer.
+ */
 export async function rewriteConfirmationBackground(
   env: Env,
   params: {
@@ -59,25 +69,14 @@ export async function rewriteConfirmationBackground(
   const model = modelOverride ?? (await resolveOpenRouterModel(env));
   const prompt = buildConfirmationBackgroundPrompt(params);
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://congress-tracker.local",
-      "X-Title": "Congress Tracker",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0,
-      max_tokens: MAX_TOKENS,
-    }),
-  });
-
-  if (!res.ok) return null;
-  const data = (await res.json()) as ChatResponse;
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) return null;
-  return parseConfirmationBackgroundJson(content);
+  return completeWithReasoningFallback(
+    env,
+    model,
+    prompt,
+    parseConfirmationBackgroundJson,
+    {
+      maxTokens: MAX_TOKENS,
+      reasoningFallbackMaxTokens: REASONING_FALLBACK_MAX_TOKENS,
+    }
+  );
 }

@@ -29,6 +29,7 @@ Return ONLY valid JSON:
 }
 
 Rules:
+- The Senate has already CONFIRMED this nominee. Say "confirmed" — never "nominated" — in the headline and "what_was_confirmed" (the source text uses nomination phrasing; the vote result is confirmation).
 - Official-only source: use Congress.gov nomination metadata (description, position, organization, nominee name/state, intro text). Do not invent biography, prior jobs, education, or politics.
 - Prefer person facts from the source (prior titles, career notes in the nomination text). Never write a generic definition of the office or agency.
 - If official facts are thin (only name + office), write a plain identity line. Example: "Jane Doe of California was confirmed as Secretary of Energy at the Department of Energy."

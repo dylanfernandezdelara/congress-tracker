@@ -33,6 +33,8 @@ function sampleConfirmation(overrides: Partial<RecentConfirmationItem> = {}): Re
       { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
       { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
     ],
+    cross_party_votes: [],
+    vote_context: null,
     ...overrides,
   }
 }
@@ -81,6 +83,129 @@ describe('RecentConfirmationsSection', () => {
 
     expect(screen.getByText('58–40 · +18')).toBeInTheDocument()
     expect(screen.queryByText(/R 53–0/)).not.toBeInTheDocument()
+  })
+
+  it('shows who the nominee is in the collapsed row and moves it to About on expand', () => {
+    const extract =
+      'Erica G. Schwartz is an American health official. She previously served as Deputy Surgeon General.'
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            nominee_names: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+            headline:
+              'Erica Schwartz confirmed as Director of the Centers for Disease Control and Prevention',
+            wikipedia_url: 'https://en.wikipedia.org/wiki/Erica_Schwartz',
+            wikipedia_extract: extract,
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    // Collapsed: the teaser leads with career history, not the vague lede.
+    expect(
+      screen.getByText('She previously served as Deputy Surgeon General.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(extract)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Erica Schwartz/i }))
+    expect(screen.getByText(extract)).toBeInTheDocument()
+    expect(
+      screen.queryByText('She previously served as Deputy Surgeon General.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows who crossed party lines and why the vote was contested', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            nominee_names: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+            headline: 'Erica Schwartz confirmed as CDC Director',
+            party_splits: [
+              { party: 'R', yeas: 50, nays: 0, party_line: 'yea' },
+              { party: 'D', yeas: 1, nays: 42, party_line: 'nay' },
+            ],
+            cross_party_votes: [
+              {
+                name: 'Tim Kaine',
+                party: 'D',
+                state: 'VA',
+                position: 'yea',
+                party_line: 'nay',
+              },
+            ],
+            vote_context:
+              'At her Senate hearing, Schwartz said she supported withdrawing the U.S. from the World Health Organization.',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Erica Schwartz/i }))
+    expect(screen.getByText('Why it was contested')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'At her Senate hearing, Schwartz said she supported withdrawing the U.S. from the World Health Organization.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Most Democrats voted against confirmation (D 1–42). Tim Kaine (D-VA) was the only Democrat to vote yes.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('hides "Why it was contested" when no party majority opposed', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            party_splits: [
+              { party: 'R', yeas: 50, nays: 0, party_line: 'yea' },
+              { party: 'D', yeas: 43, nays: 2, party_line: 'yea' },
+            ],
+            vote_context: 'Some hearing note that would overclaim a lopsided vote.',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    expect(screen.queryByText('Why it was contested')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Some hearing note that would overclaim a lopsided vote.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('never teases nominated-only phrasing for a confirmed vote', () => {
+    render(
+      <RecentConfirmationsSection
+        confirmations={[
+          sampleConfirmation({
+            nominee_names: [{ display_name: 'Erica Schwartz', state: 'FL' }],
+            headline:
+              'Erica Schwartz confirmed as Director of the Centers for Disease Control and Prevention',
+            wikipedia_url: 'https://en.wikipedia.org/wiki/Erica_Schwartz',
+            wikipedia_extract:
+              'Erica Schwartz was nominated to be CDC director in 2026. She previously served as Deputy Surgeon General.',
+          }),
+        ]}
+        loading={false}
+        error={null}
+      />,
+    )
+
+    expect(screen.queryByText(/was nominated/)).not.toBeInTheDocument()
+    expect(
+      screen.getByText('She previously served as Deputy Surgeon General.'),
+    ).toBeInTheDocument()
   })
 
   it('prefers person Wikipedia About and shows opposition plus compact sources', () => {

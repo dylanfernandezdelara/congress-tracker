@@ -18,6 +18,22 @@ export interface ConfirmationBackgroundContent {
   wikipedia_url?: string | null
   /** Person-page Wikipedia extract used as preferred About when present. */
   wikipedia_extract?: string | null
+  /**
+   * Grounded "why the vote was contested" summary rewritten from the
+   * nominee's Wikipedia article — never invented from tallies alone.
+   * `null` means attempted with no grounded answer (sealed);
+   * omit/undefined means not attempted yet.
+   */
+  vote_context?: string | null
+}
+
+/** A senator who voted against their party's majority on a confirmation roll. */
+export interface ConfirmationCrossVote {
+  name: string
+  party: string
+  state: string | null
+  position: 'yea' | 'nay'
+  party_line: 'yea' | 'nay'
 }
 
 export interface ConfirmationNominee {
@@ -57,6 +73,10 @@ export interface RecentConfirmationItem {
   wikipedia_extract: string | null
   /** Per-party yea/nay on this confirmation roll; empty when member votes unavailable. */
   party_splits: RollPartySplit[]
+  /** Senators who broke with their party on this roll; empty when unavailable. */
+  cross_party_votes: ConfirmationCrossVote[]
+  /** Grounded Wikipedia-sourced note on why the vote was contested, when found. */
+  vote_context: string | null
 }
 
 export interface RecentConfirmationsResponse {

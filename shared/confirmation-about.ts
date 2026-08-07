@@ -1,4 +1,5 @@
-import type { ConfirmationNominee } from './confirmations-api-types'
+import type { ConfirmationCrossVote, ConfirmationNominee } from './confirmations-api-types'
+import { FEED_LEAD_MAX_WORDS, splitSentences, truncateWords } from './digest-format'
 import { normalizePartyCode, partyDisplayName, partyShortLabel } from './party'
 import type { RollPartySplit } from './stats-api-types'
 
@@ -50,8 +51,22 @@ export function buildOfficialConfirmationAbout(params: {
   return null
 }
 
+/**
+ * Biographical cues for the redundancy/boilerplate checks. Office titles
+ * ("Director", "Judge", …) are deliberately excluded — identity lines like
+ * "was confirmed as Director of X" name the office, not the person's past.
+ * Teaser preference uses the narrower CAREER_HISTORY_CUE instead.
+ */
 const PERSON_BIO_CUE =
-  /\b(previously|served|led|leading|graduated|born|former|worked|director|commissioner|professor|attorney|judge|ambassador|executive|advisor|adviser)\b/i
+  /\b(previously|served|led|leading|graduated|born|former|worked|chaired)\b/i
+
+/** Identity-only restatements of the card headline (confirmed or nominated). */
+const IDENTITY_ONLY_PATTERNS = [
+  /\bwas nominated (?:to serve )?(?:as|to be|for)\b/i,
+  /\bwas confirmed as\b/i,
+  /\bwas confirmed by the Senate\b/i,
+  /^Confirmed as\b/i,
+]
 
 function normalizeAboutText(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toLowerCase()
@@ -64,7 +79,7 @@ function normalizeAboutText(text: string): string {
 export function isNominationBoilerplateAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return false
-  if (PERSON_BIO_CUE.test(text) && text.split(/(?<=[.!?])\s+/).filter(Boolean).length > 1) {
+  if (PERSON_BIO_CUE.test(text) && splitSentences(text).length > 1) {
     return false
   }
   return /,\s*of\s+[^,]+,\s*to be\s+/i.test(text)
@@ -75,14 +90,9 @@ export function isRedundantConfirmationAbout(about: string | null): boolean {
   const text = about?.trim()
   if (!text) return true
   if (isNominationBoilerplateAbout(text)) return true
-  // Multi-sentence or bio-cue sentences still carry person facts.
-  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
-  if (sentences.length > 1 || PERSON_BIO_CUE.test(text)) return false
-  return (
-    /\bwas confirmed as\b/i.test(text) ||
-    /\bwas confirmed by the Senate\b/i.test(text) ||
-    /^Confirmed as\b/i.test(text)
-  )
+  // Multi-sentence or career-cue blurbs still carry person facts.
+  if (splitSentences(text).length > 1 || PERSON_BIO_CUE.test(text)) return false
+  return IDENTITY_ONLY_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 /**
@@ -134,6 +144,77 @@ export function selectConfirmationAbout(params: {
   return { text: null, source: null }
 }
 
+/**
+ * Rewrites drafted from thin nomination-only source text sometimes mislabel a
+ * confirmation as a nomination ("Jane Doe nominated as ..."). Every row here is
+ * a confirmed Senate vote, so never surface nominated-only phrasing.
+ */
+export function isMisleadingConfirmationHeadline(headline: string): boolean {
+  return /\bnominat/i.test(headline) && !/\bconfirm/i.test(headline)
+}
+
+/**
+ * Sentences that restate the office on the card: present-tense "serves as /
+ * is serving as / currently serving as", present-perfect "has served as …
+ * since", and the confirmation event itself ("was confirmed/sworn in as").
+ * The "is … serving as" span must not jump a temporal or characterizing
+ * marker — "who, after serving as ambassador, joined …" and "is best known
+ * for serving as …" are career history — and allows "." so abbreviations
+ * like "U.S." do not break the match. Past appointments ("was appointed as
+ * ambassador in 2015") stay eligible as career history.
+ * Tradeoff: a past confirmation to a different office is also skipped — a
+ * second "confirmed as" line under a "confirmed as" headline reads as noise,
+ * and the expanded About keeps the full text.
+ */
+const ROLE_RESTATEMENT =
+  /\bserves as\b|\bis\b(?:(?!\b(?:after|before|prior|formerly|previously|known|for)\b)[^!?])*?\bserving as\b|\b(?:currently|now) serving as\b|\bhas served as\b[^!?]*?\bsince\b|\bwas (?:confirmed|sworn in) as\b/i
+
+/**
+ * Past-career markers for teaser preference. Narrower than PERSON_BIO_CUE on
+ * purpose: "born"/"graduated" make a sentence biographical for redundancy
+ * checks, but they are a weak collapsed teaser next to a profession lede.
+ */
+const CAREER_HISTORY_CUE =
+  /\b(?:previously|formerly|former|earlier|before|after|prior|until)\b|\bserved as\b|\bwas appointed\b|\b(?:led|worked|chaired)\b/i
+
+/** Birth/education facts read weak next to a profession lede; never prefer them. */
+const BIRTH_EDUCATION = /\b(?:born|graduated)\b/i
+
+/** Truncated teasers should not end on a dangling connective ("… General from…"). */
+const TRAILING_CONNECTIVE =
+  /\s+(?:a|an|and|as|at|but|by|for|from|in|into|of|on|or|the|to|with)…$/i
+
+function truncateTeaserSentence(sentence: string): string {
+  let teaser = truncateWords(sentence, FEED_LEAD_MAX_WORDS)
+  while (TRAILING_CONNECTIVE.test(teaser)) {
+    teaser = teaser.replace(TRAILING_CONNECTIVE, '…')
+  }
+  return teaser
+}
+
+/**
+ * Collapsed-row "who this is" teaser. Sentences that restate the office in the
+ * headline (or mislabel the vote as a nomination) are excluded up front; among
+ * the rest, prefer the first career-history sentence ("previously served as
+ * Deputy Surgeon General …") — that is the signal readers need — then fall
+ * back to the first remaining sentence (e.g. a profession lede). Return null
+ * when nothing beyond the headline remains.
+ */
+export function confirmationAboutTeaser(about: string | null): string | null {
+  if (!about?.trim()) return null
+  const candidates = splitSentences(about).filter(
+    (candidate) =>
+      !isMisleadingConfirmationHeadline(candidate) && !ROLE_RESTATEMENT.test(candidate),
+  )
+  const pick =
+    candidates.find(
+      (candidate) => CAREER_HISTORY_CUE.test(candidate) && !BIRTH_EDUCATION.test(candidate),
+    ) ??
+    candidates[0] ??
+    null
+  return pick ? truncateTeaserSentence(pick) : null
+}
+
 /** Card headline from stored rewrite or nomination identity. */
 export function confirmationHeadline(params: {
   storedHeadline: string | null
@@ -142,7 +223,8 @@ export function confirmationHeadline(params: {
   description: string | null
   citation: string
 }): string {
-  if (params.storedHeadline?.trim()) return params.storedHeadline.trim()
+  const stored = params.storedHeadline?.trim()
+  if (stored && !isMisleadingConfirmationHeadline(stored)) return stored
   const name = params.nominees[0]?.display_name?.trim()
   const role = params.positionTitle?.trim()
   if (name && role) return `${name} confirmed as ${role}`
@@ -174,4 +256,65 @@ export function confirmationOppositionNote(splits: RollPartySplit[]): string | n
   return primary.yeas === 0
     ? `${noun} voted against confirmation (${tally}).`
     : `Most ${noun} voted against confirmation (${tally}).`
+}
+
+function crossVoterName(vote: ConfirmationCrossVote): string {
+  const short = partyShortLabel(vote.party)
+  const seat = vote.state ? `${short}-${vote.state}` : short
+  return `${vote.name} (${seat})`
+}
+
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`
+}
+
+/**
+ * Named cross-party votes on a confirmation roll — the "who broke ranks"
+ * detail behind the party-split note. Groups by party and direction:
+ * "Tim Kaine (D-VA) was the only Democrat to vote yes." Returns null when
+ * nobody crossed (or no data). Pass party splits so members of a tied caucus
+ * (no majority line to cross) are not described as crossing party lines.
+ */
+export function confirmationCrossVoteNote(
+  crossVotes: ConfirmationCrossVote[],
+  splits: RollPartySplit[] = [],
+): string | null {
+  const tiedParties = new Set(
+    splits
+      .filter((split) => split.yeas > 0 && split.yeas === split.nays)
+      .map((split) => normalizePartyCode(split.party)),
+  )
+  const eligible = crossVotes.filter(
+    (vote) => !tiedParties.has(normalizePartyCode(vote.party)),
+  )
+  if (eligible.length === 0) return null
+
+  const groups = new Map<string, ConfirmationCrossVote[]>()
+  for (const vote of eligible) {
+    const key = `${normalizePartyCode(vote.party)}:${vote.position}`
+    const list = groups.get(key) ?? []
+    list.push(vote)
+    groups.set(key, list)
+  }
+
+  const sentences: string[] = []
+  const sorted = [...groups.values()].sort((a, b) => b.length - a.length)
+  for (const group of sorted) {
+    const first = group[0]!
+    const verb = first.position === 'yea' ? 'vote yes' : 'vote no'
+    const partyName = partyDisplayName(first.party)
+    if (group.length === 1) {
+      sentences.push(`${crossVoterName(first)} was the only ${partyName} to ${verb}.`)
+    } else if (group.length <= 3) {
+      const names = joinNames(group.map(crossVoterName))
+      sentences.push(`${names} were the only ${partyNounPlural(first.party)} to ${verb}.`)
+    } else {
+      sentences.push(
+        `${group.length} ${partyNounPlural(first.party)} crossed party lines to ${verb}.`,
+      )
+    }
+  }
+  return sentences.join(' ')
 }
