@@ -345,6 +345,50 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(selectSql).not.toMatch(/ORDER BY\s+latest_passage_date\s+DESC/i);
   });
 
+  it("adds sponsor-state EXISTS and binds state for select and count", async () => {
+    const { db, preparedSql, bindsBySql } = createMockDb([]);
+    await selectFeedBills(
+      db,
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      10,
+      0,
+      undefined,
+      undefined,
+      "NY"
+    );
+    await countFeedBills(
+      db,
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      undefined,
+      undefined,
+      "NY"
+    );
+
+    const selectSql = preparedSql.find(
+      (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
+    )!;
+    const countSql = preparedSql.find(
+      (sql) => sql.includes("WITH combined AS") && sql.includes("SELECT COUNT(*) AS total")
+    )!;
+    expect(selectSql).toContain("bill_sponsors");
+    expect(selectSql).toContain("s.is_primary = 1");
+    expect(selectSql).toContain("s.state = ?");
+    expect(bindsBySql.get(selectSql)).toEqual([
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "NY",
+      10,
+      0,
+    ]);
+    expect(bindsBySql.get(countSql)).toEqual([
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "NY",
+    ]);
+  });
+
   it("adds q search binds for title/policy/headline/bill-id and keeps executive UNION ALL", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([]);
     await selectFeedBills(

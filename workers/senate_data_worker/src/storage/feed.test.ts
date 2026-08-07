@@ -149,6 +149,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-45",
       "lookback-14",
       "Senate",
+      undefined,
       undefined
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
@@ -158,6 +159,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       50,
       0,
       "Senate",
+      undefined,
       undefined
     );
   });
@@ -175,7 +177,8 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-45",
       "lookback-14",
       undefined,
-      "housing"
+      "housing",
+      undefined
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -184,7 +187,36 @@ describe("buildFeedPage lifecycle attachment", () => {
       50,
       0,
       undefined,
-      "housing"
+      "housing",
+      undefined
+    );
+  });
+
+  it("forwards optional sponsor state to feed bill select and count", async () => {
+    await buildFeedPage(createEnv(), {
+      limit: 50,
+      offset: 0,
+      state: "NY",
+      now: "2026-07-03",
+    });
+
+    expect(mockCountFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      undefined,
+      undefined,
+      "NY"
+    );
+    expect(mockSelectFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      50,
+      0,
+      undefined,
+      undefined,
+      "NY"
     );
   });
 

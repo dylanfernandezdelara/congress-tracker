@@ -9,6 +9,8 @@ const mockUpsertDigest = vi.fn();
 const mockSelectRecentVotedBills = vi.fn();
 const mockSelectExistingVoteKeys = vi.fn();
 const mockUpsertVote = vi.fn();
+const mockBillHasSponsors = vi.fn();
+const mockReplaceBillSponsors = vi.fn();
 const mockFetchBillSummaryBundle = vi.fn();
 const mockFetchBillLifecycleSource = vi.fn();
 const mockRewriteSummary = vi.fn();
@@ -32,6 +34,11 @@ vi.mock("../d1/digests", async (importOriginal) => {
     upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
   };
 });
+
+vi.mock("../d1/sponsors", () => ({
+  billHasSponsors: (...args: unknown[]) => mockBillHasSponsors(...args),
+  replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
+}));
 
 vi.mock("../d1/votes", () => ({
   selectExistingVoteKeys: (...args: unknown[]) => mockSelectExistingVoteKeys(...args),
@@ -134,11 +141,22 @@ describe("runFeedPipeline digest retry", () => {
       chamberWarnings: [],
     });
     mockSelectRecentVotedBills.mockResolvedValue([billRow]);
+    mockBillHasSponsors.mockResolvedValue(true);
+    mockReplaceBillSponsors.mockResolvedValue(undefined);
     mockFetchBillSummaryBundle.mockResolvedValue({
       title: "Test Bill",
       policyArea: "Defense",
       rawSummaryText: "CRS summary text",
       introducedDate: "2025-01-01",
+      sponsors: [
+        {
+          bioguideId: "G000555",
+          state: "NY",
+          fullName: "Rep. Example",
+          party: "D",
+          isPrimary: true,
+        },
+      ],
     });
     mockFetchBillLifecycleSource.mockResolvedValue({
       introducedDate: "2025-01-01",
@@ -178,7 +196,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
   });
 
-  it("skips bills with a complete digest", async () => {
+  it("skips bills with a complete digest and sponsors", async () => {
     mockGetDigest.mockResolvedValue({
       ...completeDigest,
       digest_json: JSON.stringify({
@@ -188,6 +206,7 @@ describe("runFeedPipeline digest retry", () => {
         terms_explained: [],
       }),
     });
+    mockBillHasSponsors.mockResolvedValue(true);
 
     const result = await runFeedPipeline(createEnv());
 
@@ -195,6 +214,42 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsSkipped).toBe(1);
     expect(result.digestsWritten).toBe(0);
     expect(mockFetchBillSummaryBundle).not.toHaveBeenCalled();
+    expect(mockUpsertDigest).not.toHaveBeenCalled();
+    expect(mockReplaceBillSponsors).not.toHaveBeenCalled();
+  });
+
+  it("backfills sponsors when a complete digest is missing them", async () => {
+    mockGetDigest.mockResolvedValue({
+      ...completeDigest,
+      digest_json: JSON.stringify({
+        headline: "Done",
+        what_it_does: "Already complete",
+        key_points: [],
+        terms_explained: [],
+      }),
+    });
+    mockBillHasSponsors.mockResolvedValue(false);
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsSkipped).toBe(1);
+    expect(result.digestsWritten).toBe(0);
+    expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
+    expect(mockReplaceBillSponsors).toHaveBeenCalledWith(
+      expect.anything(),
+      119,
+      "HR",
+      1,
+      [
+        {
+          bioguideId: "G000555",
+          state: "NY",
+          fullName: "Rep. Example",
+          party: "D",
+          isPrimary: true,
+        },
+      ]
+    );
     expect(mockUpsertDigest).not.toHaveBeenCalled();
   });
 

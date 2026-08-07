@@ -47,6 +47,8 @@ export async function fetchFeed(options: {
   offset: number
   chamber?: 'House' | 'Senate'
   q?: string
+  /** Two-letter sponsor state code. */
+  state?: string
 }): Promise<FeedPageResponse> {
   const params = new URLSearchParams({
     limit: String(options.limit),
@@ -58,6 +60,9 @@ export async function fetchFeed(options: {
   const q = options.q?.trim()
   if (q) {
     params.set('q', q)
+  }
+  if (options.state) {
+    params.set('state', options.state)
   }
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
 }

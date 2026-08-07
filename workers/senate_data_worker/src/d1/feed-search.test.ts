@@ -36,8 +36,16 @@ describe("stripBillIdQuery / escapeLikePattern", () => {
 });
 
 describe("buildFeedFilterClause", () => {
-  it("omits WHERE when chamber and q are absent", () => {
+  it("omits WHERE when chamber, state, and q are absent", () => {
     expect(buildFeedFilterClause({})).toEqual({ sql: "", binds: [] });
+  });
+
+  it("filters by primary sponsor state", () => {
+    const { sql, binds } = buildFeedFilterClause({ state: "NY" });
+    expect(sql).toContain("bill_sponsors");
+    expect(sql).toContain("s.is_primary = 1");
+    expect(sql).toContain("s.state = ?");
+    expect(binds).toEqual(["NY"]);
   });
 
   it("builds title/policy/headline + bill-id match with case-insensitive LIKE", () => {
@@ -76,6 +84,20 @@ describe("buildFeedFilterClause", () => {
     expect(sql).toContain("v.chamber = ?");
     expect(binds[0]).toBe("House");
     expect(binds.slice(1)).toEqual(["%hr1%", "%hr1%", "%hr1%", "hr1%"]);
+  });
+
+  it("combines chamber, state, and q with AND", () => {
+    const { sql, binds } = buildFeedFilterClause({
+      chamber: "House",
+      state: "NY",
+      q: "hr1",
+    });
+    expect(sql).toContain("v.chamber = ?");
+    expect(sql).toContain("bill_sponsors");
+    expect(sql).toContain("bill_digests");
+    expect(binds[0]).toBe("House");
+    expect(binds[1]).toBe("NY");
+    expect(binds.slice(2)).toEqual(["%hr1%", "%hr1%", "%hr1%", "hr1%"]);
   });
 
   it("skips bill-id arm when stripped query is empty", () => {

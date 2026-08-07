@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -209,6 +209,20 @@ const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_confirmation_votes_date ON confirmation_votes (vote_date DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_confirmation_votes_nomination ON confirmation_votes (nomination_congress, nomination_number, part_number)`,
+  `CREATE TABLE IF NOT EXISTS bill_sponsors (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  bioguide_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  full_name TEXT,
+  party TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number, bioguide_id)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_sponsors_state ON bill_sponsors (state, congress, bill_type, bill_number)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_sponsors_bill ON bill_sponsors (congress, bill_type, bill_number)`,
 ];
 
 /**

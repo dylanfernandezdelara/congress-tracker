@@ -10,6 +10,7 @@ import {
   itemMatchesBillParam,
 } from '../utils/billDeepLink'
 import { parseChamberFilter, type ChamberFilter } from '../utils/chamberFilter'
+import { parseStateFilter, type StateFilter } from '../utils/stateFilter'
 
 const SEARCH_DEBOUNCE_MS = 300
 
@@ -27,8 +28,13 @@ function scrollRowIntoView(rowKey: string) {
   })
 }
 
-function deepLinkQueryKey(chamber: ChamberFilter | null, bill: string, q: string): string {
-  return `${chamber ?? ''}|${q}|${bill}`
+function deepLinkQueryKey(
+  chamber: ChamberFilter | null,
+  state: StateFilter | null,
+  bill: string,
+  q: string,
+): string {
+  return `${chamber ?? ''}|${state ?? ''}|${q}|${bill}`
 }
 
 function parseSearchQuery(value: string | null | undefined): string {
@@ -38,6 +44,7 @@ function parseSearchQuery(value: string | null | undefined): string {
 export function useFeedPagination() {
   const [searchParams, setSearchParams] = useSearchParams()
   const chamber = parseChamberFilter(searchParams.get('chamber'))
+  const state = parseStateFilter(searchParams.get('state'))
   const billParam = searchParams.get('bill')
   const committedQuery = parseSearchQuery(searchParams.get('q'))
 
@@ -59,17 +66,19 @@ export function useFeedPagination() {
   const lastFeedModeRef = useRef<'replace' | 'append'>('replace')
   const deepLinkBillRef = useRef<string | null>(null)
   const deepLinkPhaseRef = useRef<'idle' | 'searching' | 'done'>('done')
-  /** Chamber+q+bill pair currently being searched or already resolved for deep link. */
+  /** Chamber+state+q+bill tuple currently being searched or already resolved for deep link. */
   const deepLinkQueryRef = useRef<string | null>(null)
   const chamberRef = useRef(chamber)
   chamberRef.current = chamber
+  const stateRef = useRef(state)
+  stateRef.current = state
   const queryRef = useRef(committedQuery)
   queryRef.current = committedQuery
   const expandedRowKeyRef = useRef<string | null>(expandedRowKey)
   expandedRowKeyRef.current = expandedRowKey
-  const loadedFilterRef = useRef<{ chamber: ChamberFilter | null; q: string } | undefined>(
-    undefined,
-  )
+  const loadedFilterRef = useRef<
+    { chamber: ChamberFilter | null; state: StateFilter | null; q: string } | undefined
+  >(undefined)
 
   const pageSize = FEED_PAGE_SIZE
 
@@ -103,6 +112,7 @@ export function useFeedPagination() {
       offset: number,
       mode: 'replace' | 'append',
       chamberFilter: ChamberFilter | null,
+      stateFilter: StateFilter | null,
       q: string,
     ) => {
       if (mode === 'append') {
@@ -129,6 +139,7 @@ export function useFeedPagination() {
           limit: pageSize,
           offset,
           ...(chamberFilter ? { chamber: chamberFilter } : {}),
+          ...(stateFilter ? { state: stateFilter } : {}),
           ...(q ? { q } : {}),
         })
         if (requestId !== requestIdRef.current) return
@@ -207,24 +218,30 @@ export function useFeedPagination() {
     return () => window.clearTimeout(handle)
   }, [draftQuery, committedQuery, commitSearchQuery])
 
-  // Reset expansion on chamber/search change; keep rows visible while the replacement
+  // Reset expansion on chamber/state/search change; keep rows visible while the replacement
   // page is in flight (skeleton only for true first load / empty list).
   useEffect(() => {
     const prev = loadedFilterRef.current
     if (
       prev !== undefined &&
-      (prev.chamber !== chamber || prev.q !== committedQuery)
+      (prev.chamber !== chamber || prev.state !== state || prev.q !== committedQuery)
     ) {
       setExpandedKey(null)
       setFeedError(null)
     }
-    loadedFilterRef.current = { chamber, q: committedQuery }
-    void loadFeedPage(0, 'replace', chamber, committedQuery)
-  }, [retryKey, loadFeedPage, chamber, committedQuery, setExpandedKey])
+    loadedFilterRef.current = { chamber, state, q: committedQuery }
+    void loadFeedPage(0, 'replace', chamber, state, committedQuery)
+  }, [retryKey, loadFeedPage, chamber, state, committedQuery, setExpandedKey])
 
   const loadMore = useCallback(() => {
     if (!hasMore || isLoadingMore || isInitialLoading) return
-    void loadFeedPage(nextOffset, 'append', chamberRef.current, queryRef.current)
+    void loadFeedPage(
+      nextOffset,
+      'append',
+      chamberRef.current,
+      stateRef.current,
+      queryRef.current,
+    )
   }, [hasMore, isLoadingMore, isInitialLoading, loadFeedPage, nextOffset])
 
   const setChamberFilter = useCallback(
@@ -235,6 +252,20 @@ export function useFeedPagination() {
       replaceSearchParams((params) => {
         if (next) params.set('chamber', next)
         else params.delete('chamber')
+        params.delete('bill')
+      })
+    },
+    [clearDeepLinkState, replaceSearchParams, setExpandedKey],
+  )
+
+  const setStateFilter = useCallback(
+    (next: StateFilter | null) => {
+      setExpandedKey(null)
+      setBillMissingNotice(false)
+      clearDeepLinkState()
+      replaceSearchParams((params) => {
+        if (next) params.set('state', next)
+        else params.delete('state')
         params.delete('bill')
       })
     },
@@ -276,7 +307,12 @@ export function useFeedPagination() {
       } else {
         deepLinkPhaseRef.current = 'done'
         deepLinkBillRef.current = bill
-        deepLinkQueryRef.current = deepLinkQueryKey(chamberRef.current, bill, queryRef.current)
+        deepLinkQueryRef.current = deepLinkQueryKey(
+          chamberRef.current,
+          stateRef.current,
+          bill,
+          queryRef.current,
+        )
         replaceSearchParams((params) => {
           params.set('bill', bill)
         })
@@ -301,13 +337,13 @@ export function useFeedPagination() {
       setBillMissingNotice(false)
       return
     }
-    const queryKey = deepLinkQueryKey(chamber, billParam, committedQuery)
+    const queryKey = deepLinkQueryKey(chamber, state, billParam, committedQuery)
     if (deepLinkQueryRef.current === queryKey) return
     deepLinkQueryRef.current = queryKey
     deepLinkBillRef.current = billParam
     deepLinkPhaseRef.current = 'searching'
     setBillMissingNotice(false)
-  }, [billParam, chamber, committedQuery, clearDeepLinkState])
+  }, [billParam, chamber, state, committedQuery, clearDeepLinkState])
 
   // Deep-link: after pages load, find the bill or keep appending until exhausted.
   useEffect(() => {
@@ -335,7 +371,13 @@ export function useFeedPagination() {
     }
 
     if (hasMore) {
-      void loadFeedPage(nextOffset, 'append', chamberRef.current, queryRef.current)
+      void loadFeedPage(
+        nextOffset,
+        'append',
+        chamberRef.current,
+        stateRef.current,
+        queryRef.current,
+      )
       return
     }
 
@@ -354,6 +396,7 @@ export function useFeedPagination() {
 
   return {
     chamber,
+    state,
     searchQuery: committedQuery,
     searchDraft: draftQuery,
     items,
@@ -369,6 +412,7 @@ export function useFeedPagination() {
     reloadFeed,
     loadMore,
     setChamberFilter,
+    setStateFilter,
     setSearchDraft,
     submitSearch,
     clearSearch,

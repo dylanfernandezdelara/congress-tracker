@@ -41,6 +41,8 @@ export interface FeedPageOptions {
   chamber?: Chamber;
   /** Optional free-text search (title, policy area, headline, bill id). */
   q?: string;
+  /** Two-letter state: bills with a primary sponsor from that state. */
+  state?: string;
   /** Injectable clock for ten-day derivation tests. */
   now?: Date | string;
 }
@@ -278,10 +280,11 @@ export async function buildFeedPage(
   const offset = Math.max(0, options.offset);
   const chamber = options.chamber;
   const q = options.q;
+  const state = options.state;
   const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
-    countFeedBills(env.DB, lookback, executiveSince, chamber, q),
-    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber, q),
+    countFeedBills(env.DB, lookback, executiveSince, chamber, q, state),
+    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber, q, state),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 

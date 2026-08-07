@@ -1,5 +1,7 @@
 import { daysAgoLookbackStartIso } from "../../../../shared/lookback";
+import { parseUsStateCode } from "../../../../shared/us-states";
 import type { Env } from "../config";
+import type { BillSponsorRecord } from "../d1/sponsors";
 import {
   parseLifecycleActions,
   type CongressAction,
@@ -18,10 +20,18 @@ interface BillSummariesResponse {
   summaries?: BillSummary[];
 }
 
+interface CongressBillSponsor {
+  bioguideId?: string;
+  state?: string;
+  fullName?: string;
+  party?: string;
+}
+
 interface BillDetail {
   title?: string;
   policyArea?: { name?: string };
   introducedDate?: string;
+  sponsors?: CongressBillSponsor[];
 }
 
 interface BillDetailResponse {
@@ -37,6 +47,32 @@ export interface BillSummaryBundle {
   policyArea: string | null;
   rawSummaryText: string | null;
   introducedDate: string | null;
+  /** Primary sponsors from the bill detail payload (state denormalized). */
+  sponsors: BillSponsorRecord[];
+}
+
+export function parseBillSponsors(
+  raw: CongressBillSponsor[] | undefined
+): BillSponsorRecord[] {
+  if (!raw?.length) return [];
+  const out: BillSponsorRecord[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const bioguideId = item.bioguideId?.trim();
+    // Prefer known USPS codes so feed ?state= filters stay aligned with the UI list.
+    const state = parseUsStateCode(item.state);
+    if (!bioguideId || !state) continue;
+    if (seen.has(bioguideId)) continue;
+    seen.add(bioguideId);
+    out.push({
+      bioguideId,
+      state,
+      fullName: item.fullName?.trim() || null,
+      party: item.party?.trim() || null,
+      isPrimary: true,
+    });
+  }
+  return out;
 }
 
 export interface BillLifecycleSource {
@@ -82,6 +118,7 @@ export async function fetchBillSummaryBundle(
     policyArea: detailRes.bill?.policyArea?.name ?? null,
     rawSummaryText: latest?.text ? stripHtmlToText(latest.text) : null,
     introducedDate: detailRes.bill?.introducedDate?.slice(0, 10) ?? null,
+    sponsors: parseBillSponsors(detailRes.bill?.sponsors),
   };
 }
 

@@ -4,6 +4,7 @@ import { parseDigestRefreshRequest, runDigestRefreshPipeline } from "./run-diges
 const mockFetchBillSummaryBundle = vi.fn();
 const mockRewriteSummary = vi.fn();
 const mockUpsertDigest = vi.fn();
+const mockReplaceBillSponsors = vi.fn();
 const mockResolveOpenRouterModel = vi.fn();
 
 vi.mock("../sources/congress-client", () => ({
@@ -16,6 +17,10 @@ vi.mock("../synthesis/openrouter", () => ({
 
 vi.mock("../d1/digests", () => ({
   upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
+}));
+
+vi.mock("../d1/sponsors", () => ({
+  replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
 }));
 
 vi.mock("../synthesis/model", () => ({
@@ -56,11 +61,13 @@ describe("runDigestRefreshPipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveOpenRouterModel.mockResolvedValue("nvidia/nemotron-3-ultra-550b-a55b:free");
+    mockReplaceBillSponsors.mockResolvedValue(undefined);
     mockFetchBillSummaryBundle.mockResolvedValue({
       title: "Sample Act",
       policyArea: "Education",
       rawSummaryText: "Official CRS summary text.",
       introducedDate: "2025-01-01",
+      sponsors: [],
     });
     mockRewriteSummary.mockResolvedValue({
       headline: "Sample headline",
@@ -83,6 +90,7 @@ describe("runDigestRefreshPipeline", () => {
       skipped: 0,
       failures: [],
     });
+    expect(mockReplaceBillSponsors).toHaveBeenCalledOnce();
     expect(mockRewriteSummary).toHaveBeenCalledOnce();
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
@@ -93,6 +101,7 @@ describe("runDigestRefreshPipeline", () => {
       policyArea: null,
       rawSummaryText: null,
       introducedDate: null,
+      sponsors: [],
     });
 
     const result = await runDigestRefreshPipeline(createEnv(), [
@@ -102,5 +111,6 @@ describe("runDigestRefreshPipeline", () => {
     expect(result.refreshed).toBe(0);
     expect(result.skipped).toBe(1);
     expect(result.failures[0]).toMatchObject({ bill: "S2", reason: "no_crs_summary" });
+    expect(mockReplaceBillSponsors).toHaveBeenCalledOnce();
   });
 });

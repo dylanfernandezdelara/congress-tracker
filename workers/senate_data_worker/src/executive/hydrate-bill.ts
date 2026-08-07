@@ -1,6 +1,7 @@
 import type { Env } from "../config";
 import { getDigest } from "../d1/digests";
 import { upsertDigest } from "../d1/digests";
+import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
 import { rewriteSummary } from "../synthesis/openrouter";
 import { formatBillDocket } from "../../../../shared/feed-content";
@@ -10,6 +11,18 @@ import type { BillRef } from "../types";
 export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<boolean> {
   const existing = await getDigest(env.DB, bill.congress, bill.type, bill.number);
   if (existing?.title && existing.raw_summary_text) {
+    if (!(await billHasSponsors(env.DB, bill.congress, bill.type, bill.number))) {
+      if (env.CONGRESS_API_KEY?.trim()) {
+        const bundle = await fetchBillSummaryBundle(env, bill);
+        await replaceBillSponsors(
+          env.DB,
+          bill.congress,
+          bill.type,
+          bill.number,
+          bundle.sponsors
+        );
+      }
+    }
     await ingestPassageVotesForBill(env, bill);
     return true;
   }
@@ -17,6 +30,7 @@ export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<
   if (!env.CONGRESS_API_KEY?.trim()) return false;
 
   const bundle = await fetchBillSummaryBundle(env, bill);
+  await replaceBillSponsors(env.DB, bill.congress, bill.type, bill.number, bundle.sponsors);
   let digest = null;
   if (env.OPENROUTER_API_KEY?.trim() && bundle.rawSummaryText) {
     digest = await rewriteSummary(env, {

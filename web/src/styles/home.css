@@ -7,12 +7,25 @@
     margin: 0 0 1rem;
   }
 
+  .home-feed-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    min-width: 0;
+  }
+
   @media (min-width: 640px) {
     .home-feed-toolbar {
       flex-direction: row;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
+    }
+
+    .home-feed-filters {
+      flex: 1 1 auto;
+      min-width: 0;
     }
   }
 
@@ -147,6 +160,66 @@
   .chamber-filter-option:focus-visible {
     outline: 2px solid hsl(var(--twc-foreground));
     outline-offset: 2px;
+  }
+
+  .state-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .state-filter-label {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: -0.1px;
+    color: hsl(var(--twc-faint));
+    white-space: nowrap;
+  }
+
+  .state-filter-select {
+    min-width: 0;
+    max-width: 11rem;
+    margin: 0;
+    padding: 0.3rem 1.5rem 0.3rem 0;
+    border: none;
+    border-bottom: 1px solid hsl(var(--twc-border));
+    border-radius: 0;
+    background: transparent;
+    background-image: linear-gradient(45deg, transparent 50%, hsl(var(--twc-faint)) 50%),
+      linear-gradient(135deg, hsl(var(--twc-faint)) 50%, transparent 50%);
+    background-position:
+      calc(100% - 0.55rem) 55%,
+      calc(100% - 0.2rem) 55%;
+    background-size:
+      5px 5px,
+      5px 5px;
+    background-repeat: no-repeat;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: -0.15px;
+    line-height: 1.3;
+    color: hsl(var(--twc-foreground));
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .state-filter-select:hover {
+    border-bottom-color: hsl(var(--twc-secondary));
+  }
+
+  .state-filter-select:focus {
+    outline: none;
+    border-bottom-color: hsl(var(--twc-foreground));
+  }
+
+  .state-filter-select:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+    border-bottom-color: hsl(var(--twc-foreground));
   }
 
   .home-feed-notice {

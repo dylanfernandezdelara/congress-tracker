@@ -27,11 +27,13 @@ export function stripBillIdQuery(q: string): string {
 export type FeedFilterOptions = {
   chamber?: string;
   q?: string;
+  /** Two-letter sponsor state code (primary sponsors only). */
+  state?: string;
 };
 
 /**
  * WHERE clause fragments for selectFeedBills / countFeedBills.
- * Chamber and q combine with AND. Bills without digests still match on bill id.
+ * Chamber, q, and state combine with AND. Bills without digests still match on bill id.
  */
 export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
   sql: string;
@@ -50,6 +52,18 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
            AND v.bill_number = combined.bill_number
        )`);
     binds.push(options.chamber);
+  }
+
+  if (options.state) {
+    clauses.push(`EXISTS (
+         SELECT 1 FROM bill_sponsors s
+         WHERE s.is_primary = 1
+           AND s.state = ?
+           AND s.congress = combined.bill_congress
+           AND UPPER(s.bill_type) = combined.bill_type
+           AND s.bill_number = combined.bill_number
+       )`);
+    binds.push(options.state);
   }
 
   const q = options.q;

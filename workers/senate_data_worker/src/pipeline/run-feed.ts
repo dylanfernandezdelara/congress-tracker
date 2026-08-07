@@ -17,6 +17,7 @@ import {
   upsertVote,
   selectRecentVotedBills,
 } from "../d1/votes";
+import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
@@ -134,7 +135,15 @@ export async function runFeedPipeline(
         row.bill_type,
         row.bill_number
       );
-      if (parseStoredDigest(existing?.digest_json ?? null) !== null) {
+      const hasCompleteDigest = parseStoredDigest(existing?.digest_json ?? null) !== null;
+      const hasSponsors = await billHasSponsors(
+        env.DB,
+        row.bill_congress,
+        row.bill_type,
+        row.bill_number
+      );
+
+      if (hasCompleteDigest && hasSponsors) {
         digestsSkipped += 1;
         continue;
       }
@@ -144,6 +153,20 @@ export async function runFeedPipeline(
         type: row.bill_type,
         number: row.bill_number,
       });
+
+      await replaceBillSponsors(
+        env.DB,
+        row.bill_congress,
+        row.bill_type,
+        row.bill_number,
+        bundle.sponsors
+      );
+
+      // Digest already good — only sponsor backfill was needed.
+      if (hasCompleteDigest) {
+        digestsSkipped += 1;
+        continue;
+      }
 
       const metadataChanged =
         !existing?.raw_summary_text ||
