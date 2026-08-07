@@ -25,7 +25,7 @@ export function stripBillIdQuery(q: string): string {
 }
 
 export type FeedFilterOptions = {
-  chamber?: string;
+  chamber?: "House" | "Senate" | string;
   q?: string;
   /** Two-letter sponsor state code (primary sponsors only). */
   state?: string;

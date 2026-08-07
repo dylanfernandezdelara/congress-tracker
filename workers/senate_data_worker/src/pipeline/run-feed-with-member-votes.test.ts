@@ -17,10 +17,20 @@ const feedResult = {
   digestsWritten: 1,
   digestsSkipped: 0,
   digestsRewritten: 1,
+  digestWarnings: [],
   chamberWarnings: [],
   lifecycleRefreshed: 0,
   lifecycleSkipped: 0,
   lifecycleWarnings: [],
+  textChangesRefreshed: 0,
+  textChangesWithAddedProvisions: 0,
+  textChangesWarnings: [],
+  confirmationVotesUpserted: 0,
+  confirmationNominationsFetched: 0,
+  confirmationBackgroundsRewritten: 0,
+  confirmationWikipediaLookups: 0,
+  confirmationVoteContextsWritten: 0,
+  confirmationWarnings: [],
 };
 
 describe("runFeedWithMemberVotes", () => {

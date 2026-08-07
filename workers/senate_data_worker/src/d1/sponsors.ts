@@ -1,14 +1,8 @@
+import type { BillRef, BillSponsorRecord } from "../types";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
 
-export interface BillSponsorRecord {
-  bioguideId: string;
-  state: string;
-  fullName: string | null;
-  party: string | null;
-  /** Primary sponsor when true; reserved for future cosponsor support. */
-  isPrimary: boolean;
-}
+export type { BillSponsorRecord };
 
 export async function billHasSponsors(
   db: D1Database,
@@ -37,15 +31,13 @@ export async function billHasSponsors(
  */
 export async function replaceBillSponsors(
   db: D1Database,
-  congress: number,
-  billType: string,
-  billNumber: number,
+  bill: BillRef,
   sponsors: BillSponsorRecord[]
 ): Promise<void> {
   if (sponsors.length === 0) return;
 
   await ensureSchema(db);
-  const type = normalizeBillType(billType);
+  const type = normalizeBillType(bill.type);
   const now = new Date().toISOString();
 
   const statements = [
@@ -54,7 +46,7 @@ export async function replaceBillSponsors(
         `DELETE FROM bill_sponsors
          WHERE congress = ? AND UPPER(bill_type) = ? AND bill_number = ?`
       )
-      .bind(congress, type, billNumber),
+      .bind(bill.congress, type, bill.number),
     ...sponsors.map((sponsor) =>
       db
         .prepare(
@@ -64,9 +56,9 @@ export async function replaceBillSponsors(
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
-          congress,
+          bill.congress,
           type,
-          billNumber,
+          bill.number,
           sponsor.bioguideId,
           sponsor.state,
           sponsor.fullName,

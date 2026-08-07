@@ -10,6 +10,8 @@ export interface FeedPipelineRunRecord {
   billsSelected: number;
   digestsWritten: number;
   digestsSkipped: number;
+  /** Per-bill digest/sponsor fetch failures that did not abort the run. */
+  digest_warnings?: string[];
   chamber_warnings?: string[];
   lifecycleRefreshed?: number;
   lifecycleSkipped?: number;

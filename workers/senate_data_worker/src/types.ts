@@ -13,6 +13,16 @@ export interface BillRef {
   number: number;
 }
 
+/** Primary (or future cosponsor) sponsor row persisted for state filtering. */
+export interface BillSponsorRecord {
+  bioguideId: string;
+  state: string;
+  fullName: string | null;
+  party: string | null;
+  /** Primary sponsor when true; reserved for future cosponsor support. */
+  isPrimary: boolean;
+}
+
 export interface PassageVote {
   chamber: Chamber;
   congress: number;

@@ -1,13 +1,12 @@
 import { daysAgoLookbackStartIso } from "../../../../shared/lookback";
 import { parseUsStateCode } from "../../../../shared/us-states";
 import type { Env } from "../config";
-import type { BillSponsorRecord } from "../d1/sponsors";
 import {
   parseLifecycleActions,
   type CongressAction,
   type ParsedLifecycleMilestones,
 } from "../lifecycle/parse-actions";
-import type { BillRef } from "../types";
+import type { BillRef, BillSponsorRecord } from "../types";
 import { stripHtmlToText } from "./html-clean";
 import { fetchJson } from "./http";
 

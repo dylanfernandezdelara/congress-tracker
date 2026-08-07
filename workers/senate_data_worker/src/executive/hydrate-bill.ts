@@ -1,8 +1,7 @@
 import type { Env } from "../config";
 import { getDigest } from "../d1/digests";
 import { upsertDigest } from "../d1/digests";
-import { billHasSponsors } from "../d1/sponsors";
-import { persistBillSponsors } from "../pipeline/persist-bill-sponsors";
+import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
 import { rewriteSummary } from "../synthesis/openrouter";
 import { formatBillDocket } from "../../../../shared/feed-content";
@@ -14,7 +13,7 @@ async function fetchAndPersistSponsors(env: Env, bill: BillRef): Promise<Awaited
 > | null> {
   if (!env.CONGRESS_API_KEY?.trim()) return null;
   const bundle = await fetchBillSummaryBundle(env, bill);
-  await persistBillSponsors(env, bill, bundle.sponsors);
+  await replaceBillSponsors(env.DB, bill, bundle.sponsors);
   return bundle;
 }
 

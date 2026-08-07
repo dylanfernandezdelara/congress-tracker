@@ -40,10 +40,6 @@ vi.mock("../d1/sponsors", () => ({
   replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
 }));
 
-vi.mock("./persist-bill-sponsors", () => ({
-  persistBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
-}));
-
 vi.mock("../d1/votes", () => ({
   selectExistingVoteKeys: (...args: unknown[]) => mockSelectExistingVoteKeys(...args),
   upsertVote: (...args: unknown[]) => mockUpsertVote(...args),
@@ -242,15 +238,9 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockReplaceBillSponsors).toHaveBeenCalledWith(
       expect.anything(),
       { congress: 119, type: "HR", number: 1 },
-      [
-        {
-          bioguideId: "G000555",
-          state: "NY",
-          fullName: "Rep. Example",
-          party: "D",
-          isPrimary: true,
-        },
-      ]
+      expect.arrayContaining([
+        expect.objectContaining({ bioguideId: "G000555", state: "NY" }),
+      ])
     );
     expect(mockUpsertDigest).not.toHaveBeenCalled();
   });

@@ -17,10 +17,9 @@ import {
   upsertVote,
   selectRecentVotedBills,
 } from "../d1/votes";
-import { billHasSponsors } from "../d1/sponsors";
+import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
-import { persistBillSponsors } from "./persist-bill-sponsors";
 import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import {
@@ -39,6 +38,7 @@ export interface RunFeedResult {
   digestsWritten: number;
   digestsSkipped: number;
   digestsRewritten: number;
+  digestWarnings: string[];
   chamberWarnings: string[];
   lifecycleRefreshed: number;
   lifecycleSkipped: number;
@@ -157,7 +157,7 @@ export async function runFeedPipeline(
           number: row.bill_number,
         };
         const bundle = await fetchBillSummaryBundle(env, billRef);
-        await persistBillSponsors(env, billRef, bundle.sponsors);
+        await replaceBillSponsors(env.DB, billRef, bundle.sponsors);
 
         // Digest already good — only sponsor backfill was needed.
         if (hasCompleteDigest) {
@@ -277,6 +277,7 @@ export async function runFeedPipeline(
       digestsWritten,
       digestsSkipped,
       digestsRewritten,
+      digestWarnings,
       chamberWarnings,
       lifecycleRefreshed,
       lifecycleSkipped,
@@ -299,6 +300,7 @@ export async function runFeedPipeline(
         billsSelected: result.billsSelected,
         digestsWritten: result.digestsWritten,
         digestsSkipped: result.digestsSkipped,
+        ...(digestWarnings.length > 0 ? { digest_warnings: digestWarnings } : {}),
         ...(chamberWarnings.length > 0 ? { chamber_warnings: chamberWarnings } : {}),
         lifecycleRefreshed: result.lifecycleRefreshed,
         lifecycleSkipped: result.lifecycleSkipped,

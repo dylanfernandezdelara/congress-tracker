@@ -129,6 +129,7 @@ describe("worker", () => {
       digestsWritten: 1,
       digestsSkipped: 2,
       digestsRewritten: 1,
+      digestWarnings: [],
       chamberWarnings: [],
       lifecycleRefreshed: 0,
       lifecycleSkipped: 0,

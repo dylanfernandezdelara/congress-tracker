@@ -28,14 +28,14 @@ describe("replaceBillSponsors", () => {
 
   it("no-ops without deleting when sponsors is empty", async () => {
     const { db, prepare, batch } = createMockDb();
-    await replaceBillSponsors(db, 119, "HR", 1, []);
+    await replaceBillSponsors(db, { congress: 119, type: "HR", number: 1 }, []);
     expect(prepare).not.toHaveBeenCalled();
     expect(batch).not.toHaveBeenCalled();
   });
 
   it("batches delete + inserts for a non-empty sponsor list", async () => {
     const { db, batch } = createMockDb();
-    await replaceBillSponsors(db, 119, "hr", 1, [
+    await replaceBillSponsors(db, { congress: 119, type: "hr", number: 1 }, [
       {
         bioguideId: "G000555",
         state: "NY",
