@@ -11,8 +11,7 @@ export function StateFilterControl({ value, onChange }: StateFilterControlProps)
   const active = value != null
 
   return (
-    <label className={`state-filter${active ? ' is-active' : ''}`}>
-      <span className="visually-hidden">Sponsor state</span>
+    <div className={`state-filter${active ? ' is-active' : ''}`}>
       <select
         className="state-filter-select"
         aria-label="Filter by sponsor state"
@@ -29,6 +28,6 @@ export function StateFilterControl({ value, onChange }: StateFilterControlProps)
           </option>
         ))}
       </select>
-    </label>
+    </div>
   )
 }
