@@ -1,5 +1,6 @@
 import type { IngestMonitorPayload } from '@congress-tracker/shared/ingest-api-types'
 
+import { applyAdvancedFeedParams, type AdvancedFeedFilters } from '../utils/feedAdvancedFilters'
 import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
@@ -49,14 +50,7 @@ export async function fetchFeed(options: {
   offset: number
   chamber?: 'House' | 'Senate'
   q?: string
-  /** Two-letter sponsor state code. */
-  state?: string
-  sponsorChamber?: 'House' | 'Senate'
-  sponsor?: string
-  sponsorQ?: string
-  party?: 'D' | 'R' | 'I'
-  policy?: string
-}): Promise<FeedPageResponse> {
+} & Partial<AdvancedFeedFilters>): Promise<FeedPageResponse> {
   const params = new URLSearchParams({
     limit: String(options.limit),
     offset: String(options.offset),
@@ -68,25 +62,14 @@ export async function fetchFeed(options: {
   if (q) {
     params.set('q', q)
   }
-  if (options.state) {
-    params.set('state', options.state)
-  }
-  if (options.sponsorChamber) {
-    params.set('sponsor_chamber', options.sponsorChamber)
-  }
-  if (options.sponsor) {
-    params.set('sponsor', options.sponsor)
-  }
-  const sponsorQ = options.sponsorQ?.trim()
-  if (sponsorQ) {
-    params.set('sponsor_q', sponsorQ)
-  }
-  if (options.party) {
-    params.set('party', options.party)
-  }
-  if (options.policy) {
-    params.set('policy', options.policy)
-  }
+  applyAdvancedFeedParams(params, {
+    state: options.state ?? null,
+    sponsorChamber: options.sponsorChamber ?? null,
+    sponsor: options.sponsor ?? null,
+    sponsorQ: options.sponsorQ ?? '',
+    party: options.party ?? null,
+    policy: options.policy ?? null,
+  })
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
 }
 

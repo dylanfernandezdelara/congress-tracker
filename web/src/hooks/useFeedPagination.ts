@@ -11,13 +11,11 @@ import {
 } from '../utils/billDeepLink'
 import { parseChamberFilter, type ChamberFilter } from '../utils/chamberFilter'
 import {
+  emptyAdvancedFilters,
   parseAdvancedFeedFilters,
   writeAdvancedFeedFilters,
   type AdvancedFeedFilters,
-  type PartyFilter,
-  type SponsorChamberFilter,
 } from '../utils/feedAdvancedFilters'
-import type { StateFilter } from '../utils/stateFilter'
 
 const SEARCH_DEBOUNCE_MS = 300
 
@@ -69,17 +67,6 @@ function filtersEqual(a: FeedFilters, b: FeedFilters): boolean {
     a.policy === b.policy &&
     a.q === b.q
   )
-}
-
-function emptyAdvancedFilters(): AdvancedFeedFilters {
-  return {
-    state: null,
-    sponsorChamber: null,
-    sponsor: null,
-    sponsorQ: '',
-    party: null,
-    policy: null,
-  }
 }
 
 export function useFeedPagination() {
@@ -308,53 +295,6 @@ export function useFeedPagination() {
     [clearDeepLinkState, replaceSearchParams, setExpandedKey],
   )
 
-  const setStateFilter = useCallback(
-    (next: StateFilter | null) => {
-      patchAdvancedFilters({ state: next })
-    },
-    [patchAdvancedFilters],
-  )
-
-  const setSponsorChamberFilter = useCallback(
-    (next: SponsorChamberFilter | null) => {
-      patchAdvancedFilters({ sponsorChamber: next })
-    },
-    [patchAdvancedFilters],
-  )
-
-  const setPartyFilter = useCallback(
-    (next: PartyFilter | null) => {
-      patchAdvancedFilters({ party: next })
-    },
-    [patchAdvancedFilters],
-  )
-
-  const setPolicyFilter = useCallback(
-    (next: string | null) => {
-      patchAdvancedFilters({ policy: next })
-    },
-    [patchAdvancedFilters],
-  )
-
-  const setSponsorMember = useCallback(
-    (next: { bioguideId: string; name?: string } | null) => {
-      if (!next) {
-        patchAdvancedFilters({ sponsor: null, sponsorQ: '' })
-        return
-      }
-      patchAdvancedFilters({ sponsor: next.bioguideId, sponsorQ: '' })
-    },
-    [patchAdvancedFilters],
-  )
-
-  const setSponsorNameQuery = useCallback(
-    (next: string) => {
-      const trimmed = next.trim()
-      patchAdvancedFilters({ sponsor: null, sponsorQ: trimmed })
-    },
-    [patchAdvancedFilters],
-  )
-
   const clearAdvancedFilters = useCallback(() => {
     patchAdvancedFilters(emptyAdvancedFilters())
   }, [patchAdvancedFilters])
@@ -471,14 +411,18 @@ export function useFeedPagination() {
     setExpandedKey,
   ])
 
-  return {
-    chamber: filters.chamber,
+  const advancedFilters: AdvancedFeedFilters = {
     state: filters.state,
     sponsorChamber: filters.sponsorChamber,
     sponsor: filters.sponsor,
     sponsorQ: filters.sponsorQ,
     party: filters.party,
     policy: filters.policy,
+  }
+
+  return {
+    chamber: filters.chamber,
+    advancedFilters,
     searchQuery: filters.q,
     searchDraft: draftQuery,
     items,
@@ -494,12 +438,7 @@ export function useFeedPagination() {
     reloadFeed,
     loadMore,
     setChamberFilter,
-    setStateFilter,
-    setSponsorChamberFilter,
-    setPartyFilter,
-    setPolicyFilter,
-    setSponsorMember,
-    setSponsorNameQuery,
+    patchAdvancedFilters,
     clearAdvancedFilters,
     setSearchDraft,
     submitSearch,

@@ -3,56 +3,32 @@ import {
   normalizeSponsorNameQuery,
   parseFeedChamberParam,
   parseFeedPartyParam,
+  parseFeedStateParam,
   parseSponsorBioguideParam,
   type FeedChamberFilter,
   type FeedPartyFilter,
 } from '@congress-tracker/shared/feed-filter-params'
 import { partyDisplayName } from '@congress-tracker/shared/party'
 
-import { parseStateFilter, stateFilterLabel, type StateFilter } from './stateFilter'
-
-export type SponsorChamberFilter = FeedChamberFilter
-export type PartyFilter = FeedPartyFilter
+import { stateFilterLabel } from './stateFilter'
 
 export type AdvancedFeedFilters = {
-  state: StateFilter | null
-  sponsorChamber: SponsorChamberFilter | null
+  state: string | null
+  sponsorChamber: FeedChamberFilter | null
   sponsor: string | null
   sponsorQ: string
-  party: PartyFilter | null
+  party: FeedPartyFilter | null
   policy: string | null
-}
-
-export function parseSponsorChamberFilter(
-  value: string | null | undefined,
-): SponsorChamberFilter | null {
-  return parseFeedChamberParam(value)
-}
-
-export function parsePartyFilter(value: string | null | undefined): PartyFilter | null {
-  return parseFeedPartyParam(value)
-}
-
-export function parseSponsorFilter(value: string | null | undefined): string | null {
-  return parseSponsorBioguideParam(value)
-}
-
-export function parseSponsorNameFilter(value: string | null | undefined): string {
-  return normalizeSponsorNameQuery(value) ?? ''
-}
-
-export function parsePolicyFilter(value: string | null | undefined): string | null {
-  return normalizePolicyFilter(value) ?? null
 }
 
 export function parseAdvancedFeedFilters(params: URLSearchParams): AdvancedFeedFilters {
   return {
-    state: parseStateFilter(params.get('state')),
-    sponsorChamber: parseSponsorChamberFilter(params.get('sponsor_chamber')),
-    sponsor: parseSponsorFilter(params.get('sponsor')),
-    sponsorQ: parseSponsorNameFilter(params.get('sponsor_q')),
-    party: parsePartyFilter(params.get('party')),
-    policy: parsePolicyFilter(params.get('policy')),
+    state: parseFeedStateParam(params.get('state')),
+    sponsorChamber: parseFeedChamberParam(params.get('sponsor_chamber')),
+    sponsor: parseSponsorBioguideParam(params.get('sponsor')),
+    sponsorQ: normalizeSponsorNameQuery(params.get('sponsor_q')) ?? '',
+    party: parseFeedPartyParam(params.get('party')),
+    policy: normalizePolicyFilter(params.get('policy')) ?? null,
   }
 }
 
@@ -81,7 +57,8 @@ export function advancedFilterSummary(
   return parts
 }
 
-export function writeAdvancedFeedFilters(
+/** Write advanced feed filters into URLSearchParams or API query params. */
+export function applyAdvancedFeedParams(
   params: URLSearchParams,
   filters: AdvancedFeedFilters,
 ): void {
@@ -96,5 +73,23 @@ export function writeAdvancedFeedFilters(
   for (const [key, value] of entries) {
     if (value) params.set(key, value)
     else params.delete(key)
+  }
+}
+
+export function writeAdvancedFeedFilters(
+  params: URLSearchParams,
+  filters: AdvancedFeedFilters,
+): void {
+  applyAdvancedFeedParams(params, filters)
+}
+
+export function emptyAdvancedFilters(): AdvancedFeedFilters {
+  return {
+    state: null,
+    sponsorChamber: null,
+    sponsor: null,
+    sponsorQ: '',
+    party: null,
+    policy: null,
   }
 }

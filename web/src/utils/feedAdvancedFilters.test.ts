@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   advancedFilterCount,
   advancedFilterSummary,
+  applyAdvancedFeedParams,
   parseAdvancedFeedFilters,
-  writeAdvancedFeedFilters,
 } from './feedAdvancedFilters'
 
 describe('parseAdvancedFeedFilters', () => {
@@ -23,10 +23,10 @@ describe('parseAdvancedFeedFilters', () => {
   })
 })
 
-describe('writeAdvancedFeedFilters', () => {
+describe('applyAdvancedFeedParams', () => {
   it('prefers exact sponsor over sponsor_q in the URL', () => {
     const params = new URLSearchParams()
-    writeAdvancedFeedFilters(params, {
+    applyAdvancedFeedParams(params, {
       state: 'NY',
       sponsorChamber: 'House',
       sponsor: 'LOCAL:H002',

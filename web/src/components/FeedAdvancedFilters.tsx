@@ -1,97 +1,49 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 
+import { parseFeedPartyParam } from '@congress-tracker/shared/feed-filter-params'
 import { US_STATE_OPTIONS } from '@congress-tracker/shared/us-states'
 
-import { fetchMembersSearch, fetchPolicyAreas } from '../api/client'
-import type { MemberSearchItem } from '../api/types'
-import { loadMemberProfile } from '../api/memberProfileCache'
+import { fetchPolicyAreas } from '../api/client'
+import { getCachedMemberProfile } from '../api/memberProfileCache'
 import {
   advancedFilterCount,
   advancedFilterSummary,
-  type PartyFilter,
-  type SponsorChamberFilter,
+  type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
-import type { StateFilter } from '../utils/stateFilter'
+import { MemberSponsorCombobox } from './MemberSponsorCombobox'
 
 type FeedAdvancedFiltersProps = {
-  state: StateFilter | null
-  sponsorChamber: SponsorChamberFilter | null
-  sponsor: string | null
-  sponsorQ: string
-  party: PartyFilter | null
-  policy: string | null
-  onStateChange: (next: StateFilter | null) => void
-  onSponsorChamberChange: (next: SponsorChamberFilter | null) => void
-  onPartyChange: (next: PartyFilter | null) => void
-  onPolicyChange: (next: string | null) => void
-  onSponsorMemberChange: (next: { bioguideId: string; name?: string } | null) => void
-  onSponsorNameQueryChange: (next: string) => void
-  onClearAll: () => void
+  filters: AdvancedFeedFilters
+  onChange: (patch: Partial<AdvancedFeedFilters>) => void
+  onClear: () => void
 }
 
-const SPONSOR_CHAMBER_OPTIONS: Array<{ value: '' | SponsorChamberFilter; label: string }> = [
+const SPONSOR_CHAMBER_OPTIONS: Array<{
+  value: '' | NonNullable<AdvancedFeedFilters['sponsorChamber']>
+  label: string
+}> = [
   { value: '', label: 'Any' },
   { value: 'House', label: 'House' },
   { value: 'Senate', label: 'Senate' },
 ]
 
-const PARTY_OPTIONS: Array<{ value: '' | PartyFilter; label: string }> = [
+const PARTY_OPTIONS = [
   { value: '', label: 'Any' },
   { value: 'D', label: 'Democrat' },
   { value: 'R', label: 'Republican' },
   { value: 'I', label: 'Independent' },
-]
+] as const
 
-const MEMBER_SEARCH_DEBOUNCE_MS = 220
-
-export function FeedAdvancedFilters({
-  state,
-  sponsorChamber,
-  sponsor,
-  sponsorQ,
-  party,
-  policy,
-  onStateChange,
-  onSponsorChamberChange,
-  onPartyChange,
-  onPolicyChange,
-  onSponsorMemberChange,
-  onSponsorNameQueryChange,
-  onClearAll,
-}: FeedAdvancedFiltersProps) {
+export function FeedAdvancedFilters({ filters, onChange, onClear }: FeedAdvancedFiltersProps) {
   const panelId = useId()
-  const listboxId = useId()
-  const [open, setOpen] = useState(
-    () =>
-      advancedFilterCount({
-        state,
-        sponsorChamber,
-        sponsor,
-        sponsorQ,
-        party,
-        policy,
-      }) > 0,
-  )
+  const [open, setOpen] = useState(() => advancedFilterCount(filters) > 0)
   const [policyAreas, setPolicyAreas] = useState<string[]>([])
-  const [memberDraft, setMemberDraft] = useState(sponsorQ)
-  const [selectedName, setSelectedName] = useState<string | null>(null)
-  const [suggestions, setSuggestions] = useState<MemberSearchItem[]>([])
-  const [suggestOpen, setSuggestOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(-1)
-  const blurTimerRef = useRef<number | null>(null)
 
-  const activeCount = advancedFilterCount({
-    state,
-    sponsorChamber,
-    sponsor,
-    sponsorQ,
-    party,
-    policy,
-  })
-  const summary = advancedFilterSummary(
-    { state, sponsorChamber, sponsor, sponsorQ, party, policy },
-    selectedName,
-  )
+  const activeCount = advancedFilterCount(filters)
+  const sponsorName = filters.sponsor
+    ? getCachedMemberProfile(filters.sponsor)?.name ?? null
+    : null
+  const summary = advancedFilterSummary(filters, sponsorName)
 
   useEffect(() => {
     let cancelled = false
@@ -106,79 +58,6 @@ export function FeedAdvancedFilters({
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    if (!sponsor) {
-      setSelectedName(null)
-      setMemberDraft(sponsorQ)
-      return
-    }
-    let cancelled = false
-    void loadMemberProfile(sponsor)
-      .then((profile) => {
-        if (cancelled) return
-        setSelectedName(profile.name)
-        setMemberDraft(profile.name)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setSelectedName(sponsor)
-        setMemberDraft(sponsor)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sponsor, sponsorQ])
-
-  useEffect(() => {
-    if (sponsor) {
-      setSuggestions([])
-      return
-    }
-    const q = memberDraft.trim()
-    if (q.length < 2) {
-      setSuggestions([])
-      return
-    }
-    let cancelled = false
-    const handle = window.setTimeout(() => {
-      void fetchMembersSearch({
-        q,
-        chamber: sponsorChamber ?? undefined,
-        state: state ?? undefined,
-        limit: 8,
-      })
-        .then((res) => {
-          if (!cancelled) {
-            setSuggestions(res.items)
-            setActiveIndex(-1)
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setSuggestions([])
-        })
-    }, MEMBER_SEARCH_DEBOUNCE_MS)
-    return () => {
-      cancelled = true
-      window.clearTimeout(handle)
-    }
-  }, [memberDraft, sponsor, sponsorChamber, state])
-
-  useEffect(() => {
-    return () => {
-      if (blurTimerRef.current != null) window.clearTimeout(blurTimerRef.current)
-    }
-  }, [])
-
-  const commitMemberDraft = () => {
-    const next = memberDraft.trim()
-    if (sponsor && selectedName && next === selectedName) return
-    if (!next) {
-      onSponsorMemberChange(null)
-      return
-    }
-    onSponsorNameQueryChange(next)
-  }
 
   return (
     <div className={`feed-advanced-filters${open ? ' is-open' : ''}${activeCount ? ' is-active' : ''}`}>
@@ -198,7 +77,7 @@ export function FeedAdvancedFilters({
           </p>
         ) : null}
         {activeCount > 0 ? (
-          <button type="button" className="feed-advanced-filters-clear" onClick={onClearAll}>
+          <button type="button" className="feed-advanced-filters-clear" onClick={onClear}>
             Clear
           </button>
         ) : null}
@@ -211,10 +90,10 @@ export function FeedAdvancedFilters({
             <select
               className="feed-filter-select"
               aria-label="Filter by sponsor state"
-              value={state ?? ''}
+              value={filters.state ?? ''}
               onChange={(event) => {
                 const next = event.target.value
-                onStateChange(next === '' ? null : next)
+                onChange({ state: next === '' ? null : next })
               }}
             >
               <option value="">Any state</option>
@@ -230,7 +109,7 @@ export function FeedAdvancedFilters({
             <legend className="feed-filter-field-label">Proposed by</legend>
             <div className="feed-filter-segment" role="radiogroup" aria-label="Sponsor chamber">
               {SPONSOR_CHAMBER_OPTIONS.map((option) => {
-                const checked = (sponsorChamber ?? '') === option.value
+                const checked = (filters.sponsorChamber ?? '') === option.value
                 return (
                   <button
                     key={option.label}
@@ -239,7 +118,9 @@ export function FeedAdvancedFilters({
                     aria-checked={checked}
                     className={`feed-filter-segment-option${checked ? ' is-selected' : ''}`}
                     onClick={() =>
-                      onSponsorChamberChange(option.value === '' ? null : option.value)
+                      onChange({
+                        sponsorChamber: option.value === '' ? null : option.value,
+                      })
                     }
                   >
                     {option.label}
@@ -254,10 +135,9 @@ export function FeedAdvancedFilters({
             <select
               className="feed-filter-select"
               aria-label="Filter by sponsor party"
-              value={party ?? ''}
+              value={filters.party ?? ''}
               onChange={(event) => {
-                const next = event.target.value
-                onPartyChange(next === '' ? null : (next as PartyFilter))
+                onChange({ party: parseFeedPartyParam(event.target.value) })
               }}
             >
               {PARTY_OPTIONS.map((option) => (
@@ -268,139 +148,37 @@ export function FeedAdvancedFilters({
             </select>
           </label>
 
-          <div className="feed-filter-field feed-filter-field--member">
-            <label className="feed-filter-field-label" htmlFor={`${panelId}-member`}>
-              Member
-            </label>
-            <div className="feed-member-combobox">
-              <input
-                id={`${panelId}-member`}
-                type="search"
-                className="feed-filter-input"
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded={suggestOpen && suggestions.length > 0}
-                aria-controls={listboxId}
-                aria-activedescendant={
-                  activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined
-                }
-                placeholder="Name or last name"
-                autoComplete="off"
-                spellCheck={false}
-                value={memberDraft}
-                onChange={(event) => {
-                  setMemberDraft(event.target.value)
-                  setSuggestOpen(true)
-                  if (sponsor) onSponsorMemberChange(null)
-                }}
-                onFocus={() => setSuggestOpen(true)}
-                onBlur={() => {
-                  blurTimerRef.current = window.setTimeout(() => {
-                    setSuggestOpen(false)
-                    commitMemberDraft()
-                  }, 120)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'ArrowDown' && suggestions.length > 0) {
-                    event.preventDefault()
-                    setSuggestOpen(true)
-                    setActiveIndex((idx) => Math.min(idx + 1, suggestions.length - 1))
-                    return
-                  }
-                  if (event.key === 'ArrowUp' && suggestions.length > 0) {
-                    event.preventDefault()
-                    setActiveIndex((idx) => Math.max(idx - 1, 0))
-                    return
-                  }
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    if (activeIndex >= 0 && suggestions[activeIndex]) {
-                      const pick = suggestions[activeIndex]
-                      onSponsorMemberChange({
-                        bioguideId: pick.bioguide_id,
-                        name: pick.name,
-                      })
-                      setSelectedName(pick.name)
-                      setMemberDraft(pick.name)
-                      setSuggestOpen(false)
-                      return
-                    }
-                    commitMemberDraft()
-                    setSuggestOpen(false)
-                    return
-                  }
-                  if (event.key === 'Escape') {
-                    setSuggestOpen(false)
-                    if (memberDraft) {
-                      setMemberDraft('')
-                      onSponsorMemberChange(null)
-                    }
-                  }
-                }}
-              />
-              {memberDraft ? (
-                <button
-                  type="button"
-                  className="feed-member-combobox-clear"
-                  aria-label="Clear member filter"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    setMemberDraft('')
-                    setSuggestions([])
-                    onSponsorMemberChange(null)
-                  }}
-                >
-                  ×
-                </button>
-              ) : null}
-              {suggestOpen && suggestions.length > 0 ? (
-                <ul className="feed-member-suggestions" id={listboxId} role="listbox">
-                  {suggestions.map((item, index) => (
-                    <li key={item.bioguide_id} role="presentation">
-                      <button
-                        type="button"
-                        role="option"
-                        id={`${listboxId}-${index}`}
-                        aria-selected={index === activeIndex}
-                        className={`feed-member-suggestion${index === activeIndex ? ' is-active' : ''}`}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          onSponsorMemberChange({
-                            bioguideId: item.bioguide_id,
-                            name: item.name,
-                          })
-                          setSelectedName(item.name)
-                          setMemberDraft(item.name)
-                          setSuggestOpen(false)
-                        }}
-                      >
-                        <span className="feed-member-suggestion-name">{item.name}</span>
-                        <span className="feed-member-suggestion-meta">
-                          {item.chamber} · {item.party}
-                          {item.state ? ` · ${item.state}` : ''}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          </div>
+          <MemberSponsorCombobox
+            sponsor={filters.sponsor}
+            sponsorQ={filters.sponsorQ}
+            chamber={filters.sponsorChamber}
+            state={filters.state}
+            onPick={(next) => {
+              if (!next) {
+                onChange({ sponsor: null, sponsorQ: '' })
+                return
+              }
+              onChange({ sponsor: next.bioguideId, sponsorQ: '' })
+            }}
+            onNameQuery={(next) => {
+              onChange({ sponsor: null, sponsorQ: next.trim() })
+            }}
+          />
 
           <label className="feed-filter-field">
             <span className="feed-filter-field-label">Topic</span>
             <select
               className="feed-filter-select"
               aria-label="Filter by policy topic"
-              value={policy ?? ''}
+              value={filters.policy ?? ''}
               onChange={(event) => {
                 const next = event.target.value
-                onPolicyChange(next === '' ? null : next)
+                onChange({ policy: next === '' ? null : next })
               }}
             >
               <option value="">Any topic</option>
-              {policy && !policyAreas.includes(policy) ? (
-                <option value={policy}>{policy}</option>
+              {filters.policy && !policyAreas.includes(filters.policy) ? (
+                <option value={filters.policy}>{filters.policy}</option>
               ) : null}
               {policyAreas.map((area) => (
                 <option key={area} value={area}>

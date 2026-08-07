@@ -22,12 +22,12 @@ import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
+import { getCachedMemberProfile } from '../api/memberProfileCache'
 import { feedRowKey } from '../utils/billDeepLink'
 import {
   advancedFilterCount,
   advancedFilterSummary,
-  type PartyFilter,
-  type SponsorChamberFilter,
+  type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
@@ -42,30 +42,19 @@ function FeedSkeleton() {
   )
 }
 
-function emptyFeedCopy(options: {
-  chamber: 'House' | 'Senate' | null
-  state: string | null
-  sponsorChamber: SponsorChamberFilter | null
-  sponsor: string | null
-  sponsorQ: string
-  party: PartyFilter | null
-  policy: string | null
-  searchQuery: string
-}): string {
-  const sponsorBits = advancedFilterSummary({
-    state: options.state,
-    sponsorChamber: options.sponsorChamber,
-    sponsor: options.sponsor,
-    sponsorQ: options.sponsorQ,
-    party: options.party,
-    policy: options.policy,
-  })
+function emptyFeedCopy(
+  chamber: 'House' | 'Senate' | null,
+  advanced: AdvancedFeedFilters,
+  searchQuery: string,
+  sponsorName?: string | null,
+): string {
+  const sponsorBits = advancedFilterSummary(advanced, sponsorName)
   const sponsorScope = sponsorBits.length > 0 ? ` · ${sponsorBits.join(' · ')}` : ''
-  if (options.searchQuery) {
-    const chamberScope = options.chamber ? `${options.chamber} ` : ''
-    return `No ${chamberScope}matches for “${options.searchQuery}”${sponsorScope}.`
+  if (searchQuery) {
+    const chamberScope = chamber ? `${chamber} ` : ''
+    return `No ${chamberScope}matches for “${searchQuery}”${sponsorScope}.`
   }
-  const chamberScope = options.chamber ? `${options.chamber} ` : ''
+  const chamberScope = chamber ? `${chamber} ` : ''
   if (sponsorBits.length > 0) {
     return `No ${chamberScope}passage votes matching ${sponsorBits.join(' · ')} in the last ${VOTE_LOOKBACK_DAYS} days.`
   }
@@ -76,12 +65,7 @@ export default function Home() {
   const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
   const {
     chamber,
-    state,
-    sponsorChamber,
-    sponsor,
-    sponsorQ,
-    party,
-    policy,
+    advancedFilters,
     searchQuery,
     searchDraft,
     items,
@@ -97,12 +81,7 @@ export default function Home() {
     reloadFeed,
     loadMore,
     setChamberFilter,
-    setStateFilter,
-    setSponsorChamberFilter,
-    setPartyFilter,
-    setPolicyFilter,
-    setSponsorMember,
-    setSponsorNameQuery,
+    patchAdvancedFilters,
     clearAdvancedFilters,
     setSearchDraft,
     submitSearch,
@@ -110,6 +89,9 @@ export default function Home() {
     toggleRow,
     dismissBillMissingNotice,
   } = useFeedPagination()
+  const sponsorName = advancedFilters.sponsor
+    ? getCachedMemberProfile(advancedFilters.sponsor)?.name ?? null
+    : null
 
   const [railRetryKey, setRailRetryKey] = useState(0)
   const { reload: reloadStats, session, pulse, defectors, portfolios } = useStatsData({
@@ -192,36 +174,13 @@ export default function Home() {
     />
   )
 
-  const emptyCopy = emptyFeedCopy({
-    chamber,
-    state,
-    sponsorChamber,
-    sponsor,
-    sponsorQ,
-    party,
-    policy,
-    searchQuery,
-  })
+  const emptyCopy = emptyFeedCopy(chamber, advancedFilters, searchQuery, sponsorName)
 
-  const advancedCount = advancedFilterCount({
-    state,
-    sponsorChamber,
-    sponsor,
-    sponsorQ,
-    party,
-    policy,
-  })
+  const advancedCount = advancedFilterCount(advancedFilters)
 
   const countSuffix = [
     chamber ? chamber : null,
-    ...advancedFilterSummary({
-      state,
-      sponsorChamber,
-      sponsor,
-      sponsorQ,
-      party,
-      policy,
-    }),
+    ...advancedFilterSummary(advancedFilters, sponsorName),
     searchQuery ? `“${searchQuery}”` : null,
   ]
     .filter(Boolean)
@@ -243,19 +202,9 @@ export default function Home() {
           <div className="home-feed-filters">
             <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
             <FeedAdvancedFilters
-              state={state}
-              sponsorChamber={sponsorChamber}
-              sponsor={sponsor}
-              sponsorQ={sponsorQ}
-              party={party}
-              policy={policy}
-              onStateChange={setStateFilter}
-              onSponsorChamberChange={setSponsorChamberFilter}
-              onPartyChange={setPartyFilter}
-              onPolicyChange={setPolicyFilter}
-              onSponsorMemberChange={setSponsorMember}
-              onSponsorNameQueryChange={setSponsorNameQuery}
-              onClearAll={clearAdvancedFilters}
+              filters={advancedFilters}
+              onChange={patchAdvancedFilters}
+              onClear={clearAdvancedFilters}
             />
           </div>
           <FeedSearchInput

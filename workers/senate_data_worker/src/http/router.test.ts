@@ -465,7 +465,8 @@ describe("HTTP API", () => {
         sponsorChamber: "Senate",
         party: "D",
         sponsor: "A000001",
-        sponsorQ: "Schumer",
+        // Exact sponsor wins; free-text name is dropped when both are present.
+        sponsorQ: undefined,
         policy: "Energy",
       })
     );
