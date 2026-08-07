@@ -76,13 +76,6 @@ export function applyAdvancedFeedParams(
   }
 }
 
-export function writeAdvancedFeedFilters(
-  params: URLSearchParams,
-  filters: AdvancedFeedFilters,
-): void {
-  applyAdvancedFeedParams(params, filters)
-}
-
 export function emptyAdvancedFilters(): AdvancedFeedFilters {
   return {
     state: null,

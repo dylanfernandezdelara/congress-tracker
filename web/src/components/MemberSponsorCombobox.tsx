@@ -31,8 +31,14 @@ export function MemberSponsorCombobox({
   const inputId = useId()
   const focusedRef = useRef(false)
   const blurTimerRef = useRef<number | null>(null)
+  /** Local label for the selected sponsor so blur does not demote before cache fills. */
+  const selectedLabelRef = useRef<string | null>(
+    sponsor ? getCachedMemberProfile(sponsor)?.name ?? null : null,
+  )
   const [memberDraft, setMemberDraft] = useState(() => {
-    if (sponsor) return getCachedMemberProfile(sponsor)?.name ?? sponsorQ
+    if (sponsor) {
+      return getCachedMemberProfile(sponsor)?.name ?? selectedLabelRef.current ?? sponsor
+    }
     return sponsorQ
   })
   const [suggestions, setSuggestions] = useState<MemberSearchItem[]>([])
@@ -40,23 +46,31 @@ export function MemberSponsorCombobox({
   const [activeIndex, setActiveIndex] = useState(-1)
 
   useEffect(() => {
-    if (focusedRef.current) return
     if (!sponsor) {
-      setMemberDraft(sponsorQ)
+      selectedLabelRef.current = null
+      if (!focusedRef.current) setMemberDraft(sponsorQ)
       return
     }
     const cached = getCachedMemberProfile(sponsor)
     if (cached) {
-      setMemberDraft(cached.name)
+      selectedLabelRef.current = cached.name
+      if (!focusedRef.current) setMemberDraft(cached.name)
       return
+    }
+    if (selectedLabelRef.current && !focusedRef.current) {
+      setMemberDraft(selectedLabelRef.current)
     }
     let cancelled = false
     void loadMemberProfile(sponsor)
       .then((profile) => {
-        if (!cancelled && !focusedRef.current) setMemberDraft(profile.name)
+        if (cancelled) return
+        selectedLabelRef.current = profile.name
+        if (!focusedRef.current) setMemberDraft(profile.name)
       })
       .catch(() => {
-        if (!cancelled && !focusedRef.current) setMemberDraft(sponsor)
+        if (cancelled) return
+        selectedLabelRef.current = selectedLabelRef.current ?? sponsor
+        if (!focusedRef.current) setMemberDraft(selectedLabelRef.current)
       })
     return () => {
       cancelled = true
@@ -106,7 +120,17 @@ export function MemberSponsorCombobox({
   const commitDraft = () => {
     const next = memberDraft.trim()
     if (sponsor) {
-      const selectedName = getCachedMemberProfile(sponsor)?.name
+      const selectedName =
+        getCachedMemberProfile(sponsor)?.name ?? selectedLabelRef.current
+      if (!next) {
+        // Keep an exact sponsor selection if the draft is still resolving.
+        if (selectedName) {
+          setMemberDraft(selectedName)
+          return
+        }
+        onPick(null)
+        return
+      }
       if (selectedName && next === selectedName) return
       if (next === sponsor) return
     }
@@ -115,6 +139,14 @@ export function MemberSponsorCombobox({
       return
     }
     onNameQuery(next)
+  }
+
+  const pickMember = (item: { bioguideId: string; name: string }) => {
+    selectedLabelRef.current = item.name
+    prefetchMemberProfile(item.bioguideId)
+    onPick(item)
+    setMemberDraft(item.name)
+    setSuggestOpen(false)
   }
 
   return (
@@ -169,10 +201,7 @@ export function MemberSponsorCombobox({
               event.preventDefault()
               if (activeIndex >= 0 && suggestions[activeIndex]) {
                 const pick = suggestions[activeIndex]
-                prefetchMemberProfile(pick.bioguide_id)
-                onPick({ bioguideId: pick.bioguide_id, name: pick.name })
-                setMemberDraft(pick.name)
-                setSuggestOpen(false)
+                pickMember({ bioguideId: pick.bioguide_id, name: pick.name })
                 return
               }
               commitDraft()
@@ -220,10 +249,7 @@ export function MemberSponsorCombobox({
                   className={`feed-member-suggestion${index === activeIndex ? ' is-active' : ''}`}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
-                    prefetchMemberProfile(item.bioguide_id)
-                    onPick({ bioguideId: item.bioguide_id, name: item.name })
-                    setMemberDraft(item.name)
-                    setSuggestOpen(false)
+                    pickMember({ bioguideId: item.bioguide_id, name: item.name })
                   }}
                 >
                   <span className="feed-member-suggestion-name">{item.name}</span>

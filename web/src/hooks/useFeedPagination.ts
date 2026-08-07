@@ -11,9 +11,9 @@ import {
 } from '../utils/billDeepLink'
 import { parseChamberFilter, type ChamberFilter } from '../utils/chamberFilter'
 import {
+  applyAdvancedFeedParams,
   emptyAdvancedFilters,
   parseAdvancedFeedFilters,
-  writeAdvancedFeedFilters,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
 
@@ -154,21 +154,13 @@ export function useFeedPagination() {
       }
 
       try {
+        const { chamber, q, ...advanced } = nextFilters
         const page: FeedPageResponse = await fetchFeed({
           limit: pageSize,
           offset,
-          ...(nextFilters.chamber ? { chamber: nextFilters.chamber } : {}),
-          ...(nextFilters.state ? { state: nextFilters.state } : {}),
-          ...(nextFilters.sponsorChamber
-            ? { sponsorChamber: nextFilters.sponsorChamber }
-            : {}),
-          ...(nextFilters.sponsor ? { sponsor: nextFilters.sponsor } : {}),
-          ...(nextFilters.sponsorQ && !nextFilters.sponsor
-            ? { sponsorQ: nextFilters.sponsorQ }
-            : {}),
-          ...(nextFilters.party ? { party: nextFilters.party } : {}),
-          ...(nextFilters.policy ? { policy: nextFilters.policy } : {}),
-          ...(nextFilters.q ? { q: nextFilters.q } : {}),
+          ...(chamber ? { chamber } : {}),
+          ...(q ? { q } : {}),
+          ...advanced,
         })
         if (requestId !== requestIdRef.current) return
 
@@ -274,7 +266,7 @@ export function useFeedPagination() {
       clearDeepLinkState()
       replaceSearchParams((params) => {
         const current = parseAdvancedFeedFilters(params)
-        writeAdvancedFeedFilters(params, { ...current, ...patch })
+        applyAdvancedFeedParams(params, { ...current, ...patch })
         params.delete('bill')
       })
     },
