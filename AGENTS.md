@@ -88,7 +88,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 
 - `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`); top-level `status` is `ok` only when ingest is healthy
 - `GET /debug/ingest.json` — detailed ingest monitor payload
-- `GET /feed/latest.json?limit=&offset=&chamber=House|Senate&state=NY&q=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; optional `chamber` filters to bills with a passage vote in that chamber; optional `state` 2-letter code filters to bills with a **primary sponsor** from that state (federal bills sponsored by that state's senators/reps); optional `q` case-insensitive substring search on title, policy area, digest headline, and normalized bill id; **not** a bare array)
+- `GET /feed/latest.json?limit=&offset=&chamber=House|Senate&state=NY&q=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50; optional `chamber` filters to bills with a passage vote in that chamber; optional `state` 2-letter code filters to bills with a **primary sponsor** from that state (federal bills sponsored by that state's senators/reps; requires `bill_sponsors` rows from feed ingest — run `POST /__pipeline/run/feed` after deploy if the table is empty); optional `q` case-insensitive substring search on title, policy area, digest headline, and normalized bill id; **not** a bare array)
 - `GET /stats/session.json` — per-chamber passage vote aggregates
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
 - `GET /stats/recent-laws.json?limit=` — recently enacted bills (default 5, cap 10); each law embeds its full feed `item` (`FeedItem | null`) for expand-in-place detail

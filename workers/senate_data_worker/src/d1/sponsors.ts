@@ -22,6 +22,7 @@ export async function billHasSponsors(
       `SELECT 1 AS ok
        FROM bill_sponsors
        WHERE congress = ? AND UPPER(bill_type) = ? AND bill_number = ?
+         AND is_primary = 1
        LIMIT 1`
     )
     .bind(congress, normalizeBillType(billType), billNumber)
@@ -30,8 +31,9 @@ export async function billHasSponsors(
 }
 
 /**
- * Replace all stored sponsors for a bill. Callers pass the full primary-sponsor
- * list from Congress.gov so stale rows are cleared when membership changes.
+ * Replace stored primary sponsors for a bill.
+ * No-ops when `sponsors` is empty so a transient empty Congress.gov parse cannot
+ * wipe good rows (and leave the bill stuck in perpetual backfill).
  */
 export async function replaceBillSponsors(
   db: D1Database,
@@ -40,39 +42,39 @@ export async function replaceBillSponsors(
   billNumber: number,
   sponsors: BillSponsorRecord[]
 ): Promise<void> {
+  if (sponsors.length === 0) return;
+
   await ensureSchema(db);
   const type = normalizeBillType(billType);
   const now = new Date().toISOString();
 
-  await db
-    .prepare(
-      `DELETE FROM bill_sponsors
-       WHERE congress = ? AND UPPER(bill_type) = ? AND bill_number = ?`
-    )
-    .bind(congress, type, billNumber)
-    .run();
-
-  if (sponsors.length === 0) return;
-
-  const statements = sponsors.map((sponsor) =>
+  const statements = [
     db
       .prepare(
-        `INSERT INTO bill_sponsors (
-          congress, bill_type, bill_number, bioguide_id,
-          state, full_name, party, is_primary, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `DELETE FROM bill_sponsors
+         WHERE congress = ? AND UPPER(bill_type) = ? AND bill_number = ?`
       )
-      .bind(
-        congress,
-        type,
-        billNumber,
-        sponsor.bioguideId,
-        sponsor.state,
-        sponsor.fullName,
-        sponsor.party,
-        sponsor.isPrimary ? 1 : 0,
-        now
-      )
-  );
+      .bind(congress, type, billNumber),
+    ...sponsors.map((sponsor) =>
+      db
+        .prepare(
+          `INSERT INTO bill_sponsors (
+            congress, bill_type, bill_number, bioguide_id,
+            state, full_name, party, is_primary, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          congress,
+          type,
+          billNumber,
+          sponsor.bioguideId,
+          sponsor.state,
+          sponsor.fullName,
+          sponsor.party,
+          sponsor.isPrimary ? 1 : 0,
+          now
+        )
+    ),
+  ];
   await db.batch(statements);
 }

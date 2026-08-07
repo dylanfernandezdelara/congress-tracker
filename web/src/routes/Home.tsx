@@ -42,23 +42,13 @@ function emptyFeedCopy(
   state: string | null,
   searchQuery: string,
 ): string {
-  const stateLabel = stateFilterLabel(state)
+  const stateScope = state ? ` sponsored by ${stateFilterLabel(state)} members` : ''
   if (searchQuery) {
-    if (chamber && state) {
-      return `No ${chamber} matches for “${searchQuery}” sponsored by ${stateLabel} members.`
-    }
-    if (chamber) return `No ${chamber} matches for “${searchQuery}”.`
-    if (state) return `No matches for “${searchQuery}” sponsored by ${stateLabel} members.`
-    return `No matches for “${searchQuery}”.`
+    const chamberScope = chamber ? `${chamber} ` : ''
+    return `No ${chamberScope}matches for “${searchQuery}”${stateScope}.`
   }
-  if (chamber && state) {
-    return `No ${chamber} passage votes sponsored by ${stateLabel} members in the last ${VOTE_LOOKBACK_DAYS} days.`
-  }
-  if (state) {
-    return `No passage votes sponsored by ${stateLabel} members in the last ${VOTE_LOOKBACK_DAYS} days.`
-  }
-  if (chamber) return `No ${chamber} passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
-  return `No passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
+  const chamberScope = chamber ? `${chamber} ` : ''
+  return `No ${chamberScope}passage votes${stateScope} in the last ${VOTE_LOOKBACK_DAYS} days.`
 }
 
 export default function Home() {

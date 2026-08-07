@@ -40,6 +40,10 @@ vi.mock("../d1/sponsors", () => ({
   replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
 }));
 
+vi.mock("./persist-bill-sponsors", () => ({
+  persistBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
+}));
+
 vi.mock("../d1/votes", () => ({
   selectExistingVoteKeys: (...args: unknown[]) => mockSelectExistingVoteKeys(...args),
   upsertVote: (...args: unknown[]) => mockUpsertVote(...args),
@@ -237,9 +241,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
     expect(mockReplaceBillSponsors).toHaveBeenCalledWith(
       expect.anything(),
-      119,
-      "HR",
-      1,
+      { congress: 119, type: "HR", number: 1 },
       [
         {
           bioguideId: "G000555",

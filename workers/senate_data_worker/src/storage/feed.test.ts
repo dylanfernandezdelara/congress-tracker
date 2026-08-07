@@ -148,9 +148,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "Senate",
-      undefined,
-      undefined
+      { chamber: "Senate", q: undefined, state: undefined }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -158,9 +156,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      "Senate",
-      undefined,
-      undefined
+      { chamber: "Senate", q: undefined, state: undefined }
     );
   });
 
@@ -176,9 +172,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      undefined,
-      "housing",
-      undefined
+      { chamber: undefined, q: "housing", state: undefined }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -186,9 +180,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      undefined,
-      "housing",
-      undefined
+      { chamber: undefined, q: "housing", state: undefined }
     );
   });
 
@@ -204,9 +196,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      undefined,
-      undefined,
-      "NY"
+      { chamber: undefined, q: undefined, state: "NY" }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -214,9 +204,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      undefined,
-      undefined,
-      "NY"
+      { chamber: undefined, q: undefined, state: "NY" }
     );
   });
 

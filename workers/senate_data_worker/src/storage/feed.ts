@@ -278,13 +278,15 @@ export async function buildFeedPage(
   const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
   const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
   const offset = Math.max(0, options.offset);
-  const chamber = options.chamber;
-  const q = options.q;
-  const state = options.state;
+  const filters = {
+    chamber: options.chamber,
+    q: options.q,
+    state: options.state,
+  };
   const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
-    countFeedBills(env.DB, lookback, executiveSince, chamber, q, state),
-    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, chamber, q, state),
+    countFeedBills(env.DB, lookback, executiveSince, filters),
+    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, filters),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 

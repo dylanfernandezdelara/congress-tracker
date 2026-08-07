@@ -19,8 +19,8 @@ vi.mock("../d1/digests", () => ({
   upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
 }));
 
-vi.mock("../d1/sponsors", () => ({
-  replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
+vi.mock("./persist-bill-sponsors", () => ({
+  persistBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
 }));
 
 vi.mock("../synthesis/model", () => ({

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS bill_sponsors (
   PRIMARY KEY (congress, bill_type, bill_number, bioguide_id)
 );
 CREATE INDEX IF NOT EXISTS idx_bill_sponsors_state ON bill_sponsors (state, congress, bill_type, bill_number);
+CREATE INDEX IF NOT EXISTS idx_bill_sponsors_bill ON bill_sponsors (congress, bill_type, bill_number);
 CREATE TABLE IF NOT EXISTS members (
   bioguide_id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

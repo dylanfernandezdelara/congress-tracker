@@ -201,12 +201,10 @@ export async function selectFeedBills(
   executiveSinceIso: string,
   limit: number,
   offset = 0,
-  chamber?: Chamber,
-  q?: string,
-  state?: string
+  filters: { chamber?: Chamber; q?: string; state?: string } = {}
 ): Promise<FeedBillRow[]> {
   await ensureSchema(db);
-  const filter = buildFeedFilterClause({ chamber, q, state });
+  const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
     voteLookbackDate,
     executiveSinceIso,
@@ -247,12 +245,10 @@ export async function countFeedBills(
   db: D1Database,
   voteLookbackDate: string,
   executiveSinceIso: string,
-  chamber?: Chamber,
-  q?: string,
-  state?: string
+  filters: { chamber?: Chamber; q?: string; state?: string } = {}
 ): Promise<number> {
   await ensureSchema(db);
-  const filter = buildFeedFilterClause({ chamber, q, state });
+  const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
     voteLookbackDate,
     executiveSinceIso,
