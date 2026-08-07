@@ -1,4 +1,5 @@
 import type { Env } from "../config";
+import { stripMarkdownFence } from "./llm-json";
 import { resolveOpenRouterModel } from "./model";
 import {
   buildNotableVotePrompt,
@@ -14,9 +15,7 @@ interface NotableVoteLlmResult {
 }
 
 export function parseNotableVoteJson(text: string): NotableVoteLlmResult | null {
-  let raw = text.trim();
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) raw = fence[1].trim();
+  const raw = stripMarkdownFence(text);
   try {
     const parsed = JSON.parse(raw) as NotableVoteLlmResult;
     const blurb = parsed.why_it_matters?.trim();

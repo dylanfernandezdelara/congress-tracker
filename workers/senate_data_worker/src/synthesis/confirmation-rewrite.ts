@@ -6,11 +6,9 @@ import {
 import type { ConfirmationBackgroundContent } from "../../../../shared/confirmations-api-types";
 import type { Env } from "../config";
 import { buildConfirmationBackgroundPrompt } from "./confirmation-prompt";
+import { jsonParseCandidates } from "./llm-json";
 import { resolveOpenRouterModel } from "./model";
-
-interface ChatResponse {
-  choices?: Array<{ message?: { content?: string } }>;
-}
+import { completeWithReasoningFallback } from "./openrouter-chat";
 
 const MAX_TOKENS = 768;
 /**
@@ -25,43 +23,10 @@ function normalizePersonBackground(text: string): string {
   return truncateAtSentenceBoundary(text.trim(), BACKGROUND_MAX_CHARS);
 }
 
-/**
- * JSON object at the tail of mixed output. Reasoning models that inline their
- * thinking into `content` end with the JSON answer, so the object must close
- * the message — this rejects schema echoes inside truncated reasoning text.
- * JSON.parse is the oracle; no hand-rolled brace/escape scanning.
- */
-export function extractTrailingJsonObject(text: string): string | null {
-  const trimmed = text.trimEnd();
-  if (!trimmed.endsWith("}")) return null;
-  for (
-    let start = trimmed.indexOf("{");
-    start !== -1;
-    start = trimmed.indexOf("{", start + 1)
-  ) {
-    const candidate = trimmed.slice(start);
-    try {
-      JSON.parse(candidate);
-      return candidate;
-    } catch {
-      // Not a balanced object from this brace; try the next one.
-    }
-  }
-  return null;
-}
-
 export function parseConfirmationBackgroundJson(
   text: string
 ): ConfirmationBackgroundContent | null {
-  let raw = text.trim();
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) raw = fence[1].trim();
-
-  const candidates = [raw];
-  const trailing = extractTrailingJsonObject(raw);
-  if (trailing && trailing !== raw) candidates.push(trailing);
-
-  for (const candidate of candidates) {
+  for (const candidate of jsonParseCandidates(text)) {
     let parsed: ConfirmationBackgroundContent;
     try {
       parsed = JSON.parse(candidate) as ConfirmationBackgroundContent;
@@ -84,40 +49,6 @@ export function parseConfirmationBackgroundJson(
   return null;
 }
 
-async function requestConfirmationCompletion(
-  env: Env,
-  model: string,
-  prompt: string,
-  options: { maxTokens: number; disableReasoning: boolean }
-): Promise<ConfirmationBackgroundContent | null> {
-  const body: Record<string, unknown> = {
-    model,
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0,
-    max_tokens: options.maxTokens,
-  };
-  if (options.disableReasoning) {
-    body.reasoning = { enabled: false };
-  }
-
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://congress-tracker.local",
-      "X-Title": "Congress Tracker",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) return null;
-  const data = (await res.json()) as ChatResponse;
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) return null;
-  return parseConfirmationBackgroundJson(content);
-}
-
 /**
  * Reasoning models (default free-tier picks) burn the whole token budget on
  * chain-of-thought and get cut off before the JSON answer. Ask with reasoning
@@ -138,18 +69,14 @@ export async function rewriteConfirmationBackground(
   const model = modelOverride ?? (await resolveOpenRouterModel(env));
   const prompt = buildConfirmationBackgroundPrompt(params);
 
-  const attempts = [
-    { maxTokens: MAX_TOKENS, disableReasoning: true },
-    { maxTokens: REASONING_FALLBACK_MAX_TOKENS, disableReasoning: false },
-  ];
-  for (const attempt of attempts) {
-    const background = await requestConfirmationCompletion(
-      env,
-      model,
-      prompt,
-      attempt
-    );
-    if (background) return background;
-  }
-  return null;
+  return completeWithReasoningFallback(
+    env,
+    model,
+    prompt,
+    parseConfirmationBackgroundJson,
+    {
+      maxTokens: MAX_TOKENS,
+      reasoningFallbackMaxTokens: REASONING_FALLBACK_MAX_TOKENS,
+    }
+  );
 }

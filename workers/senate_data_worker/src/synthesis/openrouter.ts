@@ -5,6 +5,7 @@ import {
 import type { Env } from "../config";
 import type { BillDigestContent } from "../types";
 import { truncateCrsSummaryForRewrite } from "./crs-truncate";
+import { stripMarkdownFence } from "./llm-json";
 import { buildDigestPrompt, type DigestPromptMode } from "./prompt";
 import { resolveOpenRouterModel } from "./model";
 import { extractAcronyms } from "../sources/html-clean";
@@ -18,9 +19,7 @@ const FULL_MAX_TOKENS = 1024;
 const COMPACT_MAX_TOKENS = 512;
 
 export function parseDigestJson(text: string): BillDigestContent | null {
-  let raw = text.trim();
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) raw = fence[1].trim();
+  const raw = stripMarkdownFence(text);
   try {
     const parsed = JSON.parse(raw) as BillDigestContent;
     if (!parsed.headline || !parsed.what_it_does) return null;

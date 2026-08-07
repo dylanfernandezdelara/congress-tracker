@@ -7,6 +7,7 @@ import type {
 import { EXECUTIVE_LINK_MIN_CONFIDENCE } from "../constants";
 import type { BillRef } from "../types";
 import { parseSenateIssue } from "../sources/bill-ref";
+import { stripMarkdownFence } from "../synthesis/llm-json";
 
 const VALID_ROLES: ExecutiveBillRole[] = [
   "primary",
@@ -20,9 +21,7 @@ export function billRefKey(bill: BillRef): string {
 }
 
 export function parseExecutiveLinkJson(text: string): ExecutiveLinkLlmResult | null {
-  let raw = text.trim();
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) raw = fence[1]!.trim();
+  const raw = stripMarkdownFence(text);
   try {
     const parsed = JSON.parse(raw) as ExecutiveLinkLlmResult;
     if (!parsed.banner_summary?.trim() || !Array.isArray(parsed.linked_bills)) return null;
