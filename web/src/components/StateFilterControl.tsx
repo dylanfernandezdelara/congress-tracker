@@ -8,9 +8,11 @@ type StateFilterControlProps = {
 }
 
 export function StateFilterControl({ value, onChange }: StateFilterControlProps) {
+  const active = value != null
+
   return (
-    <label className="state-filter">
-      <span className="state-filter-label">Sponsor state</span>
+    <label className={`state-filter${active ? ' is-active' : ''}`}>
+      <span className="visually-hidden">Sponsor state</span>
       <select
         className="state-filter-select"
         aria-label="Filter by sponsor state"
@@ -20,7 +22,7 @@ export function StateFilterControl({ value, onChange }: StateFilterControlProps)
           onChange(next === '' ? null : next)
         }}
       >
-        <option value="">All states</option>
+        <option value="">State</option>
         {US_STATE_OPTIONS.map((state) => (
           <option key={state.code} value={state.code}>
             {state.name}
