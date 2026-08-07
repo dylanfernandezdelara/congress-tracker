@@ -20,6 +20,8 @@ const {
   fetchRecentConfirmations,
   fetchDefectors,
   fetchMemberProfile,
+  fetchMembersSearch,
+  fetchPolicyAreas,
   fetchSessionStats,
   fetchPulseStats,
   fetchPortfolioStats,
@@ -30,6 +32,8 @@ const {
   fetchRecentConfirmations: vi.fn(),
   fetchDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
+  fetchMembersSearch: vi.fn(),
+  fetchPolicyAreas: vi.fn(),
   fetchSessionStats: vi.fn(),
   fetchPulseStats: vi.fn(),
   fetchPortfolioStats: vi.fn(),
@@ -45,6 +49,8 @@ vi.mock('../api/client', () => ({
   fetchDefectors,
   fetchPortfolioStats,
   fetchMemberProfile,
+  fetchMembersSearch,
+  fetchPolicyAreas,
 }))
 
 function mockViewport(isDesktop: boolean) {
@@ -102,6 +108,8 @@ function pageResponse(
 
 describe('Home', () => {
   beforeEach(() => {
+    fetchPolicyAreas.mockResolvedValue({ items: ['Energy', 'Public Lands and Natural Resources'] })
+    fetchMembersSearch.mockResolvedValue({ items: [], q: '', limit: 8 })
     fetchFeed.mockResolvedValue(
       pageResponse([
         makeFeedItem({
@@ -522,6 +530,7 @@ describe('Home', () => {
     expect(await screen.findByText('New York sponsor headline')).toBeInTheDocument()
     expect(screen.getByText('Texas sponsor headline')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     fireEvent.change(screen.getByLabelText('Filter by sponsor state'), {
       target: { value: 'NY' },
     })
@@ -537,16 +546,94 @@ describe('Home', () => {
     expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('NY')
   })
 
-  it('shows a sponsor-state empty state with a clear action', async () => {
+  it('filters by sponsor chamber, party, member name, and topic together', async () => {
+    fetchMembersSearch.mockResolvedValue({
+      items: [
+        {
+          bioguide_id: 'LOCAL:H002',
+          name: 'Rep. Sample Loyal (local)',
+          chamber: 'House',
+          party: 'D',
+          state: 'NY',
+          district: 10,
+        },
+      ],
+      q: 'Loyal',
+      limit: 8,
+    })
+    fetchMemberProfile.mockResolvedValue({
+      bioguide_id: 'LOCAL:H002',
+      name: 'Rep. Sample Loyal (local)',
+      chamber: 'House',
+      party: 'D',
+      state: 'NY',
+      district: 10,
+      photo_url: '',
+      congress_gov_url: null,
+      congress: 119,
+      session: 2,
+      votes_cast: 1,
+      yea_count: 1,
+      nay_count: 0,
+      cross_vote_count: 0,
+      cross_vote_label: 'cross-party votes',
+      recent_cross_votes: [],
+      member_votes_available: true,
+      as_of: '2026-08-07T00:00:00.000Z',
+    })
+
+    fetchFeed
+      .mockResolvedValueOnce(pageResponse([makeFeedItem()], { total: 1 }))
+      .mockResolvedValue(pageResponse([makeFeedItem()], { total: 1 }))
+
+    renderHome()
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Sponsor chamber' })).getByRole('radio', {
+        name: 'House',
+      }),
+    )
+
+    fireEvent.change(screen.getByLabelText('Filter by sponsor party'), {
+      target: { value: 'D' },
+    })
+    fireEvent.change(screen.getByLabelText('Filter by policy topic'), {
+      target: { value: 'Energy' },
+    })
+
+    const memberInput = screen.getByPlaceholderText('Name or last name')
+    fireEvent.change(memberInput, { target: { value: 'Loyal' } })
+    expect(await screen.findByRole('option', { name: /Rep\. Sample Loyal/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('option', { name: /Rep\. Sample Loyal/ }))
+
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({
+        limit: 15,
+        offset: 0,
+        sponsorChamber: 'House',
+        party: 'D',
+        policy: 'Energy',
+        sponsor: 'LOCAL:H002',
+      })
+    })
+    expect(screen.getByTestId('search-params').textContent).toContain('sponsor_chamber=House')
+    expect(screen.getByTestId('search-params').textContent).toContain('party=D')
+    expect(screen.getByTestId('search-params').textContent).toContain('policy=Energy')
+    expect(screen.getByTestId('search-params').textContent).toContain('sponsor=LOCAL%3AH002')
+  })
+
+  it('shows a sponsor-filter empty state with a clear action', async () => {
     fetchFeed.mockResolvedValue(pageResponse([], { total: 0 }))
-    renderHome('/?state=NY')
+    renderHome('/?state=NY&sponsor_chamber=Senate')
 
     expect(
       await screen.findByText(
-        'No passage votes sponsored by New York members in the last 45 days.',
+        'No passage votes matching New York · Senate sponsors in the last 45 days.',
       ),
     ).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Clear sponsor state' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
 
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
@@ -557,6 +644,7 @@ describe('Home', () => {
     renderHome('/?state=New%20York')
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0 })
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('')
   })
 

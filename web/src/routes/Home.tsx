@@ -10,6 +10,7 @@ import type {
 } from '../api/types'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
+import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
 import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
 import { LeftSidebar } from '../components/LeftSidebar'
@@ -17,13 +18,17 @@ import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
 import { RecentLawsSection } from '../components/RecentLawsSection'
 import { RightRail } from '../components/RightRail'
-import { StateFilterControl } from '../components/StateFilterControl'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
-import { stateFilterLabel } from '../utils/stateFilter'
+import {
+  advancedFilterCount,
+  advancedFilterSummary,
+  type PartyFilter,
+  type SponsorChamberFilter,
+} from '../utils/feedAdvancedFilters'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -37,18 +42,34 @@ function FeedSkeleton() {
   )
 }
 
-function emptyFeedCopy(
-  chamber: 'House' | 'Senate' | null,
-  state: string | null,
-  searchQuery: string,
-): string {
-  const stateScope = state ? ` sponsored by ${stateFilterLabel(state)} members` : ''
-  if (searchQuery) {
-    const chamberScope = chamber ? `${chamber} ` : ''
-    return `No ${chamberScope}matches for “${searchQuery}”${stateScope}.`
+function emptyFeedCopy(options: {
+  chamber: 'House' | 'Senate' | null
+  state: string | null
+  sponsorChamber: SponsorChamberFilter | null
+  sponsor: string | null
+  sponsorQ: string
+  party: PartyFilter | null
+  policy: string | null
+  searchQuery: string
+}): string {
+  const sponsorBits = advancedFilterSummary({
+    state: options.state,
+    sponsorChamber: options.sponsorChamber,
+    sponsor: options.sponsor,
+    sponsorQ: options.sponsorQ,
+    party: options.party,
+    policy: options.policy,
+  })
+  const sponsorScope = sponsorBits.length > 0 ? ` · ${sponsorBits.join(' · ')}` : ''
+  if (options.searchQuery) {
+    const chamberScope = options.chamber ? `${options.chamber} ` : ''
+    return `No ${chamberScope}matches for “${options.searchQuery}”${sponsorScope}.`
   }
-  const chamberScope = chamber ? `${chamber} ` : ''
-  return `No ${chamberScope}passage votes${stateScope} in the last ${VOTE_LOOKBACK_DAYS} days.`
+  const chamberScope = options.chamber ? `${options.chamber} ` : ''
+  if (sponsorBits.length > 0) {
+    return `No ${chamberScope}passage votes matching ${sponsorBits.join(' · ')} in the last ${VOTE_LOOKBACK_DAYS} days.`
+  }
+  return `No ${chamberScope}passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
 }
 
 export default function Home() {
@@ -56,6 +77,11 @@ export default function Home() {
   const {
     chamber,
     state,
+    sponsorChamber,
+    sponsor,
+    sponsorQ,
+    party,
+    policy,
     searchQuery,
     searchDraft,
     items,
@@ -72,6 +98,12 @@ export default function Home() {
     loadMore,
     setChamberFilter,
     setStateFilter,
+    setSponsorChamberFilter,
+    setPartyFilter,
+    setPolicyFilter,
+    setSponsorMember,
+    setSponsorNameQuery,
+    clearAdvancedFilters,
     setSearchDraft,
     submitSearch,
     clearSearch,
@@ -160,11 +192,36 @@ export default function Home() {
     />
   )
 
-  const emptyCopy = emptyFeedCopy(chamber, state, searchQuery)
+  const emptyCopy = emptyFeedCopy({
+    chamber,
+    state,
+    sponsorChamber,
+    sponsor,
+    sponsorQ,
+    party,
+    policy,
+    searchQuery,
+  })
+
+  const advancedCount = advancedFilterCount({
+    state,
+    sponsorChamber,
+    sponsor,
+    sponsorQ,
+    party,
+    policy,
+  })
 
   const countSuffix = [
     chamber ? chamber : null,
-    state ? stateFilterLabel(state) : null,
+    ...advancedFilterSummary({
+      state,
+      sponsorChamber,
+      sponsor,
+      sponsorQ,
+      party,
+      policy,
+    }),
     searchQuery ? `“${searchQuery}”` : null,
   ]
     .filter(Boolean)
@@ -185,7 +242,21 @@ export default function Home() {
         <div className="home-feed-toolbar">
           <div className="home-feed-filters">
             <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
-            <StateFilterControl value={state} onChange={setStateFilter} />
+            <FeedAdvancedFilters
+              state={state}
+              sponsorChamber={sponsorChamber}
+              sponsor={sponsor}
+              sponsorQ={sponsorQ}
+              party={party}
+              policy={policy}
+              onStateChange={setStateFilter}
+              onSponsorChamberChange={setSponsorChamberFilter}
+              onPartyChange={setPartyFilter}
+              onPolicyChange={setPolicyFilter}
+              onSponsorMemberChange={setSponsorMember}
+              onSponsorNameQueryChange={setSponsorNameQuery}
+              onClearAll={clearAdvancedFilters}
+            />
           </div>
           <FeedSearchInput
             value={searchDraft}
@@ -236,13 +307,9 @@ export default function Home() {
                 Show all chambers
               </button>
             ) : null}
-            {state && !searchQuery ? (
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => setStateFilter(null)}
-              >
-                Clear sponsor state
+            {advancedCount > 0 && !searchQuery ? (
+              <button type="button" className="ghost-button" onClick={clearAdvancedFilters}>
+                Clear filters
               </button>
             ) : null}
           </div>

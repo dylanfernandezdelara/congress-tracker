@@ -36,7 +36,7 @@ describe("stripBillIdQuery / escapeLikePattern", () => {
 });
 
 describe("buildFeedFilterClause", () => {
-  it("omits WHERE when chamber, state, and q are absent", () => {
+  it("omits WHERE when filters are absent", () => {
     expect(buildFeedFilterClause({})).toEqual({ sql: "", binds: [] });
   });
 
@@ -45,7 +45,38 @@ describe("buildFeedFilterClause", () => {
     expect(sql).toContain("bill_sponsors");
     expect(sql).toContain("s.is_primary = 1");
     expect(sql).toContain("s.state = ?");
+    expect(sql).not.toContain("LEFT JOIN members");
     expect(binds).toEqual(["NY"]);
+  });
+
+  it("combines state, sponsor chamber, party, and name in one EXISTS", () => {
+    const { sql, binds } = buildFeedFilterClause({
+      state: "NY",
+      sponsorChamber: "Senate",
+      party: "D",
+      sponsorQ: "Schumer",
+    });
+    expect(sql).toContain("LEFT JOIN members m");
+    expect(sql).toContain("s.state = ?");
+    expect(sql).toContain("m.chamber = ?");
+    expect(sql).toContain("LOWER(s.full_name) LIKE ?");
+    expect(sql).toContain("LOWER(m.name) LIKE ?");
+    expect(sql).toContain("IN (?, ?, ?, ?)");
+    expect(binds[0]).toBe("NY");
+    expect(binds[1]).toBe("Senate");
+    expect(binds[2]).toBe("%schumer%");
+    expect(binds[3]).toBe("%schumer%");
+    expect(binds.slice(4)).toEqual(["D", "DEM", "DEMOCRAT", "DEMOCRATIC"]);
+  });
+
+  it("filters by exact sponsor bioguide and policy area", () => {
+    const { sql, binds } = buildFeedFilterClause({
+      sponsor: "A000001",
+      policy: "Energy",
+    });
+    expect(sql).toContain("s.bioguide_id = ?");
+    expect(sql).toContain("d.policy_area = ?");
+    expect(binds).toEqual(["A000001", "Energy"]);
   });
 
   it("builds title/policy/headline + bill-id match with case-insensitive LIKE", () => {

@@ -1,4 +1,9 @@
 import { FEED_SEARCH_MAX_LENGTH } from "../constants";
+import {
+  partySqlAliases,
+  type FeedChamberFilter,
+  type FeedPartyFilter,
+} from "../../../../shared/feed-filter-params";
 
 /** Escape `\`, `%`, and `_` so LIKE matches them literally under ESCAPE '\'. */
 export function escapeLikePattern(value: string): string {
@@ -25,15 +30,27 @@ export function stripBillIdQuery(q: string): string {
 }
 
 export type FeedFilterOptions = {
-  chamber?: "House" | "Senate" | string;
+  /** Passage-vote chamber (not sponsor chamber). */
+  chamber?: FeedChamberFilter | string;
   q?: string;
-  /** Two-letter sponsor state code (primary sponsors only). */
+  /** Two-letter primary-sponsor state code. */
   state?: string;
+  /** Chamber of the primary sponsor (via members join). */
+  sponsorChamber?: FeedChamberFilter;
+  /** Exact primary-sponsor bioguide (or LOCAL seed id). */
+  sponsor?: string;
+  /** Case-insensitive substring on sponsor / member name. */
+  sponsorQ?: string;
+  /** Primary-sponsor party (D/R/I). */
+  party?: FeedPartyFilter;
+  /** Exact digest policy_area. */
+  policy?: string;
 };
 
 /**
  * WHERE clause fragments for selectFeedBills / countFeedBills.
- * Chamber, q, and state combine with AND. Bills without digests still match on bill id.
+ * Filters combine with AND. Sponsor facets share one EXISTS so they apply to
+ * the same primary sponsor. Bills without digests still match on bill id for `q`.
  */
 export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
   sql: string;
@@ -54,16 +71,71 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
     binds.push(options.chamber);
   }
 
+  const sponsorConditions: string[] = [];
+  const sponsorBinds: Array<string | number> = [];
+  let needsMemberJoin = false;
+
   if (options.state) {
+    sponsorConditions.push("s.state = ?");
+    sponsorBinds.push(options.state);
+  }
+
+  if (options.sponsorChamber) {
+    needsMemberJoin = true;
+    sponsorConditions.push("m.chamber = ?");
+    sponsorBinds.push(options.sponsorChamber);
+  }
+
+  if (options.sponsor) {
+    sponsorConditions.push("s.bioguide_id = ?");
+    sponsorBinds.push(options.sponsor);
+  }
+
+  if (options.sponsorQ) {
+    needsMemberJoin = true;
+    const substring = `%${escapeLikePattern(options.sponsorQ.toLowerCase())}%`;
+    sponsorConditions.push(`(
+            (s.full_name IS NOT NULL AND LOWER(s.full_name) LIKE ? ESCAPE '\\')
+            OR (m.name IS NOT NULL AND LOWER(m.name) LIKE ? ESCAPE '\\')
+          )`);
+    sponsorBinds.push(substring, substring);
+  }
+
+  if (options.party) {
+    needsMemberJoin = true;
+    const aliases = partySqlAliases(options.party);
+    const placeholders = aliases.map(() => "?").join(", ");
+    sponsorConditions.push(
+      `UPPER(TRIM(COALESCE(NULLIF(m.party, ''), s.party, ''))) IN (${placeholders})`
+    );
+    sponsorBinds.push(...aliases);
+  }
+
+  if (sponsorConditions.length > 0) {
+    const joinSql = needsMemberJoin
+      ? "LEFT JOIN members m ON m.bioguide_id = s.bioguide_id"
+      : "";
     clauses.push(`EXISTS (
          SELECT 1 FROM bill_sponsors s
+         ${joinSql}
          WHERE s.is_primary = 1
-           AND s.state = ?
            AND s.congress = combined.bill_congress
            AND UPPER(s.bill_type) = combined.bill_type
            AND s.bill_number = combined.bill_number
+           AND ${sponsorConditions.join("\n           AND ")}
        )`);
-    binds.push(options.state);
+    binds.push(...sponsorBinds);
+  }
+
+  if (options.policy) {
+    clauses.push(`EXISTS (
+         SELECT 1 FROM bill_digests d
+         WHERE d.congress = combined.bill_congress
+           AND UPPER(d.bill_type) = combined.bill_type
+           AND d.number = combined.bill_number
+           AND d.policy_area = ?
+       )`);
+    binds.push(options.policy);
   }
 
   const q = options.q;

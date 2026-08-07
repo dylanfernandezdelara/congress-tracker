@@ -10,13 +10,19 @@ import {
   itemMatchesBillParam,
 } from '../utils/billDeepLink'
 import { parseChamberFilter, type ChamberFilter } from '../utils/chamberFilter'
-import { parseStateFilter, type StateFilter } from '../utils/stateFilter'
+import {
+  parseAdvancedFeedFilters,
+  writeAdvancedFeedFilters,
+  type AdvancedFeedFilters,
+  type PartyFilter,
+  type SponsorChamberFilter,
+} from '../utils/feedAdvancedFilters'
+import type { StateFilter } from '../utils/stateFilter'
 
 const SEARCH_DEBOUNCE_MS = 300
 
-type FeedFilters = {
+type FeedFilters = AdvancedFeedFilters & {
   chamber: ChamberFilter | null
-  state: StateFilter | null
   q: string
 }
 
@@ -35,7 +41,17 @@ function scrollRowIntoView(rowKey: string) {
 }
 
 function deepLinkQueryKey(filters: FeedFilters, bill: string): string {
-  return `${filters.chamber ?? ''}|${filters.state ?? ''}|${filters.q}|${bill}`
+  return [
+    filters.chamber ?? '',
+    filters.state ?? '',
+    filters.sponsorChamber ?? '',
+    filters.sponsor ?? '',
+    filters.sponsorQ,
+    filters.party ?? '',
+    filters.policy ?? '',
+    filters.q,
+    bill,
+  ].join('|')
 }
 
 function parseSearchQuery(value: string | null | undefined): string {
@@ -43,15 +59,36 @@ function parseSearchQuery(value: string | null | undefined): string {
 }
 
 function filtersEqual(a: FeedFilters, b: FeedFilters): boolean {
-  return a.chamber === b.chamber && a.state === b.state && a.q === b.q
+  return (
+    a.chamber === b.chamber &&
+    a.state === b.state &&
+    a.sponsorChamber === b.sponsorChamber &&
+    a.sponsor === b.sponsor &&
+    a.sponsorQ === b.sponsorQ &&
+    a.party === b.party &&
+    a.policy === b.policy &&
+    a.q === b.q
+  )
+}
+
+function emptyAdvancedFilters(): AdvancedFeedFilters {
+  return {
+    state: null,
+    sponsorChamber: null,
+    sponsor: null,
+    sponsorQ: '',
+    party: null,
+    policy: null,
+  }
 }
 
 export function useFeedPagination() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const advanced = parseAdvancedFeedFilters(searchParams)
   const filters: FeedFilters = {
     chamber: parseChamberFilter(searchParams.get('chamber')),
-    state: parseStateFilter(searchParams.get('state')),
     q: parseSearchQuery(searchParams.get('q')),
+    ...advanced,
   }
   const billParam = searchParams.get('bill')
 
@@ -135,6 +172,15 @@ export function useFeedPagination() {
           offset,
           ...(nextFilters.chamber ? { chamber: nextFilters.chamber } : {}),
           ...(nextFilters.state ? { state: nextFilters.state } : {}),
+          ...(nextFilters.sponsorChamber
+            ? { sponsorChamber: nextFilters.sponsorChamber }
+            : {}),
+          ...(nextFilters.sponsor ? { sponsor: nextFilters.sponsor } : {}),
+          ...(nextFilters.sponsorQ && !nextFilters.sponsor
+            ? { sponsorQ: nextFilters.sponsorQ }
+            : {}),
+          ...(nextFilters.party ? { party: nextFilters.party } : {}),
+          ...(nextFilters.policy ? { policy: nextFilters.policy } : {}),
           ...(nextFilters.q ? { q: nextFilters.q } : {}),
         })
         if (requestId !== requestIdRef.current) return
@@ -213,6 +259,8 @@ export function useFeedPagination() {
     return () => window.clearTimeout(handle)
   }, [draftQuery, filters.q, commitSearchQuery])
 
+  const filterDepsKey = deepLinkQueryKey(filters, '')
+
   // Reset expansion on filter change; keep rows visible while the replacement
   // page is in flight (skeleton only for true first load / empty list).
   useEffect(() => {
@@ -223,21 +271,23 @@ export function useFeedPagination() {
     }
     loadedFilterRef.current = filters
     void loadFeedPage(0, 'replace', filters)
-  }, [retryKey, loadFeedPage, filters.chamber, filters.state, filters.q, setExpandedKey])
+    // filterDepsKey captures all filter fields used by filtersEqual / fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filters object is rebuilt each render
+  }, [retryKey, loadFeedPage, filterDepsKey, setExpandedKey])
 
   const loadMore = useCallback(() => {
     if (!hasMore || isLoadingMore || isInitialLoading) return
     void loadFeedPage(nextOffset, 'append', filtersRef.current)
   }, [hasMore, isLoadingMore, isInitialLoading, loadFeedPage, nextOffset])
 
-  const setUrlFilter = useCallback(
-    (key: 'chamber' | 'state', next: string | null) => {
+  const patchAdvancedFilters = useCallback(
+    (patch: Partial<AdvancedFeedFilters>) => {
       setExpandedKey(null)
       setBillMissingNotice(false)
       clearDeepLinkState()
       replaceSearchParams((params) => {
-        if (next) params.set(key, next)
-        else params.delete(key)
+        const current = parseAdvancedFeedFilters(params)
+        writeAdvancedFeedFilters(params, { ...current, ...patch })
         params.delete('bill')
       })
     },
@@ -246,17 +296,68 @@ export function useFeedPagination() {
 
   const setChamberFilter = useCallback(
     (next: ChamberFilter | null) => {
-      setUrlFilter('chamber', next)
+      setExpandedKey(null)
+      setBillMissingNotice(false)
+      clearDeepLinkState()
+      replaceSearchParams((params) => {
+        if (next) params.set('chamber', next)
+        else params.delete('chamber')
+        params.delete('bill')
+      })
     },
-    [setUrlFilter],
+    [clearDeepLinkState, replaceSearchParams, setExpandedKey],
   )
 
   const setStateFilter = useCallback(
     (next: StateFilter | null) => {
-      setUrlFilter('state', next)
+      patchAdvancedFilters({ state: next })
     },
-    [setUrlFilter],
+    [patchAdvancedFilters],
   )
+
+  const setSponsorChamberFilter = useCallback(
+    (next: SponsorChamberFilter | null) => {
+      patchAdvancedFilters({ sponsorChamber: next })
+    },
+    [patchAdvancedFilters],
+  )
+
+  const setPartyFilter = useCallback(
+    (next: PartyFilter | null) => {
+      patchAdvancedFilters({ party: next })
+    },
+    [patchAdvancedFilters],
+  )
+
+  const setPolicyFilter = useCallback(
+    (next: string | null) => {
+      patchAdvancedFilters({ policy: next })
+    },
+    [patchAdvancedFilters],
+  )
+
+  const setSponsorMember = useCallback(
+    (next: { bioguideId: string; name?: string } | null) => {
+      if (!next) {
+        patchAdvancedFilters({ sponsor: null, sponsorQ: '' })
+        return
+      }
+      patchAdvancedFilters({ sponsor: next.bioguideId, sponsorQ: '' })
+    },
+    [patchAdvancedFilters],
+  )
+
+  const setSponsorNameQuery = useCallback(
+    (next: string) => {
+      const trimmed = next.trim()
+      patchAdvancedFilters({ sponsor: null, sponsorQ: trimmed })
+    },
+    [patchAdvancedFilters],
+  )
+
+  const clearAdvancedFilters = useCallback(() => {
+    patchAdvancedFilters(emptyAdvancedFilters())
+  }, [patchAdvancedFilters])
 
   const setSearchDraft = useCallback(
     (value: string) => {
@@ -324,7 +425,8 @@ export function useFeedPagination() {
     deepLinkBillRef.current = billParam
     deepLinkPhaseRef.current = 'searching'
     setBillMissingNotice(false)
-  }, [billParam, filters.chamber, filters.state, filters.q, clearDeepLinkState])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterDepsKey covers filter identity
+  }, [billParam, filterDepsKey, clearDeepLinkState])
 
   // Deep-link: after pages load, find the bill or keep appending until exhausted.
   useEffect(() => {
@@ -372,6 +474,11 @@ export function useFeedPagination() {
   return {
     chamber: filters.chamber,
     state: filters.state,
+    sponsorChamber: filters.sponsorChamber,
+    sponsor: filters.sponsor,
+    sponsorQ: filters.sponsorQ,
+    party: filters.party,
+    policy: filters.policy,
     searchQuery: filters.q,
     searchDraft: draftQuery,
     items,
@@ -388,6 +495,12 @@ export function useFeedPagination() {
     loadMore,
     setChamberFilter,
     setStateFilter,
+    setSponsorChamberFilter,
+    setPartyFilter,
+    setPolicyFilter,
+    setSponsorMember,
+    setSponsorNameQuery,
+    clearAdvancedFilters,
     setSearchDraft,
     submitSearch,
     clearSearch,

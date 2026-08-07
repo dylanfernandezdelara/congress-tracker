@@ -148,7 +148,16 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      { chamber: "Senate", q: undefined, state: undefined }
+      {
+        chamber: "Senate",
+        q: undefined,
+        state: undefined,
+        sponsorChamber: undefined,
+        sponsor: undefined,
+        sponsorQ: undefined,
+        party: undefined,
+        policy: undefined,
+      }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -156,7 +165,16 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      { chamber: "Senate", q: undefined, state: undefined }
+      {
+        chamber: "Senate",
+        q: undefined,
+        state: undefined,
+        sponsorChamber: undefined,
+        sponsor: undefined,
+        sponsorQ: undefined,
+        party: undefined,
+        policy: undefined,
+      }
     );
   });
 
@@ -172,7 +190,16 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      { chamber: undefined, q: "housing", state: undefined }
+      {
+      chamber: undefined,
+      q: "housing",
+      state: undefined,
+      sponsorChamber: undefined,
+      sponsor: undefined,
+      sponsorQ: undefined,
+      party: undefined,
+      policy: undefined,
+    }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -180,7 +207,16 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      { chamber: undefined, q: "housing", state: undefined }
+      {
+      chamber: undefined,
+      q: "housing",
+      state: undefined,
+      sponsorChamber: undefined,
+      sponsor: undefined,
+      sponsorQ: undefined,
+      party: undefined,
+      policy: undefined,
+    }
     );
   });
 
@@ -196,7 +232,16 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      { chamber: undefined, q: undefined, state: "NY" }
+      {
+      chamber: undefined,
+      q: undefined,
+      state: "NY",
+      sponsorChamber: undefined,
+      sponsor: undefined,
+      sponsorQ: undefined,
+      party: undefined,
+      policy: undefined,
+    }
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -204,7 +249,16 @@ describe("buildFeedPage lifecycle attachment", () => {
       "lookback-14",
       50,
       0,
-      { chamber: undefined, q: undefined, state: "NY" }
+      {
+      chamber: undefined,
+      q: undefined,
+      state: "NY",
+      sponsorChamber: undefined,
+      sponsor: undefined,
+      sponsorQ: undefined,
+      party: undefined,
+      policy: undefined,
+    }
     );
   });
 

@@ -5,7 +5,9 @@ import type {
   DefectorsResponse,
   FeedPageResponse,
   MemberProfileResponse,
+  MembersSearchResponse,
   NotableVotesResponse,
+  PolicyAreasResponse,
   PortfoliosResponse,
   PulseStatsResponse,
   RecentConfirmationsResponse,
@@ -49,6 +51,11 @@ export async function fetchFeed(options: {
   q?: string
   /** Two-letter sponsor state code. */
   state?: string
+  sponsorChamber?: 'House' | 'Senate'
+  sponsor?: string
+  sponsorQ?: string
+  party?: 'D' | 'R' | 'I'
+  policy?: string
 }): Promise<FeedPageResponse> {
   const params = new URLSearchParams({
     limit: String(options.limit),
@@ -64,7 +71,43 @@ export async function fetchFeed(options: {
   if (options.state) {
     params.set('state', options.state)
   }
+  if (options.sponsorChamber) {
+    params.set('sponsor_chamber', options.sponsorChamber)
+  }
+  if (options.sponsor) {
+    params.set('sponsor', options.sponsor)
+  }
+  const sponsorQ = options.sponsorQ?.trim()
+  if (sponsorQ) {
+    params.set('sponsor_q', sponsorQ)
+  }
+  if (options.party) {
+    params.set('party', options.party)
+  }
+  if (options.policy) {
+    params.set('policy', options.policy)
+  }
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
+}
+
+export async function fetchMembersSearch(options: {
+  q?: string
+  chamber?: 'House' | 'Senate'
+  state?: string
+  limit?: number
+}): Promise<MembersSearchResponse> {
+  const params = new URLSearchParams()
+  const q = options.q?.trim()
+  if (q) params.set('q', q)
+  if (options.chamber) params.set('chamber', options.chamber)
+  if (options.state) params.set('state', options.state)
+  if (options.limit != null) params.set('limit', String(options.limit))
+  const qs = params.toString()
+  return fetchJson<MembersSearchResponse>(`/stats/members.json${qs ? `?${qs}` : ''}`)
+}
+
+export async function fetchPolicyAreas(): Promise<PolicyAreasResponse> {
+  return fetchJson<PolicyAreasResponse>('/stats/policy-areas.json')
 }
 
 export async function fetchSessionStats(): Promise<SessionStatsResponse> {

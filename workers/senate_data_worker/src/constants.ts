@@ -10,6 +10,9 @@ export const FEED_DEFAULT_PAGE_SIZE = 50;
 export const FEED_MAX_PAGE_SIZE = 50;
 /** Max accepted length for feed `q` search (silently truncated). */
 export const FEED_SEARCH_MAX_LENGTH = 100;
+/** Default / max rows for `GET /stats/members.json` autocomplete. */
+export const MEMBER_SEARCH_DEFAULT_LIMIT = 8;
+export const MEMBER_SEARCH_MAX_LIMIT = 20;
 /** Bills with executive signals stay feed-visible for this many days. */
 export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
 /** Homepage statuses fetched per executive ingest run. */

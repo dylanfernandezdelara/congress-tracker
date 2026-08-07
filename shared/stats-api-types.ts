@@ -253,3 +253,24 @@ export interface MemberProfileResponse {
   member_votes_available: boolean
   as_of: string
 }
+
+/** Compact member row for sponsor-filter autocomplete (`GET /stats/members.json`). */
+export interface MemberSearchItem {
+  bioguide_id: string
+  name: string
+  chamber: StatsChamber
+  party: string
+  state: string
+  district: number | null
+}
+
+export interface MembersSearchResponse {
+  items: MemberSearchItem[]
+  q: string
+  limit: number
+}
+
+/** Distinct digest policy areas for feed filter dropdowns. */
+export interface PolicyAreasResponse {
+  items: string[]
+}

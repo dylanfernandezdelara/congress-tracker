@@ -1,7 +1,14 @@
 import type { MemberRecord } from "../types";
-import { isRealBioguideId, senateMemberLookupKey } from "../../../../shared/member-id";
+import { isLisMemberId, isRealBioguideId, senateMemberLookupKey } from "../../../../shared/member-id";
 import { normalizePartyCode } from "../../../../shared/party";
-import { HOUSE_ROSTER_MIN, SENATE_ROSTER_MIN } from "../constants";
+import type { MemberSearchItem } from "../../../../shared/stats-api-types";
+import {
+  HOUSE_ROSTER_MIN,
+  MEMBER_SEARCH_DEFAULT_LIMIT,
+  MEMBER_SEARCH_MAX_LIMIT,
+  SENATE_ROSTER_MIN,
+} from "../constants";
+import { escapeLikePattern } from "./feed-search";
 import { readSenateBioguideLookup } from "./pipeline-state";
 import { ensureSchema } from "./schema";
 
@@ -131,6 +138,73 @@ export async function getMembersByIds(
 export interface RealMemberCounts {
   house: number;
   senate: number;
+}
+
+export type MemberSearchOptions = {
+  q?: string;
+  chamber?: "House" | "Senate";
+  state?: string;
+  limit?: number;
+};
+
+/**
+ * Prefix/substring member search for sponsor-filter autocomplete.
+ * Excludes LIS placeholders; keeps LOCAL seed members for offline UI work.
+ */
+export async function searchMembers(
+  db: D1Database,
+  options: MemberSearchOptions = {}
+): Promise<MemberSearchItem[]> {
+  await ensureSchema(db);
+  const limit = Math.min(
+    MEMBER_SEARCH_MAX_LIMIT,
+    Math.max(1, options.limit ?? MEMBER_SEARCH_DEFAULT_LIMIT)
+  );
+  const clauses = [`bioguide_id NOT LIKE 'LIS:%'`];
+  const binds: Array<string | number> = [];
+
+  const q = options.q?.trim();
+  if (q) {
+    clauses.push(`LOWER(name) LIKE ? ESCAPE '\\'`);
+    binds.push(`%${escapeLikePattern(q.toLowerCase())}%`);
+  }
+  if (options.chamber) {
+    clauses.push(`chamber = ?`);
+    binds.push(options.chamber);
+  }
+  if (options.state) {
+    clauses.push(`state = ?`);
+    binds.push(options.state);
+  }
+
+  const { results } = await db
+    .prepare(
+      `SELECT bioguide_id, name, chamber, party, state, district
+       FROM members
+       WHERE ${clauses.join(" AND ")}
+       ORDER BY name COLLATE NOCASE ASC
+       LIMIT ?`
+    )
+    .bind(...binds, limit)
+    .all<{
+      bioguide_id: string;
+      name: string;
+      chamber: string;
+      party: string | null;
+      state: string | null;
+      district: number | null;
+    }>();
+
+  return (results ?? [])
+    .filter((row) => !isLisMemberId(row.bioguide_id))
+    .map((row) => ({
+      bioguide_id: row.bioguide_id,
+      name: row.name,
+      chamber: row.chamber === "Senate" ? "Senate" : "House",
+      party: row.party ?? "Other",
+      state: row.state ?? "",
+      district: row.district,
+    }));
 }
 
 /** Count members with real bioguide IDs (excludes LOCAL:* and LIS:* placeholders). */

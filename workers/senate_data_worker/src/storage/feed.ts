@@ -43,6 +43,16 @@ export interface FeedPageOptions {
   q?: string;
   /** Two-letter state: bills with a primary sponsor from that state. */
   state?: string;
+  /** Chamber of the primary sponsor (House/Senate via members join). */
+  sponsorChamber?: Chamber;
+  /** Exact primary-sponsor bioguide (or LOCAL seed id). */
+  sponsor?: string;
+  /** Substring match on primary sponsor / member name. */
+  sponsorQ?: string;
+  /** Primary-sponsor party (D/R/I). */
+  party?: "D" | "R" | "I";
+  /** Exact digest policy_area. */
+  policy?: string;
   /** Injectable clock for ten-day derivation tests. */
   now?: Date | string;
 }
@@ -282,6 +292,11 @@ export async function buildFeedPage(
     chamber: options.chamber,
     q: options.q,
     state: options.state,
+    sponsorChamber: options.sponsorChamber,
+    sponsor: options.sponsor,
+    sponsorQ: options.sponsorQ,
+    party: options.party,
+    policy: options.policy,
   };
   const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
