@@ -22,11 +22,13 @@ export type AdvancedFeedFilters = {
 }
 
 export function parseAdvancedFeedFilters(params: URLSearchParams): AdvancedFeedFilters {
+  const sponsor = parseSponsorBioguideParam(params.get('sponsor'))
   return {
     state: parseFeedStateParam(params.get('state')),
     sponsorChamber: parseFeedChamberParam(params.get('sponsor_chamber')),
-    sponsor: parseSponsorBioguideParam(params.get('sponsor')),
-    sponsorQ: normalizeSponsorNameQuery(params.get('sponsor_q')) ?? '',
+    sponsor,
+    // Exact sponsor wins; ignore a stale sponsor_q when both are present.
+    sponsorQ: sponsor ? '' : (normalizeSponsorNameQuery(params.get('sponsor_q')) ?? ''),
     party: parseFeedPartyParam(params.get('party')),
     policy: normalizePolicyFilter(params.get('policy')) ?? null,
   }
@@ -105,13 +107,13 @@ export function advancedFilterSummary(
   return advancedFilterChips(filters, sponsorName).map((chip) => chip.label)
 }
 
-/** Write advanced feed filters into URLSearchParams or API query params. */
+/** Write a full advanced-filter snapshot into URLSearchParams or API query params. */
 export function applyAdvancedFeedParams(
   params: URLSearchParams,
-  filters: Partial<AdvancedFeedFilters>,
+  filters: AdvancedFeedFilters,
 ): void {
-  const sponsor = filters.sponsor ?? null
-  const entries: Array<[string, string | null | undefined]> = [
+  const sponsor = filters.sponsor
+  const entries: Array<[string, string | null]> = [
     ['state', filters.state],
     ['sponsor_chamber', filters.sponsorChamber],
     ['sponsor', sponsor],

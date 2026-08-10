@@ -17,7 +17,7 @@ describe('parseAdvancedFeedFilters', () => {
       state: 'NY',
       sponsorChamber: 'Senate',
       sponsor: 'A000001',
-      sponsorQ: 'Schumer',
+      sponsorQ: '',
       party: 'D',
       policy: 'Energy',
     })

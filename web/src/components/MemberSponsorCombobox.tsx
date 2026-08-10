@@ -1,8 +1,26 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 
 import { fetchMembersSearch } from '../api/client'
 import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { MemberSearchItem } from '../api/types'
+
+export type MemberSponsorCommit = {
+  sponsor: string | null
+  sponsorQ: string
+}
+
+export type MemberSponsorComboboxHandle = {
+  /** Flush the local draft into the parent filter (blur / panel close). */
+  flush: () => void
+}
 
 type MemberSponsorComboboxProps = {
   sponsor: string | null
@@ -13,8 +31,7 @@ type MemberSponsorComboboxProps = {
   state: string | null
   /** Stack suggestions in document flow (e.g. inside a scrollable sheet). */
   suggestionsInline?: boolean
-  onPick: (next: { bioguideId: string; name: string } | null) => void
-  onNameQuery: (next: string) => void
+  onCommit: (next: MemberSponsorCommit) => void
 }
 
 const MEMBER_SEARCH_DEBOUNCE_MS = 220
@@ -29,20 +46,26 @@ function displayValue(
   return selectedName?.trim() || pickedName || sponsor
 }
 
-export function MemberSponsorCombobox({
-  sponsor,
-  sponsorQ,
-  selectedName = null,
-  chamber,
-  state,
-  suggestionsInline = false,
-  onPick,
-  onNameQuery,
-}: MemberSponsorComboboxProps) {
+export const MemberSponsorCombobox = forwardRef<
+  MemberSponsorComboboxHandle,
+  MemberSponsorComboboxProps
+>(function MemberSponsorCombobox(
+  {
+    sponsor,
+    sponsorQ,
+    selectedName = null,
+    chamber,
+    state,
+    suggestionsInline = false,
+    onCommit,
+  },
+  ref,
+) {
   const listboxId = useId()
   const inputId = useId()
   const focusedRef = useRef(false)
   const blurTimerRef = useRef<number | null>(null)
+  const draftRef = useRef('')
   /** Name from the most recent pick, until parent selectedName catches up. */
   const [pickedName, setPickedName] = useState<string | null>(null)
   const [memberDraft, setMemberDraft] = useState(() =>
@@ -51,6 +74,10 @@ export function MemberSponsorCombobox({
   const [suggestions, setSuggestions] = useState<MemberSearchItem[]>([])
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
+
+  draftRef.current = memberDraft
+
+  const resolvedLabel = selectedName?.trim() || pickedName || (sponsor ? sponsor : '')
 
   useEffect(() => {
     if (sponsor && selectedName?.trim() && pickedName && selectedName.trim() === pickedName) {
@@ -61,11 +88,13 @@ export function MemberSponsorCombobox({
   }, [sponsor, sponsorQ, selectedName, pickedName])
 
   useEffect(() => {
-    if (sponsor) {
+    const q = memberDraft.trim()
+    const editingAway =
+      Boolean(sponsor) && q.length > 0 && q !== resolvedLabel && q !== sponsor
+    if (sponsor && !editingAway) {
       setSuggestions([])
       return
     }
-    const q = memberDraft.trim()
     if (q.length < 2) {
       setSuggestions([])
       return
@@ -92,46 +121,61 @@ export function MemberSponsorCombobox({
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [memberDraft, sponsor, chamber, state])
+  }, [memberDraft, sponsor, chamber, state, resolvedLabel])
 
-  useEffect(() => {
-    return () => {
-      if (blurTimerRef.current != null) window.clearTimeout(blurTimerRef.current)
-    }
-  }, [])
-
-  const resolvedLabel = selectedName?.trim() || pickedName || (sponsor ? sponsor : '')
-
-  const commitDraft = () => {
-    const next = memberDraft.trim()
+  const commitDraft = useCallback(() => {
+    const next = draftRef.current.trim()
+    const label = selectedName?.trim() || pickedName || ''
     if (sponsor) {
       if (!next) {
         // Keep an exact sponsor selection while the display name is still resolving.
-        if (!selectedName?.trim() && !pickedName) {
+        if (!label) {
           setMemberDraft(sponsor)
           return
         }
         setPickedName(null)
-        onPick(null)
+        onCommit({ sponsor: null, sponsorQ: '' })
         return
       }
-      if (next === resolvedLabel || next === sponsor) return
+      if (next === label || next === sponsor) return
     }
     if (!next) {
+      if (!sponsor && !sponsorQ) return
       setPickedName(null)
-      onPick(null)
+      onCommit({ sponsor: null, sponsorQ: '' })
       return
     }
+    if (!sponsor && next === sponsorQ) return
     setPickedName(null)
-    onNameQuery(next)
-  }
+    onCommit({ sponsor: null, sponsorQ: next })
+  }, [onCommit, pickedName, selectedName, sponsor, sponsorQ])
+
+  useImperativeHandle(ref, () => ({ flush: commitDraft }), [commitDraft])
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current != null) {
+        window.clearTimeout(blurTimerRef.current)
+        blurTimerRef.current = null
+      }
+      // Panel/sheet unmount (Done / toggle close) must not drop a typed sponsor_q.
+      if (focusedRef.current) commitDraft()
+    }
+  }, [commitDraft])
 
   const pickMember = (item: { bioguideId: string; name: string }) => {
     setPickedName(item.name)
     prefetchMemberProfile(item.bioguideId)
-    onPick(item)
+    onCommit({ sponsor: item.bioguideId, sponsorQ: '' })
     setMemberDraft(item.name)
     setSuggestOpen(false)
+  }
+
+  const clearMember = () => {
+    setMemberDraft('')
+    setSuggestions([])
+    setPickedName(null)
+    onCommit({ sponsor: null, sponsorQ: '' })
   }
 
   return (
@@ -157,13 +201,8 @@ export function MemberSponsorCombobox({
             spellCheck={false}
             value={memberDraft}
             onChange={(event) => {
-              const value = event.target.value
-              setMemberDraft(value)
+              setMemberDraft(event.target.value)
               setSuggestOpen(true)
-              if (sponsor) {
-                setPickedName(null)
-                onPick(null)
-              }
             }}
             onFocus={() => {
               focusedRef.current = true
@@ -172,6 +211,7 @@ export function MemberSponsorCombobox({
             onBlur={() => {
               focusedRef.current = false
               blurTimerRef.current = window.setTimeout(() => {
+                blurTimerRef.current = null
                 setSuggestOpen(false)
                 commitDraft()
               }, 120)
@@ -210,9 +250,7 @@ export function MemberSponsorCombobox({
                   event.preventDefault()
                   event.stopPropagation()
                   setSuggestOpen(false)
-                  setMemberDraft('')
-                  setPickedName(null)
-                  onPick(null)
+                  clearMember()
                 }
               }
             }}
@@ -223,12 +261,7 @@ export function MemberSponsorCombobox({
               className="feed-member-combobox-clear"
               aria-label="Clear member filter"
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                setMemberDraft('')
-                setSuggestions([])
-                setPickedName(null)
-                onPick(null)
-              }}
+              onClick={clearMember}
             >
               ×
             </button>
@@ -262,4 +295,4 @@ export function MemberSponsorCombobox({
       </div>
     </div>
   )
-}
+})

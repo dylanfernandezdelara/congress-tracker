@@ -200,17 +200,21 @@ export default function Home() {
         <div className="home-feed-toolbar">
           <FeedAdvancedFilters
             filters={advancedFilters}
+            sponsorName={sponsorName}
             onChange={patchAdvancedFilters}
             onClear={clearAdvancedFilters}
-            leading={<ChamberFilterControl value={chamber} onChange={setChamberFilter} />}
-            trailing={
-              <FeedSearchInput
-                value={searchDraft}
-                onChange={setSearchDraft}
-                onSubmit={submitSearch}
-                onClear={clearSearch}
-              />
-            }
+            renderToolbar={(actions) => (
+              <div className="home-feed-toolbar-primary">
+                <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
+                {actions}
+                <FeedSearchInput
+                  value={searchDraft}
+                  onChange={setSearchDraft}
+                  onSubmit={submitSearch}
+                  onClear={clearSearch}
+                />
+              </div>
+            )}
           />
         </div>
 

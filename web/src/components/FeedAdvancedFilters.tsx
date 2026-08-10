@@ -1,25 +1,28 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 
 import { parseFeedPartyParam } from '@congress-tracker/shared/feed-filter-params'
 import { US_STATE_OPTIONS } from '@congress-tracker/shared/us-states'
 
 import { fetchPolicyAreas } from '../api/client'
 import { useMediaQuery } from '../hooks/useMediaQuery'
-import { useMemberProfile } from '../hooks/useMemberProfile'
 import {
   advancedFilterChips,
   advancedFilterCount,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
 import { AnimatedSheet } from './AnimatedSheet'
-import { MemberSponsorCombobox } from './MemberSponsorCombobox'
+import {
+  MemberSponsorCombobox,
+  type MemberSponsorComboboxHandle,
+} from './MemberSponsorCombobox'
 
 type FeedAdvancedFiltersProps = {
   filters: AdvancedFeedFilters
+  sponsorName?: string | null
   onChange: (patch: Partial<AdvancedFeedFilters>) => void
   onClear: () => void
-  leading?: ReactNode
-  trailing?: ReactNode
+  /** Home owns the primary toolbar row; this injects the Filters toggle/actions. */
+  renderToolbar: (actions: ReactNode) => ReactNode
 }
 
 const FILTERS_INLINE_QUERY = '(min-width: 640px)'
@@ -45,6 +48,7 @@ type FilterFieldsProps = {
   onChange: (patch: Partial<AdvancedFeedFilters>) => void
   policyAreas: string[]
   selectedSponsorName: string | null
+  memberRef: RefObject<MemberSponsorComboboxHandle | null>
   suggestionsInline?: boolean
 }
 
@@ -53,6 +57,7 @@ function FilterFields({
   onChange,
   policyAreas,
   selectedSponsorName,
+  memberRef,
   suggestionsInline = false,
 }: FilterFieldsProps) {
   return (
@@ -121,22 +126,14 @@ function FilterFields({
       </label>
 
       <MemberSponsorCombobox
+        ref={memberRef}
         sponsor={filters.sponsor}
         sponsorQ={filters.sponsorQ}
         selectedName={selectedSponsorName}
         chamber={filters.sponsorChamber}
         state={filters.state}
         suggestionsInline={suggestionsInline}
-        onPick={(next) => {
-          if (!next) {
-            onChange({ sponsor: null, sponsorQ: '' })
-            return
-          }
-          onChange({ sponsor: next.bioguideId, sponsorQ: '' })
-        }}
-        onNameQuery={(next) => {
-          onChange({ sponsor: null, sponsorQ: next.trim() })
-        }}
+        onCommit={(next) => onChange(next)}
       />
 
       <label className="feed-filter-field">
@@ -167,21 +164,21 @@ function FilterFields({
 
 export function FeedAdvancedFilters({
   filters,
+  sponsorName = null,
   onChange,
   onClear,
-  leading,
-  trailing,
+  renderToolbar,
 }: FeedAdvancedFiltersProps) {
   const panelId = useId()
   const sheetTitleId = useId()
+  const memberRef = useRef<MemberSponsorComboboxHandle | null>(null)
   const inlinePanel = useMediaQuery(FILTERS_INLINE_QUERY)
   const [open, setOpen] = useState(false)
   const [sheetKey, setSheetKey] = useState(0)
   const [policyAreas, setPolicyAreas] = useState<string[]>([])
 
   const activeCount = advancedFilterCount(filters)
-  const { profile: sponsorProfile } = useMemberProfile(filters.sponsor)
-  const chips = advancedFilterChips(filters, sponsorProfile?.name ?? null)
+  const chips = advancedFilterChips(filters, sponsorName)
 
   useEffect(() => {
     let cancelled = false
@@ -197,12 +194,17 @@ export function FeedAdvancedFilters({
     }
   }, [])
 
+  const flushMemberDraft = () => {
+    memberRef.current?.flush()
+  }
+
   const openFilters = () => {
     setSheetKey((key) => key + 1)
     setOpen(true)
   }
 
   const closeFilters = () => {
+    flushMemberDraft()
     setOpen(false)
   }
 
@@ -216,36 +218,44 @@ export function FeedAdvancedFilters({
       filters={filters}
       onChange={onChange}
       policyAreas={policyAreas}
-      selectedSponsorName={sponsorProfile?.name ?? null}
+      selectedSponsorName={sponsorName}
+      memberRef={memberRef}
       suggestionsInline={!inlinePanel}
     />
+  )
+
+  const actions = (
+    <div className="feed-advanced-filters-actions">
+      <button
+        type="button"
+        className="feed-advanced-filters-toggle"
+        aria-expanded={open}
+        aria-controls={inlinePanel ? panelId : undefined}
+        aria-haspopup={inlinePanel ? undefined : 'dialog'}
+        onClick={toggleFilters}
+      >
+        Filters{activeCount > 0 ? ` · ${activeCount}` : ''}
+      </button>
+      {activeCount > 0 ? (
+        <button
+          type="button"
+          className="feed-advanced-filters-clear"
+          onClick={() => {
+            flushMemberDraft()
+            onClear()
+          }}
+        >
+          Clear
+        </button>
+      ) : null}
+    </div>
   )
 
   return (
     <div
       className={`feed-advanced-filters${open ? ' is-open' : ''}${activeCount ? ' is-active' : ''}`}
     >
-      <div className="feed-advanced-filters-primary">
-        {leading}
-        <div className="feed-advanced-filters-actions">
-          <button
-            type="button"
-            className="feed-advanced-filters-toggle"
-            aria-expanded={open}
-            aria-controls={inlinePanel ? panelId : undefined}
-            aria-haspopup={inlinePanel ? undefined : 'dialog'}
-            onClick={toggleFilters}
-          >
-            Filters{activeCount > 0 ? ` · ${activeCount}` : ''}
-          </button>
-          {activeCount > 0 ? (
-            <button type="button" className="feed-advanced-filters-clear" onClick={onClear}>
-              Clear
-            </button>
-          ) : null}
-        </div>
-        {trailing}
-      </div>
+      {renderToolbar(actions)}
 
       {chips.length > 0 ? (
         <ul className="feed-filter-chips" aria-label="Active filters">
@@ -281,7 +291,7 @@ export function FeedAdvancedFilters({
           titleId={sheetTitleId}
           closeAriaLabel="Close filters"
           closeLabel="Done"
-          dismissPlacement="footer"
+          footerDismiss
           panelClassName="feed-filters-sheet"
         >
           <header className="feed-filters-sheet-header">
@@ -292,7 +302,10 @@ export function FeedAdvancedFilters({
               <button
                 type="button"
                 className="feed-advanced-filters-clear"
-                onClick={onClear}
+                onClick={() => {
+                  flushMemberDraft()
+                  onClear()
+                }}
               >
                 Clear all
               </button>

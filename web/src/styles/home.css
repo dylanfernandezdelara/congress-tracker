@@ -8,6 +8,20 @@
     min-width: 0;
   }
 
+  .home-feed-toolbar-primary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 0.85rem;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .home-feed-toolbar-primary {
+      flex-wrap: nowrap;
+    }
+  }
+
   .feed-search {
     display: flex;
     align-items: center;

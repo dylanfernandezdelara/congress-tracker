@@ -63,12 +63,12 @@ export async function fetchFeed(options: {
     params.set('q', q)
   }
   applyAdvancedFeedParams(params, {
-    state: options.state,
-    sponsorChamber: options.sponsorChamber,
-    sponsor: options.sponsor,
-    sponsorQ: options.sponsorQ,
-    party: options.party,
-    policy: options.policy,
+    state: options.state ?? null,
+    sponsorChamber: options.sponsorChamber ?? null,
+    sponsor: options.sponsor ?? null,
+    sponsorQ: options.sponsorQ ?? '',
+    party: options.party ?? null,
+    policy: options.policy ?? null,
   })
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
 }

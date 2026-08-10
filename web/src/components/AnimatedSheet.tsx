@@ -19,8 +19,11 @@ type AnimatedSheetProps = {
   closeAriaLabel: string
   /** Label for the dismiss control (defaults to Close). */
   closeLabel?: string
-  /** Where to render the dismiss control. */
-  dismissPlacement?: 'toolbar' | 'footer'
+  /**
+   * When true, render the dismiss control in a sticky footer after children
+   * (DOM order matches visual order). Default is the top toolbar.
+   */
+  footerDismiss?: boolean
   panelClassName?: string
   children: ReactNode
 }
@@ -36,7 +39,7 @@ export function AnimatedSheet({
   titleId,
   closeAriaLabel,
   closeLabel = 'Close',
-  dismissPlacement = 'toolbar',
+  footerDismiss = false,
   panelClassName,
   children,
 }: AnimatedSheetProps) {
@@ -68,7 +71,7 @@ export function AnimatedSheet({
       document.activeElement instanceof HTMLElement ? document.activeElement : null
     returnFocusRef.current = previouslyFocused
     // Footer dismiss sits below scrollable content — avoid scrolling fields away.
-    closeRef.current?.focus({ preventScroll: dismissPlacement === 'footer' })
+    closeRef.current?.focus({ preventScroll: footerDismiss })
 
     const { unregister, zIndex } = registerSheetLayer(controllerRef.current)
     setLayerZIndex(zIndex)
@@ -77,7 +80,7 @@ export function AnimatedSheet({
       returnFocusRef.current?.focus()
       returnFocusRef.current = null
     }
-  }, [open, dismissPlacement])
+  }, [open, footerDismiss])
 
   // Keep the stack's panel pointer current after each paint.
   useEffect(() => {
@@ -113,13 +116,9 @@ export function AnimatedSheet({
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        {dismissPlacement === 'toolbar' ? (
-          <div className="sheet-toolbar">{dismissButton}</div>
-        ) : null}
+        {footerDismiss ? null : <div className="sheet-toolbar">{dismissButton}</div>}
         {children}
-        {dismissPlacement === 'footer' ? (
-          <div className="sheet-footer">{dismissButton}</div>
-        ) : null}
+        {footerDismiss ? <div className="sheet-footer">{dismissButton}</div> : null}
       </div>
     </div>
   )
