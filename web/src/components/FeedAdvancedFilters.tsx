@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { parseFeedPartyParam } from '@congress-tracker/shared/feed-filter-params'
 import { US_STATE_OPTIONS } from '@congress-tracker/shared/us-states'
@@ -48,7 +48,7 @@ type FilterFieldsProps = {
   onChange: (patch: Partial<AdvancedFeedFilters>) => void
   policyAreas: string[]
   selectedSponsorName: string | null
-  memberRef: RefObject<MemberSponsorComboboxHandle | null>
+  memberRef: Ref<MemberSponsorComboboxHandle>
   suggestionsInline?: boolean
 }
 
