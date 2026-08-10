@@ -44,6 +44,7 @@ type FilterFieldsProps = {
   filters: AdvancedFeedFilters
   onChange: (patch: Partial<AdvancedFeedFilters>) => void
   policyAreas: string[]
+  selectedSponsorName: string | null
   suggestionsInline?: boolean
 }
 
@@ -51,6 +52,7 @@ function FilterFields({
   filters,
   onChange,
   policyAreas,
+  selectedSponsorName,
   suggestionsInline = false,
 }: FilterFieldsProps) {
   return (
@@ -121,6 +123,7 @@ function FilterFields({
       <MemberSponsorCombobox
         sponsor={filters.sponsor}
         sponsorQ={filters.sponsorQ}
+        selectedName={selectedSponsorName}
         chamber={filters.sponsorChamber}
         state={filters.state}
         suggestionsInline={suggestionsInline}
@@ -213,6 +216,7 @@ export function FeedAdvancedFilters({
       filters={filters}
       onChange={onChange}
       policyAreas={policyAreas}
+      selectedSponsorName={sponsorProfile?.name ?? null}
       suggestionsInline={!inlinePanel}
     />
   )
@@ -277,6 +281,7 @@ export function FeedAdvancedFilters({
           titleId={sheetTitleId}
           closeAriaLabel="Close filters"
           closeLabel="Done"
+          dismissPlacement="footer"
           panelClassName="feed-filters-sheet"
         >
           <header className="feed-filters-sheet-header">

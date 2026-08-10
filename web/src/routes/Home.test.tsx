@@ -649,6 +649,34 @@ describe('Home', () => {
     expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('')
   })
 
+  it('opens filters in a bottom sheet on narrow viewports and Escape clears member draft first', async () => {
+    mockViewport(false)
+    renderHome()
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' })
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Done' })).toBeInTheDocument()
+
+    const memberInput = within(dialog).getByPlaceholderText('Name or last name')
+    fireEvent.change(memberInput, { target: { value: 'Schumer' } })
+    fireEvent.keyDown(memberInput, { key: 'Escape' })
+
+    expect(memberInput).toHaveValue('')
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+  })
+
+  it('shows removable chips for active advanced filters', async () => {
+    renderHome('/?state=NY&sponsor_chamber=House')
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove New York filter' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove House sponsors filter' }))
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, state: 'NY' })
+    })
+  })
+
   it('expands and scrolls to a deep-linked bill, loading further pages if needed', async () => {
     const first = makeFeedItem({
       bill: { congress: 119, type: 'S', number: 2, title: 'First' },

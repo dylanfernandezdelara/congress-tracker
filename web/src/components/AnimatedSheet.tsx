@@ -17,8 +17,10 @@ type AnimatedSheetProps = {
   titleId: string
   /** Accessible name for the backdrop dismiss control. */
   closeAriaLabel: string
-  /** Label for the toolbar dismiss control (defaults to Close). */
+  /** Label for the dismiss control (defaults to Close). */
   closeLabel?: string
+  /** Where to render the dismiss control. */
+  dismissPlacement?: 'toolbar' | 'footer'
   panelClassName?: string
   children: ReactNode
 }
@@ -34,6 +36,7 @@ export function AnimatedSheet({
   titleId,
   closeAriaLabel,
   closeLabel = 'Close',
+  dismissPlacement = 'toolbar',
   panelClassName,
   children,
 }: AnimatedSheetProps) {
@@ -83,6 +86,11 @@ export function AnimatedSheet({
   if (!open) return null
 
   const panelClasses = ['sheet-panel', panelClassName].filter(Boolean).join(' ')
+  const dismissButton = (
+    <button ref={closeRef} type="button" className="sheet-close" onClick={requestClose}>
+      {closeLabel}
+    </button>
+  )
 
   return (
     <div
@@ -104,17 +112,13 @@ export function AnimatedSheet({
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <div className="sheet-toolbar">
-          <button
-            ref={closeRef}
-            type="button"
-            className="sheet-close"
-            onClick={requestClose}
-          >
-            {closeLabel}
-          </button>
-        </div>
+        {dismissPlacement === 'toolbar' ? (
+          <div className="sheet-toolbar">{dismissButton}</div>
+        ) : null}
         {children}
+        {dismissPlacement === 'footer' ? (
+          <div className="sheet-footer">{dismissButton}</div>
+        ) : null}
       </div>
     </div>
   )

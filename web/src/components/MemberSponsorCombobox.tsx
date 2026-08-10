@@ -1,16 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react'
 
 import { fetchMembersSearch } from '../api/client'
-import {
-  getCachedMemberProfile,
-  loadMemberProfile,
-  prefetchMemberProfile,
-} from '../api/memberProfileCache'
+import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { MemberSearchItem } from '../api/types'
 
 type MemberSponsorComboboxProps = {
   sponsor: string | null
   sponsorQ: string
+  /** Resolved display name for the selected sponsor (from useMemberProfile). */
+  selectedName?: string | null
   chamber: 'House' | 'Senate' | null
   state: string | null
   /** Stack suggestions in document flow (e.g. inside a scrollable sheet). */
@@ -21,9 +19,20 @@ type MemberSponsorComboboxProps = {
 
 const MEMBER_SEARCH_DEBOUNCE_MS = 220
 
+function displayValue(
+  sponsor: string | null,
+  sponsorQ: string,
+  selectedName: string | null | undefined,
+  pickedName: string | null,
+): string {
+  if (!sponsor) return sponsorQ
+  return selectedName?.trim() || pickedName || sponsor
+}
+
 export function MemberSponsorCombobox({
   sponsor,
   sponsorQ,
+  selectedName = null,
   chamber,
   state,
   suggestionsInline = false,
@@ -34,66 +43,22 @@ export function MemberSponsorCombobox({
   const inputId = useId()
   const focusedRef = useRef(false)
   const blurTimerRef = useRef<number | null>(null)
-  /** Local label for the selected sponsor so blur does not demote before cache fills. */
-  const selectedLabelRef = useRef<{ id: string; name: string } | null>(
-    (() => {
-      if (!sponsor) return null
-      const cached = getCachedMemberProfile(sponsor)
-      return cached ? { id: sponsor, name: cached.name } : null
-    })(),
+  /** Name from the most recent pick, until parent selectedName catches up. */
+  const [pickedName, setPickedName] = useState<string | null>(null)
+  const [memberDraft, setMemberDraft] = useState(() =>
+    displayValue(sponsor, sponsorQ, selectedName, null),
   )
-  const [memberDraft, setMemberDraft] = useState(() => {
-    if (sponsor) {
-      const labeled =
-        selectedLabelRef.current?.id === sponsor ? selectedLabelRef.current.name : null
-      return getCachedMemberProfile(sponsor)?.name ?? labeled ?? sponsor
-    }
-    return sponsorQ
-  })
   const [suggestions, setSuggestions] = useState<MemberSearchItem[]>([])
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
 
   useEffect(() => {
-    if (!sponsor) {
-      selectedLabelRef.current = null
-      if (!focusedRef.current) setMemberDraft(sponsorQ)
-      return
+    if (sponsor && selectedName?.trim() && pickedName && selectedName.trim() === pickedName) {
+      setPickedName(null)
     }
-    if (selectedLabelRef.current?.id !== sponsor) {
-      selectedLabelRef.current = null
-    }
-    const cached = getCachedMemberProfile(sponsor)
-    if (cached) {
-      selectedLabelRef.current = { id: sponsor, name: cached.name }
-      if (!focusedRef.current) setMemberDraft(cached.name)
-      return
-    }
-    if (selectedLabelRef.current?.id === sponsor && !focusedRef.current) {
-      setMemberDraft(selectedLabelRef.current.name)
-    } else if (!focusedRef.current && !selectedLabelRef.current) {
-      setMemberDraft(sponsor)
-    }
-    let cancelled = false
-    void loadMemberProfile(sponsor)
-      .then((profile) => {
-        if (cancelled) return
-        selectedLabelRef.current = { id: sponsor, name: profile.name }
-        if (!focusedRef.current) setMemberDraft(profile.name)
-      })
-      .catch(() => {
-        if (cancelled) return
-        const fallback =
-          selectedLabelRef.current?.id === sponsor
-            ? selectedLabelRef.current.name
-            : sponsor
-        selectedLabelRef.current = { id: sponsor, name: fallback }
-        if (!focusedRef.current) setMemberDraft(fallback)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sponsor, sponsorQ])
+    if (focusedRef.current) return
+    setMemberDraft(displayValue(sponsor, sponsorQ, selectedName, pickedName))
+  }, [sponsor, sponsorQ, selectedName, pickedName])
 
   useEffect(() => {
     if (sponsor) {
@@ -135,33 +100,34 @@ export function MemberSponsorCombobox({
     }
   }, [])
 
+  const resolvedLabel = selectedName?.trim() || pickedName || (sponsor ? sponsor : '')
+
   const commitDraft = () => {
     const next = memberDraft.trim()
     if (sponsor) {
-      const selectedName =
-        getCachedMemberProfile(sponsor)?.name ??
-        (selectedLabelRef.current?.id === sponsor ? selectedLabelRef.current.name : null)
       if (!next) {
-        // Keep an exact sponsor selection if the draft is still resolving.
-        if (selectedName) {
-          setMemberDraft(selectedName)
+        // Keep an exact sponsor selection while the display name is still resolving.
+        if (!selectedName?.trim() && !pickedName) {
+          setMemberDraft(sponsor)
           return
         }
+        setPickedName(null)
         onPick(null)
         return
       }
-      if (selectedName && next === selectedName) return
-      if (next === sponsor) return
+      if (next === resolvedLabel || next === sponsor) return
     }
     if (!next) {
+      setPickedName(null)
       onPick(null)
       return
     }
+    setPickedName(null)
     onNameQuery(next)
   }
 
   const pickMember = (item: { bioguideId: string; name: string }) => {
-    selectedLabelRef.current = { id: item.bioguideId, name: item.name }
+    setPickedName(item.name)
     prefetchMemberProfile(item.bioguideId)
     onPick(item)
     setMemberDraft(item.name)
@@ -194,7 +160,10 @@ export function MemberSponsorCombobox({
               const value = event.target.value
               setMemberDraft(value)
               setSuggestOpen(true)
-              if (sponsor) onPick(null)
+              if (sponsor) {
+                setPickedName(null)
+                onPick(null)
+              }
             }}
             onFocus={() => {
               focusedRef.current = true
@@ -231,14 +200,18 @@ export function MemberSponsorCombobox({
                 return
               }
               if (event.key === 'Escape') {
-                if (suggestOpen) {
+                if (suggestOpen && suggestions.length > 0) {
                   event.preventDefault()
+                  event.stopPropagation()
                   setSuggestOpen(false)
                   return
                 }
                 if (memberDraft) {
                   event.preventDefault()
+                  event.stopPropagation()
+                  setSuggestOpen(false)
                   setMemberDraft('')
+                  setPickedName(null)
                   onPick(null)
                 }
               }
@@ -253,6 +226,7 @@ export function MemberSponsorCombobox({
               onClick={() => {
                 setMemberDraft('')
                 setSuggestions([])
+                setPickedName(null)
                 onPick(null)
               }}
             >

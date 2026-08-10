@@ -97,6 +97,12 @@
     justify-content: flex-end;
   }
 
+  .sheet-footer {
+    display: flex;
+    justify-content: stretch;
+    margin-top: 0.15rem;
+  }
+
   .sheet-close {
     border: none;
     background: transparent;
@@ -107,8 +113,24 @@
     cursor: pointer;
   }
 
+  .sheet-footer .sheet-close {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.65rem 1rem;
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 8px;
+    background: hsl(var(--twc-foreground));
+    color: hsl(var(--twc-background));
+    font-size: 13px;
+  }
+
   .sheet-close:hover {
     color: hsl(var(--twc-foreground));
+  }
+
+  .sheet-footer .sheet-close:hover {
+    color: hsl(var(--twc-background));
+    opacity: 0.92;
   }
 
   .sheet-close:focus-visible {
