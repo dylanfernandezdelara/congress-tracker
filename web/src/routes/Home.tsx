@@ -10,6 +10,7 @@ import type {
 } from '../api/types'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
+import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
 import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
 import { LeftSidebar } from '../components/LeftSidebar'
@@ -17,13 +18,17 @@ import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
 import { RecentLawsSection } from '../components/RecentLawsSection'
 import { RightRail } from '../components/RightRail'
-import { StateFilterControl } from '../components/StateFilterControl'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
-import { stateFilterLabel } from '../utils/stateFilter'
+import {
+  advancedFilterCount,
+  advancedFilterSummary,
+  type AdvancedFeedFilters,
+} from '../utils/feedAdvancedFilters'
+import { useMemberProfile } from '../hooks/useMemberProfile'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -39,23 +44,28 @@ function FeedSkeleton() {
 
 function emptyFeedCopy(
   chamber: 'House' | 'Senate' | null,
-  state: string | null,
+  advanced: AdvancedFeedFilters,
   searchQuery: string,
+  sponsorName?: string | null,
 ): string {
-  const stateScope = state ? ` sponsored by ${stateFilterLabel(state)} members` : ''
+  const sponsorBits = advancedFilterSummary(advanced, sponsorName)
+  const sponsorScope = sponsorBits.length > 0 ? ` · ${sponsorBits.join(' · ')}` : ''
   if (searchQuery) {
     const chamberScope = chamber ? `${chamber} ` : ''
-    return `No ${chamberScope}matches for “${searchQuery}”${stateScope}.`
+    return `No ${chamberScope}matches for “${searchQuery}”${sponsorScope}.`
   }
   const chamberScope = chamber ? `${chamber} ` : ''
-  return `No ${chamberScope}passage votes${stateScope} in the last ${VOTE_LOOKBACK_DAYS} days.`
+  if (sponsorBits.length > 0) {
+    return `No ${chamberScope}passage votes matching ${sponsorBits.join(' · ')} in the last ${VOTE_LOOKBACK_DAYS} days.`
+  }
+  return `No ${chamberScope}passage votes in the last ${VOTE_LOOKBACK_DAYS} days.`
 }
 
 export default function Home() {
   const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
   const {
     chamber,
-    state,
+    advancedFilters,
     searchQuery,
     searchDraft,
     items,
@@ -71,13 +81,16 @@ export default function Home() {
     reloadFeed,
     loadMore,
     setChamberFilter,
-    setStateFilter,
+    patchAdvancedFilters,
+    clearAdvancedFilters,
     setSearchDraft,
     submitSearch,
     clearSearch,
     toggleRow,
     dismissBillMissingNotice,
   } = useFeedPagination()
+  const { profile: sponsorProfile } = useMemberProfile(advancedFilters.sponsor)
+  const sponsorName = sponsorProfile?.name ?? null
 
   const [railRetryKey, setRailRetryKey] = useState(0)
   const { reload: reloadStats, session, pulse, defectors, portfolios } = useStatsData({
@@ -160,11 +173,13 @@ export default function Home() {
     />
   )
 
-  const emptyCopy = emptyFeedCopy(chamber, state, searchQuery)
+  const emptyCopy = emptyFeedCopy(chamber, advancedFilters, searchQuery, sponsorName)
+
+  const advancedCount = advancedFilterCount(advancedFilters)
 
   const countSuffix = [
     chamber ? chamber : null,
-    state ? stateFilterLabel(state) : null,
+    ...advancedFilterSummary(advancedFilters, sponsorName),
     searchQuery ? `“${searchQuery}”` : null,
   ]
     .filter(Boolean)
@@ -183,15 +198,23 @@ export default function Home() {
 
       <main id="content" className="home-feed-column feed-main">
         <div className="home-feed-toolbar">
-          <div className="home-feed-filters">
-            <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
-            <StateFilterControl value={state} onChange={setStateFilter} />
-          </div>
-          <FeedSearchInput
-            value={searchDraft}
-            onChange={setSearchDraft}
-            onSubmit={submitSearch}
-            onClear={clearSearch}
+          <FeedAdvancedFilters
+            filters={advancedFilters}
+            sponsorName={sponsorName}
+            onChange={patchAdvancedFilters}
+            onClear={clearAdvancedFilters}
+            renderToolbar={(actions) => (
+              <div className="home-feed-toolbar-primary">
+                <ChamberFilterControl value={chamber} onChange={setChamberFilter} />
+                {actions}
+                <FeedSearchInput
+                  value={searchDraft}
+                  onChange={setSearchDraft}
+                  onSubmit={submitSearch}
+                  onClear={clearSearch}
+                />
+              </div>
+            )}
           />
         </div>
 
@@ -236,13 +259,9 @@ export default function Home() {
                 Show all chambers
               </button>
             ) : null}
-            {state && !searchQuery ? (
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => setStateFilter(null)}
-              >
-                Clear sponsor state
+            {advancedCount > 0 && !searchQuery ? (
+              <button type="button" className="ghost-button" onClick={clearAdvancedFilters}>
+                Clear filters
               </button>
             ) : null}
           </div>

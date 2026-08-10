@@ -1,11 +1,14 @@
 import type { IngestMonitorPayload } from '@congress-tracker/shared/ingest-api-types'
 
+import { applyAdvancedFeedParams, type AdvancedFeedFilters } from '../utils/feedAdvancedFilters'
 import { fetchJson } from './fetchJson'
 import type {
   DefectorsResponse,
   FeedPageResponse,
   MemberProfileResponse,
+  MembersSearchResponse,
   NotableVotesResponse,
+  PolicyAreasResponse,
   PortfoliosResponse,
   PulseStatsResponse,
   RecentConfirmationsResponse,
@@ -47,9 +50,7 @@ export async function fetchFeed(options: {
   offset: number
   chamber?: 'House' | 'Senate'
   q?: string
-  /** Two-letter sponsor state code. */
-  state?: string
-}): Promise<FeedPageResponse> {
+} & Partial<AdvancedFeedFilters>): Promise<FeedPageResponse> {
   const params = new URLSearchParams({
     limit: String(options.limit),
     offset: String(options.offset),
@@ -61,10 +62,35 @@ export async function fetchFeed(options: {
   if (q) {
     params.set('q', q)
   }
-  if (options.state) {
-    params.set('state', options.state)
-  }
+  applyAdvancedFeedParams(params, {
+    state: options.state ?? null,
+    sponsorChamber: options.sponsorChamber ?? null,
+    sponsor: options.sponsor ?? null,
+    sponsorQ: options.sponsorQ ?? '',
+    party: options.party ?? null,
+    policy: options.policy ?? null,
+  })
   return fetchJson<FeedPageResponse>(`/feed/latest.json?${params}`)
+}
+
+export async function fetchMembersSearch(options: {
+  q?: string
+  chamber?: 'House' | 'Senate'
+  state?: string
+  limit?: number
+}): Promise<MembersSearchResponse> {
+  const params = new URLSearchParams()
+  const q = options.q?.trim()
+  if (q) params.set('q', q)
+  if (options.chamber) params.set('chamber', options.chamber)
+  if (options.state) params.set('state', options.state)
+  if (options.limit != null) params.set('limit', String(options.limit))
+  const qs = params.toString()
+  return fetchJson<MembersSearchResponse>(`/stats/members.json${qs ? `?${qs}` : ''}`)
+}
+
+export async function fetchPolicyAreas(): Promise<PolicyAreasResponse> {
+  return fetchJson<PolicyAreasResponse>('/stats/policy-areas.json')
 }
 
 export async function fetchSessionStats(): Promise<SessionStatsResponse> {

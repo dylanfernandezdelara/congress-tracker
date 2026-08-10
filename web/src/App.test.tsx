@@ -98,6 +98,8 @@ vi.mock('./api/client', () => ({
     },
   }),
   fetchDefectors: vi.fn().mockResolvedValue({ defectors: [] }),
+  fetchPolicyAreas: vi.fn().mockResolvedValue({ items: [] }),
+  fetchMembersSearch: vi.fn().mockResolvedValue({ items: [], q: '', limit: 8 }),
   fetchPortfolioStats: vi.fn().mockResolvedValue({
     gainers: [],
     losers: [],

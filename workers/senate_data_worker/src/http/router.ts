@@ -31,8 +31,25 @@ import {
   EXECUTIVE_POSTS_CRON_UTC,
   SENATE_VOTE_MENU_MAX_BYTES,
 } from "../constants";
-import { parseUsStateCode } from "../../../../shared/us-states";
+import {
+  normalizePolicyFilter,
+  normalizeSponsorNameQuery,
+  parseFeedChamberParam,
+  parseFeedPartyParam,
+  parseFeedStateParam,
+  parseSponsorBioguideParam,
+} from "../../../../shared/feed-filter-params";
+import type {
+  MembersSearchResponse,
+  PolicyAreasResponse,
+} from "../../../../shared/stats-api-types";
+import {
+  MEMBER_SEARCH_DEFAULT_LIMIT,
+  MEMBER_SEARCH_MAX_LIMIT,
+} from "../constants";
 import { normalizeFeedSearchQuery } from "../d1/feed-search";
+import { searchMembers } from "../d1/members";
+import { listPolicyAreas } from "../d1/policy-areas";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
@@ -180,8 +197,18 @@ async function ingestMonitorResponse(env: Env, json: JsonFn): Promise<Response> 
 }
 
 function parseChamber(value: string | null): Chamber | null {
-  if (value === "House" || value === "Senate") return value;
-  return null;
+  return parseFeedChamberParam(value);
+}
+
+function parseOptionalParam<T>(
+  raw: string | null,
+  parse: (value: string) => T | null,
+  message: string
+): { ok: true; value: T | undefined } | { ok: false; message: string } {
+  if (raw === null || raw === "") return { ok: true, value: undefined };
+  const parsed = parse(raw);
+  if (!parsed) return { ok: false, message };
+  return { ok: true, value: parsed };
 }
 
 function parseStatsLimit(url: URL, fallback = 5, max = 20): number {
@@ -436,38 +463,69 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
   "/health": ({ env, json }) => healthResponse(env, json),
   "/debug/ingest.json": ({ env, json }) => ingestMonitorResponse(env, json),
   "/feed/latest.json": async ({ env, url, json }) => {
-    const chamberParam = url.searchParams.get("chamber");
-    let chamber: Chamber | undefined;
-    if (chamberParam !== null && chamberParam !== "") {
-      const parsed = parseChamber(chamberParam);
-      if (!parsed) {
-        return json(
-          { error: "bad_request", message: "chamber must be House or Senate" },
-          { status: 400 }
-        );
-      }
-      chamber = parsed;
+    const chamber = parseOptionalParam(
+      url.searchParams.get("chamber"),
+      parseChamber,
+      "chamber must be House or Senate"
+    );
+    if (!chamber.ok) {
+      return json({ error: "bad_request", message: chamber.message }, { status: 400 });
     }
-    const stateParam = url.searchParams.get("state");
-    let state: string | undefined;
-    if (stateParam !== null && stateParam !== "") {
-      const parsedState = parseUsStateCode(stateParam);
-      if (!parsedState) {
-        return json(
-          {
-            error: "bad_request",
-            message: "state must be a 2-letter US state, DC, or territory code",
-          },
-          { status: 400 }
-        );
-      }
-      state = parsedState;
+    const state = parseOptionalParam(
+      url.searchParams.get("state"),
+      parseFeedStateParam,
+      "state must be a 2-letter US state, DC, or territory code"
+    );
+    if (!state.ok) {
+      return json({ error: "bad_request", message: state.message }, { status: 400 });
     }
+    const sponsorChamber = parseOptionalParam(
+      url.searchParams.get("sponsor_chamber"),
+      parseChamber,
+      "sponsor_chamber must be House or Senate"
+    );
+    if (!sponsorChamber.ok) {
+      return json({ error: "bad_request", message: sponsorChamber.message }, { status: 400 });
+    }
+    const party = parseOptionalParam(
+      url.searchParams.get("party"),
+      parseFeedPartyParam,
+      "party must be D, R, or I"
+    );
+    if (!party.ok) {
+      return json({ error: "bad_request", message: party.message }, { status: 400 });
+    }
+    const sponsor = parseOptionalParam(
+      url.searchParams.get("sponsor"),
+      parseSponsorBioguideParam,
+      "sponsor must be a bioguide id (or LOCAL seed id)"
+    );
+    if (!sponsor.ok) {
+      return json({ error: "bad_request", message: sponsor.message }, { status: 400 });
+    }
+
+    // Exact sponsor wins over free-text name (mirrors web URL writer).
+    const sponsorQ = sponsor.value
+      ? undefined
+      : normalizeSponsorNameQuery(url.searchParams.get("sponsor_q"));
+    const policy = normalizePolicyFilter(url.searchParams.get("policy"));
+
     try {
       const limit = parseFeedLimit(url);
       const offset = parseFeedOffset(url, limit);
       const q = parseFeedSearchQuery(url);
-      const feed = await buildFeedPage(env, { limit, offset, chamber, q, state });
+      const feed = await buildFeedPage(env, {
+        limit,
+        offset,
+        chamber: chamber.value,
+        q,
+        state: state.value,
+        sponsorChamber: sponsorChamber.value,
+        sponsor: sponsor.value,
+        sponsorQ,
+        party: party.value,
+        policy,
+      });
       return json(feed, {
         status: 200,
         headers: { "Cache-Control": cacheLatest },
@@ -605,6 +663,57 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       "defectors unavailable"
     );
   },
+  "/stats/members.json": async ({ env, url, json }) => {
+    const q = normalizeSponsorNameQuery(url.searchParams.get("q")) ?? "";
+    const chamber = parseOptionalParam(
+      url.searchParams.get("chamber"),
+      parseChamber,
+      "chamber must be House or Senate"
+    );
+    if (!chamber.ok) {
+      return json({ error: "bad_request", message: chamber.message }, { status: 400 });
+    }
+    const state = parseOptionalParam(
+      url.searchParams.get("state"),
+      parseFeedStateParam,
+      "state must be a 2-letter US state, DC, or territory code"
+    );
+    if (!state.ok) {
+      return json({ error: "bad_request", message: state.message }, { status: 400 });
+    }
+    const limit = Math.min(
+      MEMBER_SEARCH_MAX_LIMIT,
+      Math.max(
+        1,
+        Number.parseInt(
+          url.searchParams.get("limit") ?? String(MEMBER_SEARCH_DEFAULT_LIMIT),
+          10
+        ) || MEMBER_SEARCH_DEFAULT_LIMIT
+      )
+    );
+    return handleStatsJson(
+      json,
+      async (): Promise<MembersSearchResponse> => {
+        const items = await searchMembers(env.DB, {
+          q,
+          chamber: chamber.value,
+          state: state.value,
+          limit,
+        });
+        return { items, q, limit };
+      },
+      "member search unavailable"
+    );
+  },
+  "/stats/policy-areas.json": ({ env, json }) =>
+    handleStatsJson(
+      json,
+      async (): Promise<PolicyAreasResponse> => {
+        const items = await listPolicyAreas(env.DB);
+        return { items };
+      },
+      "policy areas unavailable"
+    ),
   "/stats/member.json": async ({ env, url, json }) => {
     const congress = congressNumber(env);
     const session = sessionNumber(env);

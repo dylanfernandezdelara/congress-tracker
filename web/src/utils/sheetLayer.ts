@@ -16,20 +16,31 @@ const stack: SheetLayerController[] = []
 let keyListenerAttached = false
 let previousBodyOverflow = ''
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
+
 function onGlobalKeyDown(event: KeyboardEvent) {
   const top = stack[stack.length - 1]
   if (!top || top.getIsClosing()) return
 
   if (event.key === 'Escape') {
+    // Nested handlers (e.g. combobox) may already dismiss a local layer.
+    if (event.defaultPrevented) return
     event.preventDefault()
     top.requestClose()
     return
   }
 
   if (event.key !== 'Tab' || !top.panel) return
-  const focusable = top.panel.querySelectorAll<HTMLElement>(
-    'a[href], button:not([disabled])',
-  )
+  const focusable = Array.from(
+    top.panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter((el) => !el.hasAttribute('disabled') && el.tabIndex !== -1)
   if (focusable.length === 0) return
   const first = focusable[0]!
   const last = focusable[focusable.length - 1]!

@@ -444,6 +444,47 @@ describe("HTTP API", () => {
     expect(body.items.map((item) => item.bill.number)).toEqual([1]);
   });
 
+  it("forwards advanced sponsor and policy filters to buildFeedPage", async () => {
+    mockBuildFeedPage.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+      has_more: false,
+    });
+    const response = await handlePublicFetch(
+      new Request(
+        "https://worker.example.com/feed/latest.json?sponsor_chamber=Senate&party=D&sponsor=A000001&sponsor_q=Schumer&policy=Energy"
+      ),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sponsorChamber: "Senate",
+        party: "D",
+        sponsor: "A000001",
+        // Exact sponsor wins; free-text name is dropped when both are present.
+        sponsorQ: undefined,
+        policy: "Energy",
+      })
+    );
+  });
+
+  it("rejects invalid sponsor_chamber and party values", async () => {
+    const badChamber = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?sponsor_chamber=Congress"),
+      createMockEnv() as any
+    );
+    expect(badChamber.status).toBe(400);
+    const badParty = await handlePublicFetch(
+      new Request("https://worker.example.com/feed/latest.json?party=Green"),
+      createMockEnv() as any
+    );
+    expect(badParty.status).toBe(400);
+  });
+
   it("rejects invalid feed state values with bad_request", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/feed/latest.json?state=New%20York"),

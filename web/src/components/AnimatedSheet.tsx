@@ -17,6 +17,13 @@ type AnimatedSheetProps = {
   titleId: string
   /** Accessible name for the backdrop dismiss control. */
   closeAriaLabel: string
+  /** Label for the dismiss control (defaults to Close). */
+  closeLabel?: string
+  /**
+   * When true, render the dismiss control in a sticky footer after children
+   * (DOM order matches visual order). Default is the top toolbar.
+   */
+  footerDismiss?: boolean
   panelClassName?: string
   children: ReactNode
 }
@@ -31,6 +38,8 @@ export function AnimatedSheet({
   onClose,
   titleId,
   closeAriaLabel,
+  closeLabel = 'Close',
+  footerDismiss = false,
   panelClassName,
   children,
 }: AnimatedSheetProps) {
@@ -61,7 +70,8 @@ export function AnimatedSheet({
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
     returnFocusRef.current = previouslyFocused
-    closeRef.current?.focus()
+    // Footer dismiss sits below scrollable content — avoid scrolling fields away.
+    closeRef.current?.focus({ preventScroll: footerDismiss })
 
     const { unregister, zIndex } = registerSheetLayer(controllerRef.current)
     setLayerZIndex(zIndex)
@@ -70,7 +80,7 @@ export function AnimatedSheet({
       returnFocusRef.current?.focus()
       returnFocusRef.current = null
     }
-  }, [open])
+  }, [open, footerDismiss])
 
   // Keep the stack's panel pointer current after each paint.
   useEffect(() => {
@@ -80,6 +90,11 @@ export function AnimatedSheet({
   if (!open) return null
 
   const panelClasses = ['sheet-panel', panelClassName].filter(Boolean).join(' ')
+  const dismissButton = (
+    <button ref={closeRef} type="button" className="sheet-close" onClick={requestClose}>
+      {closeLabel}
+    </button>
+  )
 
   return (
     <div
@@ -101,17 +116,9 @@ export function AnimatedSheet({
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <div className="sheet-toolbar">
-          <button
-            ref={closeRef}
-            type="button"
-            className="sheet-close"
-            onClick={requestClose}
-          >
-            Close
-          </button>
-        </div>
+        {footerDismiss ? null : <div className="sheet-toolbar">{dismissButton}</div>}
         {children}
+        {footerDismiss ? <div className="sheet-footer">{dismissButton}</div> : null}
       </div>
     </div>
   )
