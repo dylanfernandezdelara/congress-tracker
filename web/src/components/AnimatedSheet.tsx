@@ -17,6 +17,8 @@ type AnimatedSheetProps = {
   titleId: string
   /** Accessible name for the backdrop dismiss control. */
   closeAriaLabel: string
+  /** Label for the toolbar dismiss control (defaults to Close). */
+  closeLabel?: string
   panelClassName?: string
   children: ReactNode
 }
@@ -31,6 +33,7 @@ export function AnimatedSheet({
   onClose,
   titleId,
   closeAriaLabel,
+  closeLabel = 'Close',
   panelClassName,
   children,
 }: AnimatedSheetProps) {
@@ -108,7 +111,7 @@ export function AnimatedSheet({
             className="sheet-close"
             onClick={requestClose}
           >
-            Close
+            {closeLabel}
           </button>
         </div>
         {children}

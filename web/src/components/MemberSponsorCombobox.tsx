@@ -13,6 +13,8 @@ type MemberSponsorComboboxProps = {
   sponsorQ: string
   chamber: 'House' | 'Senate' | null
   state: string | null
+  /** Stack suggestions in document flow (e.g. inside a scrollable sheet). */
+  suggestionsInline?: boolean
   onPick: (next: { bioguideId: string; name: string } | null) => void
   onNameQuery: (next: string) => void
 }
@@ -24,6 +26,7 @@ export function MemberSponsorCombobox({
   sponsorQ,
   chamber,
   state,
+  suggestionsInline = false,
   onPick,
   onNameQuery,
 }: MemberSponsorComboboxProps) {
@@ -170,89 +173,93 @@ export function MemberSponsorCombobox({
       <label className="feed-filter-field-label" htmlFor={inputId}>
         Member
       </label>
-      <div className="feed-member-combobox">
-        <input
-          id={inputId}
-          type="search"
-          className="feed-filter-input"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded={suggestOpen && suggestions.length > 0}
-          aria-controls={listboxId}
-          aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
-          placeholder="Name or last name"
-          autoComplete="off"
-          spellCheck={false}
-          value={memberDraft}
-          onChange={(event) => {
-            const value = event.target.value
-            setMemberDraft(value)
-            setSuggestOpen(true)
-            if (sponsor) onPick(null)
-          }}
-          onFocus={() => {
-            focusedRef.current = true
-            setSuggestOpen(true)
-          }}
-          onBlur={() => {
-            focusedRef.current = false
-            blurTimerRef.current = window.setTimeout(() => {
-              setSuggestOpen(false)
-              commitDraft()
-            }, 120)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown' && suggestions.length > 0) {
-              event.preventDefault()
+      <div
+        className={`feed-member-combobox${suggestionsInline ? ' feed-member-combobox--inline' : ''}`}
+      >
+        <div className="feed-member-combobox-input-row">
+          <input
+            id={inputId}
+            type="search"
+            className="feed-filter-input"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={suggestOpen && suggestions.length > 0}
+            aria-controls={listboxId}
+            aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
+            placeholder="Name or last name"
+            autoComplete="off"
+            spellCheck={false}
+            value={memberDraft}
+            onChange={(event) => {
+              const value = event.target.value
+              setMemberDraft(value)
               setSuggestOpen(true)
-              setActiveIndex((idx) => Math.min(idx + 1, suggestions.length - 1))
-              return
-            }
-            if (event.key === 'ArrowUp' && suggestions.length > 0) {
-              event.preventDefault()
-              setActiveIndex((idx) => Math.max(idx - 1, 0))
-              return
-            }
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              if (activeIndex >= 0 && suggestions[activeIndex]) {
-                const pick = suggestions[activeIndex]
-                pickMember({ bioguideId: pick.bioguide_id, name: pick.name })
+              if (sponsor) onPick(null)
+            }}
+            onFocus={() => {
+              focusedRef.current = true
+              setSuggestOpen(true)
+            }}
+            onBlur={() => {
+              focusedRef.current = false
+              blurTimerRef.current = window.setTimeout(() => {
+                setSuggestOpen(false)
+                commitDraft()
+              }, 120)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown' && suggestions.length > 0) {
+                event.preventDefault()
+                setSuggestOpen(true)
+                setActiveIndex((idx) => Math.min(idx + 1, suggestions.length - 1))
                 return
               }
-              commitDraft()
-              setSuggestOpen(false)
-              return
-            }
-            if (event.key === 'Escape') {
-              if (suggestOpen) {
+              if (event.key === 'ArrowUp' && suggestions.length > 0) {
                 event.preventDefault()
+                setActiveIndex((idx) => Math.max(idx - 1, 0))
+                return
+              }
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                if (activeIndex >= 0 && suggestions[activeIndex]) {
+                  const pick = suggestions[activeIndex]
+                  pickMember({ bioguideId: pick.bioguide_id, name: pick.name })
+                  return
+                }
+                commitDraft()
                 setSuggestOpen(false)
                 return
               }
-              if (memberDraft) {
-                event.preventDefault()
-                setMemberDraft('')
-                onPick(null)
+              if (event.key === 'Escape') {
+                if (suggestOpen) {
+                  event.preventDefault()
+                  setSuggestOpen(false)
+                  return
+                }
+                if (memberDraft) {
+                  event.preventDefault()
+                  setMemberDraft('')
+                  onPick(null)
+                }
               }
-            }
-          }}
-        />
-        {memberDraft ? (
-          <button
-            type="button"
-            className="feed-member-combobox-clear"
-            aria-label="Clear member filter"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => {
-              setMemberDraft('')
-              setSuggestions([])
-              onPick(null)
             }}
-          >
-            ×
-          </button>
-        ) : null}
+          />
+          {memberDraft ? (
+            <button
+              type="button"
+              className="feed-member-combobox-clear"
+              aria-label="Clear member filter"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                setMemberDraft('')
+                setSuggestions([])
+                onPick(null)
+              }}
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
         {suggestOpen && suggestions.length > 0 ? (
           <ul className="feed-member-suggestions" id={listboxId} role="listbox">
             {suggestions.map((item, index) => (

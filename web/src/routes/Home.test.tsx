@@ -56,7 +56,8 @@ vi.mock('../api/client', () => ({
 function mockViewport(isDesktop: boolean) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches:
-      (isDesktop && query.includes('min-width: 1024px')) ||
+      (isDesktop &&
+        (query.includes('min-width: 1024px') || query.includes('min-width: 640px'))) ||
       (!isDesktop && query.includes('prefers-reduced-motion')),
     media: query,
     onchange: null,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  advancedFilterChips,
   advancedFilterCount,
   advancedFilterSummary,
   applyAdvancedFeedParams,
@@ -60,6 +61,13 @@ describe('advancedFilterSummary / count', () => {
       'Democrat',
       '“Schumer”',
       'Energy',
+    ])
+    expect(advancedFilterChips(filters).map((chip) => chip.id)).toEqual([
+      'state',
+      'sponsorChamber',
+      'party',
+      'sponsorQ',
+      'policy',
     ])
   })
 })
