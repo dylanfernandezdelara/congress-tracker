@@ -150,8 +150,12 @@ export const MemberSponsorCombobox = forwardRef<
     onCommit({ sponsor: null, sponsorQ: next })
   }, [onCommit, pickedName, selectedName, sponsor, sponsorQ])
 
-  useImperativeHandle(ref, () => ({ flush: commitDraft }), [commitDraft])
+  const commitDraftRef = useRef(commitDraft)
+  commitDraftRef.current = commitDraft
 
+  useImperativeHandle(ref, () => ({ flush: () => commitDraftRef.current() }), [])
+
+  // Unmount-only: do not rebind when commitDraft identity churns (that raced picks).
   useEffect(() => {
     return () => {
       if (blurTimerRef.current != null) {
@@ -159,9 +163,9 @@ export const MemberSponsorCombobox = forwardRef<
         blurTimerRef.current = null
       }
       // Panel/sheet unmount (Done / toggle close) must not drop a typed sponsor_q.
-      if (focusedRef.current) commitDraft()
+      if (focusedRef.current) commitDraftRef.current()
     }
-  }, [commitDraft])
+  }, [])
 
   const pickMember = (item: { bioguideId: string; name: string }) => {
     setPickedName(item.name)

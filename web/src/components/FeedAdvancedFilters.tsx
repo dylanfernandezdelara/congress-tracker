@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react'
 
 import { parseFeedPartyParam } from '@congress-tracker/shared/feed-filter-params'
 import { US_STATE_OPTIONS } from '@congress-tracker/shared/us-states'
@@ -14,6 +22,7 @@ import { AnimatedSheet } from './AnimatedSheet'
 import {
   MemberSponsorCombobox,
   type MemberSponsorComboboxHandle,
+  type MemberSponsorCommit,
 } from './MemberSponsorCombobox'
 
 type FeedAdvancedFiltersProps = {
@@ -60,6 +69,13 @@ function FilterFields({
   memberRef,
   suggestionsInline = false,
 }: FilterFieldsProps) {
+  const onMemberCommit = useCallback(
+    (next: MemberSponsorCommit) => {
+      onChange(next)
+    },
+    [onChange],
+  )
+
   return (
     <>
       <label className="feed-filter-field">
@@ -133,7 +149,7 @@ function FilterFields({
         chamber={filters.sponsorChamber}
         state={filters.state}
         suggestionsInline={suggestionsInline}
-        onCommit={(next) => onChange(next)}
+        onCommit={onMemberCommit}
       />
 
       <label className="feed-filter-field">
