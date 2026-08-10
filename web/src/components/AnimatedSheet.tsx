@@ -67,7 +67,8 @@ export function AnimatedSheet({
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
     returnFocusRef.current = previouslyFocused
-    closeRef.current?.focus()
+    // Footer dismiss sits below scrollable content — avoid scrolling fields away.
+    closeRef.current?.focus({ preventScroll: dismissPlacement === 'footer' })
 
     const { unregister, zIndex } = registerSheetLayer(controllerRef.current)
     setLayerZIndex(zIndex)
@@ -76,7 +77,7 @@ export function AnimatedSheet({
       returnFocusRef.current?.focus()
       returnFocusRef.current = null
     }
-  }, [open])
+  }, [open, dismissPlacement])
 
   // Keep the stack's panel pointer current after each paint.
   useEffect(() => {

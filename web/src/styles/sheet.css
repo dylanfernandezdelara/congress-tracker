@@ -98,9 +98,17 @@
   }
 
   .sheet-footer {
+    position: sticky;
+    bottom: 0;
     display: flex;
     justify-content: stretch;
-    margin-top: 0.15rem;
+    margin-top: auto;
+    padding-top: 0.35rem;
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--twc-card) / 0),
+      hsl(var(--twc-card)) 28%
+    );
   }
 
   .sheet-close {
