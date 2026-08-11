@@ -36,6 +36,12 @@ describe("senate-vote-menu helpers", () => {
     expect(isSenateVoteMenuXml(sample, { congress: 118, session: 2 })).toBe(false);
   });
 
+  it("accepts vote_summary roots with attributes (Browser Rendering xmlns)", () => {
+    const withXmlns = sample.replace("<vote_summary>", '<vote_summary xmlns="">');
+    expect(isSenateVoteMenuXml(withXmlns)).toBe(true);
+    expect(isSenateVoteMenuXml(withXmlns, { congress: 119, session: 2 })).toBe(true);
+  });
+
   it("rejects empty or mismatched shells", () => {
     expect(isSenateVoteMenuXml("<html>nope</html>")).toBe(false);
     expect(

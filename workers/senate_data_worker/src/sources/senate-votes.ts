@@ -163,7 +163,7 @@ async function fetchSenateVoteMenuXml(
 ): Promise<{ xml: string; warnings: string[] }> {
   const url = senateVoteMenuUrl(congress, session);
   try {
-    const xml = await fetchSenateLegislativeText(url);
+    const xml = await fetchSenateLegislativeText(url, { browser: env.BROWSER });
     if (!isSenateVoteMenuXml(xml, { congress, session })) {
       return serveSenateVoteMenuFromCache(
         env,

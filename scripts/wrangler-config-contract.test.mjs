@@ -18,6 +18,12 @@ function parseWranglerConfig(filePath) {
 
   const workersDevMatch = content.match(/^workers_dev\s*=\s*(true|false)/m)
   const previewUrlsMatch = content.match(/^preview_urls\s*=\s*(true|false)/m)
+  const browserBindingMatch = content.match(
+    /^\[browser\]\s*\nbinding\s*=\s*"([^"]+)"/m,
+  )
+  const previewBrowserBindingMatch = content.match(
+    /^\[env\.preview\.browser\]\s*\nbinding\s*=\s*"([^"]+)"/m,
+  )
   // Anchored so a commented-out `# crons = [...]` above the live array cannot win.
   const cronMatch = content.match(/^crons\s*=\s*\[([^\]]+)\]/m)
   const crons = cronMatch
@@ -44,6 +50,8 @@ function parseWranglerConfig(filePath) {
     compatibility_date: getTopLevelString('compatibility_date'),
     workers_dev: workersDevMatch?.[1] === 'true',
     preview_urls: previewUrlsMatch?.[1] === 'true',
+    browserBinding: browserBindingMatch?.[1],
+    previewBrowserBinding: previewBrowserBindingMatch?.[1],
     crons,
     congress: congressMatch?.[1],
     session: sessionMatch?.[1],
@@ -69,6 +77,8 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.name, worker.name)
   assert.equal(root.compatibility_date, worker.compatibility_date)
   assert.equal(root.preview_urls, worker.preview_urls)
+  assert.equal(root.browserBinding, worker.browserBinding)
+  assert.equal(root.previewBrowserBinding, worker.previewBrowserBinding)
   assert.deepEqual(root.crons, worker.crons)
   assert.equal(root.congress, worker.congress)
   assert.equal(root.session, worker.session)
@@ -109,6 +119,15 @@ test('Workers Logs observability is enabled at full sampling on both configs', (
   assert.equal(root.observabilityHeadSamplingRate, 1)
   assert.equal(worker.observabilityEnabled, true)
   assert.equal(worker.observabilityHeadSamplingRate, 1)
+})
+
+test('browser binding is set on top-level and preview (not inherited by named envs)', () => {
+  const root = parseWranglerConfig(rootConfigPath)
+  const worker = parseWranglerConfig(workerConfigPath)
+  assert.equal(root.browserBinding, 'BROWSER')
+  assert.equal(worker.browserBinding, 'BROWSER')
+  assert.equal(root.previewBrowserBinding, 'BROWSER')
+  assert.equal(worker.previewBrowserBinding, 'BROWSER')
 })
 
 test('workers_dev stays explicitly enabled so ops can reach /health without Bot Fight', () => {

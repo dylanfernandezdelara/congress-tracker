@@ -65,8 +65,9 @@ function encodeSenateVoteMenuCacheValue(xml, fetchedAt = new Date().toISOString(
 /** Keep in sync with shared/senate-vote-menu.ts `isSenateVoteMenuXml`. */
 function isSenateVoteMenuXml(xml, opts) {
   const trimmed = xml.trim();
+  // Allow attribute-bearing roots (e.g. Chromium XML viewer adds xmlns="").
   if (
-    !trimmed.includes("<vote_summary>") ||
+    !/<vote_summary(?:\s[^>]*)?>/i.test(trimmed) ||
     !trimmed.includes("</vote_summary>") ||
     !trimmed.includes("<vote>") ||
     !trimmed.includes("<vote_number>") ||

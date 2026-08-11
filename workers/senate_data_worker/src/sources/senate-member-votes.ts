@@ -3,7 +3,7 @@ import type { Env } from "../config";
 import type { MemberRecord, MemberVoteRecord } from "../types";
 import { senateMemberLookupKey } from "../../../../shared/member-id";
 import { normalizePartyCode } from "../../../../shared/party";
-import { fetchText } from "./http";
+import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 
 function resolveSenateBioguideId(
@@ -78,7 +78,7 @@ export async function fetchSenateMemberVotes(
 ): Promise<{ members: MemberRecord[]; votes: MemberVoteRecord[] }> {
   const padded = String(rollNumber).padStart(5, "0");
   const url = `https://www.senate.gov/legislative/LIS/roll_call_votes/vote${congress}${session}/vote_${congress}_${session}_${padded}.xml`;
-  const xml = await fetchText(url);
+  const xml = await fetchSenateLegislativeText(url, { browser: env.BROWSER });
   return parseSenateMemberVoteXml(xml, congress, session, rollNumber, options);
 }
 

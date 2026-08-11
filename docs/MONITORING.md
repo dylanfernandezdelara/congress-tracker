@@ -45,13 +45,20 @@ Top-level `/health` `status` is `degraded` whenever ingest status is not `ok`.
 
 ## Senate.gov 403 (known blocker)
 
-Cloudflare Worker egress is frequently blocked by Senate.gov/Akamai (`HTTP 403`
-on `vote_menu_*.xml`). The feed cron then serves the D1
-`senate_vote_menu_cache_*` blob and records `chamber_warnings`, which now marks
-ingest **`degraded`** (previously this stayed `ok` and looked healthy while
-Senate data froze).
+Plain Worker `fetch` to Senate.gov/Akamai is frequently `HTTP 403` on
+`vote_menu_*.xml` (and per-roll member XML). **Cloudflare Browser Rendering**
+is the primary, Cloudflare-native workaround: the Worker `BROWSER` binding's
+`/content` quick action still reaches senate.gov, extracts LIS XML (including
+Chromium's XML-viewer wrapper), writes the D1 menu cache, and continues the
+normal feed cron. No GitHub Actions job is required.
 
-**Refresh from a non-blocked host** (Cursor Cloud, laptop, automation):
+If Browser Rendering is unavailable or fails, the feed cron falls back to the
+D1 `senate_vote_menu_cache_*` blob and records `chamber_warnings`, which marks
+ingest **`degraded`** (cache-fallback) or **`failed`** when the cache is
+nearing/past the 7-day expiry.
+
+**Manual break-glass** (Cursor Cloud, laptop) when you need an immediate
+refresh outside cron:
 
 ```bash
 # Preferred: admin upload + optional immediate feed run
@@ -88,28 +95,15 @@ stale-but-usable cache (>48h). A soft-fail that skips an entire chamber
    a pager storm; optional notify only on transition *into* `degraded`.
 3. **Manual** — `POST /__pipeline/run/feed` with
    `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
-4. **Cursor Automation (recommended)** — schedule a daily cloud agent that:
-   - Fetches the live Senate vote menu (this environment can reach senate.gov)
-   - Runs `PIPELINE_ADMIN_TOKEN=... RUN_FEED=1 CHECK_HEALTH=1 npm run refresh:senate-menu`
-   - Notifies you when the script exits non-zero (true blockers: `failed` /
-     `stale` / `unknown`, fetch errors, or admin upload failures). Note:
-     ingest stays **`degraded`** while Worker→Senate.gov is 403 even after a
-     successful cache refresh — that alone is not an automation failure
-     (`CHECK_HEALTH` accepts `ok` | `degraded`). A newer admin feed success
-     (e.g. `RUN_FEED=1`) supplies chamber_warnings for severity, so a prior
-     scheduled hard-skip `failed` clears after a successful remediation.
-
-   Suggested automation prompt:
-
-   > On repo `congress-tracker`, run production Senate menu refresh + feed:
-   > `PIPELINE_ADMIN_TOKEN=$PIPELINE_ADMIN_TOKEN RUN_FEED=1 CHECK_HEALTH=1 npm run refresh:senate-menu`
-   > using workers.dev (not trackcongress.org). If exit code ≠ 0, treat as a
-   > production ingest blocker and notify me with `/health` JSON and the script
-   > logs. `degraded` with Senate cache-fallback warnings is expected until
-   > Worker egress can reach senate.gov; still refresh the cache daily. Do not
-   > open a PR unless code changes are required to clear a true blocker.
-   > Ensure secret `PIPELINE_ADMIN_TOKEN` is available to the automation
-   > environment (plus `CLOUDFLARE_*` if using `REFRESH_VIA=d1`).
+4. **Browser Rendering (primary, in-Worker)** — daily feed cron uses the
+   `BROWSER` binding when plain `fetch` to senate.gov fails. Keep this binding
+   in both root and worker `wrangler.toml` (and `[env.preview.browser]` —
+   browser bindings are not inherited by named envs).
+5. **Manual / Cursor break-glass only** — if Browser Rendering and the D1
+   cache both fail, run
+   `PIPELINE_ADMIN_TOKEN=... RUN_FEED=1 CHECK_HEALTH=1 npm run refresh:senate-menu`
+   from a host that can reach senate.gov. Do **not** rely on GitHub Actions
+   for this path.
 
 ## Edge cache (feed / stats JSON)
 
