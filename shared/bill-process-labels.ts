@@ -18,12 +18,6 @@ export type BillProcessCurrentStatus =
   | "released_from_committee"
   | "unknown";
 
-const ADVANCEMENT_KEYS: ReadonlySet<BillProcessActivityKey> = new Set([
-  "worked_on",
-  "advanced",
-  "released",
-]);
-
 /** Normalize Congress.gov committee activity names into stable keys. */
 export function normalizeCommitteeActivity(raw: string | null | undefined): BillProcessActivityKey {
   const name = (raw ?? "").trim().toLowerCase();
@@ -35,10 +29,6 @@ export function normalizeCommitteeActivity(raw: string | null | undefined): Bill
   if (name.includes("discharged")) return "released";
   if (name.includes("referred") || name.includes("committed")) return "sent";
   return "other";
-}
-
-export function isAdvancementActivity(key: BillProcessActivityKey): boolean {
-  return ADVANCEMENT_KEYS.has(key);
 }
 
 export function activityVerb(key: BillProcessActivityKey): string {

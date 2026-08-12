@@ -60,15 +60,14 @@ export async function hydrateProcessBills(
         actions: source.actions,
       });
 
-      const payloadEmpty = source.committees.length === 0 && source.actions.length === 0;
       if (events.length === 0) {
-        if (payloadEmpty) {
-          // Genuine empty Congress.gov payload: park so we do not re-hit for 7 days.
-          await markProcessHydrated(env.DB, bill);
-        } else {
-          skipped += 1;
+        // Park even when actions exist but committees did not parse: otherwise
+        // those bills stay last_hydrated_at NULL and starve the backfill budget.
+        await markProcessHydrated(env.DB, bill);
+        skipped += 1;
+        if (source.committees.length > 0) {
           warnings.push(
-            `Process hydrate produced no events for ${label}; leaving queued`
+            `Process hydrate produced no events for ${label}; parked until rehydrate`
           );
         }
       } else {

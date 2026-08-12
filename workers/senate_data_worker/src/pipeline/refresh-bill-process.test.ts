@@ -87,10 +87,25 @@ describe("hydrateProcessBills", () => {
 
     expect(mockPersist).not.toHaveBeenCalled();
     expect(mockMarkHydrated).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ refreshed: 0, skipped: 0, warnings: [] });
+    expect(result).toMatchObject({ refreshed: 0, skipped: 1, warnings: [] });
   });
 
-  it("leaves the bill queued when a non-empty payload parses to no events", async () => {
+  it("parks bills with no committees even when actions exist", async () => {
+    mockFetchSource.mockResolvedValue({
+      committees: [],
+      actions: [{ text: "Received in the Senate." }],
+      rateLimitRemaining: 500,
+    });
+    mockParse.mockReturnValue([]);
+
+    const result = await hydrateProcessBills(createEnv(), [bill]);
+
+    expect(mockPersist).not.toHaveBeenCalled();
+    expect(mockMarkHydrated).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ refreshed: 0, skipped: 1, warnings: [] });
+  });
+
+  it("parks bills whose committees payload parses to no usable events", async () => {
     mockFetchSource.mockResolvedValue({
       committees: [{ systemCode: "hsif00" }],
       actions: [{ text: "Unrelated floor action" }],
@@ -101,10 +116,10 @@ describe("hydrateProcessBills", () => {
     const result = await hydrateProcessBills(createEnv(), [bill]);
 
     expect(mockPersist).not.toHaveBeenCalled();
-    expect(mockMarkHydrated).not.toHaveBeenCalled();
+    expect(mockMarkHydrated).toHaveBeenCalledTimes(1);
     expect(result.refreshed).toBe(0);
     expect(result.skipped).toBe(1);
-    expect(result.warnings[0]).toMatch(/leaving queued/);
+    expect(result.warnings[0]).toMatch(/parked until rehydrate/);
   });
 
   it("parks a terminal 404 so missing bills are not retried every run", async () => {

@@ -5,7 +5,6 @@ import {
   formatProcessChipLabel,
   formatProcessStageLabel,
   formatWaitingLabel,
-  isAdvancementActivity,
   normalizeCommitteeActivity,
   shortCommitteeName,
 } from "./bill-process-labels";
@@ -21,13 +20,6 @@ describe("bill-process-labels", () => {
       "interest"
     );
     expect(normalizeCommitteeActivity("Unknown")).toBe("other");
-  });
-
-  it("marks advancement activities", () => {
-    expect(isAdvancementActivity("worked_on")).toBe(true);
-    expect(isAdvancementActivity("advanced")).toBe(true);
-    expect(isAdvancementActivity("released")).toBe(true);
-    expect(isAdvancementActivity("sent")).toBe(false);
   });
 
   it("formats plain-English stage and waiting labels", () => {
