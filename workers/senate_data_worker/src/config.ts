@@ -1,6 +1,8 @@
 /**
  * Environment bindings for the Congress Tracker worker.
  */
+import type { SenateBrowserBinding } from "./sources/senate-browser-xml";
+
 export interface Env {
   DB: D1Database;
   /**
@@ -8,6 +10,11 @@ export interface Env {
    * Optional so unit tests can construct an Env without the binding.
    */
   ASSETS?: Fetcher;
+  /**
+   * Cloudflare Browser Rendering binding. Used to fetch Senate.gov LIS XML when
+   * plain Worker `fetch` is Akamai-blocked (HTTP 403). Optional in tests.
+   */
+  BROWSER?: SenateBrowserBinding;
   CONGRESS: string;
   SESSION: string;
   ALLOWED_ORIGIN?: string;

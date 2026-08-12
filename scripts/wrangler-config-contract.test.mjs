@@ -18,6 +18,12 @@ function parseWranglerConfig(filePath) {
 
   const workersDevMatch = content.match(/^workers_dev\s*=\s*(true|false)/m)
   const previewUrlsMatch = content.match(/^preview_urls\s*=\s*(true|false)/m)
+  const browserBindingMatch = content.match(
+    /^\[browser\]\s*\nbinding\s*=\s*"([^"]+)"/m,
+  )
+  const previewBrowserBindingMatch = content.match(
+    /^\[env\.preview\.browser\]\s*\nbinding\s*=\s*"([^"]+)"/m,
+  )
   // Anchored so a commented-out `# crons = [...]` above the live array cannot win.
   const cronMatch = content.match(/^crons\s*=\s*\[([^\]]+)\]/m)
   const crons = cronMatch
@@ -44,6 +50,8 @@ function parseWranglerConfig(filePath) {
     compatibility_date: getTopLevelString('compatibility_date'),
     workers_dev: workersDevMatch?.[1] === 'true',
     preview_urls: previewUrlsMatch?.[1] === 'true',
+    browserBinding: browserBindingMatch?.[1],
+    previewBrowserBinding: previewBrowserBindingMatch?.[1],
     crons,
     congress: congressMatch?.[1],
     session: sessionMatch?.[1],
@@ -62,6 +70,23 @@ function parseWranglerConfig(filePath) {
   }
 }
 
+test('compatibility_date meets Browser Run quickAction floor', () => {
+  // quickAction() requires compatibility_date >= 2026-03-24.
+  const minDate = '2026-03-24'
+  const root = parseWranglerConfig(rootConfigPath)
+  const worker = parseWranglerConfig(workerConfigPath)
+  assert.ok(root.compatibility_date, 'root compatibility_date missing')
+  assert.ok(worker.compatibility_date, 'worker compatibility_date missing')
+  assert.ok(
+    root.compatibility_date >= minDate,
+    `root compatibility_date ${root.compatibility_date} must be >= ${minDate}`,
+  )
+  assert.ok(
+    worker.compatibility_date >= minDate,
+    `worker compatibility_date ${worker.compatibility_date} must be >= ${minDate}`,
+  )
+})
+
 test('root and worker wrangler.toml share deployment metadata', () => {
   const root = parseWranglerConfig(rootConfigPath)
   const worker = parseWranglerConfig(workerConfigPath)
@@ -69,6 +94,8 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.name, worker.name)
   assert.equal(root.compatibility_date, worker.compatibility_date)
   assert.equal(root.preview_urls, worker.preview_urls)
+  assert.equal(root.browserBinding, worker.browserBinding)
+  assert.equal(root.previewBrowserBinding, worker.previewBrowserBinding)
   assert.deepEqual(root.crons, worker.crons)
   assert.equal(root.congress, worker.congress)
   assert.equal(root.session, worker.session)
@@ -109,6 +136,37 @@ test('Workers Logs observability is enabled at full sampling on both configs', (
   assert.equal(root.observabilityHeadSamplingRate, 1)
   assert.equal(worker.observabilityEnabled, true)
   assert.equal(worker.observabilityHeadSamplingRate, 1)
+})
+
+test('browser binding is set on top-level and preview (not inherited by named envs)', () => {
+  const root = parseWranglerConfig(rootConfigPath)
+  const worker = parseWranglerConfig(workerConfigPath)
+  assert.equal(root.browserBinding, 'BROWSER')
+  assert.equal(worker.browserBinding, 'BROWSER')
+  assert.equal(root.previewBrowserBinding, 'BROWSER')
+  assert.equal(worker.previewBrowserBinding, 'BROWSER')
+})
+
+test('workers_dev and preview_urls stay top-level (not swallowed by [browser] TOML table)', () => {
+  // In TOML, keys after a [table] header belong to that table. Putting
+  // workers_dev/preview_urls after [browser] makes Wrangler warn and ignore them.
+  for (const filePath of [rootConfigPath, workerConfigPath]) {
+    const content = fs.readFileSync(filePath, 'utf8')
+    const browserIdx = content.search(/^\[browser\]/m)
+    const workersDevIdx = content.search(/^workers_dev\s*=/m)
+    const previewUrlsIdx = content.search(/^preview_urls\s*=/m)
+    assert.ok(browserIdx >= 0, `${filePath} missing [browser]`)
+    assert.ok(workersDevIdx >= 0, `${filePath} missing workers_dev`)
+    assert.ok(previewUrlsIdx >= 0, `${filePath} missing preview_urls`)
+    assert.ok(
+      workersDevIdx < browserIdx,
+      `${filePath}: workers_dev must appear before [browser]`,
+    )
+    assert.ok(
+      previewUrlsIdx < browserIdx,
+      `${filePath}: preview_urls must appear before [browser]`,
+    )
+  }
 })
 
 test('workers_dev stays explicitly enabled so ops can reach /health without Bot Fight', () => {

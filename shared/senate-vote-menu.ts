@@ -37,8 +37,9 @@ export function isSenateVoteMenuXml(
   opts?: { congress?: number; session?: number }
 ): boolean {
   const trimmed = xml.trim();
+  // Allow attribute-bearing roots (e.g. Chromium XML viewer adds xmlns="").
   if (
-    !trimmed.includes("<vote_summary>") ||
+    !/<vote_summary(?:\s[^>]*)?>/i.test(trimmed) ||
     !trimmed.includes("</vote_summary>") ||
     !trimmed.includes("<vote>") ||
     !trimmed.includes("<vote_number>") ||

@@ -1,20 +1,27 @@
 # SYNC REQUIRED — keep this file aligned with wrangler.toml at the repo root
-# (name, compatibility_date, preview_urls, cron, vars, D1 binding/id/name must match).
+# (name, compatibility_date, preview_urls, cron, vars, D1 binding/id/name,
+# browser binding must match). Browser bindings are NOT inherited by named envs.
 # Paths here are worker-dir-relative; root wrangler.toml uses repo-relative paths for
 # Cloudflare Workers Builds. npm scripts invoke this file via --config.
 name = "congress-tracker-api"
 main = "src/worker.ts"
-compatibility_date = "2025-12-10"
-
+# quickAction() on the browser binding requires >= 2026-03-24.
+compatibility_date = "2026-03-24"
 # Keep workers.dev enabled even with [[routes]] custom domains. Wrangler infers
 # workers_dev=false when routes are present unless this is explicit — that broke
 # ops automation (health + admin pipeline) behind Bot Fight on trackcongress.org.
+# Top-level keys MUST appear before any [table] header in TOML.
 workers_dev = true
-
 # Generate per-version/per-branch preview URLs on workers.dev so a commit/PR
 # can be opened in a browser without touching production traffic.
-# (Top-level key: must appear before any [table] headers in TOML.)
 preview_urls = true
+
+# Senate.gov blocks plain Worker fetch (Akamai 403). Browser Rendering reaches
+# the LIS vote menu so daily cron can refresh without external ops scripts.
+# remote=true so `wrangler dev` can exercise quickAction (unsupported fully local).
+[browser]
+binding = "BROWSER"
+remote = true
 
 # Serve the built React app (web/dist) from this same Worker.
 # Static files are served directly; any non-asset path falls through to the
@@ -62,6 +69,10 @@ preview_database_id = "da5dbbc1-8111-4aa9-a49e-5e03022e44cc"
 # Clear routes so preview never inherits production custom domains.
 [env.preview]
 routes = []
+
+[env.preview.browser]
+binding = "BROWSER"
+remote = true
 
 [env.preview.vars]
 CONGRESS = "119"
