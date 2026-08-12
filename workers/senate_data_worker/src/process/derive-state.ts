@@ -6,23 +6,9 @@ import {
   formatReleasedLabel,
   formatWaitingLabel,
   isAdvancementActivity,
-  type BillProcessActivityKey,
   type BillProcessCurrentStatus,
 } from "../../../../shared/bill-process-labels";
-
-export interface CommitteeEventRow {
-  congress: number;
-  bill_type: string;
-  bill_number: number;
-  system_code: string;
-  activity_key: BillProcessActivityKey;
-  activity_at: string;
-  chamber: FeedChamber;
-  committee_name: string;
-  parent_system_code: string | null;
-  activity_raw: string;
-  tally_text: string | null;
-}
+import type { ProcessCommitteeEvent } from "./types";
 
 function dateOnly(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -38,45 +24,45 @@ function originChamberFromBillType(billType: string): FeedChamber | null {
 
 /** Timeline stages: skip interest/other noise; keep sent/hearings/work/advance/release. */
 export function eventsToStages(
-  events: CommitteeEventRow[],
+  events: ProcessCommitteeEvent[],
   nameByCode: Map<string, string>
 ): BillProcessStage[] {
   const usable = events.filter(
     (e) =>
-      e.activity_key === "sent" ||
-      e.activity_key === "hearings" ||
-      e.activity_key === "worked_on" ||
-      e.activity_key === "advanced" ||
-      e.activity_key === "released"
+      e.activityKey === "sent" ||
+      e.activityKey === "hearings" ||
+      e.activityKey === "worked_on" ||
+      e.activityKey === "advanced" ||
+      e.activityKey === "released"
   );
-  usable.sort((a, b) => a.activity_at.localeCompare(b.activity_at));
+  usable.sort((a, b) => a.activityAt.localeCompare(b.activityAt));
 
   return usable.map((e) => {
-    const parentName = e.parent_system_code
-      ? nameByCode.get(e.parent_system_code) ?? null
+    const parentName = e.parentSystemCode
+      ? nameByCode.get(e.parentSystemCode) ?? null
       : null;
     return {
-      date: dateOnly(e.activity_at),
+      date: dateOnly(e.activityAt),
       label: formatProcessStageLabel({
-        activityKey: e.activity_key,
-        committeeName: e.committee_name,
+        activityKey: e.activityKey,
+        committeeName: e.committeeName,
         parentCommitteeName: parentName,
-        tallyText: e.tally_text,
+        tallyText: e.tallyText,
       }),
-      activity_key: e.activity_key,
+      activity_key: e.activityKey,
       chamber: e.chamber,
-      committee_name: e.committee_name,
-      system_code: e.system_code,
-      parent_system_code: e.parent_system_code,
-      is_subcommittee: Boolean(e.parent_system_code),
-      tally_text: e.tally_text,
+      committee_name: e.committeeName,
+      system_code: e.systemCode,
+      parent_system_code: e.parentSystemCode,
+      is_subcommittee: Boolean(e.parentSystemCode),
+      tally_text: e.tallyText,
     };
   });
 }
 
 export function deriveProcessState(
   billType: string,
-  events: CommitteeEventRow[],
+  events: ProcessCommitteeEvent[],
   nameByCode: Map<string, string> = new Map()
 ): {
   origin_chamber: FeedChamber | null;
@@ -89,8 +75,8 @@ export function deriveProcessState(
   const stages = eventsToStages(events, nameByCode);
   let lastAdvanceAt: string | null = null;
   for (const e of events) {
-    if (!isAdvancementActivity(e.activity_key)) continue;
-    if (!lastAdvanceAt || e.activity_at > lastAdvanceAt) lastAdvanceAt = e.activity_at;
+    if (!isAdvancementActivity(e.activityKey)) continue;
+    if (!lastAdvanceAt || e.activityAt > lastAdvanceAt) lastAdvanceAt = e.activityAt;
   }
 
   if (events.length === 0) {
@@ -103,40 +89,40 @@ export function deriveProcessState(
     };
   }
 
-  const latest = [...events].sort((a, b) => b.activity_at.localeCompare(a.activity_at))[0]!;
+  const latest = [...events].sort((a, b) => b.activityAt.localeCompare(a.activityAt))[0]!;
 
   // Prefer latest non-interest event for "where is it now?"
   const latestMeaningful =
     [...events]
-      .filter((e) => e.activity_key !== "interest" && e.activity_key !== "other")
-      .sort((a, b) => b.activity_at.localeCompare(a.activity_at))[0] ?? latest;
+      .filter((e) => e.activityKey !== "interest" && e.activityKey !== "other")
+      .sort((a, b) => b.activityAt.localeCompare(a.activityAt))[0] ?? latest;
 
   const inSecondChamber =
     origin != null &&
     latestMeaningful.chamber != null &&
     latestMeaningful.chamber !== origin;
 
-  if (latestMeaningful.activity_key === "released") {
+  if (latestMeaningful.activityKey === "released") {
     return {
       origin_chamber: origin,
       current_status: "released_from_committee",
-      current_label: formatReleasedLabel(latestMeaningful.committee_name),
+      current_label: formatReleasedLabel(latestMeaningful.committeeName),
       last_advance_at: lastAdvanceAt,
       stages,
     };
   }
 
-  if (latestMeaningful.activity_key === "advanced") {
+  if (latestMeaningful.activityKey === "advanced") {
     // If still only advanced from a subcommittee, waiting on parent / chamber.
-    if (latestMeaningful.parent_system_code) {
+    if (latestMeaningful.parentSystemCode) {
       const parentName =
-        nameByCode.get(latestMeaningful.parent_system_code) ?? "the full committee";
+        nameByCode.get(latestMeaningful.parentSystemCode) ?? "the full committee";
       return {
         origin_chamber: origin,
         current_status: inSecondChamber
           ? "in_second_chamber_committee"
           : "in_subcommittee",
-        current_label: `Cleared ${latestMeaningful.committee_name} · waiting on ${parentName}`,
+        current_label: `Cleared ${latestMeaningful.committeeName} · waiting on ${parentName}`,
         last_advance_at: lastAdvanceAt,
         stages,
       };
@@ -144,25 +130,25 @@ export function deriveProcessState(
     return {
       origin_chamber: origin,
       current_status: "cleared_committee",
-      current_label: formatClearedLabel(latestMeaningful.committee_name),
+      current_label: formatClearedLabel(latestMeaningful.committeeName),
       last_advance_at: lastAdvanceAt,
       stages,
     };
   }
 
   if (
-    latestMeaningful.activity_key === "sent" ||
-    latestMeaningful.activity_key === "hearings" ||
-    latestMeaningful.activity_key === "worked_on"
+    latestMeaningful.activityKey === "sent" ||
+    latestMeaningful.activityKey === "hearings" ||
+    latestMeaningful.activityKey === "worked_on"
   ) {
-    let status: BillProcessCurrentStatus = latestMeaningful.parent_system_code
+    let status: BillProcessCurrentStatus = latestMeaningful.parentSystemCode
       ? "in_subcommittee"
       : "in_committee";
     if (inSecondChamber) status = "in_second_chamber_committee";
     return {
       origin_chamber: origin,
       current_status: status,
-      current_label: formatWaitingLabel(latestMeaningful.committee_name),
+      current_label: formatWaitingLabel(latestMeaningful.committeeName),
       last_advance_at: lastAdvanceAt,
       stages,
     };
@@ -179,7 +165,7 @@ export function deriveProcessState(
 
 export function toProcessSummary(
   billType: string,
-  events: CommitteeEventRow[],
+  events: ProcessCommitteeEvent[],
   nameByCode?: Map<string, string>
 ): BillProcessSummary | null {
   if (events.length === 0) return null;

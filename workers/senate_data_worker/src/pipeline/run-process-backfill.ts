@@ -117,6 +117,23 @@ async function discoverFromCommitteeLists(
       });
       pages += 1;
 
+      const bills: ProcessBillKey[] = page.bills
+        .filter((b) => b.congress === congress)
+        .map((b) => ({
+          congress: b.congress,
+          billType: b.type,
+          billNumber: b.number,
+        }));
+      discovered += await enqueueProcessBills(env.DB, bills);
+
+      if (page.nextOffset == null) {
+        idx += 1;
+        offset = 0;
+      } else {
+        offset = page.nextOffset;
+      }
+
+      // Finish the paid-for page, then stop before the next request.
       if (
         page.rateLimitRemaining != null &&
         page.rateLimitRemaining < PROCESS_RATELIMIT_STOP_REMAINING
@@ -132,22 +149,6 @@ async function discoverFromCommitteeLists(
           fromDateTime,
         } satisfies DiscoveryState);
         break;
-      }
-
-      const bills: ProcessBillKey[] = page.bills
-        .filter((b) => b.congress === congress)
-        .map((b) => ({
-          congress: b.congress,
-          billType: b.type,
-          billNumber: b.number,
-        }));
-      discovered += await enqueueProcessBills(env.DB, bills);
-
-      if (page.nextOffset == null) {
-        idx += 1;
-        offset = 0;
-      } else {
-        offset = page.nextOffset;
       }
     } catch (err) {
       if (err instanceof HttpResponseError && err.status === 429) {

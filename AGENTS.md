@@ -105,6 +105,8 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
 - `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)
 - `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin; also chained after daily feed cron)
+- `POST /__pipeline/run/process-backfill` — capped/resumable committee-process discovery + hydration (admin; re-invoke until `bills_remaining` is 0)
+- `POST /__pipeline/run/process-refresh` — hydrate pending `process_refresh_queue` bills only (admin; daily feed also force-refreshes a capped slice of feed bills)
 - `POST /__pipeline/run/executive-posts` — Truth Social executive ingest (admin; also hourly cron)
 - `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 

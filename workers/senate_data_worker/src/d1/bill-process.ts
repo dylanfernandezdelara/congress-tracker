@@ -4,15 +4,11 @@ import type {
 } from "../../../../shared/bill-process-labels";
 import type { FeedChamber } from "../../../../shared/feed-api-types";
 import { normalizeBillType } from "../sources/bill-type";
-import {
-  toProcessSummary,
-  type CommitteeEventRow,
-} from "../process/derive-state";
+import { toProcessSummary } from "../process/derive-state";
 import type { ProcessCommitteeEvent } from "../process/types";
 import type { BillProcessSummary } from "../../../../shared/bill-process-api-types";
 import { ensureSchema } from "./schema";
 
-export type { CommitteeEventRow };
 export type { ProcessCommitteeEvent };
 
 export interface ProcessBillKey {
@@ -295,14 +291,16 @@ export async function countProcessQueuePending(db: D1Database): Promise<number> 
 export async function getCommitteeEventsForBills(
   db: D1Database,
   bills: ProcessBillKey[]
-): Promise<Map<string, CommitteeEventRow[]>> {
+): Promise<Map<string, ProcessCommitteeEvent[]>> {
   await ensureSchema(db);
-  const out = new Map<string, CommitteeEventRow[]>();
+  const out = new Map<string, ProcessCommitteeEvent[]>();
   if (bills.length === 0) return out;
 
+  // D1 caps bound parameters at 100; 3 binds/bill → chunk ≤ 30 (match votes.ts).
+  const BILL_LOOKUP_CHUNK = 30;
   const chunks: ProcessBillKey[][] = [];
-  for (let i = 0; i < bills.length; i += 40) {
-    chunks.push(bills.slice(i, i + 40));
+  for (let i = 0; i < bills.length; i += BILL_LOOKUP_CHUNK) {
+    chunks.push(bills.slice(i, i + BILL_LOOKUP_CHUNK));
   }
 
   for (const chunk of chunks) {
@@ -341,16 +339,16 @@ export async function getCommitteeEventsForBills(
       const list = out.get(key) ?? [];
       list.push({
         congress: r.congress,
-        bill_type: r.bill_type,
-        bill_number: r.bill_number,
-        system_code: r.system_code,
-        activity_key: asActivityKey(r.activity_key),
-        activity_at: r.activity_at,
+        billType: r.bill_type,
+        billNumber: r.bill_number,
+        systemCode: r.system_code,
+        activityKey: asActivityKey(r.activity_key),
+        activityAt: r.activity_at,
         chamber,
-        committee_name: r.committee_name,
-        parent_system_code: r.parent_system_code,
-        activity_raw: r.activity_raw,
-        tally_text: r.tally_text,
+        committeeName: r.committee_name,
+        parentSystemCode: r.parent_system_code,
+        activityRaw: r.activity_raw,
+        tallyText: r.tally_text,
       });
       out.set(key, list);
     }
@@ -501,44 +499,6 @@ export async function selectStandingCommittees(
     .filter((r): r is CommitteeRosterRow => r !== null);
 }
 
-export async function selectSubcommitteeRoster(
-  db: D1Database,
-  congress: number,
-  parentSystemCode: string
-): Promise<CommitteeRosterRow[]> {
-  await ensureSchema(db);
-  const rows = await db
-    .prepare(
-      `SELECT congress, system_code, chamber, name, committee_type, parent_system_code
-       FROM committee_roster
-       WHERE congress = ? AND parent_system_code = ?
-       ORDER BY name ASC`
-    )
-    .bind(congress, parentSystemCode)
-    .all<{
-      congress: number;
-      system_code: string;
-      chamber: string;
-      name: string;
-      committee_type: string;
-      parent_system_code: string | null;
-    }>();
-  return (rows.results ?? [])
-    .map((r) => {
-      const ch = asChamber(r.chamber);
-      if (!ch) return null;
-      return {
-        congress: r.congress,
-        system_code: r.system_code,
-        chamber: ch,
-        name: r.name,
-        committee_type: r.committee_type,
-        parent_system_code: r.parent_system_code,
-      };
-    })
-    .filter((r): r is CommitteeRosterRow => r !== null);
-}
-
 /** All subcommittees for a chamber in one query (avoids N+1 on leaderboard). */
 export async function selectSubcommitteeRosterByChamber(
   db: D1Database,
@@ -594,17 +554,24 @@ export async function selectCommitteeEventsForCodes(
 ): Promise<CommitteeEventAggRow[]> {
   await ensureSchema(db);
   if (systemCodes.length === 0) return [];
-  const placeholders = systemCodes.map(() => "?").join(", ");
-  const rows = await db
-    .prepare(
-      `SELECT system_code, bill_type, bill_number, activity_key, activity_at
-       FROM bill_committee_events
-       WHERE congress = ? AND system_code IN (${placeholders})
-         AND activity_key IN ('sent', 'worked_on', 'advanced', 'released')`
-    )
-    .bind(congress, ...systemCodes)
-    .all<CommitteeEventAggRow>();
-  return rows.results ?? [];
+  // D1 100-parameter cap: 1 congress bind + N codes → chunk codes ≤ 90.
+  const CODE_CHUNK = 90;
+  const out: CommitteeEventAggRow[] = [];
+  for (let i = 0; i < systemCodes.length; i += CODE_CHUNK) {
+    const chunk = systemCodes.slice(i, i + CODE_CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = await db
+      .prepare(
+        `SELECT system_code, bill_type, bill_number, activity_key, activity_at
+         FROM bill_committee_events
+         WHERE congress = ? AND system_code IN (${placeholders})
+           AND activity_key IN ('sent', 'worked_on', 'advanced', 'released')`
+      )
+      .bind(congress, ...chunk)
+      .all<CommitteeEventAggRow>();
+    out.push(...(rows.results ?? []));
+  }
+  return out;
 }
 
 /** Bills already known via digests/lifecycle/votes for process discovery. */

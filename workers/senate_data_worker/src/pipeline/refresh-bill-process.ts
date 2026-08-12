@@ -9,10 +9,9 @@ import {
   selectProcessQueueBatch,
   type ProcessBillKey,
 } from "../d1/bill-process";
-import { deriveProcessState, type CommitteeEventRow } from "../process/derive-state";
+import { deriveProcessState } from "../process/derive-state";
 import { parseCommitteeEvents } from "../process/parse-committee-source";
 import type { Env } from "../config";
-import { normalizeBillType } from "../sources/bill-type";
 import { fetchBillCommitteesSource } from "../sources/congress-client";
 import { HttpResponseError } from "../sources/http";
 import { billLabel } from "./bill-label";
@@ -56,17 +55,6 @@ export async function hydrateProcessBills(
         number: bill.billNumber,
       });
 
-      if (
-        source.rateLimitRemaining != null &&
-        source.rateLimitRemaining < PROCESS_RATELIMIT_STOP_REMAINING
-      ) {
-        stoppedForRateLimit = true;
-        warnings.push(
-          `Stopping process hydrate early: Congress.gov rate limit remaining=${source.rateLimitRemaining}`
-        );
-        break;
-      }
-
       const events = parseCommitteeEvents({
         congress: bill.congress,
         billType: bill.billType,
@@ -84,20 +72,7 @@ export async function hydrateProcessBills(
         if (!nameByCode.has(e.systemCode)) nameByCode.set(e.systemCode, e.committeeName);
       }
 
-      const eventRows: CommitteeEventRow[] = events.map((e) => ({
-        congress: e.congress,
-        bill_type: normalizeBillType(e.billType),
-        bill_number: e.billNumber,
-        system_code: e.systemCode,
-        activity_key: e.activityKey,
-        activity_at: e.activityAt,
-        chamber: e.chamber,
-        committee_name: e.committeeName,
-        parent_system_code: e.parentSystemCode,
-        activity_raw: e.activityRaw,
-        tally_text: e.tallyText,
-      }));
-      const derived = deriveProcessState(bill.billType, eventRows, nameByCode);
+      const derived = deriveProcessState(bill.billType, events, nameByCode);
 
       await persistBillProcess(env.DB, {
         congress: bill.congress,
@@ -116,6 +91,18 @@ export async function hydrateProcessBills(
       });
       await markProcessHydrated(env.DB, bill);
       refreshed += 1;
+
+      // Finish the paid-for hydrate, then stop before the next request.
+      if (
+        source.rateLimitRemaining != null &&
+        source.rateLimitRemaining < PROCESS_RATELIMIT_STOP_REMAINING
+      ) {
+        stoppedForRateLimit = true;
+        warnings.push(
+          `Stopping process hydrate early: Congress.gov rate limit remaining=${source.rateLimitRemaining}`
+        );
+        break;
+      }
     } catch (err) {
       if (err instanceof HttpResponseError && err.status === 429) {
         stoppedForRateLimit = true;

@@ -29,8 +29,7 @@ import {
 } from "./refresh-confirmations";
 import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
-import { refreshBillProcessQueue } from "./refresh-bill-process";
-import { enqueueProcessBills } from "../d1/bill-process";
+import { hydrateProcessBills } from "./refresh-bill-process";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
 
@@ -274,15 +273,14 @@ export async function runFeedPipeline(
     }
 
     // Light committee-process refresh for feed bills (capped; full crawl is admin backfill).
-    // Force only up to the hydrate budget so discovery queue work is not starved.
+    // Hydrate candidates directly so a discovery backlog cannot starve them.
     try {
       const processCandidates = bills.slice(0, PROCESS_MAX_HYDRATIONS_PER_RUN).map((b) => ({
         congress: b.bill_congress,
         billType: b.bill_type,
         billNumber: b.bill_number,
       }));
-      await enqueueProcessBills(env.DB, processCandidates, { force: true });
-      const processResult = await refreshBillProcessQueue(env);
+      const processResult = await hydrateProcessBills(env, processCandidates);
       if (processResult.warnings.length > 0) {
         console.warn(
           JSON.stringify({
