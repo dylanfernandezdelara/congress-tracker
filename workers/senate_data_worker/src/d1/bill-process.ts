@@ -391,45 +391,6 @@ export async function selectStandingCommittees(
     .filter((r): r is CommitteeRosterRow => r !== null);
 }
 
-/** All subcommittees for a chamber in one query (avoids N+1 on leaderboard). */
-export async function selectSubcommitteeRosterByChamber(
-  db: D1Database,
-  congress: number,
-  chamber: FeedChamber
-): Promise<CommitteeRosterRow[]> {
-  await ensureSchema(db);
-  const rows = await db
-    .prepare(
-      `SELECT congress, system_code, chamber, name, committee_type, parent_system_code
-       FROM committee_roster
-       WHERE congress = ? AND chamber = ? AND parent_system_code IS NOT NULL
-       ORDER BY name ASC`
-    )
-    .bind(congress, chamber)
-    .all<{
-      congress: number;
-      system_code: string;
-      chamber: string;
-      name: string;
-      committee_type: string;
-      parent_system_code: string | null;
-    }>();
-  return (rows.results ?? [])
-    .map((r) => {
-      const ch = asChamber(r.chamber);
-      if (!ch) return null;
-      return {
-        congress: r.congress,
-        system_code: r.system_code,
-        chamber: ch,
-        name: r.name,
-        committee_type: r.committee_type,
-        parent_system_code: r.parent_system_code,
-      };
-    })
-    .filter((r): r is CommitteeRosterRow => r !== null);
-}
-
 export interface CommitteeEventAggRow {
   system_code: string;
   bill_type: string;
@@ -438,7 +399,7 @@ export interface CommitteeEventAggRow {
   activity_at: string;
 }
 
-/** All current-congress events for a set of committee system codes (for leaderboard). */
+/** Current-congress sent/advanced/released events for standing-committee waiting counts. */
 export async function selectCommitteeEventsForCodes(
   db: D1Database,
   congress: number,
@@ -457,7 +418,7 @@ export async function selectCommitteeEventsForCodes(
         `SELECT system_code, bill_type, bill_number, activity_key, activity_at
          FROM bill_committee_events
          WHERE congress = ? AND system_code IN (${placeholders})
-           AND activity_key IN ('sent', 'worked_on', 'advanced', 'released')`
+           AND activity_key IN ('sent', 'advanced', 'released')`
       )
       .bind(congress, ...chunk)
       .all<CommitteeEventAggRow>();

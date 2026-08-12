@@ -1,4 +1,5 @@
 import { normalizeCommitteeActivity } from "../../../../shared/bill-process-labels";
+import type { FeedChamber } from "../../../../shared/feed-api-types";
 import type { CongressAction } from "../lifecycle/parse-actions";
 import type {
   CongressBillCommittee,
@@ -55,13 +56,14 @@ export function parseCommitteeEvents(params: {
   const out: ProcessCommitteeEvent[] = [];
   let seq = 0;
 
-  for (const committee of params.committees) {
-    const systemCode = committee.systemCode?.trim();
-    const name = committee.name?.trim();
-    const chamber = asFeedChamber(committee.chamber);
-    if (!systemCode || !name || !chamber) continue;
-
-    for (const activity of committee.activities ?? []) {
+  const pushActivities = (target: {
+    systemCode: string;
+    name: string;
+    chamber: FeedChamber;
+    parentSystemCode: string | null;
+    activities: Array<{ name?: string; date?: string }>;
+  }) => {
+    for (const activity of target.activities) {
       const raw = activity.name?.trim() || "Unknown";
       const key = normalizeCommitteeActivity(raw);
       if (key === "interest" || key === "other") continue;
@@ -70,48 +72,47 @@ export function parseCommitteeEvents(params: {
         congress: params.congress,
         billType: params.billType,
         billNumber: params.billNumber,
-        systemCode,
+        systemCode: target.systemCode,
         activityKey: key,
         activityAt: at,
-        chamber,
-        committeeName: name,
-        parentSystemCode: null,
+        chamber: target.chamber,
+        committeeName: target.name,
+        parentSystemCode: target.parentSystemCode,
         activityRaw: raw,
         tallyText:
-          talliesByCommittee.get(name.toLowerCase()) ??
+          talliesByCommittee.get(target.name.toLowerCase()) ??
           (key === "advanced" || key === "worked_on"
             ? talliesByDate.get(at.slice(0, 10)) ?? null
             : null),
       });
     }
+  };
+
+  for (const committee of params.committees) {
+    const systemCode = committee.systemCode?.trim();
+    const name = committee.name?.trim();
+    const chamber = asFeedChamber(committee.chamber);
+    if (!systemCode || !name || !chamber) continue;
+
+    pushActivities({
+      systemCode,
+      name,
+      chamber,
+      parentSystemCode: null,
+      activities: committee.activities ?? [],
+    });
 
     for (const sub of committee.subcommittees ?? []) {
       const subCode = sub.systemCode?.trim();
       const subName = sub.name?.trim();
       if (!subCode || !subName) continue;
-      for (const activity of sub.activities ?? []) {
-        const raw = activity.name?.trim() || "Unknown";
-        const key = normalizeCommitteeActivity(raw);
-        if (key === "interest" || key === "other") continue;
-        const at = activityAtOrFallback(activity.date, seq++);
-        out.push({
-          congress: params.congress,
-          billType: params.billType,
-          billNumber: params.billNumber,
-          systemCode: subCode,
-          activityKey: key,
-          activityAt: at,
-          chamber,
-          committeeName: subName,
-          parentSystemCode: systemCode,
-          activityRaw: raw,
-          tallyText:
-            talliesByCommittee.get(subName.toLowerCase()) ??
-            (key === "advanced" || key === "worked_on"
-              ? talliesByDate.get(at.slice(0, 10)) ?? null
-              : null),
-        });
-      }
+      pushActivities({
+        systemCode: subCode,
+        name: subName,
+        chamber,
+        parentSystemCode: systemCode,
+        activities: sub.activities ?? [],
+      });
     }
   }
 

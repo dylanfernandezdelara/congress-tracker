@@ -49,7 +49,7 @@ export interface ProcessBackfillResult {
 async function ensureRoster(env: Env, congress: number): Promise<number> {
   const existingHouse = await selectStandingCommittees(env.DB, congress, "House");
   const existingSenate = await selectStandingCommittees(env.DB, congress, "Senate");
-  if (existingHouse.length + existingSenate.length >= 30) {
+  if (existingHouse.length > 0 && existingSenate.length > 0) {
     return 0;
   }
   const rows = await fetchCongressCommitteeRoster(env, congress);
