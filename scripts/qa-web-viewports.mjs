@@ -388,32 +388,6 @@ const MOCK_RECENT_LAWS = {
   ],
 }
 
-const MOCK_ADVANCING_BILLS = {
-  congress: 119,
-  session: 2,
-  as_of: '2026-06-14T00:00:00.000Z',
-  items: [
-    {
-      congress: 119,
-      bill_type: 'HR',
-      bill_number: 7008,
-      title: 'Stop Insider Trading Act',
-      policy_area: 'Congress',
-      headline: 'Congress Members Banned From Buying Stocks, Must Disclose Sales',
-      last_advance_at: '2026-06-13T12:00:00.000Z',
-      current_label: 'In House Administration Committee · waiting for the committee to act',
-      process: {
-        origin_chamber: 'House',
-        current_status: 'in_committee',
-        current_label: 'In House Administration Committee · waiting for the committee to act',
-        last_advance_at: '2026-06-13T12:00:00.000Z',
-        stages: [],
-      },
-      item: null,
-    },
-  ],
-}
-
 const MOCK_COMMITTEES = {
   congress: 119,
   session: 2,
@@ -482,14 +456,6 @@ async function installApiMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_RECENT_CONFIRMATIONS),
-    })
-  })
-
-  await page.route('**/stats/advancing-bills.json**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(MOCK_ADVANCING_BILLS),
     })
   })
 

@@ -27,12 +27,23 @@ export type BillLifecycleStageKey =
   | 'to_president'
   | 'outcome'
 
+export interface BillLifecycleSubstep {
+  key: string
+  label: string
+  date: string | null
+  isSubcommittee?: boolean
+}
+
 export interface BillLifecycleStage {
   key: BillLifecycleStageKey
   label: string
   date: string | null
   state: BillLifecycleStageState
   detail?: string
+  /** Plain-English status line (committee current waiting label). */
+  statusLabel?: string | null
+  /** Nested steps rendered under this stage (committee process). */
+  substeps?: BillLifecycleSubstep[]
 }
 
 export interface BillLifecycleStagesResult {
@@ -180,12 +191,21 @@ function committeeStage(
     state = 'current'
   }
 
+  const substeps =
+    process?.stages.map((step, index) => ({
+      key: `${step.system_code}-${step.activity_key}-${step.date ?? index}`,
+      label: step.label,
+      date: step.date,
+      isSubcommittee: step.is_subcommittee,
+    })) ?? []
+
   return {
     key: 'committee',
     label: 'Committee',
     date: process ? latestProcessStageDate(process) : null,
     state,
-    detail: process?.current_label ?? undefined,
+    statusLabel: process?.current_label ?? null,
+    substeps: substeps.length > 0 ? substeps : undefined,
   }
 }
 

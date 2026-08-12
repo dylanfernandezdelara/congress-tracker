@@ -126,11 +126,21 @@
     font-weight: 500;
   }
 
-  /* Nested committee steps — same visual language as the lifecycle stepper */
+  /* Nested committee steps under the Committee stage */
+  .bill-pipeline-step--has-substeps {
+    flex: 1 1 100%;
+    max-width: 100%;
+    grid-template-rows: auto auto auto;
+  }
+
+  .bill-pipeline-step--has-substeps .bill-pipeline-committee {
+    grid-column: 1 / -1;
+  }
+
   .bill-pipeline-committee {
     display: grid;
     gap: 0.45rem;
-    margin-top: 0.15rem;
+    margin-top: 0.35rem;
     padding-left: 0.125rem;
   }
 

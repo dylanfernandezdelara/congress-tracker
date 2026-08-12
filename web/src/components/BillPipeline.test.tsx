@@ -75,7 +75,7 @@ describe('BillPipeline', () => {
     expect(screen.getByText('Vetoed')).toBeInTheDocument()
   })
 
-  it('nests committee process steps under the lifecycle diagram', () => {
+  it('nests committee process steps under the Committee stage', () => {
     const committeeStages: BillLifecycleStage[] = [
       { key: 'introduced', label: 'Introduced', date: '2025-12-11', state: 'done' },
       {
@@ -83,7 +83,19 @@ describe('BillPipeline', () => {
         label: 'Committee',
         date: '2026-03-01',
         state: 'current',
-        detail: 'In House Administration · waiting for the committee to act',
+        statusLabel: 'In House Administration · waiting for the committee to act',
+        substeps: [
+          {
+            key: 'hsad00-sent-2026-01-10',
+            label: 'Sent to House Administration',
+            date: '2026-01-10',
+          },
+          {
+            key: 'hsad00-hearings-2026-03-01',
+            label: 'Committee held hearings in House Administration',
+            date: '2026-03-01',
+          },
+        ],
       },
       { key: 'house', label: 'Passed House', date: null, state: 'pending' },
       { key: 'senate', label: 'Passed Senate', date: null, state: 'pending' },
@@ -91,42 +103,9 @@ describe('BillPipeline', () => {
       { key: 'outcome', label: 'Law or veto', date: null, state: 'pending' },
     ]
 
-    render(
-      <BillPipeline
-        stages={committeeStages}
-        process={{
-          origin_chamber: 'House',
-          current_status: 'in_committee',
-          current_label: 'In House Administration · waiting for the committee to act',
-          last_advance_at: '2026-03-01T12:00:00.000Z',
-          stages: [
-            {
-              date: '2026-01-10',
-              label: 'Sent to House Administration',
-              activity_key: 'sent',
-              chamber: 'House',
-              committee_name: 'House Administration',
-              system_code: 'hsad00',
-              parent_system_code: null,
-              is_subcommittee: false,
-              tally_text: null,
-            },
-            {
-              date: '2026-03-01',
-              label: 'Committee held hearings in House Administration',
-              activity_key: 'hearings',
-              chamber: 'House',
-              committee_name: 'House Administration',
-              system_code: 'hsad00',
-              parent_system_code: null,
-              is_subcommittee: false,
-              tally_text: null,
-            },
-          ],
-        }}
-      />,
-    )
+    const { container } = render(<BillPipeline stages={committeeStages} />)
 
+    expect(container.querySelector('.bill-pipeline-step--has-substeps')).toBeTruthy()
     expect(screen.getByLabelText('Committee steps')).toBeInTheDocument()
     expect(
       screen.getByText('In House Administration · waiting for the committee to act'),

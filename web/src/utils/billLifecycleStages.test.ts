@@ -309,8 +309,16 @@ describe('getBillLifecycleStages', () => {
     expect(stages.find((s) => s.key === 'committee')).toMatchObject({
       state: 'current',
       date: '2026-01-12',
-      detail: 'In Energy · waiting for the committee to act',
+      statusLabel: 'In Energy · waiting for the committee to act',
     })
+    expect(stages.find((s) => s.key === 'committee')?.substeps).toEqual([
+      {
+        key: 'hsif00-sent-2026-01-12',
+        label: 'Sent to Energy',
+        date: '2026-01-12',
+        isSubcommittee: false,
+      },
+    ])
     expect(stages.find((s) => s.key === 'house')?.state).toBe('pending')
   })
 

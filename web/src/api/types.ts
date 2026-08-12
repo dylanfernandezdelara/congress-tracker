@@ -23,8 +23,6 @@ export type {
 } from '../../../shared/executive-api-types'
 
 export type {
-  AdvancingBillItem,
-  AdvancingBillsResponse,
   ChamberComposition,
   ChamberPulse,
   ChamberStats,

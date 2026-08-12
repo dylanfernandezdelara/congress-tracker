@@ -3,7 +3,6 @@ import type { IngestMonitorPayload } from '@congress-tracker/shared/ingest-api-t
 import { applyAdvancedFeedParams, type AdvancedFeedFilters } from '../utils/feedAdvancedFilters'
 import { fetchJson } from './fetchJson'
 import type {
-  AdvancingBillsResponse,
   CommitteesLeaderboardResponse,
   DefectorsResponse,
   FeedPageResponse,
@@ -115,11 +114,6 @@ export async function fetchRecentConfirmations(
 ): Promise<RecentConfirmationsResponse> {
   const params = new URLSearchParams({ limit: String(limit) })
   return fetchJson<RecentConfirmationsResponse>(`/stats/recent-confirmations.json?${params}`)
-}
-
-export async function fetchAdvancingBills(limit = 5): Promise<AdvancingBillsResponse> {
-  const params = new URLSearchParams({ limit: String(limit) })
-  return fetchJson<AdvancingBillsResponse>(`/stats/advancing-bills.json?${params}`)
 }
 
 export async function fetchCommitteesLeaderboard(

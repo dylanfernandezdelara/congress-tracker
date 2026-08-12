@@ -74,7 +74,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 
-      <BillPipeline stages={stages} detail={pipelineDetail} process={item.process} />
+      <BillPipeline stages={stages} detail={pipelineDetail} />
 
       {isProcedural ? (
         <div className="feed-row-detail-chips">

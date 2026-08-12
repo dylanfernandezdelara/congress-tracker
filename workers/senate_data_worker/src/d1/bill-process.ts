@@ -93,6 +93,9 @@ function asStatus(value: string): BillProcessCurrentStatus {
  * Atomically replace committee events and refresh the denormalized process
  * index for one bill. Events remain the source of truth for timeline reads;
  * `bill_process_state` is only a query index (advancing / filters).
+ *
+ * Empty `events` is a no-op (same pattern as `replaceBillSponsors`): a sparse
+ * Congress.gov committees payload must not wipe previously stored timelines.
  */
 export async function persistBillProcess(
   db: D1Database,
@@ -104,6 +107,8 @@ export async function persistBillProcess(
     state: UpsertProcessStateParams;
   }
 ): Promise<void> {
+  if (params.events.length === 0) return;
+
   await ensureSchema(db);
   const type = normalizeBillType(params.billType);
   const now = new Date().toISOString();
