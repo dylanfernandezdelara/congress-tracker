@@ -289,11 +289,27 @@ const MOCK_PULSE_STATS = {
     close_votes: [],
     policy_heat: [{ policy_area: 'Defense', bill_count: 1 }],
     this_week: { count: 1, headline: 'This week sample headline', bill_type: 's', bill_number: 2, congress: 119 },
+    waiting_in_committee: [
+      {
+        system_code: 'hsif00',
+        name: 'Energy and Commerce Committee',
+        chamber: 'House',
+        waiting: 2,
+      },
+    ],
   },
   senate: {
     close_votes: [],
     policy_heat: [],
     this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
+    waiting_in_committee: [
+      {
+        system_code: 'sshr00',
+        name: 'HELP Committee',
+        chamber: 'Senate',
+        waiting: 1,
+      },
+    ],
   },
 }
 

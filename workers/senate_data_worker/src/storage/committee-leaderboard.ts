@@ -5,50 +5,71 @@ import type {
 } from "../../../../shared/stats-api-types";
 import { PROCESS_STUCK_DAYS } from "../constants";
 import type { Env } from "../config";
-import {
-  selectCommitteeEventsForCodes,
-  selectStandingCommittees,
-} from "../d1/bill-process";
+import { ensureSchema } from "../d1/schema";
 import { lookbackStartIso } from "../sources/congress-client";
 
-type CommitteeEvent = {
+const PULSE_WAITING_LIMIT = 5;
+
+interface WaitingSqlRow {
   system_code: string;
-  bill_type: string;
-  bill_number: number;
-  activity_key: string;
-  activity_at: string;
-};
-
-function waitingCount(events: CommitteeEvent[], stuckSince: string): number {
-  const byBill = new Map<string, { sentAt: string | null; left: boolean }>();
-
-  for (const e of events) {
-    const key = `${e.bill_type}:${e.bill_number}`;
-    const row = byBill.get(key) ?? { sentAt: null, left: false };
-    if (e.activity_key === "sent") {
-      if (!row.sentAt || e.activity_at < row.sentAt) row.sentAt = e.activity_at;
-    }
-    if (e.activity_key === "advanced" || e.activity_key === "released") {
-      row.left = true;
-    }
-    byBill.set(key, row);
-  }
-
-  let waiting = 0;
-  for (const row of byBill.values()) {
-    if (!row.left && row.sentAt && row.sentAt <= stuckSince) waiting += 1;
-  }
-  return waiting;
+  name: string;
+  waiting: number;
 }
 
-function eventsBySystemCode(events: CommitteeEvent[]): Map<string, CommitteeEvent[]> {
-  const byCode = new Map<string, CommitteeEvent[]>();
-  for (const e of events) {
-    const list = byCode.get(e.system_code);
-    if (list) list.push(e);
-    else byCode.set(e.system_code, [e]);
-  }
-  return byCode;
+/**
+ * Standing-committee waiting counts in SQL: referred (`sent`) with no
+ * `advanced`/`released`, and earliest send at or before `stuckSince`.
+ */
+export async function selectStandingWaitingRows(
+  db: D1Database,
+  congress: number,
+  chamber: StatsChamber,
+  stuckSince: string
+): Promise<CommitteeLeaderboardRow[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT r.system_code AS system_code,
+              r.name AS name,
+              COUNT(w.bill_number) AS waiting
+       FROM committee_roster r
+       LEFT JOIN (
+         SELECT system_code, bill_type, bill_number
+         FROM bill_committee_events
+         WHERE congress = ?
+           AND activity_key IN ('sent', 'advanced', 'released')
+         GROUP BY system_code, bill_type, bill_number
+         HAVING MIN(CASE WHEN activity_key = 'sent' THEN activity_at END) IS NOT NULL
+            AND MIN(CASE WHEN activity_key = 'sent' THEN activity_at END) <= ?
+            AND MAX(CASE WHEN activity_key IN ('advanced', 'released') THEN 1 ELSE 0 END) = 0
+       ) w ON w.system_code = r.system_code
+       WHERE r.congress = ?
+         AND r.chamber = ?
+         AND r.parent_system_code IS NULL
+         AND r.committee_type = 'Standing'
+       GROUP BY r.system_code, r.name
+       ORDER BY waiting DESC, r.name ASC`
+    )
+    .bind(congress, stuckSince, congress, chamber)
+    .all<WaitingSqlRow>();
+
+  return (results ?? []).map((row) => ({
+    system_code: row.system_code,
+    name: row.name,
+    chamber,
+    waiting: Number(row.waiting) || 0,
+  }));
+}
+
+export async function waitingInCommitteeForPulse(
+  db: D1Database,
+  congress: number,
+  chamber: StatsChamber,
+  asOf: string = new Date().toISOString()
+): Promise<CommitteeLeaderboardRow[]> {
+  const stuckSince = `${lookbackStartIso(PROCESS_STUCK_DAYS, new Date(asOf))}T00:00:00.000Z`;
+  const rows = await selectStandingWaitingRows(db, congress, chamber, stuckSince);
+  return rows.filter((row) => row.waiting > 0).slice(0, PULSE_WAITING_LIMIT);
 }
 
 export async function buildCommitteesLeaderboard(
@@ -58,27 +79,8 @@ export async function buildCommitteesLeaderboard(
   chamber: StatsChamber,
   asOf: string = new Date().toISOString()
 ): Promise<CommitteesLeaderboardResponse> {
-  const standing = await selectStandingCommittees(env.DB, congress, chamber);
   const stuckSince = `${lookbackStartIso(PROCESS_STUCK_DAYS, new Date(asOf))}T00:00:00.000Z`;
-  const events = await selectCommitteeEventsForCodes(
-    env.DB,
-    congress,
-    standing.map((c) => c.system_code)
-  );
-
-  const byCode = eventsBySystemCode(events);
-  const items: CommitteeLeaderboardRow[] = standing.map((c) => ({
-    system_code: c.system_code,
-    name: c.name,
-    chamber,
-    waiting: waitingCount(byCode.get(c.system_code) ?? [], stuckSince),
-  }));
-
-  items.sort((a, b) => {
-    if (b.waiting !== a.waiting) return b.waiting - a.waiting;
-    return a.name.localeCompare(b.name);
-  });
-
+  const items = await selectStandingWaitingRows(env.DB, congress, chamber, stuckSince);
   return {
     congress,
     session,

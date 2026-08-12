@@ -31,6 +31,7 @@ const {
   fetchNotableVotes,
   fetchRecentLaws,
   fetchRecentConfirmations,
+  fetchCommitteesLeaderboard,
   fetchDefectors,
   fetchMemberProfile,
   fetchSessionStats,
@@ -74,6 +75,7 @@ describe('Home', () => {
       waitingHeadings[0]!.compareDocumentPosition(closeHeadings[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     expect(screen.getByText('Energy and Commerce')).toBeInTheDocument()
+    expect(fetchCommitteesLeaderboard).not.toHaveBeenCalled()
     expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Recent confirmations' })).toBeInTheDocument()

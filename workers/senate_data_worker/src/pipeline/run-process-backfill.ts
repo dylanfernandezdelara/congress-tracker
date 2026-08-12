@@ -2,6 +2,7 @@ import {
   PROCESS_MAX_COMMITTEE_LIST_PAGES_PER_RUN,
   PROCESS_MAX_HYDRATIONS_PER_RUN,
   PROCESS_RATELIMIT_STOP_REMAINING,
+  PROCESS_ROSTER_REFRESH_DAYS,
 } from "../constants";
 import { congressNumber, type Env } from "../config";
 import {
@@ -22,6 +23,7 @@ import { HttpResponseError } from "../sources/http";
 import { hydrateProcessBills } from "./refresh-bill-process";
 
 const DISCOVERY_STATE_KEY = "process_committee_discovery";
+const ROSTER_STATE_KEY = "process_committee_roster";
 
 interface DiscoveryState {
   chamber: "House" | "Senate";
@@ -30,9 +32,34 @@ interface DiscoveryState {
   fromDateTime: string;
 }
 
+interface RosterState {
+  fetched_at: string;
+}
+
 function congressStartFromDateTime(congress: number): string {
   const year = 1789 + (congress - 1) * 2;
   return `${year}-01-01T00:00:00Z`;
+}
+
+async function saveDiscoveryCursor(
+  db: D1Database,
+  fromDateTime: string,
+  committee: { chamber: "House" | "Senate"; system_code: string },
+  offset: number
+): Promise<void> {
+  await setPipelineState(db, DISCOVERY_STATE_KEY, {
+    chamber: committee.chamber,
+    systemCode: committee.system_code,
+    offset,
+    fromDateTime,
+  } satisfies DiscoveryState);
+}
+
+function rosterFetchIsFresh(fetchedAt: string | undefined): boolean {
+  if (!fetchedAt) return false;
+  const parsed = Date.parse(fetchedAt);
+  if (!Number.isFinite(parsed)) return false;
+  return Date.now() - parsed < PROCESS_ROSTER_REFRESH_DAYS * 24 * 60 * 60 * 1000;
 }
 
 export interface ProcessBackfillResult {
@@ -49,7 +76,12 @@ export interface ProcessBackfillResult {
 async function ensureRoster(env: Env, congress: number): Promise<number> {
   const existingHouse = await selectStandingCommittees(env.DB, congress, "House");
   const existingSenate = await selectStandingCommittees(env.DB, congress, "Senate");
-  if (existingHouse.length > 0 && existingSenate.length > 0) {
+  const stored = await getPipelineState<RosterState>(env.DB, ROSTER_STATE_KEY);
+  if (
+    existingHouse.length > 0 &&
+    existingSenate.length > 0 &&
+    rosterFetchIsFresh(stored?.fetched_at)
+  ) {
     return 0;
   }
   const rows = await fetchCongressCommitteeRoster(env, congress);
@@ -64,6 +96,9 @@ async function ensureRoster(env: Env, congress: number): Promise<number> {
       parentSystemCode: r.parentSystemCode,
     }))
   );
+  await setPipelineState(env.DB, ROSTER_STATE_KEY, {
+    fetched_at: new Date().toISOString(),
+  } satisfies RosterState);
   return rows.length;
 }
 
@@ -142,24 +177,14 @@ async function discoverFromCommitteeLists(
         warnings.push(
           `Stopping committee-list discovery early: rate limit remaining=${page.rateLimitRemaining}`
         );
-        await setPipelineState(env.DB, DISCOVERY_STATE_KEY, {
-          chamber: committee.chamber,
-          systemCode: committee.system_code,
-          offset,
-          fromDateTime,
-        } satisfies DiscoveryState);
+        await saveDiscoveryCursor(env.DB, fromDateTime, committee, offset);
         break;
       }
     } catch (err) {
       if (err instanceof HttpResponseError && err.status === 429) {
         stoppedForRateLimit = true;
         warnings.push("Congress.gov rate limited during committee-list discovery");
-        await setPipelineState(env.DB, DISCOVERY_STATE_KEY, {
-          chamber: committee.chamber,
-          systemCode: committee.system_code,
-          offset,
-          fromDateTime,
-        } satisfies DiscoveryState);
+        await saveDiscoveryCursor(env.DB, fromDateTime, committee, offset);
         break;
       }
       warnings.push(
@@ -173,20 +198,10 @@ async function discoverFromCommitteeLists(
   }
 
   if (idx >= standing.length) {
-    await setPipelineState(env.DB, DISCOVERY_STATE_KEY, {
-      chamber: standing[0]!.chamber,
-      systemCode: standing[0]!.system_code,
-      offset: 0,
-      fromDateTime,
-    } satisfies DiscoveryState);
+    await saveDiscoveryCursor(env.DB, fromDateTime, standing[0]!, 0);
   } else if (!stoppedForRateLimit) {
     const committee = standing[idx]!;
-    await setPipelineState(env.DB, DISCOVERY_STATE_KEY, {
-      chamber: committee.chamber,
-      systemCode: committee.system_code,
-      offset,
-      fromDateTime,
-    } satisfies DiscoveryState);
+    await saveDiscoveryCursor(env.DB, fromDateTime, committee, offset);
   }
 
   return { discovered, pages, stoppedForRateLimit, warnings };

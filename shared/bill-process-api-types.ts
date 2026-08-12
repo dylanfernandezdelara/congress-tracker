@@ -22,11 +22,8 @@ export interface BillProcessStage {
 }
 
 export interface BillProcessSummary {
-  origin_chamber: FeedChamber | null;
   current_status: BillProcessCurrentStatus;
   /** Plain-English current-state chip / subtitle. */
   current_label: string | null;
-  /** ISO datetime of the latest advancement-class event. */
-  last_advance_at: string | null;
   stages: BillProcessStage[];
 }

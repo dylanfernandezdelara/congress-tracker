@@ -2,14 +2,8 @@ import { useCallback, useState } from 'react'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 
-import {
-  fetchCommitteesLeaderboard,
-  fetchNotableVotes,
-  fetchRecentConfirmations,
-  fetchRecentLaws,
-} from '../api/client'
+import { fetchNotableVotes, fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
 import type {
-  CommitteesLeaderboardResponse,
   NotableVotesResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
@@ -134,20 +128,6 @@ export default function Home() {
     mapError: () => "Couldn't load confirmations.",
   })
 
-  const committeesHouse = useAsyncData<CommitteesLeaderboardResponse>({
-    deps: [railRetryKey],
-    enabled: feedSettled,
-    load: () => fetchCommitteesLeaderboard('House'),
-    mapError: () => "Couldn't load House committees.",
-  })
-
-  const committeesSenate = useAsyncData<CommitteesLeaderboardResponse>({
-    deps: [railRetryKey],
-    enabled: feedSettled,
-    load: () => fetchCommitteesLeaderboard('Senate'),
-    mapError: () => "Couldn't load Senate committees.",
-  })
-
   const showFeed = items.length > 0
   const showSkeleton = isInitialLoading && items.length === 0
   const listRefreshing = isInitialLoading && items.length > 0
@@ -155,8 +135,6 @@ export default function Home() {
   const notableLoading = !feedSettled || notableVotes.isLoading
   const recentLawsLoading = !feedSettled || recentLaws.isLoading
   const recentConfirmationsLoading = !feedSettled || recentConfirmations.isLoading
-  const committeesLoading = committeesHouse.isLoading || committeesSenate.isLoading
-  const committeesError = committeesHouse.error ?? committeesSenate.error
 
   const federalControl = (
     <FederalControlCompact
@@ -182,11 +160,6 @@ export default function Home() {
       loading={pulse.isLoading}
       error={pulse.error}
       onRetry={reloadStats}
-      committeesHouse={committeesHouse.data}
-      committeesSenate={committeesSenate.data}
-      committeesLoading={committeesLoading}
-      committeesError={committeesError}
-      onCommitteesRetry={handleReloadFeed}
     />
   )
 

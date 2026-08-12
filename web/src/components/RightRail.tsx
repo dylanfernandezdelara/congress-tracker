@@ -1,9 +1,4 @@
-import type {
-  ChamberPulse,
-  CommitteeLeaderboardRow,
-  CommitteesLeaderboardResponse,
-  PulseStatsResponse,
-} from '../api/types'
+import type { ChamberPulse, CommitteeLeaderboardRow, PulseStatsResponse } from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
 
 type RightRailProps = {
@@ -11,53 +6,17 @@ type RightRailProps = {
   loading: boolean
   error: string | null
   onRetry?: () => void
-  committeesHouse: CommitteesLeaderboardResponse | null
-  committeesSenate: CommitteesLeaderboardResponse | null
-  committeesLoading: boolean
-  committeesError: string | null
-  onCommitteesRetry?: () => void
 }
 
-function waitingRows(items: CommitteeLeaderboardRow[] | undefined): CommitteeLeaderboardRow[] {
-  return (items ?? [])
-    .filter((row) => row.waiting > 0)
-    .sort((a, b) => b.waiting - a.waiting)
-    .slice(0, 5)
-}
-
-function WaitingInCommittee({
-  items,
-  loading,
-  error,
-  onRetry,
-}: {
-  items: CommitteeLeaderboardRow[] | undefined
-  loading: boolean
-  error: string | null
-  onRetry?: () => void
-}) {
-  const rows = waitingRows(items)
-
+function WaitingInCommittee({ items }: { items: CommitteeLeaderboardRow[] }) {
   return (
     <div className="sidebar-widget space-y-2">
       <h3 className="text-[12px] font-medium text-foreground">Waiting in committee</h3>
-      {loading && items == null ? <p className="text-xs text-faint">Loading committees…</p> : null}
-      {error && items == null ? (
-        <div className="space-y-2">
-          <p className="text-xs text-fail">{error}</p>
-          {onRetry ? (
-            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-              Retry
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {!loading && !error && rows.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-xs text-faint">No long-waiting referrals yet.</p>
-      ) : null}
-      {rows.length > 0 ? (
+      ) : (
         <ol className="space-y-1 text-[12px] text-secondary">
-          {rows.map((row) => (
+          {items.map((row) => (
             <li key={row.system_code}>
               {row.name}{' '}
               <span className="text-faint">
@@ -66,7 +25,7 @@ function WaitingInCommittee({
             </li>
           ))}
         </ol>
-      ) : null}
+      )}
     </div>
   )
 }
@@ -74,17 +33,9 @@ function WaitingInCommittee({
 function ChamberPulseSection({
   title,
   data,
-  waiting,
-  waitingLoading,
-  waitingError,
-  onWaitingRetry,
 }: {
   title: string
   data: ChamberPulse | undefined
-  waiting: CommitteeLeaderboardRow[] | undefined
-  waitingLoading: boolean
-  waitingError: string | null
-  onWaitingRetry?: () => void
 }) {
   if (!data) return null
 
@@ -92,12 +43,7 @@ function ChamberPulseSection({
     <section className="sidebar-chamber space-y-4">
       <h2 className="sidebar-kicker">{title}</h2>
 
-      <WaitingInCommittee
-        items={waiting}
-        loading={waitingLoading}
-        error={waitingError}
-        onRetry={onWaitingRetry}
-      />
+      <WaitingInCommittee items={data.waiting_in_committee ?? []} />
 
       <div className="sidebar-widget space-y-2">
         <h3 className="text-[12px] font-medium text-foreground">Close votes</h3>
@@ -151,17 +97,7 @@ function ChamberPulseSection({
   )
 }
 
-export function RightRail({
-  pulse,
-  loading,
-  error,
-  onRetry,
-  committeesHouse,
-  committeesSenate,
-  committeesLoading,
-  committeesError,
-  onCommitteesRetry,
-}: RightRailProps) {
+export function RightRail({ pulse, loading, error, onRetry }: RightRailProps) {
   return (
     <div className="sidebar-panel space-y-6">
       <h2 className="sidebar-section-title">Legislative pulse</h2>
@@ -178,23 +114,9 @@ export function RightRail({
       ) : null}
       {pulse ? (
         <>
-          <ChamberPulseSection
-            title="House"
-            data={pulse.house}
-            waiting={committeesHouse?.items}
-            waitingLoading={committeesLoading}
-            waitingError={committeesError}
-            onWaitingRetry={onCommitteesRetry}
-          />
+          <ChamberPulseSection title="House" data={pulse.house} />
           <div className="border-t border-border" />
-          <ChamberPulseSection
-            title="Senate"
-            data={pulse.senate}
-            waiting={committeesSenate?.items}
-            waitingLoading={committeesLoading}
-            waitingError={committeesError}
-            onWaitingRetry={onCommitteesRetry}
-          />
+          <ChamberPulseSection title="Senate" data={pulse.senate} />
         </>
       ) : null}
     </div>

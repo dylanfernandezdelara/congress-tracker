@@ -60,14 +60,27 @@ export async function hydrateProcessBills(
         actions: source.actions,
       });
 
-      await persistBillProcess(env.DB, {
-        congress: bill.congress,
-        billType: bill.billType,
-        billNumber: bill.billNumber,
-        events,
-      });
-      await markProcessHydrated(env.DB, bill);
-      refreshed += 1;
+      const payloadEmpty = source.committees.length === 0 && source.actions.length === 0;
+      if (events.length === 0) {
+        if (payloadEmpty) {
+          // Genuine empty Congress.gov payload: park so we do not re-hit for 7 days.
+          await markProcessHydrated(env.DB, bill);
+        } else {
+          skipped += 1;
+          warnings.push(
+            `Process hydrate produced no events for ${label}; leaving queued`
+          );
+        }
+      } else {
+        await persistBillProcess(env.DB, {
+          congress: bill.congress,
+          billType: bill.billType,
+          billNumber: bill.billNumber,
+          events,
+        });
+        await markProcessHydrated(env.DB, bill);
+        refreshed += 1;
+      }
 
       // Finish the paid-for hydrate, then stop before the next request.
       if (

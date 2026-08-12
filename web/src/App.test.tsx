@@ -96,12 +96,14 @@ vi.mock('./api/client', () => ({
     house: {
       close_votes: [],
       policy_heat: [],
-      this_week: { count: 0, headline: null },
+      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
+      waiting_in_committee: [],
     },
     senate: {
       close_votes: [],
       policy_heat: [],
-      this_week: { count: 0, headline: null },
+      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
+      waiting_in_committee: [],
     },
   }),
   fetchDefectors: vi.fn().mockResolvedValue({ defectors: [] }),

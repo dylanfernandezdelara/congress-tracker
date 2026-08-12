@@ -5,7 +5,6 @@ import {
   formatProcessStageLabel,
   formatReleasedLabel,
   formatWaitingLabel,
-  isAdvancementActivity,
   type BillProcessCurrentStatus,
 } from "../../../../shared/bill-process-labels";
 import type { ProcessCommitteeEvent } from "./types";
@@ -65,102 +64,67 @@ export function deriveProcessState(
   events: ProcessCommitteeEvent[],
   nameByCode: Map<string, string> = new Map()
 ): {
-  origin_chamber: FeedChamber | null;
   current_status: BillProcessCurrentStatus;
   current_label: string | null;
-  last_advance_at: string | null;
   stages: BillProcessStage[];
 } {
   const origin = originChamberFromBillType(billType);
   const stages = eventsToStages(events, nameByCode);
-  let lastAdvanceAt: string | null = null;
-  for (const e of events) {
-    if (!isAdvancementActivity(e.activityKey)) continue;
-    if (!lastAdvanceAt || e.activityAt > lastAdvanceAt) lastAdvanceAt = e.activityAt;
-  }
+  let current_status: BillProcessCurrentStatus = "introduced";
+  let current_label: string | null = null;
 
-  if (events.length === 0) {
-    return {
-      origin_chamber: origin,
-      current_status: "introduced",
-      current_label: null,
-      last_advance_at: null,
-      stages,
-    };
-  }
+  if (events.length > 0) {
+    const latest = [...events].sort((a, b) => b.activityAt.localeCompare(a.activityAt))[0]!;
+    const latestMeaningful =
+      [...events]
+        .filter((e) => e.activityKey !== "interest" && e.activityKey !== "other")
+        .sort((a, b) => b.activityAt.localeCompare(a.activityAt))[0] ?? latest;
 
-  const latest = [...events].sort((a, b) => b.activityAt.localeCompare(a.activityAt))[0]!;
+    const inSecondChamber =
+      origin != null &&
+      latestMeaningful.chamber != null &&
+      latestMeaningful.chamber !== origin;
 
-  // Prefer latest non-interest event for "where is it now?"
-  const latestMeaningful =
-    [...events]
-      .filter((e) => e.activityKey !== "interest" && e.activityKey !== "other")
-      .sort((a, b) => b.activityAt.localeCompare(a.activityAt))[0] ?? latest;
-
-  const inSecondChamber =
-    origin != null &&
-    latestMeaningful.chamber != null &&
-    latestMeaningful.chamber !== origin;
-
-  if (latestMeaningful.activityKey === "released") {
-    return {
-      origin_chamber: origin,
-      current_status: "released_from_committee",
-      current_label: formatReleasedLabel(latestMeaningful.committeeName),
-      last_advance_at: lastAdvanceAt,
-      stages,
-    };
-  }
-
-  if (latestMeaningful.activityKey === "advanced") {
-    // If still only advanced from a subcommittee, waiting on parent / chamber.
-    if (latestMeaningful.parentSystemCode) {
-      const parentName =
-        nameByCode.get(latestMeaningful.parentSystemCode) ?? "the full committee";
-      return {
-        origin_chamber: origin,
-        current_status: inSecondChamber
-          ? "in_second_chamber_committee"
-          : "in_subcommittee",
-        current_label: `Cleared ${latestMeaningful.committeeName} · waiting on ${parentName}`,
-        last_advance_at: lastAdvanceAt,
-        stages,
-      };
+    switch (latestMeaningful.activityKey) {
+      case "released":
+        current_status = "released_from_committee";
+        current_label = formatReleasedLabel(latestMeaningful.committeeName);
+        break;
+      case "advanced":
+        if (latestMeaningful.parentSystemCode) {
+          const parentName =
+            nameByCode.get(latestMeaningful.parentSystemCode) ?? "the full committee";
+          current_status = inSecondChamber
+            ? "in_second_chamber_committee"
+            : "in_subcommittee";
+          current_label = `Cleared ${latestMeaningful.committeeName} · waiting on ${parentName}`;
+        } else {
+          current_status = "cleared_committee";
+          current_label = formatClearedLabel(latestMeaningful.committeeName);
+        }
+        break;
+      case "sent":
+      case "hearings":
+      case "worked_on":
+        current_status = latestMeaningful.parentSystemCode
+          ? "in_subcommittee"
+          : "in_committee";
+        if (inSecondChamber) current_status = "in_second_chamber_committee";
+        current_label = formatWaitingLabel(latestMeaningful.committeeName);
+        break;
+      case "interest":
+      case "other":
+        current_status = "unknown";
+        break;
+      default: {
+        const _exhaustive: never = latestMeaningful.activityKey;
+        void _exhaustive;
+        current_status = "unknown";
+      }
     }
-    return {
-      origin_chamber: origin,
-      current_status: "cleared_committee",
-      current_label: formatClearedLabel(latestMeaningful.committeeName),
-      last_advance_at: lastAdvanceAt,
-      stages,
-    };
   }
 
-  if (
-    latestMeaningful.activityKey === "sent" ||
-    latestMeaningful.activityKey === "hearings" ||
-    latestMeaningful.activityKey === "worked_on"
-  ) {
-    let status: BillProcessCurrentStatus = latestMeaningful.parentSystemCode
-      ? "in_subcommittee"
-      : "in_committee";
-    if (inSecondChamber) status = "in_second_chamber_committee";
-    return {
-      origin_chamber: origin,
-      current_status: status,
-      current_label: formatWaitingLabel(latestMeaningful.committeeName),
-      last_advance_at: lastAdvanceAt,
-      stages,
-    };
-  }
-
-  return {
-    origin_chamber: origin,
-    current_status: "unknown",
-    current_label: null,
-    last_advance_at: lastAdvanceAt,
-    stages,
-  };
+  return { current_status, current_label, stages };
 }
 
 export function toProcessSummary(
@@ -171,10 +135,8 @@ export function toProcessSummary(
   if (events.length === 0) return null;
   const derived = deriveProcessState(billType, events, nameByCode);
   return {
-    origin_chamber: derived.origin_chamber,
     current_status: derived.current_status,
     current_label: derived.current_label,
-    last_advance_at: derived.last_advance_at,
     stages: derived.stages,
   };
 }

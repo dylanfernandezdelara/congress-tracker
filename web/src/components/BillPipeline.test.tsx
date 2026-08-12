@@ -76,10 +76,8 @@ describe('BillPipeline', () => {
       <BillPipeline
         stages={stages}
         process={{
-          origin_chamber: 'House',
           current_status: 'in_committee',
           current_label: 'In House Administration · waiting for the committee to act',
-          last_advance_at: '2026-03-01T12:00:00.000Z',
           stages: [
             {
               date: '2026-01-10',
