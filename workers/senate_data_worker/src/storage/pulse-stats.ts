@@ -46,7 +46,7 @@ export function isQualifyingCloseVote(yeas: number, nays: number): boolean {
   return margin <= relativeCap && margin <= CLOSE_VOTE_MAX_ABS_MARGIN;
 }
 
-/** True when yea–nay margin qualifies as a close passage vote. */
+async function fetchCloseVotes(
   db: D1Database,
   congress: number,
   session: number,
