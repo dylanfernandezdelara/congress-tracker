@@ -69,7 +69,9 @@ export function extractSenateXmlFromBrowserContent(htmlOrXml: string): string {
   const open = trimmed.match(WEBKIT_SOURCE_OPEN_RE);
   if (open?.index !== undefined) {
     const start = open.index + open[0].length;
-    const close = trimmed.lastIndexOf("</div>");
+    // Close at the first </div> after the source open tag (not the last in the
+    // document — later Chromium chrome may add more wrappers).
+    const close = trimmed.indexOf("</div>", start);
     if (close > start) {
       const extracted = trimmed.slice(start, close).trim();
       if (extracted.startsWith("<")) {
