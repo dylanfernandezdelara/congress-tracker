@@ -1,12 +1,11 @@
 import { useId, useState } from 'react'
 
 import type { AdvancingBillItem } from '../api/types'
+import { congressGovBillUrl, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { formatBillQueryParam } from '../utils/billDeepLink'
-import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { BillIdChip } from './BillIdChip'
 import { BillProcessTimeline } from './BillProcessTimeline'
 import { ExpandChevron } from './ExpandChevron'
-import { FeedRowDate } from './FeedRowDate'
 import { FeedRowDetail } from './FeedRowDetail'
 
 type AdvancingBillsSectionProps = {
@@ -39,53 +38,61 @@ function AdvancingBillRow({
   const billId = formatShortBillId(item.bill_type, item.bill_number)
   const headline = item.headline?.trim() || item.title?.trim() || billId
   const advanceDate = item.last_advance_at.slice(0, 10)
+  const statusLine =
+    item.current_label?.trim() ||
+    item.process?.current_label?.trim() ||
+    'Recent committee progress'
+  const sourceUrl = congressGovBillUrl(item.congress, item.bill_type, item.bill_number)
 
   return (
-    <li className={`feed-row${isExpanded ? ' is-expanded' : ''}`}>
-      <article className="feed-row-article" aria-labelledby={headlineId}>
+    <li className={`advancing-bills-row${isExpanded ? ' is-expanded' : ''}`}>
+      <article aria-labelledby={headlineId}>
         <button
           type="button"
-          className="feed-row-toggle"
+          className="advancing-bills-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${billId}`}
+          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} committee process for ${billId}`}
           onClick={() => onToggle(key)}
         >
-          <FeedRowDate dateTime={advanceDate} primary={formatVoteDate(advanceDate)} />
-          <div className="feed-row-main">
-            <div className="feed-row-header">
-              <h3 id={headlineId} className="feed-row-topic">
-                {headline}
-              </h3>
-              <ExpandChevron />
-            </div>
-            <div className="feed-row-meta-row">
-              <span className="feed-row-badge">Advancing</span>
-              <BillIdChip type={item.bill_type} number={item.bill_number} />
-              {item.current_label ? (
-                <span className="feed-row-chip feed-row-chip--process">{item.current_label}</span>
-              ) : null}
-            </div>
+          <div className="advancing-bills-row-top">
+            <h3 id={headlineId} className="advancing-bills-headline">
+              {headline}
+            </h3>
+            <ExpandChevron />
+          </div>
+          <p className="advancing-bills-status">{statusLine}</p>
+          <div className="advancing-bills-meta">
+            <BillIdChip type={item.bill_type} number={item.bill_number} />
+            <time dateTime={advanceDate}>{formatVoteDate(advanceDate)}</time>
           </div>
         </button>
-        {isExpanded ? (
-          <div id={detailId} className="feed-row-detail-wrap">
-            {item.item ? (
+        <div
+          id={detailId}
+          className="advancing-bills-detail"
+          role="region"
+          aria-label={`Committee process for ${billId}`}
+          hidden={!isExpanded}
+        >
+          {isExpanded ? (
+            item.item ? (
               <FeedRowDetail item={item.item} />
             ) : (
-              <div className="feed-row-detail">
-                <p className="text-sm text-secondary">
-                  {item.current_label ??
-                    item.process?.current_label ??
-                    'Committee process details are still catching up.'}
-                </p>
-                {item.process && item.process.stages.length > 0 ? (
-                  <BillProcessTimeline process={item.process} />
-                ) : null}
+              <div className="advancing-bills-detail-fallback">
+                {item.process ? <BillProcessTimeline process={item.process} /> : null}
+                <p className="text-[13px] text-secondary">{statusLine}</p>
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="congress-link"
+                >
+                  Read on congress.gov ↗
+                </a>
               </div>
-            )}
-          </div>
-        ) : null}
+            )
+          ) : null}
+        </div>
       </article>
     </li>
   )
@@ -99,43 +106,49 @@ export function AdvancingBillsSection({
 }: AdvancingBillsSectionProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  if (loading) {
+  if (loading && (!items || items.length === 0)) {
     return (
-      <section className="home-secondary-section" aria-label="Advancing in committee">
-        <h2 className="sidebar-section-title">Advancing in committee</h2>
-        <p className="text-xs text-faint">Loading…</p>
+      <section className="advancing-bills" aria-label="Moving through committee" aria-busy="true">
+        <div className="advancing-bills-header">
+          <h2 className="home-feed-title">Moving through committee</h2>
+          <p className="advancing-bills-lede">Loading recent committee progress…</p>
+        </div>
       </section>
     )
   }
 
   if (error) {
     return (
-      <section className="home-secondary-section" aria-label="Advancing in committee">
-        <h2 className="sidebar-section-title">Advancing in committee</h2>
-        <p className="text-xs text-fail">{error}</p>
-        {onRetry ? (
-          <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-            Retry
-          </button>
-        ) : null}
+      <section className="advancing-bills" aria-label="Moving through committee">
+        <div className="advancing-bills-header">
+          <h2 className="home-feed-title">Moving through committee</h2>
+          <p className="text-[13px] text-fail">{error}</p>
+          {onRetry ? (
+            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </div>
       </section>
     )
   }
 
-  if (!items || items.length === 0) {
-    return (
-      <section className="home-secondary-section" aria-label="Advancing in committee">
-        <h2 className="sidebar-section-title">Advancing in committee</h2>
-        <p className="text-xs text-faint">No recent committee advances yet.</p>
-      </section>
-    )
-  }
+  // Keep the homepage quiet when there is nothing to show.
+  if (!items || items.length === 0) return null
+
+  // Cap the strip so the chronological feed still fits the first viewport.
+  const visible = items.slice(0, 3)
 
   return (
-    <section className="home-secondary-section" aria-label="Advancing in committee">
-      <h2 className="sidebar-section-title">Advancing in committee</h2>
-      <ul className="feed-list">
-        {items.map((item) => {
+    <section className="advancing-bills" aria-label="Moving through committee">
+      <div className="advancing-bills-header">
+        <h2 className="home-feed-title">Moving through committee</h2>
+        <p className="advancing-bills-lede">
+          Recent committee progress — before these bills reach a floor vote.
+        </p>
+      </div>
+      <ul className="advancing-bills-list">
+        {visible.map((item) => {
           const key = itemKey(item)
           return (
             <AdvancingBillRow

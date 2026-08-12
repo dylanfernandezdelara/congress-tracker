@@ -137,23 +137,22 @@ export default function Home() {
     mapError: () => "Couldn't load confirmations.",
   })
 
+  // Process surfaces load independently so they appear above the timeline
+  // without waiting on the passage-feed request.
   const advancingBills = useAsyncData<AdvancingBillsResponse>({
     deps: [railRetryKey],
-    enabled: feedSettled,
-    load: () => fetchAdvancingBills(5),
+    load: () => fetchAdvancingBills(3),
     mapError: () => "Couldn't load advancing bills.",
   })
 
   const committeesHouse = useAsyncData<CommitteesLeaderboardResponse>({
     deps: [railRetryKey],
-    enabled: feedSettled,
     load: () => fetchCommitteesLeaderboard('House'),
     mapError: () => "Couldn't load House committees.",
   })
 
   const committeesSenate = useAsyncData<CommitteesLeaderboardResponse>({
     deps: [railRetryKey],
-    enabled: feedSettled,
     load: () => fetchCommitteesLeaderboard('Senate'),
     mapError: () => "Couldn't load Senate committees.",
   })
@@ -165,9 +164,8 @@ export default function Home() {
   const notableLoading = !feedSettled || notableVotes.isLoading
   const recentLawsLoading = !feedSettled || recentLaws.isLoading
   const recentConfirmationsLoading = !feedSettled || recentConfirmations.isLoading
-  const advancingLoading = !feedSettled || advancingBills.isLoading
-  const committeesLoading =
-    !feedSettled || committeesHouse.isLoading || committeesSenate.isLoading
+  const advancingLoading = advancingBills.isLoading
+  const committeesLoading = committeesHouse.isLoading || committeesSenate.isLoading
   const committeesError = committeesHouse.error ?? committeesSenate.error
 
   const federalControl = (
@@ -270,6 +268,13 @@ export default function Home() {
           </div>
         ) : null}
 
+        <AdvancingBillsSection
+          items={advancingBills.data?.items ?? null}
+          loading={advancingLoading}
+          error={advancingBills.error}
+          onRetry={handleReloadFeed}
+        />
+
         {showSkeleton ? <FeedSkeleton /> : null}
 
         {feedError && items.length === 0 ? (
@@ -369,12 +374,6 @@ export default function Home() {
         ) : null}
 
         <div className="home-feed-secondary">
-          <AdvancingBillsSection
-            items={advancingBills.data?.items ?? null}
-            loading={advancingLoading}
-            error={advancingBills.error}
-            onRetry={handleReloadFeed}
-          />
           <RecentConfirmationsSection
             confirmations={recentConfirmations.data?.confirmations ?? null}
             loading={recentConfirmationsLoading}

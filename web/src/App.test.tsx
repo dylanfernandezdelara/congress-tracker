@@ -85,6 +85,19 @@ vi.mock('./api/client', () => ({
     as_of: '2026-06-14T00:00:00.000Z',
     confirmations: [],
   }),
+  fetchAdvancingBills: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    as_of: '2026-06-14T00:00:00.000Z',
+    items: [],
+  }),
+  fetchCommitteesLeaderboard: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    chamber: 'House',
+    as_of: '2026-06-14T00:00:00.000Z',
+    items: [],
+  }),
   fetchPulseStats: vi.fn().mockResolvedValue({
     house: {
       close_votes: [],

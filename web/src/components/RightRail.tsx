@@ -87,7 +87,7 @@ export function RightRail({
   return (
     <div className="sidebar-panel space-y-6">
       <div className="space-y-3">
-        <h2 className="sidebar-section-title">Committees</h2>
+        <h2 className="sidebar-section-title">Where bills wait</h2>
         <CommitteeLeaderboard
           house={committeesHouse}
           senate={committeesSenate}
