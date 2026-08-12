@@ -16,6 +16,7 @@ export type HomeApiMocks = {
   fetchNotableVotes: Mock
   fetchRecentLaws: Mock
   fetchRecentConfirmations: Mock
+  fetchCommitteesLeaderboard: Mock
   fetchDefectors: Mock
   fetchMemberProfile: Mock
   fetchMembersSearch: Mock
@@ -180,6 +181,13 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
       },
     ],
   })
+  api.fetchCommitteesLeaderboard.mockResolvedValue({
+    congress: 119,
+    session: 2,
+    chamber: 'House',
+    as_of: '2026-06-14T00:00:00.000Z',
+    items: [],
+  })
   api.fetchSessionStats.mockResolvedValue({
     congress: 119,
     session: 2,
@@ -233,12 +241,28 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
     house: {
       close_votes: [],
       policy_heat: [],
-      this_week: { count: 0, headline: null },
+      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
+      waiting_in_committee: [
+        {
+          system_code: 'hsif00',
+          name: 'Energy and Commerce',
+          chamber: 'House',
+          waiting: 2,
+        },
+      ],
     },
     senate: {
       close_votes: [],
       policy_heat: [],
-      this_week: { count: 0, headline: null },
+      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
+      waiting_in_committee: [
+        {
+          system_code: 'sshr00',
+          name: 'HELP',
+          chamber: 'Senate',
+          waiting: 1,
+        },
+      ],
     },
   })
   api.fetchPortfolioStats.mockResolvedValue({

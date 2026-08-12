@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -223,6 +223,48 @@ const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_bill_sponsors_state ON bill_sponsors (state, congress, bill_type, bill_number)`,
   `CREATE INDEX IF NOT EXISTS idx_bill_sponsors_bill ON bill_sponsors (congress, bill_type, bill_number)`,
+  `CREATE TABLE IF NOT EXISTS bill_committee_events (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  system_code TEXT NOT NULL,
+  activity_key TEXT NOT NULL,
+  activity_at TEXT NOT NULL,
+  chamber TEXT NOT NULL,
+  committee_name TEXT NOT NULL,
+  parent_system_code TEXT,
+  activity_raw TEXT NOT NULL,
+  tally_text TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number, system_code, activity_key, activity_at)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_bill
+    ON bill_committee_events (congress, bill_type, bill_number, activity_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_committee
+    ON bill_committee_events (congress, system_code, activity_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_advance
+    ON bill_committee_events (activity_key, activity_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS committee_roster (
+  congress INTEGER NOT NULL,
+  system_code TEXT NOT NULL,
+  chamber TEXT NOT NULL,
+  name TEXT NOT NULL,
+  committee_type TEXT NOT NULL,
+  parent_system_code TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, system_code)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_committee_roster_chamber
+    ON committee_roster (congress, chamber, parent_system_code)`,
+  `CREATE TABLE IF NOT EXISTS process_refresh_queue (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  queued_at TEXT NOT NULL,
+  last_hydrated_at TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_process_refresh_queue_pending
+    ON process_refresh_queue (last_hydrated_at, queued_at)`,
 ];
 
 /**

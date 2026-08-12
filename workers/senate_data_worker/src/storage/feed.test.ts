@@ -12,6 +12,7 @@ const mockGetExecutivePostBillsForPosts = vi.fn();
 const mockGetLifecyclesForBills = vi.fn();
 const mockGetCompanionVotesForBills = vi.fn();
 const mockGetBillTextChangesForBills = vi.fn();
+const mockGetProcessSummariesForBills = vi.fn();
 const mockLookbackStartIso = vi.fn((days: number) => `lookback-${days}`);
 
 vi.mock("../d1/schema", () => ({
@@ -61,6 +62,15 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
   return {
     ...actual,
     getLifecyclesForBills: (...args: unknown[]) => mockGetLifecyclesForBills(...args),
+  };
+});
+
+vi.mock("../d1/bill-process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/bill-process")>();
+  return {
+    ...actual,
+    getProcessSummariesForBills: (...args: unknown[]) =>
+      mockGetProcessSummariesForBills(...args),
   };
 });
 
@@ -134,6 +144,7 @@ describe("buildFeedPage lifecycle attachment", () => {
     );
     mockGetCompanionVotesForBills.mockResolvedValue(new Map([["119:HR:6644", []]]));
     mockGetBillTextChangesForBills.mockResolvedValue(new Map());
+    mockGetProcessSummariesForBills.mockResolvedValue(new Map());
   });
 
   it("forwards optional chamber to feed bill select and count", async () => {

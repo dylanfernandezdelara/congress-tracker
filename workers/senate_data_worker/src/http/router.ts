@@ -56,6 +56,12 @@ import { buildExecutiveAlerts } from "../storage/executive";
 import { buildPulseStats } from "../storage/pulse-stats";
 import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
+import { buildCommitteesLeaderboard } from "../storage/committee-leaderboard";
+import { runProcessBackfillPipeline } from "../pipeline/run-process-backfill";
+import { refreshBillProcessQueue } from "../pipeline/refresh-bill-process";
+import type {
+  CommitteesLeaderboardResponse,
+} from "../../../../shared/stats-api-types";
 import { buildNotableVotes } from "../analytics/notable-votes";
 import { buildSessionStats } from "../storage/session-stats";
 import type {
@@ -457,6 +463,8 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
   "/__pipeline/run/disclosures": ({ env }) => runDisclosuresPipeline(env),
   "/__pipeline/run/executive-posts": ({ env }) =>
     runExecutivePostsPipeline(env, { trigger: "admin" }),
+  "/__pipeline/run/process-backfill": ({ env }) => runProcessBackfillPipeline(env),
+  "/__pipeline/run/process-refresh": ({ env }) => refreshBillProcessQueue(env),
 };
 
 const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
@@ -785,6 +793,27 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       async (): Promise<RecentConfirmationsResponse> =>
         buildRecentConfirmations(env, congress, session, limit, asOf),
       "recent confirmations unavailable"
+    );
+  },
+  "/stats/committees.json": ({ env, url, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
+    const chamberParam = url.searchParams.get("chamber");
+    const chamber = parseChamber(chamberParam);
+    if (!chamber) {
+      return Promise.resolve(
+        json(
+          { error: "bad_request", message: "chamber must be House or Senate" },
+          { status: 400 }
+        )
+      );
+    }
+    return handleStatsJson(
+      json,
+      async (): Promise<CommitteesLeaderboardResponse> =>
+        buildCommitteesLeaderboard(env, congress, session, chamber, asOf),
+      "committee leaderboard unavailable"
     );
   },
 };

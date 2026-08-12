@@ -7,8 +7,9 @@ import {
   type ParsedLifecycleMilestones,
 } from "../lifecycle/parse-actions";
 import type { BillRef, BillSponsorRecord } from "../types";
+import type { FeedChamber } from "../../../../shared/feed-api-types";
 import { stripHtmlToText } from "./html-clean";
-import { fetchJson } from "./http";
+import { fetchJson, fetchJsonWithMeta, nextPageUrl } from "./http";
 
 interface BillSummary {
   text?: string;
@@ -149,3 +150,208 @@ export async function fetchBillLifecycleSource(
 export function lookbackStartIso(days: number, asOf: Date = new Date()): string {
   return daysAgoLookbackStartIso(days, asOf);
 }
+
+export interface CongressCommitteeActivity {
+  name?: string;
+  date?: string;
+}
+
+export interface CongressSubcommittee {
+  name?: string;
+  systemCode?: string;
+  activities?: CongressCommitteeActivity[];
+}
+
+export interface CongressBillCommittee {
+  name?: string;
+  systemCode?: string;
+  chamber?: string;
+  type?: string;
+  activities?: CongressCommitteeActivity[];
+  subcommittees?: CongressSubcommittee[];
+}
+
+export interface BillCommitteesSource {
+  committees: CongressBillCommittee[];
+  actions: CongressAction[];
+  rateLimitRemaining: number | null;
+}
+
+function asFeedChamber(raw: string | undefined): FeedChamber | null {
+  if (!raw) return null;
+  const t = raw.trim().toLowerCase();
+  if (t === "house") return "House";
+  if (t === "senate") return "Senate";
+  return null;
+}
+
+export async function fetchBillCommitteesSource(
+  env: Env,
+  bill: BillRef
+): Promise<BillCommitteesSource> {
+  const apiKey = env.CONGRESS_API_KEY;
+  const base = billApiBase(bill);
+
+  const [committeesMeta, actionsMeta] = await Promise.all([
+    fetchJsonWithMeta<{ committees?: CongressBillCommittee[] }>(
+      `${base}/committees?format=json&limit=50&api_key=${apiKey}`
+    ),
+    fetchJsonWithMeta<BillActionsResponse>(
+      `${base}/actions?format=json&limit=250&api_key=${apiKey}`
+    ),
+  ]);
+
+  const remaining = [committeesMeta.rateLimitRemaining, actionsMeta.rateLimitRemaining]
+    .filter((n): n is number => n != null)
+    .reduce<number | null>((min, n) => (min == null ? n : Math.min(min, n)), null);
+
+  return {
+    committees: committeesMeta.data.committees ?? [],
+    actions: actionsMeta.data.actions ?? [],
+    rateLimitRemaining: remaining,
+  };
+}
+
+export interface CongressRosterCommittee {
+  name?: string;
+  systemCode?: string;
+  chamber?: string;
+  committeeTypeCode?: string;
+  subcommittees?: Array<{ name?: string; systemCode?: string }>;
+}
+
+export async function fetchCongressCommitteeRoster(
+  env: Env,
+  congress: number
+): Promise<
+  Array<{
+    systemCode: string;
+    chamber: FeedChamber;
+    name: string;
+    committeeType: string;
+    parentSystemCode: string | null;
+  }>
+> {
+  const apiKey = env.CONGRESS_API_KEY;
+  const { data } = await fetchJsonWithMeta<{ committees?: CongressRosterCommittee[] }>(
+    `https://api.congress.gov/v3/committee/${congress}?format=json&limit=250&api_key=${apiKey}`
+  );
+  const out: Array<{
+    systemCode: string;
+    chamber: FeedChamber;
+    name: string;
+    committeeType: string;
+    parentSystemCode: string | null;
+  }> = [];
+
+  for (const c of data.committees ?? []) {
+    const chamber = asFeedChamber(c.chamber);
+    const systemCode = c.systemCode?.trim();
+    const name = c.name?.trim();
+    if (!chamber || !systemCode || !name) continue;
+    const committeeType = c.committeeTypeCode?.trim() || "Other";
+    // Congress.gov lists subcommittees both nested under parents and as top-level
+    // rows. Keep only nested copies so upsert cannot wipe parent_system_code.
+    if (committeeType === "Subcommittee" || /subcommittee$/i.test(name)) continue;
+    out.push({
+      systemCode,
+      chamber,
+      name,
+      committeeType,
+      parentSystemCode: null,
+    });
+    for (const sc of c.subcommittees ?? []) {
+      const scCode = sc.systemCode?.trim();
+      const scName = sc.name?.trim();
+      if (!scCode || !scName) continue;
+      out.push({
+        systemCode: scCode,
+        chamber,
+        name: scName,
+        committeeType: "Subcommittee",
+        parentSystemCode: systemCode,
+      });
+    }
+  }
+  return out;
+}
+
+export interface CommitteeBillListItem {
+  congress: number;
+  type: string;
+  number: number;
+  relationshipType: string | null;
+  actionDate: string | null;
+}
+
+export async function fetchCommitteeBillsPage(
+  env: Env,
+  params: {
+    chamber: "house" | "senate";
+    systemCode: string;
+    fromDateTime: string;
+    offset?: number;
+    limit?: number;
+  }
+): Promise<{
+  bills: CommitteeBillListItem[];
+  nextOffset: number | null;
+  totalCount: number | null;
+  rateLimitRemaining: number | null;
+}> {
+  const apiKey = env.CONGRESS_API_KEY;
+  const limit = params.limit ?? 250;
+  const offset = params.offset ?? 0;
+  const url =
+    `https://api.congress.gov/v3/committee/${params.chamber}/${params.systemCode}/bills` +
+    `?format=json&limit=${limit}&offset=${offset}` +
+    `&fromDateTime=${encodeURIComponent(params.fromDateTime)}&api_key=${apiKey}`;
+
+  const { data, rateLimitRemaining } = await fetchJsonWithMeta<{
+    "committee-bills"?: { bills?: Array<Record<string, unknown>> };
+    pagination?: { count?: number; next?: string };
+  }>(url);
+
+  const raw = data["committee-bills"]?.bills ?? [];
+  const bills: CommitteeBillListItem[] = [];
+  for (const item of raw) {
+    const congress = Number(item.congress);
+    // Congress.gov uses billNumber/billType on committee bill lists; accept
+    // number/type as a defensive fallback for older fixtures.
+    const number = Number(item.billNumber ?? item.number);
+    const typeRaw = item.billType ?? item.type;
+    const type = typeof typeRaw === "string" ? typeRaw : "";
+    if (!Number.isFinite(congress) || !Number.isFinite(number) || !type) continue;
+    bills.push({
+      congress,
+      type,
+      number,
+      relationshipType:
+        typeof item.relationshipType === "string" ? item.relationshipType : null,
+      actionDate: typeof item.actionDate === "string" ? item.actionDate : null,
+    });
+  }
+
+  const next = nextPageUrl(data.pagination?.next, apiKey);
+  let nextOffset: number | null = null;
+  if (next) {
+    try {
+      const parsed = new URL(next);
+      const off = parsed.searchParams.get("offset");
+      nextOffset = off != null ? Number.parseInt(off, 10) : offset + limit;
+      if (!Number.isFinite(nextOffset)) nextOffset = null;
+    } catch {
+      nextOffset = offset + limit;
+    }
+  }
+
+  return {
+    bills,
+    nextOffset,
+    totalCount:
+      typeof data.pagination?.count === "number" ? data.pagination.count : null,
+    rateLimitRemaining,
+  };
+}
+
+export { asFeedChamber };

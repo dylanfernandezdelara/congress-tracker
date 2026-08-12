@@ -70,4 +70,51 @@ describe('BillPipeline', () => {
     expect(container.querySelector('.bill-pipeline-step--failed')).toBeTruthy()
     expect(screen.getByText('Vetoed')).toBeInTheDocument()
   })
+
+  it('lists committee steps under the existing diagram', () => {
+    render(
+      <BillPipeline
+        stages={stages}
+        process={{
+          current_status: 'in_committee',
+          current_label: 'In House Administration · waiting for the committee to act',
+          stages: [
+            {
+              date: '2026-01-10',
+              label: 'Sent to House Administration',
+              activity_key: 'sent',
+              chamber: 'House',
+              committee_name: 'House Administration',
+              system_code: 'hsad00',
+              parent_system_code: null,
+              is_subcommittee: false,
+              tally_text: null,
+            },
+            {
+              date: '2026-03-01',
+              label: 'Committee held hearings in House Administration',
+              activity_key: 'hearings',
+              chamber: 'House',
+              committee_name: 'House Administration',
+              system_code: 'hsad00',
+              parent_system_code: null,
+              is_subcommittee: false,
+              tally_text: null,
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByLabelText('Bill lifecycle')).toBeInTheDocument()
+    expect(screen.queryByText('Committee')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Committee steps')).toBeInTheDocument()
+    expect(
+      screen.getByText('In House Administration · waiting for the committee to act'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Sent to House Administration')).toBeInTheDocument()
+    expect(
+      screen.getByText('Committee held hearings in House Administration'),
+    ).toBeInTheDocument()
+  })
 })

@@ -128,6 +128,8 @@ describe("buildPulseStats close votes", () => {
     const pulse = await buildPulseStats(db, 119, 2);
 
     expect(pulse.house.close_votes).toHaveLength(1);
+    expect(pulse.house.waiting_in_committee).toEqual([]);
+    expect(pulse.senate.waiting_in_committee).toEqual([]);
     expect(pulse.house.close_votes[0]).toMatchObject({
       bill_number: 100,
       yeas: 214,
@@ -168,5 +170,7 @@ describe("buildPulseStats close votes", () => {
 
     expect(pulse.house.close_votes).toEqual([]);
     expect(pulse.senate.close_votes).toEqual([]);
+    expect(pulse.house.waiting_in_committee).toEqual([]);
+    expect(pulse.senate.waiting_in_committee).toEqual([]);
   });
 });

@@ -18,6 +18,11 @@ import {
   lifecycleMapKey,
   type LifecycleRow,
 } from "../d1/lifecycle";
+import {
+  getProcessSummariesForBills,
+  processMapKey,
+} from "../d1/bill-process";
+import type { BillProcessSummary } from "../../../../shared/bill-process-api-types";
 import { ensureSchema } from "../d1/schema";
 import {
   billLookupKey,
@@ -66,6 +71,7 @@ interface FeedItemAssemblyContext {
   executiveByBill: Map<string, ExecutivePostForBill[]>;
   textChangesByBill: Awaited<ReturnType<typeof getBillTextChangesForBills>>;
   companionVotesByBill: Map<string, VoteRow[]>;
+  processByBill: Map<string, BillProcessSummary>;
   linksByPost: ExecutivePostLinks;
 }
 
@@ -89,6 +95,7 @@ async function loadFeedItemAssemblyContext(
     executiveByBill,
     textChangesByBill,
     companionVotesByBill,
+    processByBill,
   ] = await Promise.all([
     getLifecyclesForBills(env.DB, billKeys),
     getDigestsForBills(
@@ -103,6 +110,7 @@ async function loadFeedItemAssemblyContext(
     getExecutivePostBillsForBills(env.DB, billKeys, executiveSince),
     getBillTextChangesForBills(env.DB, billKeys),
     getCompanionVotesForBills(env.DB, billKeys),
+    getProcessSummariesForBills(env.DB, billKeys),
   ]);
 
   const postIds = new Set<string>();
@@ -151,6 +159,7 @@ async function loadFeedItemAssemblyContext(
     executiveByBill,
     textChangesByBill,
     companionVotesByBill,
+    processByBill,
     linksByPost,
   };
 }
@@ -207,6 +216,10 @@ function assembleFeedItem(
   const lifecycleRow = ctx.lifecycles.get(
     lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number)
   );
+  const process =
+    ctx.processByBill.get(
+      processMapKey(row.bill_congress, row.bill_type, row.bill_number)
+    ) ?? null;
 
   const textChangesRow = ctx.textChangesByBill.get(
     billTextChangesMapKey(row.bill_congress, row.bill_type, row.bill_number)
@@ -252,6 +265,7 @@ function assembleFeedItem(
     latest_passage_date: row.latest_passage_date || latestPassageDateFromVotes(votes),
     latest_activity_date: row.latest_activity_date,
     lifecycle: lifecycleRow ? lifecycleRowToApi(lifecycleRow, now) : null,
+    ...(process ? { process } : {}),
     executive_signals,
     related_executive_bills,
     ...(text_changes ? { text_changes } : {}),

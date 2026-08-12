@@ -126,6 +126,42 @@
     font-weight: 500;
   }
 
+  .bill-pipeline-process {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .bill-pipeline-process-status {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .bill-pipeline-process-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .bill-pipeline-process-step {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .bill-pipeline-process-step time {
+    color: hsl(var(--twc-secondary));
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
   @keyframes bill-pipeline-pulse {
     0%,
     100% {

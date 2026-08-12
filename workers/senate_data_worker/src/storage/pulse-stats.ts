@@ -1,5 +1,6 @@
 import type { Chamber, ChamberPulse, CloseVoteEntry, PolicyHeatEntry, ThisWeekSummary } from "../types";
 import { ensureSchema } from "../d1/schema";
+import { waitingInCommitteeForPulse } from "./committee-leaderboard";
 
 interface CloseVoteRow {
   chamber: string;
@@ -43,14 +44,6 @@ export function isQualifyingCloseVote(yeas: number, nays: number): boolean {
   const margin = Math.abs(yeas - nays);
   const relativeCap = Math.ceil(total * CLOSE_VOTE_RELATIVE_FRACTION);
   return margin <= relativeCap && margin <= CLOSE_VOTE_MAX_ABS_MARGIN;
-}
-
-function emptyPulse(): ChamberPulse {
-  return {
-    close_votes: [],
-    policy_heat: [],
-    this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
-  };
 }
 
 async function fetchCloseVotes(
@@ -179,12 +172,13 @@ async function buildChamberPulse(
   chamber: Chamber
 ): Promise<ChamberPulse> {
   const weekStart = weekStartIso();
-  const [close_votes, policy_heat, this_week] = await Promise.all([
+  const [close_votes, policy_heat, this_week, waiting_in_committee] = await Promise.all([
     fetchCloseVotes(db, congress, session, chamber, 5),
     fetchPolicyHeat(db, congress, session, chamber, 5),
     fetchThisWeek(db, congress, session, chamber, weekStart),
+    waitingInCommitteeForPulse(db, congress, chamber),
   ]);
-  return { close_votes, policy_heat, this_week };
+  return { close_votes, policy_heat, this_week, waiting_in_committee };
 }
 
 export async function buildPulseStats(
@@ -199,5 +193,3 @@ export async function buildPulseStats(
   ]);
   return { house, senate };
 }
-
-export { emptyPulse };

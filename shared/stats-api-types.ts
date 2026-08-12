@@ -122,10 +122,19 @@ export interface ThisWeekSummary {
   congress: number | null
 }
 
+export interface CommitteeLeaderboardRow {
+  system_code: string
+  name: string
+  chamber: StatsChamber
+  waiting: number
+}
+
 export interface ChamberPulse {
   close_votes: CloseVoteEntry[]
   policy_heat: PolicyHeatEntry[]
   this_week: ThisWeekSummary
+  /** Standing committees with long-waiting referrals, highest count first. */
+  waiting_in_committee: CommitteeLeaderboardRow[]
 }
 
 export interface PulseStatsResponse {
@@ -273,4 +282,12 @@ export interface MembersSearchResponse {
 /** Distinct digest policy areas for feed filter dropdowns. */
 export interface PolicyAreasResponse {
   items: string[]
+}
+
+export interface CommitteesLeaderboardResponse {
+  congress: number
+  session: number
+  chamber: StatsChamber
+  items: CommitteeLeaderboardRow[]
+  as_of: string
 }

@@ -1,3 +1,5 @@
+import type { BillProcessSummary } from '@congress-tracker/shared/bill-process-api-types'
+
 import type { BillLifecycleStage } from '../utils/billLifecycleStages'
 import { formatVoteDate } from '../utils/billLabels'
 
@@ -5,6 +7,8 @@ type BillPipelineProps = {
   stages: BillLifecycleStage[]
   /** Optional callout under the stepper (e.g. unsigned-law explanation). */
   detail?: string | null
+  /** Committee history shown as a step list under the existing diagram. */
+  process?: BillProcessSummary | null
 }
 
 function stageDateLabel(date: string | null): string | null {
@@ -12,8 +16,12 @@ function stageDateLabel(date: string | null): string | null {
   return formatVoteDate(date)
 }
 
-export function BillPipeline({ stages, detail }: BillPipelineProps) {
+export function BillPipeline({ stages, detail, process = null }: BillPipelineProps) {
   if (stages.length === 0) return null
+
+  const processSteps = process?.stages ?? []
+  const processStatus = process?.current_label?.trim() || null
+  const showProcess = Boolean(processStatus || processSteps.length > 0)
 
   return (
     <div className="bill-pipeline">
@@ -39,6 +47,31 @@ export function BillPipeline({ stages, detail }: BillPipelineProps) {
           )
         })}
       </ol>
+
+      {showProcess ? (
+        <div className="bill-pipeline-process" aria-label="Committee steps">
+          {processStatus ? <p className="bill-pipeline-process-status">{processStatus}</p> : null}
+          {processSteps.length > 0 ? (
+            <ol className="bill-pipeline-process-steps">
+              {processSteps.map((step, index) => {
+                const dateLabel = step.date ? stageDateLabel(step.date) : null
+                return (
+                  <li
+                    key={`${step.system_code}-${step.activity_key}-${step.date ?? index}`}
+                    className="bill-pipeline-process-step"
+                  >
+                    <span>{step.label}</span>
+                    {dateLabel && step.date ? (
+                      <time dateTime={step.date}>{dateLabel}</time>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ol>
+          ) : null}
+        </div>
+      ) : null}
+
       {detail ? <p className="bill-pipeline-detail">{detail}</p> : null}
     </div>
   )

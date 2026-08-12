@@ -1,4 +1,4 @@
-import type { ChamberPulse, PulseStatsResponse } from '../api/types'
+import type { ChamberPulse, CommitteeLeaderboardRow, PulseStatsResponse } from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
 
 type RightRailProps = {
@@ -8,12 +8,42 @@ type RightRailProps = {
   onRetry?: () => void
 }
 
-function ChamberPulseSection({ title, data }: { title: string; data: ChamberPulse | undefined }) {
+function WaitingInCommittee({ items }: { items: CommitteeLeaderboardRow[] }) {
+  return (
+    <div className="sidebar-widget space-y-2">
+      <h3 className="text-[12px] font-medium text-foreground">Waiting in committee</h3>
+      {items.length === 0 ? (
+        <p className="text-xs text-faint">No long-waiting referrals yet.</p>
+      ) : (
+        <ol className="space-y-1 text-[12px] text-secondary">
+          {items.map((row) => (
+            <li key={row.system_code}>
+              {row.name}{' '}
+              <span className="text-faint">
+                ({row.waiting} waiting)
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  )
+}
+
+function ChamberPulseSection({
+  title,
+  data,
+}: {
+  title: string
+  data: ChamberPulse | undefined
+}) {
   if (!data) return null
 
   return (
     <section className="sidebar-chamber space-y-4">
       <h2 className="sidebar-kicker">{title}</h2>
+
+      <WaitingInCommittee items={data.waiting_in_committee ?? []} />
 
       <div className="sidebar-widget space-y-2">
         <h3 className="text-[12px] font-medium text-foreground">Close votes</h3>
@@ -68,33 +98,27 @@ function ChamberPulseSection({ title, data }: { title: string; data: ChamberPuls
 }
 
 export function RightRail({ pulse, loading, error, onRetry }: RightRailProps) {
-  if (loading) {
-    return <p className="text-xs text-faint">Loading pulse…</p>
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-2">
-        <p className="text-xs text-fail">{error}</p>
-        {onRetry ? (
-          <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-            Retry
-          </button>
-        ) : null}
-      </div>
-    )
-  }
-
-  if (!pulse) {
-    return null
-  }
-
   return (
     <div className="sidebar-panel space-y-6">
       <h2 className="sidebar-section-title">Legislative pulse</h2>
-      <ChamberPulseSection title="House" data={pulse.house} />
-      <div className="border-t border-border" />
-      <ChamberPulseSection title="Senate" data={pulse.senate} />
+      {loading ? <p className="text-xs text-faint">Loading pulse…</p> : null}
+      {error ? (
+        <div className="space-y-2">
+          <p className="text-xs text-fail">{error}</p>
+          {onRetry ? (
+            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {pulse ? (
+        <>
+          <ChamberPulseSection title="House" data={pulse.house} />
+          <div className="border-t border-border" />
+          <ChamberPulseSection title="Senate" data={pulse.senate} />
+        </>
+      ) : null}
     </div>
   )
 }

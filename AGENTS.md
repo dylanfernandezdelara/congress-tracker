@@ -92,8 +92,9 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/members.json?q=&chamber=House|Senate&state=NY&limit=` — member autocomplete for sponsor filters (`{ items, q, limit }`; excludes `LIS:` placeholders; keeps `LOCAL:` seed members)
 - `GET /stats/policy-areas.json` — distinct digest policy areas for the topic filter (`{ items: string[] }`)
 - `GET /stats/session.json` — per-chamber passage vote aggregates
-- `GET /stats/pulse.json` — close votes, policy heat, this-week activity
+- `GET /stats/pulse.json` — close votes, policy heat, this-week activity, and standing-committee waiting counts (`waiting_in_committee`)
 - `GET /stats/recent-laws.json?limit=` — recently enacted bills (default 5, cap 10); each law embeds its full feed `item` (`FeedItem | null`) for expand-in-place detail
+- `GET /stats/committees.json?chamber=House|Senate` — full standing-committee waiting counts (including zeros); pulse embeds the top waiting rows as `waiting_in_committee`
 - `GET /stats/recent-confirmations.json?limit=` — recent Senate nomination confirmations (default 5, cap 10); each item includes nominee, position/org, tally, plain-English background, named cross-party voters (`cross_party_votes`), and a grounded Wikipedia-sourced `vote_context` ("why it was contested") when available. Vote-context uses the shared grounded-summary helpers in `synthesis/grounded-summary.ts` (confirmation adapter: `confirmation-vote-context.ts`); bill adapters can reuse the same prompt/parse/OpenRouter loop with a different source.
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
@@ -103,6 +104,8 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
 - `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)
 - `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin; also chained after daily feed cron)
+- `POST /__pipeline/run/process-backfill` — capped/resumable committee-process discovery + hydration (admin; re-invoke until `bills_remaining` is 0)
+- `POST /__pipeline/run/process-refresh` — hydrate pending `process_refresh_queue` bills only (admin; daily feed also force-refreshes a capped slice of feed bills)
 - `POST /__pipeline/run/executive-posts` — Truth Social executive ingest (admin; also hourly cron)
 - `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 

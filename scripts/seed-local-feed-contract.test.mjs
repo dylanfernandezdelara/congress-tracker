@@ -30,6 +30,8 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_lifecycle/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS nominations/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS confirmation_votes/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_committee_events/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS committee_roster/)
   assert.match(sql, /INSERT OR REPLACE INTO votes/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_digests/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_sponsors/)
@@ -37,6 +39,8 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /INSERT OR REPLACE INTO bill_lifecycle/)
   assert.match(sql, /INSERT OR REPLACE INTO nominations/)
   assert.match(sql, /INSERT OR REPLACE INTO confirmation_votes/)
+  assert.match(sql, /INSERT INTO bill_committee_events/)
+  assert.match(sql, /INSERT OR REPLACE INTO committee_roster/)
   assert.match(sql, /'signed'/)
   assert.match(sql, /'law_unsigned'/)
   assert.match(sql, /On the Nomination/)
@@ -107,4 +111,18 @@ test('seed confirmations include background JSON matching the confirmations cont
 test('seeded data is clearly marked as a local sample', () => {
   const sql = printSql()
   assert.match(sql, /local sample/)
+})
+
+test('seed includes long-waiting committee referrals for the pulse widget', () => {
+  const sql = printSql()
+  assert.match(sql, /HR', 9001, 'hsif00', 'sent'/)
+  assert.match(sql, /HR', 9003, 'hsba00', 'sent'/)
+  assert.match(sql, /S', 9001, 'sshr00', 'sent'/)
+  const match = sql.match(/HR', 9001, 'hsif00', 'sent', '(\d{4}-\d{2}-\d{2})T/)
+  assert.ok(match, 'expected a sent timestamp for HR 9001')
+  const ageDays = (Date.now() - Date.parse(`${match[1]}T00:00:00.000Z`)) / 86_400_000
+  assert.ok(
+    ageDays >= 90,
+    `waiting seed ${match[1]} (${Math.round(ageDays)}d old) must be at least 90 days old`,
+  )
 })

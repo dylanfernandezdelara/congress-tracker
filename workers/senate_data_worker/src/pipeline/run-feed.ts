@@ -1,6 +1,7 @@
 import {
   DIGEST_MAX_NEW_REWRITES,
   FEED_MAX_BILLS,
+  PROCESS_MAX_HYDRATIONS_PER_RUN,
   VOTE_LOOKBACK_DAYS,
 } from "../constants";
 import type { Env } from "../config";
@@ -28,6 +29,8 @@ import {
 } from "./refresh-confirmations";
 import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
+import { enqueueProcessBills } from "../d1/bill-process";
+import { hydrateProcessBills } from "./refresh-bill-process";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
 
@@ -266,6 +269,36 @@ export async function runFeedPipeline(
           event: "feed_pipeline_partial_text_changes_refresh",
           trigger,
           warnings: textChanges.warnings,
+        })
+      );
+    }
+
+    // Light committee-process refresh for feed bills (capped; full crawl is admin backfill).
+    // Enqueue first so park/rehydrate timestamps stick; hydrate directly so a
+    // discovery backlog cannot starve feed bills.
+    try {
+      const processCandidates = bills.slice(0, PROCESS_MAX_HYDRATIONS_PER_RUN).map((b) => ({
+        congress: b.bill_congress,
+        billType: b.bill_type,
+        billNumber: b.bill_number,
+      }));
+      await enqueueProcessBills(env.DB, processCandidates);
+      const processResult = await hydrateProcessBills(env, processCandidates);
+      if (processResult.warnings.length > 0) {
+        console.warn(
+          JSON.stringify({
+            event: "feed_pipeline_partial_process_refresh",
+            trigger,
+            warnings: processResult.warnings,
+          })
+        );
+      }
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_process_refresh_failed",
+          trigger,
+          error: err instanceof Error ? err.message : String(err),
         })
       );
     }
