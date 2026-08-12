@@ -53,6 +53,7 @@ export async function buildAdvancingBills(
 
   const out: AdvancingBillItem[] = rows.map((r, index) => {
     const key = processMapKey(r.congress, r.bill_type, r.bill_number);
+    const process = summaries.get(key) ?? null;
     return {
       congress: r.congress,
       bill_type: r.bill_type,
@@ -61,8 +62,9 @@ export async function buildAdvancingBills(
       policy_area: r.policy_area ?? null,
       headline: r.headline ?? null,
       last_advance_at: r.last_advance_at ?? asOf,
-      current_label: r.current_label,
-      process: summaries.get(key) ?? null,
+      // Prefer event-derived summary label; fall back to process-state index.
+      current_label: process?.current_label ?? r.current_label,
+      process,
       item: items[index] ?? null,
     };
   });

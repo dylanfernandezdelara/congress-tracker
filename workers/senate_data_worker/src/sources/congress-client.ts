@@ -316,8 +316,11 @@ export async function fetchCommitteeBillsPage(
   const bills: CommitteeBillListItem[] = [];
   for (const item of raw) {
     const congress = Number(item.congress);
-    const number = Number(item.number);
-    const type = typeof item.type === "string" ? item.type : "";
+    // Congress.gov uses billNumber/billType on committee bill lists; accept
+    // number/type as a defensive fallback for older fixtures.
+    const number = Number(item.billNumber ?? item.number);
+    const typeRaw = item.billType ?? item.type;
+    const type = typeof typeRaw === "string" ? typeRaw : "";
     if (!Number.isFinite(congress) || !Number.isFinite(number) || !type) continue;
     bills.push({
       congress,

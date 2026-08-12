@@ -8,29 +8,17 @@ import {
   toProcessSummary,
   type CommitteeEventRow,
 } from "../process/derive-state";
+import type { ProcessCommitteeEvent } from "../process/types";
 import type { BillProcessSummary } from "../../../../shared/bill-process-api-types";
 import { ensureSchema } from "./schema";
 
 export type { CommitteeEventRow };
+export type { ProcessCommitteeEvent };
 
 export interface ProcessBillKey {
   congress: number;
   billType: string;
   billNumber: number;
-}
-
-export interface UpsertCommitteeEventParams {
-  congress: number;
-  billType: string;
-  billNumber: number;
-  systemCode: string;
-  activityKey: BillProcessActivityKey;
-  activityAt: string;
-  chamber: FeedChamber;
-  committeeName: string;
-  parentSystemCode: string | null;
-  activityRaw: string;
-  tallyText: string | null;
 }
 
 export interface UpsertProcessStateParams {
@@ -105,87 +93,86 @@ function asStatus(value: string): BillProcessCurrentStatus {
   return "unknown";
 }
 
-export async function replaceCommitteeEventsForBill(
+/**
+ * Atomically replace committee events and refresh the denormalized process
+ * index for one bill. Events remain the source of truth for timeline reads;
+ * `bill_process_state` is only a query index (advancing / filters).
+ */
+export async function persistBillProcess(
   db: D1Database,
-  congress: number,
-  billType: string,
-  billNumber: number,
-  events: UpsertCommitteeEventParams[]
+  params: {
+    congress: number;
+    billType: string;
+    billNumber: number;
+    events: ProcessCommitteeEvent[];
+    state: UpsertProcessStateParams;
+  }
 ): Promise<void> {
   await ensureSchema(db);
-  const type = normalizeBillType(billType);
-  await db
-    .prepare(
-      `DELETE FROM bill_committee_events
-       WHERE congress = ? AND bill_type = ? AND bill_number = ?`
-    )
-    .bind(congress, type, billNumber)
-    .run();
+  const type = normalizeBillType(params.billType);
+  const now = new Date().toISOString();
 
-  if (events.length === 0) return;
-
-  const stmts = events.map((e) =>
+  const stmts = [
     db
       .prepare(
-        `INSERT INTO bill_committee_events (
-          congress, bill_type, bill_number, system_code, activity_key, activity_at,
-          chamber, committee_name, parent_system_code, activity_raw, tally_text
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(congress, bill_type, bill_number, system_code, activity_key, activity_at)
-        DO UPDATE SET
-          chamber = excluded.chamber,
-          committee_name = excluded.committee_name,
-          parent_system_code = excluded.parent_system_code,
-          activity_raw = excluded.activity_raw,
-          tally_text = COALESCE(excluded.tally_text, bill_committee_events.tally_text)`
+        `DELETE FROM bill_committee_events
+         WHERE congress = ? AND bill_type = ? AND bill_number = ?`
+      )
+      .bind(params.congress, type, params.billNumber),
+    ...params.events.map((e) =>
+      db
+        .prepare(
+          `INSERT INTO bill_committee_events (
+            congress, bill_type, bill_number, system_code, activity_key, activity_at,
+            chamber, committee_name, parent_system_code, activity_raw, tally_text
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(congress, bill_type, bill_number, system_code, activity_key, activity_at)
+          DO UPDATE SET
+            chamber = excluded.chamber,
+            committee_name = excluded.committee_name,
+            parent_system_code = excluded.parent_system_code,
+            activity_raw = excluded.activity_raw,
+            tally_text = COALESCE(excluded.tally_text, bill_committee_events.tally_text)`
+        )
+        .bind(
+          e.congress,
+          normalizeBillType(e.billType),
+          e.billNumber,
+          e.systemCode,
+          e.activityKey,
+          e.activityAt,
+          e.chamber,
+          e.committeeName,
+          e.parentSystemCode,
+          e.activityRaw,
+          e.tallyText
+        )
+    ),
+    db
+      .prepare(
+        `INSERT INTO bill_process_state (
+          congress, bill_type, bill_number, origin_chamber, current_status,
+          current_label, last_advance_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(congress, bill_type, bill_number) DO UPDATE SET
+          origin_chamber = excluded.origin_chamber,
+          current_status = excluded.current_status,
+          current_label = excluded.current_label,
+          last_advance_at = excluded.last_advance_at,
+          updated_at = excluded.updated_at`
       )
       .bind(
-        e.congress,
-        normalizeBillType(e.billType),
-        e.billNumber,
-        e.systemCode,
-        e.activityKey,
-        e.activityAt,
-        e.chamber,
-        e.committeeName,
-        e.parentSystemCode,
-        e.activityRaw,
-        e.tallyText
-      )
-  );
+        params.state.congress,
+        normalizeBillType(params.state.billType),
+        params.state.billNumber,
+        params.state.originChamber,
+        params.state.currentStatus,
+        params.state.currentLabel,
+        params.state.lastAdvanceAt,
+        now
+      ),
+  ];
   await db.batch(stmts);
-}
-
-export async function upsertProcessState(
-  db: D1Database,
-  params: UpsertProcessStateParams
-): Promise<void> {
-  await ensureSchema(db);
-  const now = new Date().toISOString();
-  await db
-    .prepare(
-      `INSERT INTO bill_process_state (
-        congress, bill_type, bill_number, origin_chamber, current_status,
-        current_label, last_advance_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(congress, bill_type, bill_number) DO UPDATE SET
-        origin_chamber = excluded.origin_chamber,
-        current_status = excluded.current_status,
-        current_label = excluded.current_label,
-        last_advance_at = excluded.last_advance_at,
-        updated_at = excluded.updated_at`
-    )
-    .bind(
-      params.congress,
-      normalizeBillType(params.billType),
-      params.billNumber,
-      params.originChamber,
-      params.currentStatus,
-      params.currentLabel,
-      params.lastAdvanceAt,
-      now
-    )
-    .run();
 }
 
 export async function upsertCommitteeRoster(
@@ -436,7 +423,9 @@ export async function selectAdvancingProcessBills(
          json_extract(d.digest_json, '$.headline') AS headline
        FROM bill_process_state p
        LEFT JOIN bill_digests d
-         ON d.congress = p.congress AND d.bill_type = p.bill_type AND d.number = p.bill_number
+         ON d.congress = p.congress
+        AND UPPER(d.bill_type) = UPPER(p.bill_type)
+        AND d.number = p.bill_number
        WHERE p.congress = ?
          AND p.last_advance_at IS NOT NULL
          AND p.last_advance_at >= ?
@@ -526,6 +515,45 @@ export async function selectSubcommitteeRoster(
        ORDER BY name ASC`
     )
     .bind(congress, parentSystemCode)
+    .all<{
+      congress: number;
+      system_code: string;
+      chamber: string;
+      name: string;
+      committee_type: string;
+      parent_system_code: string | null;
+    }>();
+  return (rows.results ?? [])
+    .map((r) => {
+      const ch = asChamber(r.chamber);
+      if (!ch) return null;
+      return {
+        congress: r.congress,
+        system_code: r.system_code,
+        chamber: ch,
+        name: r.name,
+        committee_type: r.committee_type,
+        parent_system_code: r.parent_system_code,
+      };
+    })
+    .filter((r): r is CommitteeRosterRow => r !== null);
+}
+
+/** All subcommittees for a chamber in one query (avoids N+1 on leaderboard). */
+export async function selectSubcommitteeRosterByChamber(
+  db: D1Database,
+  congress: number,
+  chamber: FeedChamber
+): Promise<CommitteeRosterRow[]> {
+  await ensureSchema(db);
+  const rows = await db
+    .prepare(
+      `SELECT congress, system_code, chamber, name, committee_type, parent_system_code
+       FROM committee_roster
+       WHERE congress = ? AND chamber = ? AND parent_system_code IS NOT NULL
+       ORDER BY name ASC`
+    )
+    .bind(congress, chamber)
     .all<{
       congress: number;
       system_code: string;

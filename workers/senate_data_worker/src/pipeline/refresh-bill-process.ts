@@ -5,9 +5,8 @@ import {
 import {
   getCommitteeNameMap,
   markProcessHydrated,
-  replaceCommitteeEventsForBill,
+  persistBillProcess,
   selectProcessQueueBatch,
-  upsertProcessState,
   type ProcessBillKey,
 } from "../d1/bill-process";
 import { deriveProcessState, type CommitteeEventRow } from "../process/derive-state";
@@ -32,6 +31,10 @@ export async function refreshBillProcessQueue(
   const limit = opts.limit ?? PROCESS_MAX_HYDRATIONS_PER_RUN;
   const bills = await selectProcessQueueBatch(env.DB, limit);
   return hydrateProcessBills(env, bills);
+}
+
+function isTerminalMissingBill(err: unknown): boolean {
+  return err instanceof HttpResponseError && err.status === 404;
 }
 
 export async function hydrateProcessBills(
@@ -72,20 +75,11 @@ export async function hydrateProcessBills(
         actions: source.actions,
       });
 
-      await replaceCommitteeEventsForBill(
-        env.DB,
-        bill.congress,
-        bill.billType,
-        bill.billNumber,
-        events
-      );
-
       let nameByCode = nameMaps.get(bill.congress);
       if (!nameByCode) {
         nameByCode = await getCommitteeNameMap(env.DB, bill.congress);
         nameMaps.set(bill.congress, nameByCode);
       }
-      // Prefer names from events themselves when roster is sparse.
       for (const e of events) {
         if (!nameByCode.has(e.systemCode)) nameByCode.set(e.systemCode, e.committeeName);
       }
@@ -105,14 +99,20 @@ export async function hydrateProcessBills(
       }));
       const derived = deriveProcessState(bill.billType, eventRows, nameByCode);
 
-      await upsertProcessState(env.DB, {
+      await persistBillProcess(env.DB, {
         congress: bill.congress,
         billType: bill.billType,
         billNumber: bill.billNumber,
-        originChamber: derived.origin_chamber,
-        currentStatus: derived.current_status,
-        currentLabel: derived.current_label,
-        lastAdvanceAt: derived.last_advance_at,
+        events,
+        state: {
+          congress: bill.congress,
+          billType: bill.billType,
+          billNumber: bill.billNumber,
+          originChamber: derived.origin_chamber,
+          currentStatus: derived.current_status,
+          currentLabel: derived.current_label,
+          lastAdvanceAt: derived.last_advance_at,
+        },
       });
       await markProcessHydrated(env.DB, bill);
       refreshed += 1;
@@ -128,11 +128,13 @@ export async function hydrateProcessBills(
           err instanceof Error ? err.message : String(err)
         }`
       );
-      // Still mark hydrated so a permanent 404 cannot block the queue forever.
-      try {
-        await markProcessHydrated(env.DB, bill);
-      } catch {
-        // ignore
+      // Only park permanent misses so transient 5xx/timeouts can retry.
+      if (isTerminalMissingBill(err)) {
+        try {
+          await markProcessHydrated(env.DB, bill);
+        } catch {
+          // ignore
+        }
       }
     }
   }

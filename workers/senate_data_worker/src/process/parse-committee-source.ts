@@ -1,11 +1,10 @@
-import type { FeedChamber } from "../../../../shared/feed-api-types";
 import { normalizeCommitteeActivity } from "../../../../shared/bill-process-labels";
 import type { CongressAction } from "../lifecycle/parse-actions";
-import type { UpsertCommitteeEventParams } from "../d1/bill-process";
 import type {
   CongressBillCommittee,
 } from "../sources/congress-client";
 import { asFeedChamber } from "../sources/congress-client";
+import type { ProcessCommitteeEvent } from "./types";
 
 /** Pull "52 - 0" / "47–0" style tallies from committee action text. */
 export function extractCommitteeTally(text: string | null | undefined): string | null {
@@ -38,7 +37,7 @@ export function parseCommitteeEvents(params: {
   billNumber: number;
   committees: CongressBillCommittee[];
   actions: CongressAction[];
-}): UpsertCommitteeEventParams[] {
+}): ProcessCommitteeEvent[] {
   const talliesByCommittee = new Map<string, string>();
   const talliesByDate = new Map<string, string>();
   for (const action of params.actions) {
@@ -53,13 +52,13 @@ export function parseCommitteeEvents(params: {
     }
   }
 
-  const out: UpsertCommitteeEventParams[] = [];
+  const out: ProcessCommitteeEvent[] = [];
   let seq = 0;
 
   for (const committee of params.committees) {
     const systemCode = committee.systemCode?.trim();
     const name = committee.name?.trim();
-    const chamber = asFeedChamber(committee.chamber) as FeedChamber | null;
+    const chamber = asFeedChamber(committee.chamber);
     if (!systemCode || !name || !chamber) continue;
 
     for (const activity of committee.activities ?? []) {

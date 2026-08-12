@@ -96,7 +96,7 @@ export function deriveProcessState(
   if (events.length === 0) {
     return {
       origin_chamber: origin,
-      current_status: "unknown",
+      current_status: "introduced",
       current_label: null,
       last_advance_at: null,
       stages,
@@ -110,6 +110,11 @@ export function deriveProcessState(
     [...events]
       .filter((e) => e.activity_key !== "interest" && e.activity_key !== "other")
       .sort((a, b) => b.activity_at.localeCompare(a.activity_at))[0] ?? latest;
+
+  const inSecondChamber =
+    origin != null &&
+    latestMeaningful.chamber != null &&
+    latestMeaningful.chamber !== origin;
 
   if (latestMeaningful.activity_key === "released") {
     return {
@@ -128,7 +133,9 @@ export function deriveProcessState(
         nameByCode.get(latestMeaningful.parent_system_code) ?? "the full committee";
       return {
         origin_chamber: origin,
-        current_status: "in_subcommittee",
+        current_status: inSecondChamber
+          ? "in_second_chamber_committee"
+          : "in_subcommittee",
         current_label: `Cleared ${latestMeaningful.committee_name} · waiting on ${parentName}`,
         last_advance_at: lastAdvanceAt,
         stages,
@@ -148,9 +155,10 @@ export function deriveProcessState(
     latestMeaningful.activity_key === "hearings" ||
     latestMeaningful.activity_key === "worked_on"
   ) {
-    const status: BillProcessCurrentStatus = latestMeaningful.parent_system_code
+    let status: BillProcessCurrentStatus = latestMeaningful.parent_system_code
       ? "in_subcommittee"
       : "in_committee";
+    if (inSecondChamber) status = "in_second_chamber_committee";
     return {
       origin_chamber: origin,
       current_status: status,

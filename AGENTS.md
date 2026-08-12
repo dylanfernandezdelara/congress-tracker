@@ -94,6 +94,8 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/session.json` — per-chamber passage vote aggregates
 - `GET /stats/pulse.json` — close votes, policy heat, this-week activity
 - `GET /stats/recent-laws.json?limit=` — recently enacted bills (default 5, cap 10); each law embeds its full feed `item` (`FeedItem | null`) for expand-in-place detail
+- `GET /stats/advancing-bills.json?limit=` — bills with a committee advancement in the last 14 days (newest first; embeds `process` + feed `item` when available)
+- `GET /stats/committees.json?chamber=House|Senate` — standing-committee waiting/advance leaderboard with nested `subcommittees[]`
 - `GET /stats/recent-confirmations.json?limit=` — recent Senate nomination confirmations (default 5, cap 10); each item includes nominee, position/org, tally, plain-English background, named cross-party voters (`cross_party_votes`), and a grounded Wikipedia-sourced `vote_context` ("why it was contested") when available. Vote-context uses the shared grounded-summary helpers in `synthesis/grounded-summary.ts` (confirmation adapter: `confirmation-vote-context.ts`); bill adapters can reuse the same prompt/parse/OpenRouter loop with a different source.
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers

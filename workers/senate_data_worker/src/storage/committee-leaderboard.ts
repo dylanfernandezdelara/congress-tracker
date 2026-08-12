@@ -9,7 +9,7 @@ import type { Env } from "../config";
 import {
   selectCommitteeEventsForCodes,
   selectStandingCommittees,
-  selectSubcommitteeRoster,
+  selectSubcommitteeRosterByChamber,
 } from "../d1/bill-process";
 import { lookbackStartIso } from "../sources/congress-client";
 
@@ -110,13 +110,18 @@ export async function buildCommitteesLeaderboard(
   const asOfDate = new Date(asOf);
 
   const allCodes: string[] = [];
-  const subsByParent = new Map<string, Awaited<ReturnType<typeof selectSubcommitteeRoster>>>();
+  const allSubs = await selectSubcommitteeRosterByChamber(env.DB, congress, chamber);
+  const subsByParent = new Map<string, typeof allSubs>();
+  for (const sub of allSubs) {
+    if (!sub.parent_system_code) continue;
+    const list = subsByParent.get(sub.parent_system_code) ?? [];
+    list.push(sub);
+    subsByParent.set(sub.parent_system_code, list);
+  }
 
   for (const c of standing) {
     allCodes.push(c.system_code);
-    const subs = await selectSubcommitteeRoster(env.DB, congress, c.system_code);
-    subsByParent.set(c.system_code, subs);
-    for (const s of subs) allCodes.push(s.system_code);
+    for (const s of subsByParent.get(c.system_code) ?? []) allCodes.push(s.system_code);
   }
 
   const events = await selectCommitteeEventsForCodes(env.DB, congress, allCodes);
