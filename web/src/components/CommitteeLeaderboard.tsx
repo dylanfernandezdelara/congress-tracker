@@ -80,24 +80,9 @@ export function CommitteeLeaderboard({
   const [chamber, setChamber] = useState<StatsChamber>('House')
   const data = chamber === 'House' ? house : senate
 
-  if (loading && !data) {
-    return <p className="text-xs text-faint">Loading committees…</p>
-  }
-
-  if (error && !data) {
-    return (
-      <div className="space-y-2">
-        <p className="text-xs text-fail">{error}</p>
-        {onRetry ? (
-          <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-            Retry
-          </button>
-        ) : null}
-      </div>
-    )
-  }
-
   const items = data?.items ?? []
+  const showLoading = loading && !data
+  const showError = Boolean(error && !data)
 
   return (
     <div className="committee-leaderboard sidebar-widget">
@@ -116,15 +101,27 @@ export function CommitteeLeaderboard({
           ))}
         </div>
       </div>
-      {items.length === 0 ? (
+      {showLoading ? <p className="text-xs text-faint">Loading committees…</p> : null}
+      {showError ? (
+        <div className="space-y-2">
+          <p className="text-xs text-fail">{error}</p>
+          {onRetry ? (
+            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {!showLoading && !showError && items.length === 0 ? (
         <p className="text-xs text-faint">No committee waiting data yet.</p>
-      ) : (
+      ) : null}
+      {!showLoading && !showError && items.length > 0 ? (
         <ol className="committee-leaderboard-list">
           {items.slice(0, 8).map((row) => (
             <CommitteeRow key={row.system_code} row={row} />
           ))}
         </ol>
-      )}
+      ) : null}
       <p className="committee-leaderboard-footnote">
         Waiting = sent to the committee with no advance for 90+ days.
       </p>

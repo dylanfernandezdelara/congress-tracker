@@ -95,6 +95,10 @@
     border-top: 0;
   }
 
+  .advancing-bills-row.is-expanded .feed-row-chevron {
+    transform: rotate(90deg);
+  }
+
   .advancing-bills-toggle {
     display: flex;
     flex-direction: column;
