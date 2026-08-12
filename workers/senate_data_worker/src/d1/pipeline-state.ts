@@ -60,6 +60,20 @@ async function readPipelineState<T>(db: D1Database, key: string): Promise<T | nu
   }
 }
 
+/** Generic pipeline_state read for resumable backfill watermarks. */
+export async function getPipelineState<T>(db: D1Database, key: string): Promise<T | null> {
+  return readPipelineState<T>(db, key);
+}
+
+/** Generic pipeline_state write for resumable backfill watermarks. */
+export async function setPipelineState(
+  db: D1Database,
+  key: string,
+  value: unknown
+): Promise<void> {
+  await upsertPipelineState(db, key, value, new Date().toISOString());
+}
+
 const SENATE_BIOGUIDE_LOOKUP_KEY = "senate_bioguide_lookup";
 
 export async function storeSenateBioguideLookup(

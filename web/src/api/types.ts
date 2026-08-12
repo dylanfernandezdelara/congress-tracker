@@ -23,10 +23,15 @@ export type {
 } from '../../../shared/executive-api-types'
 
 export type {
+  AdvancingBillItem,
+  AdvancingBillsResponse,
   ChamberComposition,
   ChamberPulse,
   ChamberStats,
   CloseVoteEntry,
+  CommitteeLeaderboardRow,
+  CommitteeLeaderboardSubRow,
+  CommitteesLeaderboardResponse,
   DateRange,
   DefectorEntry,
   DefectorsResponse,
@@ -50,6 +55,11 @@ export type {
   VoteDefectorEntry,
   VoteDefectorsResponse,
 } from '../../../shared/stats-api-types'
+
+export type {
+  BillProcessStage,
+  BillProcessSummary,
+} from '@congress-tracker/shared/bill-process-api-types'
 
 export type {
   RecentLawItem,

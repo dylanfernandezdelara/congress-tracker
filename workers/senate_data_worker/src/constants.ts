@@ -58,6 +58,20 @@ export const HOUSE_VOTE_DETAIL_FETCHES_PER_RUN = 200;
 export const LIFECYCLE_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 
 /**
+ * Per-bill Congress.gov committee hydrations (committees + actions) per process
+ * refresh/backfill run. Each bill costs ~2 subrequests.
+ */
+export const PROCESS_MAX_HYDRATIONS_PER_RUN = 40;
+/** Standing-committee bill-list pages to walk per process-backfill run. */
+export const PROCESS_MAX_COMMITTEE_LIST_PAGES_PER_RUN = 8;
+/** Bills with a committee advancement in this many days are "actively advancing". */
+export const PROCESS_ADVANCING_DAYS = 14;
+/** Referred with no advance/release for this many days counts as waiting/stuck. */
+export const PROCESS_STUCK_DAYS = 90;
+/** Stop a process run early when Congress.gov rate-limit remaining falls below this. */
+export const PROCESS_RATELIMIT_STOP_REMAINING = 200;
+
+/**
  * Roll-call votes to backfill per /__pipeline/run/member-votes invocation.
  * Each roll costs one upstream fetch plus a couple of batched D1 writes, so we
  * cap per run to stay under the Worker subrequest limit (1000) and let the

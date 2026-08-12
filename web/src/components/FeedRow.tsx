@@ -96,6 +96,9 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
                   {meta.presidentDeskChip}
                 </span>
               ) : null}
+              {meta.processChip ? (
+                <span className="feed-row-chip feed-row-chip--process">{meta.processChip}</span>
+              ) : null}
               {executiveSignal ? (
                 <span className="feed-row-chip feed-row-chip--executive">Executive</span>
               ) : null}

@@ -160,6 +160,49 @@ CREATE TABLE IF NOT EXISTS bill_lifecycle (
   updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, bill_number)
 );
+CREATE TABLE IF NOT EXISTS bill_committee_events (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  system_code TEXT NOT NULL,
+  activity_key TEXT NOT NULL,
+  activity_at TEXT NOT NULL,
+  chamber TEXT NOT NULL,
+  committee_name TEXT NOT NULL,
+  parent_system_code TEXT,
+  activity_raw TEXT NOT NULL,
+  tally_text TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number, system_code, activity_key, activity_at)
+);
+CREATE TABLE IF NOT EXISTS bill_process_state (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  origin_chamber TEXT,
+  current_status TEXT NOT NULL,
+  current_label TEXT,
+  last_advance_at TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number)
+);
+CREATE TABLE IF NOT EXISTS committee_roster (
+  congress INTEGER NOT NULL,
+  system_code TEXT NOT NULL,
+  chamber TEXT NOT NULL,
+  name TEXT NOT NULL,
+  committee_type TEXT NOT NULL,
+  parent_system_code TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, system_code)
+);
+CREATE TABLE IF NOT EXISTS process_refresh_queue (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  queued_at TEXT NOT NULL,
+  last_hydrated_at TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number)
+);
 CREATE TABLE IF NOT EXISTS nominations (
   congress INTEGER NOT NULL,
   nomination_number INTEGER NOT NULL,
@@ -243,6 +286,36 @@ VALUES
    '${D_MID}', 'Became Public Law No: 119-2 without signature. (local sample)', '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, '${D_OLDER}', '${D_RECENT}', NULL, NULL, NULL, NULL, NULL,
    '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO committee_roster
+  (congress, system_code, chamber, name, committee_type, parent_system_code, updated_at)
+VALUES
+  (119, 'hsif00', 'House', 'Energy and Commerce Committee', 'Standing', NULL, '${D_RECENT}T00:00:00.000Z'),
+  (119, 'hsif14', 'House', 'Health Subcommittee', 'Subcommittee', 'hsif00', '${D_RECENT}T00:00:00.000Z'),
+  (119, 'hsba00', 'House', 'Financial Services Committee', 'Standing', NULL, '${D_RECENT}T00:00:00.000Z'),
+  (119, 'sshr00', 'Senate', 'Health, Education, Labor, and Pensions Committee', 'Standing', NULL, '${D_RECENT}T00:00:00.000Z');
+
+DELETE FROM bill_committee_events WHERE congress = 119;
+DELETE FROM bill_process_state WHERE congress = 119;
+
+INSERT INTO bill_committee_events
+  (congress, bill_type, bill_number, system_code, activity_key, activity_at, chamber, committee_name, parent_system_code, activity_raw, tally_text)
+VALUES
+  (119, 'HR', 1, 'hsif00', 'sent', '${D_OLDER}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Referred To', NULL),
+  (119, 'HR', 1, 'hsif14', 'sent', '${D_OLDER}T15:00:00.000Z', 'House', 'Health Subcommittee', 'hsif00', 'Referred to', NULL),
+  (119, 'HR', 1, 'hsif14', 'advanced', '${D_MID}T15:00:00.000Z', 'House', 'Health Subcommittee', 'hsif00', 'Reported by', NULL),
+  (119, 'HR', 1, 'hsif00', 'advanced', '${D_MID}T18:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Reported By', '47-0'),
+  (119, 'HR', 22, 'hsba00', 'sent', '${D_OLDER}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Referred To', NULL),
+  (119, 'HR', 22, 'hsba00', 'worked_on', '${D_RECENT}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Markup By', NULL),
+  (119, 'S', 47, 'sshr00', 'sent', '${D_OLDER}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Referred To', NULL),
+  (119, 'S', 47, 'sshr00', 'released', '${D_MID}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Discharged From', NULL);
+
+INSERT INTO bill_process_state
+  (congress, bill_type, bill_number, origin_chamber, current_status, current_label, last_advance_at, updated_at)
+VALUES
+  (119, 'HR', 1, 'House', 'cleared_committee', 'Cleared Energy and Commerce Committee · waiting for a chamber vote', '${D_MID}T18:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
+  (119, 'HR', 22, 'House', 'in_committee', 'In Financial Services Committee · waiting for the committee to act', '${D_RECENT}T12:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
+  (119, 'S', 47, 'Senate', 'released_from_committee', 'Released from Health, Education, Labor, and Pensions Committee', '${D_MID}T12:00:00.000Z', '${D_MID}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO nominations
   (congress, nomination_number, part_number, citation, description, organization, position_title,

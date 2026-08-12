@@ -239,7 +239,8 @@
   }
 
   .feed-row-chip--executive,
-  .feed-row-chip--president-desk {
+  .feed-row-chip--president-desk,
+  .feed-row-chip--process {
     border: none;
     color: hsl(var(--twc-secondary));
     background: transparent;

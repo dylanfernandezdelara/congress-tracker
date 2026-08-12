@@ -1,11 +1,17 @@
-import type { ChamberPulse, PulseStatsResponse } from '../api/types'
+import type { ChamberPulse, CommitteesLeaderboardResponse, PulseStatsResponse } from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import { CommitteeLeaderboard } from './CommitteeLeaderboard'
 
 type RightRailProps = {
   pulse: PulseStatsResponse | null
   loading: boolean
   error: string | null
   onRetry?: () => void
+  committeesHouse: CommitteesLeaderboardResponse | null
+  committeesSenate: CommitteesLeaderboardResponse | null
+  committeesLoading: boolean
+  committeesError: string | null
+  onCommitteesRetry?: () => void
 }
 
 function ChamberPulseSection({ title, data }: { title: string; data: ChamberPulse | undefined }) {
@@ -67,34 +73,51 @@ function ChamberPulseSection({ title, data }: { title: string; data: ChamberPuls
   )
 }
 
-export function RightRail({ pulse, loading, error, onRetry }: RightRailProps) {
-  if (loading) {
-    return <p className="text-xs text-faint">Loading pulse…</p>
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-2">
-        <p className="text-xs text-fail">{error}</p>
-        {onRetry ? (
-          <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-            Retry
-          </button>
-        ) : null}
-      </div>
-    )
-  }
-
-  if (!pulse) {
-    return null
-  }
-
+export function RightRail({
+  pulse,
+  loading,
+  error,
+  onRetry,
+  committeesHouse,
+  committeesSenate,
+  committeesLoading,
+  committeesError,
+  onCommitteesRetry,
+}: RightRailProps) {
   return (
     <div className="sidebar-panel space-y-6">
-      <h2 className="sidebar-section-title">Legislative pulse</h2>
-      <ChamberPulseSection title="House" data={pulse.house} />
+      <div className="space-y-3">
+        <h2 className="sidebar-section-title">Committees</h2>
+        <CommitteeLeaderboard
+          house={committeesHouse}
+          senate={committeesSenate}
+          loading={committeesLoading}
+          error={committeesError}
+          onRetry={onCommitteesRetry}
+        />
+      </div>
+
       <div className="border-t border-border" />
-      <ChamberPulseSection title="Senate" data={pulse.senate} />
+
+      <h2 className="sidebar-section-title">Legislative pulse</h2>
+      {loading ? <p className="text-xs text-faint">Loading pulse…</p> : null}
+      {error ? (
+        <div className="space-y-2">
+          <p className="text-xs text-fail">{error}</p>
+          {onRetry ? (
+            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {pulse ? (
+        <>
+          <ChamberPulseSection title="House" data={pulse.house} />
+          <div className="border-t border-border" />
+          <ChamberPulseSection title="Senate" data={pulse.senate} />
+        </>
+      ) : null}
     </div>
   )
 }

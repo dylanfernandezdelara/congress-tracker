@@ -1,0 +1,103 @@
+@layer components {
+  .bill-process {
+    margin-top: 0.75rem;
+  }
+
+  .bill-process-current {
+    margin: 0 0 0.65rem;
+    font-size: 0.8125rem;
+    color: var(--color-secondary);
+  }
+
+  .bill-process-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .bill-process-step {
+    display: grid;
+    grid-template-columns: 0.75rem 1fr;
+    gap: 0.55rem;
+    align-items: start;
+  }
+
+  .bill-process-step--sub .bill-process-label {
+    padding-left: 0.35rem;
+  }
+
+  .bill-process-marker {
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-top: 0.3rem;
+    border-radius: 999px;
+    background: var(--color-border-strong, var(--color-border));
+  }
+
+  .bill-process-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  .bill-process-label {
+    font-size: 0.8125rem;
+    color: var(--color-foreground);
+    line-height: 1.35;
+  }
+
+  .bill-process-date {
+    font-size: 0.75rem;
+    color: var(--color-faint);
+  }
+
+  .committee-leaderboard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .committee-leaderboard-toggle {
+    display: inline-flex;
+    gap: 0.35rem;
+  }
+
+  .committee-leaderboard-toggle button {
+    font-size: 0.75rem;
+  }
+
+  .committee-leaderboard-row {
+    border-top: 1px solid var(--color-border);
+    padding-top: 0.5rem;
+  }
+
+  .committee-leaderboard-row:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .committee-leaderboard-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+  }
+
+  .committee-leaderboard-subs {
+    margin: 0.4rem 0 0;
+    padding-left: 0.75rem;
+    list-style: none;
+  }
+
+  .committee-leaderboard-subs li {
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+  }
+}

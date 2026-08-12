@@ -2,12 +2,21 @@ import { useCallback, useState } from 'react'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 
-import { fetchNotableVotes, fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
+import {
+  fetchAdvancingBills,
+  fetchCommitteesLeaderboard,
+  fetchNotableVotes,
+  fetchRecentConfirmations,
+  fetchRecentLaws,
+} from '../api/client'
 import type {
+  AdvancingBillsResponse,
+  CommitteesLeaderboardResponse,
   NotableVotesResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
 } from '../api/types'
+import { AdvancingBillsSection } from '../components/AdvancingBillsSection'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
@@ -128,6 +137,27 @@ export default function Home() {
     mapError: () => "Couldn't load confirmations.",
   })
 
+  const advancingBills = useAsyncData<AdvancingBillsResponse>({
+    deps: [railRetryKey],
+    enabled: feedSettled,
+    load: () => fetchAdvancingBills(5),
+    mapError: () => "Couldn't load advancing bills.",
+  })
+
+  const committeesHouse = useAsyncData<CommitteesLeaderboardResponse>({
+    deps: [railRetryKey],
+    enabled: feedSettled,
+    load: () => fetchCommitteesLeaderboard('House'),
+    mapError: () => "Couldn't load House committees.",
+  })
+
+  const committeesSenate = useAsyncData<CommitteesLeaderboardResponse>({
+    deps: [railRetryKey],
+    enabled: feedSettled,
+    load: () => fetchCommitteesLeaderboard('Senate'),
+    mapError: () => "Couldn't load Senate committees.",
+  })
+
   const showFeed = items.length > 0
   const showSkeleton = isInitialLoading && items.length === 0
   const listRefreshing = isInitialLoading && items.length > 0
@@ -135,6 +165,10 @@ export default function Home() {
   const notableLoading = !feedSettled || notableVotes.isLoading
   const recentLawsLoading = !feedSettled || recentLaws.isLoading
   const recentConfirmationsLoading = !feedSettled || recentConfirmations.isLoading
+  const advancingLoading = !feedSettled || advancingBills.isLoading
+  const committeesLoading =
+    !feedSettled || committeesHouse.isLoading || committeesSenate.isLoading
+  const committeesError = committeesHouse.error ?? committeesSenate.error
 
   const federalControl = (
     <FederalControlCompact
@@ -160,6 +194,11 @@ export default function Home() {
       loading={pulse.isLoading}
       error={pulse.error}
       onRetry={reloadStats}
+      committeesHouse={committeesHouse.data}
+      committeesSenate={committeesSenate.data}
+      committeesLoading={committeesLoading}
+      committeesError={committeesError}
+      onCommitteesRetry={handleReloadFeed}
     />
   )
 
@@ -330,6 +369,12 @@ export default function Home() {
         ) : null}
 
         <div className="home-feed-secondary">
+          <AdvancingBillsSection
+            items={advancingBills.data?.items ?? null}
+            loading={advancingLoading}
+            error={advancingBills.error}
+            onRetry={handleReloadFeed}
+          />
           <RecentConfirmationsSection
             confirmations={recentConfirmations.data?.confirmations ?? null}
             loading={recentConfirmationsLoading}

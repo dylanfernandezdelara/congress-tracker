@@ -59,6 +59,8 @@ export interface FeedRowMeta {
   billId: string
   /** Compact chip for bills awaiting signature, e.g. "President's desk · day 4/10". */
   presidentDeskChip: string | null
+  /** Compact committee-process chip when useful, e.g. waiting in committee. */
+  processChip: string | null
 }
 
 export type FeedRowView = {
@@ -151,6 +153,26 @@ function presidentDeskChipLabel(item: FeedItem): string | null {
     return "President's desk"
   }
   return `President's desk · day ${day}/10`
+}
+
+/** Compact chip from process current_label; omit when law/desk already dominate. */
+function processChipLabel(item: FeedItem): string | null {
+  const label = item.process?.current_label?.trim()
+  if (!label) return null
+  const status = item.process?.current_status
+  if (
+    status === 'in_committee' ||
+    status === 'in_subcommittee' ||
+    status === 'in_second_chamber_committee'
+  ) {
+    // Prefer the committee name segment before the waiting clause.
+    const head = label.split('·')[0]?.trim()
+    return head || label
+  }
+  if (status === 'cleared_committee') {
+    return 'Cleared committee'
+  }
+  return null
 }
 
 export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
@@ -303,6 +325,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
   const vote = getPrimaryPassageVote(item)
   const billId = formatShortBillId(item.bill.type, item.bill.number)
   const terminalStatus = deriveTerminalStatus(item.lifecycle)
+  const processChip = processChipLabel(item)
 
   if (!vote) {
     if (terminalStatus && terminalStatus !== 'pending_signature') {
@@ -314,6 +337,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
           margin: null,
           billId,
           presidentDeskChip: null,
+          processChip: null,
         },
         terminalStatus === 'became_law_unsigned' ? UNSIGNED_LAW_EVENT : 'No vote recorded',
       )
@@ -327,6 +351,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
         margin: null,
         billId,
         presidentDeskChip: null,
+        processChip,
       },
       'No vote recorded',
     )
@@ -347,6 +372,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
         margin,
         billId,
         presidentDeskChip: null,
+        processChip: null,
       },
       suffix ? `${tally} · ${suffix}` : tally,
     )
@@ -361,6 +387,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
         margin,
         billId,
         presidentDeskChip: null,
+        processChip: null,
       },
       terminalStatus === 'became_law_unsigned'
         ? UNSIGNED_LAW_EVENT
@@ -382,6 +409,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
       margin,
       billId,
       presidentDeskChip: deskChip,
+      processChip: deskChip ? null : processChip,
     },
     // Badge/chips already carry outcome + bill; keep the chamber margin line.
     `${margin} in the ${vote.chamber}`,

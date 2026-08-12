@@ -1,5 +1,8 @@
 /** Shared JSON contracts for /stats/* — consumed by worker and web. */
 
+import type { BillProcessSummary } from './bill-process-api-types'
+import type { FeedItem } from './feed-api-types'
+
 export type StatsChamber = 'House' | 'Senate'
 
 export interface DateRange {
@@ -273,4 +276,58 @@ export interface MembersSearchResponse {
 /** Distinct digest policy areas for feed filter dropdowns. */
 export interface PolicyAreasResponse {
   items: string[]
+}
+
+/** Bill with a recent committee advancement (`GET /stats/advancing-bills.json`). */
+export interface AdvancingBillItem {
+  congress: number
+  bill_type: string
+  bill_number: number
+  title: string | null
+  policy_area: string | null
+  headline: string | null
+  /** ISO datetime of the latest advancement-class committee event. */
+  last_advance_at: string
+  /** Plain-English current-state label. */
+  current_label: string | null
+  process: BillProcessSummary | null
+  /** Full feed item when available for expand-in-place detail. */
+  item: FeedItem | null
+}
+
+export interface AdvancingBillsResponse {
+  congress: number
+  session: number
+  items: AdvancingBillItem[]
+  as_of: string
+}
+
+export interface CommitteeLeaderboardSubRow {
+  system_code: string
+  name: string
+  referred: number
+  advanced: number
+  waiting: number
+  advance_rate: number | null
+  median_days_to_advance: number | null
+}
+
+export interface CommitteeLeaderboardRow {
+  system_code: string
+  name: string
+  chamber: StatsChamber
+  referred: number
+  advanced: number
+  waiting: number
+  advance_rate: number | null
+  median_days_to_advance: number | null
+  subcommittees: CommitteeLeaderboardSubRow[]
+}
+
+export interface CommitteesLeaderboardResponse {
+  congress: number
+  session: number
+  chamber: StatsChamber
+  items: CommitteeLeaderboardRow[]
+  as_of: string
 }

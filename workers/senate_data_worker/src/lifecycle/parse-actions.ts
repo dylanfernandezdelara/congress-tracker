@@ -5,6 +5,7 @@ export interface CongressAction {
   actionDate?: string | null;
   text?: string | null;
   type?: string | null;
+  committees?: Array<{ name?: string | null; systemCode?: string | null }> | null;
 }
 
 export interface ParsedLifecycleMilestones {

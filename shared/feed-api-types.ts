@@ -1,5 +1,6 @@
 /** Shared JSON contracts for /feed/* — consumed by worker and web. */
 
+import type { BillProcessSummary } from './bill-process-api-types'
 import type { BillTextChanges } from './bill-text-api-types'
 import type { BillDigestContent } from './digest-api-types'
 import type { ExecutiveSignal, RelatedExecutiveBill } from './executive-api-types'
@@ -64,6 +65,11 @@ export interface FeedItem {
    */
   latest_activity_date: string
   lifecycle: BillLifecycle | null
+  /**
+   * Committee-process timeline + current waiting label when hydrated.
+   * Omitted when no committee events are stored for the bill.
+   */
+  process?: BillProcessSummary | null
   executive_signals?: ExecutiveSignal[]
   related_executive_bills?: RelatedExecutiveBill[]
   /**

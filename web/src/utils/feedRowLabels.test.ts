@@ -96,6 +96,7 @@ describe('getFeedRowView', () => {
         margin: '52–47',
         billId: 'H.R. 2913',
         presidentDeskChip: null,
+        processChip: null,
       },
       eventDisplay: '52–47 in the Senate',
       badgeToneClass: ' text-pass',
@@ -133,6 +134,7 @@ describe('getFeedRowView', () => {
         margin: '198–230',
         billId: 'H.R. 8428',
         presidentDeskChip: null,
+        processChip: null,
       },
       eventDisplay: '198–230 in the House',
       badgeToneClass: ' text-fail',
@@ -180,6 +182,7 @@ describe('getFeedRowView', () => {
         margin: '85–5',
         billId: 'H.R. 6644',
         presidentDeskChip: null,
+        processChip: null,
       },
       eventDisplay: "Became law without the President's signature",
       badgeToneClass: ' text-law',
@@ -230,6 +233,7 @@ describe('getFeedRowView', () => {
       margin: '85–5',
       billId: 'S. 2',
       presidentDeskChip: "President's desk · day 4/10",
+      processChip: null,
     })
   })
 
@@ -686,6 +690,7 @@ describe('getFeedRowMeta via getFeedRowView', () => {
       margin: '52–47',
       billId: 'S. 2',
       presidentDeskChip: null,
+      processChip: null,
     })
   })
 
@@ -720,6 +725,7 @@ describe('getFeedRowMeta via getFeedRowView', () => {
       margin: '218–210',
       billId: 'H.Res. 512',
       presidentDeskChip: null,
+      processChip: null,
     })
   })
 })

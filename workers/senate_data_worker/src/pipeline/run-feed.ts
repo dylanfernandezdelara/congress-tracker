@@ -28,6 +28,8 @@ import {
 } from "./refresh-confirmations";
 import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
+import { refreshBillProcessQueue } from "./refresh-bill-process";
+import { enqueueProcessBills } from "../d1/bill-process";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
 
@@ -266,6 +268,37 @@ export async function runFeedPipeline(
           event: "feed_pipeline_partial_text_changes_refresh",
           trigger,
           warnings: textChanges.warnings,
+        })
+      );
+    }
+
+    // Light committee-process refresh for feed bills (capped; full crawl is admin backfill).
+    try {
+      await enqueueProcessBills(
+        env.DB,
+        bills.map((b) => ({
+          congress: b.bill_congress,
+          billType: b.bill_type,
+          billNumber: b.bill_number,
+        })),
+        { force: true }
+      );
+      const processResult = await refreshBillProcessQueue(env);
+      if (processResult.warnings.length > 0) {
+        console.warn(
+          JSON.stringify({
+            event: "feed_pipeline_partial_process_refresh",
+            trigger,
+            warnings: processResult.warnings,
+          })
+        );
+      }
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_process_refresh_failed",
+          trigger,
+          error: err instanceof Error ? err.message : String(err),
         })
       );
     }

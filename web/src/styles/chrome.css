@@ -87,6 +87,12 @@
     outline-offset: 2px;
   }
 
+  .ghost-button.is-active {
+    border-color: hsl(var(--twc-foreground) / 0.45);
+    color: hsl(var(--twc-foreground));
+    background: hsl(var(--twc-foreground) / 0.06);
+  }
+
   .feed-pagination {
     display: flex;
     flex-direction: column;
