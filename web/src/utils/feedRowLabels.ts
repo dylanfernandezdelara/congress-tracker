@@ -11,6 +11,7 @@ import {
   trimDisplayTitle,
   voteIndicatesFailure,
 } from '@congress-tracker/shared/feed-content'
+import { formatProcessChipLabel } from '@congress-tracker/shared/bill-process-labels'
 
 import {
   deriveTerminalStatus,
@@ -155,24 +156,13 @@ function presidentDeskChipLabel(item: FeedItem): string | null {
   return `President's desk · day ${day}/10`
 }
 
-/** Compact chip from process current_label; omit when law/desk already dominate. */
+/** Compact chip from structured process status; omit when law/desk already dominate. */
 function processChipLabel(item: FeedItem): string | null {
-  const label = item.process?.current_label?.trim()
-  if (!label) return null
-  const status = item.process?.current_status
-  if (
-    status === 'in_committee' ||
-    status === 'in_subcommittee' ||
-    status === 'in_second_chamber_committee'
-  ) {
-    // Prefer the committee name segment before the waiting clause.
-    const head = label.split('·')[0]?.trim()
-    return head || label
-  }
-  if (status === 'cleared_committee') {
-    return 'Cleared committee'
-  }
-  return null
+  const process = item.process
+  if (!process) return null
+  const committeeName =
+    [...process.stages].reverse().find((stage) => stage.committee_name)?.committee_name ?? null
+  return formatProcessChipLabel(process.current_status, committeeName)
 }
 
 export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {

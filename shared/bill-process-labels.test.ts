@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   activityVerb,
   formatClearedLabel,
+  formatProcessChipLabel,
   formatProcessStageLabel,
   formatWaitingLabel,
   isAdvancementActivity,
@@ -50,5 +51,12 @@ describe("bill-process-labels", () => {
     expect(shortCommitteeName("Energy and Commerce Committee")).toBe(
       "Energy and Commerce"
     );
+    expect(formatProcessChipLabel("in_committee", "House Administration Committee")).toBe(
+      "In House Administration"
+    );
+    expect(formatProcessChipLabel("cleared_committee", "Financial Services Committee")).toBe(
+      "Cleared Financial Services"
+    );
+    expect(formatProcessChipLabel("introduced", "Energy and Commerce Committee")).toBe(null);
   });
 });

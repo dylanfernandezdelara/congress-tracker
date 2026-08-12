@@ -97,3 +97,28 @@ export function formatReleasedLabel(committeeName: string): string {
 export function shortCommitteeName(name: string): string {
   return name.replace(/\s+Committee$/i, "").trim() || name;
 }
+
+/** Compact feed-row chip from structured status — do not parse current_label prose. */
+export function formatProcessChipLabel(
+  status: BillProcessCurrentStatus,
+  committeeName: string | null | undefined
+): string | null {
+  const trimmed = committeeName?.trim();
+  const short = trimmed ? shortCommitteeName(trimmed) : null;
+  switch (status) {
+    case "in_committee":
+    case "in_subcommittee":
+    case "in_second_chamber_committee":
+      return short ? `In ${short}` : "In committee";
+    case "cleared_committee":
+      return short ? `Cleared ${short}` : "Cleared committee";
+    case "introduced":
+    case "released_from_committee":
+    case "unknown":
+      return null;
+    default: {
+      const _exhaustive: never = status;
+      return _exhaustive;
+    }
+  }
+}

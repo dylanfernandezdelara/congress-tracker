@@ -106,6 +106,32 @@ describe('getFeedRowView', () => {
     })
   })
 
+  it('uses structured process status for the committee chip, not current_label prose', () => {
+    const item = makeFeedItem({
+      process: {
+        origin_chamber: 'House',
+        current_status: 'in_committee',
+        current_label: 'In House Administration Committee · waiting for the committee to act',
+        last_advance_at: null,
+        stages: [
+          {
+            date: '2026-03-10',
+            label: 'Sent to House Administration Committee',
+            activity_key: 'sent',
+            chamber: 'House',
+            committee_name: 'House Administration Committee',
+            system_code: 'hsha00',
+            parent_system_code: null,
+            is_subcommittee: false,
+            tally_text: null,
+          },
+        ],
+      },
+    })
+
+    expect(getFeedRowView(item).meta.processChip).toBe('In House Administration')
+  })
+
   it('returns meta and de-duplicated event copy for a substantive fail', () => {
     const item = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 8428, title: 'Rural hospital funding' },

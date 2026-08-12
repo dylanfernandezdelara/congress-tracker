@@ -11,20 +11,18 @@ import {
 } from "../d1/bill-process";
 import { lookbackStartIso } from "../sources/congress-client";
 
-function waitingCount(
-  systemCode: string,
-  events: Array<{
-    system_code: string;
-    bill_type: string;
-    bill_number: number;
-    activity_key: string;
-    activity_at: string;
-  }>,
-  stuckSince: string
-): number {
+type CommitteeEvent = {
+  system_code: string;
+  bill_type: string;
+  bill_number: number;
+  activity_key: string;
+  activity_at: string;
+};
+
+function waitingCount(events: CommitteeEvent[], stuckSince: string): number {
   const byBill = new Map<string, { sentAt: string | null; left: boolean }>();
 
-  for (const e of events.filter((x) => x.system_code === systemCode)) {
+  for (const e of events) {
     const key = `${e.bill_type}:${e.bill_number}`;
     const row = byBill.get(key) ?? { sentAt: null, left: false };
     if (e.activity_key === "sent") {
@@ -43,6 +41,16 @@ function waitingCount(
   return waiting;
 }
 
+function eventsBySystemCode(events: CommitteeEvent[]): Map<string, CommitteeEvent[]> {
+  const byCode = new Map<string, CommitteeEvent[]>();
+  for (const e of events) {
+    const list = byCode.get(e.system_code);
+    if (list) list.push(e);
+    else byCode.set(e.system_code, [e]);
+  }
+  return byCode;
+}
+
 export async function buildCommitteesLeaderboard(
   env: Env,
   congress: number,
@@ -58,11 +66,12 @@ export async function buildCommitteesLeaderboard(
     standing.map((c) => c.system_code)
   );
 
+  const byCode = eventsBySystemCode(events);
   const items: CommitteeLeaderboardRow[] = standing.map((c) => ({
     system_code: c.system_code,
     name: c.name,
     chamber,
-    waiting: waitingCount(c.system_code, events, stuckSince),
+    waiting: waitingCount(byCode.get(c.system_code) ?? [], stuckSince),
   }));
 
   items.sort((a, b) => {
