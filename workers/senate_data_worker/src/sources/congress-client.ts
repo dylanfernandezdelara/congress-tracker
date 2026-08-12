@@ -250,9 +250,9 @@ export async function fetchCongressCommitteeRoster(
     const name = c.name?.trim();
     if (!chamber || !systemCode || !name) continue;
     const committeeType = c.committeeTypeCode?.trim() || "Other";
-    // Skip mis-typed subcommittee rows at the top level when name ends with Subcommittee
-    // and type is Standing — still store nested subs from parents.
-    if (committeeType === "Standing" && /subcommittee$/i.test(name)) continue;
+    // Congress.gov lists subcommittees both nested under parents and as top-level
+    // rows. Keep only nested copies so upsert cannot wipe parent_system_code.
+    if (committeeType === "Subcommittee" || /subcommittee$/i.test(name)) continue;
     out.push({
       systemCode,
       chamber,
