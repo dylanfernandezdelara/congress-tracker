@@ -7,6 +7,14 @@ name = "congress-tracker-api"
 main = "src/worker.ts"
 # quickAction() on the browser binding requires >= 2026-03-24.
 compatibility_date = "2026-03-24"
+# Keep workers.dev enabled even with [[routes]] custom domains. Wrangler infers
+# workers_dev=false when routes are present unless this is explicit — that broke
+# ops automation (health + admin pipeline) behind Bot Fight on trackcongress.org.
+# Top-level keys MUST appear before any [table] header in TOML.
+workers_dev = true
+# Generate per-version/per-branch preview URLs on workers.dev so a commit/PR
+# can be opened in a browser without touching production traffic.
+preview_urls = true
 
 # Senate.gov blocks plain Worker fetch (Akamai 403). Browser Rendering reaches
 # the LIS vote menu so daily cron can refresh without external ops scripts.
@@ -14,16 +22,6 @@ compatibility_date = "2026-03-24"
 [browser]
 binding = "BROWSER"
 remote = true
-
-# Keep workers.dev enabled even with [[routes]] custom domains. Wrangler infers
-# workers_dev=false when routes are present unless this is explicit — that broke
-# ops automation (health + admin pipeline) behind Bot Fight on trackcongress.org.
-workers_dev = true
-
-# Generate per-version/per-branch preview URLs on workers.dev so a commit/PR
-# can be opened in a browser without touching production traffic.
-# (Top-level key: must appear before any [table] headers in TOML.)
-preview_urls = true
 
 # Serve the built React app (web/dist) from this same Worker.
 # Static files are served directly; any non-asset path falls through to the

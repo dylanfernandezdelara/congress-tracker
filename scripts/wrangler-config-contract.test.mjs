@@ -130,6 +130,28 @@ test('browser binding is set on top-level and preview (not inherited by named en
   assert.equal(worker.previewBrowserBinding, 'BROWSER')
 })
 
+test('workers_dev and preview_urls stay top-level (not swallowed by [browser] TOML table)', () => {
+  // In TOML, keys after a [table] header belong to that table. Putting
+  // workers_dev/preview_urls after [browser] makes Wrangler warn and ignore them.
+  for (const filePath of [rootConfigPath, workerConfigPath]) {
+    const content = fs.readFileSync(filePath, 'utf8')
+    const browserIdx = content.search(/^\[browser\]/m)
+    const workersDevIdx = content.search(/^workers_dev\s*=/m)
+    const previewUrlsIdx = content.search(/^preview_urls\s*=/m)
+    assert.ok(browserIdx >= 0, `${filePath} missing [browser]`)
+    assert.ok(workersDevIdx >= 0, `${filePath} missing workers_dev`)
+    assert.ok(previewUrlsIdx >= 0, `${filePath} missing preview_urls`)
+    assert.ok(
+      workersDevIdx < browserIdx,
+      `${filePath}: workers_dev must appear before [browser]`,
+    )
+    assert.ok(
+      previewUrlsIdx < browserIdx,
+      `${filePath}: preview_urls must appear before [browser]`,
+    )
+  }
+})
+
 test('workers_dev stays explicitly enabled so ops can reach /health without Bot Fight', () => {
   // Custom-domain [[routes]] make Wrangler infer workers_dev=false unless set.
   const root = parseWranglerConfig(rootConfigPath)
