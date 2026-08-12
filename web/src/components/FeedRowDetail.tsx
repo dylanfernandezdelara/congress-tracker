@@ -7,7 +7,6 @@ import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
-import { BillProcessTimeline } from './BillProcessTimeline'
 import { BillTextChangesSection } from './BillTextChangesSection'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 import { FeedSummarySections } from './FeedSummarySections'
@@ -75,9 +74,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 
-      {item.process ? <BillProcessTimeline process={item.process} /> : null}
-
-      <BillPipeline stages={stages} detail={pipelineDetail} />
+      <BillPipeline stages={stages} detail={pipelineDetail} process={item.process} />
 
       {isProcedural ? (
         <div className="feed-row-detail-chips">

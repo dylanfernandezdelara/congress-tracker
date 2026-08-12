@@ -3,20 +3,17 @@ import { useCallback, useState } from 'react'
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 
 import {
-  fetchAdvancingBills,
   fetchCommitteesLeaderboard,
   fetchNotableVotes,
   fetchRecentConfirmations,
   fetchRecentLaws,
 } from '../api/client'
 import type {
-  AdvancingBillsResponse,
   CommitteesLeaderboardResponse,
   NotableVotesResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
 } from '../api/types'
-import { AdvancingBillsSection } from '../components/AdvancingBillsSection'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
@@ -137,14 +134,6 @@ export default function Home() {
     mapError: () => "Couldn't load confirmations.",
   })
 
-  // Process surfaces load independently so they appear above the timeline
-  // without waiting on the passage-feed request.
-  const advancingBills = useAsyncData<AdvancingBillsResponse>({
-    deps: [railRetryKey],
-    load: () => fetchAdvancingBills(3),
-    mapError: () => "Couldn't load advancing bills.",
-  })
-
   const committeesHouse = useAsyncData<CommitteesLeaderboardResponse>({
     deps: [railRetryKey],
     load: () => fetchCommitteesLeaderboard('House'),
@@ -164,7 +153,6 @@ export default function Home() {
   const notableLoading = !feedSettled || notableVotes.isLoading
   const recentLawsLoading = !feedSettled || recentLaws.isLoading
   const recentConfirmationsLoading = !feedSettled || recentConfirmations.isLoading
-  const advancingLoading = advancingBills.isLoading
   const committeesLoading = committeesHouse.isLoading || committeesSenate.isLoading
   const committeesError = committeesHouse.error ?? committeesSenate.error
 
@@ -267,13 +255,6 @@ export default function Home() {
             </button>
           </div>
         ) : null}
-
-        <AdvancingBillsSection
-          items={advancingBills.data?.items ?? null}
-          loading={advancingLoading}
-          error={advancingBills.error}
-          onRetry={handleReloadFeed}
-        />
 
         {showSkeleton ? <FeedSkeleton /> : null}
 

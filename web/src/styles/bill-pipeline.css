@@ -126,6 +126,87 @@
     font-weight: 500;
   }
 
+  /* Nested committee steps — same visual language as the lifecycle stepper */
+  .bill-pipeline-committee {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 0.15rem;
+    padding-left: 0.125rem;
+  }
+
+  .bill-pipeline-committee-status {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .bill-pipeline-committee-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .bill-pipeline-committee-step {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.625rem;
+    align-items: start;
+    padding: 0.28rem 0;
+  }
+
+  .bill-pipeline-committee-step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    top: 0.75rem;
+    left: 0.25rem;
+    width: 1px;
+    height: calc(100% - 0.2rem);
+    background-color: hsl(var(--twc-border-muted));
+  }
+
+  .bill-pipeline-committee-marker {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-top: 0.2rem;
+    border-radius: 9999px;
+    border: 1.5px solid hsl(var(--twc-border-muted));
+    background-color: hsl(var(--twc-card));
+    flex-shrink: 0;
+  }
+
+  .bill-pipeline-committee-step--sub .bill-pipeline-committee-label {
+    padding-left: 0.2rem;
+  }
+
+  .bill-pipeline-committee-copy {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  .bill-pipeline-committee-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.35;
+    color: hsl(var(--twc-foreground));
+    overflow-wrap: anywhere;
+  }
+
+  .bill-pipeline-committee-date {
+    font-size: 0.625rem;
+    line-height: 1.3;
+    color: hsl(var(--twc-secondary));
+    font-variant-numeric: tabular-nums;
+  }
+
   @keyframes bill-pipeline-pulse {
     0%,
     100% {

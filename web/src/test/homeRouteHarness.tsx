@@ -16,7 +16,6 @@ export type HomeApiMocks = {
   fetchNotableVotes: Mock
   fetchRecentLaws: Mock
   fetchRecentConfirmations: Mock
-  fetchAdvancingBills: Mock
   fetchCommitteesLeaderboard: Mock
   fetchDefectors: Mock
   fetchMemberProfile: Mock
@@ -179,25 +178,6 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
           { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
           { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
         ],
-      },
-    ],
-  })
-  api.fetchAdvancingBills.mockResolvedValue({
-    congress: 119,
-    session: 2,
-    as_of: '2026-06-14T00:00:00.000Z',
-    items: [
-      {
-        congress: 119,
-        bill_type: 'HR',
-        bill_number: 7008,
-        title: 'Stop Insider Trading Act',
-        policy_area: 'Congress',
-        headline: 'Congress Members Banned From Buying Stocks, Must Disclose Sales',
-        last_advance_at: '2026-06-13T12:00:00.000Z',
-        current_label: 'In House Administration Committee · waiting for the committee to act',
-        process: null,
-        item: null,
       },
     ],
   })

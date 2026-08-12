@@ -1,4 +1,6 @@
 import { voteIndicatesFailure } from '@congress-tracker/shared/feed-content'
+import type { BillProcessCurrentStatus } from '@congress-tracker/shared/bill-process-labels'
+import type { BillProcessSummary } from '@congress-tracker/shared/bill-process-api-types'
 import type { BillLawKind, BillLifecycle } from '@congress-tracker/shared/lifecycle-api-types'
 
 import type { FeedItem, FeedPassageVote } from '../api/types'
@@ -19,6 +21,7 @@ export type BillLifecycleStageState = 'done' | 'current' | 'pending' | 'failed'
 
 export type BillLifecycleStageKey =
   | 'introduced'
+  | 'committee'
   | 'house'
   | 'senate'
   | 'to_president'
@@ -128,6 +131,62 @@ function chamberPassage(
   }
 
   return { date: latestVoteDate(chamberVotes), state: 'failed' }
+}
+
+function latestProcessStageDate(process: BillProcessSummary): string | null {
+  let latest: string | null = null
+  for (const stage of process.stages) {
+    if (!stage.date) continue
+    if (!latest || stage.date > latest) latest = stage.date
+  }
+  if (latest) return latest
+  const advanceAt = process.last_advance_at
+  if (!advanceAt) return null
+  return advanceAt.slice(0, 10)
+}
+
+function committeeStatusState(
+  status: BillProcessCurrentStatus,
+): BillLifecycleStageState | null {
+  switch (status) {
+    case 'cleared_committee':
+    case 'released_from_committee':
+      return 'done'
+    case 'in_committee':
+    case 'in_subcommittee':
+    case 'in_second_chamber_committee':
+      return 'current'
+    case 'introduced':
+    case 'unknown':
+      return null
+    default:
+      return assertNever(status)
+  }
+}
+
+function committeeStage(
+  process: BillProcessSummary | null | undefined,
+  introducedDone: boolean,
+  chambersReached: boolean,
+): BillLifecycleStage {
+  const fromStatus = process ? committeeStatusState(process.current_status) : null
+  let state: BillLifecycleStageState = 'pending'
+  if (chambersReached || fromStatus === 'done') {
+    state = 'done'
+  } else if (fromStatus === 'current') {
+    state = 'current'
+  } else if (introducedDone) {
+    // Introduced but still waiting on committee signals — treat as current.
+    state = 'current'
+  }
+
+  return {
+    key: 'committee',
+    label: 'Committee',
+    date: process ? latestProcessStageDate(process) : null,
+    state,
+    detail: process?.current_label ?? undefined,
+  }
 }
 
 function unsignedLawDate(lifecycle: BillLifecycle): string | null {
@@ -269,6 +328,13 @@ export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResul
   const toPresidentState: BillLifecycleStageState =
     presentedDate || terminalStatus !== null ? 'done' : 'pending'
 
+  const chambersReached =
+    house.state === 'done' ||
+    house.state === 'failed' ||
+    senate.state === 'done' ||
+    senate.state === 'failed' ||
+    reachedPresident
+
   const stages: BillLifecycleStage[] = [
     {
       key: 'introduced',
@@ -276,6 +342,7 @@ export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResul
       date: introducedDate,
       state: introducedDone ? 'done' : 'pending',
     },
+    committeeStage(item.process, introducedDone, chambersReached),
     {
       key: 'house',
       label: 'Passed House',
