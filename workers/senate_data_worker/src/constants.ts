@@ -70,6 +70,11 @@ export const PROCESS_ADVANCING_DAYS = 14;
 export const PROCESS_STUCK_DAYS = 90;
 /** Stop a process run early when Congress.gov rate-limit remaining falls below this. */
 export const PROCESS_RATELIMIT_STOP_REMAINING = 200;
+/**
+ * Re-queue committee hydrations this many days after the last success so
+ * waiting/leaderboard bills do not freeze after the first crawl.
+ */
+export const PROCESS_REHYDRATE_DAYS = 7;
 
 /**
  * Roll-call votes to backfill per /__pipeline/run/member-votes invocation.

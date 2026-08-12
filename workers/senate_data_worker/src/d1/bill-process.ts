@@ -3,11 +3,18 @@ import type {
   BillProcessCurrentStatus,
 } from "../../../../shared/bill-process-labels";
 import type { FeedChamber } from "../../../../shared/feed-api-types";
+import { PROCESS_REHYDRATE_DAYS } from "../constants";
 import { normalizeBillType } from "../sources/bill-type";
 import { toProcessSummary } from "../process/derive-state";
 import type { ProcessCommitteeEvent } from "../process/types";
 import type { BillProcessSummary } from "../../../../shared/bill-process-api-types";
 import { ensureSchema } from "./schema";
+
+function processRehydrateCutoffIso(): string {
+  return new Date(
+    Date.now() - PROCESS_REHYDRATE_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+}
 
 export type { ProcessCommitteeEvent };
 
@@ -254,11 +261,12 @@ export async function selectProcessQueueBatch(
     .prepare(
       `SELECT congress, bill_type, bill_number
        FROM process_refresh_queue
-       WHERE last_hydrated_at IS NULL
-       ORDER BY queued_at ASC
+       WHERE last_hydrated_at IS NULL OR last_hydrated_at < ?
+       ORDER BY CASE WHEN last_hydrated_at IS NULL THEN 0 ELSE 1 END,
+                COALESCE(last_hydrated_at, queued_at) ASC
        LIMIT ?`
     )
-    .bind(Math.max(1, limit))
+    .bind(processRehydrateCutoffIso(), Math.max(1, limit))
     .all<{ congress: number; bill_type: string; bill_number: number }>();
   return (rows.results ?? []).map((r) => ({
     congress: r.congress,
@@ -287,8 +295,10 @@ export async function countProcessQueuePending(db: D1Database): Promise<number> 
   await ensureSchema(db);
   const row = await db
     .prepare(
-      `SELECT COUNT(*) AS n FROM process_refresh_queue WHERE last_hydrated_at IS NULL`
+      `SELECT COUNT(*) AS n FROM process_refresh_queue
+       WHERE last_hydrated_at IS NULL OR last_hydrated_at < ?`
     )
+    .bind(processRehydrateCutoffIso())
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
