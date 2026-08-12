@@ -193,12 +193,7 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
               system_code: 'hsif00',
               name: 'Energy and Commerce',
               chamber: 'House',
-              referred: 4,
-              advanced: 1,
               waiting: 2,
-              advance_rate: 0.25,
-              median_days_to_advance: 18,
-              subcommittees: [],
             },
           ]
         : [],

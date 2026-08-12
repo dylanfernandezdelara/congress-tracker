@@ -174,17 +174,6 @@ CREATE TABLE IF NOT EXISTS bill_committee_events (
   tally_text TEXT,
   PRIMARY KEY (congress, bill_type, bill_number, system_code, activity_key, activity_at)
 );
-CREATE TABLE IF NOT EXISTS bill_process_state (
-  congress INTEGER NOT NULL,
-  bill_type TEXT NOT NULL,
-  bill_number INTEGER NOT NULL,
-  origin_chamber TEXT,
-  current_status TEXT NOT NULL,
-  current_label TEXT,
-  last_advance_at TEXT,
-  updated_at TEXT NOT NULL,
-  PRIMARY KEY (congress, bill_type, bill_number)
-);
 CREATE TABLE IF NOT EXISTS committee_roster (
   congress INTEGER NOT NULL,
   system_code TEXT NOT NULL,
@@ -296,7 +285,6 @@ VALUES
   (119, 'sshr00', 'Senate', 'Health, Education, Labor, and Pensions Committee', 'Standing', NULL, '${D_RECENT}T00:00:00.000Z');
 
 DELETE FROM bill_committee_events WHERE congress = 119;
-DELETE FROM bill_process_state WHERE congress = 119;
 
 -- Process tables store normalizeBillType() casing (HR/S). Digests/votes may be
 -- lowercase locally; process lookups use UPPER() so both match.
@@ -311,13 +299,6 @@ VALUES
   (119, 'HR', 22, 'hsba00', 'worked_on', '${D_RECENT}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Markup By', NULL),
   (119, 'S', 47, 'sshr00', 'sent', '${D_OLDER}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Referred To', NULL),
   (119, 'S', 47, 'sshr00', 'released', '${D_MID}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Discharged From', NULL);
-
-INSERT INTO bill_process_state
-  (congress, bill_type, bill_number, origin_chamber, current_status, current_label, last_advance_at, updated_at)
-VALUES
-  (119, 'HR', 1, 'House', 'cleared_committee', 'Cleared Energy and Commerce Committee · waiting for a chamber vote', '${D_MID}T18:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
-  (119, 'HR', 22, 'House', 'in_committee', 'In Financial Services Committee · waiting for the committee to act', '${D_RECENT}T12:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
-  (119, 'S', 47, 'Senate', 'released_from_committee', 'Released from Health, Education, Labor, and Pensions Committee', '${D_MID}T12:00:00.000Z', '${D_MID}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO nominations
   (congress, nomination_number, part_number, citation, description, organization, position_title,

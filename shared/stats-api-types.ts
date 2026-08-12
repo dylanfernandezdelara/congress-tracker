@@ -275,26 +275,11 @@ export interface PolicyAreasResponse {
   items: string[]
 }
 
-export interface CommitteeLeaderboardSubRow {
-  system_code: string
-  name: string
-  referred: number
-  advanced: number
-  waiting: number
-  advance_rate: number | null
-  median_days_to_advance: number | null
-}
-
 export interface CommitteeLeaderboardRow {
   system_code: string
   name: string
   chamber: StatsChamber
-  referred: number
-  advanced: number
   waiting: number
-  advance_rate: number | null
-  median_days_to_advance: number | null
-  subcommittees: CommitteeLeaderboardSubRow[]
 }
 
 export interface CommitteesLeaderboardResponse {

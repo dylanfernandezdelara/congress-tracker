@@ -1,7 +1,4 @@
-import type {
-  BillProcessActivityKey,
-  BillProcessCurrentStatus,
-} from "../../../../shared/bill-process-labels";
+import type { BillProcessActivityKey } from "../../../../shared/bill-process-labels";
 import type { FeedChamber } from "../../../../shared/feed-api-types";
 import { PROCESS_REHYDRATE_DAYS } from "../constants";
 import { normalizeBillType } from "../sources/bill-type";
@@ -22,16 +19,6 @@ export interface ProcessBillKey {
   congress: number;
   billType: string;
   billNumber: number;
-}
-
-export interface UpsertProcessStateParams {
-  congress: number;
-  billType: string;
-  billNumber: number;
-  originChamber: FeedChamber | null;
-  currentStatus: BillProcessCurrentStatus;
-  currentLabel: string | null;
-  lastAdvanceAt: string | null;
 }
 
 export interface CommitteeRosterRow {
@@ -68,9 +55,8 @@ function asActivityKey(value: string): BillProcessActivityKey {
 }
 
 /**
- * Atomically replace committee events and refresh the denormalized process
- * index for one bill. Events remain the source of truth for timeline reads;
- * `bill_process_state` is only a query index (leaderboard / filters).
+ * Atomically replace committee events for one bill. Events remain the source
+ * of truth for timeline and waiting-count reads.
  *
  * Empty `events` is a no-op (same pattern as `replaceBillSponsors`): a sparse
  * Congress.gov committees payload must not wipe previously stored timelines.
@@ -82,14 +68,12 @@ export async function persistBillProcess(
     billType: string;
     billNumber: number;
     events: ProcessCommitteeEvent[];
-    state: UpsertProcessStateParams;
   }
 ): Promise<void> {
   if (params.events.length === 0) return;
 
   await ensureSchema(db);
   const type = normalizeBillType(params.billType);
-  const now = new Date().toISOString();
 
   const stmts = [
     db
@@ -127,29 +111,6 @@ export async function persistBillProcess(
           e.tallyText
         )
     ),
-    db
-      .prepare(
-        `INSERT INTO bill_process_state (
-          congress, bill_type, bill_number, origin_chamber, current_status,
-          current_label, last_advance_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(congress, bill_type, bill_number) DO UPDATE SET
-          origin_chamber = excluded.origin_chamber,
-          current_status = excluded.current_status,
-          current_label = excluded.current_label,
-          last_advance_at = excluded.last_advance_at,
-          updated_at = excluded.updated_at`
-      )
-      .bind(
-        params.state.congress,
-        normalizeBillType(params.state.billType),
-        params.state.billNumber,
-        params.state.originChamber,
-        params.state.currentStatus,
-        params.state.currentLabel,
-        params.state.lastAdvanceAt,
-        now
-      ),
   ];
   await db.batch(stmts);
 }

@@ -398,22 +398,7 @@ const MOCK_COMMITTEES = {
       system_code: 'hsif00',
       name: 'Energy and Commerce Committee',
       chamber: 'House',
-      referred: 4,
-      advanced: 1,
       waiting: 2,
-      advance_rate: 0.25,
-      median_days_to_advance: 18,
-      subcommittees: [
-        {
-          system_code: 'hsif14',
-          name: 'Health Subcommittee',
-          referred: 2,
-          advanced: 1,
-          waiting: 1,
-          advance_rate: 0.5,
-          median_days_to_advance: 12,
-        },
-      ],
     },
   ],
 }

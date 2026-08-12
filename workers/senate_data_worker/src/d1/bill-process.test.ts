@@ -41,15 +41,6 @@ describe("persistBillProcess", () => {
       billType: "HR",
       billNumber: 7008,
       events: [],
-      state: {
-        congress: 119,
-        billType: "HR",
-        billNumber: 7008,
-        originChamber: null,
-        currentStatus: "introduced",
-        currentLabel: null,
-        lastAdvanceAt: null,
-      },
     });
 
     expect(batch).not.toHaveBeenCalled();

@@ -3,13 +3,11 @@ import {
   PROCESS_RATELIMIT_STOP_REMAINING,
 } from "../constants";
 import {
-  getCommitteeNameMap,
   markProcessHydrated,
   persistBillProcess,
   selectProcessQueueBatch,
   type ProcessBillKey,
 } from "../d1/bill-process";
-import { deriveProcessState } from "../process/derive-state";
 import { parseCommitteeEvents } from "../process/parse-committee-source";
 import type { Env } from "../config";
 import { fetchBillCommitteesSource } from "../sources/congress-client";
@@ -44,7 +42,6 @@ export async function hydrateProcessBills(
   let skipped = 0;
   let stoppedForRateLimit = false;
   const warnings: string[] = [];
-  const nameMaps = new Map<number, Map<string, string>>();
 
   for (const bill of bills) {
     const label = billLabel(bill.billType, bill.billNumber, bill.congress);
@@ -63,31 +60,11 @@ export async function hydrateProcessBills(
         actions: source.actions,
       });
 
-      let nameByCode = nameMaps.get(bill.congress);
-      if (!nameByCode) {
-        nameByCode = await getCommitteeNameMap(env.DB, bill.congress);
-        nameMaps.set(bill.congress, nameByCode);
-      }
-      for (const e of events) {
-        if (!nameByCode.has(e.systemCode)) nameByCode.set(e.systemCode, e.committeeName);
-      }
-
-      const derived = deriveProcessState(bill.billType, events, nameByCode);
-
       await persistBillProcess(env.DB, {
         congress: bill.congress,
         billType: bill.billType,
         billNumber: bill.billNumber,
         events,
-        state: {
-          congress: bill.congress,
-          billType: bill.billType,
-          billNumber: bill.billNumber,
-          originChamber: derived.origin_chamber,
-          currentStatus: derived.current_status,
-          currentLabel: derived.current_label,
-          lastAdvanceAt: derived.last_advance_at,
-        },
       });
       await markProcessHydrated(env.DB, bill);
       refreshed += 1;

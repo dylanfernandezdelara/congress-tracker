@@ -243,19 +243,6 @@ const SCHEMA_DDL = [
     ON bill_committee_events (congress, system_code, activity_key)`,
   `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_advance
     ON bill_committee_events (activity_key, activity_at DESC)`,
-  `CREATE TABLE IF NOT EXISTS bill_process_state (
-  congress INTEGER NOT NULL,
-  bill_type TEXT NOT NULL,
-  bill_number INTEGER NOT NULL,
-  origin_chamber TEXT,
-  current_status TEXT NOT NULL,
-  current_label TEXT,
-  last_advance_at TEXT,
-  updated_at TEXT NOT NULL,
-  PRIMARY KEY (congress, bill_type, bill_number)
-)`,
-  `CREATE INDEX IF NOT EXISTS idx_bill_process_state_advance
-    ON bill_process_state (last_advance_at DESC)`,
   `CREATE TABLE IF NOT EXISTS committee_roster (
   congress INTEGER NOT NULL,
   system_code TEXT NOT NULL,
