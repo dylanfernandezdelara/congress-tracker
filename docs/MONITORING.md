@@ -98,7 +98,10 @@ stale-but-usable cache (>48h). A soft-fail that skips an entire chamber
 4. **Browser Rendering (primary, in-Worker)** — daily feed cron uses the
    `BROWSER` binding when plain `fetch` to senate.gov fails. Keep this binding
    in both root and worker `wrangler.toml` (and `[env.preview.browser]` —
-   browser bindings are not inherited by named envs).
+   browser bindings are not inherited by named envs). Requires
+   `compatibility_date >= 2026-03-24`. Local `wrangler dev` needs
+   `browser.remote = true` (or `--remote`) because `quickAction` is not
+   supported fully locally.
 5. **Manual / Cursor break-glass only** — if Browser Rendering and the D1
    cache both fail, run
    `PIPELINE_ADMIN_TOKEN=... RUN_FEED=1 CHECK_HEALTH=1 npm run refresh:senate-menu`
