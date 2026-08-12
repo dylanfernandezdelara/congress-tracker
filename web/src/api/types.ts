@@ -28,7 +28,6 @@ export type {
   ChamberStats,
   CloseVoteEntry,
   CommitteeLeaderboardRow,
-  CommitteeLeaderboardSubRow,
   CommitteesLeaderboardResponse,
   DateRange,
   DefectorEntry,

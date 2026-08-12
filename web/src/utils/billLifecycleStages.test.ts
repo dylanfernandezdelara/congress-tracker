@@ -124,14 +124,13 @@ describe('getBillLifecycleStages', () => {
     expect(terminalStatus).toBe('became_law_unsigned')
     expect(stages.map((s) => [s.key, s.state, s.date, s.label])).toEqual([
       ['introduced', 'done', '2025-12-11', 'Introduced'],
-      ['committee', 'done', null, 'Committee'],
       ['house', 'done', '2026-05-14', 'Passed House'],
       ['senate', 'done', '2026-06-24', 'Passed Senate'],
       ['to_president', 'done', '2026-06-29', 'To President'],
       ['outcome', 'done', '2026-07-11', 'Became law — unsigned'],
     ])
-    expect(stages[5]?.detail).toContain("without the President's signature")
-    expect(stages[5]?.detail).toContain('Public Law 119-42')
+    expect(stages[4]?.detail).toContain("without the President's signature")
+    expect(stages[4]?.detail).toContain('Public Law 119-42')
   })
 
   it('uses day-after-deadline when became_law_date is missing for derived unsigned law', () => {
@@ -151,7 +150,7 @@ describe('getBillLifecycleStages', () => {
 
     const { terminalStatus, stages } = getBillLifecycleStages(item)
     expect(terminalStatus).toBe('became_law_unsigned')
-    expect(stages[5]).toMatchObject({
+    expect(stages[4]).toMatchObject({
       label: 'Became law — unsigned',
       date: '2026-07-11',
       state: 'done',
@@ -173,7 +172,7 @@ describe('getBillLifecycleStages', () => {
 
     const { terminalStatus, stages } = getBillLifecycleStages(item)
     expect(terminalStatus).toBe('became_law_signed')
-    expect(stages[5]).toMatchObject({
+    expect(stages[4]).toMatchObject({
       label: 'Signed into law',
       date: '2026-03-05',
       state: 'done',
@@ -193,7 +192,7 @@ describe('getBillLifecycleStages', () => {
 
     const { terminalStatus, stages } = getBillLifecycleStages(item)
     expect(terminalStatus).toBe('vetoed')
-    expect(stages[5]).toMatchObject({
+    expect(stages[4]).toMatchObject({
       label: 'Vetoed',
       date: '2026-03-08',
       state: 'failed',
@@ -217,13 +216,13 @@ describe('getBillLifecycleStages', () => {
 
     const { terminalStatus, stages } = getBillLifecycleStages(item)
     expect(terminalStatus).toBe('pending_signature')
-    expect(stages[4]).toMatchObject({ key: 'to_president', state: 'done', date: '2026-06-29' })
-    expect(stages[5]).toMatchObject({
+    expect(stages[3]).toMatchObject({ key: 'to_president', state: 'done', date: '2026-06-29' })
+    expect(stages[4]).toMatchObject({
       label: "On the President's desk",
       state: 'current',
       date: '2026-06-29',
     })
-    expect(stages[5]?.detail).toBe('Day 4 of 10 — becomes law 2026-07-11 if unsigned')
+    expect(stages[4]?.detail).toBe('Day 4 of 10 — becomes law 2026-07-11 if unsigned')
   })
 
   it('derives stages from votes alone when lifecycle is null', () => {
@@ -236,13 +235,12 @@ describe('getBillLifecycleStages', () => {
     expect(terminalStatus).toBeNull()
     expect(stages.map((s) => [s.key, s.state])).toEqual([
       ['introduced', 'done'],
-      ['committee', 'done'],
       ['house', 'done'],
       ['senate', 'done'],
       ['to_president', 'current'],
       ['outcome', 'pending'],
     ])
-    expect(stages[4]?.label).toBe('To President')
+    expect(stages[3]?.label).toBe('To President')
   })
 
   it('infers both chambers passed when the bill reached the President despite missing votes', () => {
@@ -272,54 +270,11 @@ describe('getBillLifecycleStages', () => {
     const { stages } = getBillLifecycleStages(item)
     expect(stages.map((s) => [s.key, s.state])).toEqual([
       ['introduced', 'done'],
-      ['committee', 'done'],
       ['house', 'done'],
       ['senate', 'current'],
       ['to_president', 'pending'],
       ['outcome', 'pending'],
     ])
-  })
-
-  it('marks committee current from process status before chamber passage', () => {
-    const item = makeFeedItem({
-      passage_votes: [],
-      lifecycle: makeLifecycle({ introduced_date: '2026-01-10' }),
-      process: {
-        origin_chamber: 'House',
-        current_status: 'in_committee',
-        current_label: 'In Energy · waiting for the committee to act',
-        last_advance_at: '2026-02-01T00:00:00.000Z',
-        stages: [
-          {
-            date: '2026-01-12',
-            label: 'Sent to Energy',
-            activity_key: 'sent',
-            chamber: 'House',
-            committee_name: 'Energy',
-            system_code: 'hsif00',
-            parent_system_code: null,
-            is_subcommittee: false,
-            tally_text: null,
-          },
-        ],
-      },
-    })
-
-    const { stages } = getBillLifecycleStages(item)
-    expect(stages.find((s) => s.key === 'committee')).toMatchObject({
-      state: 'current',
-      date: '2026-01-12',
-      statusLabel: 'In Energy · waiting for the committee to act',
-    })
-    expect(stages.find((s) => s.key === 'committee')?.substeps).toEqual([
-      {
-        key: 'hsif00-sent-2026-01-12',
-        label: 'Sent to Energy',
-        date: '2026-01-12',
-        isSubcommittee: false,
-      },
-    ])
-    expect(stages.find((s) => s.key === 'house')?.state).toBe('pending')
   })
 
   it('marks a chamber failed when it only has failed votes', () => {

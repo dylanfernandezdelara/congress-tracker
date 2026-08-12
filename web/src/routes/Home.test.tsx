@@ -66,6 +66,8 @@ describe('Home', () => {
     expect(await screen.findByRole('region', { name: 'New laws' })).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
     expect(screen.getByLabelText('Legislative pulse')).toBeInTheDocument()
+    expect(await screen.findAllByRole('heading', { name: 'Waiting in committee' })).toHaveLength(2)
+    expect(screen.getByText('Energy and Commerce')).toBeInTheDocument()
     expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Recent confirmations' })).toBeInTheDocument()

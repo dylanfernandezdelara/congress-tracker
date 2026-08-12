@@ -181,13 +181,28 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
       },
     ],
   })
-  api.fetchCommitteesLeaderboard.mockResolvedValue({
+  api.fetchCommitteesLeaderboard.mockImplementation(async (chamber: 'House' | 'Senate') => ({
     congress: 119,
     session: 2,
-    chamber: 'House',
+    chamber,
     as_of: '2026-06-14T00:00:00.000Z',
-    items: [],
-  })
+    items:
+      chamber === 'House'
+        ? [
+            {
+              system_code: 'hsif00',
+              name: 'Energy and Commerce',
+              chamber: 'House',
+              referred: 4,
+              advanced: 1,
+              waiting: 2,
+              advance_rate: 0.25,
+              median_days_to_advance: 18,
+              subcommittees: [],
+            },
+          ]
+        : [],
+  }))
   api.fetchSessionStats.mockResolvedValue({
     congress: 119,
     session: 2,

@@ -299,7 +299,7 @@ DELETE FROM bill_committee_events WHERE congress = 119;
 DELETE FROM bill_process_state WHERE congress = 119;
 
 -- Process tables store normalizeBillType() casing (HR/S). Digests/votes may be
--- lowercase locally; advancing joins use UPPER() so both match.
+-- lowercase locally; process lookups use UPPER() so both match.
 INSERT INTO bill_committee_events
   (congress, bill_type, bill_number, system_code, activity_key, activity_at, chamber, committee_name, parent_system_code, activity_raw, tally_text)
 VALUES

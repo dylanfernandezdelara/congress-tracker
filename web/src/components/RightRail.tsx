@@ -1,6 +1,10 @@
-import type { ChamberPulse, CommitteesLeaderboardResponse, PulseStatsResponse } from '../api/types'
+import type {
+  ChamberPulse,
+  CommitteeLeaderboardRow,
+  CommitteesLeaderboardResponse,
+  PulseStatsResponse,
+} from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
-import { CommitteeLeaderboard } from './CommitteeLeaderboard'
 
 type RightRailProps = {
   pulse: PulseStatsResponse | null
@@ -14,7 +18,74 @@ type RightRailProps = {
   onCommitteesRetry?: () => void
 }
 
-function ChamberPulseSection({ title, data }: { title: string; data: ChamberPulse | undefined }) {
+function waitingRows(items: CommitteeLeaderboardRow[] | undefined): CommitteeLeaderboardRow[] {
+  return (items ?? [])
+    .filter((row) => row.waiting > 0)
+    .sort((a, b) => b.waiting - a.waiting)
+    .slice(0, 5)
+}
+
+function WaitingInCommittee({
+  items,
+  loading,
+  error,
+  onRetry,
+}: {
+  items: CommitteeLeaderboardRow[] | undefined
+  loading: boolean
+  error: string | null
+  onRetry?: () => void
+}) {
+  const rows = waitingRows(items)
+
+  return (
+    <div className="sidebar-widget space-y-2">
+      <h3 className="text-[12px] font-medium text-foreground">Waiting in committee</h3>
+      {loading && items == null ? <p className="text-xs text-faint">Loading committees…</p> : null}
+      {error && items == null ? (
+        <div className="space-y-2">
+          <p className="text-xs text-fail">{error}</p>
+          {onRetry ? (
+            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {!loading && !error && rows.length === 0 ? (
+        <p className="text-xs text-faint">No long-waiting referrals yet.</p>
+      ) : null}
+      {rows.length > 0 ? (
+        <ol className="space-y-1 text-[12px] text-secondary">
+          {rows.map((row) => (
+            <li key={row.system_code}>
+              {row.name}{' '}
+              <span className="text-faint">
+                ({row.waiting} waiting)
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
+  )
+}
+
+function ChamberPulseSection({
+  title,
+  data,
+  waiting,
+  waitingLoading,
+  waitingError,
+  onWaitingRetry,
+}: {
+  title: string
+  data: ChamberPulse | undefined
+  waiting: CommitteeLeaderboardRow[] | undefined
+  waitingLoading: boolean
+  waitingError: string | null
+  onWaitingRetry?: () => void
+}) {
   if (!data) return null
 
   return (
@@ -69,6 +140,13 @@ function ChamberPulseSection({ title, data }: { title: string; data: ChamberPuls
           ) : null}
         </p>
       </div>
+
+      <WaitingInCommittee
+        items={waiting}
+        loading={waitingLoading}
+        error={waitingError}
+        onRetry={onWaitingRetry}
+      />
     </section>
   )
 }
@@ -86,19 +164,6 @@ export function RightRail({
 }: RightRailProps) {
   return (
     <div className="sidebar-panel space-y-6">
-      <div className="space-y-3">
-        <h2 className="sidebar-section-title">Where bills wait</h2>
-        <CommitteeLeaderboard
-          house={committeesHouse}
-          senate={committeesSenate}
-          loading={committeesLoading}
-          error={committeesError}
-          onRetry={onCommitteesRetry}
-        />
-      </div>
-
-      <div className="border-t border-border" />
-
       <h2 className="sidebar-section-title">Legislative pulse</h2>
       {loading ? <p className="text-xs text-faint">Loading pulse…</p> : null}
       {error ? (
@@ -113,9 +178,23 @@ export function RightRail({
       ) : null}
       {pulse ? (
         <>
-          <ChamberPulseSection title="House" data={pulse.house} />
+          <ChamberPulseSection
+            title="House"
+            data={pulse.house}
+            waiting={committeesHouse?.items}
+            waitingLoading={committeesLoading}
+            waitingError={committeesError}
+            onWaitingRetry={onCommitteesRetry}
+          />
           <div className="border-t border-border" />
-          <ChamberPulseSection title="Senate" data={pulse.senate} />
+          <ChamberPulseSection
+            title="Senate"
+            data={pulse.senate}
+            waiting={committeesSenate?.items}
+            waitingLoading={committeesLoading}
+            waitingError={committeesError}
+            onWaitingRetry={onCommitteesRetry}
+          />
         </>
       ) : null}
     </div>

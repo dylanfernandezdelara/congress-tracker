@@ -136,12 +136,14 @@ export default function Home() {
 
   const committeesHouse = useAsyncData<CommitteesLeaderboardResponse>({
     deps: [railRetryKey],
+    enabled: feedSettled,
     load: () => fetchCommitteesLeaderboard('House'),
     mapError: () => "Couldn't load House committees.",
   })
 
   const committeesSenate = useAsyncData<CommitteesLeaderboardResponse>({
     deps: [railRetryKey],
+    enabled: feedSettled,
     load: () => fetchCommitteesLeaderboard('Senate'),
     mapError: () => "Couldn't load Senate committees.",
   })

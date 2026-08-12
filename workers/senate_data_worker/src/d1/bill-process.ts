@@ -43,20 +43,6 @@ export interface CommitteeRosterRow {
   parent_system_code: string | null;
 }
 
-export interface ProcessStateRow {
-  congress: number;
-  bill_type: string;
-  bill_number: number;
-  origin_chamber: FeedChamber | null;
-  current_status: BillProcessCurrentStatus;
-  current_label: string | null;
-  last_advance_at: string | null;
-  updated_at: string;
-  title?: string | null;
-  policy_area?: string | null;
-  headline?: string | null;
-}
-
 function billKey(congress: number, billType: string, billNumber: number): string {
   return `${congress}:${normalizeBillType(billType)}:${billNumber}`;
 }
@@ -81,25 +67,10 @@ function asActivityKey(value: string): BillProcessActivityKey {
   return "other";
 }
 
-function asStatus(value: string): BillProcessCurrentStatus {
-  if (
-    value === "introduced" ||
-    value === "in_committee" ||
-    value === "in_subcommittee" ||
-    value === "cleared_committee" ||
-    value === "in_second_chamber_committee" ||
-    value === "released_from_committee" ||
-    value === "unknown"
-  ) {
-    return value;
-  }
-  return "unknown";
-}
-
 /**
  * Atomically replace committee events and refresh the denormalized process
  * index for one bill. Events remain the source of truth for timeline reads;
- * `bill_process_state` is only a query index (advancing / filters).
+ * `bill_process_state` is only a query index (leaderboard / filters).
  *
  * Empty `events` is a no-op (same pattern as `replaceBillSponsors`): a sparse
  * Congress.gov committees payload must not wipe previously stored timelines.
@@ -418,61 +389,6 @@ export function processMapKey(
   billNumber: number
 ): string {
   return billKey(congress, billType, billNumber);
-}
-
-export async function selectAdvancingProcessBills(
-  db: D1Database,
-  congress: number,
-  sinceIso: string,
-  limit: number
-): Promise<ProcessStateRow[]> {
-  await ensureSchema(db);
-  const rows = await db
-    .prepare(
-      `SELECT
-         p.congress, p.bill_type, p.bill_number, p.origin_chamber, p.current_status,
-         p.current_label, p.last_advance_at, p.updated_at,
-         d.title AS title, d.policy_area AS policy_area,
-         json_extract(d.digest_json, '$.headline') AS headline
-       FROM bill_process_state p
-       LEFT JOIN bill_digests d
-         ON d.congress = p.congress
-        AND UPPER(d.bill_type) = UPPER(p.bill_type)
-        AND d.number = p.bill_number
-       WHERE p.congress = ?
-         AND p.last_advance_at IS NOT NULL
-         AND p.last_advance_at >= ?
-       ORDER BY p.last_advance_at DESC
-       LIMIT ?`
-    )
-    .bind(congress, sinceIso, Math.max(1, limit))
-    .all<{
-      congress: number;
-      bill_type: string;
-      bill_number: number;
-      origin_chamber: string | null;
-      current_status: string;
-      current_label: string | null;
-      last_advance_at: string | null;
-      updated_at: string;
-      title: string | null;
-      policy_area: string | null;
-      headline: string | null;
-    }>();
-
-  return (rows.results ?? []).map((r) => ({
-    congress: r.congress,
-    bill_type: r.bill_type,
-    bill_number: r.bill_number,
-    origin_chamber: asChamber(r.origin_chamber),
-    current_status: asStatus(r.current_status),
-    current_label: r.current_label,
-    last_advance_at: r.last_advance_at,
-    updated_at: r.updated_at,
-    title: r.title,
-    policy_area: r.policy_area,
-    headline: r.headline,
-  }));
 }
 
 export async function selectStandingCommittees(
