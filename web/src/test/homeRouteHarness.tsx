@@ -196,7 +196,14 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
               waiting: 2,
             },
           ]
-        : [],
+        : [
+            {
+              system_code: 'sshr00',
+              name: 'HELP',
+              chamber: 'Senate',
+              waiting: 1,
+            },
+          ],
   }))
   api.fetchSessionStats.mockResolvedValue({
     congress: 119,

@@ -66,7 +66,13 @@ describe('Home', () => {
     expect(await screen.findByRole('region', { name: 'New laws' })).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
     expect(screen.getByLabelText('Legislative pulse')).toBeInTheDocument()
-    expect(await screen.findAllByRole('heading', { name: 'Waiting in committee' })).toHaveLength(2)
+    const waitingHeadings = await screen.findAllByRole('heading', { name: 'Waiting in committee' })
+    expect(waitingHeadings).toHaveLength(2)
+    const closeHeadings = screen.getAllByRole('heading', { name: 'Close votes' })
+    expect(closeHeadings.length).toBeGreaterThan(0)
+    expect(
+      waitingHeadings[0]!.compareDocumentPosition(closeHeadings[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.getByText('Energy and Commerce')).toBeInTheDocument()
     expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()

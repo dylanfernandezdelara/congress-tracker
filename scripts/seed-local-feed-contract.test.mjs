@@ -112,3 +112,17 @@ test('seeded data is clearly marked as a local sample', () => {
   const sql = printSql()
   assert.match(sql, /local sample/)
 })
+
+test('seed includes long-waiting committee referrals for the pulse widget', () => {
+  const sql = printSql()
+  assert.match(sql, /HR', 9001, 'hsif00', 'sent'/)
+  assert.match(sql, /HR', 9003, 'hsba00', 'sent'/)
+  assert.match(sql, /S', 9001, 'sshr00', 'sent'/)
+  const match = sql.match(/HR', 9001, 'hsif00', 'sent', '(\d{4}-\d{2}-\d{2})T/)
+  assert.ok(match, 'expected a sent timestamp for HR 9001')
+  const ageDays = (Date.now() - Date.parse(`${match[1]}T00:00:00.000Z`)) / 86_400_000
+  assert.ok(
+    ageDays >= 90,
+    `waiting seed ${match[1]} (${Math.round(ageDays)}d old) must be at least 90 days old`,
+  )
+})

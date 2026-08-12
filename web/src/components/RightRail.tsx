@@ -92,6 +92,13 @@ function ChamberPulseSection({
     <section className="sidebar-chamber space-y-4">
       <h2 className="sidebar-kicker">{title}</h2>
 
+      <WaitingInCommittee
+        items={waiting}
+        loading={waitingLoading}
+        error={waitingError}
+        onRetry={onWaitingRetry}
+      />
+
       <div className="sidebar-widget space-y-2">
         <h3 className="text-[12px] font-medium text-foreground">Close votes</h3>
         {data.close_votes.length === 0 ? (
@@ -140,13 +147,6 @@ function ChamberPulseSection({
           ) : null}
         </p>
       </div>
-
-      <WaitingInCommittee
-        items={waiting}
-        loading={waitingLoading}
-        error={waitingError}
-        onRetry={onWaitingRetry}
-      />
     </section>
   )
 }

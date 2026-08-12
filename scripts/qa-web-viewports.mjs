@@ -445,10 +445,23 @@ async function installApiMocks(page) {
   })
 
   await page.route('**/stats/committees.json**', async (route) => {
+    const url = new URL(route.request().url())
+    const chamber = url.searchParams.get('chamber') === 'Senate' ? 'Senate' : 'House'
+    const items =
+      chamber === 'Senate'
+        ? [
+            {
+              system_code: 'sshr00',
+              name: 'HELP Committee',
+              chamber: 'Senate',
+              waiting: 1,
+            },
+          ]
+        : MOCK_COMMITTEES.items
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(MOCK_COMMITTEES),
+      body: JSON.stringify({ ...MOCK_COMMITTEES, chamber, items }),
     })
   })
 

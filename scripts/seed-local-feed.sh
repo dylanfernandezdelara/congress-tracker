@@ -36,6 +36,9 @@ days_ago() {
 D_RECENT="$(days_ago 1)"
 D_MID="$(days_ago 4)"
 D_OLDER="$(days_ago 9)"
+# Referrals older than PROCESS_STUCK_DAYS (90) so the pulse "Waiting in
+# committee" widget has standing-committee rows to show.
+D_STUCK="$(days_ago 100)"
 
 # Schema mirrors workers/senate_data_worker/src/d1/schema.ts so seeding works
 # against a brand-new local store before the worker has applied its schema.
@@ -298,7 +301,11 @@ VALUES
   (119, 'HR', 22, 'hsba00', 'sent', '${D_OLDER}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Referred To', NULL),
   (119, 'HR', 22, 'hsba00', 'worked_on', '${D_RECENT}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Markup By', NULL),
   (119, 'S', 47, 'sshr00', 'sent', '${D_OLDER}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Referred To', NULL),
-  (119, 'S', 47, 'sshr00', 'released', '${D_MID}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Discharged From', NULL);
+  (119, 'S', 47, 'sshr00', 'released', '${D_MID}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Discharged From', NULL),
+  (119, 'HR', 9001, 'hsif00', 'sent', '${D_STUCK}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Referred To', NULL),
+  (119, 'HR', 9002, 'hsif00', 'sent', '${D_STUCK}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Referred To', NULL),
+  (119, 'HR', 9003, 'hsba00', 'sent', '${D_STUCK}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Referred To', NULL),
+  (119, 'S', 9001, 'sshr00', 'sent', '${D_STUCK}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Referred To', NULL);
 
 INSERT OR REPLACE INTO nominations
   (congress, nomination_number, part_number, citation, description, organization, position_title,
