@@ -66,6 +66,13 @@ export const LIFECYCLE_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 export const MEMBER_VOTES_MAX_ROLLS_PER_RUN = 150;
 
 /**
+ * Max Senate.gov Browser Rendering fetches per Worker isolate/invocation.
+ * Caps catch-up member-votes days when Akamai 403 forces BR for every roll.
+ * Menu ingest needs at most one; leave headroom for member rolls.
+ */
+export const SENATE_BROWSER_FETCHES_MAX_PER_RUN = 40;
+
+/**
  * Max rolls to repair per member-session-stats reconcile invocation when drift
  * is detected. Remaining drifted rolls are reported so the next run continues.
  */

@@ -76,13 +76,13 @@ Severity split (important while Senate.gov 403 persists):
 | Severity | Status | Action |
 |----------|--------|--------|
 | Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken, no scheduled success, hard chamber skip, **or** menu cache nearing expiry / expired |
-| Tracked / known | `degraded` (Senate **cache fallback** and/or menu cache stale >48h) | Keep daily menu refresh; do **not** page forever |
+| Tracked / known | `degraded` (Senate **cache fallback** and/or menu cache stale >48h) | Confirm `senate_fetch_browser_rendering_fallback` / menu cache write in Workers Logs; page only if Browser Rendering **and** D1 cache both fail, or cache nears 7d. Break-glass: `npm run refresh:senate-menu`. Do **not** page forever on expected 403→BR/cache. |
 | Clear | `ok` | No action |
 
-`degraded` covers expected Worker→Senate.gov 403 → D1 menu cache fallback and
-stale-but-usable cache (>48h). A soft-fail that skips an entire chamber
-(`* ingest skipped:`) or a menu cache within 24h of the 7d hard expiry is
-**`failed`** so uptime checks and `CHECK_HEALTH=1` still page.
+`degraded` covers expected Worker→Senate.gov 403 → Browser Rendering (or D1
+menu cache fallback) and stale-but-usable cache (>48h). A soft-fail that skips
+an entire chamber (`* ingest skipped:`) or a menu cache within 24h of the 7d
+hard expiry is **`failed`** so uptime checks and `CHECK_HEALTH=1` still page.
 
 1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
    `last_skipped` (lease skips leave no failure log). Alert only when
@@ -91,8 +91,8 @@ stale-but-usable cache (>48h). A soft-fail that skips an entire chamber
    `skipped_at` — the field is sticky and non-null alone is not an alarm.
 2. **Uptime** — poll workers.dev `/health` or `/debug/ingest.json` and **page**
    when `data.ingest.status` is `failed` | `stale` | `unknown`. Treat sustained
-   `degraded` + Senate cache-fallback as a known condition (daily refresh), not
-   a pager storm; optional notify only on transition *into* `degraded`.
+   `degraded` (403 → Browser Rendering and/or D1 cache) as a known condition,
+   not a pager storm; optional notify only on transition *into* `degraded`.
 3. **Manual** — `POST /__pipeline/run/feed` with
    `Authorization: Bearer <PIPELINE_ADMIN_TOKEN>`.
 4. **Browser Rendering (primary, in-Worker)** — daily feed cron uses the

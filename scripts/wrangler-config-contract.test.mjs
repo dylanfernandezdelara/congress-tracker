@@ -70,6 +70,23 @@ function parseWranglerConfig(filePath) {
   }
 }
 
+test('compatibility_date meets Browser Run quickAction floor', () => {
+  // quickAction() requires compatibility_date >= 2026-03-24.
+  const minDate = '2026-03-24'
+  const root = parseWranglerConfig(rootConfigPath)
+  const worker = parseWranglerConfig(workerConfigPath)
+  assert.ok(root.compatibility_date, 'root compatibility_date missing')
+  assert.ok(worker.compatibility_date, 'worker compatibility_date missing')
+  assert.ok(
+    root.compatibility_date >= minDate,
+    `root compatibility_date ${root.compatibility_date} must be >= ${minDate}`,
+  )
+  assert.ok(
+    worker.compatibility_date >= minDate,
+    `worker compatibility_date ${worker.compatibility_date} must be >= ${minDate}`,
+  )
+})
+
 test('root and worker wrangler.toml share deployment metadata', () => {
   const root = parseWranglerConfig(rootConfigPath)
   const worker = parseWranglerConfig(workerConfigPath)
