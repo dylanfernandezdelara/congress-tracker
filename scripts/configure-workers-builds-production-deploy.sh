@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Configure Cloudflare Workers Builds so pushes to main deploy production.
+# Configure Cloudflare Workers Builds so pushes to GitHub main deploy production.
+# Workers Builds git integration supports GitHub/GitLab only — keep the trigger
+# on dylanfernandezdelara/congress-tracker. Origin is the development host, not
+# the Cloudflare git provider. See docs/ORIGIN.md.
 #
 # Requires a *user-scoped* API token with "Workers Builds Configuration: Edit"
 # (account-scoped deploy tokens return "Invalid token" on the Builds API).
@@ -145,4 +148,5 @@ if [[ "${updated_preview}" -eq 1 ]]; then
 fi
 echo
 echo "Production URL: https://${WORKER_NAME}.<subdomain>.workers.dev"
-echo "Next push to main will deploy there automatically."
+echo "Next push that reaches GitHub main will deploy there automatically."
+echo "Keep Workers Builds connected to GitHub (not Origin). See docs/ORIGIN.md."

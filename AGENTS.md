@@ -53,11 +53,35 @@ Whenever you change the UI (`web/`), always share the preview URL in your reply 
 
 `qa:web` checks home across iPhone SE (320px), iPhone 14 (390px), desktop (1280px), and wide desktop (1440px) in both light and dark mode (8 checks). It verifies the header, theme, feed card / sidebar sections, and headlines are not clipped, and that the requested theme is active. Override the target URL with `QA_WEB_URL` if Vite uses a non-default port. Screenshots and a JSON summary land in `artifacts/qa-viewports/`.
 
-Agent context lives in this file and `.cursor/rules/` (`pr-viewport-qa.mdc`, `pr-thermonuclear-review.mdc`) so any Cursor session picks up the same workflow without depending on GitHub.
+Agent context lives in this file and `.cursor/rules/` (`pr-viewport-qa.mdc`, `pr-thermonuclear-review.mdc`, `origin-github-hosting.mdc`) so any Cursor session picks up the same workflow without depending on GitHub Actions.
+
+### Hosting (Cursor Origin + GitHub)
+
+Day-to-day development happens on [Cursor Origin](https://cursor.com/docs/origin)
+([cursor.com/codebase](https://cursor.com/codebase)): browse, search, pull
+requests, and cloud agents. **GitHub is not deprecated.**
+
+Production Cloudflare Workers Builds stays connected to
+[`dylanfernandezdelara/congress-tracker`](https://github.com/dylanfernandezdelara/congress-tracker).
+Cloudflare's git integration supports GitHub and GitLab only — not Origin — so
+do **not** detach the Origin mirror from GitHub and do **not** remove the
+GitHub remote.
+
+Preferred setup: **Sync from GitHub** so Origin is a live mirror. Pushes and
+PRs on Origin pass through to GitHub, which still triggers Workers Builds and
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). Add the Origin remote
+without replacing GitHub:
+
+```bash
+ORIGIN_REPO_URL=https://origin.cursor.com/{codebase}/congress-tracker.git \
+  npm run remotes:origin
+```
+
+Details: [`docs/ORIGIN.md`](docs/ORIGIN.md).
 
 ### Production deploys (Cloudflare Workers Builds, not GitHub Actions)
 
-Pushes to `main` should deploy production via Cloudflare Workers Builds
+Pushes that reach GitHub `main` deploy production via Cloudflare Workers Builds
 (`wrangler deploy` via the worker package on the production trigger).
 PR branches use `wrangler versions upload` for preview URLs only.
 
@@ -153,6 +177,6 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 - Default to `npm test` for verification.
 - Never commit secrets from `.dev.vars`.
 - `FEED_MAX_BILLS` and `DIGEST_MAX_NEW_REWRITES` are module constants in `workers/senate_data_worker/src/constants.ts`. `VOTE_LOOKBACK_DAYS` lives in `shared/feed-constants.ts` (worker re-exports; web imports for empty-state copy).
-- Always `git fetch origin` before starting work on a fresh session.
+- Always `git fetch` the GitHub remote (`origin` today) before starting work on a fresh session. If you added a `cursor` Origin remote, fetch that too.
 - After `web/` work, follow the ship checklist above (tests → `qa:web` → thermonuclear review → preview URL). Never publish a preview URL without attempting QA and review first.
 - After any UI change, always give the user the latest preview URL in chat so they can view the result in a browser.

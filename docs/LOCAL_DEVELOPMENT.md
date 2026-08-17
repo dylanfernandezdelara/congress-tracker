@@ -5,6 +5,11 @@ auto-runs `./scripts/cursor-cloud-setup.sh` and ships with Cloudflare
 credentials and API keys already injected. This guide makes a **local machine**
 behave the same way so you can move between the two without surprises.
 
+Day-to-day source control can be Cursor Origin
+([cursor.com/codebase](https://cursor.com/codebase)). Keep the GitHub remote —
+Cloudflare Workers Builds still deploys from GitHub. See
+[`ORIGIN.md`](ORIGIN.md) and `npm run remotes:origin`.
+
 ## TL;DR
 
 ```bash

@@ -1,6 +1,6 @@
 # Docs agent guide
 
-The app is in a product reset. Use the root `AGENTS.md` for commands and current behavior.
+The app is in a product reset. Use the root `AGENTS.md` for commands and current behavior. Hosting (Origin + GitHub + Cloudflare) is in [`ORIGIN.md`](ORIGIN.md).
 
 ## Local preview
 

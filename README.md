@@ -34,6 +34,8 @@ curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed
 ```
 
 Local ↔ Cursor Cloud parity details: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md).
+Develop on [Cursor Origin](https://cursor.com/codebase); production still
+deploys from GitHub — see [`docs/ORIGIN.md`](docs/ORIGIN.md).
 
 ## Architecture
 
@@ -61,9 +63,12 @@ npm test
 The Worker serves both the API and the bundled React app (Workers static
 assets), so a single deploy ships everything from one origin.
 
-**Automatic:** pushes to `main` deploy production via Cloudflare Workers Builds
-(Wrangler + Cloudflare git integration — no GitHub Actions deploy workflow).
-See [`docs/PREVIEW_DEPLOYMENTS.md`](docs/PREVIEW_DEPLOYMENTS.md) for build
+**Automatic:** pushes that reach GitHub `main` deploy production via Cloudflare
+Workers Builds (Wrangler + Cloudflare git integration — no GitHub Actions
+deploy workflow). Cloudflare cannot connect Workers Builds to Origin, so keep
+the GitHub repo and the Origin **Sync from GitHub** mirror. See
+[`docs/ORIGIN.md`](docs/ORIGIN.md) and
+[`docs/PREVIEW_DEPLOYMENTS.md`](docs/PREVIEW_DEPLOYMENTS.md) for build
 commands and one-time setup (`npm run configure:cloudflare-builds`).
 
 **Manual** (local or agent):

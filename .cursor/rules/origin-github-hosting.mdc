@@ -1,0 +1,16 @@
+---
+description: Keep GitHub as the Cloudflare deploy trigger while developing on Cursor Origin
+alwaysApply: true
+---
+
+# Origin + GitHub hosting
+
+Development happens on Cursor Origin (`cursor.com/codebase`). Production
+Cloudflare Workers Builds stays connected to GitHub
+(`dylanfernandezdelara/congress-tracker`).
+
+- Do **not** detach the Origin repo from GitHub.
+- Do **not** remove the GitHub remote, delete `.github/workflows/ci.yml`, or
+  reconnect Workers Builds to Origin (Cloudflare only supports GitHub/GitLab).
+- Add Origin as a second remote (`cursor`) with `npm run remotes:origin`.
+- Details: [`docs/ORIGIN.md`](docs/ORIGIN.md).

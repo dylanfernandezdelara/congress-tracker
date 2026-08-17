@@ -25,9 +25,11 @@ Previews use Cloudflare [version preview URLs](https://developers.cloudflare.com
 new immutable version with its own URL but leaves production on the currently
 deployed version.
 
-**Production** updates when `main` is pushed (Cloudflare Workers Builds runs
-`wrangler deploy`) or when you run `npm run deploy` manually. Preview uploads
-never shift production traffic.
+**Production** updates when GitHub `main` is pushed (Cloudflare Workers Builds
+runs `wrangler deploy`) or when you run `npm run deploy` manually. Preview
+uploads never shift production traffic. Develop on Cursor Origin if you want;
+keep the GitHub repository connected to Workers Builds. Origin is not a
+Cloudflare git provider — see [`ORIGIN.md`](ORIGIN.md).
 
 Each upload yields two URLs:
 
@@ -61,7 +63,10 @@ Cloudflare env vars set. No GitHub Actions, secrets, or pull request required.
 ## Production deploys — Cloudflare Workers Builds (no GitHub Actions)
 
 This repo uses [Cloudflare Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/)
-(not GitHub Actions) for CI/CD:
+(not GitHub Actions) for CI/CD. The Builds git integration must stay on the
+**GitHub** repository (`dylanfernandezdelara/congress-tracker`). Cloudflare
+supports GitHub and GitLab only; do not reconnect Builds to Origin and do not
+**Detach from GitHub** in Origin settings.
 
 | Branch | Deploy command | Result |
 | --- | --- | --- |
@@ -101,8 +106,10 @@ Settings → Build**:
 Enable [non-production branch builds](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/#configure-non-production-branch-builds)
 so PR branches get preview URLs.
 
-After setup, every push to `main` deploys production automatically via Wrangler.
-No GitHub Actions deploy workflow is required.
+After setup, every push that reaches GitHub `main` deploys production
+automatically via Wrangler. Origin-mirrored pushes pass through to GitHub, so
+Origin development still ships production. No GitHub Actions deploy workflow is
+required.
 
 ## Safety notes
 
