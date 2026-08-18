@@ -1,26 +1,28 @@
 #!/usr/bin/env bash
-# Add or verify git remotes so Cursor Origin and GitHub stay in parallel.
+# Ensure git remotes keep GitHub (Cloudflare Workers Builds) and optionally
+# add a Cursor Origin remote. Never deletes remotes and never overwrites a
+# GitHub `origin`.
 #
 # Cloudflare Workers Builds only supports GitHub/GitLab. Production deploys
-# require GitHub to keep receiving commits. This script never deletes remotes
-# and never overwrites a GitHub `origin`.
+# require GitHub to keep receiving commits.
 #
 # Usage:
 #   ./scripts/setup-origin-remote.sh
 #   ORIGIN_REPO_URL=https://origin.cursor.com/{codebase}/congress-tracker.git \
 #     ./scripts/setup-origin-remote.sh
 #
+# A bare run prints remotes and adds the GitHub remote if it is missing
+# (needed after an Origin-only clone). Set ORIGIN_REPO_URL to add `cursor`.
+#
 # Optional:
 #   GITHUB_REPO_URL=https://github.com/dylanfernandezdelara/congress-tracker.git
 #   ORIGIN_REMOTE_NAME=cursor
-#   REQUIRE_GITHUB=1   # exit 1 when no GitHub remote exists after setup
 
 set -euo pipefail
 
 GITHUB_REPO_URL="${GITHUB_REPO_URL:-https://github.com/dylanfernandezdelara/congress-tracker.git}"
 ORIGIN_REPO_URL="${ORIGIN_REPO_URL:-}"
 ORIGIN_REMOTE_NAME="${ORIGIN_REMOTE_NAME:-cursor}"
-REQUIRE_GITHUB="${REQUIRE_GITHUB:-0}"
 
 if ! command -v git >/dev/null; then
   echo "error: git is required." >&2
@@ -32,6 +34,14 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
+sanitize_url() {
+  local url="$1"
+  if [[ "${url}" == *"@"* && "${url}" == *"://"* ]]; then
+    url="${url%%://*}://${url#*@}"
+  fi
+  printf '%s' "${url}"
+}
+
 normalize_remote_url() {
   local url="$1"
   url="${url#https://}"
@@ -40,7 +50,6 @@ normalize_remote_url() {
   url="${url#ssh://git@}"
   url="${url/://}"
   url="${url%.git}"
-  # Strip credentials (x-access-token:…@host/path).
   if [[ "${url}" == *"@"* ]]; then
     url="${url#*@}"
   fi
@@ -64,13 +73,13 @@ remote_url() {
 }
 
 display_remote_url() {
-  local url
-  url="$(remote_url "$1")"
-  if [[ "${url}" == *"@"* && "${url}" == *"://"* ]]; then
-    url="${url%%://*}://${url#*@}"
-  fi
-  printf '%s' "${url}"
+  sanitize_url "$(remote_url "$1")"
 }
+
+if ! is_github_url "${GITHUB_REPO_URL}"; then
+  echo "error: GITHUB_REPO_URL must be a GitHub URL (github.com)." >&2
+  exit 1
+fi
 
 has_github_remote=0
 has_origin_remote=0
@@ -98,7 +107,7 @@ echo "Git remotes (GitHub stays the Cloudflare Workers Builds trigger):"
 if [[ "${has_github_remote}" -eq 1 ]]; then
   echo "  GitHub: ${github_remote_name} -> $(display_remote_url "${github_remote_name}")"
 else
-  echo "  GitHub: missing"
+  echo "  GitHub: missing (will add)"
 fi
 
 if [[ "${has_origin_remote}" -eq 1 ]]; then
@@ -112,11 +121,11 @@ fi
 if [[ "${has_github_remote}" -eq 0 ]]; then
   if git remote get-url origin >/dev/null 2>&1; then
     git remote add github "${GITHUB_REPO_URL}"
-    echo "added github -> ${GITHUB_REPO_URL}"
+    echo "added github -> $(sanitize_url "${GITHUB_REPO_URL}")"
     github_remote_name="github"
   else
     git remote add origin "${GITHUB_REPO_URL}"
-    echo "added origin -> ${GITHUB_REPO_URL}"
+    echo "added origin -> $(sanitize_url "${GITHUB_REPO_URL}")"
     github_remote_name="origin"
   fi
   has_github_remote=1
@@ -124,7 +133,7 @@ fi
 
 if [[ -n "${ORIGIN_REPO_URL}" ]]; then
   if ! is_origin_url "${ORIGIN_REPO_URL}"; then
-    echo "error: ORIGIN_REPO_URL must be an Origin HTTPS URL (origin.cursor.com)." >&2
+    echo "error: ORIGIN_REPO_URL must be an Origin URL (origin.cursor.com)." >&2
     exit 1
   fi
   if [[ "${has_origin_remote}" -eq 0 ]]; then
@@ -133,7 +142,7 @@ if [[ -n "${ORIGIN_REPO_URL}" ]]; then
       exit 1
     fi
     git remote add "${ORIGIN_REMOTE_NAME}" "${ORIGIN_REPO_URL}"
-    echo "added ${ORIGIN_REMOTE_NAME} -> ${ORIGIN_REPO_URL}"
+    echo "added ${ORIGIN_REMOTE_NAME} -> $(sanitize_url "${ORIGIN_REPO_URL}")"
     origin_remote_name="${ORIGIN_REMOTE_NAME}"
     has_origin_remote=1
   else
@@ -144,8 +153,3 @@ fi
 echo
 echo "Do not Detach from GitHub in Origin settings. That would stop production"
 echo "Cloudflare deploys. See docs/ORIGIN.md."
-
-if [[ "${REQUIRE_GITHUB}" == "1" && "${has_github_remote}" -eq 0 ]]; then
-  echo "error: no GitHub remote after setup." >&2
-  exit 1
-fi

@@ -57,8 +57,9 @@ ORIGIN_REPO_URL=https://origin.cursor.com/{codebase}/congress-tracker.git \
   npm run remotes:origin
 ```
 
-That adds a `cursor` remote when missing and refuses to drop GitHub. Check
-status anytime with `npm run remotes:origin`.
+That **ensures** remotes: it adds a `cursor` remote when missing, adds GitHub
+if you cloned from Origin only, and refuses to drop GitHub. A bare
+`npm run remotes:origin` prints remotes and repairs a missing GitHub remote.
 
 If you cloned from Origin instead of GitHub, the same command adds a `github`
 remote pointing at `https://github.com/dylanfernandezdelara/congress-tracker.git`.

@@ -46,7 +46,7 @@ function runScript(dir, env = {}) {
 
 test('setup-origin-remote adds GitHub origin when no remotes exist', () => {
   const dir = initRepo()
-  const output = runScript(dir, { REQUIRE_GITHUB: '1' })
+  const output = runScript(dir)
 
   assert.match(output, /added origin -> /)
   assert.match(remotes(dir), /origin\s+https:\/\/github\.com\/dylanfernandezdelara\/congress-tracker\.git/)
@@ -74,7 +74,7 @@ test('setup-origin-remote adds github remote when origin already points at Origi
     env: isolatedGitEnv(),
   })
 
-  const output = runScript(dir, { REQUIRE_GITHUB: '1' })
+  const output = runScript(dir)
 
   assert.match(output, /added github -> /)
   const listed = remotes(dir)
@@ -91,7 +91,7 @@ test('setup-origin-remote refuses a non-Origin ORIGIN_REPO_URL', () => {
 
   assert.throws(
     () => runScript(dir, { ORIGIN_REPO_URL: githubUrl }),
-    /ORIGIN_REPO_URL must be an Origin HTTPS URL/,
+    /ORIGIN_REPO_URL must be an Origin URL/,
   )
   assert.doesNotMatch(remotes(dir), /cursor\s+/)
 })
@@ -131,4 +131,27 @@ test('docs keep GitHub as the Cloudflare deploy trigger', () => {
   assert.match(readme, /docs\/ORIGIN\.md/)
   assert.match(preview, /GitHub repository/)
   assert.equal(packageJson.scripts['remotes:origin'], './scripts/setup-origin-remote.sh')
+})
+
+test('setup-origin-remote redacts credentials when adding remotes', () => {
+  const dir = initRepo()
+  const output = runScript(dir, {
+    GITHUB_REPO_URL: 'https://x-access-token:SUPERSECRET@github.com/dylanfernandezdelara/congress-tracker.git',
+    ORIGIN_REPO_URL: 'https://user:ORIGINSECRET@origin.cursor.com/example-codebase/congress-tracker.git',
+  })
+
+  assert.match(output, /added origin -> https:\/\/github\.com\/dylanfernandezdelara\/congress-tracker\.git/)
+  assert.match(output, /added cursor -> https:\/\/origin\.cursor\.com\/example-codebase\/congress-tracker\.git/)
+  assert.doesNotMatch(output, /SUPERSECRET/)
+  assert.doesNotMatch(output, /ORIGINSECRET/)
+})
+
+test('setup-origin-remote refuses a non-GitHub GITHUB_REPO_URL', () => {
+  const dir = initRepo()
+
+  assert.throws(
+    () => runScript(dir, { GITHUB_REPO_URL: 'https://evil.example/fake.git' }),
+    /GITHUB_REPO_URL must be a GitHub URL/,
+  )
+  assert.doesNotMatch(remotes(dir), /origin\s+/)
 })
