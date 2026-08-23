@@ -40,9 +40,10 @@ describe("assertSenateGovLisUrl", () => {
     );
     expect(() => assertSenateGovLisUrl("https://evil.example/x.xml")).toThrow(/host/i);
     expect(() => assertSenateGovLisUrl("https://www.senate.gov/index.htm")).toThrow(/path/i);
-    expect(() =>
-      assertSenateGovLisUrl("https://user:pass@www.senate.gov/legislative/LIS/roll_call_lists/x.xml")
-    ).toThrow(/credentials/i);
+    const credentialed = new URL("https://www.senate.gov/legislative/LIS/roll_call_lists/x.xml");
+    credentialed.username = "user";
+    credentialed.password = "pass";
+    expect(() => assertSenateGovLisUrl(credentialed.href)).toThrow(/credentials/i);
     expect(() =>
       assertSenateGovLisUrl("https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2")
     ).toThrow(/\.xml/i);

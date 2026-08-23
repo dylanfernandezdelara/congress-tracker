@@ -18,10 +18,25 @@ else
 fi
 
 OUTPUT_PATH="${1:-target/trufflehog-history-scan.json}"
+ALLOW_PATH="${ROOT_DIR}/scripts/trufflehog-allow.json"
 mkdir -p "$(dirname "${OUTPUT_PATH}")"
 
+# Default trufflehog 2.x fetches every origin ref and scans them all. A stale
+# feature branch with test fixtures must not fail main CI.
+SCAN_BRANCH="${TRUFFLEHOG_BRANCH:-}"
+if [[ -z "${SCAN_BRANCH}" ]]; then
+  SCAN_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  if [[ -z "${SCAN_BRANCH}" || "${SCAN_BRANCH}" == "HEAD" ]]; then
+    SCAN_BRANCH="main"
+  fi
+fi
+
 set +e
-"${SCANNER_BIN}" --json --regex --entropy=False --repo_path "${ROOT_DIR}" "file://${ROOT_DIR}" > "${OUTPUT_PATH}"
+"${SCANNER_BIN}" --json --regex --entropy=False \
+  --allow "${ALLOW_PATH}" \
+  --branch "${SCAN_BRANCH}" \
+  --repo_path "${ROOT_DIR}" \
+  "file://${ROOT_DIR}" > "${OUTPUT_PATH}"
 status=$?
 set -e
 
