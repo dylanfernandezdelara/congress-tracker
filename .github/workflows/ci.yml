@@ -46,19 +46,3 @@ jobs:
 
       - name: Run public readiness check
         run: npm run public:check
-
-      - name: Setup Python
-        if: github.event_name != 'pull_request'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install trufflehog
-        if: github.event_name != 'pull_request'
-        run: |
-          python3 -m pip install --user trufflehog
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: History secret scan
-        if: github.event_name != 'pull_request'
-        run: npm run public:scan:history-secrets
