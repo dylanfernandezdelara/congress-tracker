@@ -349,7 +349,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockUpsertLifecycle).not.toHaveBeenCalled();
   });
 
-  it("merges public-law bills into lifecycle refresh before persisting gaps", async () => {
+  it("persists public-law gaps without stealing the lifecycle refresh budget", async () => {
     mockGetDigest.mockResolvedValue(completeDigest);
     mockFetchRecentPublicLaws.mockResolvedValue([
       {
@@ -378,10 +378,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockFetchRecentPublicLaws).toHaveBeenCalledWith(expect.anything(), 119);
     expect(mockGetLifecyclesForBills).toHaveBeenCalledWith(
       {},
-      expect.arrayContaining([
-        expect.objectContaining({ congress: 119, billType: "S", billNumber: 1003 }),
-        expect.objectContaining({ congress: 119, billType: "HR", billNumber: 1 }),
-      ])
+      [expect.objectContaining({ congress: 119, billType: "HR", billNumber: 1 })]
     );
     expect(mockPersistPublicLaws).toHaveBeenCalledWith(
       expect.anything(),

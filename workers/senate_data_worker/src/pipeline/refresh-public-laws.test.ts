@@ -207,8 +207,10 @@ describe("persistPublicLaws", () => {
       {},
       expect.objectContaining({
         title: "21st Century ROAD to Housing Act",
-        preserveDigestJson: expect.stringContaining("local sample"),
+        preserveDigestJson: expect.stringContaining("Overhauls federal housing programs"),
       })
     );
+    const digestArg = mockUpsertDigest.mock.calls[0]?.[1] as { preserveDigestJson?: string };
+    expect(digestArg.preserveDigestJson).not.toContain("local sample");
   });
 });

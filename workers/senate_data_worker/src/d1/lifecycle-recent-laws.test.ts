@@ -94,7 +94,8 @@ function createLifecycleQueryDb(opts: {
             d.bill_type.toUpperCase() === row.bill_type.toUpperCase() &&
             d.number === row.bill_number
         );
-        const joined = dedupeDigests ? matches.slice(0, 1) : matches;
+        const preferred = matches.find((d) => d.title && !d.title.includes("(local sample)"));
+        const joined = dedupeDigests ? [preferred ?? matches[0]].filter(Boolean) : matches;
         const digestRows = joined.length > 0 ? joined : [null];
         return digestRows.map((digest) => {
           let headline: string | null = null;
@@ -134,7 +135,9 @@ function createLifecycleQueryDb(opts: {
 
   const stmt = (sql: string) => {
     const isEnacted = sql.includes("FROM bill_lifecycle l") && sql.includes("became_law_date IS NOT NULL");
-    const digestDeduped = sql.includes("GROUP BY congress, UPPER(bill_type), number");
+    const digestDeduped =
+      sql.includes("GROUP BY congress, UPPER(bill_type), number") &&
+      sql.includes("local sample");
     const isPresented =
       sql.includes("FROM bill_lifecycle") &&
       sql.includes("presented_date IS NOT NULL") &&

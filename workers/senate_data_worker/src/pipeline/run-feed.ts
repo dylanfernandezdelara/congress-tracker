@@ -28,8 +28,8 @@ import {
   persistConfirmationVotes,
   refreshConfirmationEnrichment,
 } from "./refresh-confirmations";
-import { persistPublicLaws, publicLawsToBillRows } from "./refresh-public-laws";
-import { mergeLifecycleRefreshCandidates, refreshBillLifecycles } from "./refresh-lifecycles";
+import { persistPublicLaws } from "./refresh-public-laws";
+import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
 import { enqueueProcessBills } from "../d1/bill-process";
 import { hydrateProcessBills } from "./refresh-bill-process";
@@ -265,11 +265,7 @@ export async function runFeedPipeline(
       );
     }
 
-    const lifecycleResult = await refreshBillLifecycles(
-      env,
-      mergeLifecycleRefreshCandidates(publicLawsToBillRows(publicLaws), bills),
-      trigger
-    );
+    const lifecycleResult = await refreshBillLifecycles(env, bills, trigger);
     const lifecycleRefreshed = lifecycleResult.refreshed;
     const lifecycleSkipped = lifecycleResult.skipped;
     const lifecycleWarnings = [...publicLawWarnings, ...lifecycleResult.warnings];

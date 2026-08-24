@@ -1,4 +1,4 @@
-import { containsLocalSampleLabel } from "../../../../shared/bill-id";
+import { containsLocalSampleLabel, stripLocalSampleLabel } from "../../../../shared/bill-id";
 import type { Env } from "../config";
 import { getDigest, parseStoredDigest, upsertDigest } from "../d1/digests";
 import {
@@ -15,6 +15,15 @@ export interface PersistPublicLawsResult {
   upserted: number;
   titlesWritten: number;
   warnings: string[];
+}
+
+function stripSampleLabelsFromDigestJson(json: string | null): string | null {
+  const parsed = parseStoredDigest(json);
+  if (!parsed) return json;
+  if (!containsLocalSampleLabel(parsed.headline)) return json;
+  const headline = stripLocalSampleLabel(parsed.headline);
+  if (!headline) return json;
+  return JSON.stringify({ ...parsed, headline });
 }
 
 export function publicLawsToBillRows(laws: PublicLawRecord[]): LifecycleBillRow[] {
@@ -88,6 +97,7 @@ export async function persistPublicLaws(
     try {
       const digestRow = await getDigest(env.DB, law.congress, law.billType, law.billNumber);
       const digest = parseStoredDigest(digestRow?.digest_json ?? null);
+      const cleanedDigestJson = stripSampleLabelsFromDigestJson(digestRow?.digest_json ?? null);
       const needsTitle =
         !digestRow ||
         containsLocalSampleLabel(digestRow.title) ||
@@ -102,7 +112,7 @@ export async function persistPublicLaws(
         policyArea: digestRow?.policy_area ?? null,
         rawSummaryText: digestRow?.raw_summary_text ?? null,
         digest: null,
-        preserveDigestJson: digestRow?.digest_json ?? null,
+        preserveDigestJson: cleanedDigestJson,
       });
       titlesWritten += 1;
     } catch (err: unknown) {
