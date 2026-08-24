@@ -80,45 +80,49 @@ function createLifecycleQueryDb(opts: {
       }));
   }
 
-  function enactedResults(congress: number, limit: number) {
+  function enactedResults(congress: number, limit: number, dedupeDigests: boolean) {
     return opts.lifecycles
       .filter((row) => row.congress === congress)
       .filter((row) => row.became_law_date != null)
       .filter(
         (row) => row.law_kind == null || (row.law_kind !== "vetoed" && row.law_kind !== "pocket_vetoed")
       )
-      .map((row) => {
-        const digest = digests.find(
+      .flatMap((row) => {
+        const matches = digests.filter(
           (d) =>
             d.congress === row.congress &&
             d.bill_type.toUpperCase() === row.bill_type.toUpperCase() &&
             d.number === row.bill_number
         );
-        let headline: string | null = null;
-        if (digest?.digest_json) {
-          try {
-            const parsed = JSON.parse(digest.digest_json) as { headline?: string };
-            headline = parsed.headline ?? null;
-          } catch {
-            headline = null;
+        const joined = dedupeDigests ? matches.slice(0, 1) : matches;
+        const digestRows = joined.length > 0 ? joined : [null];
+        return digestRows.map((digest) => {
+          let headline: string | null = null;
+          if (digest?.digest_json) {
+            try {
+              const parsed = JSON.parse(digest.digest_json) as { headline?: string };
+              headline = parsed.headline ?? null;
+            } catch {
+              headline = null;
+            }
           }
-        }
-        return {
-          congress: row.congress,
-          bill_type: row.bill_type,
-          bill_number: row.bill_number,
-          title: digest?.title ?? null,
-          policy_area: digest?.policy_area ?? null,
-          headline,
-          became_law_date: row.became_law_date,
-          law_kind: row.law_kind,
-          public_law: row.public_law,
-          signed_date: row.signed_date,
-          presented_date: row.presented_date,
-          latest_action_date: row.latest_action_date,
-          latest_action_text: row.latest_action_text,
-          latest_passage_vote_date: latestPassageVoteDate(row),
-        };
+          return {
+            congress: row.congress,
+            bill_type: row.bill_type,
+            bill_number: row.bill_number,
+            title: digest?.title ?? null,
+            policy_area: digest?.policy_area ?? null,
+            headline,
+            became_law_date: row.became_law_date,
+            law_kind: row.law_kind,
+            public_law: row.public_law,
+            signed_date: row.signed_date,
+            presented_date: row.presented_date,
+            latest_action_date: row.latest_action_date,
+            latest_action_text: row.latest_action_text,
+            latest_passage_vote_date: latestPassageVoteDate(row),
+          };
+        });
       })
       .sort((a, b) => {
         const byLaw = (b.became_law_date ?? "").localeCompare(a.became_law_date ?? "");
@@ -130,6 +134,7 @@ function createLifecycleQueryDb(opts: {
 
   const stmt = (sql: string) => {
     const isEnacted = sql.includes("FROM bill_lifecycle l") && sql.includes("became_law_date IS NOT NULL");
+    const digestDeduped = sql.includes("GROUP BY congress, UPPER(bill_type), number");
     const isPresented =
       sql.includes("FROM bill_lifecycle") &&
       sql.includes("presented_date IS NOT NULL") &&
@@ -139,7 +144,9 @@ function createLifecycleQueryDb(opts: {
       bind: (...args: unknown[]) => ({
         all: async () => {
           if (isEnacted) {
-            return { results: enactedResults(args[0] as number, args[1] as number) };
+            return {
+              results: enactedResults(args[0] as number, args[1] as number, digestDeduped),
+            };
           }
           if (isPresented) {
             return { results: presentedPendingResults(args[0] as number, args[1] as number) };
@@ -311,6 +318,48 @@ describe("selectRecentlyEnactedBills", () => {
     expect(all.every((r) => r.became_law_date != null)).toBe(true);
     expect(all.every((r) => r.item === null)).toBe(true);
     expect(all.find((r) => r.bill_number === 100)?.latest_passage_vote_date).toBeNull();
+  });
+
+  it("does not duplicate a law when digest rows differ only by bill_type case", async () => {
+    const db = createLifecycleQueryDb({
+      lifecycles: [
+        {
+          congress: 119,
+          bill_type: "HR",
+          bill_number: 6644,
+          presented_date: "2026-06-29",
+          signed_date: null,
+          vetoed_date: null,
+          became_law_date: "2026-07-11",
+          law_kind: "law_unsigned",
+          public_law: "119-101",
+          latest_action_date: "2026-07-11",
+          latest_action_text: "Became Public Law No: 119-101.",
+        },
+      ],
+      digests: [
+        {
+          congress: 119,
+          bill_type: "HR",
+          number: 6644,
+          title: "21st Century ROAD to Housing Act",
+          policy_area: "Housing",
+          digest_json: null,
+        },
+        {
+          congress: 119,
+          bill_type: "hr",
+          number: 6644,
+          title: "21st Century ROAD to Housing Act (local sample)",
+          policy_area: "Housing",
+          digest_json: null,
+        },
+      ],
+    });
+
+    const rows = await selectRecentlyEnactedBills(db, 119, 10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.bill_number).toBe(6644);
   });
 });
 

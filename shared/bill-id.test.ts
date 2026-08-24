@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   congressGovBillUrl,
   congressOrdinal,
+  containsLocalSampleLabel,
   formatBillDocket,
+  stripLocalSampleLabel,
 } from './bill-id'
 
 describe('congressOrdinal', () => {
@@ -43,6 +45,18 @@ describe('congressGovBillUrl', () => {
     )
     expect(congressGovBillUrl(119, 'SCONRES', 7)).toBe(
       'https://www.congress.gov/bill/119th-congress/senate-concurrent-resolution/7',
+    )
+  })
+})
+
+describe('local sample labels', () => {
+  it('detects and strips the offline seed marker', () => {
+    expect(containsLocalSampleLabel('21st Century ROAD to Housing Act (local sample)')).toBe(true)
+    expect(containsLocalSampleLabel('Overhauls federal housing programs (local sample)')).toBe(true)
+    expect(containsLocalSampleLabel('21st Century ROAD to Housing Act')).toBe(false)
+    expect(containsLocalSampleLabel(null)).toBe(false)
+    expect(stripLocalSampleLabel('21st Century ROAD to Housing Act (local sample)')).toBe(
+      '21st Century ROAD to Housing Act',
     )
   })
 })

@@ -255,9 +255,16 @@ export async function selectRecentlyEnactedBills(
               l.latest_action_date, l.latest_action_text,
               v.latest_passage_vote_date
        FROM bill_lifecycle l
-       LEFT JOIN bill_digests d
+       LEFT JOIN (
+         SELECT congress, UPPER(bill_type) AS bill_type, number,
+                MAX(title) AS title,
+                MAX(policy_area) AS policy_area,
+                MAX(digest_json) AS digest_json
+         FROM bill_digests
+         GROUP BY congress, UPPER(bill_type), number
+       ) d
          ON d.congress = l.congress
-        AND UPPER(d.bill_type) = UPPER(l.bill_type)
+        AND d.bill_type = UPPER(l.bill_type)
         AND d.number = l.bill_number
        LEFT JOIN (
          SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number,

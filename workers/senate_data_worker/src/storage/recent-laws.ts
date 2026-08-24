@@ -1,10 +1,31 @@
+import { stripLocalSampleLabel } from "../../../../shared/bill-id";
+import type { FeedItem } from "../../../../shared/feed-api-types";
+import type { RecentLawItem, RecentLawsResponse } from "../../../../shared/laws-api-types";
 import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS } from "../constants";
 import type { Env } from "../config";
 import { selectRecentlyEnactedBills } from "../d1/lifecycle";
 import type { FeedBillRow } from "../d1/votes";
 import { lookbackStartIso } from "../sources/congress-client";
-import type { RecentLawItem, RecentLawsResponse } from "../../../../shared/laws-api-types";
 import { buildFeedItemsForBills } from "./feed";
+
+function cleanDisplayText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const cleaned = stripLocalSampleLabel(text);
+  return cleaned || null;
+}
+
+function stripSampleLabelsFromItem(item: FeedItem): FeedItem {
+  return {
+    ...item,
+    bill: { ...item.bill, title: cleanDisplayText(item.bill.title) },
+    digest: item.digest
+      ? {
+          ...item.digest,
+          headline: cleanDisplayText(item.digest.headline) ?? item.digest.headline,
+        }
+      : item.digest,
+  };
+}
 
 export type { RecentLawItem, RecentLawsResponse };
 
@@ -49,10 +70,15 @@ export async function buildRecentLaws(
   return {
     congress,
     session,
-    laws: laws.map((law, index) => ({
-      ...law,
-      item: items[index] ?? null,
-    })),
+    laws: laws.map((law, index) => {
+      const item = items[index] ?? null;
+      return {
+        ...law,
+        title: cleanDisplayText(law.title),
+        headline: cleanDisplayText(law.headline),
+        item: item ? stripSampleLabelsFromItem(item) : null,
+      };
+    }),
     as_of: asOf,
   };
 }
