@@ -21,12 +21,14 @@ import {
 import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
-import { fetchBillSummaryBundle, lookbackStartIso } from "../sources/congress-client";
+import { fetchBillSummaryBundle, fetchRecentPublicLaws, lookbackStartIso } from "../sources/congress-client";
+import type { PublicLawRecord } from "../sources/public-laws";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import {
   persistConfirmationVotes,
   refreshConfirmationEnrichment,
 } from "./refresh-confirmations";
+import { persistPublicLaws } from "./refresh-public-laws";
 import { refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
 import { enqueueProcessBills } from "../d1/bill-process";
@@ -247,10 +249,53 @@ export async function runFeedPipeline(
       );
     }
 
+    let publicLaws: PublicLawRecord[] = [];
+    const publicLawWarnings: string[] = [];
+    try {
+      publicLaws = await fetchRecentPublicLaws(env, congress);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      publicLawWarnings.push(message);
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_public_laws_list_failed",
+          trigger,
+          error: message,
+        })
+      );
+    }
+
     const lifecycleResult = await refreshBillLifecycles(env, bills, trigger);
     const lifecycleRefreshed = lifecycleResult.refreshed;
     const lifecycleSkipped = lifecycleResult.skipped;
-    const lifecycleWarnings = lifecycleResult.warnings;
+    const lifecycleWarnings = [...publicLawWarnings, ...lifecycleResult.warnings];
+
+    try {
+      const persisted = await persistPublicLaws(env, publicLaws, trigger);
+      if (persisted.warnings.length > 0) {
+        lifecycleWarnings.push(...persisted.warnings);
+        console.warn(
+          JSON.stringify({
+            event: "feed_pipeline_partial_public_laws",
+            trigger,
+            listed: persisted.listed,
+            upserted: persisted.upserted,
+            titlesWritten: persisted.titlesWritten,
+            warnings: persisted.warnings,
+          })
+        );
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      lifecycleWarnings.push(message);
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_public_laws_persist_failed",
+          trigger,
+          error: message,
+        })
+      );
+    }
 
     if (lifecycleWarnings.length > 0) {
       console.warn(

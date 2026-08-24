@@ -1,6 +1,7 @@
 import { daysAgoLookbackStartIso } from "../../../../shared/lookback";
 import { parseUsStateCode } from "../../../../shared/us-states";
 import type { Env } from "../config";
+import { PUBLIC_LAWS_PAGE_SIZE } from "../constants";
 import {
   parseLifecycleActions,
   type CongressAction,
@@ -10,6 +11,9 @@ import type { BillRef, BillSponsorRecord } from "../types";
 import type { FeedChamber } from "../../../../shared/feed-api-types";
 import { stripHtmlToText } from "./html-clean";
 import { fetchJson, fetchJsonWithMeta, nextPageUrl } from "./http";
+import { parsePublicLawsPage, type PublicLawRecord } from "./public-laws";
+
+export type { PublicLawRecord };
 
 interface BillSummary {
   text?: string;
@@ -144,6 +148,45 @@ export async function fetchBillLifecycleSource(
     introducedDate: detailRes.bill?.introducedDate?.slice(0, 10) ?? null,
     milestones: parseLifecycleActions(actionsRes.actions ?? []),
   };
+}
+
+/**
+ * List public laws for a congress from Congress.gov `/v3/law/{congress}/pub`.
+ * Default list order is not newest-first, so callers sort by `becameLawDate`.
+ * Walks pagination when a congress exceeds one page (~250).
+ */
+export async function fetchRecentPublicLaws(
+  env: Env,
+  congress: number,
+  pageSize: number = PUBLIC_LAWS_PAGE_SIZE
+): Promise<PublicLawRecord[]> {
+  const apiKey = env.CONGRESS_API_KEY;
+  const limit = Math.max(1, Math.min(250, Math.floor(pageSize)));
+  const all: PublicLawRecord[] = [];
+  const seen = new Set<string>();
+  let url: string | null =
+    `https://api.congress.gov/v3/law/${congress}/pub?format=json&limit=${limit}&api_key=${apiKey}`;
+  let pages = 0;
+
+  while (url && pages < 8) {
+    pages += 1;
+    const data: unknown = await fetchJson(url);
+    const page = parsePublicLawsPage(data);
+    for (const law of page.laws) {
+      const key = `${law.congress}:${law.billType}:${law.billNumber}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      all.push(law);
+    }
+    url = page.nextUrl ? nextPageUrl(page.nextUrl, apiKey) : null;
+  }
+
+  all.sort((a, b) => {
+    const byDate = b.becameLawDate.localeCompare(a.becameLawDate);
+    if (byDate !== 0) return byDate;
+    return b.publicLaw.localeCompare(a.publicLaw);
+  });
+  return all;
 }
 
 /** UTC start date for feed/vote lookback: today minus `days` (legacy days-ago window). */

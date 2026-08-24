@@ -173,6 +173,64 @@ describe("buildRecentLaws", () => {
     );
   });
 
+  it("strips leftover local-sample labels from titles and headlines", async () => {
+    mockBuildFeedItemsForBills.mockResolvedValue([
+      {
+        bill: {
+          congress: 119,
+          type: "HR",
+          number: 6644,
+          title: "21st Century ROAD to Housing Act (local sample)",
+        },
+        policy_area: "Housing",
+        digest: {
+          headline: "Overhauls federal housing programs (local sample)",
+          what_it_does: "Reforms housing.",
+          key_points: [],
+          terms_explained: [],
+        },
+        raw_summary_text: null,
+        passage_votes: [],
+        latest_passage_date: null,
+        latest_activity_date: "2026-07-11",
+        lifecycle: null,
+        executive_signals: [],
+        related_executive_bills: [],
+      },
+    ]);
+
+    const body = await buildRecentLaws(
+      createEnv(
+        createRecentLawsDb([
+          {
+            congress: 119,
+            bill_type: "HR",
+            bill_number: 6644,
+            title: "21st Century ROAD to Housing Act (local sample)",
+            policy_area: "Housing",
+            headline: "Overhauls federal housing programs (local sample)",
+            became_law_date: "2026-07-11",
+            law_kind: "law_unsigned",
+            public_law: "119-101",
+            signed_date: null,
+            presented_date: "2026-06-29",
+            latest_action_date: "2026-07-11",
+            latest_action_text: "Became Public Law No: 119-101.",
+            latest_passage_vote_date: "2026-06-22",
+          },
+        ])
+      ),
+      119,
+      2,
+      5
+    );
+
+    expect(body.laws[0]?.title).toBe("21st Century ROAD to Housing Act");
+    expect(body.laws[0]?.headline).toBe("Overhauls federal housing programs");
+    expect(body.laws[0]?.item?.bill.title).toBe("21st Century ROAD to Housing Act");
+    expect(body.laws[0]?.item?.digest?.headline).toBe("Overhauls federal housing programs");
+  });
+
   it("skips feed assembly when there are no laws", async () => {
     const body = await buildRecentLaws(createEnv(createRecentLawsDb([])), 119, 2, 5);
     expect(body.laws).toEqual([]);

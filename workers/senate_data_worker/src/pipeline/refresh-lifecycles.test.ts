@@ -79,6 +79,18 @@ describe("mergeLifecycleRefreshCandidates", () => {
       { bill_congress: 119, bill_type: "S", bill_number: 6644 },
     ]);
   });
+
+  it("keeps earlier groups first when merging public-law candidates", () => {
+    const merged = mergeLifecycleRefreshCandidates(
+      [{ bill_congress: 119, bill_type: "S", bill_number: 1003 }],
+      [{ bill_congress: 119, bill_type: "HR", bill_number: 10 }],
+      [{ bill_congress: 119, bill_type: "S", bill_number: 1003 }]
+    );
+    expect(merged).toEqual([
+      { bill_congress: 119, bill_type: "S", bill_number: 1003 },
+      { bill_congress: 119, bill_type: "HR", bill_number: 10 },
+    ]);
+  });
 });
 
 describe("refreshBillLifecycles", () => {
