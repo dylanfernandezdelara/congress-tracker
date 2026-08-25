@@ -81,20 +81,25 @@ export function timelineFloorChrome(params: {
   now?: Date
 }): { throughLabel: string | null; notice: string | null; statusLabel: string | null } {
   const now = params.now ?? new Date()
-  const passageDay = latestPassageDateAmong(params.items)
+  const includeNotice = params.includeNotice !== false
+  const pagePassageDay = latestPassageDateAmong(params.items)
+  const confirmationDay = maxIsoDay(params.confirmationVoteDates ?? [])
+  const activityDate = (confirmation: string | null) =>
+    floorActivityDate({
+      passageDay: pagePassageDay,
+      houseLast: params.houseLast,
+      senateLast: params.senateLast,
+      confirmationDay: confirmation,
+      chamber: params.chamber,
+    })
+  // Unfiltered / chamber views use session passage watermarks so page-1
+  // executive ranking cannot hide the latest floor vote. Filtered views keep
+  // the through-date on the loaded page.
+  const passageDay = includeNotice ? activityDate(null) : pagePassageDay
   const { throughLabel, notice } = feedQuietCopy(passageDay, now, params.chamber)
   return {
     throughLabel,
-    notice: params.includeNotice === false ? null : notice,
-    statusLabel: floorStatusLabel(
-      floorActivityDate({
-        passageDay,
-        houseLast: params.houseLast,
-        senateLast: params.senateLast,
-        confirmationDay: maxIsoDay(params.confirmationVoteDates ?? []),
-        chamber: params.chamber,
-      }),
-      now,
-    ),
+    notice: includeNotice ? notice : null,
+    statusLabel: floorStatusLabel(activityDate(confirmationDay), now),
   }
 }

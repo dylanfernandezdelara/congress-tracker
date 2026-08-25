@@ -139,4 +139,37 @@ describe('timelineFloorChrome', () => {
       statusLabel: 'In recess',
     })
   })
+
+  it('uses session passage watermarks so page-1 ranking cannot hide the floor date', () => {
+    expect(
+      timelineFloorChrome({
+        items: [{ latest_passage_date: '2026-04-10' }],
+        chamber: null,
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        now,
+      }),
+    ).toEqual({
+      throughLabel: 'Aug 8',
+      notice: 'No new House or Senate passage votes since Aug 8.',
+      statusLabel: 'In recess',
+    })
+  })
+
+  it('keeps a searched through-date on the loaded page', () => {
+    expect(
+      timelineFloorChrome({
+        items: [{ latest_passage_date: '2026-04-10' }],
+        chamber: null,
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        includeNotice: false,
+        now,
+      }),
+    ).toEqual({
+      throughLabel: 'Apr 10',
+      notice: null,
+      statusLabel: 'In recess',
+    })
+  })
 })
