@@ -230,7 +230,7 @@ describe('Home', () => {
     expect(
       await screen.findByText('No new House passage votes since Jun 5.'),
     ).toBeInTheDocument()
-    expect(screen.getByText(/through Jun 5/)).toBeInTheDocument()
+    expect(screen.getByText(/1 of 1 passage vote · through Jun 5 · House/)).toBeInTheDocument()
     expect(screen.queryByText(/since Aug 8/)).not.toBeInTheDocument()
     expect(screen.getByText('In recess')).toBeInTheDocument()
   })
