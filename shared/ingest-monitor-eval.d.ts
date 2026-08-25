@@ -20,6 +20,7 @@ export function isIngestMonitorOpsAcceptable(
 
 export function isChamberHardSkipWarning(warning: string): boolean;
 export function isSenateCacheFallbackWarning(warning: string): boolean;
+export function isIngestTruncationWarning(warning: string): boolean;
 
 export function classifyChamberWarningSeverity(
   warnings: readonly string[]

@@ -4,6 +4,7 @@ import {
   isChamberHardSkipWarning,
   isIngestMonitorHealthy,
   isIngestMonitorOpsAcceptable,
+  isIngestTruncationWarning,
   isSenateCacheFallbackWarning,
 } from "./ingest-monitor-status";
 
@@ -43,9 +44,31 @@ describe("ingest monitor status helpers", () => {
       ])
     ).toBe("failed");
     expect(classifyChamberWarningSeverity(["some other soft warning"])).toBe("failed");
+    expect(
+      classifyChamberWarningSeverity([
+        "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).",
+      ])
+    ).toBe("degraded");
+    expect(
+      classifyChamberWarningSeverity([
+        "Senate vote menu served from D1 cache after live fetch failed: HTTP 403",
+        "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).",
+      ])
+    ).toBe("degraded");
+    expect(
+      classifyChamberWarningSeverity([
+        "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).",
+        "House source listed latest 2026-08-10 is newer than stored 2026-07-23",
+      ])
+    ).toBe("failed");
     expect(isSenateCacheFallbackWarning("Senate vote menu served from D1 cache after live fetch failed: x")).toBe(
       true
     );
     expect(isChamberHardSkipWarning("Senate ingest skipped: 403")).toBe(true);
+    expect(
+      isIngestTruncationWarning(
+        "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first)."
+      )
+    ).toBe(true);
   });
 });

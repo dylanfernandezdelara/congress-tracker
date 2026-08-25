@@ -50,6 +50,33 @@ have nothing newer. Do **not** page that as a stuck timeline. `missing_digest_co
 is scoped to bills inside the 45-day feed window; older session-backfill rows
 without rewrites are expected.
 
+House ingest that hits the per-run detail cap records `House ingest truncated:…`
+and is **`degraded`** (newest-first fetch still lands the current week's rolls).
+A warning that a chamber **source listed latest YYYY-MM-DD is newer than stored**
+is **`failed`** — listed/menu dates got ahead of D1. Successful runs persist
+`house_source_latest_date` / `senate_source_latest_date` on `last_success` for
+that same comparison.
+
+## Quiet floor vs ingest lag (source watermarks)
+
+When the chronological timeline looks frozen, compare official sources to D1
+**before** treating it as a stuck pipeline. Matching watermarks plus ingest
+`status=ok` means the floor is quiet.
+
+| Check | How | 2026-08-25 (worked example) |
+|-------|-----|-----------------------------|
+| Clerk House | `https://clerk.house.gov/evs/{year}/roll{n}.xml` — newest existing roll | Roll **283** `23-Jul-2026` On Passage H.R. 8884; **284+ 404** |
+| Congress.gov House list | `/v3/house-vote/{congress}/{session}` | **283** rolls; latest `2026-07-23` roll 283 H.R. 8884 |
+| Senate.gov menu | `vote_menu_{congress}_{session}.xml` | **231** votes; last passage **00228** H.R. 6500 `08-Aug` (231 is cloture on S. 5271 the same day) |
+| Production D1 `votes` | `MAX(vote_date)` per chamber, `is_passage = 1` | House **2026-07-23** (77); Senate **2026-08-08** (5) |
+| `GET /feed/latest.json` | first item | Senate H.R. 6500 roll 228 **2026-08-08** |
+| `GET /health` (`workers.dev`) | `data.ingest` | `ok`, scheduled success `2026-08-25T10:03:12Z`, `votesUpserted: 0` |
+
+Repeat the source rows (Clerk, Congress.gov, Senate.gov) whenever this report
+recurs. If any source is newer than D1/`latest_passage_vote_date`, ingest is
+behind — page `failed` and run `POST /__pipeline/run/feed`. If sources match D1
+and status is `ok`, the timeline is current and Congress is not voting.
+
 ## Senate.gov 403 (known blocker)
 
 Plain Worker `fetch` to Senate.gov/Akamai is frequently `HTTP 403` on

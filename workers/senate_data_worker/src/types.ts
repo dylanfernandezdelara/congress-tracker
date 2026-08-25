@@ -75,6 +75,17 @@ export interface IngestVotesResult {
   truncated?: boolean;
   warnings?: string[];
   nonPassageStubs?: NonPassageVoteStub[];
+  /**
+   * Latest listed/menu vote date in the lookback (`YYYY-MM-DD`), including
+   * rolls this run skipped as already stored.
+   */
+  sourceLatestDate?: string;
+  /**
+   * Latest date among rolls this run skipped as known or persisted as a
+   * passage vote / companion stub / confirmation. When this lags
+   * `sourceLatestDate`, ingest missed the newest listed roll.
+   */
+  coveredLatestDate?: string;
 }
 
 /** Senate ingest also surfaces nomination confirmation rolls (House never does). */

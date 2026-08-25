@@ -74,4 +74,43 @@ describe("ingestPassageVotesByChamber", () => {
       /House ingest failed: House down; Senate ingest failed: Senate down/
     );
   });
+
+  it("warns when House ingest hits the per-run fetch cap", async () => {
+    mockIngestHousePassageVotes.mockResolvedValue({
+      votes: [{ chamber: "House" }],
+      skipped: 0,
+      truncated: true,
+      sourceLatestDate: "2026-07-23",
+      coveredLatestDate: "2026-07-23",
+    });
+    mockIngestSenatePassageVotes.mockResolvedValue({ votes: [], skipped: 0, confirmationVotes: [] });
+
+    const result = await ingestPassageVotesByChamber(createEnv(), "2026-05-01", new Set());
+
+    expect(result.chamberWarnings).toEqual([
+      "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).",
+    ]);
+  });
+
+  it("pages source-ahead House dates as a chamber warning", async () => {
+    mockIngestHousePassageVotes.mockResolvedValue({
+      votes: [],
+      skipped: 0,
+      sourceLatestDate: "2026-08-10",
+      coveredLatestDate: "2026-07-23",
+    });
+    mockIngestSenatePassageVotes.mockResolvedValue({
+      votes: [],
+      skipped: 0,
+      confirmationVotes: [],
+      sourceLatestDate: "2026-08-08",
+      coveredLatestDate: "2026-08-08",
+    });
+
+    const result = await ingestPassageVotesByChamber(createEnv(), "2026-05-01", new Set());
+
+    expect(result.chamberWarnings).toEqual([
+      "House source listed latest 2026-08-10 is newer than stored 2026-07-23",
+    ]);
+  });
 });

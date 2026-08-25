@@ -13,6 +13,7 @@ export {
   isChamberHardSkipWarning,
   isIngestMonitorHealthy,
   isIngestMonitorOpsAcceptable,
+  isIngestTruncationWarning,
   isSenateCacheFallbackWarning,
   resolveScheduledSuccess,
 } from "./ingest-monitor-eval.mjs";

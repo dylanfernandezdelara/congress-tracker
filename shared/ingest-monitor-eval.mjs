@@ -31,10 +31,21 @@ export function isSenateCacheFallbackWarning(warning) {
   return /served from D1 cache after live fetch failed/i.test(warning);
 }
 
+/** House (or Senate) per-run fetch cap; newest rolls still land this run. */
+export function isIngestTruncationWarning(warning) {
+  return /ingest truncated:/i.test(warning);
+}
+
 export function classifyChamberWarningSeverity(warnings) {
   if (!warnings || warnings.length === 0) return "none";
   if (warnings.some(isChamberHardSkipWarning)) return "failed";
-  if (warnings.every(isSenateCacheFallbackWarning)) return "degraded";
+  if (
+    warnings.every(
+      (warning) => isSenateCacheFallbackWarning(warning) || isIngestTruncationWarning(warning)
+    )
+  ) {
+    return "degraded";
+  }
   return "failed";
 }
 

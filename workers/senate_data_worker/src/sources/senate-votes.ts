@@ -15,6 +15,7 @@ import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
 import { SENATE_VOTE_MENU_CACHE_MAX_AGE_MS } from "../constants";
 import { ensureSchema } from "../d1/schema";
+import { maxIsoDay } from "../../../../shared/floor-quiet";
 import type { SenateVoteMenuCacheMonitor } from "../../../../shared/ingest-api-types";
 import { buildSenateVoteMenuCacheMonitor } from "../../../../shared/ingest-monitor-status";
 import {
@@ -349,6 +350,10 @@ export function parseSenateVoteMenuXml(
   return { votes, nonPassageStubs, confirmationVotes };
 }
 
+function laterIsoDay(current: string | undefined, isoOrDay: string): string | undefined {
+  return maxIsoDay([current, isoOrDay]) ?? undefined;
+}
+
 export async function ingestSenatePassageVotes(
   env: Env,
   lookbackStart: string | null,
@@ -359,22 +364,39 @@ export async function ingestSenatePassageVotes(
   const { xml, warnings } = await fetchSenateVoteMenuXml(env, congress, session);
   const parsed = parseSenateVoteMenuXml(xml, congress, session);
 
+  let sourceLatestDate: string | undefined;
+  let coveredLatestDate: string | undefined;
+  const noteListed = (date: string) => {
+    sourceLatestDate = laterIsoDay(sourceLatestDate, date);
+  };
+  const noteCovered = (date: string) => {
+    coveredLatestDate = laterIsoDay(coveredLatestDate, date);
+  };
+
   const votes: PassageVote[] = [];
   let skipped = 0;
   for (const vote of parsed.votes) {
     if (lookbackStart && vote.voteDate < lookbackStart) continue;
+    noteListed(vote.voteDate);
     if (knownKeys.has(voteKey(vote))) {
       skipped += 1;
+      noteCovered(vote.voteDate);
       continue;
     }
     votes.push(vote);
+    noteCovered(vote.voteDate);
   }
 
   const nonPassageStubs: NonPassageVoteStub[] = [];
   for (const stub of parsed.nonPassageStubs) {
     if (lookbackStart && stub.voteDate < lookbackStart) continue;
-    if (knownKeys.has(voteKey(stub))) continue;
+    noteListed(stub.voteDate);
+    if (knownKeys.has(voteKey(stub))) {
+      noteCovered(stub.voteDate);
+      continue;
+    }
     nonPassageStubs.push(stub);
+    noteCovered(stub.voteDate);
   }
 
   // Confirmations are upserted idempotently; do not share knownKeys with
@@ -382,7 +404,9 @@ export async function ingestSenatePassageVotes(
   const confirmationVotes: ConfirmationVote[] = [];
   for (const vote of parsed.confirmationVotes) {
     if (lookbackStart && vote.voteDate < lookbackStart) continue;
+    noteListed(vote.voteDate);
     confirmationVotes.push(vote);
+    noteCovered(vote.voteDate);
   }
 
   return {
@@ -391,5 +415,7 @@ export async function ingestSenatePassageVotes(
     warnings: warnings.length > 0 ? warnings : undefined,
     nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
     confirmationVotes,
+    ...(sourceLatestDate ? { sourceLatestDate } : {}),
+    ...(coveredLatestDate ? { coveredLatestDate } : {}),
   };
 }

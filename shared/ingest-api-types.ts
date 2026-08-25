@@ -13,6 +13,10 @@ export interface FeedPipelineRunRecord {
   /** Per-bill digest/sponsor fetch failures that did not abort the run. */
   digest_warnings?: string[];
   chamber_warnings?: string[];
+  /** Latest House list date in the lookback (`YYYY-MM-DD`), including skipped known rolls. */
+  house_source_latest_date?: string;
+  /** Latest Senate menu date in the lookback (`YYYY-MM-DD`), including skipped known rolls. */
+  senate_source_latest_date?: string;
   lifecycleRefreshed?: number;
   lifecycleSkipped?: number;
   lifecycle_warnings?: string[];

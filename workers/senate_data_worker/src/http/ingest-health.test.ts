@@ -258,6 +258,36 @@ describe("buildIngestMonitorPayload", () => {
     expect(payload.floor_quiet_days).toBe(3);
   });
 
+  it("marks degraded when scheduled success carried House truncation warnings", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 2,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 2,
+      digestsSkipped: 3,
+      chamber_warnings: [
+        "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).",
+      ],
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-22",
+      missingDigestCount: 0,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("degraded");
+    expect(payload.message).toContain("ingest truncated");
+    expect(payload.message).not.toContain("Floor has been quiet");
+  });
+
   it("marks failed when scheduled success carried hard chamber skip warnings", () => {
     const lastScheduled = {
       completed_at: "2026-06-23T10:05:00.000Z",

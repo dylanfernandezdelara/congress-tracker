@@ -1,5 +1,5 @@
 import type { Env } from "../config";
-import type { IngestVotesResult, SenateIngestVotesResult } from "../types";
+import type { Chamber, IngestVotesResult, SenateIngestVotesResult } from "../types";
 import { ingestHousePassageVotes } from "../sources/house-votes";
 import { ingestSenatePassageVotes } from "../sources/senate-votes";
 
@@ -13,6 +13,36 @@ function emptyHouseResult(): IngestVotesResult {
 
 function emptySenateResult(): SenateIngestVotesResult {
   return { votes: [], skipped: 0, confirmationVotes: [] };
+}
+
+function chamberTruncationWarning(chamber: Chamber): string {
+  return `${chamber} ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).`;
+}
+
+function chamberSourceLagWarning(
+  chamber: Chamber,
+  sourceLatestDate: string | undefined,
+  coveredLatestDate: string | undefined
+): string | null {
+  if (!sourceLatestDate) return null;
+  if (coveredLatestDate && sourceLatestDate <= coveredLatestDate) return null;
+  return `${chamber} source listed latest ${sourceLatestDate} is newer than stored ${coveredLatestDate ?? "none"}`;
+}
+
+function appendIntegrityWarnings(
+  chamber: Chamber,
+  result: IngestVotesResult,
+  chamberWarnings: string[]
+): void {
+  if (result.truncated) {
+    chamberWarnings.push(chamberTruncationWarning(chamber));
+  }
+  const lag = chamberSourceLagWarning(
+    chamber,
+    result.sourceLatestDate,
+    result.coveredLatestDate
+  );
+  if (lag) chamberWarnings.push(lag);
 }
 
 export interface ChamberIngestResult {
@@ -55,6 +85,7 @@ export async function ingestPassageVotesByChamber(
     if (house.warnings?.length) {
       chamberWarnings.push(...house.warnings);
     }
+    appendIntegrityWarnings("House", house, chamberWarnings);
   }
 
   let senate: SenateIngestVotesResult;
@@ -73,6 +104,7 @@ export async function ingestPassageVotesByChamber(
     if (senate.warnings?.length) {
       chamberWarnings.push(...senate.warnings);
     }
+    appendIntegrityWarnings("Senate", senate, chamberWarnings);
   }
 
   if (houseSettled.status === "rejected" && senateSettled.status === "rejected") {

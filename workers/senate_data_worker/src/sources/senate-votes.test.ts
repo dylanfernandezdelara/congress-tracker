@@ -209,6 +209,8 @@ describe("parseSenateVoteMenuXml", () => {
     expect(result.skipped).toBe(1);
     expect(result.votes).toHaveLength(1);
     expect(result.votes[0]?.rollNumber).toBe(182);
+    expect(result.sourceLatestDate).toBe("2026-06-22");
+    expect(result.coveredLatestDate).toBe("2026-06-22");
 
     fetchSenate.mockRestore();
   });
