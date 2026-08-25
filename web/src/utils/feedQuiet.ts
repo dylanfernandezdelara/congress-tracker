@@ -1,4 +1,9 @@
-import { isFloorQuiet, parseIsoDay } from '@congress-tracker/shared/floor-quiet'
+import {
+  floorWorkStatus,
+  isFloorQuiet,
+  maxIsoDay,
+  parseIsoDay,
+} from '@congress-tracker/shared/floor-quiet'
 
 import { formatVoteDate } from './billLabels'
 
@@ -6,12 +11,53 @@ import { formatVoteDate } from './billLabels'
 export function latestPassageDateAmong(
   items: readonly { latest_passage_date: string | null }[],
 ): string | null {
-  let latest: string | null = null
-  for (const item of items) {
-    const day = parseIsoDay(item.latest_passage_date)
-    if (day && (latest === null || day > latest)) latest = day
+  return maxIsoDay(items.map((item) => item.latest_passage_date))
+}
+
+export function floorActivityDate(params: {
+  passageDay: string | null
+  houseLast?: string | null
+  senateLast?: string | null
+  confirmationDay?: string | null
+  chamber: 'House' | 'Senate' | null
+}): string | null {
+  switch (params.chamber) {
+    case 'House':
+      return maxIsoDay([params.passageDay, params.houseLast])
+    case 'Senate':
+      return maxIsoDay([params.passageDay, params.senateLast, params.confirmationDay])
+    case null:
+      return maxIsoDay([
+        params.passageDay,
+        params.houseLast,
+        params.senateLast,
+        params.confirmationDay,
+      ])
+    default: {
+      const _exhaustive: never = params.chamber
+      return _exhaustive
+    }
   }
-  return latest
+}
+
+export function floorStatusLabel(
+  latestFloorDate: string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  const status = floorWorkStatus(latestFloorDate, now)
+  if (!status) return null
+  switch (status) {
+    case 'working':
+      return 'Working'
+    case 'in_session':
+      return 'In session'
+    case 'in_recess':
+      return 'In recess'
+    default: {
+      const _exhaustive: never = status
+      return _exhaustive
+    }
+  }
 }
 
 export function feedQuietCopy(

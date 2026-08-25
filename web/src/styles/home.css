@@ -327,10 +327,19 @@
   .home-feed-header {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.35rem 1rem;
     margin-bottom: 0.75rem;
+  }
+
+  .home-feed-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.55rem;
+    min-width: 0;
   }
 
   .home-feed-title {
@@ -339,6 +348,14 @@
     font-weight: 500;
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
+  }
+
+  .home-feed-floor-status {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    color: hsl(var(--twc-faint));
   }
 
   .home-feed-count {

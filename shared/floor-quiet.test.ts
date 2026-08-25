@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   FLOOR_QUIET_AFTER_DAYS,
+  FLOOR_RECESS_AFTER_DAYS,
   floorQuietDays,
+  floorWorkStatus,
   isFloorQuiet,
   isFloorQuietDays,
+  maxIsoDay,
   parseIsoDay,
   utcCalendarDaysSince,
 } from './floor-quiet'
@@ -54,5 +57,20 @@ describe('floor quiet helpers', () => {
     expect(isFloorQuietDays(3)).toBe(true)
     expect(isFloorQuietDays(2)).toBe(false)
     expect(isFloorQuietDays(null)).toBe(false)
+  })
+
+  it('labels working, in-session, and recess stretches', () => {
+    expect(FLOOR_RECESS_AFTER_DAYS).toBe(7)
+    expect(floorWorkStatus('2026-08-24', now)).toBe('working')
+    expect(floorWorkStatus('2026-08-22', now)).toBe('in_session')
+    expect(floorWorkStatus('2026-08-18', now)).toBe('in_recess')
+    expect(floorWorkStatus(null, now)).toBeNull()
+  })
+})
+
+describe('maxIsoDay', () => {
+  it('returns the latest valid calendar day', () => {
+    expect(maxIsoDay(['2026-04-10', null, '2026-08-08T16:00:00.000Z'])).toBe('2026-08-08')
+    expect(maxIsoDay([null, 'not-a-date'])).toBeNull()
   })
 })

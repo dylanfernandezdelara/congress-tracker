@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
+import { maxIsoDay } from '@congress-tracker/shared/floor-quiet'
 
 import { fetchNotableVotes, fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
 import type {
@@ -29,9 +30,14 @@ import {
   advancedFilterSummary,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
-import { feedQuietCopy, latestPassageDateAmong } from '../utils/feedQuiet'
+import { feedQuietCopy, floorActivityDate, floorStatusLabel, latestPassageDateAmong } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
+
+function FloorStatusLabel({ label }: { label: string | null }) {
+  if (!label) return null
+  return <p className="home-feed-floor-status">{label}</p>
+}
 
 function FeedSkeleton() {
   return (
@@ -186,8 +192,20 @@ export default function Home() {
     .filter(Boolean)
     .join(' · ')
 
-  const quietCopy = feedQuietCopy(latestPassageDateAmong(items), new Date(), chamber)
+  const passageDay = latestPassageDateAmong(items)
+  const quietCopy = feedQuietCopy(passageDay, new Date(), chamber)
   const showQuietNotice = !searchQuery && advancedCount === 0 && Boolean(quietCopy.notice)
+  const statusLabel = floorStatusLabel(
+    floorActivityDate({
+      passageDay,
+      houseLast: session.data?.house.date_range.last,
+      senateLast: session.data?.senate.date_range.last,
+      confirmationDay: maxIsoDay(
+        (recentConfirmations.data?.confirmations ?? []).map((item) => item.vote_date),
+      ),
+      chamber,
+    }),
+  )
 
   return (
     <div className="home-shell">
@@ -248,6 +266,7 @@ export default function Home() {
 
         {!showSkeleton && !feedError && total === 0 && !inFlight ? (
           <div className="home-feed-empty">
+            <FloorStatusLabel label={statusLabel} />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
@@ -274,7 +293,10 @@ export default function Home() {
         {showFeed ? (
           <section id="feed-top" aria-busy={listRefreshing || undefined}>
             <div className="home-feed-header">
-              <h2 className="home-feed-title">Chronological timeline</h2>
+              <div className="home-feed-heading">
+                <h2 className="home-feed-title">Chronological timeline</h2>
+                <FloorStatusLabel label={statusLabel} />
+              </div>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
                 {quietCopy.throughLabel ? ` · through ${quietCopy.throughLabel}` : ''}

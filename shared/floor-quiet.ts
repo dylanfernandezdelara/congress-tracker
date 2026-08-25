@@ -1,10 +1,30 @@
 /** Calendar days after the latest passage vote before the floor is treated as quiet. */
 export const FLOOR_QUIET_AFTER_DAYS = 3
 
+/**
+ * Calendar days with no floor activity before the chambers are treated as in recess
+ * (a district work period), not merely between votes.
+ */
+export const FLOOR_RECESS_AFTER_DAYS = 7
+
+export type FloorWorkStatus = 'working' | 'in_session' | 'in_recess'
+
 /** UTC calendar day (`YYYY-MM-DD`) from a date or datetime string; null when invalid. */
 export function parseIsoDay(value: string | null | undefined): string | null {
   const day = value?.trim().slice(0, 10) ?? ''
   return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null
+}
+
+/** Latest valid UTC calendar day among date or datetime strings. */
+export function maxIsoDay(
+  values: readonly (string | null | undefined)[],
+): string | null {
+  let latest: string | null = null
+  for (const value of values) {
+    const day = parseIsoDay(value)
+    if (day && (latest === null || day > latest)) latest = day
+  }
+  return latest
 }
 
 /**
@@ -44,4 +64,19 @@ export function isFloorQuiet(
   afterDays: number = FLOOR_QUIET_AFTER_DAYS,
 ): boolean {
   return isFloorQuietDays(floorQuietDays(latestPassageVoteDate, now), afterDays)
+}
+
+/**
+ * Whether the floor is currently voting, still in session between votes, or
+ * in a recess-length quiet stretch. Null when the activity date is unknown.
+ */
+export function floorWorkStatus(
+  latestFloorDate: string | null | undefined,
+  now: Date = new Date(),
+): FloorWorkStatus | null {
+  const days = floorQuietDays(latestFloorDate, now)
+  if (days === null) return null
+  if (days < FLOOR_QUIET_AFTER_DAYS) return 'working'
+  if (days >= FLOOR_RECESS_AFTER_DAYS) return 'in_recess'
+  return 'in_session'
 }

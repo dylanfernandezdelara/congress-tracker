@@ -127,6 +127,7 @@ describe('Home', () => {
       await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
     expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(screen.getByText('In recess')).toBeInTheDocument()
   })
 
   it('omits the quiet notice when the newest vote is recent', async () => {
@@ -142,6 +143,8 @@ describe('Home', () => {
       screen.queryByText(/No new House or Senate passage votes since/),
     ).not.toBeInTheDocument()
     expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(screen.getByText('Working')).toBeInTheDocument()
+    expect(screen.queryByText('In recess')).not.toBeInTheDocument()
   })
 
   it('dates the quiet floor from passage votes, not an executive-boosted first row', async () => {
@@ -183,6 +186,22 @@ describe('Home', () => {
     expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
+  })
+
+  it('marks an in-session lull separately from recess', async () => {
+    const latest = isoUtcDaysAgo(4)
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(await screen.findByText('In session')).toBeInTheDocument()
+    expect(
+      screen.getByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('In recess')).not.toBeInTheDocument()
+    expect(screen.queryByText('Working')).not.toBeInTheDocument()
   })
 
   it('stacks rail content below the feed on narrow viewports without duplicate fetches', async () => {

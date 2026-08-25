@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { feedQuietCopy, latestPassageDateAmong } from './feedQuiet'
+import { floorStatusLabel, floorActivityDate, feedQuietCopy, latestPassageDateAmong } from './feedQuiet'
 
 describe('latestPassageDateAmong', () => {
   it('picks the max vote-only passage day and skips executive timestamps', () => {
@@ -59,5 +59,42 @@ describe('feedQuietCopy', () => {
   it('returns empty copy when the feed has no passage date', () => {
     expect(feedQuietCopy(null, now)).toEqual({ throughLabel: null, notice: null })
     expect(feedQuietCopy('not-a-date', now)).toEqual({ throughLabel: null, notice: null })
+  })
+})
+
+describe('floorStatusLabel', () => {
+  const now = new Date('2026-08-25T20:00:00.000Z')
+
+  it('names working, in-session, and recess floors', () => {
+    expect(floorStatusLabel('2026-08-24', now)).toBe('Working')
+    expect(floorStatusLabel('2026-08-21', now)).toBe('In session')
+    expect(floorStatusLabel('2026-08-08', now)).toBe('In recess')
+    expect(floorStatusLabel(null, now)).toBeNull()
+  })
+})
+
+describe('floorActivityDate', () => {
+  it('keeps House status on House passage dates', () => {
+    expect(
+      floorActivityDate({
+        passageDay: '2026-04-10',
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        confirmationDay: '2026-08-24',
+        chamber: 'House',
+      }),
+    ).toBe('2026-07-23')
+  })
+
+  it('lets Senate confirmations count as floor work', () => {
+    expect(
+      floorActivityDate({
+        passageDay: '2026-08-08',
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        confirmationDay: '2026-08-24',
+        chamber: 'Senate',
+      }),
+    ).toBe('2026-08-24')
   })
 })
