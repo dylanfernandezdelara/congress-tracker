@@ -227,10 +227,10 @@ describe('Home', () => {
       ]),
     )
     renderHome('/?chamber=House&q=housing')
-    expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    // Floor status waits on session watermarks; the heading renders before they land.
+    expect(await screen.findByText('In recess')).toBeInTheDocument()
     expect(screen.queryByText(/through Aug 8/)).not.toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
-    expect(screen.getByText('In recess')).toBeInTheDocument()
   })
 
   it('dates a House-filtered floor from House session watermarks, not a Senate passage on the same bill', async () => {
