@@ -103,6 +103,27 @@ describe('floorActivityDate', () => {
       }),
     ).toBe('2026-08-24')
   })
+
+  it('does not treat a bicameral bill latest_passage_date as a House floor day', () => {
+    expect(
+      floorActivityDate({
+        passageDay: '2026-08-08',
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        chamber: 'House',
+      }),
+    ).toBe('2026-07-23')
+  })
+
+  it('does not fall back to bill latest_passage_date when House dates are missing', () => {
+    expect(
+      floorActivityDate({
+        passageDay: '2026-08-08',
+        senateLast: '2026-08-08',
+        chamber: 'House',
+      }),
+    ).toBeNull()
+  })
 })
 
 describe('timelineFloorChrome', () => {
@@ -169,6 +190,27 @@ describe('timelineFloorChrome', () => {
     ).toEqual({
       throughLabel: 'Apr 10',
       notice: null,
+      statusLabel: 'In recess',
+    })
+  })
+
+  it('dates a House-filtered floor from House votes, not a Senate passage on the same bill', () => {
+    expect(
+      timelineFloorChrome({
+        items: [
+          {
+            latest_passage_date: '2026-08-08',
+            passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }],
+          },
+        ],
+        chamber: 'House',
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        now,
+      }),
+    ).toEqual({
+      throughLabel: 'Jul 23',
+      notice: 'No new House passage votes since Jul 23.',
       statusLabel: 'In recess',
     })
   })

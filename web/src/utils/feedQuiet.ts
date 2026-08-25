@@ -24,17 +24,39 @@ export function latestPassageDateAmong(
 }
 
 export function floorActivityDate(params: {
-  passageDay: string | null
+  passageDay?: string | null
   houseLast?: string | null
   senateLast?: string | null
+  houseVoteDays?: readonly (string | null | undefined)[]
+  senateVoteDays?: readonly (string | null | undefined)[]
   confirmationDates?: readonly (string | null | undefined)[]
   chamber: FloorChamber
 }): string | null {
-  return maxIsoDayForChamber(params.chamber, {
-    house: [params.passageDay, params.houseLast],
-    senate: [params.passageDay, params.senateLast],
+  const fromChamber = maxIsoDayForChamber(params.chamber, {
+    house: [params.houseLast, ...(params.houseVoteDays ?? [])],
+    senate: [params.senateLast, ...(params.senateVoteDays ?? [])],
     confirmation: params.confirmationDates,
   })
+  // Bill-level latest_passage_date is the max across chambers. A House/Senate
+  // filter must not fall back to it or a bicameral bill dates the other floor.
+  if (params.chamber !== null) return fromChamber
+  return fromChamber ?? parseIsoDay(params.passageDay)
+}
+
+function voteDaysByChamber(
+  items: readonly {
+    passage_votes?: readonly { chamber: string; date: string }[]
+  }[],
+): { house: string[]; senate: string[] } {
+  const house: string[] = []
+  const senate: string[] = []
+  for (const item of items) {
+    for (const vote of item.passage_votes ?? []) {
+      if (vote.chamber === 'House') house.push(vote.date)
+      else if (vote.chamber === 'Senate') senate.push(vote.date)
+    }
+  }
+  return { house, senate }
 }
 
 export function floorStatusLabel(
@@ -64,7 +86,10 @@ export function feedQuietCopy(
 export type TimelineThrough = 'session' | 'page'
 
 export function timelineFloorChrome(params: {
-  items: readonly { latest_passage_date: string | null }[]
+  items: readonly {
+    latest_passage_date: string | null
+    passage_votes?: readonly { chamber: string; date: string }[]
+  }[]
   chamber: FloorChamber
   houseLast?: string | null
   senateLast?: string | null
@@ -75,18 +100,19 @@ export function timelineFloorChrome(params: {
   const now = params.now ?? new Date()
   const through = params.through ?? 'session'
   const pagePassageDay = latestPassageDateAmong(params.items)
-  const sessionPassageDay = floorActivityDate({
+  const itemVotes = voteDaysByChamber(params.items)
+  const sessionDates = {
     passageDay: pagePassageDay,
     houseLast: params.houseLast,
     senateLast: params.senateLast,
+    houseVoteDays: itemVotes.house,
+    senateVoteDays: itemVotes.senate,
     chamber: params.chamber,
-  })
+  }
+  const sessionPassageDay = floorActivityDate(sessionDates)
   const activityDay = floorActivityDate({
-    passageDay: pagePassageDay,
-    houseLast: params.houseLast,
-    senateLast: params.senateLast,
+    ...sessionDates,
     confirmationDates: params.confirmationVoteDates,
-    chamber: params.chamber,
   })
   const throughDay = through === 'page' ? pagePassageDay : sessionPassageDay
   const { throughLabel, notice } = feedQuietCopy(throughDay, now, params.chamber)

@@ -172,7 +172,23 @@ describe('Home', () => {
     const latest = isoUtcDaysAgo(10)
     fetchFeed.mockResolvedValue(
       pageResponse([
-        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+        makeFeedItem({
+          latest_passage_date: latest,
+          latest_activity_date: latest,
+          passage_votes: [
+            {
+              chamber: 'House',
+              congress: 119,
+              session: 2,
+              roll_number: 283,
+              question: 'On Passage',
+              result: 'Passed',
+              yeas: 220,
+              nays: 200,
+              date: latest,
+            },
+          ],
+        }),
       ]),
     )
     const { unmount } = renderHome('/?chamber=House')
@@ -186,6 +202,37 @@ describe('Home', () => {
     expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
+  })
+
+  it('dates a House-filtered floor from House session watermarks, not a Senate passage on the same bill', async () => {
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          latest_passage_date: '2026-08-08',
+          latest_activity_date: '2026-08-08',
+          passage_votes: [
+            {
+              chamber: 'Senate',
+              congress: 119,
+              session: 2,
+              roll_number: 228,
+              question: 'On Passage of the Bill',
+              result: 'Passed',
+              yeas: 52,
+              nays: 47,
+              date: '2026-08-08',
+            },
+          ],
+        }),
+      ]),
+    )
+    renderHome('/?chamber=House')
+    expect(
+      await screen.findByText('No new House passage votes since Jun 5.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/through Jun 5/)).toBeInTheDocument()
+    expect(screen.queryByText(/since Aug 8/)).not.toBeInTheDocument()
+    expect(screen.getByText('In recess')).toBeInTheDocument()
   })
 
   it('marks an in-session lull separately from recess', async () => {
