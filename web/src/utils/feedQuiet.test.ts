@@ -124,4 +124,19 @@ describe('timelineFloorChrome', () => {
       statusLabel: 'Working',
     })
   })
+
+  it('drops the quiet notice when the timeline is searched or filtered', () => {
+    expect(
+      timelineFloorChrome({
+        items: [{ latest_passage_date: '2026-08-08' }],
+        chamber: null,
+        includeNotice: false,
+        now,
+      }),
+    ).toEqual({
+      throughLabel: 'Aug 8',
+      notice: null,
+      statusLabel: 'In recess',
+    })
+  })
 })

@@ -15,34 +15,47 @@ function emptySenateResult(): SenateIngestVotesResult {
   return { votes: [], skipped: 0, confirmationVotes: [] };
 }
 
-function chamberTruncationWarning(chamber: Chamber): string {
-  return `${chamber} ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).`;
-}
-
-function chamberSourceLagWarning(
-  chamber: Chamber,
-  sourceLatestDate: string | undefined,
-  coveredLatestDate: string | undefined
-): string | null {
-  if (!sourceLatestDate) return null;
-  if (coveredLatestDate && sourceLatestDate <= coveredLatestDate) return null;
-  return `${chamber} source listed latest ${sourceLatestDate} is newer than stored ${coveredLatestDate ?? "none"}`;
-}
-
-function appendIntegrityWarnings(
-  chamber: Chamber,
-  result: IngestVotesResult,
-  chamberWarnings: string[]
-): void {
+/** Truncation and source-ahead watermarks — not fetch errors from the chamber client. */
+function ingestIntegrityWarnings(chamber: Chamber, result: IngestVotesResult): string[] {
+  const warnings: string[] = [];
   if (result.truncated) {
-    chamberWarnings.push(chamberTruncationWarning(chamber));
+    warnings.push(
+      `${chamber} ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).`
+    );
   }
-  const lag = chamberSourceLagWarning(
-    chamber,
-    result.sourceLatestDate,
-    result.coveredLatestDate
-  );
-  if (lag) chamberWarnings.push(lag);
+  const source = result.sourceLatestDate;
+  const covered = result.coveredLatestDate;
+  if (source && !(covered && source <= covered)) {
+    warnings.push(
+      `${chamber} source listed latest ${source} is newer than stored ${covered ?? "none"}`
+    );
+  }
+  return warnings;
+}
+
+function settleChamber<T extends IngestVotesResult>(
+  settled: PromiseSettledResult<T>,
+  chamber: Chamber,
+  empty: () => T
+): { result: T; warnings: string[] } {
+  if (settled.status === "rejected") {
+    const message = errorMessage(settled.reason);
+    console.warn(
+      JSON.stringify({
+        event: `${chamber.toLowerCase()}_ingest_failed`,
+        error: message,
+      })
+    );
+    return {
+      result: empty(),
+      warnings: [`${chamber} ingest skipped: ${message}`],
+    };
+  }
+  const result = settled.value;
+  return {
+    result,
+    warnings: [...(result.warnings ?? []), ...ingestIntegrityWarnings(chamber, result)],
+  };
 }
 
 export interface ChamberIngestResult {
@@ -67,45 +80,8 @@ export async function ingestPassageVotesByChamber(
     ingestSenatePassageVotes(env, lookbackStart, knownKeys),
   ]);
 
-  const chamberWarnings: string[] = [];
-
-  let house: IngestVotesResult;
-  if (houseSettled.status === "rejected") {
-    const message = errorMessage(houseSettled.reason);
-    chamberWarnings.push(`House ingest skipped: ${message}`);
-    console.warn(
-      JSON.stringify({
-        event: "house_ingest_failed",
-        error: message,
-      })
-    );
-    house = emptyHouseResult();
-  } else {
-    house = houseSettled.value;
-    if (house.warnings?.length) {
-      chamberWarnings.push(...house.warnings);
-    }
-    appendIntegrityWarnings("House", house, chamberWarnings);
-  }
-
-  let senate: SenateIngestVotesResult;
-  if (senateSettled.status === "rejected") {
-    const message = errorMessage(senateSettled.reason);
-    chamberWarnings.push(`Senate ingest skipped: ${message}`);
-    console.warn(
-      JSON.stringify({
-        event: "senate_ingest_failed",
-        error: message,
-      })
-    );
-    senate = emptySenateResult();
-  } else {
-    senate = senateSettled.value;
-    if (senate.warnings?.length) {
-      chamberWarnings.push(...senate.warnings);
-    }
-    appendIntegrityWarnings("Senate", senate, chamberWarnings);
-  }
+  const house = settleChamber(houseSettled, "House", emptyHouseResult);
+  const senate = settleChamber(senateSettled, "Senate", emptySenateResult);
 
   if (houseSettled.status === "rejected" && senateSettled.status === "rejected") {
     throw new Error(
@@ -113,5 +89,9 @@ export async function ingestPassageVotesByChamber(
     );
   }
 
-  return { house, senate, chamberWarnings };
+  return {
+    house: house.result,
+    senate: senate.result,
+    chamberWarnings: [...house.warnings, ...senate.warnings],
+  };
 }

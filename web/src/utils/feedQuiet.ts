@@ -3,9 +3,16 @@ import {
   isFloorQuiet,
   maxIsoDay,
   parseIsoDay,
+  type FloorWorkStatus,
 } from '@congress-tracker/shared/floor-quiet'
 
 import { formatVoteDate } from './billLabels'
+
+const FLOOR_STATUS_LABEL = {
+  working: 'Working',
+  in_session: 'In session',
+  in_recess: 'In recess',
+} as const satisfies Record<FloorWorkStatus, string>
 
 /** Latest vote-only passage day among feed rows. Ignores executive activity timestamps. */
 export function latestPassageDateAmong(
@@ -45,19 +52,7 @@ export function floorStatusLabel(
   now: Date = new Date(),
 ): string | null {
   const status = floorWorkStatus(latestFloorDate, now)
-  if (!status) return null
-  switch (status) {
-    case 'working':
-      return 'Working'
-    case 'in_session':
-      return 'In session'
-    case 'in_recess':
-      return 'In recess'
-    default: {
-      const _exhaustive: never = status
-      return _exhaustive
-    }
-  }
+  return status ? FLOOR_STATUS_LABEL[status] : null
 }
 
 export function feedQuietCopy(
@@ -81,13 +76,16 @@ export function timelineFloorChrome(params: {
   houseLast?: string | null
   senateLast?: string | null
   confirmationVoteDates?: readonly (string | null | undefined)[]
+  /** False while searching or using advanced filters so the quiet-floor notice stays off. */
+  includeNotice?: boolean
   now?: Date
 }): { throughLabel: string | null; notice: string | null; statusLabel: string | null } {
   const now = params.now ?? new Date()
   const passageDay = latestPassageDateAmong(params.items)
-  const quietCopy = feedQuietCopy(passageDay, now, params.chamber)
+  const { throughLabel, notice } = feedQuietCopy(passageDay, now, params.chamber)
   return {
-    ...quietCopy,
+    throughLabel,
+    notice: params.includeNotice === false ? null : notice,
     statusLabel: floorStatusLabel(
       floorActivityDate({
         passageDay,

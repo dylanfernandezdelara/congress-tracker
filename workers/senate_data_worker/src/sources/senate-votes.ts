@@ -13,9 +13,9 @@ import { parseSenateNominationIssue } from "./nomination-ref";
 import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
+import { createVoteDateWatermarks, type VoteDateWatermarks } from "./vote-date-watermarks";
 import { SENATE_VOTE_MENU_CACHE_MAX_AGE_MS } from "../constants";
 import { ensureSchema } from "../d1/schema";
-import { maxIsoDay } from "../../../../shared/floor-quiet";
 import type { SenateVoteMenuCacheMonitor } from "../../../../shared/ingest-api-types";
 import { buildSenateVoteMenuCacheMonitor } from "../../../../shared/ingest-monitor-status";
 import {
@@ -350,8 +350,25 @@ export function parseSenateVoteMenuXml(
   return { votes, nonPassageStubs, confirmationVotes };
 }
 
-function laterIsoDay(current: string | undefined, isoOrDay: string): string | undefined {
-  return maxIsoDay([current, isoOrDay]) ?? undefined;
+function takeLookbackItems<T extends { voteDate: string }>(
+  items: readonly T[],
+  lookbackStart: string | null,
+  watermarks: VoteDateWatermarks,
+  isKnown: (item: T) => boolean
+): { kept: T[]; skipped: number } {
+  const kept: T[] = [];
+  let skipped = 0;
+  for (const item of items) {
+    if (lookbackStart && item.voteDate < lookbackStart) continue;
+    watermarks.noteListed(item.voteDate);
+    watermarks.noteCovered(item.voteDate);
+    if (isKnown(item)) {
+      skipped += 1;
+      continue;
+    }
+    kept.push(item);
+  }
+  return { kept, skipped };
 }
 
 export async function ingestSenatePassageVotes(
@@ -363,51 +380,31 @@ export async function ingestSenatePassageVotes(
   const session = sessionNumber(env);
   const { xml, warnings } = await fetchSenateVoteMenuXml(env, congress, session);
   const parsed = parseSenateVoteMenuXml(xml, congress, session);
+  const watermarks = createVoteDateWatermarks();
+  const alreadyStored = (
+    item: Pick<PassageVote, "chamber" | "congress" | "session" | "rollNumber">
+  ) => knownKeys.has(voteKey(item));
 
-  let sourceLatestDate: string | undefined;
-  let coveredLatestDate: string | undefined;
-  const noteListed = (date: string) => {
-    sourceLatestDate = laterIsoDay(sourceLatestDate, date);
-  };
-  const noteCovered = (date: string) => {
-    coveredLatestDate = laterIsoDay(coveredLatestDate, date);
-  };
-
-  const votes: PassageVote[] = [];
-  let skipped = 0;
-  for (const vote of parsed.votes) {
-    if (lookbackStart && vote.voteDate < lookbackStart) continue;
-    noteListed(vote.voteDate);
-    if (knownKeys.has(voteKey(vote))) {
-      skipped += 1;
-      noteCovered(vote.voteDate);
-      continue;
-    }
-    votes.push(vote);
-    noteCovered(vote.voteDate);
-  }
-
-  const nonPassageStubs: NonPassageVoteStub[] = [];
-  for (const stub of parsed.nonPassageStubs) {
-    if (lookbackStart && stub.voteDate < lookbackStart) continue;
-    noteListed(stub.voteDate);
-    if (knownKeys.has(voteKey(stub))) {
-      noteCovered(stub.voteDate);
-      continue;
-    }
-    nonPassageStubs.push(stub);
-    noteCovered(stub.voteDate);
-  }
-
+  const { kept: votes, skipped } = takeLookbackItems(
+    parsed.votes,
+    lookbackStart,
+    watermarks,
+    alreadyStored
+  );
+  const { kept: nonPassageStubs } = takeLookbackItems(
+    parsed.nonPassageStubs,
+    lookbackStart,
+    watermarks,
+    alreadyStored
+  );
   // Confirmations are upserted idempotently; do not share knownKeys with
   // passage/companion roll skip state.
-  const confirmationVotes: ConfirmationVote[] = [];
-  for (const vote of parsed.confirmationVotes) {
-    if (lookbackStart && vote.voteDate < lookbackStart) continue;
-    noteListed(vote.voteDate);
-    confirmationVotes.push(vote);
-    noteCovered(vote.voteDate);
-  }
+  const { kept: confirmationVotes } = takeLookbackItems(
+    parsed.confirmationVotes,
+    lookbackStart,
+    watermarks,
+    () => false
+  );
 
   return {
     votes,
@@ -415,7 +412,6 @@ export async function ingestSenatePassageVotes(
     warnings: warnings.length > 0 ? warnings : undefined,
     nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
     confirmationVotes,
-    ...(sourceLatestDate ? { sourceLatestDate } : {}),
-    ...(coveredLatestDate ? { coveredLatestDate } : {}),
+    ...watermarks.toFields(),
   };
 }

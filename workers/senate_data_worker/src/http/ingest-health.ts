@@ -112,19 +112,20 @@ export function buildIngestMonitorPayload(params: {
   });
 
   const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
-  let message = evaluated.message;
-  if (
-    isFloorQuietDays(quietDays) &&
-    (evaluated.status === "ok" || evaluated.status === "degraded")
-  ) {
-    message = `${message} Floor has been quiet since ${params.latestPassageVoteDate} (${quietDays} day(s) with no new passage votes).`;
+  const annotations: string[] = [];
+  if (isFloorQuietDays(quietDays)) {
+    annotations.push(
+      `Floor has been quiet since ${params.latestPassageVoteDate} (${quietDays} day(s) with no new passage votes).`
+    );
   }
-  if (
-    params.missingDigestCount > 0 &&
-    (evaluated.status === "ok" || evaluated.status === "degraded")
-  ) {
-    message = `${message} ${params.missingDigestCount} feed bill(s) missing digests.`;
+  if (params.missingDigestCount > 0) {
+    annotations.push(`${params.missingDigestCount} feed bill(s) missing digests.`);
   }
+  const canAnnotate = evaluated.status === "ok" || evaluated.status === "degraded";
+  const message =
+    canAnnotate && annotations.length > 0
+      ? [evaluated.message, ...annotations].join(" ")
+      : evaluated.message;
 
   const executive = params.executive
     ? buildExecutiveIngestMonitorPayload({

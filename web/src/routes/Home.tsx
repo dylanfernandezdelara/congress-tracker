@@ -197,8 +197,8 @@ export default function Home() {
     houseLast: session.data?.house.date_range.last,
     senateLast: session.data?.senate.date_range.last,
     confirmationVoteDates: (recentConfirmations.data?.confirmations ?? []).map((item) => item.vote_date),
+    includeNotice: !searchQuery && advancedCount === 0,
   })
-  const showQuietNotice = !searchQuery && advancedCount === 0 && Boolean(floorChrome.notice)
 
   return (
     <div className="home-shell">
@@ -296,7 +296,7 @@ export default function Home() {
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
-            {showQuietNotice ? (
+            {floorChrome.notice ? (
               <p className="home-feed-quiet" role="status">
                 {floorChrome.notice}
               </p>

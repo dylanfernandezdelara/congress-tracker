@@ -36,16 +36,16 @@ export function isIngestTruncationWarning(warning) {
   return /ingest truncated:/i.test(warning);
 }
 
+const DEGRADED_CHAMBER_WARNING = [isSenateCacheFallbackWarning, isIngestTruncationWarning];
+
+function isDegradedChamberWarning(warning) {
+  return DEGRADED_CHAMBER_WARNING.some((test) => test(warning));
+}
+
 export function classifyChamberWarningSeverity(warnings) {
   if (!warnings || warnings.length === 0) return "none";
   if (warnings.some(isChamberHardSkipWarning)) return "failed";
-  if (
-    warnings.every(
-      (warning) => isSenateCacheFallbackWarning(warning) || isIngestTruncationWarning(warning)
-    )
-  ) {
-    return "degraded";
-  }
+  if (warnings.every(isDegradedChamberWarning)) return "degraded";
   return "failed";
 }
 

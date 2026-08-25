@@ -113,4 +113,28 @@ describe("ingestPassageVotesByChamber", () => {
       "House source listed latest 2026-08-10 is newer than stored 2026-07-23",
     ]);
   });
+
+  it("collects integrity warnings from both chambers", async () => {
+    mockIngestHousePassageVotes.mockResolvedValue({
+      votes: [],
+      skipped: 0,
+      truncated: true,
+      sourceLatestDate: "2026-07-23",
+      coveredLatestDate: "2026-07-23",
+    });
+    mockIngestSenatePassageVotes.mockResolvedValue({
+      votes: [],
+      skipped: 0,
+      confirmationVotes: [],
+      sourceLatestDate: "2026-08-10",
+      coveredLatestDate: "2026-08-01",
+    });
+
+    const result = await ingestPassageVotesByChamber(createEnv(), "2026-05-01", new Set());
+
+    expect(result.chamberWarnings).toEqual([
+      "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).",
+      "Senate source listed latest 2026-08-10 is newer than stored 2026-08-01",
+    ]);
+  });
 });
