@@ -1,3 +1,4 @@
+import { parseIsoDay } from "../../../../shared/iso-day";
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { HOUSE_VOTE_DETAIL_FETCHES_PER_RUN } from "../constants";
@@ -57,11 +58,12 @@ function sumTally(parties: PartyTotal[] | undefined): { yeas: number; nays: numb
 }
 
 function voteDateFromIso(iso: string): string {
-  return iso.slice(0, 10);
+  return parseIsoDay(iso) ?? iso.slice(0, 10);
 }
 
 function withinLookback(isoDate: string, lookbackStart: string): boolean {
-  return voteDateFromIso(isoDate) >= lookbackStart;
+  const day = parseIsoDay(isoDate);
+  return day !== null && day >= lookbackStart;
 }
 
 /** A listed roll that still needs a detail request, with its bill reference known. */

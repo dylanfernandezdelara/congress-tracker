@@ -1,35 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  feedQuietCopy,
-  floorActivityDate,
-  floorStatusLabel,
-  latestPassageDateAmong,
-  timelineFloorChrome,
-} from './feedQuiet'
-
-describe('latestPassageDateAmong', () => {
-  it('picks the max vote-only passage day and skips executive timestamps', () => {
-    expect(
-      latestPassageDateAmong([
-        {
-          latest_passage_date: '2026-04-10',
-        },
-        {
-          latest_passage_date: null,
-        },
-        {
-          latest_passage_date: '2026-08-08T16:00:00.000Z',
-        },
-      ]),
-    ).toBe('2026-08-08')
-  })
-
-  it('returns null when no row has a passage date', () => {
-    expect(latestPassageDateAmong([{ latest_passage_date: null }])).toBeNull()
-    expect(latestPassageDateAmong([])).toBeNull()
-  })
-})
+import { feedQuietCopy, floorStatusLabel, timelineFloorChrome } from './feedQuiet'
 
 describe('feedQuietCopy', () => {
   const now = new Date('2026-08-25T20:00:00.000Z')
@@ -76,53 +47,6 @@ describe('floorStatusLabel', () => {
     expect(floorStatusLabel('2026-08-21', now)).toBe('In session')
     expect(floorStatusLabel('2026-08-08', now)).toBe('In recess')
     expect(floorStatusLabel(null, now)).toBeNull()
-  })
-})
-
-describe('floorActivityDate', () => {
-  it('keeps House status on House passage dates', () => {
-    expect(
-      floorActivityDate({
-        passageDay: '2026-04-10',
-        houseLast: '2026-07-23',
-        senateLast: '2026-08-08',
-        confirmationDates: ['2026-08-24'],
-        chamber: 'House',
-      }),
-    ).toBe('2026-07-23')
-  })
-
-  it('lets Senate confirmations count as floor work', () => {
-    expect(
-      floorActivityDate({
-        passageDay: '2026-08-08',
-        houseLast: '2026-07-23',
-        senateLast: '2026-08-08',
-        confirmationDates: ['2026-08-24'],
-        chamber: 'Senate',
-      }),
-    ).toBe('2026-08-24')
-  })
-
-  it('does not treat a bicameral bill latest_passage_date as a House floor day', () => {
-    expect(
-      floorActivityDate({
-        passageDay: '2026-08-08',
-        houseLast: '2026-07-23',
-        senateLast: '2026-08-08',
-        chamber: 'House',
-      }),
-    ).toBe('2026-07-23')
-  })
-
-  it('does not fall back to bill latest_passage_date when House dates are missing', () => {
-    expect(
-      floorActivityDate({
-        passageDay: '2026-08-08',
-        senateLast: '2026-08-08',
-        chamber: 'House',
-      }),
-    ).toBeNull()
   })
 })
 
@@ -211,6 +135,53 @@ describe('timelineFloorChrome', () => {
     ).toEqual({
       throughLabel: 'Jul 23',
       notice: 'No new House passage votes since Jul 23.',
+      statusLabel: 'In recess',
+    })
+  })
+
+  it('dates a House-filtered search from House votes, not bill latest_passage_date', () => {
+    expect(
+      timelineFloorChrome({
+        items: [
+          {
+            latest_passage_date: '2026-08-08',
+            passage_votes: [
+              { chamber: 'House', date: '2026-07-23' },
+              { chamber: 'Senate', date: '2026-08-08' },
+            ],
+          },
+        ],
+        chamber: 'House',
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        through: 'page',
+        now,
+      }),
+    ).toEqual({
+      throughLabel: 'Jul 23',
+      notice: null,
+      statusLabel: 'In recess',
+    })
+  })
+
+  it('does not fall back to bill latest_passage_date on a House-filtered search', () => {
+    expect(
+      timelineFloorChrome({
+        items: [
+          {
+            latest_passage_date: '2026-08-08',
+            passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }],
+          },
+        ],
+        chamber: 'House',
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        through: 'page',
+        now,
+      }),
+    ).toEqual({
+      throughLabel: null,
+      notice: null,
       statusLabel: 'In recess',
     })
   })

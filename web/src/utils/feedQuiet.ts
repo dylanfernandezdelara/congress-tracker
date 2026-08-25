@@ -1,12 +1,11 @@
 import {
   floorWorkStatus,
   isFloorQuiet,
-  maxIsoDay,
   maxIsoDayForChamber,
-  parseIsoDay,
   type FloorChamber,
   type FloorWorkStatus,
 } from '@congress-tracker/shared/floor-quiet'
+import { maxIsoDay } from '@congress-tracker/shared/iso-day'
 
 import { formatVoteDate } from './billLabels'
 
@@ -15,33 +14,6 @@ const FLOOR_STATUS_LABEL = {
   in_session: 'In session',
   in_recess: 'In recess',
 } as const satisfies Record<FloorWorkStatus, string>
-
-/** Latest vote-only passage day among feed rows. Ignores executive activity timestamps. */
-export function latestPassageDateAmong(
-  items: readonly { latest_passage_date: string | null }[],
-): string | null {
-  return maxIsoDay(items.map((item) => item.latest_passage_date))
-}
-
-export function floorActivityDate(params: {
-  passageDay?: string | null
-  houseLast?: string | null
-  senateLast?: string | null
-  houseVoteDays?: readonly (string | null | undefined)[]
-  senateVoteDays?: readonly (string | null | undefined)[]
-  confirmationDates?: readonly (string | null | undefined)[]
-  chamber: FloorChamber
-}): string | null {
-  const fromChamber = maxIsoDayForChamber(params.chamber, {
-    house: [params.houseLast, ...(params.houseVoteDays ?? [])],
-    senate: [params.senateLast, ...(params.senateVoteDays ?? [])],
-    confirmation: params.confirmationDates,
-  })
-  // Bill-level latest_passage_date is the max across chambers. A House/Senate
-  // filter must not fall back to it or a bicameral bill dates the other floor.
-  if (params.chamber !== null) return fromChamber
-  return fromChamber ?? parseIsoDay(params.passageDay)
-}
 
 function voteDaysByChamber(
   items: readonly {
@@ -72,7 +44,7 @@ export function feedQuietCopy(
   now: Date = new Date(),
   chamber: FloorChamber = null,
 ): { throughLabel: string | null; notice: string | null } {
-  const day = parseIsoDay(latestPassageDate)
+  const day = maxIsoDay([latestPassageDate])
   if (!day) return { throughLabel: null, notice: null }
   const throughLabel = formatVoteDate(day)
   const who = chamber ?? 'House or Senate'
@@ -99,21 +71,30 @@ export function timelineFloorChrome(params: {
 }): { throughLabel: string | null; notice: string | null; statusLabel: string | null } {
   const now = params.now ?? new Date()
   const through = params.through ?? 'session'
-  const pagePassageDay = latestPassageDateAmong(params.items)
-  const itemVotes = voteDaysByChamber(params.items)
+  const votes = voteDaysByChamber(params.items)
+  // Unfiltered timelines may still date from bill-level latest_passage_date when
+  // the page has no passage_votes. Chamber filters must not — that field is the
+  // max across chambers.
+  const unfilteredBillDay =
+    params.chamber === null
+      ? maxIsoDay(params.items.map((item) => item.latest_passage_date))
+      : null
   const sessionDates = {
-    passageDay: pagePassageDay,
-    houseLast: params.houseLast,
-    senateLast: params.senateLast,
-    houseVoteDays: itemVotes.house,
-    senateVoteDays: itemVotes.senate,
-    chamber: params.chamber,
+    house: [params.houseLast, ...votes.house],
+    senate: [params.senateLast, ...votes.senate],
   }
-  const sessionPassageDay = floorActivityDate(sessionDates)
-  const activityDay = floorActivityDate({
-    ...sessionDates,
-    confirmationDates: params.confirmationVoteDates,
-  })
+  const sessionPassageDay =
+    maxIsoDayForChamber(params.chamber, sessionDates) ?? unfilteredBillDay
+  const pagePassageDay =
+    maxIsoDayForChamber(params.chamber, {
+      house: votes.house,
+      senate: votes.senate,
+    }) ?? unfilteredBillDay
+  const activityDay =
+    maxIsoDayForChamber(params.chamber, {
+      ...sessionDates,
+      confirmation: params.confirmationVoteDates,
+    }) ?? unfilteredBillDay
   const throughDay = through === 'page' ? pagePassageDay : sessionPassageDay
   const { throughLabel, notice } = feedQuietCopy(throughDay, now, params.chamber)
   return {

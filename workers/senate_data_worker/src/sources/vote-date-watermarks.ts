@@ -1,4 +1,4 @@
-import { maxIsoDay } from "../../../../shared/floor-quiet";
+import { maxIsoDay } from "../../../../shared/iso-day";
 
 export type VoteDateWatermarkFields = {
   sourceLatestDate?: string;

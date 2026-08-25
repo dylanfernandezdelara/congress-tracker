@@ -204,6 +204,35 @@ describe('Home', () => {
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
   })
 
+  it('does not date a House-filtered search from a Senate passage on the same bill', async () => {
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          latest_passage_date: '2026-08-08',
+          latest_activity_date: '2026-08-08',
+          passage_votes: [
+            {
+              chamber: 'Senate',
+              congress: 119,
+              session: 2,
+              roll_number: 228,
+              question: 'On Passage of the Bill',
+              result: 'Passed',
+              yeas: 52,
+              nays: 47,
+              date: '2026-08-08',
+            },
+          ],
+        }),
+      ]),
+    )
+    renderHome('/?chamber=House&q=housing')
+    expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    expect(screen.queryByText(/through Aug 8/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
+    expect(screen.getByText('In recess')).toBeInTheDocument()
+  })
+
   it('dates a House-filtered floor from House session watermarks, not a Senate passage on the same bill', async () => {
     fetchFeed.mockResolvedValue(
       pageResponse([
