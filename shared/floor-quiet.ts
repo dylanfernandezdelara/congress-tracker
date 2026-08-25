@@ -27,6 +27,37 @@ export function maxIsoDay(
   return latest
 }
 
+export type FloorChamber = 'House' | 'Senate' | null
+
+/**
+ * Latest calendar day for the chambers in view. Confirmations are Senate floor
+ * work, not passage votes — omit `confirmation` when dating the timeline.
+ */
+export function maxIsoDayForChamber(
+  chamber: FloorChamber,
+  dates: {
+    house?: readonly (string | null | undefined)[]
+    senate?: readonly (string | null | undefined)[]
+    confirmation?: readonly (string | null | undefined)[]
+  },
+): string | null {
+  const house = dates.house ?? []
+  const senate = dates.senate ?? []
+  const confirmation = dates.confirmation ?? []
+  switch (chamber) {
+    case 'House':
+      return maxIsoDay(house)
+    case 'Senate':
+      return maxIsoDay([...senate, ...confirmation])
+    case null:
+      return maxIsoDay([...house, ...senate, ...confirmation])
+    default: {
+      const _exhaustive: never = chamber
+      return _exhaustive
+    }
+  }
+}
+
 /**
  * Whole UTC calendar days from `isoDate` (YYYY-MM-DD) to `now`'s UTC date.
  * Returns null when the date cannot be parsed. Future dates clamp to 0.

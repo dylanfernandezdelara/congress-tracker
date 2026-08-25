@@ -13,6 +13,7 @@ export {
   isChamberHardSkipWarning,
   isIngestMonitorHealthy,
   isIngestMonitorOpsAcceptable,
+  isDegradedChamberWarning,
   isIngestTruncationWarning,
   isSenateCacheFallbackWarning,
   resolveScheduledSuccess,

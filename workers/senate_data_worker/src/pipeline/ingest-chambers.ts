@@ -2,6 +2,7 @@ import type { Env } from "../config";
 import type { Chamber, IngestVotesResult, SenateIngestVotesResult } from "../types";
 import { ingestHousePassageVotes } from "../sources/house-votes";
 import { ingestSenatePassageVotes } from "../sources/senate-votes";
+import { isSourceAheadOfCovered } from "../sources/vote-date-watermarks";
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -25,7 +26,7 @@ function ingestIntegrityWarnings(chamber: Chamber, result: IngestVotesResult): s
   }
   const source = result.sourceLatestDate;
   const covered = result.coveredLatestDate;
-  if (source && !(covered && source <= covered)) {
+  if (isSourceAheadOfCovered(source, covered)) {
     warnings.push(
       `${chamber} source listed latest ${source} is newer than stored ${covered ?? "none"}`
     );

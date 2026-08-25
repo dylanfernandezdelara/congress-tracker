@@ -354,15 +354,14 @@ function takeLookbackItems<T extends { voteDate: string }>(
   items: readonly T[],
   lookbackStart: string | null,
   watermarks: VoteDateWatermarks,
-  isKnown: (item: T) => boolean
+  isKnown?: (item: T) => boolean
 ): { kept: T[]; skipped: number } {
   const kept: T[] = [];
   let skipped = 0;
   for (const item of items) {
     if (lookbackStart && item.voteDate < lookbackStart) continue;
-    watermarks.noteListed(item.voteDate);
-    watermarks.noteCovered(item.voteDate);
-    if (isKnown(item)) {
+    watermarks.noteListedAndCovered(item.voteDate);
+    if (isKnown?.(item)) {
       skipped += 1;
       continue;
     }
@@ -402,8 +401,7 @@ export async function ingestSenatePassageVotes(
   const { kept: confirmationVotes } = takeLookbackItems(
     parsed.confirmationVotes,
     lookbackStart,
-    watermarks,
-    () => false
+    watermarks
   );
 
   return {

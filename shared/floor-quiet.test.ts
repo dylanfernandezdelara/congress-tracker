@@ -8,6 +8,7 @@ import {
   isFloorQuiet,
   isFloorQuietDays,
   maxIsoDay,
+  maxIsoDayForChamber,
   parseIsoDay,
   utcCalendarDaysSince,
 } from './floor-quiet'
@@ -72,5 +73,21 @@ describe('maxIsoDay', () => {
   it('returns the latest valid calendar day', () => {
     expect(maxIsoDay(['2026-04-10', null, '2026-08-08T16:00:00.000Z'])).toBe('2026-08-08')
     expect(maxIsoDay([null, 'not-a-date'])).toBeNull()
+  })
+})
+
+describe('maxIsoDayForChamber', () => {
+  it('keeps House on House dates and lets Senate confirmations count as floor work', () => {
+    const dates = {
+      house: ['2026-07-23', '2026-04-10'],
+      senate: ['2026-08-08'],
+      confirmation: ['2026-08-24'],
+    }
+    expect(maxIsoDayForChamber('House', dates)).toBe('2026-07-23')
+    expect(maxIsoDayForChamber('Senate', dates)).toBe('2026-08-24')
+    expect(maxIsoDayForChamber(null, dates)).toBe('2026-08-24')
+    expect(maxIsoDayForChamber(null, { house: dates.house, senate: dates.senate })).toBe(
+      '2026-08-08',
+    )
   })
 })

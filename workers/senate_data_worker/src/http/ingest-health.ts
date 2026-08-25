@@ -1,4 +1,4 @@
-import { floorQuietDays, isFloorQuietDays } from "../../../../shared/floor-quiet";
+import { floorQuietDays, isFloorQuietDays, parseIsoDay } from "../../../../shared/floor-quiet";
 import type {
   ExecutiveIngestMonitorPayload,
   ExecutivePipelineRunRecord,
@@ -112,10 +112,11 @@ export function buildIngestMonitorPayload(params: {
   });
 
   const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
+  const quietDay = parseIsoDay(params.latestPassageVoteDate);
   const annotations: string[] = [];
-  if (isFloorQuietDays(quietDays)) {
+  if (isFloorQuietDays(quietDays) && quietDay) {
     annotations.push(
-      `Floor has been quiet since ${params.latestPassageVoteDate} (${quietDays} day(s) with no new passage votes).`
+      `Floor has been quiet since ${quietDay} (${quietDays} day(s) with no new passage votes).`
     );
   }
   if (params.missingDigestCount > 0) {

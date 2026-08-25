@@ -36,9 +36,10 @@ export function isIngestTruncationWarning(warning) {
   return /ingest truncated:/i.test(warning);
 }
 
+/** Allowlist: anything else (hard skip, source-ahead, unknown) fails closed. */
 const DEGRADED_CHAMBER_WARNING = [isSenateCacheFallbackWarning, isIngestTruncationWarning];
 
-function isDegradedChamberWarning(warning) {
+export function isDegradedChamberWarning(warning) {
   return DEGRADED_CHAMBER_WARNING.some((test) => test(warning));
 }
 

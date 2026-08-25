@@ -3,6 +3,7 @@ import {
   isFloorQuiet,
   maxIsoDay,
   parseIsoDay,
+  type FloorChamber,
   type FloorWorkStatus,
 } from '@congress-tracker/shared/floor-quiet'
 
@@ -25,26 +26,14 @@ export function floorActivityDate(params: {
   passageDay: string | null
   houseLast?: string | null
   senateLast?: string | null
-  confirmationDay?: string | null
-  chamber: 'House' | 'Senate' | null
+  confirmationDates?: readonly (string | null | undefined)[]
+  chamber: FloorChamber
 }): string | null {
-  switch (params.chamber) {
-    case 'House':
-      return maxIsoDay([params.passageDay, params.houseLast])
-    case 'Senate':
-      return maxIsoDay([params.passageDay, params.senateLast, params.confirmationDay])
-    case null:
-      return maxIsoDay([
-        params.passageDay,
-        params.houseLast,
-        params.senateLast,
-        params.confirmationDay,
-      ])
-    default: {
-      const _exhaustive: never = params.chamber
-      return _exhaustive
-    }
-  }
+  return maxIsoDayForChamber(params.chamber, {
+    house: [params.passageDay, params.houseLast],
+    senate: [params.passageDay, params.senateLast],
+    confirmation: params.confirmationDates,
+  })
 }
 
 export function floorStatusLabel(
@@ -58,7 +47,7 @@ export function floorStatusLabel(
 export function feedQuietCopy(
   latestPassageDate: string | null | undefined,
   now: Date = new Date(),
-  chamber: 'House' | 'Senate' | null = null,
+  chamber: FloorChamber = null,
 ): { throughLabel: string | null; notice: string | null } {
   const day = parseIsoDay(latestPassageDate)
   if (!day) return { throughLabel: null, notice: null }
@@ -70,36 +59,39 @@ export function feedQuietCopy(
   return { throughLabel, notice }
 }
 
+/** `session` = chronological timeline; `page` = search / advanced-filter slice. */
+export type TimelineThrough = 'session' | 'page'
+
 export function timelineFloorChrome(params: {
   items: readonly { latest_passage_date: string | null }[]
-  chamber: 'House' | 'Senate' | null
+  chamber: FloorChamber
   houseLast?: string | null
   senateLast?: string | null
   confirmationVoteDates?: readonly (string | null | undefined)[]
-  /** False while searching or using advanced filters so the quiet-floor notice stays off. */
-  includeNotice?: boolean
+  through?: TimelineThrough
   now?: Date
 }): { throughLabel: string | null; notice: string | null; statusLabel: string | null } {
   const now = params.now ?? new Date()
-  const includeNotice = params.includeNotice !== false
+  const through = params.through ?? 'session'
   const pagePassageDay = latestPassageDateAmong(params.items)
-  const confirmationDay = maxIsoDay(params.confirmationVoteDates ?? [])
-  const activityDate = (confirmation: string | null) =>
-    floorActivityDate({
-      passageDay: pagePassageDay,
-      houseLast: params.houseLast,
-      senateLast: params.senateLast,
-      confirmationDay: confirmation,
-      chamber: params.chamber,
-    })
-  // Unfiltered / chamber views use session passage watermarks so page-1
-  // executive ranking cannot hide the latest floor vote. Filtered views keep
-  // the through-date on the loaded page.
-  const passageDay = includeNotice ? activityDate(null) : pagePassageDay
-  const { throughLabel, notice } = feedQuietCopy(passageDay, now, params.chamber)
+  const sessionPassageDay = floorActivityDate({
+    passageDay: pagePassageDay,
+    houseLast: params.houseLast,
+    senateLast: params.senateLast,
+    chamber: params.chamber,
+  })
+  const activityDay = floorActivityDate({
+    passageDay: pagePassageDay,
+    houseLast: params.houseLast,
+    senateLast: params.senateLast,
+    confirmationDates: params.confirmationVoteDates,
+    chamber: params.chamber,
+  })
+  const throughDay = through === 'page' ? pagePassageDay : sessionPassageDay
+  const { throughLabel, notice } = feedQuietCopy(throughDay, now, params.chamber)
   return {
     throughLabel,
-    notice: includeNotice ? notice : null,
-    statusLabel: floorStatusLabel(activityDate(confirmationDay), now),
+    notice: through === 'session' ? notice : null,
+    statusLabel: floorStatusLabel(activityDay, now),
   }
 }

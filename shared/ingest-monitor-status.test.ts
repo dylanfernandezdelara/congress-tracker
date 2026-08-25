@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyChamberWarningSeverity,
   isChamberHardSkipWarning,
+  isDegradedChamberWarning,
   isIngestMonitorHealthy,
   isIngestMonitorOpsAcceptable,
   isIngestTruncationWarning,
@@ -70,5 +71,16 @@ describe("ingest monitor status helpers", () => {
         "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first)."
       )
     ).toBe(true);
+    expect(
+      isDegradedChamberWarning(
+        "House ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first)."
+      )
+    ).toBe(true);
+    expect(
+      isDegradedChamberWarning("Senate vote menu served from D1 cache after live fetch failed: x")
+    ).toBe(true);
+    expect(
+      isDegradedChamberWarning("House source listed latest 2026-08-10 is newer than stored 2026-07-23")
+    ).toBe(false);
   });
 });

@@ -86,7 +86,7 @@ describe('floorActivityDate', () => {
         passageDay: '2026-04-10',
         houseLast: '2026-07-23',
         senateLast: '2026-08-08',
-        confirmationDay: '2026-08-24',
+        confirmationDates: ['2026-08-24'],
         chamber: 'House',
       }),
     ).toBe('2026-07-23')
@@ -98,7 +98,7 @@ describe('floorActivityDate', () => {
         passageDay: '2026-08-08',
         houseLast: '2026-07-23',
         senateLast: '2026-08-08',
-        confirmationDay: '2026-08-24',
+        confirmationDates: ['2026-08-24'],
         chamber: 'Senate',
       }),
     ).toBe('2026-08-24')
@@ -130,7 +130,7 @@ describe('timelineFloorChrome', () => {
       timelineFloorChrome({
         items: [{ latest_passage_date: '2026-08-08' }],
         chamber: null,
-        includeNotice: false,
+        through: 'page',
         now,
       }),
     ).toEqual({
@@ -163,7 +163,7 @@ describe('timelineFloorChrome', () => {
         chamber: null,
         houseLast: '2026-07-23',
         senateLast: '2026-08-08',
-        includeNotice: false,
+        through: 'page',
         now,
       }),
     ).toEqual({

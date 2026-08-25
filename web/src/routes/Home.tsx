@@ -197,7 +197,7 @@ export default function Home() {
     houseLast: session.data?.house.date_range.last,
     senateLast: session.data?.senate.date_range.last,
     confirmationVoteDates: (recentConfirmations.data?.confirmations ?? []).map((item) => item.vote_date),
-    includeNotice: !searchQuery && advancedCount === 0,
+    through: searchQuery || advancedCount > 0 ? 'page' : 'session',
   })
 
   return (
