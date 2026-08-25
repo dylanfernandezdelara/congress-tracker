@@ -1,4 +1,4 @@
-import { floorQuietDays, isFloorQuiet } from "../../../../shared/floor-quiet";
+import { floorQuietDays, isFloorQuietDays } from "../../../../shared/floor-quiet";
 import type {
   ExecutiveIngestMonitorPayload,
   ExecutivePipelineRunRecord,
@@ -114,8 +114,7 @@ export function buildIngestMonitorPayload(params: {
   const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
   let message = evaluated.message;
   if (
-    isFloorQuiet(params.latestPassageVoteDate, params.now) &&
-    params.latestPassageVoteDate &&
+    isFloorQuietDays(quietDays) &&
     (evaluated.status === "ok" || evaluated.status === "degraded")
   ) {
     message = `${message} Floor has been quiet since ${params.latestPassageVoteDate} (${quietDays} day(s) with no new passage votes).`;

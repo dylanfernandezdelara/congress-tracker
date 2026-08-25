@@ -29,7 +29,7 @@ import {
   advancedFilterSummary,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
-import { feedQuietCopy } from '../utils/feedQuiet'
+import { feedQuietCopy, latestPassageDateAmong } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -186,7 +186,8 @@ export default function Home() {
     .filter(Boolean)
     .join(' · ')
 
-  const quietCopy = feedQuietCopy(items[0]?.latest_activity_date ?? null)
+  const quietCopy = feedQuietCopy(latestPassageDateAmong(items), new Date(), chamber)
+  const showQuietNotice = !searchQuery && advancedCount === 0 && Boolean(quietCopy.notice)
 
   return (
     <div className="home-shell">
@@ -280,7 +281,7 @@ export default function Home() {
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
-            {quietCopy.notice ? (
+            {showQuietNotice ? (
               <p className="home-feed-quiet" role="status">
                 {quietCopy.notice}
               </p>

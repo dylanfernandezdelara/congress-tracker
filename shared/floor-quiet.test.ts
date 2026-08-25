@@ -4,8 +4,19 @@ import {
   FLOOR_QUIET_AFTER_DAYS,
   floorQuietDays,
   isFloorQuiet,
+  isFloorQuietDays,
+  parseIsoDay,
   utcCalendarDaysSince,
 } from './floor-quiet'
+
+describe('parseIsoDay', () => {
+  it('keeps a calendar day and slices datetimes', () => {
+    expect(parseIsoDay('2026-08-08')).toBe('2026-08-08')
+    expect(parseIsoDay(' 2026-08-08T16:00:00.000Z ')).toBe('2026-08-08')
+    expect(parseIsoDay(null)).toBeNull()
+    expect(parseIsoDay('not-a-date')).toBeNull()
+  })
+})
 
 describe('utcCalendarDaysSince', () => {
   const now = new Date('2026-08-25T20:18:00.000Z')
@@ -40,5 +51,8 @@ describe('floor quiet helpers', () => {
     expect(isFloorQuiet('2026-08-22', now)).toBe(true)
     expect(isFloorQuiet('2026-08-23', now)).toBe(false)
     expect(isFloorQuiet('2026-08-25', now)).toBe(false)
+    expect(isFloorQuietDays(3)).toBe(true)
+    expect(isFloorQuietDays(2)).toBe(false)
+    expect(isFloorQuietDays(null)).toBe(false)
   })
 })

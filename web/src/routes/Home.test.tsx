@@ -144,6 +144,47 @@ describe('Home', () => {
     expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
   })
 
+  it('dates the quiet floor from passage votes, not an executive-boosted first row', async () => {
+    const latest = isoUtcDaysAgo(10)
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          bill: { congress: 119, type: 'HR', number: 1, title: 'Boosted' },
+          latest_passage_date: '2026-04-10',
+          latest_activity_date: '2026-08-24T14:26:00.000Z',
+        }),
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(
+      await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/through Apr 10/)).not.toBeInTheDocument()
+  })
+
+  it('names a chamber-filtered quiet floor and skips the notice while searching', async () => {
+    const latest = isoUtcDaysAgo(10)
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    const { unmount } = renderHome('/?chamber=House')
+    expect(
+      await screen.findByText(`No new House passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/House or Senate/)).not.toBeInTheDocument()
+    unmount()
+
+    renderHome('/?q=housing')
+    expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
+  })
+
   it('stacks rail content below the feed on narrow viewports without duplicate fetches', async () => {
     mockViewport(false)
     const { container } = renderHome()
