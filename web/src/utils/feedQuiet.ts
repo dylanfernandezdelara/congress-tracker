@@ -74,3 +74,29 @@ export function feedQuietCopy(
     : null
   return { throughLabel, notice }
 }
+
+export function timelineFloorChrome(params: {
+  items: readonly { latest_passage_date: string | null }[]
+  chamber: 'House' | 'Senate' | null
+  houseLast?: string | null
+  senateLast?: string | null
+  confirmationVoteDates?: readonly (string | null | undefined)[]
+  now?: Date
+}): { throughLabel: string | null; notice: string | null; statusLabel: string | null } {
+  const now = params.now ?? new Date()
+  const passageDay = latestPassageDateAmong(params.items)
+  const quietCopy = feedQuietCopy(passageDay, now, params.chamber)
+  return {
+    ...quietCopy,
+    statusLabel: floorStatusLabel(
+      floorActivityDate({
+        passageDay,
+        houseLast: params.houseLast,
+        senateLast: params.senateLast,
+        confirmationDay: maxIsoDay(params.confirmationVoteDates ?? []),
+        chamber: params.chamber,
+      }),
+      now,
+    ),
+  }
+}

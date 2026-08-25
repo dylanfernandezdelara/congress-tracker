@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { floorStatusLabel, floorActivityDate, feedQuietCopy, latestPassageDateAmong } from './feedQuiet'
+import {
+  feedQuietCopy,
+  floorActivityDate,
+  floorStatusLabel,
+  latestPassageDateAmong,
+  timelineFloorChrome,
+} from './feedQuiet'
 
 describe('latestPassageDateAmong', () => {
   it('picks the max vote-only passage day and skips executive timestamps', () => {
@@ -96,5 +102,26 @@ describe('floorActivityDate', () => {
         chamber: 'Senate',
       }),
     ).toBe('2026-08-24')
+  })
+})
+
+describe('timelineFloorChrome', () => {
+  const now = new Date('2026-08-25T20:00:00.000Z')
+
+  it('keeps passage through-copy while confirmations can mark Working', () => {
+    expect(
+      timelineFloorChrome({
+        items: [{ latest_passage_date: '2026-08-08' }],
+        chamber: null,
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        confirmationVoteDates: ['2026-08-24'],
+        now,
+      }),
+    ).toEqual({
+      throughLabel: 'Aug 8',
+      notice: 'No new House or Senate passage votes since Aug 8.',
+      statusLabel: 'Working',
+    })
   })
 })

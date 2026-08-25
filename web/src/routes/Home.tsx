@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
-import { maxIsoDay } from '@congress-tracker/shared/floor-quiet'
 
 import { fetchNotableVotes, fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
 import type {
@@ -30,7 +29,7 @@ import {
   advancedFilterSummary,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
-import { feedQuietCopy, floorActivityDate, floorStatusLabel, latestPassageDateAmong } from '../utils/feedQuiet'
+import { timelineFloorChrome } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -192,20 +191,14 @@ export default function Home() {
     .filter(Boolean)
     .join(' · ')
 
-  const passageDay = latestPassageDateAmong(items)
-  const quietCopy = feedQuietCopy(passageDay, new Date(), chamber)
-  const showQuietNotice = !searchQuery && advancedCount === 0 && Boolean(quietCopy.notice)
-  const statusLabel = floorStatusLabel(
-    floorActivityDate({
-      passageDay,
-      houseLast: session.data?.house.date_range.last,
-      senateLast: session.data?.senate.date_range.last,
-      confirmationDay: maxIsoDay(
-        (recentConfirmations.data?.confirmations ?? []).map((item) => item.vote_date),
-      ),
-      chamber,
-    }),
-  )
+  const floorChrome = timelineFloorChrome({
+    items,
+    chamber,
+    houseLast: session.data?.house.date_range.last,
+    senateLast: session.data?.senate.date_range.last,
+    confirmationVoteDates: (recentConfirmations.data?.confirmations ?? []).map((item) => item.vote_date),
+  })
+  const showQuietNotice = !searchQuery && advancedCount === 0 && Boolean(floorChrome.notice)
 
   return (
     <div className="home-shell">
@@ -266,7 +259,7 @@ export default function Home() {
 
         {!showSkeleton && !feedError && total === 0 && !inFlight ? (
           <div className="home-feed-empty">
-            <FloorStatusLabel label={statusLabel} />
+            <FloorStatusLabel label={floorChrome.statusLabel} />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
@@ -295,17 +288,17 @@ export default function Home() {
             <div className="home-feed-header">
               <div className="home-feed-heading">
                 <h2 className="home-feed-title">Chronological timeline</h2>
-                <FloorStatusLabel label={statusLabel} />
+                <FloorStatusLabel label={floorChrome.statusLabel} />
               </div>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
-                {quietCopy.throughLabel ? ` · through ${quietCopy.throughLabel}` : ''}
+                {floorChrome.throughLabel ? ` · through ${floorChrome.throughLabel}` : ''}
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
             {showQuietNotice ? (
               <p className="home-feed-quiet" role="status">
-                {quietCopy.notice}
+                {floorChrome.notice}
               </p>
             ) : null}
 
