@@ -2,6 +2,7 @@ import {
   floorWorkStatus,
   isFloorQuiet,
   maxIsoDay,
+  maxIsoDayForChamber,
   parseIsoDay,
   type FloorChamber,
   type FloorWorkStatus,
