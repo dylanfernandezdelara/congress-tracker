@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { FLOOR_QUIET_AFTER_DAYS } from '@congress-tracker/shared/floor-quiet'
+import { isFloorQuietDays } from '@congress-tracker/shared/floor-quiet'
 import type {
   ExecutiveIngestMonitorPayload,
   ExecutivePipelineRunRecord,
@@ -275,7 +275,7 @@ function FeedMonitorSection({ ingest }: { ingest: IngestMonitorPayload }) {
             <dt className="text-secondary">Latest passage vote in D1</dt>
             <dd className="font-medium">
               {ingest.latest_passage_vote_date ?? '—'}
-              {ingest.floor_quiet_days != null && ingest.floor_quiet_days >= FLOOR_QUIET_AFTER_DAYS
+              {isFloorQuietDays(ingest.floor_quiet_days)
                 ? ` (${ingest.floor_quiet_days}d quiet floor)`
                 : ''}
             </dd>
