@@ -1,5 +1,7 @@
 import { ensureSchema } from "./schema";
 import { congressNumber, type Env } from "../config";
+import { VOTE_LOOKBACK_DAYS } from "../constants";
+import { daysAgoLookbackStartIso } from "../../../../shared/lookback";
 import type {
   ExecutivePipelineRunRecord,
   FeedPipelineFailureRecord,
@@ -258,39 +260,57 @@ export async function getLatestPassageVoteDate(env: Env): Promise<string | null>
 }
 
 /**
- * Count digests the feed would treat as missing — mirrors `parseStoredDigest`:
- * null JSON, invalid JSON, or JSON lacking a non-empty headline/what_it_does.
+ * Count incomplete digests for bills that can appear on the chronological
+ * timeline (passage vote inside the lookback window). Session-backfill rows
+ * outside that window are expected to lack rewrites and must not look like
+ * a stuck feed.
+ *
+ * Mirrors `parseStoredDigest`: null JSON, invalid JSON, or JSON lacking a
+ * non-empty headline/what_it_does.
  *
  * D1/`json_extract` throws on malformed JSON, so invalid rows are gated with
  * `json_valid` and extracts only run over a CASE-nullified payload.
  */
-export async function getMissingDigestCount(env: Env): Promise<number> {
+export async function getMissingDigestCount(
+  env: Env,
+  asOf: Date = new Date()
+): Promise<number> {
   await ensureSchema(env.DB);
+  const lookback = daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf);
   const row = await env.DB
     .prepare(
       `SELECT COUNT(*) AS missing_count
-       FROM bill_digests
-       WHERE congress = ?1
+       FROM bill_digests d
+       WHERE d.congress = ?1
+         AND EXISTS (
+           SELECT 1
+           FROM votes v
+           WHERE v.bill_congress = d.congress
+             AND UPPER(v.bill_type) = UPPER(d.bill_type)
+             AND v.bill_number = d.number
+             AND v.is_passage = 1
+             AND v.vote_date >= ?2
+         )
          AND (
-           digest_json IS NULL
-           OR json_valid(digest_json) = 0
+           d.digest_json IS NULL
+           OR json_valid(d.digest_json) = 0
            OR COALESCE(
                 json_extract(
-                  CASE WHEN json_valid(digest_json) = 1 THEN digest_json END,
+                  CASE WHEN json_valid(d.digest_json) = 1 THEN d.digest_json END,
                   '$.headline'
                 ),
                 ''
               ) = ''
            OR COALESCE(
                 json_extract(
-                  CASE WHEN json_valid(digest_json) = 1 THEN digest_json END,
+                  CASE WHEN json_valid(d.digest_json) = 1 THEN d.digest_json END,
                   '$.what_it_does'
                 ),
                 ''
               ) = ''
          )`
     )
-    .bind(congressNumber(env))
+    .bind(congressNumber(env), lookback)
     .first<{ missing_count: number }>();
   return row?.missing_count ?? 0;
 }

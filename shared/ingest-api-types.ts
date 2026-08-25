@@ -57,6 +57,12 @@ export interface IngestMonitorPayload {
   daily_cron_utc: string;
   stale_after_hours: number;
   latest_passage_vote_date: string | null;
+  /**
+   * Whole UTC days since `latest_passage_vote_date`. Null when no passage
+   * vote is stored. A large value with status `ok` means Congress is quiet,
+   * not that ingest is stuck.
+   */
+  floor_quiet_days: number | null;
   missing_digest_count: number;
   last_success: FeedPipelineRunRecord | null;
   last_failure: FeedPipelineFailureRecord | null;

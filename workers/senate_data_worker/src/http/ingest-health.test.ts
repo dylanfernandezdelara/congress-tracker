@@ -253,7 +253,9 @@ describe("buildIngestMonitorPayload", () => {
 
     expect(payload.status).toBe("degraded");
     expect(payload.message).toContain("Partial chamber ingest");
-    expect(payload.message).toContain("1 bill(s) missing digests");
+    expect(payload.message).toContain("1 feed bill(s) missing digests");
+    expect(payload.message).toContain("Floor has been quiet since 2026-06-20");
+    expect(payload.floor_quiet_days).toBe(3);
   });
 
   it("marks failed when scheduled success carried hard chamber skip warnings", () => {
@@ -356,6 +358,35 @@ describe("buildIngestMonitorPayload", () => {
     });
 
     expect(payload.status).toBe("ok");
+    expect(payload.floor_quiet_days).toBe(3);
+    expect(payload.message).toContain("Floor has been quiet since 2026-06-20");
+  });
+
+  it("does not treat a same-day latest vote as a quiet floor", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 2,
+      votesSkipped: 4,
+      billsSelected: 5,
+      digestsWritten: 1,
+      digestsSkipped: 4,
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-23",
+      missingDigestCount: 0,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("ok");
+    expect(payload.floor_quiet_days).toBe(0);
+    expect(payload.message).toBe("Scheduled ingest completed within the expected window.");
   });
 
   it("surfaces last_skipped without changing status fields", () => {

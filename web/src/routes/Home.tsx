@@ -21,6 +21,7 @@ import { RightRail } from '../components/RightRail'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import { useMemberProfile } from '../hooks/useMemberProfile'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
 import {
@@ -28,7 +29,7 @@ import {
   advancedFilterSummary,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
-import { useMemberProfile } from '../hooks/useMemberProfile'
+import { feedQuietCopy } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -185,6 +186,8 @@ export default function Home() {
     .filter(Boolean)
     .join(' · ')
 
+  const quietCopy = feedQuietCopy(items[0]?.latest_activity_date ?? null)
+
   return (
     <div className="home-shell">
       {isDesktop ? (
@@ -273,9 +276,15 @@ export default function Home() {
               <h2 className="home-feed-title">Chronological timeline</h2>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
+                {quietCopy.throughLabel ? ` · through ${quietCopy.throughLabel}` : ''}
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
+            {quietCopy.notice ? (
+              <p className="home-feed-quiet" role="status">
+                {quietCopy.notice}
+              </p>
+            ) : null}
 
             <ul className={`feed-list${listRefreshing ? ' is-refreshing' : ''}`}>
               {items.map((item) => {

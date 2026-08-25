@@ -9,6 +9,7 @@ import {
   renderHome,
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
+import { formatVoteDate } from '../utils/billLabels'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
@@ -39,6 +40,12 @@ const {
 } = homeApi
 
 vi.mock('../api/client', () => homeApi)
+
+function isoUtcDaysAgo(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
+}
 
 describe('Home', () => {
   beforeEach(() => {
@@ -106,6 +113,35 @@ describe('Home', () => {
     expect(
       within(secondary as HTMLElement).getByRole('region', { name: 'New laws' }),
     ).toBeInTheDocument()
+  })
+
+  it('explains a quiet floor so the timeline does not look stuck', async () => {
+    const latest = isoUtcDaysAgo(10)
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(
+      await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+  })
+
+  it('omits the quiet notice when the newest vote is recent', async () => {
+    const latest = isoUtcDaysAgo(1)
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    expect(
+      screen.queryByText(/No new House or Senate passage votes since/),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
   })
 
   it('stacks rail content below the feed on narrow viewports without duplicate fetches', async () => {

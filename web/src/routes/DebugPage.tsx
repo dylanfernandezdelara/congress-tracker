@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { fetchIngestMonitor } from '../api/client'
+import { FLOOR_QUIET_AFTER_DAYS } from '@congress-tracker/shared/floor-quiet'
 import type {
   ExecutiveIngestMonitorPayload,
   ExecutivePipelineRunRecord,
@@ -11,6 +11,8 @@ import type {
   IngestMonitorPayload,
   IngestMonitorStatus,
 } from '@congress-tracker/shared/ingest-api-types'
+
+import { fetchIngestMonitor } from '../api/client'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { isSameRun, isSkipSuperseded, type RunIdentity } from '../utils/ingestMonitorDisplay'
 
@@ -271,10 +273,15 @@ function FeedMonitorSection({ ingest }: { ingest: IngestMonitorPayload }) {
         <>
           <div>
             <dt className="text-secondary">Latest passage vote in D1</dt>
-            <dd className="font-medium">{ingest.latest_passage_vote_date ?? '—'}</dd>
+            <dd className="font-medium">
+              {ingest.latest_passage_vote_date ?? '—'}
+              {ingest.floor_quiet_days != null && ingest.floor_quiet_days >= FLOOR_QUIET_AFTER_DAYS
+                ? ` (${ingest.floor_quiet_days}d quiet floor)`
+                : ''}
+            </dd>
           </div>
           <div>
-            <dt className="text-secondary">Missing digests</dt>
+            <dt className="text-secondary">Missing feed digests</dt>
             <dd className="font-medium">{ingest.missing_digest_count}</dd>
           </div>
         </>
@@ -378,6 +385,12 @@ export default function DebugPage() {
                 is later than{' '}
                 <code className="rounded bg-surface-subtle px-1">skipped_at</code>. The field is sticky
                 — non-null alone is not an alarm.
+              </li>
+              <li>
+                Quiet floor: a large{' '}
+                <code className="rounded bg-surface-subtle px-1">ingest.floor_quiet_days</code> with
+                status <code className="rounded bg-surface-subtle px-1">ok</code> means the House and
+                Senate have not published newer passage votes. Do not page that as stuck ingest.
               </li>
               <li>
                 Manual override:{' '}

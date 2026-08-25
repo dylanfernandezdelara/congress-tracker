@@ -1,3 +1,4 @@
+import { floorQuietDays, isFloorQuiet } from "../../../../shared/floor-quiet";
 import type {
   ExecutiveIngestMonitorPayload,
   ExecutivePipelineRunRecord,
@@ -110,12 +111,20 @@ export function buildIngestMonitorPayload(params: {
     senateVoteMenuCache: params.senateVoteMenuCache ?? null,
   });
 
+  const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
   let message = evaluated.message;
+  if (
+    isFloorQuiet(params.latestPassageVoteDate, params.now) &&
+    params.latestPassageVoteDate &&
+    (evaluated.status === "ok" || evaluated.status === "degraded")
+  ) {
+    message = `${message} Floor has been quiet since ${params.latestPassageVoteDate} (${quietDays} day(s) with no new passage votes).`;
+  }
   if (
     params.missingDigestCount > 0 &&
     (evaluated.status === "ok" || evaluated.status === "degraded")
   ) {
-    message = `${message} ${params.missingDigestCount} bill(s) missing digests.`;
+    message = `${message} ${params.missingDigestCount} feed bill(s) missing digests.`;
   }
 
   const executive = params.executive
@@ -135,6 +144,7 @@ export function buildIngestMonitorPayload(params: {
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,
     latest_passage_vote_date: params.latestPassageVoteDate,
+    floor_quiet_days: quietDays,
     missing_digest_count: params.missingDigestCount,
     last_success: sanitizeRunRecord(params.lastSuccess),
     last_failure: sanitizeFailureRecord(params.lastFailure),
