@@ -337,7 +337,7 @@
   .home-feed-heading {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     gap: 0.35rem 0.55rem;
     min-width: 0;
   }
@@ -352,10 +352,16 @@
 
   .home-feed-floor-status {
     margin: 0;
-    font-size: 12px;
-    font-weight: 400;
+    padding: 0.12rem 0.4rem;
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 4px;
+    background: hsl(var(--twc-surface-subtle));
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+    line-height: 1.2;
     white-space: nowrap;
-    color: hsl(var(--twc-faint));
+    color: hsl(var(--twc-secondary));
   }
 
   .home-feed-count {
