@@ -118,8 +118,10 @@ restore offline sample spotlights for UI work.
   schema is created on demand by `ensureSchema()` (and by `npm run seed`), so
   there is no migration step to run.
 - **`npm run preview` is not local.** It builds the web app and uploads a
-  Cloudflare preview version, which reuses production bindings (incl. D1). It
-  needs Cloudflare credentials and is best run from Cursor Cloud.
+  Cloudflare preview Worker. That version uses the `[env.preview]` D1
+  (`congress-tracker-preview`), not production. Cron does not run on preview,
+  and pipeline writes are blocked, so the preview DB can lag production or stay
+  empty until seeded. Needs Cloudflare credentials; best run from Cursor Cloud.
 
 ## Verifying parity
 
