@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatBillDocket, formatCoverageDate, formatVoteDate } from './billLabels'
+import {
+  formatBillDocket,
+  formatCoverageDate,
+  formatVoteDate,
+  formatWeekdayVoteDate,
+} from './billLabels'
 
 describe('formatBillDocket', () => {
   it('re-exports shared bill docket formatting', () => {
@@ -18,5 +23,12 @@ describe('formatVoteDate', () => {
 describe('formatCoverageDate', () => {
   it('formats ISO dates with the year included', () => {
     expect(formatCoverageDate('2026-06-30')).toBe('Jun 30, 2026')
+  })
+})
+
+describe('formatWeekdayVoteDate', () => {
+  it('formats UTC calendar days with the weekday', () => {
+    expect(formatWeekdayVoteDate('2026-08-31')).toBe('Monday, Aug 31')
+    expect(formatWeekdayVoteDate('2026-09-14')).toBe('Monday, Sep 14')
   })
 })

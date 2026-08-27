@@ -63,7 +63,7 @@ describe('timelineFloorChrome', () => {
         confirmationVoteDates: ['2026-08-24'],
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
       statusLabel: 'Working',
@@ -78,7 +78,7 @@ describe('timelineFloorChrome', () => {
         through: 'page',
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: null,
       statusLabel: 'In recess',
@@ -94,7 +94,7 @@ describe('timelineFloorChrome', () => {
         senateLast: '2026-08-08',
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
       statusLabel: 'In recess',
@@ -110,7 +110,7 @@ describe('timelineFloorChrome', () => {
         senateLast: '2026-08-08',
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
       statusLabel: 'In recess',
@@ -127,7 +127,7 @@ describe('timelineFloorChrome', () => {
         through: 'page',
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: 'Apr 10',
       notice: null,
       statusLabel: 'In recess',
@@ -147,7 +147,7 @@ describe('timelineFloorChrome', () => {
         senateLast: '2026-08-08',
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: 'Jul 23',
       notice: 'No new House passage votes since Jul 23.',
       statusLabel: 'In recess',
@@ -171,7 +171,7 @@ describe('timelineFloorChrome', () => {
         through: 'page',
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: 'Jul 23',
       notice: null,
       statusLabel: 'In recess',
@@ -192,10 +192,34 @@ describe('timelineFloorChrome', () => {
         through: 'page',
         now,
       }),
-    ).toEqual({
+    ).toMatchObject({
       throughLabel: null,
       notice: null,
       statusLabel: 'In recess',
+    })
+  })
+
+  it('splits House and Senate recess return dates from published calendars', () => {
+    const chrome = timelineFloorChrome({
+      items: [],
+      chamber: null,
+      houseLast: '2026-07-23',
+      senateLast: '2026-08-08',
+      now,
+    })
+    expect(chrome.house).toMatchObject({
+      chamber: 'House',
+      status: 'in_recess',
+      lastActivityDay: '2026-07-23',
+      returnsOn: '2026-08-31',
+      periodLabel: 'District work period',
+    })
+    expect(chrome.senate).toMatchObject({
+      chamber: 'Senate',
+      status: 'in_recess',
+      lastActivityDay: '2026-08-08',
+      returnsOn: '2026-09-14',
+      periodLabel: 'State work period',
     })
   })
 })

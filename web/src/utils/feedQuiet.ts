@@ -1,11 +1,17 @@
 import {
+  calendarSource,
+  publishedRecessLabel,
+  publishedReturnDay,
+  type CalendarChamber,
+} from '@congress-tracker/shared/chamber-calendar'
+import {
   floorWorkStatus,
   isFloorQuiet,
   maxIsoDayForChamber,
   type FloorChamber,
   type FloorWorkStatus,
 } from '@congress-tracker/shared/floor-quiet'
-import { maxIsoDay } from '@congress-tracker/shared/iso-day'
+import { maxIsoDay, parseIsoDay, utcIsoDay } from '@congress-tracker/shared/iso-day'
 
 import { formatVoteDate } from './billLabels'
 
@@ -54,8 +60,48 @@ export function feedQuietCopy(
   return { throughLabel, notice }
 }
 
+export type ChamberFloorDetail = {
+  chamber: CalendarChamber
+  status: FloorWorkStatus | null
+  statusLabel: string | null
+  lastActivityDay: string | null
+  returnsOn: string | null
+  periodLabel: string | null
+  sourceName: string
+  sourceUrl: string
+}
+
+export function chamberFloorDetail(
+  chamber: CalendarChamber,
+  activityDay: string | null | undefined,
+  now: Date = new Date(),
+): ChamberFloorDetail {
+  const status = floorWorkStatus(activityDay, now)
+  const onDay = utcIsoDay(now)
+  const source = calendarSource(chamber)
+  const inRecess = status === 'in_recess'
+  return {
+    chamber,
+    status,
+    statusLabel: status ? FLOOR_STATUS_LABEL[status] : null,
+    lastActivityDay: parseIsoDay(activityDay),
+    returnsOn: inRecess ? publishedReturnDay(chamber, onDay) : null,
+    periodLabel: inRecess ? publishedRecessLabel(chamber, onDay) : null,
+    sourceName: source.name,
+    sourceUrl: source.url,
+  }
+}
+
 /** `session` = chronological timeline; `page` = search / advanced-filter slice. */
 export type TimelineThrough = 'session' | 'page'
+
+export type TimelineFloorChrome = {
+  throughLabel: string | null
+  notice: string | null
+  statusLabel: string | null
+  house: ChamberFloorDetail
+  senate: ChamberFloorDetail
+}
 
 export function timelineFloorChrome(params: {
   items: readonly {
@@ -67,7 +113,7 @@ export function timelineFloorChrome(params: {
   confirmationVoteDates?: readonly (string | null | undefined)[]
   through?: TimelineThrough
   now?: Date
-}): { throughLabel: string | null; notice: string | null; statusLabel: string | null } {
+}): TimelineFloorChrome {
   const now = params.now ?? new Date()
   const through = params.through ?? 'session'
   const votes = voteDaysByChamber(params.items)
@@ -92,9 +138,20 @@ export function timelineFloorChrome(params: {
   const throughDay = through === 'page' ? pagePassageDay : (sessionPassageDay ?? pagePassageDay)
   const activityDay = sessionActivityDay ?? pageActivityDay
   const { throughLabel, notice } = feedQuietCopy(throughDay, now, params.chamber)
+  const houseActivity = maxIsoDayForChamber('House', {
+    house: [params.houseLast],
+    senate: [],
+  })
+  const senateActivity = maxIsoDayForChamber('Senate', {
+    house: [],
+    senate: [params.senateLast],
+    confirmation: params.confirmationVoteDates,
+  })
   return {
     throughLabel,
     notice: through === 'session' ? notice : null,
     statusLabel: floorStatusLabel(activityDay, now),
+    house: chamberFloorDetail('House', houseActivity, now),
+    senate: chamberFloorDetail('Senate', senateActivity, now),
   }
 }

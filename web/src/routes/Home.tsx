@@ -13,6 +13,7 @@ import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
 import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
+import { FloorStatusChip } from '../components/FloorStatusChip'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
@@ -32,11 +33,6 @@ import {
 import { timelineFloorChrome } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
-
-function FloorStatusLabel({ label }: { label: string | null }) {
-  if (!label) return null
-  return <p className="home-feed-floor-status">{label}</p>
-}
 
 function FeedSkeleton() {
   return (
@@ -259,7 +255,11 @@ export default function Home() {
 
         {!showSkeleton && !feedError && total === 0 && !inFlight ? (
           <div className="home-feed-empty">
-            <FloorStatusLabel label={floorChrome.statusLabel} />
+            <FloorStatusChip
+              label={floorChrome.statusLabel}
+              house={floorChrome.house}
+              senate={floorChrome.senate}
+            />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
@@ -288,7 +288,11 @@ export default function Home() {
             <div className="home-feed-header">
               <div className="home-feed-heading">
                 <h2 className="home-feed-title">Chronological timeline</h2>
-                <FloorStatusLabel label={floorChrome.statusLabel} />
+                <FloorStatusChip
+                  label={floorChrome.statusLabel}
+                  house={floorChrome.house}
+                  senate={floorChrome.senate}
+                />
               </div>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
