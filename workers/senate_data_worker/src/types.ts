@@ -76,14 +76,16 @@ export interface IngestVotesResult {
   warnings?: string[];
   nonPassageStubs?: NonPassageVoteStub[];
   /**
-   * Latest listed/menu vote date in the lookback (`YYYY-MM-DD`), including
-   * rolls this run skipped as already stored.
+   * Latest listed/menu passage or companion-stub date in the lookback
+   * (`YYYY-MM-DD`), including rolls this run skipped as already stored.
+   * Nomination confirmations do not stamp this field.
    */
   sourceLatestDate?: string;
   /**
    * Latest date among rolls this run skipped as known or persisted as a
-   * passage vote / companion stub / confirmation. When this lags
-   * `sourceLatestDate`, ingest missed the newest listed roll.
+   * passage vote / companion stub. Confirmation rolls are ingested separately
+   * and do not stamp this field. When this lags `sourceLatestDate`, ingest
+   * missed the newest listed passage or companion roll.
    */
   coveredLatestDate?: string;
 }
