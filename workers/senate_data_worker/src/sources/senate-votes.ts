@@ -353,14 +353,14 @@ export function parseSenateVoteMenuXml(
 function takeLookbackItems<T extends { voteDate: string }>(
   items: readonly T[],
   lookbackStart: string | null,
-  watermarks: VoteDateWatermarks,
+  watermarks?: VoteDateWatermarks,
   isKnown?: (item: T) => boolean
 ): { kept: T[]; skipped: number } {
   const kept: T[] = [];
   let skipped = 0;
   for (const item of items) {
     if (lookbackStart && item.voteDate < lookbackStart) continue;
-    watermarks.noteListedAndCovered(item.voteDate);
+    watermarks?.noteListedAndCovered(item.voteDate);
     if (isKnown?.(item)) {
       skipped += 1;
       continue;
@@ -397,11 +397,11 @@ export async function ingestSenatePassageVotes(
     alreadyStored
   );
   // Confirmations are upserted idempotently; do not share knownKeys with
-  // passage/companion roll skip state.
+  // passage/companion roll skip state, and do not stamp passage watermarks
+  // (sourceLatestDate / coveredLatestDate) from nomination rolls.
   const { kept: confirmationVotes } = takeLookbackItems(
     parsed.confirmationVotes,
-    lookbackStart,
-    watermarks
+    lookbackStart
   );
 
   return {

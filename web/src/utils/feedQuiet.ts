@@ -59,7 +59,6 @@ export type TimelineThrough = 'session' | 'page'
 
 export function timelineFloorChrome(params: {
   items: readonly {
-    latest_passage_date: string | null
     passage_votes?: readonly { chamber: string; date: string }[]
   }[]
   chamber: FloorChamber
@@ -72,30 +71,26 @@ export function timelineFloorChrome(params: {
   const now = params.now ?? new Date()
   const through = params.through ?? 'session'
   const votes = voteDaysByChamber(params.items)
-  // Unfiltered timelines may still date from bill-level latest_passage_date when
-  // the page has no passage_votes. Chamber filters must not — that field is the
-  // max across chambers.
-  const unfilteredBillDay =
-    params.chamber === null
-      ? maxIsoDay(params.items.map((item) => item.latest_passage_date))
-      : null
-  const sessionDates = {
-    house: [params.houseLast, ...votes.house],
-    senate: [params.senateLast, ...votes.senate],
-  }
-  const sessionPassageDay =
-    maxIsoDayForChamber(params.chamber, sessionDates) ?? unfilteredBillDay
-  const pagePassageDay =
-    maxIsoDayForChamber(params.chamber, {
-      house: votes.house,
-      senate: votes.senate,
-    }) ?? unfilteredBillDay
-  const activityDay =
-    maxIsoDayForChamber(params.chamber, {
-      ...sessionDates,
-      confirmation: params.confirmationVoteDates,
-    }) ?? unfilteredBillDay
-  const throughDay = through === 'page' ? pagePassageDay : sessionPassageDay
+  const sessionPassageDay = maxIsoDayForChamber(params.chamber, {
+    house: [params.houseLast],
+    senate: [params.senateLast],
+  })
+  const pagePassageDay = maxIsoDayForChamber(params.chamber, {
+    house: votes.house,
+    senate: votes.senate,
+  })
+  const sessionActivityDay = maxIsoDayForChamber(params.chamber, {
+    house: [params.houseLast],
+    senate: [params.senateLast],
+    confirmation: params.confirmationVoteDates,
+  })
+  const pageActivityDay = maxIsoDayForChamber(params.chamber, {
+    house: votes.house,
+    senate: votes.senate,
+    confirmation: params.confirmationVoteDates,
+  })
+  const throughDay = through === 'page' ? pagePassageDay : (sessionPassageDay ?? pagePassageDay)
+  const activityDay = sessionActivityDay ?? pageActivityDay
   const { throughLabel, notice } = feedQuietCopy(throughDay, now, params.chamber)
   return {
     throughLabel,

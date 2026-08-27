@@ -56,7 +56,7 @@ describe('timelineFloorChrome', () => {
   it('keeps passage through-copy while confirmations can mark Working', () => {
     expect(
       timelineFloorChrome({
-        items: [{ latest_passage_date: '2026-08-08' }],
+        items: [{ passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }] }],
         chamber: null,
         houseLast: '2026-07-23',
         senateLast: '2026-08-08',
@@ -73,7 +73,7 @@ describe('timelineFloorChrome', () => {
   it('drops the quiet notice when the timeline is searched or filtered', () => {
     expect(
       timelineFloorChrome({
-        items: [{ latest_passage_date: '2026-08-08' }],
+        items: [{ passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }] }],
         chamber: null,
         through: 'page',
         now,
@@ -88,7 +88,23 @@ describe('timelineFloorChrome', () => {
   it('uses session passage watermarks so page-1 ranking cannot hide the floor date', () => {
     expect(
       timelineFloorChrome({
-        items: [{ latest_passage_date: '2026-04-10' }],
+        items: [{ passage_votes: [{ chamber: 'Senate', date: '2026-04-10' }] }],
+        chamber: null,
+        houseLast: '2026-07-23',
+        senateLast: '2026-08-08',
+        now,
+      }),
+    ).toEqual({
+      throughLabel: 'Aug 8',
+      notice: 'No new House or Senate passage votes since Aug 8.',
+      statusLabel: 'In recess',
+    })
+  })
+
+  it('does not let a later page roll bump chronological through past session watermarks', () => {
+    expect(
+      timelineFloorChrome({
+        items: [{ passage_votes: [{ chamber: 'Senate', date: '2026-08-24' }] }],
         chamber: null,
         houseLast: '2026-07-23',
         senateLast: '2026-08-08',
@@ -104,7 +120,7 @@ describe('timelineFloorChrome', () => {
   it('keeps a searched through-date on the loaded page', () => {
     expect(
       timelineFloorChrome({
-        items: [{ latest_passage_date: '2026-04-10' }],
+        items: [{ passage_votes: [{ chamber: 'Senate', date: '2026-04-10' }] }],
         chamber: null,
         houseLast: '2026-07-23',
         senateLast: '2026-08-08',
@@ -123,7 +139,6 @@ describe('timelineFloorChrome', () => {
       timelineFloorChrome({
         items: [
           {
-            latest_passage_date: '2026-08-08',
             passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }],
           },
         ],
@@ -144,7 +159,6 @@ describe('timelineFloorChrome', () => {
       timelineFloorChrome({
         items: [
           {
-            latest_passage_date: '2026-08-08',
             passage_votes: [
               { chamber: 'House', date: '2026-07-23' },
               { chamber: 'Senate', date: '2026-08-08' },
@@ -169,7 +183,6 @@ describe('timelineFloorChrome', () => {
       timelineFloorChrome({
         items: [
           {
-            latest_passage_date: '2026-08-08',
             passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }],
           },
         ],

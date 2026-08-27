@@ -1,7 +1,5 @@
 import { maxIsoDay, utcCalendarDaysSince } from './iso-day'
 
-export { maxIsoDay, parseIsoDay, utcCalendarDaysSince } from './iso-day'
-
 /** Calendar days after the latest passage vote before the floor is treated as quiet. */
 export const FLOOR_QUIET_AFTER_DAYS = 3
 

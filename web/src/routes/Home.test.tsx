@@ -117,6 +117,7 @@ describe('Home', () => {
 
   it('explains a quiet floor so the timeline does not look stuck', async () => {
     const latest = isoUtcDaysAgo(10)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
         makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
@@ -132,6 +133,7 @@ describe('Home', () => {
 
   it('omits the quiet notice when the newest vote is recent', async () => {
     const latest = isoUtcDaysAgo(1)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
         makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
@@ -149,6 +151,7 @@ describe('Home', () => {
 
   it('dates the quiet floor from passage votes, not an executive-boosted first row', async () => {
     const latest = isoUtcDaysAgo(10)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
         makeFeedItem({
@@ -170,6 +173,7 @@ describe('Home', () => {
 
   it('names a chamber-filtered quiet floor and skips the notice while searching', async () => {
     const latest = isoUtcDaysAgo(10)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
         makeFeedItem({
@@ -266,6 +270,7 @@ describe('Home', () => {
 
   it('marks an in-session lull separately from recess', async () => {
     const latest = isoUtcDaysAgo(4)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
         makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
