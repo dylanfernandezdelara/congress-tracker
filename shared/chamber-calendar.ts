@@ -30,6 +30,11 @@ export type PublishedRecess = {
   label: string
 }
 
+/**
+ * Published 2026 calendars only. When House and Senate release 2027
+ * schedules, update HOUSE_SESSION_RANGES_2026, SENATE_NON_LEGISLATIVE_2026,
+ * CALENDAR_YEAR, and these source URLs. Lookups return null outside 2026.
+ */
 export const HOUSE_CALENDAR_SOURCE: ChamberCalendarSource = {
   year: 2026,
   name: '2026 House Calendar',
@@ -42,7 +47,7 @@ export const SENATE_CALENDAR_SOURCE: ChamberCalendarSource = {
   url: 'https://www.senate.gov/legislative/2026_schedule.htm',
 }
 
-const CALENDAR_YEAR = '2026'
+const CALENDAR_YEAR = '2026' // bump when the 2027 calendars are published
 
 /**
  * Published House legislative days (gold session blocks on the Majority Leader
