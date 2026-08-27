@@ -222,4 +222,18 @@ describe('timelineFloorChrome', () => {
       periodLabel: 'State work period',
     })
   })
+
+  it('uses today as the House return when the calendar says they are in session', () => {
+    const chrome = timelineFloorChrome({
+      items: [],
+      chamber: null,
+      houseLast: '2026-07-23',
+      senateLast: '2026-08-08',
+      now: new Date('2026-08-31T16:00:00.000Z'),
+    })
+    expect(chrome.house).toMatchObject({
+      status: 'in_recess',
+      returnsOn: '2026-08-31',
+    })
+  })
 })

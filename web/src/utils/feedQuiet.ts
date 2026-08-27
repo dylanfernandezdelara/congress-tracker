@@ -1,7 +1,7 @@
 import {
   calendarSource,
-  publishedRecessLabel,
-  publishedReturnDay,
+  isPublishedSessionDay,
+  publishedRecess,
   type CalendarChamber,
 } from '@congress-tracker/shared/chamber-calendar'
 import {
@@ -80,13 +80,17 @@ export function chamberFloorDetail(
   const onDay = utcIsoDay(now)
   const source = calendarSource(chamber)
   const inRecess = status === 'in_recess'
+  const recess = inRecess ? publishedRecess(chamber, onDay) : null
+  const returnsOn = inRecess
+    ? (recess?.returnsOn ?? (isPublishedSessionDay(chamber, onDay) ? onDay : null))
+    : null
   return {
     chamber,
     status,
     statusLabel: status ? FLOOR_STATUS_LABEL[status] : null,
     lastActivityDay: parseIsoDay(activityDay),
-    returnsOn: inRecess ? publishedReturnDay(chamber, onDay) : null,
-    periodLabel: inRecess ? publishedRecessLabel(chamber, onDay) : null,
+    returnsOn,
+    periodLabel: inRecess ? recess?.label ?? null : null,
     sourceName: source.name,
     sourceUrl: source.url,
   }

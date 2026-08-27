@@ -5,6 +5,7 @@ import {
   SENATE_NON_LEGISLATIVE_2026,
   isIsoDayInRanges,
   isPublishedSessionDay,
+  publishedRecess,
   publishedRecessLabel,
   publishedReturnDay,
 } from './chamber-calendar'
@@ -27,9 +28,17 @@ describe('2026 chamber calendars', () => {
       expect(SENATE_NON_LEGISLATIVE_2026[i - 1]!.end < range.start).toBe(true)
     }
   })
+
+  it('matches the published House gold blocks for January and March', () => {
+    expect(isPublishedSessionDay('House', '2026-01-09')).toBe(true)
+    expect(isPublishedSessionDay('House', '2026-01-10')).toBe(false)
+    expect(isPublishedSessionDay('House', '2026-01-23')).toBe(true)
+    expect(isPublishedSessionDay('House', '2026-01-24')).toBe(false)
+    expect(isPublishedSessionDay('House', '2026-03-19')).toBe(true)
+  })
 })
 
-describe('publishedReturnDay', () => {
+describe('publishedRecess', () => {
   it('returns House Aug 31 and Senate Sep 14 during the August district work period', () => {
     expect(publishedReturnDay('House', '2026-08-27')).toBe('2026-08-31')
     expect(publishedReturnDay('Senate', '2026-08-27')).toBe('2026-09-14')
@@ -39,6 +48,7 @@ describe('publishedReturnDay', () => {
 
   it('keeps the Senate out through the weekend after its state work period', () => {
     expect(publishedReturnDay('Senate', '2026-09-12')).toBe('2026-09-14')
+    expect(publishedRecess('Senate', '2026-09-12')?.end).toBe('2026-09-13')
     expect(publishedReturnDay('Senate', '2026-09-14')).toBeNull()
   })
 
@@ -55,6 +65,16 @@ describe('publishedReturnDay', () => {
   it('does not call a short Senate holiday week a recess', () => {
     expect(publishedReturnDay('Senate', '2026-05-06')).toBeNull()
     expect(publishedRecessLabel('Senate', '2026-05-06')).toBeNull()
+  })
+
+  it('returns Senate first in the April stretch', () => {
+    expect(publishedReturnDay('Senate', '2026-04-05')).toBe('2026-04-13')
+    expect(publishedReturnDay('House', '2026-04-05')).toBe('2026-04-14')
+  })
+
+  it('does not invent a 2027 Senate return after the year-end work period', () => {
+    expect(publishedReturnDay('Senate', '2026-12-28')).toBeNull()
+    expect(publishedRecessLabel('Senate', '2026-12-28')).toBe('State work period')
   })
 
   it('returns null outside the 2026 calendars', () => {

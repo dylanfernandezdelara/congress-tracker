@@ -14,7 +14,19 @@ describe('floorStatusTogetherCopy', () => {
         formatDay,
       ),
     ).toBe(
-      'House and Senate are both in recess, but they do not return together. The House is scheduled back Monday, Aug 31; the Senate stays out until Monday, Sep 14.',
+      'House and Senate are both in recess, but they do not return together. The House is scheduled back Monday, Aug 31. The Senate is scheduled back Monday, Sep 14.',
+    )
+  })
+
+  it('names whichever chamber returns first without assuming House', () => {
+    expect(
+      floorStatusTogetherCopy(
+        { status: 'in_recess', statusLabel: 'In recess', returnsOn: '2026-04-14' },
+        { status: 'in_recess', statusLabel: 'In recess', returnsOn: '2026-04-13' },
+        (iso) => (iso === '2026-04-13' ? 'Monday, Apr 13' : 'Tuesday, Apr 14'),
+      ),
+    ).toBe(
+      'House and Senate are both in recess, but they do not return together. The House is scheduled back Tuesday, Apr 14. The Senate is scheduled back Monday, Apr 13.',
     )
   })
 

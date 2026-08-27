@@ -4,6 +4,7 @@ import {
   addUtcIsoDays,
   maxIsoDay,
   parseIsoDay,
+  utcCalendarDaysBetween,
   utcCalendarDaysSince,
   utcIsoDay,
   utcIsoWeekday,
@@ -45,6 +46,15 @@ describe('maxIsoDay', () => {
   it('returns the latest valid calendar day', () => {
     expect(maxIsoDay(['2026-04-10', null, '2026-08-08T16:00:00.000Z'])).toBe('2026-08-08')
     expect(maxIsoDay([null, 'not-a-date'])).toBeNull()
+  })
+})
+
+describe('utcCalendarDaysBetween', () => {
+  it('counts signed UTC days between calendar dates', () => {
+    expect(utcCalendarDaysBetween('2026-07-23', '2026-08-31')).toBe(39)
+    expect(utcCalendarDaysBetween('2026-08-31', '2026-07-23')).toBe(-39)
+    expect(utcCalendarDaysBetween('2026-08-27', '2026-08-27')).toBe(0)
+    expect(utcCalendarDaysBetween('bad', '2026-08-27')).toBeNull()
   })
 })
 

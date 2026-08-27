@@ -43,6 +43,20 @@ export function maxIsoDay(
 }
 
 /**
+ * Whole UTC calendar days from `fromDay` to `toDay`.
+ * Null when either date is invalid. Negative when `toDay` is earlier.
+ */
+export function utcCalendarDaysBetween(fromDay: string, toDay: string): number | null {
+  const from = parseIsoDay(fromDay)
+  const to = parseIsoDay(toDay)
+  if (!from || !to) return null
+  const fromMs = Date.parse(`${from}T00:00:00.000Z`)
+  const toMs = Date.parse(`${to}T00:00:00.000Z`)
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return null
+  return Math.round((toMs - fromMs) / 86_400_000)
+}
+
+/**
  * Whole UTC calendar days from `isoDate` (YYYY-MM-DD) to `now`'s UTC date.
  * Returns null when the date cannot be parsed. Future dates clamp to 0.
  */

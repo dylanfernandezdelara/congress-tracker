@@ -2,8 +2,7 @@ import { FLOOR_RECESS_AFTER_DAYS } from './floor-quiet'
 import {
   addUtcIsoDays,
   parseIsoDay,
-  utcCalendarDaysSince,
-  utcIsoDay,
+  utcCalendarDaysBetween,
   utcIsoWeekday,
 } from './iso-day'
 
@@ -24,6 +23,13 @@ export type ChamberCalendarSource = {
   url: string
 }
 
+export type PublishedRecess = {
+  start: string
+  end: string
+  returnsOn: string | null
+  label: string
+}
+
 export const HOUSE_CALENDAR_SOURCE: ChamberCalendarSource = {
   year: 2026,
   name: '2026 House Calendar',
@@ -36,20 +42,21 @@ export const SENATE_CALENDAR_SOURCE: ChamberCalendarSource = {
   url: 'https://www.senate.gov/legislative/2026_schedule.htm',
 }
 
+const CALENDAR_YEAR = '2026'
+
 /**
  * Published House legislative days (gold session blocks on the Majority Leader
- * 2026 calendar). Inclusive ranges; adjacent blocks are kept split to match
- * the printed calendar.
+ * 2026 calendar). Inclusive ranges.
  */
 export const HOUSE_SESSION_RANGES_2026: readonly IsoDateRange[] = [
-  { start: '2026-01-06', end: '2026-01-10' },
+  { start: '2026-01-06', end: '2026-01-09' },
   { start: '2026-01-12', end: '2026-01-15' },
-  { start: '2026-01-20', end: '2026-01-24' },
+  { start: '2026-01-20', end: '2026-01-23' },
   { start: '2026-02-02', end: '2026-02-05' },
   { start: '2026-02-09', end: '2026-02-12' },
   { start: '2026-02-23', end: '2026-02-25' },
   { start: '2026-03-03', end: '2026-03-06' },
-  { start: '2026-03-16', end: '2026-03-18' },
+  { start: '2026-03-16', end: '2026-03-19' },
   { start: '2026-03-24', end: '2026-03-27' },
   { start: '2026-04-14', end: '2026-04-17' },
   { start: '2026-04-20', end: '2026-04-23' },
@@ -98,15 +105,6 @@ export function calendarSource(chamber: CalendarChamber): ChamberCalendarSource 
   return chamber === 'House' ? HOUSE_CALENDAR_SOURCE : SENATE_CALENDAR_SOURCE
 }
 
-function dateAtUtcDay(day: string): Date {
-  return new Date(`${day}T12:00:00.000Z`)
-}
-
-function inclusiveDays(range: IsoDateRange): number {
-  const span = utcCalendarDaysSince(range.start, dateAtUtcDay(range.end))
-  return span === null ? 0 : span + 1
-}
-
 export function isIsoDayInRanges(
   day: string,
   ranges: readonly IsoDateRange[],
@@ -114,58 +112,19 @@ export function isIsoDayInRanges(
   return ranges.some((range) => range.start <= day && day <= range.end)
 }
 
-function rangeContaining<T extends IsoDateRange>(
-  day: string,
-  ranges: readonly T[],
-): T | null {
-  return ranges.find((range) => range.start <= day && day <= range.end) ?? null
-}
-
-function lastRangeEndingBefore<T extends IsoDateRange>(
-  day: string,
-  ranges: readonly T[],
-): T | null {
-  let latest: T | null = null
-  for (const range of ranges) {
-    if (range.end < day && (latest === null || range.end > latest.end)) latest = range
-  }
-  return latest
-}
-
-function firstRangeDayOnOrAfter(
-  day: string,
-  ranges: readonly IsoDateRange[],
-): string | null {
-  let best: string | null = null
-  for (const range of ranges) {
-    if (range.end < day) continue
-    const candidate = range.start >= day ? range.start : day
-    if (best === null || candidate < best) best = candidate
-  }
-  return best
-}
-
-function lastRangeDayBefore(day: string, ranges: readonly IsoDateRange[]): string | null {
-  let latest: string | null = null
-  for (const range of ranges) {
-    if (range.start >= day) continue
-    const candidate = range.end < day ? range.end : addUtcIsoDays(day, -1)
-    if (candidate && candidate >= range.start && (latest === null || candidate > latest)) {
-      latest = candidate
-    }
-  }
-  return latest
-}
-
 function isUtcWeekend(day: string): boolean {
   const weekday = utcIsoWeekday(day)
   return weekday === 0 || weekday === 6
 }
 
+function inCalendarYear(day: string): boolean {
+  return day.startsWith(`${CALENDAR_YEAR}-`)
+}
+
 function nextSenateLegislativeDayAfter(endInclusive: string): string | null {
   let day = addUtcIsoDays(endInclusive, 1)
   for (let i = 0; i < 21; i += 1) {
-    if (!day) return null
+    if (!day || !inCalendarYear(day)) return null
     if (!isUtcWeekend(day) && !isIsoDayInRanges(day, SENATE_NON_LEGISLATIVE_2026)) {
       return day
     }
@@ -174,67 +133,70 @@ function nextSenateLegislativeDayAfter(endInclusive: string): string | null {
   return null
 }
 
-function longEnoughForRecess(range: IsoDateRange, day: string): boolean {
-  if (inclusiveDays(range) >= FLOOR_RECESS_AFTER_DAYS) return true
-  const returnsOn = nextSenateLegislativeDayAfter(range.end)
-  if (!returnsOn) return false
-  const untilReturn = utcCalendarDaysSince(day, dateAtUtcDay(returnsOn))
-  return untilReturn !== null && untilReturn >= FLOOR_RECESS_AFTER_DAYS
+function recessFromSessionGaps(
+  ranges: readonly IsoDateRange[],
+  label: string,
+): PublishedRecess[] {
+  const periods: PublishedRecess[] = []
+  for (let i = 0; i < ranges.length - 1; i += 1) {
+    const lastSession = ranges[i]!.end
+    const nextSession = ranges[i + 1]!.start
+    const gap = utcCalendarDaysBetween(lastSession, nextSession)
+    if (gap === null || gap < FLOOR_RECESS_AFTER_DAYS) continue
+    const start = addUtcIsoDays(lastSession, 1)
+    const end = addUtcIsoDays(nextSession, -1)
+    if (!start || !end) continue
+    periods.push({ start, end, returnsOn: nextSession, label })
+  }
+  return periods
 }
 
-function senateRecessAround(
-  day: string,
-): { period: LabeledIsoDateRange; returnsOn: string | null } | null {
-  const containing = rangeContaining(day, SENATE_NON_LEGISLATIVE_2026)
-  if (containing && longEnoughForRecess(containing, day)) {
-    return { period: containing, returnsOn: nextSenateLegislativeDayAfter(containing.end) }
+function recessFromNonLegislative(
+  ranges: readonly LabeledIsoDateRange[],
+): PublishedRecess[] {
+  const periods: PublishedRecess[] = []
+  for (const range of ranges) {
+    const span = utcCalendarDaysBetween(range.start, range.end)
+    if (span === null || span + 1 < FLOOR_RECESS_AFTER_DAYS) continue
+    const returnsOn = nextSenateLegislativeDayAfter(range.end)
+    const end = returnsOn ? addUtcIsoDays(returnsOn, -1) : range.end
+    if (!end) continue
+    periods.push({ start: range.start, end, returnsOn, label: range.label })
   }
-  const previous = lastRangeEndingBefore(day, SENATE_NON_LEGISLATIVE_2026)
-  if (!previous || !longEnoughForRecess(previous, previous.end)) return null
-  const returnsOn = nextSenateLegislativeDayAfter(previous.end)
-  if (!returnsOn || day >= returnsOn) return null
-  return { period: previous, returnsOn }
+  return periods
 }
 
-function houseRecessAround(
-  day: string,
-): { returnsOn: string | null; label: string } | null {
-  if (isIsoDayInRanges(day, HOUSE_SESSION_RANGES_2026)) return null
-  const returnsOn = firstRangeDayOnOrAfter(day, HOUSE_SESSION_RANGES_2026)
-  const lastSession = lastRangeDayBefore(day, HOUSE_SESSION_RANGES_2026)
-  const daysSince = lastSession
-    ? utcCalendarDaysSince(lastSession, dateAtUtcDay(day))
-    : Number.POSITIVE_INFINITY
-  const daysUntil = returnsOn
-    ? utcCalendarDaysSince(day, dateAtUtcDay(returnsOn))
-    : Number.POSITIVE_INFINITY
-  if (
-    (daysSince !== null && daysSince >= FLOOR_RECESS_AFTER_DAYS) ||
-    (daysUntil !== null && daysUntil >= FLOOR_RECESS_AFTER_DAYS)
-  ) {
-    return { returnsOn, label: 'District work period' }
-  }
-  return null
+const HOUSE_RECESS_2026 = recessFromSessionGaps(
+  HOUSE_SESSION_RANGES_2026,
+  'District work period',
+)
+const SENATE_RECESS_2026 = recessFromNonLegislative(SENATE_NON_LEGISLATIVE_2026)
+
+function recessTable(chamber: CalendarChamber): readonly PublishedRecess[] {
+  return chamber === 'House' ? HOUSE_RECESS_2026 : SENATE_RECESS_2026
+}
+
+export function publishedRecess(
+  chamber: CalendarChamber,
+  onDay: string | null | undefined,
+): PublishedRecess | null {
+  const day = parseIsoDay(onDay)
+  if (!day || !inCalendarYear(day)) return null
+  return recessTable(chamber).find((period) => period.start <= day && day <= period.end) ?? null
 }
 
 export function publishedReturnDay(
   chamber: CalendarChamber,
   onDay: string | null | undefined,
 ): string | null {
-  const day = parseIsoDay(onDay) ?? (onDay ? null : utcIsoDay())
-  if (!day || !day.startsWith('2026-')) return null
-  if (chamber === 'House') return houseRecessAround(day)?.returnsOn ?? null
-  return senateRecessAround(day)?.returnsOn ?? null
+  return publishedRecess(chamber, onDay)?.returnsOn ?? null
 }
 
 export function publishedRecessLabel(
   chamber: CalendarChamber,
   onDay: string | null | undefined,
 ): string | null {
-  const day = parseIsoDay(onDay) ?? (onDay ? null : utcIsoDay())
-  if (!day || !day.startsWith('2026-')) return null
-  if (chamber === 'House') return houseRecessAround(day)?.label ?? null
-  return senateRecessAround(day)?.period.label ?? null
+  return publishedRecess(chamber, onDay)?.label ?? null
 }
 
 export function isPublishedSessionDay(
@@ -242,7 +204,7 @@ export function isPublishedSessionDay(
   onDay: string | null | undefined,
 ): boolean {
   const day = parseIsoDay(onDay)
-  if (!day || !day.startsWith('2026-')) return false
+  if (!day || !inCalendarYear(day)) return false
   if (chamber === 'House') return isIsoDayInRanges(day, HOUSE_SESSION_RANGES_2026)
   return !isUtcWeekend(day) && !isIsoDayInRanges(day, SENATE_NON_LEGISLATIVE_2026)
 }

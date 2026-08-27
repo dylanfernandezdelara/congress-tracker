@@ -32,7 +32,7 @@ export function floorStatusTogetherCopy(
       return `House and Senate are both in recess and are scheduled back ${houseBack}. They often share August and holiday breaks, but each chamber sets its own calendar.`
     }
     if (houseBack && senateBack) {
-      return `House and Senate are both in recess, but they do not return together. The House is scheduled back ${houseBack}; the Senate stays out until ${senateBack}.`
+      return `House and Senate are both in recess, but they do not return together. The House is scheduled back ${houseBack}. The Senate is scheduled back ${senateBack}.`
     }
     if (houseBack) {
       return `House and Senate are both in recess. The House is scheduled back ${houseBack}. The Senate has not published a return date for this stretch.`

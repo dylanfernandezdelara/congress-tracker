@@ -46,7 +46,7 @@ describe('FloorStatusChip', () => {
     expect(dialog).toBeInTheDocument()
     expect(
       within(dialog).getByText(
-        'House and Senate are both in recess, but they do not return together. The House is scheduled back Monday, Aug 31; the Senate stays out until Monday, Sep 14.',
+        'House and Senate are both in recess, but they do not return together. The House is scheduled back Monday, Aug 31. The Senate is scheduled back Monday, Sep 14.',
       ),
     ).toBeInTheDocument()
 

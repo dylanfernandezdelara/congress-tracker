@@ -151,7 +151,7 @@ describe('Home', () => {
     expect(
       within(dialog).getByText(/House is scheduled back Monday, Aug 31/),
     ).toBeInTheDocument()
-    expect(within(dialog).getByText(/Senate stays out until Monday, Sep 14/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Senate is scheduled back Monday, Sep 14/)).toBeInTheDocument()
     expect(within(dialog).getByRole('link', { name: /2026 House Calendar/ })).toHaveAttribute(
       'href',
       'https://pressgallery.house.gov/schedules/2026-house-calendar',
