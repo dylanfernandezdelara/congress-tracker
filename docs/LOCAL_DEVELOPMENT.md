@@ -135,5 +135,5 @@ it is safe to run any time.
 
 Follow the ship checklist in [`AGENTS.md`](../AGENTS.md): `npm test`, then for
 `web/` changes `npm run qa:web` (with `npm run dev:web` running), a
-thermonuclear review of the branch diff with Grok 4.6 (`cursor-grok-4.6-high-fast`),
+thermonuclear review of the branch diff with Grok 4.6 (`cursor-grok-4.6-high-fast`; never Grok 4.5),
 and `npm run preview` for a shareable URL.

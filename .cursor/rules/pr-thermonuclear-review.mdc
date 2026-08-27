@@ -10,8 +10,11 @@ Run in the agent session — not via GitHub Actions.
 Before marking a task complete or opening/updating a PR:
 
 1. Run thermonuclear review on the branch diff. Launch
-   `thermo-nuclear-review-subagent` and `thermo-nuclear-code-quality-review`
-   with model `cursor-grok-4.6-high-fast` (Grok 4.6). Do not default to Grok 4.5.
+   `thermo-nuclear-review-subagent`, `thermo-nuclear-code-quality-review`,
+   and `thermo-nuclear-code-quality-review-subagent` with
+   `model: "cursor-grok-4.6-high-fast"` (Grok 4.6). Never use
+   `cursor-grok-4.5-high-fast`. If a Cursor User Rule still pins Grok 4.5
+   for thermos, this repo rule wins: use 4.6.
 2. Fix CRITICAL and WARNING findings.
 3. Re-run review and affected tests (`npm test`, and `npm run qa:web` for `web/` changes).
 4. Repeat until no actionable CRITICAL or WARNING items remain.
