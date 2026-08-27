@@ -127,7 +127,9 @@ describe('Home', () => {
     expect(
       await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
-    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
     expect(screen.getByText('In recess')).toBeInTheDocument()
   })
 
@@ -144,7 +146,9 @@ describe('Home', () => {
     expect(
       screen.queryByText(/No new House or Senate passage votes since/),
     ).not.toBeInTheDocument()
-    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
     expect(screen.getByText('Working')).toBeInTheDocument()
     expect(screen.queryByText('In recess')).not.toBeInTheDocument()
   })
@@ -166,7 +170,9 @@ describe('Home', () => {
     expect(
       await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
-    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 2 passage votes · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
     expect(screen.queryByText(/through Apr 10/)).not.toBeInTheDocument()
   })
@@ -204,7 +210,9 @@ describe('Home', () => {
 
     renderHome('/?q=housing')
     expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
-    expect(screen.getByText(new RegExp(`through ${formatVoteDate(latest)}`))).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
   })
 
