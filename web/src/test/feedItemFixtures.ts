@@ -30,13 +30,24 @@ export function makeFeedItem(overrides: Partial<FeedItem> = {}): FeedItem {
     ...overrides,
   }
 
-  // Callers often override only latest_passage_date; keep activity aligned unless set.
+  // Callers often override only latest_passage_date; keep activity and the
+  // primary roll date aligned unless set.
   if (
     overrides.latest_activity_date === undefined &&
     overrides.latest_passage_date !== undefined &&
     overrides.latest_passage_date !== null
   ) {
     item.latest_activity_date = overrides.latest_passage_date
+  }
+  if (
+    overrides.passage_votes === undefined &&
+    overrides.latest_passage_date !== undefined &&
+    overrides.latest_passage_date !== null &&
+    item.passage_votes[0]
+  ) {
+    item.passage_votes = [
+      { ...item.passage_votes[0], date: overrides.latest_passage_date },
+    ]
   }
 
   return item

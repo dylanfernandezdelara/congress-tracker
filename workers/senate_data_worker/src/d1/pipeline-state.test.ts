@@ -253,7 +253,7 @@ describe("pipeline-state", () => {
     expect(record?.skipped_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("counts null and unparseable digests as missing (matches parseStoredDigest)", async () => {
+  it("counts incomplete digests only for bills with a lookback passage vote", async () => {
     const preparedSql: string[] = [];
     const rows = [
       { congress: 119, digest_json: null as string | null },
@@ -285,10 +285,15 @@ describe("pipeline-state", () => {
           first: vi.fn(async () => {
             if (!sql.includes("FROM bill_digests")) return null;
             // D1 throws on json_extract(malformed) — query must gate with json_valid.
-            expect(sql).toContain("json_valid(digest_json) = 0");
-            expect(sql).toContain("CASE WHEN json_valid(digest_json) = 1 THEN digest_json END");
+            expect(sql).toContain("json_valid(d.digest_json) = 0");
+            expect(sql).toContain("CASE WHEN json_valid(d.digest_json) = 1 THEN d.digest_json END");
             expect(sql).toContain("$.headline");
             expect(sql).toContain("$.what_it_does");
+            expect(sql).toContain("FROM votes v");
+            expect(sql).toContain("v.vote_date >= ?2");
+            expect(state.args).toHaveLength(2);
+            expect(state.args[0]).toBe(119);
+            expect(String(state.args[1])).toMatch(/^\d{4}-\d{2}-\d{2}$/);
             const congress = Number(state.args[0]);
             const missing = rows.filter((row) => {
               if (row.congress !== congress) return false;

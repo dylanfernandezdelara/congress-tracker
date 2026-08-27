@@ -13,6 +13,7 @@ import { parseSenateNominationIssue } from "./nomination-ref";
 import { fetchSenateLegislativeText } from "./senate-fetch";
 import { getTag } from "./senate-xml";
 import { isPassageVote } from "./passage";
+import { createVoteDateWatermarks, type VoteDateWatermarks } from "./vote-date-watermarks";
 import { SENATE_VOTE_MENU_CACHE_MAX_AGE_MS } from "../constants";
 import { ensureSchema } from "../d1/schema";
 import type { SenateVoteMenuCacheMonitor } from "../../../../shared/ingest-api-types";
@@ -349,6 +350,26 @@ export function parseSenateVoteMenuXml(
   return { votes, nonPassageStubs, confirmationVotes };
 }
 
+function takeLookbackItems<T extends { voteDate: string }>(
+  items: readonly T[],
+  lookbackStart: string | null,
+  watermarks?: VoteDateWatermarks,
+  isKnown?: (item: T) => boolean
+): { kept: T[]; skipped: number } {
+  const kept: T[] = [];
+  let skipped = 0;
+  for (const item of items) {
+    if (lookbackStart && item.voteDate < lookbackStart) continue;
+    watermarks?.noteListedAndCovered(item.voteDate);
+    if (isKnown?.(item)) {
+      skipped += 1;
+      continue;
+    }
+    kept.push(item);
+  }
+  return { kept, skipped };
+}
+
 export async function ingestSenatePassageVotes(
   env: Env,
   lookbackStart: string | null,
@@ -358,32 +379,30 @@ export async function ingestSenatePassageVotes(
   const session = sessionNumber(env);
   const { xml, warnings } = await fetchSenateVoteMenuXml(env, congress, session);
   const parsed = parseSenateVoteMenuXml(xml, congress, session);
+  const watermarks = createVoteDateWatermarks();
+  const alreadyStored = (
+    item: Pick<PassageVote, "chamber" | "congress" | "session" | "rollNumber">
+  ) => knownKeys.has(voteKey(item));
 
-  const votes: PassageVote[] = [];
-  let skipped = 0;
-  for (const vote of parsed.votes) {
-    if (lookbackStart && vote.voteDate < lookbackStart) continue;
-    if (knownKeys.has(voteKey(vote))) {
-      skipped += 1;
-      continue;
-    }
-    votes.push(vote);
-  }
-
-  const nonPassageStubs: NonPassageVoteStub[] = [];
-  for (const stub of parsed.nonPassageStubs) {
-    if (lookbackStart && stub.voteDate < lookbackStart) continue;
-    if (knownKeys.has(voteKey(stub))) continue;
-    nonPassageStubs.push(stub);
-  }
-
+  const { kept: votes, skipped } = takeLookbackItems(
+    parsed.votes,
+    lookbackStart,
+    watermarks,
+    alreadyStored
+  );
+  const { kept: nonPassageStubs } = takeLookbackItems(
+    parsed.nonPassageStubs,
+    lookbackStart,
+    watermarks,
+    alreadyStored
+  );
   // Confirmations are upserted idempotently; do not share knownKeys with
-  // passage/companion roll skip state.
-  const confirmationVotes: ConfirmationVote[] = [];
-  for (const vote of parsed.confirmationVotes) {
-    if (lookbackStart && vote.voteDate < lookbackStart) continue;
-    confirmationVotes.push(vote);
-  }
+  // passage/companion roll skip state, and do not stamp passage watermarks
+  // (sourceLatestDate / coveredLatestDate) from nomination rolls.
+  const { kept: confirmationVotes } = takeLookbackItems(
+    parsed.confirmationVotes,
+    lookbackStart
+  );
 
   return {
     votes,
@@ -391,5 +410,6 @@ export async function ingestSenatePassageVotes(
     warnings: warnings.length > 0 ? warnings : undefined,
     nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
     confirmationVotes,
+    ...watermarks.toFields(),
   };
 }

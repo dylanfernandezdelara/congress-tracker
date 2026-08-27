@@ -9,6 +9,7 @@ import {
   renderHome,
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
+import { formatVoteDate } from '../utils/billLabels'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
@@ -39,6 +40,12 @@ const {
 } = homeApi
 
 vi.mock('../api/client', () => homeApi)
+
+function isoUtcDaysAgo(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
+}
 
 describe('Home', () => {
   beforeEach(() => {
@@ -106,6 +113,184 @@ describe('Home', () => {
     expect(
       within(secondary as HTMLElement).getByRole('region', { name: 'New laws' }),
     ).toBeInTheDocument()
+  })
+
+  it('explains a quiet floor so the timeline does not look stuck', async () => {
+    const latest = isoUtcDaysAgo(10)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(
+      await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
+    expect(screen.getByText('In recess')).toBeInTheDocument()
+  })
+
+  it('omits the quiet notice when the newest vote is recent', async () => {
+    const latest = isoUtcDaysAgo(1)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    expect(
+      screen.queryByText(/No new House or Senate passage votes since/),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Working')).toBeInTheDocument()
+    expect(screen.queryByText('In recess')).not.toBeInTheDocument()
+  })
+
+  it('dates the quiet floor from passage votes, not an executive-boosted first row', async () => {
+    const latest = isoUtcDaysAgo(10)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          bill: { congress: 119, type: 'HR', number: 1, title: 'Boosted' },
+          latest_passage_date: '2026-04-10',
+          latest_activity_date: '2026-08-24T14:26:00.000Z',
+        }),
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(
+      await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 2 passage votes · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/through Apr 10/)).not.toBeInTheDocument()
+  })
+
+  it('names a chamber-filtered quiet floor and skips the notice while searching', async () => {
+    const latest = isoUtcDaysAgo(10)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          latest_passage_date: latest,
+          latest_activity_date: latest,
+          passage_votes: [
+            {
+              chamber: 'House',
+              congress: 119,
+              session: 2,
+              roll_number: 283,
+              question: 'On Passage',
+              result: 'Passed',
+              yeas: 220,
+              nays: 200,
+              date: latest,
+            },
+          ],
+        }),
+      ]),
+    )
+    const { unmount } = renderHome('/?chamber=House')
+    expect(
+      await screen.findByText(`No new House passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/House or Senate/)).not.toBeInTheDocument()
+    unmount()
+
+    renderHome('/?q=housing')
+    expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
+    expect(
+      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
+  })
+
+  it('does not date a House-filtered search from a Senate passage on the same bill', async () => {
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          latest_passage_date: '2026-08-08',
+          latest_activity_date: '2026-08-08',
+          passage_votes: [
+            {
+              chamber: 'Senate',
+              congress: 119,
+              session: 2,
+              roll_number: 228,
+              question: 'On Passage of the Bill',
+              result: 'Passed',
+              yeas: 52,
+              nays: 47,
+              date: '2026-08-08',
+            },
+          ],
+        }),
+      ]),
+    )
+    renderHome('/?chamber=House&q=housing')
+    // Floor status waits on session watermarks; the heading renders before they land.
+    expect(await screen.findByText('In recess')).toBeInTheDocument()
+    expect(screen.queryByText(/through Aug 8/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
+  })
+
+  it('dates a House-filtered floor from House session watermarks, not a Senate passage on the same bill', async () => {
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          latest_passage_date: '2026-08-08',
+          latest_activity_date: '2026-08-08',
+          passage_votes: [
+            {
+              chamber: 'Senate',
+              congress: 119,
+              session: 2,
+              roll_number: 228,
+              question: 'On Passage of the Bill',
+              result: 'Passed',
+              yeas: 52,
+              nays: 47,
+              date: '2026-08-08',
+            },
+          ],
+        }),
+      ]),
+    )
+    renderHome('/?chamber=House')
+    expect(
+      await screen.findByText('No new House passage votes since Jun 5.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/1 of 1 passage vote · through Jun 5 · House/)).toBeInTheDocument()
+    expect(screen.queryByText(/since Aug 8/)).not.toBeInTheDocument()
+    expect(screen.getByText('In recess')).toBeInTheDocument()
+  })
+
+  it('marks an in-session lull separately from recess', async () => {
+    const latest = isoUtcDaysAgo(4)
+    stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({ latest_passage_date: latest, latest_activity_date: latest }),
+      ]),
+    )
+    renderHome()
+    expect(await screen.findByText('In session')).toBeInTheDocument()
+    expect(
+      screen.getByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('In recess')).not.toBeInTheDocument()
+    expect(screen.queryByText('Working')).not.toBeInTheDocument()
   })
 
   it('stacks rail content below the feed on narrow viewports without duplicate fetches', async () => {

@@ -1,3 +1,4 @@
+import { parseIsoDay } from "../../../../shared/iso-day";
 import type { Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { HOUSE_VOTE_DETAIL_FETCHES_PER_RUN } from "../constants";
@@ -7,6 +8,7 @@ import { parseHouseLegislation } from "./bill-ref";
 import { normalizeBillType } from "./bill-type";
 import { fetchJson, nextPageUrl } from "./http";
 import { isPassageVote } from "./passage";
+import { createVoteDateWatermarks } from "./vote-date-watermarks";
 
 interface HouseVoteListItem {
   congress: number;
@@ -56,11 +58,12 @@ function sumTally(parties: PartyTotal[] | undefined): { yeas: number; nays: numb
 }
 
 function voteDateFromIso(iso: string): string {
-  return iso.slice(0, 10);
+  return parseIsoDay(iso) ?? iso.slice(0, 10);
 }
 
 function withinLookback(isoDate: string, lookbackStart: string): boolean {
-  return voteDateFromIso(isoDate) >= lookbackStart;
+  const day = parseIsoDay(isoDate);
+  return day !== null && day >= lookbackStart;
 }
 
 /** A listed roll that still needs a detail request, with its bill reference known. */
@@ -83,6 +86,7 @@ export async function ingestHousePassageVotes(
   const seenThisRun = new Set<string>();
   let skipped = 0;
   let truncated = false;
+  const watermarks = createVoteDateWatermarks();
   let nextUrl: string | null =
     `https://api.congress.gov/v3/house-vote/${congress}/${session}?format=json&limit=50&api_key=${apiKey}`;
 
@@ -96,6 +100,7 @@ export async function ingestHousePassageVotes(
       if (lookbackStart && !withinLookback(item.startDate, lookbackStart)) continue;
       if (!item.legislationNumber || !item.legislationType) continue;
 
+      watermarks.noteListed(item.startDate);
       const key = voteKey({
         chamber: "House",
         congress,
@@ -104,6 +109,7 @@ export async function ingestHousePassageVotes(
       });
       if (knownKeys.has(key) || seenThisRun.has(key)) {
         skipped += 1;
+        watermarks.noteCovered(item.startDate);
         continue;
       }
       seenThisRun.add(key);
@@ -174,6 +180,7 @@ export async function ingestHousePassageVotes(
         nays: stubTally.nays,
         voteDate: voteDateFromIso(detail.startDate ?? item.startDate),
       });
+      watermarks.noteCovered(detail.startDate ?? item.startDate);
       continue;
     }
 
@@ -193,6 +200,7 @@ export async function ingestHousePassageVotes(
       nays,
       voteDate: voteDateFromIso(detail.startDate),
     });
+    watermarks.noteCovered(detail.startDate);
 
     if (maxNewVotes !== undefined && out.length >= maxNewVotes) {
       truncated = true;
@@ -205,6 +213,7 @@ export async function ingestHousePassageVotes(
     skipped,
     truncated: truncated || undefined,
     nonPassageStubs: nonPassageStubs.length > 0 ? nonPassageStubs : undefined,
+    ...watermarks.toFields(),
   };
 }
 

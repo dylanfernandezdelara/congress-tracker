@@ -1,3 +1,5 @@
+import { floorQuietDays, isFloorQuietDays } from "../../../../shared/floor-quiet";
+import { parseIsoDay } from "../../../../shared/iso-day";
 import type {
   ExecutiveIngestMonitorPayload,
   ExecutivePipelineRunRecord,
@@ -110,13 +112,22 @@ export function buildIngestMonitorPayload(params: {
     senateVoteMenuCache: params.senateVoteMenuCache ?? null,
   });
 
-  let message = evaluated.message;
-  if (
-    params.missingDigestCount > 0 &&
-    (evaluated.status === "ok" || evaluated.status === "degraded")
-  ) {
-    message = `${message} ${params.missingDigestCount} bill(s) missing digests.`;
+  const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
+  const quietDay = parseIsoDay(params.latestPassageVoteDate);
+  const annotations: string[] = [];
+  if (isFloorQuietDays(quietDays) && quietDay) {
+    annotations.push(
+      `Floor has been quiet since ${quietDay} (${quietDays} day(s) with no new passage votes).`
+    );
   }
+  if (params.missingDigestCount > 0) {
+    annotations.push(`${params.missingDigestCount} feed bill(s) missing digests.`);
+  }
+  const canAnnotate = evaluated.status === "ok" || evaluated.status === "degraded";
+  const message =
+    canAnnotate && annotations.length > 0
+      ? [evaluated.message, ...annotations].join(" ")
+      : evaluated.message;
 
   const executive = params.executive
     ? buildExecutiveIngestMonitorPayload({
@@ -135,6 +146,7 @@ export function buildIngestMonitorPayload(params: {
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,
     latest_passage_vote_date: params.latestPassageVoteDate,
+    floor_quiet_days: quietDays,
     missing_digest_count: params.missingDigestCount,
     last_success: sanitizeRunRecord(params.lastSuccess),
     last_failure: sanitizeFailureRecord(params.lastFailure),

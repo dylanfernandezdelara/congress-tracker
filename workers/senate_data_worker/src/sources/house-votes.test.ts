@@ -354,6 +354,8 @@ describe("ingestHousePassageVotes", () => {
     expect(detailFetches).toBe(HOUSE_VOTE_DETAIL_FETCHES_PER_RUN);
     expect(result.truncated).toBe(true);
     expect(result.votes).toHaveLength(HOUSE_VOTE_DETAIL_FETCHES_PER_RUN);
+    expect(result.sourceLatestDate).toBe("2026-06-05");
+    expect(result.coveredLatestDate).toBe("2026-06-05");
 
     fetchJson.mockRestore();
   });
@@ -398,6 +400,106 @@ describe("ingestHousePassageVotes", () => {
     await ingestHousePassageVotes(env, "2026-05-01", new Set());
 
     expect(fetched).toEqual([3, 2, 1]);
+
+    fetchJson.mockRestore();
+  });
+
+  it("keeps the newest listed date covered when the per-run vote cap truncates older rolls", async () => {
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      const detail = url.match(/\/(\d+)\?format=json/);
+      if (detail && !url.includes("/119/2?")) {
+        const roll = Number(detail[1]);
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: roll,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: `2026-06-${String(roll).padStart(2, "0")}T12:00:00Z`,
+            voteQuestion: "On Passage",
+            votePartyTotal: [{ yeaTotal: 220, nayTotal: 200 }],
+          },
+        };
+      }
+      return {
+        houseRollCallVotes: [1, 2, 3].map((roll) => ({
+          congress: 119,
+          rollCallNumber: roll,
+          sessionNumber: 2,
+          legislationNumber: "100",
+          legislationType: "HR",
+          result: "Passed",
+          startDate: `2026-06-${String(roll).padStart(2, "0")}T12:00:00Z`,
+        })),
+        pagination: {},
+      };
+    });
+
+    const result = await ingestHousePassageVotes(env, "2026-05-01", new Set(), 1);
+
+    expect(result.truncated).toBe(true);
+    expect(result.votes).toHaveLength(1);
+    expect(result.votes[0]?.rollNumber).toBe(3);
+    expect(result.sourceLatestDate).toBe("2026-06-03");
+    expect(result.coveredLatestDate).toBe("2026-06-03");
+
+    fetchJson.mockRestore();
+  });
+
+  it("leaves coveredLatestDate behind when the newest listed roll has empty detail", async () => {
+    const fetchJson = vi.spyOn(http, "fetchJson").mockImplementation(async (url: string) => {
+      const detail = url.match(/\/(\d+)\?format=json/);
+      if (detail && !url.includes("/119/2?")) {
+        const roll = Number(detail[1]);
+        if (roll === 2) {
+          return { houseRollCallVote: undefined };
+        }
+        return {
+          houseRollCallVote: {
+            congress: 119,
+            rollCallNumber: roll,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-01T12:00:00Z",
+            voteQuestion: "On Passage",
+            votePartyTotal: [{ yeaTotal: 220, nayTotal: 200 }],
+          },
+        };
+      }
+      return {
+        houseRollCallVotes: [
+          {
+            congress: 119,
+            rollCallNumber: 1,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-01T12:00:00Z",
+          },
+          {
+            congress: 119,
+            rollCallNumber: 2,
+            sessionNumber: 2,
+            legislationNumber: "100",
+            legislationType: "HR",
+            result: "Passed",
+            startDate: "2026-06-10T12:00:00Z",
+          },
+        ],
+        pagination: {},
+      };
+    });
+
+    const result = await ingestHousePassageVotes(env, "2026-05-01", new Set());
+
+    expect(result.sourceLatestDate).toBe("2026-06-10");
+    expect(result.coveredLatestDate).toBe("2026-06-01");
+    expect(result.votes).toHaveLength(1);
 
     fetchJson.mockRestore();
   });

@@ -209,6 +209,39 @@ describe("parseSenateVoteMenuXml", () => {
     expect(result.skipped).toBe(1);
     expect(result.votes).toHaveLength(1);
     expect(result.votes[0]?.rollNumber).toBe(182);
+    expect(result.sourceLatestDate).toBe("2026-06-22");
+    expect(result.coveredLatestDate).toBe("2026-06-22");
+
+    fetchSenate.mockRestore();
+  });
+
+  it("does not stamp passage watermarks from a newer confirmation roll", async () => {
+    const xml = sample.replace(
+      /<vote_number>00165<\/vote_number>\s*<vote_date>05-Jun<\/vote_date>/,
+      "<vote_number>00165</vote_number><vote_date>24-Aug</vote_date>"
+    );
+    const fetchSenate = vi
+      .spyOn(senateFetch, "fetchSenateLegislativeText")
+      .mockResolvedValue(xml);
+    const env = {
+      CONGRESS: "119",
+      SESSION: "2",
+      DB: {
+        prepare: () => ({
+          bind: () => ({
+            first: async () => null,
+            run: async () => ({ success: true, meta: { duration: 0 } }),
+          }),
+          run: async () => ({ success: true, meta: { duration: 0 } }),
+        }),
+      },
+    } as unknown as Env;
+
+    const result = await ingestSenatePassageVotes(env, "2026-01-01", new Set());
+
+    expect(result.confirmationVotes[0]?.voteDate).toBe("2026-08-24");
+    expect(result.sourceLatestDate).toBe("2026-06-22");
+    expect(result.coveredLatestDate).toBe("2026-06-22");
 
     fetchSenate.mockRestore();
   });

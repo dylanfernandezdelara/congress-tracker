@@ -380,6 +380,12 @@ export async function runFeedPipeline(
         digestsSkipped: result.digestsSkipped,
         ...(digestWarnings.length > 0 ? { digest_warnings: digestWarnings } : {}),
         ...(chamberWarnings.length > 0 ? { chamber_warnings: chamberWarnings } : {}),
+        ...(houseResult.sourceLatestDate
+          ? { house_source_latest_date: houseResult.sourceLatestDate }
+          : {}),
+        ...(senateResult.sourceLatestDate
+          ? { senate_source_latest_date: senateResult.sourceLatestDate }
+          : {}),
         lifecycleRefreshed: result.lifecycleRefreshed,
         lifecycleSkipped: result.lifecycleSkipped,
         ...(lifecycleWarnings.length > 0
