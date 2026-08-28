@@ -286,9 +286,9 @@ VALUES
 INSERT OR REPLACE INTO bill_lifecycle
   (congress, bill_type, bill_number, introduced_date, presented_date, signed_date, vetoed_date, became_law_date, law_kind, public_law, latest_action_date, latest_action_text, updated_at)
 VALUES
-  (119, 'hr', 1, '${D_OLDER}', '${D_MID}', '${D_RECENT}', NULL, '${D_RECENT}', 'signed', '119-1',
+  (119, 'hr', 1, '${D_OLDER}', '${D_RECENT}', '${D_RECENT}', NULL, '${D_RECENT}', 'signed', '119-1',
    '${D_RECENT}', 'Became Public Law No: 119-1. (local sample)', '${D_RECENT}T00:00:00.000Z'),
-  (119, 's', 47, '${D_OLDER}', '${D_OLDER}', NULL, NULL, '${D_MID}', 'law_unsigned', '119-2',
+  (119, 's', 47, '${D_OLDER}', '${D_MID}', NULL, NULL, '${D_MID}', 'law_unsigned', '119-2',
    '${D_MID}', 'Became Public Law No: 119-2 without signature. (local sample)', '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, '${D_OLDER}', '${D_RECENT}', NULL, NULL, NULL, NULL, NULL,
    '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z');
