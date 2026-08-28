@@ -133,6 +133,34 @@ describe('Home', () => {
     expect(screen.getByText('In recess')).toBeInTheDocument()
   })
 
+  it('opens floor status with House and Senate return dates from In recess', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-27T16:00:00.000Z'))
+    stubHomeRouteDefaults(homeApi, { house: '2026-07-23', senate: '2026-08-08' })
+    fetchFeed.mockResolvedValue(
+      pageResponse([
+        makeFeedItem({
+          latest_passage_date: '2026-08-08',
+          latest_activity_date: '2026-08-08',
+        }),
+      ]),
+    )
+    renderHome()
+    fireEvent.click(await screen.findByRole('button', { name: /In recess/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Floor status' })
+    expect(
+      within(dialog).getByText(/House is scheduled back Monday, Aug 31/),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByText(/Senate is scheduled back Monday, Sep 14/)).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: /2026 House Calendar/ })).toHaveAttribute(
+      'href',
+      'https://pressgallery.house.gov/schedules/2026-house-calendar',
+    )
+    expect(
+      within(dialog).getByRole('link', { name: /Senate 2026 legislative schedule/ }),
+    ).toHaveAttribute('href', 'https://www.senate.gov/legislative/2026_schedule.htm')
+  })
+
   it('omits the quiet notice when the newest vote is recent', async () => {
     const latest = isoUtcDaysAgo(1)
     stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })

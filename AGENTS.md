@@ -45,7 +45,7 @@ Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHu
 
 1. `npm test`
 2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`
-3. Run thermonuclear review on the branch diff; fix CRITICAL and WARNING findings; repeat until CLEAR
+3. Run thermonuclear review per `.cursor/rules/pr-thermonuclear-review.mdc` (two Grok 4.6 thermos passes in one background launch, then synthesize); fix CRITICAL and WARNING findings; repeat until CLEAR. Never launch thermos on Grok 4.5 (`cursor-grok-4.5-high-fast`).
 4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask)
 5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
 

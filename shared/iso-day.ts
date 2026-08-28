@@ -4,6 +4,32 @@ export function parseIsoDay(value: string | null | undefined): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null
 }
 
+/** UTC calendar day (`YYYY-MM-DD`) for `now`. */
+export function utcIsoDay(now: Date = new Date()): string {
+  const year = now.getUTCFullYear()
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(now.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** Add whole UTC days to a calendar day. Null when `isoDate` is invalid. */
+export function addUtcIsoDays(isoDate: string, days: number): string | null {
+  const day = parseIsoDay(isoDate)
+  if (!day) return null
+  const startMs = Date.parse(`${day}T00:00:00.000Z`)
+  if (!Number.isFinite(startMs)) return null
+  return utcIsoDay(new Date(startMs + days * 86_400_000))
+}
+
+/** 0 = Sunday … 6 = Saturday in UTC. Null when the date is invalid. */
+export function utcIsoWeekday(isoDate: string): number | null {
+  const day = parseIsoDay(isoDate)
+  if (!day) return null
+  const ms = Date.parse(`${day}T00:00:00.000Z`)
+  if (!Number.isFinite(ms)) return null
+  return new Date(ms).getUTCDay()
+}
+
 /** Latest valid UTC calendar day among date or datetime strings. */
 export function maxIsoDay(
   values: readonly (string | null | undefined)[],
@@ -14,6 +40,20 @@ export function maxIsoDay(
     if (day && (latest === null || day > latest)) latest = day
   }
   return latest
+}
+
+/**
+ * Whole UTC calendar days from `fromDay` to `toDay`.
+ * Null when either date is invalid. Negative when `toDay` is earlier.
+ */
+export function utcCalendarDaysBetween(fromDay: string, toDay: string): number | null {
+  const from = parseIsoDay(fromDay)
+  const to = parseIsoDay(toDay)
+  if (!from || !to) return null
+  const fromMs = Date.parse(`${from}T00:00:00.000Z`)
+  const toMs = Date.parse(`${to}T00:00:00.000Z`)
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return null
+  return Math.round((toMs - fromMs) / 86_400_000)
 }
 
 /**
