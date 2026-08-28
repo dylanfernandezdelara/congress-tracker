@@ -1,20 +1,8 @@
 import { voteIndicatesFailure } from '@congress-tracker/shared/feed-content'
 import type { BillFloorActionKey, BillProcessActivityKey } from '@congress-tracker/shared/bill-process-labels'
 import type { FeedChamber, FeedCompanionVote, FeedItem, FeedPassageVote } from '../api/types'
-import { getBillLifecycleStages, type BillLifecycleStage } from './billLifecycleStages'
 
-export type BillJourneyKind =
-  | 'introduced'
-  | 'committee'
-  | 'received'
-  | 'calendar'
-  | 'considered'
-  | 'cloture'
-  | 'conference'
-  | 'companion_vote'
-  | 'passage_vote'
-  | 'to_president'
-  | 'outcome'
+export type BillJourneyKind = BillFloorActionKey | 'committee' | 'companion_vote' | 'passage_vote'
 
 export type BillJourneyState = 'done' | 'failed'
 
@@ -23,13 +11,12 @@ export interface BillJourneyEvent {
   date: string | null
   kind: BillJourneyKind
   label: string
-  detail?: string | null
   chamber: FeedChamber | null
   state: BillJourneyState
   tally: string | null
 }
 
-const COMMITTEE_SORT: Record<BillProcessActivityKey, number> = {
+const ORIGIN_COMMITTEE_SORT: Record<BillProcessActivityKey, number> = {
   sent: 10,
   hearings: 11,
   worked_on: 12,
@@ -39,8 +26,9 @@ const COMMITTEE_SORT: Record<BillProcessActivityKey, number> = {
   other: 16,
 }
 
+const SECOND_CHAMBER_COMMITTEE_SORT = 32
+
 const KIND_SORT: Record<BillJourneyKind, number> = {
-  introduced: 0,
   committee: 10,
   calendar: 20,
   considered: 21,
@@ -48,17 +36,14 @@ const KIND_SORT: Record<BillJourneyKind, number> = {
   cloture: 23,
   passage_vote: 30,
   received: 31,
-  conference: 32,
-  to_president: 40,
-  outcome: 41,
+  conference: 33,
 }
 
-const FLOOR_KIND: Record<BillFloorActionKey, BillJourneyKind> = {
-  received: 'received',
-  calendar: 'calendar',
-  considered: 'considered',
-  cloture: 'cloture',
-  conference: 'conference',
+function originChamberFromBillType(billType: string): FeedChamber | null {
+  const t = billType.toUpperCase()
+  if (t.startsWith('H')) return 'House'
+  if (t.startsWith('S')) return 'Senate'
+  return null
 }
 
 function dateKey(date: string | null): string {
@@ -92,38 +77,32 @@ function isClotureQuestion(question: string): boolean {
   return /cloture/i.test(question)
 }
 
-function stageToJourney(
-  stage: BillLifecycleStage,
-  kind: Extract<BillJourneyKind, 'introduced' | 'to_president' | 'outcome'>,
-): (BillJourneyEvent & { sort: number }) | null {
-  if (!stage.date) return null
-  return {
-    id: `${kind}-${stage.date}`,
-    date: stage.date,
-    kind,
-    label: stage.label,
-    detail: stage.detail ?? null,
-    chamber: null,
-    state: stage.state === 'failed' ? 'failed' : 'done',
-    tally: null,
-    sort: KIND_SORT[kind],
-  }
+const ROLL_COVERS_FLOOR: Partial<Record<BillFloorActionKey, (question: string) => boolean>> = {
+  cloture: isClotureQuestion,
+}
+
+function floorCoveredByRoll(
+  action: { key: BillFloorActionKey; date: string | null },
+  votes: FeedCompanionVote[],
+): boolean {
+  const matchesQuestion = ROLL_COVERS_FLOOR[action.key]
+  if (!matchesQuestion || !action.date) return false
+  return votes.some((vote) => matchesQuestion(vote.question) && vote.date === action.date)
+}
+
+function committeeSort(origin: FeedChamber | null, chamber: FeedChamber | null, activity: BillProcessActivityKey): number {
+  if (origin && chamber && chamber !== origin) return SECOND_CHAMBER_COMMITTEE_SORT
+  return ORIGIN_COMMITTEE_SORT[activity] ?? KIND_SORT.committee
 }
 
 /**
- * Chronological path through Congress: committee work, floor actions,
- * related rolls, passage, and presidential milestones.
+ * Granular path under the major-stage map: committee work, floor actions,
+ * related rolls, and passage tallies. Introduced / president / law stay on
+ * the 5-step stepper.
  */
 export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
-  const { stages } = getBillLifecycleStages(item)
-  const introduced = stages.find((s) => s.key === 'introduced')
-  const toPresident = stages.find((s) => s.key === 'to_president')
-  const outcome = stages.find((s) => s.key === 'outcome')
-
+  const origin = originChamberFromBillType(item.bill.type)
   const rows: Array<BillJourneyEvent & { sort: number }> = []
-
-  const introEvent = introduced ? stageToJourney(introduced, 'introduced') : null
-  if (introEvent) rows.push(introEvent)
 
   for (const [index, stage] of (item.process?.stages ?? []).entries()) {
     rows.push({
@@ -131,48 +110,40 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       date: stage.date,
       kind: 'committee',
       label: stage.label,
-      detail: null,
       chamber: stage.chamber,
       state: 'done',
       tally: stage.tally_text,
-      sort: COMMITTEE_SORT[stage.activity_key] ?? KIND_SORT.committee,
+      sort: committeeSort(origin, stage.chamber, stage.activity_key),
     })
   }
 
   const companionVotes = item.companion_votes ?? []
-  const clotureDates = new Set(
-    companionVotes.filter((v) => isClotureQuestion(v.question)).map((v) => v.date),
-  )
 
   for (const [index, action] of (item.process?.floor_actions ?? []).entries()) {
-    if (action.key === 'cloture' && action.date && clotureDates.has(action.date)) {
-      continue
-    }
-    const kind = FLOOR_KIND[action.key]
+    if (floorCoveredByRoll(action, companionVotes)) continue
     rows.push({
       id: `floor-${action.key}-${action.date ?? index}-${action.chamber ?? 'none'}`,
       date: action.date,
-      kind,
+      kind: action.key,
       label: action.label,
-      detail: null,
       chamber: action.chamber,
       state: 'done',
       tally: action.tally_text,
-      sort: KIND_SORT[kind],
+      sort: KIND_SORT[action.key],
     })
   }
 
   for (const vote of companionVotes) {
+    const kind: BillJourneyKind = isClotureQuestion(vote.question) ? 'cloture' : 'companion_vote'
     rows.push({
       id: `companion-${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`,
       date: vote.date,
-      kind: isClotureQuestion(vote.question) ? 'cloture' : 'companion_vote',
+      kind,
       label: companionLabel(vote),
-      detail: null,
       chamber: vote.chamber,
       state: voteIndicatesFailure(vote.result) ? 'failed' : 'done',
       tally: voteTally(vote),
-      sort: isClotureQuestion(vote.question) ? KIND_SORT.cloture : KIND_SORT.companion_vote,
+      sort: KIND_SORT[kind],
     })
   }
 
@@ -182,7 +153,6 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       date: vote.date,
       kind: 'passage_vote',
       label: passageLabel(vote),
-      detail: vote.question,
       chamber: vote.chamber,
       state: voteIndicatesFailure(vote.result) ? 'failed' : 'done',
       tally: voteTally(vote),
@@ -190,20 +160,12 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
     })
   }
 
-  const presidentEvent = toPresident ? stageToJourney(toPresident, 'to_president') : null
-  if (presidentEvent) rows.push(presidentEvent)
-
-  const outcomeEvent = outcome ? stageToJourney(outcome, 'outcome') : null
-  if (outcomeEvent) rows.push(outcomeEvent)
-
   rows.sort(eventSort)
   return rows.map(({ sort: _sort, ...event }) => event)
 }
 
 export function journeyKindLabel(kind: BillJourneyKind): string {
   switch (kind) {
-    case 'introduced':
-      return 'Introduced'
     case 'committee':
       return 'Committee'
     case 'received':
@@ -220,10 +182,6 @@ export function journeyKindLabel(kind: BillJourneyKind): string {
       return 'Floor vote'
     case 'passage_vote':
       return 'Passage'
-    case 'to_president':
-      return 'President'
-    case 'outcome':
-      return 'Law'
     default: {
       const _exhaustive: never = kind
       return _exhaustive

@@ -1,5 +1,3 @@
-import type { BillProcessSummary } from '@congress-tracker/shared/bill-process-api-types'
-
 import type { BillLifecycleStage } from '../utils/billLifecycleStages'
 import type { BillJourneyEvent } from '../utils/billJourney'
 import { journeyKindLabel } from '../utils/billJourney'
@@ -9,9 +7,9 @@ type BillPipelineProps = {
   stages: BillLifecycleStage[]
   /** Optional callout under the stepper (e.g. unsigned-law explanation). */
   detail?: string | null
-  /** Committee status line when hydrated. */
-  process?: BillProcessSummary | null
-  /** Chronological committee + floor + vote + presidential path. */
+  /** Committee/floor status line when hydrated. */
+  statusLabel?: string | null
+  /** Chronological committee + floor + vote path (not the 5-step map). */
   journey?: BillJourneyEvent[]
 }
 
@@ -23,12 +21,12 @@ function stageDateLabel(date: string | null): string | null {
 export function BillPipeline({
   stages,
   detail,
-  process = null,
+  statusLabel = null,
   journey = [],
 }: BillPipelineProps) {
   if (stages.length === 0 && journey.length === 0) return null
 
-  const processStatus = process?.current_label?.trim() || null
+  const processStatus = statusLabel?.trim() || null
   const showJourney = journey.length > 0
 
   return (

@@ -4,7 +4,7 @@ import { makeFeedItem } from '../test/feedItemFixtures'
 import { buildBillJourney, journeyKindLabel } from './billJourney'
 
 describe('buildBillJourney', () => {
-  it('interleaves committee, floor, companion, passage, and law milestones', () => {
+  it('interleaves committee, floor, companion, and passage without repeating stepper milestones', () => {
     const events = buildBillJourney(
       makeFeedItem({
         bill: { congress: 119, type: 'HR', number: 1, title: 'Energy Act' },
@@ -112,7 +112,6 @@ describe('buildBillJourney', () => {
     )
 
     expect(events.map((e) => e.kind)).toEqual([
-      'introduced',
       'committee',
       'committee',
       'committee',
@@ -120,16 +119,65 @@ describe('buildBillJourney', () => {
       'companion_vote',
       'passage_vote',
       'received',
-      'to_president',
-      'outcome',
     ])
-    expect(events[0]?.label).toBe('Introduced')
     expect(events.find((e) => e.kind === 'committee' && e.tally === '47-0')?.label).toMatch(
       /Energy and Commerce/,
     )
     expect(events.find((e) => e.kind === 'passage_vote')?.label).toBe('Passed the House 220–213')
     expect(events.find((e) => e.kind === 'received')?.label).toBe('Received in the Senate')
-    expect(events[events.length - 1]?.label).toBe('Signed into law')
+    expect(events.some((e) => e.label === 'Introduced' || e.label === 'Signed into law')).toBe(
+      false,
+    )
+  })
+
+  it('puts same-day second-chamber referral after passage and received', () => {
+    const events = buildBillJourney(
+      makeFeedItem({
+        bill: { congress: 119, type: 'HR', number: 1, title: 'Energy Act' },
+        passage_votes: [
+          {
+            chamber: 'House',
+            congress: 119,
+            session: 2,
+            roll_number: 1,
+            question: 'On Passage',
+            result: 'Passed',
+            yeas: 220,
+            nays: 213,
+            date: '2026-04-02',
+          },
+        ],
+        process: {
+          current_status: 'in_second_chamber_committee',
+          current_label: 'In Finance · waiting for the committee to act',
+          stages: [
+            {
+              date: '2026-04-02',
+              label: 'Sent to Finance Committee',
+              activity_key: 'sent',
+              chamber: 'Senate',
+              committee_name: 'Finance Committee',
+              system_code: 'ssfi00',
+              parent_system_code: null,
+              is_subcommittee: false,
+              tally_text: null,
+            },
+          ],
+          floor_actions: [
+            {
+              date: '2026-04-02',
+              key: 'received',
+              label: 'Received in the Senate',
+              chamber: 'Senate',
+              tally_text: null,
+            },
+          ],
+        },
+      }),
+    )
+
+    expect(events.map((e) => e.kind)).toEqual(['passage_vote', 'received', 'committee'])
+    expect(events[2]?.label).toBe('Sent to Finance Committee')
   })
 
   it('drops a floor cloture row when a cloture roll already exists that day', () => {

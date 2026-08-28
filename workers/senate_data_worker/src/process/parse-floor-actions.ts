@@ -1,10 +1,10 @@
+import { parseIsoDay } from "../../../../shared/iso-day";
 import {
   formatFloorActionLabel,
   type BillFloorActionKey,
 } from "../../../../shared/bill-process-labels";
 import type { FeedChamber } from "../../../../shared/feed-api-types";
 import type { CongressAction } from "../lifecycle/parse-actions";
-import { asFeedChamber } from "../sources/congress-client";
 import type { ProcessFloorEvent } from "./types";
 
 const SKIP_TEXT =
@@ -13,11 +13,12 @@ const SKIP_TEXT =
 const COMMITTEE_ONLY =
   /^(referred to the (house|senate) committee|committee (hearings|consideration|markup)|ordered to be reported|reported (to|by)|discharged from)/i;
 
-function actionDate(action: CongressAction): string | null {
-  const raw = action.actionDate?.trim();
-  if (!raw) return null;
-  return raw.slice(0, 10);
-}
+const CALENDAR_TEXT = /placed on .{0,40}calendar/i;
+const RECEIVED_TEXT = /received in the (house|senate)|message on senate action received in house/i;
+
+/** House Clerk / LIS codes. LOC 1000 is "Introduced in House", not received. */
+const HOUSE_RECEIVED_CODES = new Set(["H14000"]);
+const HOUSE_CALENDAR_CODES = new Set(["H12410"]);
 
 function actionText(action: CongressAction): string {
   return action.text?.trim() ?? "";
@@ -42,10 +43,14 @@ export function extractFloorTally(text: string | null | undefined): string | nul
 }
 
 function inferChamber(action: CongressAction, text: string): FeedChamber | null {
-  const lower = text.toLowerCase();
   const source = action.sourceSystem?.name?.toLowerCase() ?? "";
-  if (/\bsenate\b/.test(lower) || source.includes("senate")) return "Senate";
-  if (/\bhouse\b/.test(lower) || source.includes("house")) return "House";
+  if (source.includes("senate")) return "Senate";
+  if (source.includes("house")) return "House";
+  const lower = text.toLowerCase();
+  const hasSenate = /\bsenate\b/.test(lower);
+  const hasHouse = /\bhouse\b/.test(lower);
+  if (hasSenate && !hasHouse) return "Senate";
+  if (hasHouse && !hasSenate) return "House";
   if (/union calendar|house calendar|private calendar|corrections calendar/i.test(text)) {
     return "House";
   }
@@ -53,20 +58,63 @@ function inferChamber(action: CongressAction, text: string): FeedChamber | null 
   if (/suspension of the rules/i.test(text)) return "House";
   if (/h\.\s*rept/i.test(text)) return "House";
   if (/s\.\s*rept/i.test(text)) return "Senate";
-  return asFeedChamber(action.type ?? undefined);
+  return null;
 }
 
 function shouldSkip(text: string, type: string): boolean {
   if (!text) return true;
   if (SKIP_TEXT.test(text)) return true;
-  if (COMMITTEE_ONLY.test(text) && !/received/i.test(text)) return true;
+  if (CALENDAR_TEXT.test(text) || RECEIVED_TEXT.test(text)) return false;
+  if (COMMITTEE_ONLY.test(text)) return true;
   if (type === "committee") return true;
   if (type === "president" || type === "becominglaw") return true;
-  if (type === "introreferral" && /referred/i.test(text) && !/received/i.test(text)) {
-    return true;
-  }
+  if (type === "introreferral" && /referred/i.test(text)) return true;
   return false;
 }
+
+type FloorRule = {
+  key: BillFloorActionKey;
+  chamber?: FeedChamber;
+  match: (params: { text: string; type: string; code: string }) => boolean;
+};
+
+const FLOOR_RULES: FloorRule[] = [
+  {
+    key: "received",
+    chamber: "Senate",
+    match: ({ text }) => /received in the senate/i.test(text),
+  },
+  {
+    key: "received",
+    chamber: "House",
+    match: ({ text, code }) =>
+      HOUSE_RECEIVED_CODES.has(code) ||
+      /received in the house/i.test(text) ||
+      /message on senate action received in house/i.test(text),
+  },
+  {
+    key: "cloture",
+    chamber: "Senate",
+    match: ({ text }) => /cloture/i.test(text),
+  },
+  {
+    key: "conference",
+    match: ({ text }) => /conference/i.test(text),
+  },
+  {
+    key: "calendar",
+    match: ({ text, type, code }) =>
+      HOUSE_CALENDAR_CODES.has(code) || CALENDAR_TEXT.test(text) || type === "calendars",
+  },
+  {
+    key: "considered",
+    match: ({ text, type }) =>
+      /considered as unfinished business/i.test(text) ||
+      /measure laid before/i.test(text) ||
+      /considered under (the )?(suspension|unanimous)/i.test(text) ||
+      (type === "floor" && /debated|considered/i.test(text)),
+  },
+];
 
 function classify(
   action: CongressAction,
@@ -76,51 +124,40 @@ function classify(
 ): { key: BillFloorActionKey; chamber: FeedChamber } | null {
   if (shouldSkip(text, type)) return null;
 
-  if (/received in the senate/i.test(text) || code === "1000") {
-    return { key: "received", chamber: "Senate" };
-  }
-  if (
-    /received in the house/i.test(text) ||
-    /message on senate action received in house/i.test(text)
-  ) {
-    return { key: "received", chamber: "House" };
-  }
-
-  if (/cloture/i.test(text)) {
-    return { key: "cloture", chamber: "Senate" };
-  }
-
-  if (/conference/i.test(text) || type === "resolvingdifferences") {
-    const chamber = inferChamber(action, text);
+  for (const rule of FLOOR_RULES) {
+    if (!rule.match({ text, type, code })) continue;
+    const chamber = rule.chamber ?? inferChamber(action, text);
     if (!chamber) return null;
-    return { key: "conference", chamber };
+    return { key: rule.key, chamber };
   }
-
-  if (
-    /placed on .{0,40}calendar/i.test(text) ||
-    type === "calendars" ||
-    code === "5000"
-  ) {
-    const chamber = inferChamber(action, text);
-    if (!chamber) return null;
-    return { key: "calendar", chamber };
-  }
-
-  if (
-    /considered as unfinished business/i.test(text) ||
-    /measure laid before/i.test(text) ||
-    /considered under (the )?(suspension|unanimous)/i.test(text) ||
-    (type === "floor" && /debated|considered/i.test(text))
-  ) {
-    const chamber = inferChamber(action, text);
-    if (!chamber) return null;
-    return { key: "considered", chamber };
-  }
-
   return null;
 }
 
 const MAX_FLOOR_EVENTS = 24;
+
+function capFloorEvents(events: ProcessFloorEvent[]): ProcessFloorEvent[] {
+  const considered = events.filter((e) => e.actionKey === "considered");
+  const rest = events.filter((e) => e.actionKey !== "considered");
+  const consideredKeep: ProcessFloorEvent[] = [];
+  const byChamber = new Map<FeedChamber, ProcessFloorEvent[]>();
+  for (const event of considered) {
+    const list = byChamber.get(event.chamber) ?? [];
+    list.push(event);
+    byChamber.set(event.chamber, list);
+  }
+  for (const list of byChamber.values()) {
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (first) consideredKeep.push(first);
+    if (last && last !== first) consideredKeep.push(last);
+  }
+  const combined = [...rest, ...consideredKeep].sort((a, b) =>
+    a.actionAt.localeCompare(b.actionAt)
+  );
+  if (combined.length <= MAX_FLOOR_EVENTS) return combined;
+  if (rest.length >= MAX_FLOOR_EVENTS) return rest.slice(-MAX_FLOOR_EVENTS);
+  return combined.slice(-MAX_FLOOR_EVENTS);
+}
 
 /**
  * Map Congress.gov `/actions` into floor/calendar/cloture/conference rows.
@@ -137,14 +174,14 @@ export function parseFloorActions(params: {
   const out: ProcessFloorEvent[] = [];
 
   const sorted = [...params.actions].sort((a, b) => {
-    const da = actionDate(a) ?? "";
-    const db = actionDate(b) ?? "";
+    const da = parseIsoDay(a.actionDate) ?? "";
+    const db = parseIsoDay(b.actionDate) ?? "";
     return da.localeCompare(db);
   });
 
   for (const action of sorted) {
     const text = actionText(action);
-    const date = actionDate(action);
+    const date = parseIsoDay(action.actionDate);
     if (!date) continue;
     const type = (action.type ?? "").trim().toLowerCase();
     const code = action.actionCode == null ? "" : String(action.actionCode);
@@ -171,9 +208,7 @@ export function parseFloorActions(params: {
       rawText: text,
       tallyText,
     });
-
-    if (out.length >= MAX_FLOOR_EVENTS) break;
   }
 
-  return out;
+  return capFloorEvents(out);
 }

@@ -75,11 +75,7 @@ describe('BillPipeline', () => {
     render(
       <BillPipeline
         stages={stages}
-        process={{
-          current_status: 'in_committee',
-          current_label: 'In House Administration · waiting for the committee to act',
-          stages: [],
-        }}
+        statusLabel="In House Administration · waiting for the committee to act"
         journey={[
           {
             id: 'committee-1',

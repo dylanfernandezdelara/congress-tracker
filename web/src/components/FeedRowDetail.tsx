@@ -78,7 +78,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
       <BillPipeline
         stages={stages}
         detail={pipelineDetail}
-        process={item.process}
+        statusLabel={item.process?.current_label}
         journey={buildBillJourney(item)}
       />
 

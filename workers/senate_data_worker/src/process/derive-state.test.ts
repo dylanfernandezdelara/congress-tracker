@@ -51,6 +51,8 @@ describe("toProcessSummary", () => {
     const summary = toProcessSummary("HR", [], new Map(), [received]);
     expect(summary).not.toBeNull();
     expect(summary?.stages).toEqual([]);
+    expect(summary?.current_status).toBe("unknown");
+    expect(summary?.current_label).toBe("Received in the Senate");
     expect(summary?.floor_actions?.[0]?.key).toBe("received");
   });
 });

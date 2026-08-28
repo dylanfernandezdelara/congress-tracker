@@ -1,5 +1,6 @@
 import type { BillProcessSummary, BillProcessStage, BillFloorAction } from "../../../../shared/bill-process-api-types";
 import type { FeedChamber } from "../../../../shared/feed-api-types";
+import { parseIsoDay } from "../../../../shared/iso-day";
 import {
   formatClearedLabel,
   formatProcessStageLabel,
@@ -8,11 +9,6 @@ import {
   type BillProcessCurrentStatus,
 } from "../../../../shared/bill-process-labels";
 import type { ProcessCommitteeEvent, ProcessFloorEvent } from "./types";
-
-function dateOnly(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  return iso.slice(0, 10);
-}
 
 function originChamberFromBillType(billType: string): FeedChamber | null {
   const t = billType.toUpperCase();
@@ -41,7 +37,7 @@ export function eventsToStages(
       ? nameByCode.get(e.parentSystemCode) ?? null
       : null;
     return {
-      date: dateOnly(e.activityAt),
+      date: parseIsoDay(e.activityAt),
       label: formatProcessStageLabel({
         activityKey: e.activityKey,
         committeeName: e.committeeName,
@@ -130,12 +126,23 @@ export function deriveProcessState(
 export function floorEventsToActions(events: ProcessFloorEvent[]): BillFloorAction[] {
   const sorted = [...events].sort((a, b) => a.actionAt.localeCompare(b.actionAt));
   return sorted.map((e) => ({
-    date: dateOnly(e.actionAt),
+    date: parseIsoDay(e.actionAt),
     key: e.actionKey,
     label: e.label,
     chamber: e.chamber,
     tally_text: e.tallyText,
   }));
+}
+
+function deriveFloorFallback(floorEvents: ProcessFloorEvent[]): {
+  current_status: BillProcessCurrentStatus;
+  current_label: string | null;
+} {
+  const latest = [...floorEvents].sort((a, b) => b.actionAt.localeCompare(a.actionAt))[0];
+  if (!latest) {
+    return { current_status: "unknown", current_label: null };
+  }
+  return { current_status: "unknown", current_label: latest.label };
 }
 
 export function toProcessSummary(
@@ -147,9 +154,11 @@ export function toProcessSummary(
   if (events.length === 0 && floorEvents.length === 0) return null;
   const derived = deriveProcessState(billType, events, nameByCode);
   const floor_actions = floorEventsToActions(floorEvents);
+  const floorOnly = events.length === 0 && floorEvents.length > 0;
+  const status = floorOnly ? deriveFloorFallback(floorEvents) : derived;
   return {
-    current_status: derived.current_status,
-    current_label: derived.current_label,
+    current_status: status.current_status,
+    current_label: status.current_label,
     stages: derived.stages,
     ...(floor_actions.length > 0 ? { floor_actions } : {}),
   };
