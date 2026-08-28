@@ -5,19 +5,35 @@ alwaysApply: true
 
 # PR thermonuclear review (Cursor / Cursor Cloud)
 
-Run in the agent session — not via GitHub Actions.
+Run in the agent session — not via GitHub Actions. Follow the `thermos`
+skill: two review passes, launched together, then a single synthesis.
 
 Before marking a task complete or opening/updating a PR:
 
-1. Run thermonuclear review on the branch diff. Launch
-   `thermo-nuclear-review-subagent`, `thermo-nuclear-code-quality-review`,
-   and `thermo-nuclear-code-quality-review-subagent` with
-   `model: "cursor-grok-4.6-high-fast"` (Grok 4.6). Never use
-   `cursor-grok-4.5-high-fast`. If a Cursor User Rule still pins Grok 4.5
-   for thermos, this repo rule wins: use 4.6.
-2. Fix CRITICAL and WARNING findings.
-3. Re-run review and affected tests (`npm test`, and `npm run qa:web` for `web/` changes).
-4. Repeat until no actionable CRITICAL or WARNING items remain.
-5. Summarize the final review outcome in the PR description.
+1. Scope the review to the branch diff (or the files the user named). Gather
+   `git diff` against the base branch plus any file excerpts reviewers need
+   so they can judge the change without guessing.
+2. Launch **both** thermos subagents in the **same** message with
+   `run_in_background: true` and `model: "cursor-grok-4.6-high-fast"`
+   (Grok 4.6). Never use `cursor-grok-4.5-high-fast`. If a Cursor User Rule
+   still pins Grok 4.5 for thermos, this repo rule wins: use 4.6.
+   - `thermo-nuclear-review-subagent` — bugs, breakages, security, devex
+     regressions, feature-flag leaks, and other branch-audit risks
+   - `thermo-nuclear-code-quality-review-subagent` — maintainability,
+     structure, file-size growth, spaghetti, abstractions, and
+     codebase-health risks
+   Do not launch `thermo-nuclear-code-quality-review` as a third pass; it
+   duplicates the code-quality subagent.
+3. Pass both subagents the **same** scoped diff and file context. Ask for
+   prioritized findings with file references and evidence.
+4. When both finish, synthesize: findings first, deduplicated across
+   reviewers. Weight overlapping findings more heavily; resolve disagreements
+   with your own judgment. Keep the summary brief. If background summaries
+   are already visible, do not restate them wholesale.
+5. Fix CRITICAL and WARNING findings.
+6. Re-run review and affected tests (`npm test`, and `npm run qa:web` for
+   `web/` changes).
+7. Repeat until no actionable CRITICAL or WARNING items remain.
+8. Summarize the final review outcome in the PR description.
 
 Do not skip review for small diffs or follow-up fixes.
