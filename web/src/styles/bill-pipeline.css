@@ -193,17 +193,6 @@
     white-space: nowrap;
   }
 
-  @media (max-width: 479px) {
-    .bill-pipeline-journey-step {
-      grid-template-columns: minmax(0, 1fr);
-      row-gap: 0.15rem;
-    }
-
-    .bill-pipeline-journey-copy {
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-  }
-
   @keyframes bill-pipeline-pulse {
     0%,
     100% {
@@ -215,6 +204,15 @@
   }
 
   @media (max-width: 479px) {
+    .bill-pipeline-journey-step {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 0.15rem;
+    }
+
+    .bill-pipeline-journey-copy {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
     .bill-pipeline-steps {
       flex-direction: column;
       flex-wrap: nowrap;
