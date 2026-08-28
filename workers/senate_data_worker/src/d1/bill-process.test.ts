@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { persistBillProcess, selectProcessQueueBatch } from "./bill-process";
+import { persistBillFloorEvents, persistBillProcess, selectProcessQueueBatch } from "./bill-process";
 import { resetSchemaFlag } from "./schema";
 
 function createMockDb(options?: {
@@ -37,6 +37,25 @@ describe("persistBillProcess", () => {
   it("does not wipe stored events when a hydrate returns an empty list", async () => {
     const { db, prepare, batch } = createMockDb();
     await persistBillProcess(db, {
+      congress: 119,
+      billType: "HR",
+      billNumber: 7008,
+      events: [],
+    });
+
+    expect(batch).not.toHaveBeenCalled();
+    expect(prepare).not.toHaveBeenCalled();
+  });
+});
+
+describe("persistBillFloorEvents", () => {
+  beforeEach(() => {
+    resetSchemaFlag();
+  });
+
+  it("does not wipe stored floor events when a hydrate returns an empty list", async () => {
+    const { db, prepare, batch } = createMockDb();
+    await persistBillFloorEvents(db, {
       congress: 119,
       billType: "HR",
       billNumber: 7008,

@@ -91,8 +91,8 @@
   }
 
   .bill-pipeline-label {
-    font-size: 0.6875rem;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     line-height: 1.3;
     color: hsl(var(--twc-foreground));
     overflow-wrap: anywhere;
@@ -112,7 +112,7 @@
   }
 
   .bill-pipeline-date {
-    font-size: 0.625rem;
+    font-size: 12px;
     line-height: 1.3;
     color: hsl(var(--twc-secondary));
     font-variant-numeric: tabular-nums;
@@ -120,46 +120,88 @@
 
   .bill-pipeline-detail {
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: 13px;
     line-height: 1.4;
     color: hsl(var(--twc-law));
     font-weight: 500;
   }
 
-  .bill-pipeline-process {
-    display: grid;
-    gap: 0.4rem;
-  }
-
   .bill-pipeline-process-status {
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: 13px;
     line-height: 1.4;
     color: hsl(var(--twc-secondary));
   }
 
-  .bill-pipeline-process-steps {
+  .bill-pipeline-journey {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .bill-pipeline-journey-list {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    gap: 0.25rem;
+    gap: 0;
+    border-top: 1px solid hsl(var(--twc-border));
   }
 
-  .bill-pipeline-process-step {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.25rem 0.75rem;
-    font-size: 0.75rem;
-    line-height: 1.35;
+  .bill-pipeline-journey-step {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    column-gap: 0.75rem;
+    align-items: start;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid hsl(var(--twc-border));
+  }
+
+  .bill-pipeline-journey-kind {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: hsl(var(--twc-faint));
+    padding-top: 0.05rem;
+  }
+
+  .bill-pipeline-journey-copy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .bill-pipeline-journey-label {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.4;
     color: hsl(var(--twc-foreground));
+    overflow-wrap: anywhere;
   }
 
-  .bill-pipeline-process-step time {
+  .bill-pipeline-journey-step--failed .bill-pipeline-journey-label {
+    color: hsl(var(--twc-fail));
+  }
+
+  .bill-pipeline-journey-date {
+    font-size: 12px;
+    line-height: 1.4;
     color: hsl(var(--twc-secondary));
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 479px) {
+    .bill-pipeline-journey-step {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 0.15rem;
+    }
+
+    .bill-pipeline-journey-copy {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
   }
 
   @keyframes bill-pipeline-pulse {

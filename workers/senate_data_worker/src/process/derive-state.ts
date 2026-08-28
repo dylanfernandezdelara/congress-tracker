@@ -1,4 +1,4 @@
-import type { BillProcessSummary, BillProcessStage } from "../../../../shared/bill-process-api-types";
+import type { BillProcessSummary, BillProcessStage, BillFloorAction } from "../../../../shared/bill-process-api-types";
 import type { FeedChamber } from "../../../../shared/feed-api-types";
 import {
   formatClearedLabel,
@@ -7,7 +7,7 @@ import {
   formatWaitingLabel,
   type BillProcessCurrentStatus,
 } from "../../../../shared/bill-process-labels";
-import type { ProcessCommitteeEvent } from "./types";
+import type { ProcessCommitteeEvent, ProcessFloorEvent } from "./types";
 
 function dateOnly(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -127,16 +127,30 @@ export function deriveProcessState(
   return { current_status, current_label, stages };
 }
 
+export function floorEventsToActions(events: ProcessFloorEvent[]): BillFloorAction[] {
+  const sorted = [...events].sort((a, b) => a.actionAt.localeCompare(b.actionAt));
+  return sorted.map((e) => ({
+    date: dateOnly(e.actionAt),
+    key: e.actionKey,
+    label: e.label,
+    chamber: e.chamber,
+    tally_text: e.tallyText,
+  }));
+}
+
 export function toProcessSummary(
   billType: string,
   events: ProcessCommitteeEvent[],
-  nameByCode?: Map<string, string>
+  nameByCode?: Map<string, string>,
+  floorEvents: ProcessFloorEvent[] = []
 ): BillProcessSummary | null {
-  if (events.length === 0) return null;
+  if (events.length === 0 && floorEvents.length === 0) return null;
   const derived = deriveProcessState(billType, events, nameByCode);
+  const floor_actions = floorEventsToActions(floorEvents);
   return {
     current_status: derived.current_status,
     current_label: derived.current_label,
     stages: derived.stages,
+    ...(floor_actions.length > 0 ? { floor_actions } : {}),
   };
 }

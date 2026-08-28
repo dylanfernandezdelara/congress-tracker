@@ -5,6 +5,7 @@ export interface CongressAction {
   actionDate?: string | null;
   text?: string | null;
   type?: string | null;
+  sourceSystem?: { name?: string | null; code?: number | null } | null;
   committees?: Array<{ name?: string | null; systemCode?: string | null }> | null;
 }
 

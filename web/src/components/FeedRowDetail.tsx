@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { FeedItem } from '../api/types'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
+import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
@@ -74,7 +75,12 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 
-      <BillPipeline stages={stages} detail={pipelineDetail} process={item.process} />
+      <BillPipeline
+        stages={stages}
+        detail={pipelineDetail}
+        process={item.process}
+        journey={buildBillJourney(item)}
+      />
 
       {isProcedural ? (
         <div className="feed-row-detail-chips">
