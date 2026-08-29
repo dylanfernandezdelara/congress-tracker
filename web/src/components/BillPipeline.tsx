@@ -28,6 +28,8 @@ export function BillPipeline({
 
   const processStatus = statusLabel?.trim() || null
   const chapters = groupJourneyChapters(journey)
+  const showStatus =
+    Boolean(processStatus) && !journey.some((event) => event.kind === 'passage_vote')
 
   return (
     <div className="bill-pipeline">
@@ -60,7 +62,7 @@ export function BillPipeline({
         <section className="bill-pipeline-path">
           <header className="bill-pipeline-path-head">
             <h3 className="feed-row-detail-heading">Path through Congress</h3>
-            {processStatus ? (
+            {showStatus ? (
               <p className="bill-pipeline-process-status">{processStatus}</p>
             ) : null}
           </header>

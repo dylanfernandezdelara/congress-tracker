@@ -140,8 +140,20 @@ function canMerge(pending: BillJourneyEvent[], next: BillJourneyEvent): boolean 
   return !isCommittee(first) && !isCommittee(next)
 }
 
+function finishCommitteeRun(events: BillJourneyEvent[]): JourneyRun {
+  const parentAdvanced = events.some(
+    (event) => !event.is_subcommittee && event.activity_key === 'advanced',
+  )
+  const kept = parentAdvanced
+    ? events.filter((event) => !(event.is_subcommittee && event.activity_key === 'advanced'))
+    : events
+  return toRun(kept, committeeSubject(events), kept.map(committeeBeat))
+}
+
 function finishRun(pending: BillJourneyEvent[]): JourneyRun {
-  return isCommittee(pending[0]!) ? toRun(pending, committeeSubject(pending), pending.map(committeeBeat)) : toRun(pending, null, pending.map(floorBeat))
+  return isCommittee(pending[0]!)
+    ? finishCommitteeRun(pending)
+    : toRun(pending, null, pending.map(floorBeat))
 }
 
 /**

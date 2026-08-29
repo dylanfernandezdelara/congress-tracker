@@ -75,6 +75,17 @@ describe('groupJourneyChapters', () => {
               },
               {
                 date: '2026-03-15',
+                label: 'Committee advanced the bill from Energy and Commerce Committee → Health Subcommittee',
+                activity_key: 'advanced',
+                chamber: 'House',
+                committee_name: 'Health Subcommittee',
+                system_code: 'hsif14',
+                parent_system_code: 'hsif00',
+                is_subcommittee: true,
+                tally_text: null,
+              },
+              {
+                date: '2026-03-15',
                 label: 'Committee advanced the bill from Energy and Commerce Committee (47-0)',
                 activity_key: 'advanced',
                 chamber: 'House',
