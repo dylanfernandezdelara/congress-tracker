@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
-import { buildBillJourney, journeyKindLabel } from './billJourney'
+import { buildBillJourney } from './billJourney'
 
 describe('buildBillJourney', () => {
   it('interleaves committee, floor, companion, and passage without repeating stepper milestones', () => {
@@ -239,13 +239,5 @@ describe('buildBillJourney', () => {
     const passage = events.find((e) => e.kind === 'passage_vote')
     expect(passage?.state).toBe('failed')
     expect(passage?.label).toBe('Failed in the House 198–230')
-  })
-})
-
-describe('journeyKindLabel', () => {
-  it('names committee and floor kinds for the timeline rail', () => {
-    expect(journeyKindLabel('committee')).toBe('Committee')
-    expect(journeyKindLabel('passage_vote')).toBe('Passage')
-    expect(journeyKindLabel('cloture')).toBe('Cloture')
   })
 })

@@ -68,7 +68,7 @@ export function BillPipeline({
           </header>
           <ol className="bill-pipeline-path-chapters" aria-label="Path through Congress">
             {chapters.map((chapter) => (
-              <li key={chapter.id} className="bill-pipeline-path-chapter">
+              <li key={chapter.key} className="bill-pipeline-path-chapter">
                 <h4 className="bill-pipeline-path-chamber">{journeyChapterLabel(chapter.id)}</h4>
                 <ol className="bill-pipeline-path-runs">
                   {chapter.runs.map((run) => {

@@ -175,28 +175,3 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
   rows.sort(eventSort)
   return rows.map(({ sort: _sort, ...event }) => event)
 }
-
-export function journeyKindLabel(kind: BillJourneyKind): string {
-  switch (kind) {
-    case 'committee':
-      return 'Committee'
-    case 'received':
-      return 'Received'
-    case 'calendar':
-      return 'Calendar'
-    case 'considered':
-      return 'Floor'
-    case 'cloture':
-      return 'Cloture'
-    case 'conference':
-      return 'Conference'
-    case 'companion_vote':
-      return 'Floor vote'
-    case 'passage_vote':
-      return 'Passage'
-    default: {
-      const _exhaustive: never = kind
-      return _exhaustive
-    }
-  }
-}

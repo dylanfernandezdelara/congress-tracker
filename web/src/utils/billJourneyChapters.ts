@@ -20,6 +20,8 @@ export interface JourneyRun {
 
 export interface JourneyChapter {
   id: JourneyChapterId
+  /** Unique even when the same chamber appears twice (House → Senate → House). */
+  key: string
   runs: JourneyRun[]
 }
 
@@ -180,7 +182,7 @@ export function groupJourneyChapters(events: BillJourneyEvent[]): JourneyChapter
     const current = chapters[chapters.length - 1]
     if (!current || current.id !== id) {
       flushPending()
-      chapters.push({ id, runs: [] })
+      chapters.push({ id, key: `${id}-${chapters.length}`, runs: [] })
     } else if (pending.length > 0 && !canMerge(pending, event)) {
       flushPending()
     }

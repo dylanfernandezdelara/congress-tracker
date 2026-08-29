@@ -158,4 +158,48 @@ describe('groupJourneyChapters', () => {
     expect(beat?.text).toBe('Failed 198–230')
     expect(beat?.failed).toBe(true)
   })
+
+  it('gives a second House visit its own chapter key', () => {
+    const chapters = groupJourneyChapters([
+      {
+        id: 'h1',
+        date: '2026-01-10',
+        kind: 'committee',
+        label: 'Sent to Energy and Commerce',
+        chamber: 'House',
+        state: 'done',
+        tally: null,
+        activity_key: 'sent',
+        committee_name: 'Energy and Commerce Committee',
+        system_code: 'hsif00',
+        parent_system_code: null,
+        is_subcommittee: false,
+      },
+      {
+        id: 's1',
+        date: '2026-02-01',
+        kind: 'received',
+        label: 'Received in the Senate',
+        chamber: 'Senate',
+        state: 'done',
+        tally: null,
+      },
+      {
+        id: 'h2',
+        date: '2026-03-01',
+        kind: 'committee',
+        label: 'Sent to Energy and Commerce',
+        chamber: 'House',
+        state: 'done',
+        tally: null,
+        activity_key: 'sent',
+        committee_name: 'Energy and Commerce Committee',
+        system_code: 'hsif00',
+        parent_system_code: null,
+        is_subcommittee: false,
+      },
+    ])
+    expect(chapters.map((chapter) => chapter.id)).toEqual(['House', 'Senate', 'House'])
+    expect(chapters.map((chapter) => chapter.key)).toEqual(['House-0', 'Senate-1', 'House-2'])
+  })
 })
