@@ -2,7 +2,7 @@
   /* Bill lifecycle pipeline stepper */
   .bill-pipeline {
     display: grid;
-    gap: 0.5rem;
+    gap: 1rem;
   }
 
   .bill-pipeline-steps {
@@ -128,9 +128,10 @@
 
   .bill-pipeline-process-status {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
+    font-weight: 400;
     line-height: 1.4;
-    color: hsl(var(--twc-secondary));
+    color: hsl(var(--twc-faint));
   }
 
   .bill-pipeline-journey {
@@ -138,29 +139,56 @@
     gap: 0.5rem;
   }
 
+  .bill-pipeline-steps + .bill-pipeline-journey {
+    padding-top: 1rem;
+    border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  .bill-pipeline-journey-head {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .bill-pipeline-journey-head .feed-row-detail-heading {
+    margin: 0;
+  }
+
   .bill-pipeline-journey-list {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 0 0 0 0.75rem;
     display: grid;
     gap: 0;
-    border-top: 1px solid hsl(var(--twc-border));
+    border-left: 1px solid hsl(var(--twc-border));
   }
 
   .bill-pipeline-journey-step {
     display: grid;
-    grid-template-columns: 5.5rem minmax(0, 1fr);
+    grid-template-columns: 4.75rem minmax(0, 1fr);
     column-gap: 0.75rem;
     align-items: start;
-    padding: 0.45rem 0;
-    border-bottom: 1px solid hsl(var(--twc-border));
+    padding: 0.28rem 0;
+  }
+
+  .bill-pipeline-journey-step--kind-start {
+    padding-top: 0.55rem;
+  }
+
+  .bill-pipeline-journey-step--kind-start:first-child {
+    padding-top: 0;
+  }
+
+  .bill-pipeline-journey-step--kind-start:not(:first-child) {
+    margin-top: 0.15rem;
+    border-top: 1px solid hsl(var(--twc-border));
+    padding-top: 0.55rem;
   }
 
   .bill-pipeline-journey-kind {
     font-size: 12px;
     font-weight: 500;
     line-height: 1.4;
-    color: hsl(var(--twc-faint));
+    color: hsl(var(--twc-secondary));
     padding-top: 0.05rem;
   }
 
@@ -207,6 +235,10 @@
     .bill-pipeline-journey-step {
       grid-template-columns: minmax(0, 1fr);
       row-gap: 0.15rem;
+    }
+
+    .bill-pipeline-journey-kind:empty {
+      display: none;
     }
 
     .bill-pipeline-journey-copy {

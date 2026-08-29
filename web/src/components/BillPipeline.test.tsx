@@ -72,7 +72,7 @@ describe('BillPipeline', () => {
   })
 
   it('lists the chronological path through Congress', () => {
-    render(
+    const { container } = render(
       <BillPipeline
         stages={stages}
         statusLabel="In House Administration · waiting for the committee to act"
@@ -119,5 +119,14 @@ describe('BillPipeline', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Received in the Senate')).toBeInTheDocument()
     expect(screen.getByText('Received')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Path through Congress' })).toBeInTheDocument()
+    expect(screen.getAllByText('Committee')).toHaveLength(1)
+
+    const journeySteps = container.querySelectorAll('.bill-pipeline-journey-step')
+    expect(journeySteps).toHaveLength(3)
+    expect(container.querySelectorAll('.bill-pipeline-journey-step--kind-start')).toHaveLength(2)
+    expect(journeySteps[0]).toHaveClass('bill-pipeline-journey-step--kind-start')
+    expect(journeySteps[1]).not.toHaveClass('bill-pipeline-journey-step--kind-start')
+    expect(journeySteps[2]).toHaveClass('bill-pipeline-journey-step--kind-start')
   })
 })

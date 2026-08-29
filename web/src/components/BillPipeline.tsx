@@ -57,17 +57,28 @@ export function BillPipeline({
       ) : null}
 
       {showJourney ? (
-        <div className="bill-pipeline-journey">
-          {processStatus ? <p className="bill-pipeline-process-status">{processStatus}</p> : null}
+        <section className="bill-pipeline-journey">
+          <header className="bill-pipeline-journey-head">
+            <h3 className="feed-row-detail-heading">Path through Congress</h3>
+            {processStatus ? (
+              <p className="bill-pipeline-process-status">{processStatus}</p>
+            ) : null}
+          </header>
           <ol className="bill-pipeline-journey-list" aria-label="Path through Congress">
-            {journey.map((step) => {
+            {journey.map((step, index) => {
+              const prev = index > 0 ? journey[index - 1] : undefined
+              const kindStart = !prev || prev.kind !== step.kind
               const dateLabel = step.date ? stageDateLabel(step.date) : null
               return (
                 <li
                   key={step.id}
-                  className={`bill-pipeline-journey-step bill-pipeline-journey-step--${step.state}`}
+                  className={`bill-pipeline-journey-step bill-pipeline-journey-step--${step.state}${
+                    kindStart ? ' bill-pipeline-journey-step--kind-start' : ''
+                  }`}
                 >
-                  <span className="bill-pipeline-journey-kind">{journeyKindLabel(step.kind)}</span>
+                  <span className="bill-pipeline-journey-kind">
+                    {kindStart ? journeyKindLabel(step.kind) : null}
+                  </span>
                   <span className="bill-pipeline-journey-copy">
                     <span className="bill-pipeline-journey-label">{step.label}</span>
                     {dateLabel && step.date ? (
@@ -80,7 +91,7 @@ export function BillPipeline({
               )
             })}
           </ol>
-        </div>
+        </section>
       ) : null}
 
       {detail ? <p className="bill-pipeline-detail">{detail}</p> : null}
