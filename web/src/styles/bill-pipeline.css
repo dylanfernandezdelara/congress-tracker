@@ -134,73 +134,66 @@
     color: hsl(var(--twc-faint));
   }
 
-  .bill-pipeline-journey {
+  .bill-pipeline-path {
     display: grid;
     gap: 0.5rem;
   }
 
-  .bill-pipeline-steps + .bill-pipeline-journey {
+  .bill-pipeline-steps + .bill-pipeline-path {
     padding-top: 1rem;
     border-top: 1px solid hsl(var(--twc-border));
   }
 
-  .bill-pipeline-journey-head {
+  .bill-pipeline-path-head {
     display: grid;
     gap: 0.15rem;
   }
 
-  .bill-pipeline-journey-head .feed-row-detail-heading {
+  .bill-pipeline-path-head .feed-row-detail-heading {
     margin: 0;
   }
 
-  .bill-pipeline-journey-list {
+  .bill-pipeline-path-chapters,
+  .bill-pipeline-path-runs {
     list-style: none;
     margin: 0;
-    padding: 0 0 0 0.75rem;
+    padding: 0;
     display: grid;
-    gap: 0;
-    border-left: 1px solid hsl(var(--twc-border));
   }
 
-  .bill-pipeline-journey-step {
+  .bill-pipeline-path-chapters {
+    gap: 0.85rem;
+  }
+
+  .bill-pipeline-path-chapter {
     display: grid;
-    grid-template-columns: 4.75rem minmax(0, 1fr);
-    column-gap: 0.75rem;
-    align-items: start;
-    padding: 0.28rem 0;
+    gap: 0.28rem;
   }
 
-  .bill-pipeline-journey-step--kind-start {
-    padding-top: 0.55rem;
-  }
-
-  .bill-pipeline-journey-step--kind-start:first-child {
-    padding-top: 0;
-  }
-
-  .bill-pipeline-journey-step--kind-start:not(:first-child) {
-    margin-top: 0.15rem;
-    border-top: 1px solid hsl(var(--twc-border));
-    padding-top: 0.55rem;
-  }
-
-  .bill-pipeline-journey-kind {
+  .bill-pipeline-path-chamber {
+    margin: 0;
     font-size: 12px;
     font-weight: 500;
     line-height: 1.4;
-    color: hsl(var(--twc-secondary));
-    padding-top: 0.05rem;
+    color: hsl(var(--twc-faint));
   }
 
-  .bill-pipeline-journey-copy {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 0.75rem;
-    align-items: start;
+  .bill-pipeline-path-runs {
+    gap: 0.2rem;
+  }
+
+  .bill-pipeline-path-run {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.1rem 0.75rem;
+  }
+
+  .bill-pipeline-path-copy {
+    margin: 0;
     min-width: 0;
-  }
-
-  .bill-pipeline-journey-label {
+    flex: 1 1 12rem;
     font-size: 13px;
     font-weight: 400;
     line-height: 1.4;
@@ -208,16 +201,23 @@
     overflow-wrap: anywhere;
   }
 
-  .bill-pipeline-journey-step--failed .bill-pipeline-journey-label {
+  .bill-pipeline-path-subject {
+    font-weight: 500;
+  }
+
+  .bill-pipeline-path-dot {
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-pipeline-path-beat--failed {
     color: hsl(var(--twc-fail));
   }
 
-  .bill-pipeline-journey-date {
+  .bill-pipeline-path-date {
     font-size: 12px;
     line-height: 1.4;
     color: hsl(var(--twc-secondary));
     font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
     white-space: nowrap;
   }
 
@@ -228,26 +228,6 @@
     }
     50% {
       box-shadow: 0 0 0 4px hsl(var(--twc-law) / 0.28);
-    }
-  }
-
-  @media (max-width: 639px) {
-    .bill-pipeline-journey-list {
-      padding-left: 0.5rem;
-    }
-
-    .bill-pipeline-journey-step {
-      grid-template-columns: minmax(0, 1fr);
-      row-gap: 0.1rem;
-    }
-
-    .bill-pipeline-journey-kind:empty {
-      display: none;
-    }
-
-    .bill-pipeline-journey-copy {
-      grid-template-columns: minmax(0, 1fr) auto;
-      column-gap: 0.5rem;
     }
   }
 

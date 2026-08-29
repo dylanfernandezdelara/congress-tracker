@@ -14,6 +14,12 @@ export interface BillJourneyEvent {
   chamber: FeedChamber | null
   state: BillJourneyState
   tally: string | null
+  activity_key?: BillProcessActivityKey
+  committee_name?: string
+  system_code?: string
+  parent_system_code?: string | null
+  is_subcommittee?: boolean
+  question?: string
 }
 
 const ORIGIN_COMMITTEE_SORT: Record<BillProcessActivityKey, number> = {
@@ -113,6 +119,11 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       chamber: stage.chamber,
       state: 'done',
       tally: stage.tally_text,
+      activity_key: stage.activity_key,
+      committee_name: stage.committee_name,
+      system_code: stage.system_code,
+      parent_system_code: stage.parent_system_code,
+      is_subcommittee: stage.is_subcommittee,
       sort: committeeSort(origin, stage.chamber, stage.activity_key),
     })
   }
@@ -143,6 +154,7 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       chamber: vote.chamber,
       state: voteIndicatesFailure(vote.result) ? 'failed' : 'done',
       tally: voteTally(vote),
+      question: vote.question,
       sort: KIND_SORT[kind],
     })
   }

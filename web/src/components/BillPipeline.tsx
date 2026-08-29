@@ -1,7 +1,7 @@
 import type { BillLifecycleStage } from '../utils/billLifecycleStages'
 import type { BillJourneyEvent } from '../utils/billJourney'
-import { journeyKindLabel } from '../utils/billJourney'
-import { formatVoteDate } from '../utils/billLabels'
+import { groupJourneyChapters, journeyChapterLabel } from '../utils/billJourneyChapters'
+import { formatDateRange, formatVoteDate } from '../utils/billLabels'
 
 type BillPipelineProps = {
   stages: BillLifecycleStage[]
@@ -27,7 +27,7 @@ export function BillPipeline({
   if (stages.length === 0 && journey.length === 0) return null
 
   const processStatus = statusLabel?.trim() || null
-  const showJourney = journey.length > 0
+  const chapters = groupJourneyChapters(journey)
 
   return (
     <div className="bill-pipeline">
@@ -56,40 +56,56 @@ export function BillPipeline({
         </ol>
       ) : null}
 
-      {showJourney ? (
-        <section className="bill-pipeline-journey">
-          <header className="bill-pipeline-journey-head">
+      {chapters.length > 0 ? (
+        <section className="bill-pipeline-path">
+          <header className="bill-pipeline-path-head">
             <h3 className="feed-row-detail-heading">Path through Congress</h3>
             {processStatus ? (
               <p className="bill-pipeline-process-status">{processStatus}</p>
             ) : null}
           </header>
-          <ol className="bill-pipeline-journey-list" aria-label="Path through Congress">
-            {journey.map((step, index) => {
-              const prev = index > 0 ? journey[index - 1] : undefined
-              const kindStart = !prev || prev.kind !== step.kind
-              const dateLabel = step.date ? stageDateLabel(step.date) : null
-              return (
-                <li
-                  key={step.id}
-                  className={`bill-pipeline-journey-step bill-pipeline-journey-step--${step.state}${
-                    kindStart ? ' bill-pipeline-journey-step--kind-start' : ''
-                  }`}
-                >
-                  <span className="bill-pipeline-journey-kind">
-                    {kindStart ? journeyKindLabel(step.kind) : null}
-                  </span>
-                  <span className="bill-pipeline-journey-copy">
-                    <span className="bill-pipeline-journey-label">{step.label}</span>
-                    {dateLabel && step.date ? (
-                      <time className="bill-pipeline-journey-date" dateTime={step.date}>
-                        {dateLabel}
-                      </time>
-                    ) : null}
-                  </span>
-                </li>
-              )
-            })}
+          <ol className="bill-pipeline-path-chapters" aria-label="Path through Congress">
+            {chapters.map((chapter) => (
+              <li key={chapter.id} className="bill-pipeline-path-chapter">
+                <h4 className="bill-pipeline-path-chamber">{journeyChapterLabel(chapter.id)}</h4>
+                <ol className="bill-pipeline-path-runs">
+                  {chapter.runs.map((run) => {
+                    const dateLabel = formatDateRange(run.dateStart, run.dateEnd)
+                    const dateTime = run.dateEnd ?? run.dateStart
+                    return (
+                      <li key={run.id} className="bill-pipeline-path-run">
+                        <p className="bill-pipeline-path-copy">
+                          {run.subject ? (
+                            <span className="bill-pipeline-path-subject">{run.subject}</span>
+                          ) : null}
+                          {run.beats.map((beat, index) => (
+                            <span key={`${run.id}-${index}`}>
+                              {run.subject || index > 0 ? (
+                                <span className="bill-pipeline-path-dot" aria-hidden="true">
+                                  {' · '}
+                                </span>
+                              ) : null}
+                              <span
+                                className={`bill-pipeline-path-beat${
+                                  beat.failed ? ' bill-pipeline-path-beat--failed' : ''
+                                }`}
+                              >
+                                {beat.text}
+                              </span>
+                            </span>
+                          ))}
+                        </p>
+                        {dateLabel && dateTime ? (
+                          <time className="bill-pipeline-path-date" dateTime={dateTime}>
+                            {dateLabel}
+                          </time>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ol>
+              </li>
+            ))}
           </ol>
         </section>
       ) : null}

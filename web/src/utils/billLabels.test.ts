@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatBillDocket,
   formatCoverageDate,
+  formatDateRange,
   formatVoteDate,
   formatWeekdayVoteDate,
 } from './billLabels'
@@ -17,6 +18,15 @@ describe('formatBillDocket', () => {
 describe('formatVoteDate', () => {
   it('formats ISO dates as short month and day', () => {
     expect(formatVoteDate('2026-06-30')).toBe('Jun 30')
+  })
+})
+
+describe('formatDateRange', () => {
+  it('collapses a same-month span and keeps mixed months readable', () => {
+    expect(formatDateRange('2026-08-19', '2026-08-19')).toBe('Aug 19')
+    expect(formatDateRange('2026-08-19', '2026-08-24')).toBe('Aug 19–24')
+    expect(formatDateRange('2026-08-19', '2026-09-02')).toBe('Aug 19 – Sep 2')
+    expect(formatDateRange(null, null)).toBeNull()
   })
 })
 

@@ -71,8 +71,8 @@ describe('BillPipeline', () => {
     expect(screen.getByText('Vetoed')).toBeInTheDocument()
   })
 
-  it('lists the chronological path through Congress', () => {
-    const { container } = render(
+  it('lists the path as chamber chapters with condensed committee work', () => {
+    render(
       <BillPipeline
         stages={stages}
         statusLabel="In House Administration · waiting for the committee to act"
@@ -85,6 +85,11 @@ describe('BillPipeline', () => {
             chamber: 'House',
             state: 'done',
             tally: null,
+            activity_key: 'sent',
+            committee_name: 'House Administration Committee',
+            system_code: 'hsha00',
+            parent_system_code: null,
+            is_subcommittee: false,
           },
           {
             id: 'committee-2',
@@ -94,6 +99,11 @@ describe('BillPipeline', () => {
             chamber: 'House',
             state: 'done',
             tally: null,
+            activity_key: 'hearings',
+            committee_name: 'House Administration Committee',
+            system_code: 'hsha00',
+            parent_system_code: null,
+            is_subcommittee: false,
           },
           {
             id: 'floor-received',
@@ -113,20 +123,13 @@ describe('BillPipeline', () => {
     expect(
       screen.getByText('In House Administration · waiting for the committee to act'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Sent to House Administration')).toBeInTheDocument()
-    expect(
-      screen.getByText('Committee held hearings in House Administration'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Received in the Senate')).toBeInTheDocument()
-    expect(screen.getByText('Received')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Path through Congress' })).toBeInTheDocument()
-    expect(screen.getAllByText('Committee')).toHaveLength(1)
-
-    const journeySteps = container.querySelectorAll('.bill-pipeline-journey-step')
-    expect(journeySteps).toHaveLength(3)
-    expect(container.querySelectorAll('.bill-pipeline-journey-step--kind-start')).toHaveLength(2)
-    expect(journeySteps[0]).toHaveClass('bill-pipeline-journey-step--kind-start')
-    expect(journeySteps[1]).not.toHaveClass('bill-pipeline-journey-step--kind-start')
-    expect(journeySteps[2]).toHaveClass('bill-pipeline-journey-step--kind-start')
+    expect(screen.getByRole('heading', { name: 'House' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Senate' })).toBeInTheDocument()
+    expect(screen.getByText('House Administration')).toBeInTheDocument()
+    expect(screen.getByText('referred')).toBeInTheDocument()
+    expect(screen.getByText('hearings')).toBeInTheDocument()
+    expect(screen.getByText('Received')).toBeInTheDocument()
+    expect(screen.queryByText('Sent to House Administration')).not.toBeInTheDocument()
   })
 })
