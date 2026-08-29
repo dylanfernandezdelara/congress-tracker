@@ -7,6 +7,7 @@
     --feed-date-rail: 4.25rem;
     --feed-date-gap: 0.85rem;
     --feed-row-pad-x: 0.1rem;
+    --feed-detail-pad-x: 0.875rem;
     --feed-content-inset: calc(
       var(--feed-date-rail) + var(--feed-date-gap) + var(--feed-row-pad-x)
     );
@@ -496,7 +497,7 @@
 
   .feed-row-detail-panel {
     border-top: 1px solid hsl(var(--twc-border));
-    padding: 1rem 0.875rem 1rem var(--feed-content-inset);
+    padding: 1rem var(--feed-detail-pad-x) 1rem var(--feed-content-inset);
     animation: feed-row-detail-enter 0.3s var(--motion-ease-out) both;
   }
 
@@ -778,6 +779,13 @@
 
   .feed-list > .feed-row-skeleton:first-child {
     border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  /* Expanded panel has no date rail — don't reserve that column on phones. */
+  @media (max-width: 639px) {
+    .feed-row-detail-panel {
+      padding-left: var(--feed-detail-pad-x);
+    }
   }
 
   @media (max-width: 379px) {
