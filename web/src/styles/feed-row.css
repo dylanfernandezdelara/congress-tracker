@@ -496,7 +496,7 @@
 
   .feed-row-detail-panel {
     border-top: 1px solid hsl(var(--twc-border));
-    padding: 1rem var(--feed-row-pad-x) 1rem var(--feed-content-inset);
+    padding: 1rem 0.875rem 1rem var(--feed-content-inset);
     animation: feed-row-detail-enter 0.3s var(--motion-ease-out) both;
   }
 
