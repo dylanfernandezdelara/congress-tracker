@@ -137,6 +137,7 @@
   .bill-pipeline-journey {
     display: grid;
     gap: 0.5rem;
+    padding-right: 0.75rem;
   }
 
   .bill-pipeline-steps + .bill-pipeline-journey {
