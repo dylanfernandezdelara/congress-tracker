@@ -28,6 +28,11 @@ describe('formatDateRange', () => {
     expect(formatDateRange('2026-08-19', '2026-09-02')).toBe('Aug 19 – Sep 2')
     expect(formatDateRange(null, null)).toBeNull()
   })
+
+  it('keeps the year when a span crosses a calendar year', () => {
+    expect(formatDateRange('2025-08-19', '2026-08-24')).toBe('Aug 19, 2025 – Aug 24, 2026')
+    expect(formatDateRange('2025-01-10', '2026-01-15')).toBe('Jan 10, 2025 – Jan 15, 2026')
+  })
 })
 
 describe('formatCoverageDate', () => {
