@@ -6,6 +6,8 @@ import type { BillJourneyEvent } from './billJourney'
 export type JourneyChapterId = 'House' | 'Senate' | 'Conference' | 'Other'
 
 export interface JourneyBeat {
+  id: string
+  date: string | null
   text: string
   failed: boolean
 }
@@ -26,13 +28,13 @@ export interface JourneyChapter {
 }
 
 const ACTIVITY_BEAT: Record<BillProcessActivityKey, string> = {
-  sent: 'referred',
-  hearings: 'hearings',
-  worked_on: 'markup',
-  advanced: 'advanced',
-  released: 'discharged',
-  interest: 'noted',
-  other: 'update',
+  sent: 'Referred',
+  hearings: 'Hearings',
+  worked_on: 'Markup',
+  advanced: 'Advanced',
+  released: 'Discharged',
+  interest: 'Noted',
+  other: 'Update',
 }
 
 function tallySuffix(tally: string | null | undefined): string {
@@ -69,17 +71,18 @@ function shortBodyName(name: string): string {
 
 function committeeBeat(event: BillJourneyEvent): JourneyBeat {
   const failed = event.state === 'failed'
+  const base = { id: event.id, date: event.date, failed }
   if (event.is_subcommittee && event.committee_name) {
     const short = shortBodyName(event.committee_name)
-    if (event.activity_key === 'sent') return { text: short, failed }
+    if (event.activity_key === 'sent') return { ...base, text: short }
     if (event.activity_key === 'advanced') {
-      return { text: `${short} advanced${tallySuffix(event.tally)}`, failed }
+      return { ...base, text: `${short} Advanced${tallySuffix(event.tally)}` }
     }
   }
   if (event.activity_key) {
-    return { text: `${ACTIVITY_BEAT[event.activity_key]}${tallySuffix(event.tally)}`, failed }
+    return { ...base, text: `${ACTIVITY_BEAT[event.activity_key]}${tallySuffix(event.tally)}` }
   }
-  return { text: event.label, failed }
+  return { ...base, text: event.label }
 }
 
 function committeeSubject(events: BillJourneyEvent[]): string | null {
@@ -92,23 +95,24 @@ function committeeSubject(events: BillJourneyEvent[]): string | null {
 function floorBeat(event: BillJourneyEvent): JourneyBeat {
   const failed = event.state === 'failed'
   const tally = tallySuffix(event.tally)
+  const base = { id: event.id, date: event.date, failed }
   switch (event.kind) {
     case 'calendar':
-      return { text: 'Calendar', failed }
+      return { ...base, text: 'Calendar' }
     case 'considered':
-      return { text: 'Debated', failed }
+      return { ...base, text: 'Debated' }
     case 'cloture':
-      return { text: `Cloture${tally}`, failed }
+      return { ...base, text: `Cloture${tally}` }
     case 'conference':
-      return { text: 'Conference', failed }
+      return { ...base, text: 'Conference' }
     case 'received':
-      return { text: 'Received', failed }
+      return { ...base, text: 'Received' }
     case 'companion_vote':
-      return { text: `${shortVoteQuestion(event.question ?? event.label)}${tally}`, failed }
+      return { ...base, text: `${shortVoteQuestion(event.question ?? event.label)}${tally}` }
     case 'passage_vote':
-      return { text: `${failed ? 'Failed' : 'Passed'}${tally}`, failed }
+      return { ...base, text: `${failed ? 'Failed' : 'Passed'}${tally}` }
     default:
-      return { text: event.label, failed }
+      return { ...base, text: event.label }
   }
 }
 
@@ -135,11 +139,8 @@ function isCommittee(event: BillJourneyEvent): boolean {
 
 function canMerge(pending: BillJourneyEvent[], next: BillJourneyEvent): boolean {
   const first = pending[0]
-  if (!first) return true
-  if (isCommittee(first) && isCommittee(next)) {
-    return committeeFamily(first) === committeeFamily(next)
-  }
-  return !isCommittee(first) && !isCommittee(next)
+  if (!first) return false
+  return isCommittee(first) && isCommittee(next) && committeeFamily(first) === committeeFamily(next)
 }
 
 function finishCommitteeRun(events: BillJourneyEvent[]): JourneyRun {
@@ -160,8 +161,8 @@ function finishRun(pending: BillJourneyEvent[]): JourneyRun {
 
 /**
  * Collapse a chronological event list into chamber chapters.
- * Same-committee work becomes one line of beats; calendar, rule,
- * and passage share a line instead of repeating kind labels.
+ * Same-committee work becomes one collapsible run of beats;
+ * each floor action or vote stays its own step.
  */
 export function groupJourneyChapters(events: BillJourneyEvent[]): JourneyChapter[] {
   const chapters: JourneyChapter[] = []

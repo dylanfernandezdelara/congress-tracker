@@ -71,7 +71,7 @@ describe('BillPipeline', () => {
     expect(screen.getByText('Vetoed')).toBeInTheDocument()
   })
 
-  it('lists the path as chamber chapters with condensed committee work', () => {
+  it('lists the path as chamber chapters with a collapsible committee list', () => {
     render(
       <BillPipeline
         stages={stages}
@@ -127,9 +127,54 @@ describe('BillPipeline', () => {
     expect(screen.getByRole('heading', { name: 'House' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Senate' })).toBeInTheDocument()
     expect(screen.getByText('House Administration')).toBeInTheDocument()
-    expect(screen.getByText('referred')).toBeInTheDocument()
-    expect(screen.getByText('hearings')).toBeInTheDocument()
+    expect(screen.getByText('Referred')).toBeInTheDocument()
+    expect(screen.getByText('Hearings')).toBeInTheDocument()
     expect(screen.getByText('Received')).toBeInTheDocument()
     expect(screen.queryByText('Sent to House Administration')).not.toBeInTheDocument()
+    expect(screen.getByRole('group')).toBeInTheDocument()
+  })
+
+  it('keeps each floor vote on its own path row', () => {
+    render(
+      <BillPipeline
+        stages={stages}
+        journey={[
+          {
+            id: 'floor-calendar',
+            date: '2026-03-20',
+            kind: 'calendar',
+            label: 'Placed on the House calendar',
+            chamber: 'House',
+            state: 'done',
+            tally: null,
+          },
+          {
+            id: 'vote-rule',
+            date: '2026-04-02',
+            kind: 'companion_vote',
+            label: 'On Agreeing to the Resolution',
+            chamber: 'House',
+            state: 'done',
+            tally: '218-210',
+            question: 'On Agreeing to the Resolution',
+          },
+          {
+            id: 'vote-pass',
+            date: '2026-04-02',
+            kind: 'passage_vote',
+            label: 'On Passage',
+            chamber: 'House',
+            state: 'done',
+            tally: '220-213',
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Calendar')).toBeInTheDocument()
+    expect(screen.getByText('Rule 218–210')).toBeInTheDocument()
+    expect(screen.getByText('Passed 220–213')).toBeInTheDocument()
+    expect(document.querySelectorAll('.bill-pipeline-path-run')).toHaveLength(3)
+    expect(document.querySelector('.bill-pipeline-path-fold')).toBeNull()
   })
 })

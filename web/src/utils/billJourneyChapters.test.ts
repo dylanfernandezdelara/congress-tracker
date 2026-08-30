@@ -118,18 +118,18 @@ describe('groupJourneyChapters', () => {
     )
 
     expect(chapters.map((chapter) => chapter.id)).toEqual(['House', 'Senate'])
-    expect(chapters[0]?.runs).toHaveLength(2)
-    expect(chapters[0]?.runs[0]?.subject).toBe('Energy and Commerce')
-    expect(chapters[0]?.runs[0]?.beats.map((beat) => beat.text)).toEqual([
-      'referred',
-      'Health',
-      'hearings',
-      'advanced 47–0',
+    expect(chapters[0]?.runs.map((run) => run.beats.map((beat) => beat.text))).toEqual([
+      ['Referred', 'Health', 'Hearings', 'Advanced 47–0'],
+      ['Calendar'],
+      ['Rule 218–210'],
+      ['Passed 220–213'],
     ])
-    expect(chapters[0]?.runs[1]?.beats.map((beat) => beat.text)).toEqual([
-      'Calendar',
-      'Rule 218–210',
-      'Passed 220–213',
+    expect(chapters[0]?.runs[0]?.subject).toBe('Energy and Commerce')
+    expect(chapters[0]?.runs[0]?.beats.map((beat) => beat.date)).toEqual([
+      '2026-01-10',
+      '2026-01-10',
+      '2026-03-01',
+      '2026-03-15',
     ])
     expect(chapters[1]?.runs[0]?.beats.map((beat) => beat.text)).toEqual(['Received'])
   })
