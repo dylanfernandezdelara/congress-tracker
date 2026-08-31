@@ -63,7 +63,7 @@ echo "  dest   (write only):  ${PREVIEW_DB_NAME} (${PREVIEW_DB_ID})"
 echo "  production is never executed against for writes"
 
 if [[ "${SYNC_PREVIEW_DB_DRY_RUN:-}" == "1" ]]; then
-  echo "DRY RUN: would export ${PROD_DB_NAME} --remote, DROP user tables on ${PREVIEW_DB_NAME} (keeping _cf_KV / sqlite_*), then execute the dump with --env preview --remote --yes."
+  echo "DRY RUN: would export ${PROD_DB_NAME} --remote, DROP user tables on ${PREVIEW_DB_NAME} (keeping _cf_KV / sqlite_*), then import the dump in chunks into ${PREVIEW_DB_NAME} with --env preview (never ${PROD_DB_NAME} writes)."
   exit 0
 fi
 
@@ -127,8 +127,11 @@ else
   wrangler_d1 execute "${PREVIEW_DB_NAME}" --remote --env preview --yes --file "${DROP_FILE}"
 fi
 
-echo "Importing production dump into preview D1..."
-wrangler_d1 execute "${PREVIEW_DB_NAME}" --remote --env preview --yes --file "${DUMP_FILE}"
+echo "Importing production dump into preview D1 in chunks..."
+node "${ROOT_DIR}/scripts/d1-import-sql-chunks.mjs" \
+  --file "${DUMP_FILE}" \
+  --database "${PREVIEW_DB_NAME}" \
+  --env preview
 
 echo "Verifying preview matches production vote recency..."
 PREVIEW_STATS_JSON="$(wrangler_d1 execute "${PREVIEW_DB_NAME}" --remote --env preview --json --yes --command "SELECT COUNT(*) AS votes, MAX(vote_date) AS latest FROM votes;")"

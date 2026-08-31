@@ -4,6 +4,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import {
+  PRODUCTION_D1_NAME,
+  PREVIEW_D1_NAME,
+  chunkStatements,
+  dropOversizedStatements,
+  parseArgs,
+  splitSqlStatements,
+} from './d1-import-sql-chunks.mjs'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const script = path.join(rootDir, 'scripts', 'sync-preview-db.sh')
@@ -52,12 +60,41 @@ test('script refuses to write production and keeps Cloudflare system tables', ()
   const source = fs.readFileSync(script, 'utf8')
   assert.match(source, /d1 export "\$\{PROD_DB_NAME\}"/)
   assert.match(source, /execute "\$\{PREVIEW_DB_NAME\}"/)
+  assert.match(source, /d1-import-sql-chunks\.mjs/)
   assert.match(source, /--env preview/)
   assert.match(source, /DROP TABLE IF EXISTS/)
   assert.match(source, /_cf_KV/)
   assert.match(source, /sqlite_/)
   assert.doesNotMatch(source, /execute "\$\{PROD_DB_NAME\}"/)
   assert.doesNotMatch(source, /CONFIRM_PRODUCTION/)
+})
+
+test('chunk importer splits SQL and refuses production dest', () => {
+  const statements = splitSqlStatements(
+    'PRAGMA defer_foreign_keys=TRUE;\nINSERT INTO "votes" VALUES(1);\nCREATE INDEX idx_x ON votes (vote_date);\n',
+  )
+  assert.equal(statements.length, 3)
+  const chunks = chunkStatements(statements, 2, 10_000)
+  assert.equal(chunks.length, 2)
+  assert.equal(chunks[0].length, 2)
+  assert.equal(chunks[1].length, 1)
+
+  const args = parseArgs([
+    '--file',
+    'dump.sql',
+    '--database',
+    PREVIEW_D1_NAME,
+    '--env',
+    'preview',
+  ])
+  assert.equal(args.database, PREVIEW_D1_NAME)
+  assert.equal(PRODUCTION_D1_NAME, 'congress-tracker')
+
+  const filtered = dropOversizedStatements(
+    ['INSERT INTO votes VALUES (1);', 'x'.repeat(120_000) + ';'],
+    100_000,
+  )
+  assert.deepEqual(filtered, ['INSERT INTO votes VALUES (1);'])
 })
 
 test('script ids match wrangler.toml production vs preview D1', () => {
