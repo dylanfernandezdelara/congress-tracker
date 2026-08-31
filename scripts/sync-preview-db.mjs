@@ -11,7 +11,7 @@
  *   SYNC_PREVIEW_DB_DRY_RUN=1 npm run sync:preview-db
  *   SYNC_PREVIEW_DB_DUMP=/tmp/dump.sql npm run sync:preview-db
  */
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import {
   existsSync,
   mkdtempSync,
@@ -147,13 +147,28 @@ function wranglerEntry() {
   return local
 }
 
+export function isRetryableD1Error(detail) {
+  return /D1_RESET_DO|D1 reset before execute completed|exceeded its CPU|isolate exceeded|timed out|overloaded/i.test(
+    detail,
+  )
+}
+
 function wrangler(args, { json = false } = {}) {
-  const result = execFileSync(process.execPath, [wranglerEntry(), ...args], {
+  const result = spawnSync(process.execPath, [wranglerEntry(), ...args], {
     cwd: workerDir,
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', json ? 'pipe' : 'inherit'],
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
-  return json ? result : ''
+  if (result.stderr) process.stderr.write(result.stderr)
+  if (result.status !== 0) {
+    const err = new Error(
+      result.stderr?.trim() || result.stdout?.trim() || `wrangler exited ${result.status}`,
+    )
+    err.stderr = result.stderr
+    err.stdout = result.stdout
+    throw err
+  }
+  return json ? result.stdout : ''
 }
 
 function executePreview({ file, command, json = false }) {
@@ -191,10 +206,7 @@ function executeChunkWithRetry(file, attempt, total) {
     } catch (err) {
       lastError = err
       const detail = `${err.stderr ?? ''}\n${err.stdout ?? ''}\n${err.message}`
-      const retryable = /D1_RESET_DO|exceeded its CPU|isolate exceeded|timed out|overloaded/i.test(
-        detail,
-      )
-      if (!retryable || tryNum === DEFAULT_RETRIES) throw err
+      if (!isRetryableD1Error(detail) || tryNum === DEFAULT_RETRIES) throw err
       process.stderr.write(`  retry ${tryNum}/${DEFAULT_RETRIES} after ${tryNum}s\n`)
       sleep(tryNum)
     }

@@ -12,6 +12,7 @@ import {
   dumpTableInsertCount,
   dumpVotesLatest,
   filterDumpStatements,
+  isRetryableD1Error,
   parseWorkerD1Config,
   planSync,
   splitSqlStatements,
@@ -65,6 +66,7 @@ test('script execute paths never target production and require preview env', () 
   assert.match(source, /'d1',\s*'execute',\s*PREVIEW_D1_NAME/)
   assert.match(source, /'--env',\s*'preview'/)
   assert.doesNotMatch(source, /startChunk|start-chunk/)
+  assert.match(source, /spawnSync/)
   assert.match(source, /senate_vote_menu_cache_/)
 })
 
@@ -111,6 +113,13 @@ test('filterDumpStatements skips only the senate vote-menu cache row', () => {
     () => filterDumpStatements([`${'INSERT INTO "bill_digests" VALUES(\''}${'y'.repeat(120_000)}');`]),
     /Refusing oversized SQL/,
   )
+})
+
+test('isRetryableD1Error sees D1_RESET_DO on captured stderr', () => {
+  const inheritedOnly = 'Command failed: wrangler.js d1 execute congress-tracker-preview --file chunk.sql'
+  assert.equal(isRetryableD1Error(inheritedOnly), false)
+  assert.equal(isRetryableD1Error(`${inheritedOnly}\n{"D1_RESET_DO":true}`), true)
+  assert.equal(isRetryableD1Error('D1 reset before execute completed!'), true)
 })
 
 test('AGENTS.md does not export production D1 on every preview upload', () => {

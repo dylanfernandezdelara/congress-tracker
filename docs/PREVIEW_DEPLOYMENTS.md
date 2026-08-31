@@ -114,7 +114,8 @@ No GitHub Actions deploy workflow is required.
   so that D1 can lag (or stay empty). When a preview URL needs current votes, run
   `npm run sync:preview-db` (read production, write preview only). Remote export
   briefly makes production D1 unavailable — do not clone on every preview upload;
-  retry a failed import with `SYNC_PREVIEW_DB_DUMP=` to skip a new export.
+  retry a failed import with `SYNC_PREVIEW_DB_DUMP=/tmp/congress-tracker-preview-clone.sql`
+  to skip a new export.
   `npm run seed` fills **local** Miniflare D1 only; it does not update remote
   preview URLs.
 - **Pipeline writes are disabled on preview hostnames** (`/__pipeline/run/*`
