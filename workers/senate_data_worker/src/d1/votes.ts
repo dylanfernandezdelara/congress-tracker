@@ -1,3 +1,4 @@
+import { cleanVoteQuestion } from "../../../../shared/vote-question";
 import { COMPANION_VOTES_PER_BILL } from "../constants";
 import type { Chamber, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
@@ -102,7 +103,7 @@ export async function upsertVote(db: D1Database, vote: PassageVote): Promise<voi
       vote.bill.congress,
       normalizeBillType(vote.bill.type),
       vote.bill.number,
-      vote.question,
+      cleanVoteQuestion(vote.question),
       vote.result,
       vote.yeas,
       vote.nays,
@@ -147,7 +148,7 @@ export async function upsertNonPassageVoteStub(
       stub.bill.congress,
       normalizeBillType(stub.bill.type),
       stub.bill.number,
-      stub.question,
+      cleanVoteQuestion(stub.question),
       stub.result,
       stub.yeas,
       stub.nays,
@@ -289,6 +290,10 @@ export interface VoteRow {
   vote_date: string;
 }
 
+function mapVoteRow(row: VoteRow): VoteRow {
+  return { ...row, question: cleanVoteQuestion(row.question) };
+}
+
 /** Bill + tally metadata for one passage roll call. */
 export interface VoteRollMeta {
   chamber: string;
@@ -341,7 +346,7 @@ export async function getPassageVotesForBill(
     )
     .bind(congress, normalizeBillType(billType), billNumber)
     .all<VoteRow>();
-  return results ?? [];
+  return (results ?? []).map(mapVoteRow);
 }
 
 export type BillLookupKey = {
@@ -411,17 +416,19 @@ export async function getPassageVotesForBills(
     for (const row of results ?? []) {
       const key = billLookupKey(row.bill_congress, row.bill_type, row.bill_number);
       const listForBill = map.get(key) ?? [];
-      listForBill.push({
-        chamber: row.chamber,
-        congress: row.congress,
-        session: row.session,
-        roll_number: row.roll_number,
-        question: row.question,
-        result: row.result,
-        yeas: row.yeas,
-        nays: row.nays,
-        vote_date: row.vote_date,
-      });
+      listForBill.push(
+        mapVoteRow({
+          chamber: row.chamber,
+          congress: row.congress,
+          session: row.session,
+          roll_number: row.roll_number,
+          question: row.question,
+          result: row.result,
+          yeas: row.yeas,
+          nays: row.nays,
+          vote_date: row.vote_date,
+        }),
+      );
       map.set(key, listForBill);
     }
   }
@@ -492,17 +499,19 @@ export async function getCompanionVotesForBills(
       const listForBill = map.get(key) ?? [];
       // Backstop for the SQL cap above; both must move together.
       if (listForBill.length >= COMPANION_VOTES_PER_BILL) continue;
-      listForBill.push({
-        chamber: row.chamber,
-        congress: row.congress,
-        session: row.session,
-        roll_number: row.roll_number,
-        question: row.question,
-        result: row.result,
-        yeas: row.yeas,
-        nays: row.nays,
-        vote_date: row.vote_date,
-      });
+      listForBill.push(
+        mapVoteRow({
+          chamber: row.chamber,
+          congress: row.congress,
+          session: row.session,
+          roll_number: row.roll_number,
+          question: row.question,
+          result: row.result,
+          yeas: row.yeas,
+          nays: row.nays,
+          vote_date: row.vote_date,
+        }),
+      );
       map.set(key, listForBill);
     }
   }

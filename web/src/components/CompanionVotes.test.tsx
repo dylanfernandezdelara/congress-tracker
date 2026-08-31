@@ -25,6 +25,28 @@ describe('CompanionVotes', () => {
     expect(screen.getByText(/Failed · 211–218 · Jul 22/)).toBeInTheDocument()
   })
 
+  it('does not show Senate LIS <measure> markup in the question', () => {
+    render(
+      <CompanionVotes
+        votes={[
+          {
+            ...motionToRecommit,
+            chamber: 'Senate',
+            roll_number: 227,
+            question: 'On the Motion to Table <measure>S.Amdt. 6747</measure>',
+            result: 'Agreed to',
+            yeas: 52,
+            nays: 45,
+            date: '2026-08-08',
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('On the Motion to Table S.Amdt. 6747')).toBeInTheDocument()
+    expect(screen.queryByText(/<measure>/i)).not.toBeInTheDocument()
+  })
+
   it('renders nothing when there are no companion rolls', () => {
     const { container } = render(<CompanionVotes votes={[]} />)
     expect(container).toBeEmptyDOMElement()

@@ -1,5 +1,6 @@
 import type { BillProcessActivityKey } from '@congress-tracker/shared/bill-process-labels'
 import { shortCommitteeName } from '@congress-tracker/shared/bill-process-labels'
+import { cleanVoteQuestion } from '@congress-tracker/shared/vote-question'
 
 import type { BillJourneyEvent } from './billJourney'
 
@@ -63,7 +64,7 @@ function chapterId(event: BillJourneyEvent): JourneyChapterId {
 }
 
 function shortVoteQuestion(question: string): string {
-  const text = question.trim()
+  const text = cleanVoteQuestion(question)
   if (/agreeing to the resolution/i.test(text)) return 'Rule'
   if (/previous question/i.test(text)) return 'Previous question'
   if (/cloture/i.test(text)) return 'Cloture'

@@ -18,6 +18,7 @@ import { SENATE_VOTE_MENU_CACHE_MAX_AGE_MS } from "../constants";
 import { ensureSchema } from "../d1/schema";
 import type { SenateVoteMenuCacheMonitor } from "../../../../shared/ingest-api-types";
 import { buildSenateVoteMenuCacheMonitor } from "../../../../shared/ingest-monitor-status";
+import { cleanVoteQuestion } from "../../../../shared/vote-question";
 import {
   encodeSenateVoteMenuCacheValue,
   isSenateVoteMenuXml,
@@ -46,8 +47,8 @@ function parseMenuVoteFields(
   const voteNumber = Number.parseInt(getTag(block, "vote_number"), 10);
   if (Number.isNaN(voteNumber)) return null;
 
-  const question = getTag(block, "question");
-  const title = getTag(block, "title");
+  const question = cleanVoteQuestion(getTag(block, "question"));
+  const title = cleanVoteQuestion(getTag(block, "title"));
   const yeas = Number.parseInt(getTag(block, "yeas"), 10) || 0;
   const nays = Number.parseInt(getTag(block, "nays"), 10) || 0;
   const tallyBlock = block.match(/<vote_tally>[\s\S]*?<\/vote_tally>/i)?.[0] ?? block;

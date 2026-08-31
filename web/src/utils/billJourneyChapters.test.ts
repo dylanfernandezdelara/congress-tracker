@@ -173,6 +173,31 @@ describe('groupJourneyChapters', () => {
     expect(run?.kind === 'step' && run.beat.failed).toBe(true)
   })
 
+  it('does not leak Senate LIS <measure> tags into companion beats', () => {
+    const chapters = groupJourneyChapters(
+      buildBillJourney(
+        makeFeedItem({
+          companion_votes: [
+            {
+              chamber: 'Senate',
+              congress: 119,
+              session: 2,
+              roll_number: 227,
+              question: 'On the Motion to Table <measure>S.Amdt. 6747</measure>',
+              result: 'Agreed to',
+              yeas: 52,
+              nays: 45,
+              date: '2026-08-08',
+            },
+          ],
+        }),
+      ),
+    )
+    const texts = chapters.flatMap((chapter) => chapter.runs.flatMap(runTexts))
+    expect(texts.some((text) => /<measure>/i.test(text))).toBe(false)
+    expect(texts.some((text) => /S\.Amdt\.\s*6747/.test(text))).toBe(true)
+  })
+
   it('gives a second House visit its own chapter key', () => {
     const chapters = groupJourneyChapters([
       {

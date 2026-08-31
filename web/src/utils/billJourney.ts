@@ -1,5 +1,6 @@
-import { voteIndicatesFailure } from '@congress-tracker/shared/feed-content'
 import type { BillFloorActionKey, BillProcessActivityKey } from '@congress-tracker/shared/bill-process-labels'
+import { voteIndicatesFailure } from '@congress-tracker/shared/feed-content'
+import { cleanVoteQuestion } from '@congress-tracker/shared/vote-question'
 import type { FeedChamber, FeedCompanionVote, FeedItem, FeedPassageVote } from '../api/types'
 
 export type BillJourneyKind = BillFloorActionKey | 'committee' | 'companion_vote' | 'passage_vote'
@@ -75,7 +76,7 @@ function passageLabel(vote: FeedPassageVote): string {
 }
 
 function companionLabel(vote: FeedCompanionVote): string {
-  const question = vote.question.trim() || 'Related floor vote'
+  const question = cleanVoteQuestion(vote.question) || 'Related floor vote'
   return `${vote.chamber} · ${question} · ${vote.result} ${voteTally(vote)}`
 }
 
@@ -154,7 +155,7 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       chamber: vote.chamber,
       state: voteIndicatesFailure(vote.result) ? 'failed' : 'done',
       tally: voteTally(vote),
-      question: vote.question,
+      question: cleanVoteQuestion(vote.question),
       sort: KIND_SORT[kind],
     })
   }
