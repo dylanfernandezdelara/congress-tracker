@@ -93,7 +93,7 @@ function committeeBeat(event: BillJourneyCommitteeEvent): JourneyBeat {
   return { ...base, text: `${ACTIVITY_BEAT[event.activity_key]}${tallySuffix(event.tally)}` }
 }
 
-function committeeSubject(events: BillJourneyEvent[]): string | null {
+function committeeSubject(events: BillJourneyCommitteeEvent[]): string | null {
   const parent = events.find((event) => !event.is_subcommittee && event.committee_name)
   const named = parent ?? events.find((event) => event.committee_name)
   if (!named?.committee_name) return null
@@ -130,7 +130,10 @@ function dateSpan(events: BillJourneyEvent[]): { dateStart: string | null; dateE
   return { dateStart: dates[0] ?? null, dateEnd: dates[dates.length - 1] ?? null }
 }
 
-function toCommitteeRun(events: BillJourneyEvent[], beats: JourneyBeat[]): JourneyCommitteeRun | null {
+function toCommitteeRun(
+  events: BillJourneyCommitteeEvent[],
+  beats: JourneyBeat[],
+): JourneyCommitteeRun | null {
   const kept = beats.filter((beat) => beat.text.trim().length > 0)
   if (kept.length === 0) return null
   const { dateStart, dateEnd } = dateSpan(events)
