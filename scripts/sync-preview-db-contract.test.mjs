@@ -8,21 +8,26 @@ import {
   PRODUCTION_D1_NAME,
   PREVIEW_D1_NAME,
   chunkStatements,
-  dropOversizedStatements,
-  parseArgs,
+  dropUserTablesSql,
+  dumpTableInsertCount,
+  dumpVotesLatest,
+  filterDumpStatements,
+  parseWorkerD1Config,
+  planSync,
   splitSqlStatements,
-} from './d1-import-sql-chunks.mjs'
+} from './sync-preview-db.mjs'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const script = path.join(rootDir, 'scripts', 'sync-preview-db.sh')
+const script = path.join(rootDir, 'scripts', 'sync-preview-db.mjs')
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 const workerToml = fs.readFileSync(
   path.join(rootDir, 'workers', 'senate_data_worker', 'wrangler.toml'),
   'utf8',
 )
+const agents = fs.readFileSync(path.join(rootDir, 'AGENTS.md'), 'utf8')
 
 function dryRun() {
-  return execFileSync('bash', [script], {
+  return execFileSync(process.execPath, [script], {
     cwd: rootDir,
     encoding: 'utf8',
     env: {
@@ -34,14 +39,11 @@ function dryRun() {
   })
 }
 
-test('sync-preview-db script exists and is executable', () => {
-  const stat = fs.statSync(script)
-  assert.ok(stat.isFile())
-  assert.ok((stat.mode & 0o111) !== 0, 'sync-preview-db.sh should be executable')
-})
-
-test('sync:preview-db is wired in package.json', () => {
-  assert.equal(packageJson.scripts['sync:preview-db'], './scripts/sync-preview-db.sh')
+test('sync:preview-db is a single Node entrypoint', () => {
+  assert.equal(packageJson.scripts['sync:preview-db'], 'node scripts/sync-preview-db.mjs')
+  assert.ok(fs.existsSync(script))
+  assert.equal(fs.existsSync(path.join(rootDir, 'scripts', 'sync-preview-db.sh')), false)
+  assert.equal(fs.existsSync(path.join(rootDir, 'scripts', 'd1-import-sql-chunks.mjs')), false)
 })
 
 test('dry run documents export-only production and preview write target', () => {
@@ -53,61 +55,68 @@ test('dry run documents export-only production and preview write target', () => 
   assert.match(out, /production is never executed against for writes/)
   assert.match(out, /DRY RUN/)
   assert.match(out, /--env preview/)
+  assert.match(out, /SYNC_PREVIEW_DB_DUMP/)
   assert.doesNotMatch(out, /d1 execute congress-tracker /)
 })
 
-test('script refuses to write production and keeps Cloudflare system tables', () => {
+test('script execute paths never target production and require preview env', () => {
   const source = fs.readFileSync(script, 'utf8')
-  assert.match(source, /d1 export "\$\{PROD_DB_NAME\}"/)
-  assert.match(source, /execute "\$\{PREVIEW_DB_NAME\}"/)
-  assert.match(source, /d1-import-sql-chunks\.mjs/)
-  assert.match(source, /--env preview/)
-  assert.match(source, /DROP TABLE IF EXISTS/)
-  assert.match(source, /_cf_KV/)
-  assert.match(source, /sqlite_/)
-  assert.doesNotMatch(source, /execute "\$\{PROD_DB_NAME\}"/)
-  assert.doesNotMatch(source, /CONFIRM_PRODUCTION/)
+  assert.match(source, /'d1',\s*'export',\s*PRODUCTION_D1_NAME/)
+  assert.match(source, /'d1',\s*'execute',\s*PREVIEW_D1_NAME/)
+  assert.match(source, /'--env',\s*'preview'/)
+  assert.doesNotMatch(source, /startChunk|start-chunk/)
+  assert.match(source, /senate_vote_menu_cache_/)
 })
 
-test('chunk importer splits SQL and refuses production dest', () => {
+test('planSync ids match wrangler.toml and differ from each other', () => {
+  const cfg = planSync(workerToml)
+  const parsed = parseWorkerD1Config(workerToml)
+  assert.equal(cfg.productionName, PRODUCTION_D1_NAME)
+  assert.equal(cfg.previewName, PREVIEW_D1_NAME)
+  assert.equal(cfg.productionId, parsed.productionId)
+  assert.equal(cfg.previewId, parsed.previewId)
+  assert.notEqual(cfg.productionId, cfg.previewId)
+  const out = dryRun()
+  assert.match(out, new RegExp(cfg.productionId))
+  assert.match(out, new RegExp(cfg.previewId))
+})
+
+test('SQL split, chunk, dump vote stats, and drop SQL keep system tables', () => {
   const statements = splitSqlStatements(
-    'PRAGMA defer_foreign_keys=TRUE;\nINSERT INTO "votes" VALUES(1);\nCREATE INDEX idx_x ON votes (vote_date);\n',
+    'PRAGMA defer_foreign_keys=TRUE;\nINSERT INTO "votes" ("vote_date") VALUES(\'2026-08-08\');\nINSERT INTO "member_votes" VALUES(1);\nCREATE INDEX idx_x ON votes (vote_date);\n',
   )
-  assert.equal(statements.length, 3)
+  assert.equal(statements.length, 4)
+  assert.equal(dumpTableInsertCount(statements, 'votes'), 1)
+  assert.equal(dumpTableInsertCount(statements, 'member_votes'), 1)
+  assert.equal(dumpVotesLatest(statements), '2026-08-08')
   const chunks = chunkStatements(statements, 2, 10_000)
   assert.equal(chunks.length, 2)
-  assert.equal(chunks[0].length, 2)
-  assert.equal(chunks[1].length, 1)
-
-  const args = parseArgs([
-    '--file',
-    'dump.sql',
-    '--database',
-    PREVIEW_D1_NAME,
-    '--env',
-    'preview',
-  ])
-  assert.equal(args.database, PREVIEW_D1_NAME)
-  assert.equal(PRODUCTION_D1_NAME, 'congress-tracker')
-
-  const filtered = dropOversizedStatements(
-    ['INSERT INTO votes VALUES (1);', 'x'.repeat(120_000) + ';'],
-    100_000,
-  )
-  assert.deepEqual(filtered, ['INSERT INTO votes VALUES (1);'])
+  const drop = dropUserTablesSql(['votes', '_cf_KV', 'sqlite_sequence', 'bill_floor_events'])
+  assert.match(drop, /DROP TABLE IF EXISTS "votes"/)
+  assert.match(drop, /DROP TABLE IF EXISTS "bill_floor_events"/)
+  assert.doesNotMatch(drop, /_cf_KV/)
+  assert.doesNotMatch(drop, /sqlite_sequence/)
 })
 
-test('script ids match wrangler.toml production vs preview D1', () => {
-  const out = dryRun()
-  const prodId = workerToml.match(
-    /\[\[d1_databases\]\][\s\S]*?^database_id\s*=\s*"([^"]+)"/m,
-  )?.[1]
-  const previewId = workerToml.match(
-    /\[\[env\.preview\.d1_databases\]\][\s\S]*?^database_id\s*=\s*"([^"]+)"/m,
-  )?.[1]
-  assert.ok(prodId)
-  assert.ok(previewId)
-  assert.notEqual(prodId, previewId)
-  assert.match(out, new RegExp(prodId))
-  assert.match(out, new RegExp(previewId))
+test('filterDumpStatements skips only the senate vote-menu cache row', () => {
+  const menu = `INSERT INTO "pipeline_state" ("key","value_json","updated_at") VALUES('senate_vote_menu_cache_119_2','${'x'.repeat(120_000)}','2026-08-08');`
+  const filtered = filterDumpStatements([
+    'INSERT INTO "votes" VALUES(1);',
+    menu,
+  ])
+  assert.equal(filtered.skippedMenu, 1)
+  assert.deepEqual(filtered.statements, ['INSERT INTO "votes" VALUES(1);'])
+
+  assert.throws(
+    () => filterDumpStatements([`${'INSERT INTO "bill_digests" VALUES(\''}${'y'.repeat(120_000)}');`]),
+    /Refusing oversized SQL/,
+  )
+})
+
+test('AGENTS.md does not export production D1 on every preview upload', () => {
+  const checklist = agents.split('### Cursor Cloud ship checklist')[1].split('### Production deploys')[0]
+  assert.match(checklist, /npm run preview/)
+  assert.doesNotMatch(checklist, /Then `npm run sync:preview-db`/)
+  assert.match(agents, /npm run seed/)
+  assert.match(agents, /sync:preview-db/)
 })
