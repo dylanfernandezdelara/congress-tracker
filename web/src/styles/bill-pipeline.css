@@ -300,7 +300,8 @@
   .bill-pipeline-path-beats {
     gap: 0.2rem;
     margin-top: 0.28rem;
-    padding-left: 1.1rem;
+    /* mark column + gap, then one more step under the committee name */
+    padding-left: 1.85rem;
   }
 
   @keyframes bill-pipeline-pulse {
