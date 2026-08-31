@@ -120,14 +120,17 @@ describe('buildBillJourney', () => {
       'passage_vote',
       'received',
     ])
-    expect(events.find((e) => e.kind === 'committee' && e.tally === '47-0')?.label).toMatch(
-      /Energy and Commerce/,
-    )
-    expect(events.find((e) => e.kind === 'passage_vote')?.label).toBe('Passed the House 220–213')
-    expect(events.find((e) => e.kind === 'received')?.label).toBe('Received in the Senate')
-    expect(events.some((e) => e.label === 'Introduced' || e.label === 'Signed into law')).toBe(
-      false,
-    )
+    expect(events.find((e) => e.kind === 'committee' && e.tally === '47-0')).toMatchObject({
+      activity_key: 'advanced',
+      committee_name: 'Energy and Commerce Committee',
+      chamber: 'House',
+    })
+    expect(events.find((e) => e.kind === 'passage_vote')).toMatchObject({
+      chamber: 'House',
+      state: 'done',
+      tally: '220–213',
+    })
+    expect(events.find((e) => e.kind === 'received')).toMatchObject({ chamber: 'Senate' })
   })
 
   it('puts same-day second-chamber referral after passage and received', () => {
@@ -177,7 +180,11 @@ describe('buildBillJourney', () => {
     )
 
     expect(events.map((e) => e.kind)).toEqual(['passage_vote', 'received', 'committee'])
-    expect(events[2]?.label).toBe('Sent to Finance Committee')
+    expect(events[2]).toMatchObject({
+      kind: 'committee',
+      activity_key: 'sent',
+      committee_name: 'Finance Committee',
+    })
   })
 
   it('drops a floor cloture row when a cloture roll already exists that day', () => {
@@ -215,7 +222,11 @@ describe('buildBillJourney', () => {
 
     const cloture = events.filter((e) => e.kind === 'cloture')
     expect(cloture).toHaveLength(1)
-    expect(cloture[0]?.label).toMatch(/On the Cloture Motion/)
+    expect(cloture[0]).toMatchObject({
+      chamber: 'Senate',
+      state: 'done',
+      tally: '60–37',
+    })
   })
 
   it('marks a failed passage vote', () => {
@@ -237,7 +248,10 @@ describe('buildBillJourney', () => {
       }),
     )
     const passage = events.find((e) => e.kind === 'passage_vote')
-    expect(passage?.state).toBe('failed')
-    expect(passage?.label).toBe('Failed in the House 198–230')
+    expect(passage).toMatchObject({
+      state: 'failed',
+      chamber: 'House',
+      tally: '198–230',
+    })
   })
 })

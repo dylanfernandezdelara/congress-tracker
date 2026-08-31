@@ -2,7 +2,8 @@ import type { BillProcessActivityKey } from '@congress-tracker/shared/bill-proce
 import { shortCommitteeName } from '@congress-tracker/shared/bill-process-labels'
 import { cleanVoteQuestion } from '@congress-tracker/shared/vote-question'
 
-import type { BillJourneyEvent } from './billJourney'
+import { assertNever } from './assertNever'
+import type { BillJourneyCommitteeEvent, BillJourneyEvent } from './billJourney'
 
 export type JourneyChapterId = 'House' | 'Senate' | 'Conference' | 'Other'
 
@@ -53,8 +54,8 @@ function tallySuffix(tally: string | null | undefined): string {
   return ` ${trimmed.replace(/-/g, '–')}`
 }
 
-function committeeFamily(event: BillJourneyEvent): string {
-  return event.parent_system_code ?? event.system_code ?? event.committee_name ?? 'committee'
+function committeeFamily(event: BillJourneyCommitteeEvent): string {
+  return event.parent_system_code ?? event.system_code ?? event.committee_name
 }
 
 function chapterId(event: BillJourneyEvent): JourneyChapterId {
@@ -79,20 +80,17 @@ function shortBodyName(name: string): string {
   return shortCommitteeName(name).replace(/\s+Subcommittee$/i, '').trim() || name
 }
 
-function committeeBeat(event: BillJourneyEvent): JourneyBeat {
+function committeeBeat(event: BillJourneyCommitteeEvent): JourneyBeat {
   const failed = event.state === 'failed'
   const base = { id: event.id, date: event.date, failed }
-  if (event.is_subcommittee && event.committee_name) {
+  if (event.is_subcommittee) {
     const short = shortBodyName(event.committee_name)
     if (event.activity_key === 'sent') return { ...base, text: short }
     if (event.activity_key === 'advanced') {
       return { ...base, text: `Advanced${tallySuffix(event.tally)} (${short})` }
     }
   }
-  if (event.activity_key) {
-    return { ...base, text: `${ACTIVITY_BEAT[event.activity_key]}${tallySuffix(event.tally)}` }
-  }
-  return { ...base, text: event.label }
+  return { ...base, text: `${ACTIVITY_BEAT[event.activity_key]}${tallySuffix(event.tally)}` }
 }
 
 function committeeSubject(events: BillJourneyEvent[]): string | null {
@@ -102,7 +100,7 @@ function committeeSubject(events: BillJourneyEvent[]): string | null {
   return shortCommitteeName(named.committee_name)
 }
 
-function floorBeat(event: BillJourneyEvent): JourneyBeat {
+function floorBeat(event: Exclude<BillJourneyEvent, BillJourneyCommitteeEvent>): JourneyBeat {
   const failed = event.state === 'failed'
   const tally = tallySuffix(event.tally)
   const base = { id: event.id, date: event.date, failed }
@@ -118,11 +116,11 @@ function floorBeat(event: BillJourneyEvent): JourneyBeat {
     case 'received':
       return { ...base, text: 'Received' }
     case 'companion_vote':
-      return { ...base, text: `${shortVoteQuestion(event.question ?? event.label)}${tally}` }
+      return { ...base, text: `${shortVoteQuestion(event.question)}${tally}` }
     case 'passage_vote':
       return { ...base, text: `${failed ? 'Failed' : 'Passed'}${tally}` }
     default:
-      return { ...base, text: event.label }
+      return assertNever(event)
   }
 }
 
@@ -151,7 +149,7 @@ function toStepRun(event: BillJourneyEvent, beat: JourneyBeat): JourneyStepRun |
   return { kind: 'step', id: event.id, beat }
 }
 
-function isCommittee(event: BillJourneyEvent): boolean {
+function isCommittee(event: BillJourneyEvent): event is BillJourneyCommitteeEvent {
   return event.kind === 'committee'
 }
 
@@ -161,7 +159,7 @@ function canMerge(pending: BillJourneyEvent[], next: BillJourneyEvent): boolean 
   return isCommittee(first) && isCommittee(next) && committeeFamily(first) === committeeFamily(next)
 }
 
-function finishCommitteeRun(events: BillJourneyEvent[]): JourneyCommitteeRun | null {
+function finishCommitteeRun(events: BillJourneyCommitteeEvent[]): JourneyCommitteeRun | null {
   const parentAdvanced = events.some(
     (event) => !event.is_subcommittee && event.activity_key === 'advanced',
   )
@@ -174,7 +172,7 @@ function finishCommitteeRun(events: BillJourneyEvent[]): JourneyCommitteeRun | n
 function finishRun(pending: BillJourneyEvent[]): JourneyRun | null {
   const first = pending[0]
   if (!first) return null
-  if (isCommittee(first)) return finishCommitteeRun(pending)
+  if (isCommittee(first)) return finishCommitteeRun(pending.filter(isCommittee))
   return toStepRun(first, floorBeat(first))
 }
 

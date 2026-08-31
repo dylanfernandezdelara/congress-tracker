@@ -7,21 +7,41 @@ export type BillJourneyKind = BillFloorActionKey | 'committee' | 'companion_vote
 
 export type BillJourneyState = 'done' | 'failed'
 
-export interface BillJourneyEvent {
+interface BillJourneyEventBase {
   id: string
   date: string | null
-  kind: BillJourneyKind
-  label: string
   chamber: FeedChamber | null
   state: BillJourneyState
   tally: string | null
-  activity_key?: BillProcessActivityKey
-  committee_name?: string
-  system_code?: string
-  parent_system_code?: string | null
-  is_subcommittee?: boolean
-  question?: string
 }
+
+export interface BillJourneyCommitteeEvent extends BillJourneyEventBase {
+  kind: 'committee'
+  activity_key: BillProcessActivityKey
+  committee_name: string
+  system_code: string
+  parent_system_code: string | null
+  is_subcommittee: boolean
+}
+
+export interface BillJourneyCompanionEvent extends BillJourneyEventBase {
+  kind: 'companion_vote'
+  question: string
+}
+
+export interface BillJourneyFloorEvent extends BillJourneyEventBase {
+  kind: BillFloorActionKey
+}
+
+export interface BillJourneyPassageEvent extends BillJourneyEventBase {
+  kind: 'passage_vote'
+}
+
+export type BillJourneyEvent =
+  | BillJourneyCommitteeEvent
+  | BillJourneyCompanionEvent
+  | BillJourneyFloorEvent
+  | BillJourneyPassageEvent
 
 const ORIGIN_COMMITTEE_SORT: Record<BillProcessActivityKey, number> = {
   sent: 10,
@@ -57,7 +77,10 @@ function dateKey(date: string | null): string {
   return date ?? ''
 }
 
-function eventSort(a: BillJourneyEvent & { sort: number }, b: BillJourneyEvent & { sort: number }): number {
+function eventSort(
+  a: BillJourneyEvent & { sort: number },
+  b: BillJourneyEvent & { sort: number },
+): number {
   const byDate = dateKey(a.date).localeCompare(dateKey(b.date))
   if (byDate !== 0) return byDate
   return a.sort - b.sort
@@ -65,19 +88,6 @@ function eventSort(a: BillJourneyEvent & { sort: number }, b: BillJourneyEvent &
 
 function voteTally(vote: FeedPassageVote | FeedCompanionVote): string {
   return `${vote.yeas}–${vote.nays}`
-}
-
-function passageLabel(vote: FeedPassageVote): string {
-  const tally = voteTally(vote)
-  if (voteIndicatesFailure(vote.result)) {
-    return `Failed in the ${vote.chamber} ${tally}`
-  }
-  return `Passed the ${vote.chamber} ${tally}`
-}
-
-function companionLabel(vote: FeedCompanionVote): string {
-  const question = cleanVoteQuestion(vote.question) || 'Related floor vote'
-  return `${vote.chamber} · ${question} · ${vote.result} ${voteTally(vote)}`
 }
 
 function isClotureQuestion(question: string): boolean {
@@ -97,7 +107,11 @@ function floorCoveredByRoll(
   return votes.some((vote) => matchesQuestion(vote.question) && vote.date === action.date)
 }
 
-function committeeSort(origin: FeedChamber | null, chamber: FeedChamber | null, activity: BillProcessActivityKey): number {
+function committeeSort(
+  origin: FeedChamber | null,
+  chamber: FeedChamber | null,
+  activity: BillProcessActivityKey,
+): number {
   if (origin && chamber && chamber !== origin) return SECOND_CHAMBER_COMMITTEE_SORT
   return ORIGIN_COMMITTEE_SORT[activity] ?? KIND_SORT.committee
 }
@@ -105,7 +119,7 @@ function committeeSort(origin: FeedChamber | null, chamber: FeedChamber | null, 
 /**
  * Granular path under the major-stage map: committee work, floor actions,
  * related rolls, and passage tallies. Introduced / president / law stay on
- * the 5-step stepper.
+ * the 5-step stepper. Visible copy lives in `billJourneyChapters`.
  */
 export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
   const origin = originChamberFromBillType(item.bill.type)
@@ -116,7 +130,6 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       id: `committee-${stage.system_code}-${stage.activity_key}-${stage.date ?? index}`,
       date: stage.date,
       kind: 'committee',
-      label: stage.label,
       chamber: stage.chamber,
       state: 'done',
       tally: stage.tally_text,
@@ -137,7 +150,6 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       id: `floor-${action.key}-${action.date ?? index}-${action.chamber ?? 'none'}`,
       date: action.date,
       kind: action.key,
-      label: action.label,
       chamber: action.chamber,
       state: 'done',
       tally: action.tally_text,
@@ -146,17 +158,28 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
   }
 
   for (const vote of companionVotes) {
-    const kind: BillJourneyKind = isClotureQuestion(vote.question) ? 'cloture' : 'companion_vote'
+    const question = cleanVoteQuestion(vote.question)
+    if (isClotureQuestion(vote.question)) {
+      rows.push({
+        id: `companion-${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`,
+        date: vote.date,
+        kind: 'cloture',
+        chamber: vote.chamber,
+        state: voteIndicatesFailure(vote.result) ? 'failed' : 'done',
+        tally: voteTally(vote),
+        sort: KIND_SORT.cloture,
+      })
+      continue
+    }
     rows.push({
       id: `companion-${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`,
       date: vote.date,
-      kind,
-      label: companionLabel(vote),
+      kind: 'companion_vote',
       chamber: vote.chamber,
       state: voteIndicatesFailure(vote.result) ? 'failed' : 'done',
       tally: voteTally(vote),
-      question: cleanVoteQuestion(vote.question),
-      sort: KIND_SORT[kind],
+      question,
+      sort: KIND_SORT.companion_vote,
     })
   }
 
@@ -165,7 +188,6 @@ export function buildBillJourney(item: FeedItem): BillJourneyEvent[] {
       id: `passage-${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`,
       date: vote.date,
       kind: 'passage_vote',
-      label: passageLabel(vote),
       chamber: vote.chamber,
       state: voteIndicatesFailure(vote.result) ? 'failed' : 'done',
       tally: voteTally(vote),
