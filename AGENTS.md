@@ -46,7 +46,7 @@ Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHu
 1. `npm test`
 2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`
 3. Run thermonuclear review per `.cursor/rules/pr-thermonuclear-review.mdc` (two Grok 4.6 thermos passes in one background launch, then synthesize); fix CRITICAL and WARNING findings; repeat until CLEAR. Never launch thermos on Grok 4.5 (`cursor-grok-4.5-high-fast`).
-4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask)
+4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask). Then `npm run sync:preview-db` so the preview URL serves current production feed data (preview D1 does not receive cron).
 5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
 
 Whenever you change the UI (`web/`), always share the preview URL in your reply so the user can click through and review the visual changes. Each `npm run preview` run prints a new version-specific URL; do not reuse an older link unless you confirm it matches the current build.
@@ -81,7 +81,9 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - Previews never receive production traffic (`versions upload` ≠ `deploy`). Deployed
   previews use the `[env.preview]` D1 database (`congress-tracker-preview`); local
   `wrangler dev` uses `preview_database_id`. Pipeline writes are blocked on preview
-  hostnames.
+  hostnames, and cron does not run there, so the preview DB lags until you copy
+  production into it: `npm run sync:preview-db` (export production, write preview
+  only). All preview URLs share that D1.
 - Full details and safety notes: `docs/PREVIEW_DEPLOYMENTS.md`.
 
 ## API

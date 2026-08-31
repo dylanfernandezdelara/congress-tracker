@@ -121,7 +121,9 @@ restore offline sample spotlights for UI work.
   Cloudflare preview Worker. That version uses the `[env.preview]` D1
   (`congress-tracker-preview`), not production. Cron does not run on preview,
   and pipeline writes are blocked, so the preview DB can lag production or stay
-  empty until seeded. Needs Cloudflare credentials; best run from Cursor Cloud.
+  empty. Copy current production data into it with `npm run sync:preview-db`
+  (does not write production). `npm run seed` is local Miniflare only. Needs
+  Cloudflare credentials; best run from Cursor Cloud.
 
 ## Verifying parity
 
