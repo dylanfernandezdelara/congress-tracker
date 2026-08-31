@@ -110,8 +110,14 @@ No GitHub Actions deploy workflow is required.
   traffic; only `versions deploy` / `wrangler deploy` do.
 - **Preview versions use a separate D1 database** via the `[env.preview]` Wrangler
   environment (`congress-tracker-preview`; uploaded with `--env preview`). Production
-  data is not read or mutated by preview URLs. Preview DB starts empty; run
-  `npm run seed` against the preview D1 binding locally if you need sample data there.
+  is never mutated by preview URLs. Cron and pipeline writes do not run on preview,
+  so that D1 can lag (or stay empty). When a preview URL needs current votes, run
+  `npm run sync:preview-db` (read production, write preview only). Remote export
+  briefly makes production D1 unavailable — do not clone on every preview upload;
+  retry a failed import with `SYNC_PREVIEW_DB_DUMP=/tmp/congress-tracker-preview-clone.sql`
+  to skip a new export.
+  `npm run seed` fills **local** Miniflare D1 only; it does not update remote
+  preview URLs.
 - **Pipeline writes are disabled on preview hostnames** (`/__pipeline/run/*`
   returns `401 preview_pipeline_writes_disabled`), even when a bearer token is
   supplied. Use production or local dev (`DEV_OPEN_PIPELINE=1`) for admin writes.

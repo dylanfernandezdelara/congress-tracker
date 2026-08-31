@@ -4,11 +4,13 @@ import {
 } from "../constants";
 import {
   markProcessHydrated,
+  persistBillFloorEvents,
   persistBillProcess,
   selectProcessQueueBatch,
   type ProcessBillKey,
 } from "../d1/bill-process";
 import { parseCommitteeEvents } from "../process/parse-committee-source";
+import { parseFloorActions } from "../process/parse-floor-actions";
 import type { Env } from "../config";
 import { fetchBillCommitteesSource } from "../sources/congress-client";
 import { HttpResponseError } from "../sources/http";
@@ -59,9 +61,15 @@ export async function hydrateProcessBills(
         committees: source.committees,
         actions: source.actions,
       });
+      const floorEvents = parseFloorActions({
+        congress: bill.congress,
+        billType: bill.billType,
+        billNumber: bill.billNumber,
+        actions: source.actions,
+      });
 
-      if (events.length === 0) {
-        // Park even when actions exist but committees did not parse: otherwise
+      if (events.length === 0 && floorEvents.length === 0) {
+        // Park even when actions exist but nothing classified: otherwise
         // those bills stay last_hydrated_at NULL and starve the backfill budget.
         await markProcessHydrated(env.DB, bill);
         skipped += 1;
@@ -71,12 +79,22 @@ export async function hydrateProcessBills(
           );
         }
       } else {
-        await persistBillProcess(env.DB, {
-          congress: bill.congress,
-          billType: bill.billType,
-          billNumber: bill.billNumber,
-          events,
-        });
+        if (events.length > 0) {
+          await persistBillProcess(env.DB, {
+            congress: bill.congress,
+            billType: bill.billType,
+            billNumber: bill.billNumber,
+            events,
+          });
+        }
+        if (floorEvents.length > 0) {
+          await persistBillFloorEvents(env.DB, {
+            congress: bill.congress,
+            billType: bill.billType,
+            billNumber: bill.billNumber,
+            events: floorEvents,
+          });
+        }
         await markProcessHydrated(env.DB, bill);
         refreshed += 1;
       }

@@ -71,50 +71,138 @@ describe('BillPipeline', () => {
     expect(screen.getByText('Vetoed')).toBeInTheDocument()
   })
 
-  it('lists committee steps under the existing diagram', () => {
+  it('lists the path as chamber chapters with a collapsible committee list', () => {
     render(
       <BillPipeline
         stages={stages}
-        process={{
-          current_status: 'in_committee',
-          current_label: 'In House Administration · waiting for the committee to act',
-          stages: [
-            {
-              date: '2026-01-10',
-              label: 'Sent to House Administration',
-              activity_key: 'sent',
-              chamber: 'House',
-              committee_name: 'House Administration',
-              system_code: 'hsad00',
-              parent_system_code: null,
-              is_subcommittee: false,
-              tally_text: null,
-            },
-            {
-              date: '2026-03-01',
-              label: 'Committee held hearings in House Administration',
-              activity_key: 'hearings',
-              chamber: 'House',
-              committee_name: 'House Administration',
-              system_code: 'hsad00',
-              parent_system_code: null,
-              is_subcommittee: false,
-              tally_text: null,
-            },
-          ],
-        }}
+        statusLabel="In House Administration · waiting for the committee to act"
+        journey={[
+          {
+            id: 'committee-1',
+            date: '2026-01-10',
+            kind: 'committee',
+            chamber: 'House',
+            state: 'done',
+            tally: null,
+            activity_key: 'sent',
+            committee_name: 'House Administration Committee',
+            system_code: 'hsha00',
+            parent_system_code: null,
+            is_subcommittee: false,
+          },
+          {
+            id: 'committee-2',
+            date: '2026-03-01',
+            kind: 'committee',
+            chamber: 'House',
+            state: 'done',
+            tally: null,
+            activity_key: 'hearings',
+            committee_name: 'House Administration Committee',
+            system_code: 'hsha00',
+            parent_system_code: null,
+            is_subcommittee: false,
+          },
+          {
+            id: 'floor-received',
+            date: '2026-03-23',
+            kind: 'received',
+            chamber: 'Senate',
+            state: 'done',
+            tally: null,
+          },
+        ]}
       />,
     )
 
     expect(screen.getByLabelText('Bill lifecycle')).toBeInTheDocument()
-    expect(screen.queryByText('Committee')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Committee steps')).toBeInTheDocument()
+    expect(screen.getByLabelText('Path through Congress')).toBeInTheDocument()
     expect(
       screen.getByText('In House Administration · waiting for the committee to act'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Sent to House Administration')).toBeInTheDocument()
-    expect(
-      screen.getByText('Committee held hearings in House Administration'),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Path through Congress' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'House' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Senate' })).toBeInTheDocument()
+    expect(screen.getByText('House Administration')).toBeInTheDocument()
+    expect(screen.getByText('Referred')).toBeInTheDocument()
+    expect(screen.getByText('Hearings')).toBeInTheDocument()
+    expect(screen.getByText('Jan 10')).toBeInTheDocument()
+    expect(screen.getByText('Mar 1')).toBeInTheDocument()
+    expect(screen.getByText('Received')).toBeInTheDocument()
+    expect(screen.queryByText('Sent to House Administration')).not.toBeInTheDocument()
+    const fold = document.querySelector('.bill-pipeline-path-fold')
+    expect(fold).toBeInTheDocument()
+    expect(fold).toHaveAttribute('open')
+    expect(document.querySelectorAll('.bill-pipeline-path-mark').length).toBeGreaterThan(0)
+  })
+
+  it('folds a one-beat committee instead of a middot line', () => {
+    render(
+      <BillPipeline
+        stages={stages}
+        journey={[
+          {
+            id: 'committee-1',
+            date: '2026-01-10',
+            kind: 'committee',
+            chamber: 'House',
+            state: 'done',
+            tally: null,
+            activity_key: 'sent',
+            committee_name: 'House Administration Committee',
+            system_code: 'hsha00',
+            parent_system_code: null,
+            is_subcommittee: false,
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('House Administration')).toBeInTheDocument()
+    expect(screen.getByText('Referred')).toBeInTheDocument()
+    expect(document.querySelector('.bill-pipeline-path-fold')).toBeInTheDocument()
+    expect(document.querySelector('.bill-pipeline-path-step')).toBeNull()
+    expect(screen.queryByText('House Administration · Referred')).not.toBeInTheDocument()
+  })
+
+  it('keeps each floor vote on its own path row', () => {
+    render(
+      <BillPipeline
+        stages={stages}
+        journey={[
+          {
+            id: 'floor-calendar',
+            date: '2026-03-20',
+            kind: 'calendar',
+            chamber: 'House',
+            state: 'done',
+            tally: null,
+          },
+          {
+            id: 'vote-rule',
+            date: '2026-04-02',
+            kind: 'companion_vote',
+            chamber: 'House',
+            state: 'done',
+            tally: '218-210',
+            question: 'On Agreeing to the Resolution',
+          },
+          {
+            id: 'vote-pass',
+            date: '2026-04-02',
+            kind: 'passage_vote',
+            chamber: 'House',
+            state: 'done',
+            tally: '220-213',
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Calendar')).toBeInTheDocument()
+    expect(screen.getByText('Rule 218–210')).toBeInTheDocument()
+    expect(screen.getByText('Passed 220–213')).toBeInTheDocument()
+    expect(document.querySelectorAll('.bill-pipeline-path-run')).toHaveLength(3)
+    expect(document.querySelector('.bill-pipeline-path-fold')).toBeNull()
   })
 })

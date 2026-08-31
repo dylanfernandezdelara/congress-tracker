@@ -328,4 +328,95 @@ describe('getBillLifecycleStages', () => {
     expect(stages.find((s) => s.key === 'house')?.state).toBe('done')
     expect(stages.find((s) => s.key === 'senate')?.state).toBe('done')
   })
+
+  it('puts Senate before House when the Senate passage is the only chamber vote', () => {
+    const item = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 6500, title: 'Continuing appropriations' },
+      passage_votes: [hr6644Votes[1]!],
+      latest_passage_date: '2026-06-24',
+      lifecycle: makeLifecycle({ introduced_date: '2025-12-09' }),
+    })
+
+    const { stages } = getBillLifecycleStages(item)
+    expect(stages.map((s) => [s.key, s.state, s.date])).toEqual([
+      ['introduced', 'done', '2025-12-09'],
+      ['senate', 'done', '2026-06-24'],
+      ['house', 'current', null],
+      ['to_president', 'pending', null],
+      ['outcome', 'pending', null],
+    ])
+  })
+
+  it('puts Senate before House when the Senate passed first', () => {
+    const item = makeFeedItem({
+      bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
+      passage_votes: [
+        hr6644Votes[1]!,
+        { ...hr6644Votes[0]!, date: '2026-07-01' },
+      ],
+      latest_passage_date: '2026-07-01',
+      lifecycle: makeLifecycle({ introduced_date: '2026-01-03' }),
+    })
+
+    const { stages } = getBillLifecycleStages(item)
+    expect(stages.map((s) => [s.key, s.state, s.date])).toEqual([
+      ['introduced', 'done', '2026-01-03'],
+      ['senate', 'done', '2026-06-24'],
+      ['house', 'done', '2026-07-01'],
+      ['to_president', 'current', null],
+      ['outcome', 'pending', null],
+    ])
+  })
+
+  it('uses origin chamber when neither chamber has acted', () => {
+    const senateBill = makeFeedItem({
+      bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
+      passage_votes: [],
+      latest_passage_date: null,
+      lifecycle: makeLifecycle({ introduced_date: '2026-01-03' }),
+    })
+    const houseBill = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 1, title: 'Sample House Act' },
+      passage_votes: [],
+      latest_passage_date: null,
+      lifecycle: makeLifecycle({ introduced_date: '2026-01-03' }),
+    })
+
+    expect(getBillLifecycleStages(senateBill).stages.map((s) => s.key)).toEqual([
+      'introduced',
+      'senate',
+      'house',
+      'to_president',
+      'outcome',
+    ])
+    expect(getBillLifecycleStages(houseBill).stages.map((s) => s.key)).toEqual([
+      'introduced',
+      'house',
+      'senate',
+      'to_president',
+      'outcome',
+    ])
+    expect(getBillLifecycleStages(senateBill).stages[1]?.state).toBe('current')
+    expect(getBillLifecycleStages(houseBill).stages[1]?.state).toBe('current')
+  })
+
+  it('keeps origin order when both chambers are inferred done without dates', () => {
+    const item = makeFeedItem({
+      bill: { congress: 119, type: 'S', number: 2, title: 'Sample Act' },
+      passage_votes: [],
+      latest_passage_date: null,
+      lifecycle: makeLifecycle({
+        introduced_date: '2026-01-03',
+        presented_date: '2026-06-29',
+      }),
+    })
+
+    expect(getBillLifecycleStages(item).stages.map((s) => [s.key, s.state])).toEqual([
+      ['introduced', 'done'],
+      ['senate', 'done'],
+      ['house', 'done'],
+      ['to_president', 'done'],
+      ['outcome', 'current'],
+    ])
+  })
 })

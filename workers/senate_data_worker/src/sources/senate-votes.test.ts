@@ -109,6 +109,31 @@ describe("parseSenateVoteMenuXml", () => {
     });
   });
 
+  it("unwraps nested <measure> tags in companion questions", () => {
+    const xml = `<vote_summary><congress_year>2026</congress_year><votes>
+      <vote>
+        <vote_number>00227</vote_number>
+        <vote_date>August 08</vote_date>
+        <issue>H.R. 6500</issue>
+        <question>On the Motion to Table <measure>S.Amdt. 6747</measure></question>
+        <title></title>
+        <result>Agreed to</result>
+        <vote_tally><yeas>52</yeas><nays>45</nays></vote_tally>
+      </vote>
+    </votes></vote_summary>`;
+
+    const { nonPassageStubs } = parseSenateVoteMenuXml(
+      xml,
+      119,
+      2,
+      new Date("2026-08-10T00:00:00Z")
+    );
+
+    expect(nonPassageStubs).toHaveLength(1);
+    expect(nonPassageStubs[0]?.question).toBe("On the Motion to Table S.Amdt. 6747");
+    expect(nonPassageStubs[0]?.question).not.toMatch(/<measure>/i);
+  });
+
   it("returns On the Nomination PN rolls as confirmation votes and skips cloture on nominations", () => {
     const { confirmationVotes } = parseSenateVoteMenuXml(
       sample,

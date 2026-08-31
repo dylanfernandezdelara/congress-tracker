@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   activityVerb,
   formatClearedLabel,
+  formatFloorActionLabel,
   formatProcessChipLabel,
   formatProcessStageLabel,
   formatWaitingLabel,
@@ -50,5 +51,21 @@ describe("bill-process-labels", () => {
       "Cleared Financial Services"
     );
     expect(formatProcessChipLabel("introduced", "Energy and Commerce Committee")).toBe(null);
+  });
+
+  it("formats floor-action labels with chamber and tally", () => {
+    expect(formatFloorActionLabel({ key: "received", chamber: "Senate" })).toBe(
+      "Received in the Senate"
+    );
+    expect(formatFloorActionLabel({ key: "calendar", chamber: "House" })).toBe(
+      "Placed on the House calendar"
+    );
+    expect(formatFloorActionLabel({ key: "cloture", chamber: "Senate", tallyText: "60-37" })).toBe(
+      "Cloture in the Senate (60-37)"
+    );
+    expect(formatFloorActionLabel({ key: "conference", chamber: null })).toBe("Conference committee");
+    expect(formatFloorActionLabel({ key: "considered", chamber: "House" })).toBe(
+      "Debated in the House"
+    );
   });
 });

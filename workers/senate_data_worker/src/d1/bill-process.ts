@@ -8,6 +8,7 @@ export {
   getProcessSummariesForBills,
   processMapKey,
 } from "./bill-committee-events";
+export { persistBillFloorEvents, getFloorEventsForBills } from "./bill-floor-events";
 export {
   upsertCommitteeRoster,
   getCommitteeNameMap,

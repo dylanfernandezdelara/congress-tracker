@@ -9,6 +9,14 @@ export type BillProcessActivityKey =
   | "interest"
   | "other";
 
+/** Floor actions that committee activity names do not cover. */
+export type BillFloorActionKey =
+  | "received"
+  | "calendar"
+  | "considered"
+  | "cloture"
+  | "conference";
+
 export type BillProcessCurrentStatus =
   | "introduced"
   | "in_committee"
@@ -78,6 +86,38 @@ export function formatClearedLabel(committeeName: string): string {
 
 export function formatReleasedLabel(committeeName: string): string {
   return `Released from ${committeeName}`;
+}
+
+export function formatFloorActionLabel(params: {
+  key: BillFloorActionKey;
+  chamber: "House" | "Senate" | null;
+  tallyText?: string | null;
+}): string {
+  const chamber = params.chamber;
+  let base: string;
+  switch (params.key) {
+    case "received":
+      base = chamber ? `Received in the ${chamber}` : "Received in the other chamber";
+      break;
+    case "calendar":
+      base = chamber ? `Placed on the ${chamber} calendar` : "Placed on the calendar";
+      break;
+    case "considered":
+      base = chamber ? `Debated in the ${chamber}` : "Debated on the floor";
+      break;
+    case "cloture":
+      base = "Cloture in the Senate";
+      break;
+    case "conference":
+      base = "Conference committee";
+      break;
+    default: {
+      const _exhaustive: never = params.key;
+      return _exhaustive;
+    }
+  }
+  const tally = params.tallyText?.trim();
+  return tally ? `${base} (${tally})` : base;
 }
 
 /**

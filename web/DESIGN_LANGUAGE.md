@@ -50,7 +50,7 @@ Tokens live as `--twc-*` HSL channels in `web/src/styles/base.css`.
 
 - **Feed list** — open timeline on the page background (no outer card); hairline top/bottom dividers between rows (~72–80px collapsed)
 - **Collapsed row** — left date rail · 14px headline · 12px meta line (outcome colored) · 13px teaser; bullets live in expanded detail
-- **Expanded detail** — key points, lifecycle pipeline, vote history, multi-column defectors
+- **Expanded detail** — key points, major-stage map, path through Congress, vote history, multi-column defectors
 - **Federal Control compact** — horizontal seat bars on the home feed sidebar
 
 ## Rules

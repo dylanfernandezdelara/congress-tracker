@@ -114,6 +114,39 @@ describe("upsertNonPassageVoteStub", () => {
     ]);
   });
 
+  it("strips Senate LIS <measure> tags before storing companion questions", async () => {
+    const { db, preparedSql, bindsBySql } = createMockDb([]);
+
+    await upsertNonPassageVoteStub(db, {
+      chamber: "Senate",
+      congress: 119,
+      session: 2,
+      rollNumber: 227,
+      bill: { congress: 119, type: "hr", number: 6500 },
+      question: "On the Motion to Table <measure>S.Amdt. 6747</measure>",
+      result: "Agreed to",
+      yeas: 52,
+      nays: 45,
+      voteDate: "2026-08-08",
+    });
+
+    const insertSql = preparedSql.find((sql) => sql.includes("INSERT INTO votes"))!;
+    expect(bindsBySql.get(insertSql)).toEqual([
+      "Senate",
+      119,
+      2,
+      227,
+      119,
+      "HR",
+      6500,
+      "On the Motion to Table S.Amdt. 6747",
+      "Agreed to",
+      52,
+      45,
+      "2026-08-08",
+    ]);
+  });
+
   it("never overwrites a passage row that shares the roll-call key", async () => {
     const { db, preparedSql } = createMockDb([]);
 
@@ -169,6 +202,36 @@ describe("getCompanionVotesForBills", () => {
     expect(selectSql).toMatch(/ORDER BY vote_date DESC, roll_number DESC/);
     expect(map.get("119:HR:7008")).toEqual([
       expect.objectContaining({ roll_number: 249, question: "On Motion to Recommit" }),
+    ]);
+  });
+
+  it("unwraps stored <measure> tags so existing companion rows are safe to show", async () => {
+    const { db } = createMockDb([
+      {
+        chamber: "Senate",
+        congress: 119,
+        session: 2,
+        roll_number: 227,
+        question: "On the Motion to Table <measure>S.Amdt. 6747</measure>",
+        result: "Agreed to",
+        yeas: 52,
+        nays: 45,
+        vote_date: "2026-08-08",
+        bill_congress: 119,
+        bill_type: "HR",
+        bill_number: 6500,
+      },
+    ]);
+
+    const map = await getCompanionVotesForBills(db, [
+      { congress: 119, billType: "hr", billNumber: 6500 },
+    ]);
+
+    expect(map.get("119:HR:6500")).toEqual([
+      expect.objectContaining({
+        roll_number: 227,
+        question: "On the Motion to Table S.Amdt. 6747",
+      }),
     ]);
   });
 

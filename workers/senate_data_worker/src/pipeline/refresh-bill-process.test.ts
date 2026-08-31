@@ -5,7 +5,9 @@ import { HttpResponseError } from "../sources/http";
 
 const mockFetchSource = vi.fn();
 const mockParse = vi.fn();
+const mockParseFloor = vi.fn();
 const mockPersist = vi.fn();
+const mockPersistFloor = vi.fn();
 const mockMarkHydrated = vi.fn();
 
 vi.mock("../sources/congress-client", () => ({
@@ -16,8 +18,13 @@ vi.mock("../process/parse-committee-source", () => ({
   parseCommitteeEvents: (...args: unknown[]) => mockParse(...args),
 }));
 
+vi.mock("../process/parse-floor-actions", () => ({
+  parseFloorActions: (...args: unknown[]) => mockParseFloor(...args),
+}));
+
 vi.mock("../d1/bill-process", () => ({
   persistBillProcess: (...args: unknown[]) => mockPersist(...args),
+  persistBillFloorEvents: (...args: unknown[]) => mockPersistFloor(...args),
   markProcessHydrated: (...args: unknown[]) => mockMarkHydrated(...args),
   selectProcessQueueBatch: vi.fn(),
 }));
@@ -54,10 +61,14 @@ describe("hydrateProcessBills", () => {
   beforeEach(() => {
     mockFetchSource.mockReset();
     mockParse.mockReset();
+    mockParseFloor.mockReset();
     mockPersist.mockReset();
+    mockPersistFloor.mockReset();
     mockMarkHydrated.mockReset();
     mockPersist.mockResolvedValue(undefined);
+    mockPersistFloor.mockResolvedValue(undefined);
     mockMarkHydrated.mockResolvedValue(undefined);
+    mockParseFloor.mockReturnValue([]);
   });
 
   it("persists and parks the queue when parse yields events", async () => {
@@ -90,19 +101,33 @@ describe("hydrateProcessBills", () => {
     expect(result).toMatchObject({ refreshed: 0, skipped: 1, warnings: [] });
   });
 
-  it("parks bills with no committees even when actions exist", async () => {
+  it("persists floor actions when committees are empty", async () => {
     mockFetchSource.mockResolvedValue({
       committees: [],
       actions: [{ text: "Received in the Senate." }],
       rateLimitRemaining: 500,
     });
     mockParse.mockReturnValue([]);
+    mockParseFloor.mockReturnValue([
+      {
+        congress: 119,
+        billType: "HR",
+        billNumber: 7008,
+        actionKey: "received",
+        actionAt: "2026-03-23T12:00:00.000Z",
+        chamber: "Senate",
+        label: "Received in the Senate",
+        rawText: "Received in the Senate.",
+        tallyText: null,
+      },
+    ]);
 
     const result = await hydrateProcessBills(createEnv(), [bill]);
 
     expect(mockPersist).not.toHaveBeenCalled();
+    expect(mockPersistFloor).toHaveBeenCalledTimes(1);
     expect(mockMarkHydrated).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ refreshed: 0, skipped: 1, warnings: [] });
+    expect(result).toMatchObject({ refreshed: 1, skipped: 0, warnings: [] });
   });
 
   it("parks bills whose committees payload parses to no usable events", async () => {

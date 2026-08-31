@@ -5,6 +5,7 @@ export type { BillDigestContent, BillLifecycle }
 
 export type {
   FeedBill,
+  FeedChamber,
   FeedCompanionVote,
   FeedItem,
   FeedPageResponse,

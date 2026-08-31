@@ -46,7 +46,7 @@ Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHu
 1. `npm test`
 2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`
 3. Run thermonuclear review per `.cursor/rules/pr-thermonuclear-review.mdc` (two Grok 4.6 thermos passes in one background launch, then synthesize); fix CRITICAL and WARNING findings; repeat until CLEAR. Never launch thermos on Grok 4.5 (`cursor-grok-4.5-high-fast`).
-4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask)
+4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask). If that URL’s feed lags production, run `npm run sync:preview-db` once (it exports production D1 and briefly makes live queries unavailable; do not run it on every preview upload).
 5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
 
 Whenever you change the UI (`web/`), always share the preview URL in your reply so the user can click through and review the visual changes. Each `npm run preview` run prints a new version-specific URL; do not reuse an older link unless you confirm it matches the current build.
@@ -81,7 +81,11 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - Previews never receive production traffic (`versions upload` ≠ `deploy`). Deployed
   previews use the `[env.preview]` D1 database (`congress-tracker-preview`); local
   `wrangler dev` uses `preview_database_id`. Pipeline writes are blocked on preview
-  hostnames.
+  hostnames, and cron does not run there, so the preview DB can lag. Copy
+  production into it with `npm run sync:preview-db` when the preview feed is
+  stale (export production, write preview only; remote export stalls production
+  D1 briefly). All preview URLs share that D1. Do not run the clone on every
+  `npm run preview`.
 - Full details and safety notes: `docs/PREVIEW_DEPLOYMENTS.md`.
 
 ## API
@@ -112,10 +116,12 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 **Sidebar data backfill (production):** Daily cron already chains feed then `member-votes`. After
 deploy, still run `session-backfill` (then re-run `member-votes` if needed) against the
 **production** Worker before expecting full-session left-rail member spotlights. Preview
-Workers block admin writes and use a separate empty D1; local offline: `npm run seed`
-populates sample sidebar data (and clears any local real roster so `LOCAL:*` spotlights
-are not hidden). After local `members-roster` / `member-votes`, re-run `npm run seed` if
-the House/Senate left rail goes empty during UI work.
+Workers block admin writes and use a separate D1 (`congress-tracker-preview`); that
+database is not filled by `npm run seed` (seed is local Miniflare only). If a preview
+URL’s feed is stale vs production, run `npm run sync:preview-db` once. Local offline:
+`npm run seed` populates sample sidebar data (and clears any local real roster so
+`LOCAL:*` spotlights are not hidden). After local `members-roster` / `member-votes`,
+re-run `npm run seed` if the House/Senate left rail goes empty during UI work.
 
 **Daily ingest (production):** Cloudflare cron runs `runFeedWithMemberVotes` (feed then
 best-effort `member-votes`) at **10:00 UTC**, and `runExecutivePostsPipeline` hourly at **:20**

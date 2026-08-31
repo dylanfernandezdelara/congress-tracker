@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -243,6 +243,20 @@ const SCHEMA_DDL = [
     ON bill_committee_events (congress, system_code, activity_key)`,
   `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_advance
     ON bill_committee_events (activity_key, activity_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS bill_floor_events (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  action_key TEXT NOT NULL,
+  action_at TEXT NOT NULL,
+  chamber TEXT NOT NULL,
+  label TEXT NOT NULL,
+  raw_text TEXT NOT NULL,
+  tally_text TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number, action_key, action_at, chamber)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_floor_events_bill
+    ON bill_floor_events (congress, bill_type, bill_number, action_at)`,
   `CREATE TABLE IF NOT EXISTS committee_roster (
   congress INTEGER NOT NULL,
   system_code TEXT NOT NULL,
