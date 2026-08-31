@@ -231,6 +231,40 @@ function markCurrent(stages: BillLifecycleStage[]): BillLifecycleStage[] {
   )
 }
 
+function originChamberFromBillType(billType: string): 'House' | 'Senate' | null {
+  const t = billType.toUpperCase()
+  if (t.startsWith('H')) return 'House'
+  if (t.startsWith('S')) return 'Senate'
+  return null
+}
+
+function chamberActed(state: BillLifecycleStageState): boolean {
+  return state === 'done' || state === 'failed'
+}
+
+/**
+ * Keep the 5-step map chronological: the chamber that acted first
+ * (or the origin chamber, when neither has) comes before the other.
+ * Avoids a filled Senate/House dot after an empty one.
+ */
+function senateChamberFirst(
+  house: { date: string | null; state: BillLifecycleStageState },
+  senate: { date: string | null; state: BillLifecycleStageState },
+  billType: string,
+): boolean {
+  if (house.date && senate.date) {
+    if (senate.date < house.date) return true
+    if (house.date < senate.date) return false
+    return originChamberFromBillType(billType) === 'Senate'
+  }
+
+  const houseDid = chamberActed(house.state)
+  const senateDid = chamberActed(senate.state)
+  if (senateDid !== houseDid) return senateDid
+
+  return originChamberFromBillType(billType) === 'Senate'
+}
+
 /**
  * Pure derivation of terminal lifecycle status + ordered pipeline stages
  * for the feed row stepper.
@@ -269,6 +303,22 @@ export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResul
   const toPresidentState: BillLifecycleStageState =
     presentedDate || terminalStatus !== null ? 'done' : 'pending'
 
+  const houseStage: BillLifecycleStage = {
+    key: 'house',
+    label: 'Passed House',
+    date: house.date,
+    state: house.state,
+  }
+  const senateStage: BillLifecycleStage = {
+    key: 'senate',
+    label: 'Passed Senate',
+    date: senate.date,
+    state: senate.state,
+  }
+  const chamberStages = senateChamberFirst(house, senate, item.bill.type)
+    ? [senateStage, houseStage]
+    : [houseStage, senateStage]
+
   const stages: BillLifecycleStage[] = [
     {
       key: 'introduced',
@@ -276,18 +326,7 @@ export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResul
       date: introducedDate,
       state: introducedDone ? 'done' : 'pending',
     },
-    {
-      key: 'house',
-      label: 'Passed House',
-      date: house.date,
-      state: house.state,
-    },
-    {
-      key: 'senate',
-      label: 'Passed Senate',
-      date: senate.date,
-      state: senate.state,
-    },
+    ...chamberStages,
     {
       key: 'to_president',
       label: 'To President',
