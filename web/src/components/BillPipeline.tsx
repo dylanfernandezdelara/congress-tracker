@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import type { BillLifecycleStage } from '../utils/billLifecycleStages'
 import type { BillJourneyEvent } from '../utils/billJourney'
 import type { JourneyBeat, JourneyRun } from '../utils/billJourneyChapters'
@@ -41,26 +43,39 @@ function PathBeatRow({ beat }: { beat: JourneyBeat }) {
   )
 }
 
+function PathFoldRun({ run }: { run: JourneyRun }) {
+  const [open, setOpen] = useState(true)
+  const rangeLabel = formatDateRange(run.dateStart, run.dateEnd)
+  const rangeDate = run.dateEnd ?? run.dateStart
+
+  return (
+    <details
+      className="bill-pipeline-path-fold"
+      open={open}
+      onToggle={(event) => {
+        setOpen(event.currentTarget.open)
+      }}
+    >
+      <summary className="bill-pipeline-path-fold-summary">
+        <span className="bill-pipeline-path-subject">{run.subject}</span>
+        <PathDate date={rangeDate} label={rangeLabel} />
+      </summary>
+      <ol className="bill-pipeline-path-beats">
+        {run.beats.map((item) => (
+          <PathBeatRow key={item.id} beat={item} />
+        ))}
+      </ol>
+    </details>
+  )
+}
+
 function PathRunItem({ run }: { run: JourneyRun }) {
   const rangeLabel = formatDateRange(run.dateStart, run.dateEnd)
   const rangeDate = run.dateEnd ?? run.dateStart
-  const foldable = Boolean(run.subject && run.beats.length > 1)
   const beat = run.beats[0]
 
-  if (foldable) {
-    return (
-      <details className="bill-pipeline-path-fold" open>
-        <summary className="bill-pipeline-path-fold-summary">
-          <span className="bill-pipeline-path-subject">{run.subject}</span>
-          <PathDate date={rangeDate} label={rangeLabel} />
-        </summary>
-        <ol className="bill-pipeline-path-beats">
-          {run.beats.map((item) => (
-            <PathBeatRow key={item.id} beat={item} />
-          ))}
-        </ol>
-      </details>
-    )
+  if (run.subject && run.beats.length > 1) {
+    return <PathFoldRun run={run} />
   }
 
   if (!beat) return null

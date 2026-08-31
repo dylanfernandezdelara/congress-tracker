@@ -131,7 +131,9 @@ describe('BillPipeline', () => {
     expect(screen.getByText('Hearings')).toBeInTheDocument()
     expect(screen.getByText('Received')).toBeInTheDocument()
     expect(screen.queryByText('Sent to House Administration')).not.toBeInTheDocument()
-    expect(screen.getByRole('group')).toBeInTheDocument()
+    const fold = document.querySelector('.bill-pipeline-path-fold')
+    expect(fold).toBeInTheDocument()
+    expect(fold).toHaveAttribute('open')
   })
 
   it('keeps each floor vote on its own path row', () => {
