@@ -213,32 +213,21 @@
   }
 
   .bill-pipeline-path-step,
-  .bill-pipeline-path-fold-summary,
   .bill-pipeline-path-beat-row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
-    gap: 0.1rem 0.75rem;
-  }
-
-  .bill-pipeline-path-copy {
-    margin: 0;
-    min-width: 0;
-    flex: 1 1 10rem;
+    column-gap: 0.75rem;
     font-size: 13px;
     font-weight: 400;
     line-height: 1.4;
     color: hsl(var(--twc-foreground));
-    overflow-wrap: anywhere;
   }
 
   .bill-pipeline-path-subject {
+    min-width: 0;
     font-weight: 500;
-  }
-
-  .bill-pipeline-path-sep {
-    color: hsl(var(--twc-faint));
+    overflow-wrap: anywhere;
   }
 
   .bill-pipeline-path-beat--failed {
@@ -246,6 +235,7 @@
   }
 
   .bill-pipeline-path-date {
+    grid-column: -1;
     font-size: 12px;
     line-height: 1.4;
     color: hsl(var(--twc-secondary));
@@ -258,6 +248,10 @@
   }
 
   .bill-pipeline-path-fold-summary {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 0.35rem;
     cursor: pointer;
     list-style: none;
     font-size: 13px;
@@ -272,8 +266,6 @@
 
   .bill-pipeline-path-fold-summary::before {
     content: '▸';
-    display: inline-block;
-    flex: none;
     width: 0.75rem;
     color: hsl(var(--twc-faint));
     font-weight: 400;
@@ -289,23 +281,10 @@
     outline-offset: 2px;
   }
 
-  .bill-pipeline-path-fold-summary .bill-pipeline-path-subject {
-    flex: 1 1 8rem;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
   .bill-pipeline-path-beats {
     gap: 0.2rem;
     margin-top: 0.28rem;
     padding-left: 0.75rem;
-  }
-
-  .bill-pipeline-path-beat-row {
-    font-size: 13px;
-    font-weight: 400;
-    line-height: 1.4;
-    color: hsl(var(--twc-foreground));
   }
 
   @keyframes bill-pipeline-pulse {

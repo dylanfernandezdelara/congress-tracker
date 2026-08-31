@@ -12,13 +12,22 @@ export interface JourneyBeat {
   failed: boolean
 }
 
-export interface JourneyRun {
+export interface JourneyCommitteeRun {
+  kind: 'committee'
   id: string
-  subject: string | null
+  subject: string
   beats: JourneyBeat[]
   dateStart: string | null
   dateEnd: string | null
 }
+
+export interface JourneyStepRun {
+  kind: 'step'
+  id: string
+  beat: JourneyBeat
+}
+
+export type JourneyRun = JourneyCommitteeRun | JourneyStepRun
 
 export interface JourneyChapter {
   id: JourneyChapterId
@@ -76,7 +85,7 @@ function committeeBeat(event: BillJourneyEvent): JourneyBeat {
     const short = shortBodyName(event.committee_name)
     if (event.activity_key === 'sent') return { ...base, text: short }
     if (event.activity_key === 'advanced') {
-      return { ...base, text: `${short} Advanced${tallySuffix(event.tally)}` }
+      return { ...base, text: `Advanced${tallySuffix(event.tally)} (${short})` }
     }
   }
   if (event.activity_key) {
@@ -122,15 +131,23 @@ function dateSpan(events: BillJourneyEvent[]): { dateStart: string | null; dateE
   return { dateStart: dates[0] ?? null, dateEnd: dates[dates.length - 1] ?? null }
 }
 
-function toRun(events: BillJourneyEvent[], subject: string | null, beats: JourneyBeat[]): JourneyRun {
+function toCommitteeRun(events: BillJourneyEvent[], beats: JourneyBeat[]): JourneyCommitteeRun | null {
+  const kept = beats.filter((beat) => beat.text.trim().length > 0)
+  if (kept.length === 0) return null
   const { dateStart, dateEnd } = dateSpan(events)
   return {
+    kind: 'committee',
     id: events.map((event) => event.id).join('|'),
-    subject,
-    beats: beats.filter((beat) => beat.text.trim().length > 0),
+    subject: committeeSubject(events) ?? 'Committee',
+    beats: kept,
     dateStart,
     dateEnd,
   }
+}
+
+function toStepRun(event: BillJourneyEvent, beat: JourneyBeat): JourneyStepRun | null {
+  if (!beat.text.trim()) return null
+  return { kind: 'step', id: event.id, beat }
 }
 
 function isCommittee(event: BillJourneyEvent): boolean {
@@ -143,20 +160,21 @@ function canMerge(pending: BillJourneyEvent[], next: BillJourneyEvent): boolean 
   return isCommittee(first) && isCommittee(next) && committeeFamily(first) === committeeFamily(next)
 }
 
-function finishCommitteeRun(events: BillJourneyEvent[]): JourneyRun {
+function finishCommitteeRun(events: BillJourneyEvent[]): JourneyCommitteeRun | null {
   const parentAdvanced = events.some(
     (event) => !event.is_subcommittee && event.activity_key === 'advanced',
   )
   const kept = parentAdvanced
     ? events.filter((event) => !(event.is_subcommittee && event.activity_key === 'advanced'))
     : events
-  return toRun(kept, committeeSubject(events), kept.map(committeeBeat))
+  return toCommitteeRun(kept, kept.map(committeeBeat))
 }
 
-function finishRun(pending: BillJourneyEvent[]): JourneyRun {
-  return isCommittee(pending[0]!)
-    ? finishCommitteeRun(pending)
-    : toRun(pending, null, pending.map(floorBeat))
+function finishRun(pending: BillJourneyEvent[]): JourneyRun | null {
+  const first = pending[0]
+  if (!first) return null
+  if (isCommittee(first)) return finishCommitteeRun(pending)
+  return toStepRun(first, floorBeat(first))
 }
 
 /**
@@ -174,7 +192,8 @@ export function groupJourneyChapters(events: BillJourneyEvent[]): JourneyChapter
       pending = []
       return
     }
-    chapter.runs.push(finishRun(pending))
+    const run = finishRun(pending)
+    if (run) chapter.runs.push(run)
     pending = []
   }
 
@@ -191,7 +210,7 @@ export function groupJourneyChapters(events: BillJourneyEvent[]): JourneyChapter
   }
   flushPending()
 
-  return chapters.filter((chapter) => chapter.runs.some((run) => run.beats.length > 0))
+  return chapters.filter((chapter) => chapter.runs.length > 0)
 }
 
 export function journeyChapterLabel(id: JourneyChapterId): string {

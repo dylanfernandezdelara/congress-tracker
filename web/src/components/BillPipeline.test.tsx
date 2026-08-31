@@ -129,11 +129,43 @@ describe('BillPipeline', () => {
     expect(screen.getByText('House Administration')).toBeInTheDocument()
     expect(screen.getByText('Referred')).toBeInTheDocument()
     expect(screen.getByText('Hearings')).toBeInTheDocument()
+    expect(screen.getByText('Jan 10')).toBeInTheDocument()
+    expect(screen.getByText('Mar 1')).toBeInTheDocument()
     expect(screen.getByText('Received')).toBeInTheDocument()
     expect(screen.queryByText('Sent to House Administration')).not.toBeInTheDocument()
     const fold = document.querySelector('.bill-pipeline-path-fold')
     expect(fold).toBeInTheDocument()
     expect(fold).toHaveAttribute('open')
+  })
+
+  it('folds a one-beat committee instead of a middot line', () => {
+    render(
+      <BillPipeline
+        stages={stages}
+        journey={[
+          {
+            id: 'committee-1',
+            date: '2026-01-10',
+            kind: 'committee',
+            label: 'Sent to House Administration',
+            chamber: 'House',
+            state: 'done',
+            tally: null,
+            activity_key: 'sent',
+            committee_name: 'House Administration Committee',
+            system_code: 'hsha00',
+            parent_system_code: null,
+            is_subcommittee: false,
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('House Administration')).toBeInTheDocument()
+    expect(screen.getByText('Referred')).toBeInTheDocument()
+    expect(document.querySelector('.bill-pipeline-path-fold')).toBeInTheDocument()
+    expect(document.querySelector('.bill-pipeline-path-step')).toBeNull()
+    expect(screen.queryByText('House Administration · Referred')).not.toBeInTheDocument()
   })
 
   it('keeps each floor vote on its own path row', () => {

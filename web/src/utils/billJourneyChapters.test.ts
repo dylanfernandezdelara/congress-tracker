@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { buildBillJourney } from './billJourney'
-import { groupJourneyChapters } from './billJourneyChapters'
+import { groupJourneyChapters, type JourneyRun } from './billJourneyChapters'
+
+function runTexts(run: JourneyRun): string[] {
+  return run.kind === 'committee' ? run.beats.map((beat) => beat.text) : [run.beat.text]
+}
 
 describe('groupJourneyChapters', () => {
   it('collapses a House committee run and same-day floor into chamber chapters', () => {
@@ -118,20 +122,29 @@ describe('groupJourneyChapters', () => {
     )
 
     expect(chapters.map((chapter) => chapter.id)).toEqual(['House', 'Senate'])
-    expect(chapters[0]?.runs.map((run) => run.beats.map((beat) => beat.text))).toEqual([
+    expect(chapters[0]?.runs.map((run) => run.kind)).toEqual([
+      'committee',
+      'step',
+      'step',
+      'step',
+    ])
+    expect(chapters[0]?.runs.map(runTexts)).toEqual([
       ['Referred', 'Health', 'Hearings', 'Advanced 47–0'],
       ['Calendar'],
       ['Rule 218–210'],
       ['Passed 220–213'],
     ])
-    expect(chapters[0]?.runs[0]?.subject).toBe('Energy and Commerce')
-    expect(chapters[0]?.runs[0]?.beats.map((beat) => beat.date)).toEqual([
+    const houseCommittee = chapters[0]?.runs[0]
+    expect(houseCommittee?.kind === 'committee' && houseCommittee.subject).toBe(
+      'Energy and Commerce',
+    )
+    expect(houseCommittee?.kind === 'committee' && houseCommittee.beats.map((beat) => beat.date)).toEqual([
       '2026-01-10',
       '2026-01-10',
       '2026-03-01',
       '2026-03-15',
     ])
-    expect(chapters[1]?.runs[0]?.beats.map((beat) => beat.text)).toEqual(['Received'])
+    expect(chapters[1]?.runs.map(runTexts)).toEqual([['Received']])
   })
 
   it('keeps a failed passage beat', () => {
@@ -154,9 +167,10 @@ describe('groupJourneyChapters', () => {
         }),
       ),
     )
-    const beat = chapters[0]?.runs[0]?.beats[0]
-    expect(beat?.text).toBe('Failed 198–230')
-    expect(beat?.failed).toBe(true)
+    const run = chapters[0]?.runs[0]
+    expect(run?.kind).toBe('step')
+    expect(run?.kind === 'step' && run.beat.text).toBe('Failed 198–230')
+    expect(run?.kind === 'step' && run.beat.failed).toBe(true)
   })
 
   it('gives a second House visit its own chapter key', () => {
@@ -201,5 +215,10 @@ describe('groupJourneyChapters', () => {
     ])
     expect(chapters.map((chapter) => chapter.id)).toEqual(['House', 'Senate', 'House'])
     expect(chapters.map((chapter) => chapter.key)).toEqual(['House-0', 'Senate-1', 'House-2'])
+    expect(chapters.map((chapter) => chapter.runs[0]?.kind)).toEqual([
+      'committee',
+      'step',
+      'committee',
+    ])
   })
 })

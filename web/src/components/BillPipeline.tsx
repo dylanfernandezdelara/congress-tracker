@@ -2,7 +2,12 @@ import { useState } from 'react'
 
 import type { BillLifecycleStage } from '../utils/billLifecycleStages'
 import type { BillJourneyEvent } from '../utils/billJourney'
-import type { JourneyBeat, JourneyRun } from '../utils/billJourneyChapters'
+import type {
+  JourneyBeat,
+  JourneyCommitteeRun,
+  JourneyRun,
+  JourneyStepRun,
+} from '../utils/billJourneyChapters'
 import { groupJourneyChapters, journeyChapterLabel } from '../utils/billJourneyChapters'
 import { formatDateRange, formatVoteDate } from '../utils/billLabels'
 
@@ -43,7 +48,7 @@ function PathBeatRow({ beat }: { beat: JourneyBeat }) {
   )
 }
 
-function PathFoldRun({ run }: { run: JourneyRun }) {
+function PathFoldRun({ run }: { run: JourneyCommitteeRun }) {
   const [open, setOpen] = useState(true)
   const rangeLabel = formatDateRange(run.dateStart, run.dateEnd)
   const rangeDate = run.dateEnd ?? run.dateStart
@@ -61,39 +66,28 @@ function PathFoldRun({ run }: { run: JourneyRun }) {
         <PathDate date={rangeDate} label={rangeLabel} />
       </summary>
       <ol className="bill-pipeline-path-beats">
-        {run.beats.map((item) => (
-          <PathBeatRow key={item.id} beat={item} />
+        {run.beats.map((item, index) => (
+          <PathBeatRow key={`${item.id}-${index}`} beat={item} />
         ))}
       </ol>
     </details>
   )
 }
 
-function PathRunItem({ run }: { run: JourneyRun }) {
-  const rangeLabel = formatDateRange(run.dateStart, run.dateEnd)
-  const rangeDate = run.dateEnd ?? run.dateStart
-  const beat = run.beats[0]
-
-  if (run.subject && run.beats.length > 1) {
-    return <PathFoldRun run={run} />
-  }
-
-  if (!beat) return null
-
+function PathStep({ run }: { run: JourneyStepRun }) {
   return (
     <div className="bill-pipeline-path-step">
-      <p className="bill-pipeline-path-copy">
-        {run.subject ? <span className="bill-pipeline-path-subject">{run.subject}</span> : null}
-        {run.subject ? (
-          <span className="bill-pipeline-path-sep" aria-hidden="true">
-            {' · '}
-          </span>
-        ) : null}
-        <span className={beatClassName(beat.failed)}>{beat.text}</span>
-      </p>
-      <PathDate date={rangeDate} label={rangeLabel} />
+      <span className={beatClassName(run.beat.failed)}>{run.beat.text}</span>
+      <PathDate
+        date={run.beat.date}
+        label={run.beat.date ? formatVoteDate(run.beat.date) : null}
+      />
     </div>
   )
+}
+
+function PathRunItem({ run }: { run: JourneyRun }) {
+  return run.kind === 'committee' ? <PathFoldRun run={run} /> : <PathStep run={run} />
 }
 
 export function BillPipeline({
