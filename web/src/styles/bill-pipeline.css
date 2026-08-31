@@ -213,20 +213,36 @@
     background-color: hsl(var(--twc-card));
   }
 
-  .bill-pipeline-path-run--fold::before {
-    display: none;
+  .bill-pipeline-path-step,
+  .bill-pipeline-path-fold-summary {
+    display: grid;
+    grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 0.35rem;
   }
 
-  .bill-pipeline-path-step,
   .bill-pipeline-path-beat-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
     column-gap: 0.75rem;
+  }
+
+  .bill-pipeline-path-step,
+  .bill-pipeline-path-beat-row {
     font-size: 13px;
     font-weight: 400;
     line-height: 1.4;
     color: hsl(var(--twc-foreground));
+  }
+
+  .bill-pipeline-path-mark {
+    display: block;
+    width: 0.75rem;
+    height: 1em;
+    color: hsl(var(--twc-faint));
+    font-weight: 400;
+    text-align: center;
   }
 
   .bill-pipeline-path-subject {
@@ -253,10 +269,6 @@
   }
 
   .bill-pipeline-path-fold-summary {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: baseline;
-    column-gap: 0.75rem;
     cursor: pointer;
     list-style: none;
     font-size: 13px;
@@ -269,20 +281,14 @@
     display: none;
   }
 
-  .bill-pipeline-path-fold-summary::before {
+  .bill-pipeline-path-fold-summary .bill-pipeline-path-mark::before {
     content: '▸';
-    position: absolute;
-    top: 0.05em;
-    left: -0.875rem;
-    width: 0.75rem;
-    text-align: center;
-    color: hsl(var(--twc-faint));
-    font-weight: 400;
+    display: inline-block;
     transform-origin: 50% 55%;
     transition: transform 0.15s ease;
   }
 
-  .bill-pipeline-path-fold[open] .bill-pipeline-path-fold-summary::before {
+  .bill-pipeline-path-fold[open] .bill-pipeline-path-fold-summary .bill-pipeline-path-mark::before {
     transform: rotate(90deg);
   }
 
@@ -294,7 +300,7 @@
   .bill-pipeline-path-beats {
     gap: 0.2rem;
     margin-top: 0.28rem;
-    padding-left: 0.75rem;
+    padding-left: 1.1rem;
   }
 
   @keyframes bill-pipeline-pulse {
@@ -349,7 +355,7 @@
       animation: none;
     }
 
-    .bill-pipeline-path-fold-summary::before {
+    .bill-pipeline-path-fold-summary .bill-pipeline-path-mark::before {
       transition: none;
     }
   }

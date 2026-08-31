@@ -136,7 +136,7 @@ describe('BillPipeline', () => {
     const fold = document.querySelector('.bill-pipeline-path-fold')
     expect(fold).toBeInTheDocument()
     expect(fold).toHaveAttribute('open')
-    expect(document.querySelector('.bill-pipeline-path-run--fold')).toBeInTheDocument()
+    expect(document.querySelectorAll('.bill-pipeline-path-mark').length).toBeGreaterThan(0)
   })
 
   it('folds a one-beat committee instead of a middot line', () => {

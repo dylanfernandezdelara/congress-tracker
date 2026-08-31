@@ -62,6 +62,7 @@ function PathFoldRun({ run }: { run: JourneyCommitteeRun }) {
       }}
     >
       <summary className="bill-pipeline-path-fold-summary">
+        <span className="bill-pipeline-path-mark" aria-hidden="true" />
         <span className="bill-pipeline-path-subject">{run.subject}</span>
         <PathDate date={rangeDate} label={rangeLabel} />
       </summary>
@@ -77,6 +78,7 @@ function PathFoldRun({ run }: { run: JourneyCommitteeRun }) {
 function PathStep({ run }: { run: JourneyStepRun }) {
   return (
     <div className="bill-pipeline-path-step">
+      <span className="bill-pipeline-path-mark" aria-hidden="true" />
       <span className={beatClassName(run.beat.failed)}>{run.beat.text}</span>
       <PathDate
         date={run.beat.date}
@@ -146,11 +148,7 @@ export function BillPipeline({
                   {chapter.runs.map((run) => (
                     <li
                       key={run.id}
-                      className={
-                        run.kind === 'committee'
-                          ? 'bill-pipeline-path-run bill-pipeline-path-run--fold'
-                          : 'bill-pipeline-path-run'
-                      }
+                      className="bill-pipeline-path-run"
                     >
                       <PathRunItem run={run} />
                     </li>
