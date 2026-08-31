@@ -144,7 +144,14 @@ export function BillPipeline({
                 <h4 className="bill-pipeline-path-chamber">{journeyChapterLabel(chapter.id)}</h4>
                 <ol className="bill-pipeline-path-runs">
                   {chapter.runs.map((run) => (
-                    <li key={run.id} className="bill-pipeline-path-run">
+                    <li
+                      key={run.id}
+                      className={
+                        run.kind === 'committee'
+                          ? 'bill-pipeline-path-run bill-pipeline-path-run--fold'
+                          : 'bill-pipeline-path-run'
+                      }
+                    >
                       <PathRunItem run={run} />
                     </li>
                   ))}

@@ -173,6 +173,7 @@
 
   .bill-pipeline-path-chamber {
     margin: 0;
+    padding-left: 0.875rem;
     font-size: 12px;
     font-weight: 500;
     line-height: 1.4;
@@ -212,6 +213,10 @@
     background-color: hsl(var(--twc-card));
   }
 
+  .bill-pipeline-path-run--fold::before {
+    display: none;
+  }
+
   .bill-pipeline-path-step,
   .bill-pipeline-path-beat-row {
     display: grid;
@@ -249,9 +254,9 @@
 
   .bill-pipeline-path-fold-summary {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
-    column-gap: 0.35rem;
+    column-gap: 0.75rem;
     cursor: pointer;
     list-style: none;
     font-size: 13px;
@@ -266,9 +271,14 @@
 
   .bill-pipeline-path-fold-summary::before {
     content: '▸';
+    position: absolute;
+    top: 0.05em;
+    left: -0.875rem;
     width: 0.75rem;
+    text-align: center;
     color: hsl(var(--twc-faint));
     font-weight: 400;
+    transform-origin: 50% 55%;
     transition: transform 0.15s ease;
   }
 
