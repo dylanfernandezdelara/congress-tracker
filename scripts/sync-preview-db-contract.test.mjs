@@ -9,6 +9,7 @@ import {
   PREVIEW_D1_NAME,
   chunkStatements,
   dropUserTablesSql,
+  dumpStats,
   dumpTableInsertCount,
   dumpVotesLatest,
   filterDumpStatements,
@@ -67,6 +68,9 @@ test('script execute paths never target production and require preview env', () 
   assert.match(source, /'--env',\s*'preview'/)
   assert.doesNotMatch(source, /startChunk|start-chunk/)
   assert.match(source, /spawnSync/)
+  assert.match(source, /stdio:\s*\[\s*'ignore',\s*'pipe',\s*'pipe'\s*\]/)
+  assert.match(source, /new Error\(`wrangler exited \$\{/)
+  assert.doesNotMatch(source, /if \(err\.stderr\) process\.stderr\.write/)
   assert.match(source, /senate_vote_menu_cache_/)
 })
 
@@ -91,6 +95,7 @@ test('SQL split, chunk, dump vote stats, and drop SQL keep system tables', () =>
   assert.equal(dumpTableInsertCount(statements, 'votes'), 1)
   assert.equal(dumpTableInsertCount(statements, 'member_votes'), 1)
   assert.equal(dumpVotesLatest(statements), '2026-08-08')
+  assert.deepEqual(dumpStats(statements), { votes: 1, latest: '2026-08-08', memberVotes: 1 })
   const chunks = chunkStatements(statements, 2, 10_000)
   assert.equal(chunks.length, 2)
   const drop = dropUserTablesSql(['votes', '_cf_KV', 'sqlite_sequence', 'bill_floor_events'])

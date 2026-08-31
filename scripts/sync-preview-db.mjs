@@ -11,7 +11,7 @@
  *   SYNC_PREVIEW_DB_DRY_RUN=1 npm run sync:preview-db
  *   SYNC_PREVIEW_DB_DUMP=/tmp/dump.sql npm run sync:preview-db
  */
-import { execFileSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import {
   existsSync,
   mkdtempSync,
@@ -126,6 +126,14 @@ export function dumpVotesLatest(statements) {
   return latest
 }
 
+export function dumpStats(statements) {
+  return {
+    votes: dumpTableInsertCount(statements, 'votes'),
+    latest: dumpVotesLatest(statements),
+    memberVotes: dumpTableInsertCount(statements, 'member_votes'),
+  }
+}
+
 export function dropUserTablesSql(tableNames) {
   const lines = ['PRAGMA foreign_keys=OFF;']
   for (const name of tableNames) {
@@ -161,9 +169,7 @@ function wrangler(args, { json = false } = {}) {
   })
   if (result.stderr) process.stderr.write(result.stderr)
   if (result.status !== 0) {
-    const err = new Error(
-      result.stderr?.trim() || result.stdout?.trim() || `wrangler exited ${result.status}`,
-    )
+    const err = new Error(`wrangler exited ${result.status ?? result.signal ?? 'unknown'}`)
     err.stderr = result.stderr
     err.stdout = result.stdout
     throw err
@@ -193,29 +199,25 @@ function d1Rows(raw) {
 }
 
 function sleep(seconds) {
-  execFileSync('sleep', [String(seconds)])
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000)
 }
 
 function executeChunkWithRetry(file, attempt, total) {
   process.stderr.write(`  chunk ${attempt}/${total} (${path.basename(file)})\n`)
-  let lastError
   for (let tryNum = 1; tryNum <= DEFAULT_RETRIES; tryNum += 1) {
     try {
       executePreview({ file })
       return
     } catch (err) {
-      lastError = err
       const detail = `${err.stderr ?? ''}\n${err.stdout ?? ''}\n${err.message}`
       if (!isRetryableD1Error(detail) || tryNum === DEFAULT_RETRIES) throw err
       process.stderr.write(`  retry ${tryNum}/${DEFAULT_RETRIES} after ${tryNum}s\n`)
       sleep(tryNum)
     }
   }
-  throw lastError
 }
 
-function importDump(sql) {
-  const { statements, skippedMenu } = filterDumpStatements(splitSqlStatements(sql))
+function importStatements(statements, { skippedMenu = 0 } = {}) {
   const chunks = chunkStatements(statements)
   const dir = mkdtempSync(path.join(tmpdir(), 'd1-import-chunks-'))
   process.stderr.write(
@@ -232,7 +234,6 @@ function importDump(sql) {
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
-  return statements
 }
 
 export function planSync(toml = readFileSync(workerTomlPath, 'utf8')) {
@@ -252,24 +253,38 @@ export function planSync(toml = readFileSync(workerTomlPath, 'utf8')) {
   return cfg
 }
 
-function previewCountAndLatest(table) {
-  const rows = d1Rows(
+function wipePreview() {
+  const tables = d1Rows(
     executePreview({
-      command: `SELECT COUNT(*) AS n, MAX(vote_date) AS latest FROM ${table};`,
+      command: "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;",
       json: true,
     }),
-  )
-  return { n: Number(rows[0].n), latest: String(rows[0].latest ?? '') }
+  ).map((row) => row.name)
+  const dropSql = dropUserTablesSql(tables)
+  if (!dropSql.includes('DROP TABLE IF EXISTS')) return
+  const dropFile = path.join(tmpdir(), `congress-tracker-preview-drop-${process.pid}.sql`)
+  writeFileSync(dropFile, dropSql)
+  try {
+    executePreview({ file: dropFile })
+  } finally {
+    unlinkSync(dropFile)
+  }
 }
 
-function previewCount(table) {
-  const rows = d1Rows(
+function previewStats() {
+  const row = d1Rows(
     executePreview({
-      command: `SELECT COUNT(*) AS n FROM ${table};`,
+      command:
+        'SELECT (SELECT COUNT(*) FROM votes) AS votes, (SELECT MAX(vote_date) FROM votes) AS latest, (SELECT COUNT(*) FROM member_votes) AS member_votes;',
       json: true,
     }),
-  )
-  return Number(rows[0].n)
+  )[0]
+  if (!row) throw new Error('preview stats query returned no rows')
+  return {
+    votes: Number(row.votes),
+    latest: String(row.latest ?? ''),
+    memberVotes: Number(row.member_votes),
+  }
 }
 
 export function runSync({
@@ -309,55 +324,34 @@ export function runSync({
   }
 
   try {
-    const dumpSql = readFileSync(resolvedDump, 'utf8')
-    const dumpStatements = splitSqlStatements(dumpSql)
-    const expectedVotes = dumpTableInsertCount(dumpStatements, 'votes')
-    const expectedMemberVotes = dumpTableInsertCount(dumpStatements, 'member_votes')
-    const expectedLatest = dumpVotesLatest(dumpStatements)
-    if (expectedVotes < 1 || !expectedLatest) {
+    const { statements, skippedMenu } = filterDumpStatements(
+      splitSqlStatements(readFileSync(resolvedDump, 'utf8')),
+    )
+    const dump = dumpStats(statements)
+    if (dump.votes < 1 || !dump.latest) {
       throw new Error('production export is missing votes rows')
     }
     process.stderr.write(
-      `  dump votes=${expectedVotes} latest=${expectedLatest} member_votes=${expectedMemberVotes}\n`,
+      `  dump votes=${dump.votes} latest=${dump.latest} member_votes=${dump.memberVotes}\n`,
     )
 
-    const tables = d1Rows(
-      executePreview({
-        command: "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;",
-        json: true,
-      }),
-    ).map((row) => row.name)
-    const dropSql = dropUserTablesSql(tables)
-    if (dropSql.includes('DROP TABLE IF EXISTS')) {
-      process.stderr.write(
-        `Dropping preview user tables, then importing. A failed import leaves preview empty until this command is retried (SYNC_PREVIEW_DB_DUMP=${resolvedDump} skips a new production export).\n`,
-      )
-      const dropFile = path.join(tmpdir(), `congress-tracker-preview-drop-${process.pid}.sql`)
-      writeFileSync(dropFile, dropSql)
-      try {
-        executePreview({ file: dropFile })
-      } finally {
-        unlinkSync(dropFile)
-      }
-    }
-
-    const imported = importDump(dumpSql)
-    const votes = previewCountAndLatest('votes')
-    const memberVotes = previewCount('member_votes')
-    const importedVotes = dumpTableInsertCount(imported, 'votes')
-    const importedMemberVotes = dumpTableInsertCount(imported, 'member_votes')
-    const importedLatest = dumpVotesLatest(imported)
+    process.stderr.write(
+      `Dropping preview user tables, then importing. A failed import leaves preview empty until this command is retried (SYNC_PREVIEW_DB_DUMP=${resolvedDump} skips a new production export).\n`,
+    )
+    wipePreview()
+    importStatements(statements, { skippedMenu })
+    const preview = previewStats()
     if (
-      votes.n !== importedVotes ||
-      votes.latest !== importedLatest ||
-      memberVotes !== importedMemberVotes
+      preview.votes !== dump.votes ||
+      preview.latest !== dump.latest ||
+      preview.memberVotes !== dump.memberVotes
     ) {
       throw new Error(
-        `preview votes=${votes.n} latest=${votes.latest} member_votes=${memberVotes} does not match dump votes=${importedVotes} latest=${importedLatest} member_votes=${importedMemberVotes}`,
+        `preview votes=${preview.votes} latest=${preview.latest} member_votes=${preview.memberVotes} does not match dump votes=${dump.votes} latest=${dump.latest} member_votes=${dump.memberVotes}`,
       )
     }
     process.stdout.write(
-      `Preview D1 now matches the dump (${votes.n} votes, latest ${votes.latest}, ${memberVotes} member_votes).\n`,
+      `Preview D1 now matches the dump (${preview.votes} votes, latest ${preview.latest}, ${preview.memberVotes} member_votes).\n`,
     )
     process.stdout.write(
       `Existing preview URLs share this database; wait ~60s for feed Cache-Control to expire.\n`,
@@ -377,7 +371,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     runSync()
   } catch (err) {
     process.stderr.write(`${err.message || err}\n`)
-    if (err.stderr) process.stderr.write(String(err.stderr))
     process.exit(err.message?.includes('CLOUDFLARE_') ? 2 : 1)
   }
 }
