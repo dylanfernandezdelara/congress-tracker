@@ -18,7 +18,6 @@
     "configure:cloudflare-builds": "./scripts/configure-workers-builds-production-deploy.sh",
     "public:check": "./scripts/public-readiness-check.sh",
     "public:scan:tracked-secrets": "./scripts/scan-tracked-secrets.sh",
-    "public:scan:history-secrets": "./scripts/scan-history-secrets.sh",
     "public:scan:internal-refs": "./scripts/scan-internal-references.sh"
   },
   "devDependencies": {
