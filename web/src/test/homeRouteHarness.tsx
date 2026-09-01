@@ -80,7 +80,12 @@ export function pageResponse(
   }
 }
 
-export function stubHomeRouteDefaults(api: HomeApiMocks) {
+export function stubHomeRouteDefaults(
+  api: HomeApiMocks,
+  sessionLast: { house?: string; senate?: string } = {},
+) {
+  const houseLast = sessionLast.house ?? '2026-06-05'
+  const senateLast = sessionLast.senate ?? '2026-06-05'
   api.fetchPolicyAreas.mockResolvedValue({
     items: ['Energy', 'Public Lands and Natural Resources'],
   })
@@ -225,7 +230,7 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
       unique_bills_passed: 8,
       avg_margin: 12,
       closest_margin: 2,
-      date_range: { first: '2026-01-01', last: '2026-06-05' },
+      date_range: { first: '2026-01-01', last: houseLast },
       coverage_days: 120,
     },
     senate: {
@@ -233,7 +238,7 @@ export function stubHomeRouteDefaults(api: HomeApiMocks) {
       unique_bills_passed: 4,
       avg_margin: 10,
       closest_margin: 1,
-      date_range: { first: '2026-01-01', last: '2026-06-05' },
+      date_range: { first: '2026-01-01', last: senateLast },
       coverage_days: 120,
     },
   })

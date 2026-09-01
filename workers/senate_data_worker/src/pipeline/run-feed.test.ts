@@ -12,7 +12,9 @@ const mockUpsertVote = vi.fn();
 const mockBillHasSponsors = vi.fn();
 const mockReplaceBillSponsors = vi.fn();
 const mockFetchBillSummaryBundle = vi.fn();
+const mockFetchRecentPublicLaws = vi.fn();
 const mockFetchBillLifecycleSource = vi.fn();
+const mockPersistPublicLaws = vi.fn();
 const mockRewriteSummary = vi.fn();
 const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
@@ -60,8 +62,19 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
 
 vi.mock("../sources/congress-client", () => ({
   fetchBillSummaryBundle: (...args: unknown[]) => mockFetchBillSummaryBundle(...args),
+  fetchRecentPublicLaws: (...args: unknown[]) => mockFetchRecentPublicLaws(...args),
   fetchBillLifecycleSource: (...args: unknown[]) => mockFetchBillLifecycleSource(...args),
   lookbackStartIso: (days: number) => `2026-01-01-${days}`,
+}));
+
+vi.mock("./refresh-public-laws", () => ({
+  persistPublicLaws: (...args: unknown[]) => mockPersistPublicLaws(...args),
+  publicLawsToBillRows: (laws: Array<{ congress: number; billType: string; billNumber: number }>) =>
+    laws.map((law) => ({
+      bill_congress: law.congress,
+      bill_type: law.billType,
+      bill_number: law.billNumber,
+    })),
 }));
 
 vi.mock("../synthesis/openrouter", () => ({
@@ -174,6 +187,13 @@ describe("runFeedPipeline digest retry", () => {
     mockGetLifecyclesForBills.mockResolvedValue(new Map());
     mockUpsertLifecycle.mockResolvedValue(undefined);
     mockSelectPresentedPendingLifecycleBills.mockResolvedValue([]);
+    mockFetchRecentPublicLaws.mockResolvedValue([]);
+    mockPersistPublicLaws.mockResolvedValue({
+      listed: 0,
+      upserted: 0,
+      titlesWritten: 0,
+      warnings: [] as string[],
+    });
     mockRewriteSummary.mockResolvedValue({
       headline: "Rewritten headline",
       what_it_does: "Does things",
@@ -327,6 +347,44 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.lifecycleRefreshed).toBe(0);
     expect(mockFetchBillLifecycleSource).not.toHaveBeenCalled();
     expect(mockUpsertLifecycle).not.toHaveBeenCalled();
+  });
+
+  it("persists public-law gaps without stealing the lifecycle refresh budget", async () => {
+    mockGetDigest.mockResolvedValue(completeDigest);
+    mockFetchRecentPublicLaws.mockResolvedValue([
+      {
+        congress: 119,
+        billType: "S",
+        billNumber: 1003,
+        title: "Lulu’s Law",
+        becameLawDate: "2026-06-26",
+        publicLaw: "119-100",
+        latestActionText: "Became Public Law No: 119-100.",
+        milestones: {
+          presented_date: null,
+          signed_date: null,
+          vetoed_date: null,
+          became_law_date: "2026-06-26",
+          law_kind: null,
+          public_law: "119-100",
+          latest_action_date: "2026-06-26",
+          latest_action_text: "Became Public Law No: 119-100.",
+        },
+      },
+    ]);
+
+    await runFeedPipeline(createEnv());
+
+    expect(mockFetchRecentPublicLaws).toHaveBeenCalledWith(expect.anything(), 119);
+    expect(mockGetLifecyclesForBills).toHaveBeenCalledWith(
+      {},
+      [expect.objectContaining({ congress: 119, billType: "HR", billNumber: 1 })]
+    );
+    expect(mockPersistPublicLaws).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([expect.objectContaining({ billNumber: 1003 })]),
+      "admin"
+    );
   });
 
   it("upserts lifecycle when non-terminal and continues on fetch errors", async () => {

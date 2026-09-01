@@ -1,5 +1,6 @@
 import type { BillProcessActivityKey } from "../../../../shared/bill-process-labels";
 import type { BillProcessSummary } from "../../../../shared/bill-process-api-types";
+import { getFloorEventsForBills } from "./bill-floor-events";
 import { toProcessSummary } from "../process/derive-state";
 import type { ProcessCommitteeEvent } from "../process/types";
 import { normalizeBillType } from "../sources/bill-type";
@@ -161,6 +162,7 @@ export async function getProcessSummariesForBills(
   bills: ProcessBillKey[]
 ): Promise<Map<string, BillProcessSummary>> {
   const eventsByBill = await getCommitteeEventsForBills(db, bills);
+  const floorByBill = await getFloorEventsForBills(db, bills);
   const congresses = [...new Set(bills.map((b) => b.congress))];
   const nameMaps = new Map<number, Map<string, string>>();
   for (const c of congresses) {
@@ -171,10 +173,12 @@ export async function getProcessSummariesForBills(
   for (const bill of bills) {
     const key = billKey(bill.congress, bill.billType, bill.billNumber);
     const events = eventsByBill.get(key) ?? [];
+    const floorEvents = floorByBill.get(key) ?? [];
     const summary = toProcessSummary(
       bill.billType,
       events,
-      nameMaps.get(bill.congress)
+      nameMaps.get(bill.congress),
+      floorEvents
     );
     if (summary) out.set(key, summary);
   }

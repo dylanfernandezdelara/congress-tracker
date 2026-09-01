@@ -13,6 +13,7 @@ import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
 import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
+import { FloorStatusChip } from '../components/FloorStatusChip'
 import { LeftSidebar } from '../components/LeftSidebar'
 import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
@@ -21,6 +22,7 @@ import { RightRail } from '../components/RightRail'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import { useMemberProfile } from '../hooks/useMemberProfile'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
 import {
@@ -28,7 +30,7 @@ import {
   advancedFilterSummary,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
-import { useMemberProfile } from '../hooks/useMemberProfile'
+import { timelineFloorChrome } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
@@ -185,6 +187,15 @@ export default function Home() {
     .filter(Boolean)
     .join(' · ')
 
+  const floorChrome = timelineFloorChrome({
+    items,
+    chamber,
+    houseLast: session.data?.house.date_range.last,
+    senateLast: session.data?.senate.date_range.last,
+    confirmationVoteDates: (recentConfirmations.data?.confirmations ?? []).map((item) => item.vote_date),
+    through: searchQuery || advancedCount > 0 ? 'page' : 'session',
+  })
+
   return (
     <div className="home-shell">
       {isDesktop ? (
@@ -244,6 +255,11 @@ export default function Home() {
 
         {!showSkeleton && !feedError && total === 0 && !inFlight ? (
           <div className="home-feed-empty">
+            <FloorStatusChip
+              label={floorChrome.statusLabel}
+              house={floorChrome.house}
+              senate={floorChrome.senate}
+            />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
@@ -270,12 +286,25 @@ export default function Home() {
         {showFeed ? (
           <section id="feed-top" aria-busy={listRefreshing || undefined}>
             <div className="home-feed-header">
-              <h2 className="home-feed-title">Chronological timeline</h2>
+              <div className="home-feed-heading">
+                <h2 className="home-feed-title">Chronological timeline</h2>
+                <FloorStatusChip
+                  label={floorChrome.statusLabel}
+                  house={floorChrome.house}
+                  senate={floorChrome.senate}
+                />
+              </div>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
+                {floorChrome.throughLabel ? ` · through ${floorChrome.throughLabel}` : ''}
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
+            {floorChrome.notice ? (
+              <p className="home-feed-quiet" role="status">
+                {floorChrome.notice}
+              </p>
+            ) : null}
 
             <ul className={`feed-list${listRefreshing ? ' is-refreshing' : ''}`}>
               {items.map((item) => {

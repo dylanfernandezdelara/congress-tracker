@@ -81,6 +81,12 @@ export function congressGovBillUrl(congress: number, type: string, number: numbe
   return `https://www.congress.gov/bill/${congressOrdinal(congress)}-congress/${segment}/${number}`
 }
 
+/** True when a title or headline still carries the offline seed marker. */
+export function containsLocalSampleLabel(text: string | null | undefined): boolean {
+  if (!text) return false
+  return /\(\s*local sample\s*\)/i.test(text)
+}
+
 /** Strip offline seed marker from titles/headlines when real data is shown. */
 export function stripLocalSampleLabel(text: string): string {
   return text.replace(LOCAL_SAMPLE_LABEL, ' ').replace(/\s+/g, ' ').trim()

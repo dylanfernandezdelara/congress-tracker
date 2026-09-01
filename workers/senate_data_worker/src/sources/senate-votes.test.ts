@@ -109,6 +109,31 @@ describe("parseSenateVoteMenuXml", () => {
     });
   });
 
+  it("unwraps nested <measure> tags in companion questions", () => {
+    const xml = `<vote_summary><congress_year>2026</congress_year><votes>
+      <vote>
+        <vote_number>00227</vote_number>
+        <vote_date>August 08</vote_date>
+        <issue>H.R. 6500</issue>
+        <question>On the Motion to Table <measure>S.Amdt. 6747</measure></question>
+        <title></title>
+        <result>Agreed to</result>
+        <vote_tally><yeas>52</yeas><nays>45</nays></vote_tally>
+      </vote>
+    </votes></vote_summary>`;
+
+    const { nonPassageStubs } = parseSenateVoteMenuXml(
+      xml,
+      119,
+      2,
+      new Date("2026-08-10T00:00:00Z")
+    );
+
+    expect(nonPassageStubs).toHaveLength(1);
+    expect(nonPassageStubs[0]?.question).toBe("On the Motion to Table S.Amdt. 6747");
+    expect(nonPassageStubs[0]?.question).not.toMatch(/<measure>/i);
+  });
+
   it("returns On the Nomination PN rolls as confirmation votes and skips cloture on nominations", () => {
     const { confirmationVotes } = parseSenateVoteMenuXml(
       sample,
@@ -209,6 +234,39 @@ describe("parseSenateVoteMenuXml", () => {
     expect(result.skipped).toBe(1);
     expect(result.votes).toHaveLength(1);
     expect(result.votes[0]?.rollNumber).toBe(182);
+    expect(result.sourceLatestDate).toBe("2026-06-22");
+    expect(result.coveredLatestDate).toBe("2026-06-22");
+
+    fetchSenate.mockRestore();
+  });
+
+  it("does not stamp passage watermarks from a newer confirmation roll", async () => {
+    const xml = sample.replace(
+      /<vote_number>00165<\/vote_number>\s*<vote_date>05-Jun<\/vote_date>/,
+      "<vote_number>00165</vote_number><vote_date>24-Aug</vote_date>"
+    );
+    const fetchSenate = vi
+      .spyOn(senateFetch, "fetchSenateLegislativeText")
+      .mockResolvedValue(xml);
+    const env = {
+      CONGRESS: "119",
+      SESSION: "2",
+      DB: {
+        prepare: () => ({
+          bind: () => ({
+            first: async () => null,
+            run: async () => ({ success: true, meta: { duration: 0 } }),
+          }),
+          run: async () => ({ success: true, meta: { duration: 0 } }),
+        }),
+      },
+    } as unknown as Env;
+
+    const result = await ingestSenatePassageVotes(env, "2026-01-01", new Set());
+
+    expect(result.confirmationVotes[0]?.voteDate).toBe("2026-08-24");
+    expect(result.sourceLatestDate).toBe("2026-06-22");
+    expect(result.coveredLatestDate).toBe("2026-06-22");
 
     fetchSenate.mockRestore();
   });

@@ -1,5 +1,6 @@
 import type { FeedCompanionVote } from '../api/types'
 import { formatVoteDate } from '../utils/billLabels'
+import { cleanVoteQuestion } from '@congress-tracker/shared/vote-question'
 
 /** Companion rolls tell readers what the chamber fought over before passage. */
 export function CompanionVotes({ votes }: { votes: FeedCompanionVote[] }) {
@@ -14,7 +15,7 @@ export function CompanionVotes({ votes }: { votes: FeedCompanionVote[] }) {
             key={`${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`}
             className="feed-row-companion-item"
           >
-            <span className="feed-row-companion-question">{vote.question}</span>
+            <span className="feed-row-companion-question">{cleanVoteQuestion(vote.question)}</span>
             <span className="feed-row-companion-meta">
               {vote.result} · {vote.yeas}–{vote.nays} · {formatVoteDate(vote.date)}
             </span>

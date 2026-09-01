@@ -118,8 +118,13 @@ restore offline sample spotlights for UI work.
   schema is created on demand by `ensureSchema()` (and by `npm run seed`), so
   there is no migration step to run.
 - **`npm run preview` is not local.** It builds the web app and uploads a
-  Cloudflare preview version, which reuses production bindings (incl. D1). It
-  needs Cloudflare credentials and is best run from Cursor Cloud.
+  Cloudflare preview Worker. That version uses the `[env.preview]` D1
+  (`congress-tracker-preview`), not production. Cron does not run on preview,
+  and pipeline writes are blocked, so the preview DB can lag production or stay
+  empty. If the preview feed lags production, copy current data with
+  `npm run sync:preview-db` (does not write production; remote export briefly
+  stalls live D1, so do not run it on every upload). `npm run seed` is local
+  Miniflare only. Needs Cloudflare credentials; best run from Cursor Cloud.
 
 ## Verifying parity
 
@@ -133,5 +138,5 @@ it is safe to run any time.
 
 Follow the ship checklist in [`AGENTS.md`](../AGENTS.md): `npm test`, then for
 `web/` changes `npm run qa:web` (with `npm run dev:web` running), a
-thermonuclear review of the branch diff, and `npm run preview` for a shareable
-URL.
+thermonuclear review of the branch diff with Grok 4.6 (`cursor-grok-4.6-high-fast`; never Grok 4.5),
+and `npm run preview` for a shareable URL.

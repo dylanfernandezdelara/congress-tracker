@@ -13,6 +13,10 @@ export interface FeedPipelineRunRecord {
   /** Per-bill digest/sponsor fetch failures that did not abort the run. */
   digest_warnings?: string[];
   chamber_warnings?: string[];
+  /** Latest House list date in the lookback (`YYYY-MM-DD`), including skipped known rolls. */
+  house_source_latest_date?: string;
+  /** Latest Senate menu date in the lookback (`YYYY-MM-DD`), including skipped known rolls. */
+  senate_source_latest_date?: string;
   lifecycleRefreshed?: number;
   lifecycleSkipped?: number;
   lifecycle_warnings?: string[];
@@ -57,6 +61,12 @@ export interface IngestMonitorPayload {
   daily_cron_utc: string;
   stale_after_hours: number;
   latest_passage_vote_date: string | null;
+  /**
+   * Whole UTC days since `latest_passage_vote_date`. Null when no passage
+   * vote is stored. A large value with status `ok` means Congress is quiet,
+   * not that ingest is stuck.
+   */
+  floor_quiet_days: number | null;
   missing_digest_count: number;
   last_success: FeedPipelineRunRecord | null;
   last_failure: FeedPipelineFailureRecord | null;

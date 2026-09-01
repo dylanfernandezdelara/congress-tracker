@@ -1,7 +1,8 @@
 import type { Env } from "../config";
-import type { IngestVotesResult, SenateIngestVotesResult } from "../types";
+import type { Chamber, IngestVotesResult, SenateIngestVotesResult } from "../types";
 import { ingestHousePassageVotes } from "../sources/house-votes";
 import { ingestSenatePassageVotes } from "../sources/senate-votes";
+import { isSourceAheadOfCovered } from "../sources/vote-date-watermarks";
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -13,6 +14,49 @@ function emptyHouseResult(): IngestVotesResult {
 
 function emptySenateResult(): SenateIngestVotesResult {
   return { votes: [], skipped: 0, confirmationVotes: [] };
+}
+
+/** Truncation and source-ahead watermarks — not fetch errors from the chamber client. */
+function ingestIntegrityWarnings(chamber: Chamber, result: IngestVotesResult): string[] {
+  const warnings: string[] = [];
+  if (result.truncated) {
+    warnings.push(
+      `${chamber} ingest truncated: per-run fetch cap reached; remaining unknown rolls retry next run (newest first).`
+    );
+  }
+  const source = result.sourceLatestDate;
+  const covered = result.coveredLatestDate;
+  if (isSourceAheadOfCovered(source, covered)) {
+    warnings.push(
+      `${chamber} source listed latest ${source} is newer than stored ${covered ?? "none"}`
+    );
+  }
+  return warnings;
+}
+
+function settleChamber<T extends IngestVotesResult>(
+  settled: PromiseSettledResult<T>,
+  chamber: Chamber,
+  empty: () => T
+): { result: T; warnings: string[] } {
+  if (settled.status === "rejected") {
+    const message = errorMessage(settled.reason);
+    console.warn(
+      JSON.stringify({
+        event: `${chamber.toLowerCase()}_ingest_failed`,
+        error: message,
+      })
+    );
+    return {
+      result: empty(),
+      warnings: [`${chamber} ingest skipped: ${message}`],
+    };
+  }
+  const result = settled.value;
+  return {
+    result,
+    warnings: [...(result.warnings ?? []), ...ingestIntegrityWarnings(chamber, result)],
+  };
 }
 
 export interface ChamberIngestResult {
@@ -37,43 +81,8 @@ export async function ingestPassageVotesByChamber(
     ingestSenatePassageVotes(env, lookbackStart, knownKeys),
   ]);
 
-  const chamberWarnings: string[] = [];
-
-  let house: IngestVotesResult;
-  if (houseSettled.status === "rejected") {
-    const message = errorMessage(houseSettled.reason);
-    chamberWarnings.push(`House ingest skipped: ${message}`);
-    console.warn(
-      JSON.stringify({
-        event: "house_ingest_failed",
-        error: message,
-      })
-    );
-    house = emptyHouseResult();
-  } else {
-    house = houseSettled.value;
-    if (house.warnings?.length) {
-      chamberWarnings.push(...house.warnings);
-    }
-  }
-
-  let senate: SenateIngestVotesResult;
-  if (senateSettled.status === "rejected") {
-    const message = errorMessage(senateSettled.reason);
-    chamberWarnings.push(`Senate ingest skipped: ${message}`);
-    console.warn(
-      JSON.stringify({
-        event: "senate_ingest_failed",
-        error: message,
-      })
-    );
-    senate = emptySenateResult();
-  } else {
-    senate = senateSettled.value;
-    if (senate.warnings?.length) {
-      chamberWarnings.push(...senate.warnings);
-    }
-  }
+  const house = settleChamber(houseSettled, "House", emptyHouseResult);
+  const senate = settleChamber(senateSettled, "Senate", emptySenateResult);
 
   if (houseSettled.status === "rejected" && senateSettled.status === "rejected") {
     throw new Error(
@@ -81,5 +90,9 @@ export async function ingestPassageVotesByChamber(
     );
   }
 
-  return { house, senate, chamberWarnings };
+  return {
+    house: house.result,
+    senate: senate.result,
+    chamberWarnings: [...house.warnings, ...senate.warnings],
+  };
 }

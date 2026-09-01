@@ -177,6 +177,18 @@ CREATE TABLE IF NOT EXISTS bill_committee_events (
   tally_text TEXT,
   PRIMARY KEY (congress, bill_type, bill_number, system_code, activity_key, activity_at)
 );
+CREATE TABLE IF NOT EXISTS bill_floor_events (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  action_key TEXT NOT NULL,
+  action_at TEXT NOT NULL,
+  chamber TEXT NOT NULL,
+  label TEXT NOT NULL,
+  raw_text TEXT NOT NULL,
+  tally_text TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number, action_key, action_at, chamber)
+);
 CREATE TABLE IF NOT EXISTS committee_roster (
   congress INTEGER NOT NULL,
   system_code TEXT NOT NULL,
@@ -243,7 +255,9 @@ INSERT OR REPLACE INTO votes
   (chamber, congress, session, roll_number, bill_congress, bill_type, bill_number, question, result, yeas, nays, vote_date, is_passage)
 VALUES
   ('House', 119, 2, 9001, 119, 'hr', 1, 'On Passage', 'Passed', 220, 213, '${D_RECENT}', 1),
+  ('House', 119, 2, 9005, 119, 'hr', 1, 'On Agreeing to the Resolution', 'Passed', 218, 210, '${D_RECENT}', 0),
   ('Senate', 119, 2, 9002, 119, 's', 47, 'On Passage of the Bill', 'Passed', 68, 32, '${D_MID}', 1),
+  ('Senate', 119, 2, 9006, 119, 's', 47, 'On the Cloture Motion', 'Agreed to', 60, 37, '${D_MID}', 0),
   ('House', 119, 2, 9003, 119, 'hr', 22, 'On Passage', 'Passed', 314, 117, '${D_OLDER}', 1);
 
 INSERT OR REPLACE INTO bill_digests
@@ -272,9 +286,9 @@ VALUES
 INSERT OR REPLACE INTO bill_lifecycle
   (congress, bill_type, bill_number, introduced_date, presented_date, signed_date, vetoed_date, became_law_date, law_kind, public_law, latest_action_date, latest_action_text, updated_at)
 VALUES
-  (119, 'hr', 1, '${D_OLDER}', '${D_MID}', '${D_RECENT}', NULL, '${D_RECENT}', 'signed', '119-1',
+  (119, 'hr', 1, '${D_OLDER}', '${D_RECENT}', '${D_RECENT}', NULL, '${D_RECENT}', 'signed', '119-1',
    '${D_RECENT}', 'Became Public Law No: 119-1. (local sample)', '${D_RECENT}T00:00:00.000Z'),
-  (119, 's', 47, '${D_OLDER}', '${D_OLDER}', NULL, NULL, '${D_MID}', 'law_unsigned', '119-2',
+  (119, 's', 47, '${D_OLDER}', '${D_MID}', NULL, NULL, '${D_MID}', 'law_unsigned', '119-2',
    '${D_MID}', 'Became Public Law No: 119-2 without signature. (local sample)', '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, '${D_OLDER}', '${D_RECENT}', NULL, NULL, NULL, NULL, NULL,
    '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z');
@@ -296,6 +310,7 @@ INSERT INTO bill_committee_events
 VALUES
   (119, 'HR', 1, 'hsif00', 'sent', '${D_OLDER}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Referred To', NULL),
   (119, 'HR', 1, 'hsif14', 'sent', '${D_OLDER}T15:00:00.000Z', 'House', 'Health Subcommittee', 'hsif00', 'Referred to', NULL),
+  (119, 'HR', 1, 'hsif00', 'hearings', '${D_OLDER}T18:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Hearings By', NULL),
   (119, 'HR', 1, 'hsif14', 'advanced', '${D_MID}T15:00:00.000Z', 'House', 'Health Subcommittee', 'hsif00', 'Reported by', NULL),
   (119, 'HR', 1, 'hsif00', 'advanced', '${D_MID}T18:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Reported By', '47-0'),
   (119, 'HR', 22, 'hsba00', 'sent', '${D_OLDER}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Referred To', NULL),
@@ -306,6 +321,15 @@ VALUES
   (119, 'HR', 9002, 'hsif00', 'sent', '${D_STUCK}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Referred To', NULL),
   (119, 'HR', 9003, 'hsba00', 'sent', '${D_STUCK}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Referred To', NULL),
   (119, 'S', 9001, 'sshr00', 'sent', '${D_STUCK}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Referred To', NULL);
+
+DELETE FROM bill_floor_events WHERE congress = 119;
+INSERT INTO bill_floor_events
+  (congress, bill_type, bill_number, action_key, action_at, chamber, label, raw_text, tally_text)
+VALUES
+  (119, 'HR', 1, 'calendar', '${D_MID}T20:00:00.000Z', 'House', 'Placed on the House calendar', 'Placed on the Union Calendar, Calendar No. 12. (local sample)', NULL),
+  (119, 'HR', 1, 'received', '${D_RECENT}T18:00:00.000Z', 'Senate', 'Received in the Senate', 'Received in the Senate. (local sample)', NULL),
+  (119, 'S', 47, 'considered', '${D_MID}T08:00:00.000Z', 'Senate', 'Debated in the Senate', 'Measure laid before Senate by unanimous consent. (local sample)', 'unanimous consent'),
+  (119, 'HR', 22, 'calendar', '${D_OLDER}T16:00:00.000Z', 'House', 'Placed on the House calendar', 'Placed on the Union Calendar. (local sample)', NULL);
 
 INSERT OR REPLACE INTO nominations
   (congress, nomination_number, part_number, citation, description, organization, position_title,

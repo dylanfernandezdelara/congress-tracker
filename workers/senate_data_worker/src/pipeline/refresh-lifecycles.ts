@@ -28,16 +28,16 @@ export function lifecycleRefreshPriority(stored: LifecycleRow | undefined): numb
 }
 
 /**
- * Merge recent-voted bills with presented-but-not-terminal lifecycle rows.
- * Vote lookback alone misses bills still awaiting signature after passage ages out.
+ * Merge lifecycle refresh groups (feed votes, public laws, presented-pending).
+ * Earlier groups win when the same bill appears twice. Vote lookback alone
+ * misses bills that became law after passage aged out.
  */
 export function mergeLifecycleRefreshCandidates(
-  votedBills: LifecycleBillRow[],
-  presentedPending: LifecycleBillRow[]
+  ...groups: LifecycleBillRow[][]
 ): LifecycleBillRow[] {
   const seen = new Set<string>();
   const out: LifecycleBillRow[] = [];
-  for (const row of [...votedBills, ...presentedPending]) {
+  for (const row of groups.flat()) {
     const key = lifecycleMapKey(row.bill_congress, row.bill_type, row.bill_number);
     if (seen.has(key)) continue;
     seen.add(key);

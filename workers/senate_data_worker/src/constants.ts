@@ -58,6 +58,12 @@ export const HOUSE_VOTE_DETAIL_FETCHES_PER_RUN = 200;
 export const LIFECYCLE_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 
 /**
+ * Congress.gov public-law list page size. One page covers a typical congress
+ * (~100 public laws); the ingest walks `pagination.next` if a session exceeds it.
+ */
+export const PUBLIC_LAWS_PAGE_SIZE = 250;
+
+/**
  * Per-bill Congress.gov committee hydrations (committees + actions) per process
  * refresh/backfill run. Each bill costs ~2 subrequests.
  */
