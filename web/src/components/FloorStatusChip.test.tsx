@@ -40,7 +40,6 @@ describe('FloorStatusChip', () => {
   it('shows which chamber the status belongs to', () => {
     render(
       <FloorStatusChip
-        label="House working · Senate in recess"
         house={detail('House', { status: 'working', statusLabel: 'Working', returnsOn: null, periodLabel: null })}
         senate={detail('Senate')}
       />,
@@ -53,7 +52,7 @@ describe('FloorStatusChip', () => {
 
   it('opens a concise sheet with per-chamber facts, not a long lead', () => {
     render(
-      <FloorStatusChip label="House & Senate in recess" house={detail('House')} senate={detail('Senate')} />,
+      <FloorStatusChip house={detail('House')} senate={detail('Senate')} />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /House & Senate in recess/ }))
@@ -77,7 +76,10 @@ describe('FloorStatusChip', () => {
 
   it('renders nothing without a status label', () => {
     const { container } = render(
-      <FloorStatusChip label={null} house={detail('House')} senate={detail('Senate')} />,
+      <FloorStatusChip
+        house={detail('House', { status: null, statusLabel: null })}
+        senate={detail('Senate', { status: null, statusLabel: null })}
+      />,
     )
     expect(container).toBeEmptyDOMElement()
   })

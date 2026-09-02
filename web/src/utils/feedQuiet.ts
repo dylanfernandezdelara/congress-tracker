@@ -14,13 +14,7 @@ import {
 import { maxIsoDay, parseIsoDay, utcIsoDay } from '@congress-tracker/shared/iso-day'
 
 import { formatVoteDate } from './billLabels'
-import { floorChipLabel } from './floorStatusCopy'
-
-const FLOOR_STATUS_LABEL = {
-  working: 'Working',
-  in_session: 'In session',
-  in_recess: 'In recess',
-} as const satisfies Record<FloorWorkStatus, string>
+import { FLOOR_STATUS_LABEL } from './floorStatusCopy'
 
 function voteDaysByChamber(
   items: readonly {
@@ -36,14 +30,6 @@ function voteDaysByChamber(
     }
   }
   return { house, senate }
-}
-
-export function floorStatusLabel(
-  latestFloorDate: string | null | undefined,
-  now: Date = new Date(),
-): string | null {
-  const status = floorWorkStatus(latestFloorDate, now)
-  return status ? FLOOR_STATUS_LABEL[status] : null
 }
 
 export function feedQuietCopy(
@@ -103,7 +89,6 @@ export type TimelineThrough = 'session' | 'page'
 export type TimelineFloorChrome = {
   throughLabel: string | null
   notice: string | null
-  statusLabel: string | null
   house: ChamberFloorDetail
   senate: ChamberFloorDetail
 }
@@ -152,7 +137,6 @@ export function timelineFloorChrome(params: {
   return {
     throughLabel,
     notice: through === 'session' ? notice : null,
-    statusLabel: floorChipLabel(house, senate),
     house,
     senate,
   }

@@ -379,12 +379,6 @@
     outline-offset: 2px;
   }
 
-  .floor-status-sheet-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
   .floor-status-sheet-title {
     margin: 0;
     font-size: 1.125rem;

@@ -255,11 +255,7 @@ export default function Home() {
 
         {!showSkeleton && !feedError && total === 0 && !inFlight ? (
           <div className="home-feed-empty">
-            <FloorStatusChip
-              label={floorChrome.statusLabel}
-              house={floorChrome.house}
-              senate={floorChrome.senate}
-            />
+            <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
@@ -288,11 +284,7 @@ export default function Home() {
             <div className="home-feed-header">
               <div className="home-feed-heading">
                 <h2 className="home-feed-title">Chronological timeline</h2>
-                <FloorStatusChip
-                  label={floorChrome.statusLabel}
-                  house={floorChrome.house}
-                  senate={floorChrome.senate}
-                />
+                <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
               </div>
               <p className="home-feed-count">
                 {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}

@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 
 import { formatVoteDate, formatWeekdayVoteDate } from '../utils/billLabels'
 import type { ChamberFloorDetail } from '../utils/feedQuiet'
-import { chamberReturnCopy } from '../utils/floorStatusCopy'
+import { chamberReturnCopy, floorChipLabel } from '../utils/floorStatusCopy'
 import { AnimatedSheet } from './AnimatedSheet'
 
 function ChamberStatusRow({ detail }: { detail: ChamberFloorDetail }) {
@@ -50,11 +50,9 @@ export function FloorStatusSheet({
       closeAriaLabel="Close floor status"
       panelClassName="floor-status-sheet"
     >
-      <header className="floor-status-sheet-header">
-        <h2 id={titleId} className="floor-status-sheet-title">
-          Floor status
-        </h2>
-      </header>
+      <h2 id={titleId} className="floor-status-sheet-title">
+        Floor status
+      </h2>
 
       <ChamberStatusRow detail={house} />
       <ChamberStatusRow detail={senate} />
@@ -83,14 +81,14 @@ export function FloorStatusSheet({
 }
 
 type FloorStatusChipProps = {
-  label: string | null
   house: ChamberFloorDetail
   senate: ChamberFloorDetail
 }
 
-export function FloorStatusChip({ label, house, senate }: FloorStatusChipProps) {
+export function FloorStatusChip({ house, senate }: FloorStatusChipProps) {
   const [open, setOpen] = useState(false)
   const [selectionKey, setSelectionKey] = useState(0)
+  const label = floorChipLabel(house, senate)
 
   if (!label) return null
 

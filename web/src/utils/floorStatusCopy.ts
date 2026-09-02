@@ -3,23 +3,14 @@ import type { FloorWorkStatus } from '@congress-tracker/shared/floor-quiet'
 type ChamberChipStatus = { status: FloorWorkStatus | null }
 type ChamberReturn = { status: FloorWorkStatus | null; returnsOn: string | null }
 
-const CHIP_STATUS_PHRASE = {
-  working: 'working',
-  in_session: 'in session',
-  in_recess: 'in recess',
+export const FLOOR_STATUS_LABEL = {
+  working: 'Working',
+  in_session: 'In session',
+  in_recess: 'In recess',
 } as const satisfies Record<FloorWorkStatus, string>
 
 function chipStatusPhrase(status: FloorWorkStatus): string {
-  switch (status) {
-    case 'working':
-    case 'in_session':
-    case 'in_recess':
-      return CHIP_STATUS_PHRASE[status]
-    default: {
-      const _exhaustive: never = status
-      return _exhaustive
-    }
-  }
+  return FLOOR_STATUS_LABEL[status].toLowerCase()
 }
 
 /**

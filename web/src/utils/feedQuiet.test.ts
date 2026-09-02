@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { feedQuietCopy, floorStatusLabel, timelineFloorChrome } from './feedQuiet'
+import { chamberFloorDetail, feedQuietCopy, timelineFloorChrome } from './feedQuiet'
+import { floorChipLabel } from './floorStatusCopy'
 
 describe('feedQuietCopy', () => {
   const now = new Date('2026-08-25T20:00:00.000Z')
@@ -39,14 +40,14 @@ describe('feedQuietCopy', () => {
   })
 })
 
-describe('floorStatusLabel', () => {
+describe('chamberFloorDetail status labels', () => {
   const now = new Date('2026-08-25T20:00:00.000Z')
 
   it('names working, in-session, and recess floors', () => {
-    expect(floorStatusLabel('2026-08-24', now)).toBe('Working')
-    expect(floorStatusLabel('2026-08-21', now)).toBe('In session')
-    expect(floorStatusLabel('2026-08-08', now)).toBe('In recess')
-    expect(floorStatusLabel(null, now)).toBeNull()
+    expect(chamberFloorDetail('House', '2026-08-24', now).statusLabel).toBe('Working')
+    expect(chamberFloorDetail('House', '2026-08-21', now).statusLabel).toBe('In session')
+    expect(chamberFloorDetail('House', '2026-08-08', now).statusLabel).toBe('In recess')
+    expect(chamberFloorDetail('House', null, now).statusLabel).toBeNull()
   })
 })
 
@@ -54,20 +55,21 @@ describe('timelineFloorChrome', () => {
   const now = new Date('2026-08-25T20:00:00.000Z')
 
   it('keeps passage through-copy while confirmations can mark Working', () => {
-    expect(
-      timelineFloorChrome({
-        items: [{ passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }] }],
-        chamber: null,
-        houseLast: '2026-07-23',
-        senateLast: '2026-08-08',
-        confirmationVoteDates: ['2026-08-24'],
-        now,
-      }),
-    ).toMatchObject({
+    const chrome = timelineFloorChrome({
+      items: [{ passage_votes: [{ chamber: 'Senate', date: '2026-08-08' }] }],
+      chamber: null,
+      houseLast: '2026-07-23',
+      senateLast: '2026-08-08',
+      confirmationVoteDates: ['2026-08-24'],
+      now,
+    })
+    expect(chrome).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
-      statusLabel: 'House in recess · Senate working',
+      house: { status: 'in_recess' },
+      senate: { status: 'working' },
     })
+    expect(floorChipLabel(chrome.house, chrome.senate)).toBe('House in recess · Senate working')
   })
 
   it('drops the quiet notice when the timeline is searched or filtered', () => {
@@ -81,7 +83,8 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: null,
-      statusLabel: null,
+      house: { status: null },
+      senate: { status: null },
     })
   })
 
@@ -97,7 +100,8 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
-      statusLabel: 'House & Senate in recess',
+      house: { status: 'in_recess' },
+      senate: { status: 'in_recess' },
     })
   })
 
@@ -113,7 +117,8 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
-      statusLabel: 'House & Senate in recess',
+      house: { status: 'in_recess' },
+      senate: { status: 'in_recess' },
     })
   })
 
@@ -130,7 +135,8 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Apr 10',
       notice: null,
-      statusLabel: 'House & Senate in recess',
+      house: { status: 'in_recess' },
+      senate: { status: 'in_recess' },
     })
   })
 
@@ -150,7 +156,8 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Jul 23',
       notice: 'No new House passage votes since Jul 23.',
-      statusLabel: 'House & Senate in recess',
+      house: { status: 'in_recess' },
+      senate: { status: 'in_recess' },
     })
   })
 
@@ -174,7 +181,8 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Jul 23',
       notice: null,
-      statusLabel: 'House & Senate in recess',
+      house: { status: 'in_recess' },
+      senate: { status: 'in_recess' },
     })
   })
 
@@ -195,7 +203,8 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: null,
       notice: null,
-      statusLabel: 'House & Senate in recess',
+      house: { status: 'in_recess' },
+      senate: { status: 'in_recess' },
     })
   })
 
