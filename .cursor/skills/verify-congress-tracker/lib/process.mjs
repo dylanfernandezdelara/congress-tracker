@@ -20,18 +20,26 @@ export function pidAlive(pid) {
   }
 }
 
+// Signal the whole process group first: a dead npm leader leaves Vite/wrangler/Chromium
+// children alive in the same group, so the leader's liveness must not gate the group kill.
 export function killPid(pid, signal = 'SIGTERM') {
   if (!pid || pid <= 1) return
-  if (!pidAlive(pid)) return
   try {
     process.kill(-pid, signal)
+    return
   } catch {
-    try {
-      process.kill(pid, signal)
-    } catch {
-      // already gone
-    }
+    // no such group (or not a group leader); fall back to the pid itself
   }
+  if (!pidAlive(pid)) return
+  try {
+    process.kill(pid, signal)
+  } catch {
+    // already gone
+  }
+}
+
+function groupAlive(pid) {
+  return pidAlive(-pid) || pidAlive(pid)
 }
 
 export function listenersOnPort(port) {
@@ -148,15 +156,15 @@ export function teardownPids(pids, { graceMs = 8000 } = {}) {
   const list = [...new Set((pids || []).filter((pid) => Number(pid) > 1))]
   for (const pid of list) killPid(pid, 'SIGTERM')
   const deadline = Date.now() + graceMs
-  while (Date.now() < deadline && list.some((pid) => pidAlive(pid))) {
+  while (Date.now() < deadline && list.some((pid) => groupAlive(pid))) {
     sleepMs(200)
   }
-  const leftover = list.filter((pid) => pidAlive(pid))
+  const leftover = list.filter((pid) => groupAlive(pid))
   if (leftover.length > 0) {
     for (const pid of leftover) killPid(pid, 'SIGKILL')
     sleepMs(400)
   }
-  return list.filter((pid) => pidAlive(pid))
+  return list.filter((pid) => groupAlive(pid))
 }
 
 export function recordedPids(state) {

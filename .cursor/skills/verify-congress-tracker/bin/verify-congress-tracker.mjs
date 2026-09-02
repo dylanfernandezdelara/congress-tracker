@@ -488,13 +488,13 @@ function cmdCleanup() {
       workerUrl: `http://127.0.0.1:${workerPort}`,
     }
   }
-  const portPids = corrupt
-    ? [endpoints.webPort, endpoints.workerPort, endpoints.cdpPort].flatMap((port) =>
-        listenersOnPort(port).filter((pid) =>
-          listenerLooksLikeVerification(pid, RUN_DIR, { isWebPort: port === endpoints.webPort }),
-        ),
-      )
-    : []
+  // Always sweep the ports too: a recorded npm leader can die and leave its Vite/wrangler/
+  // Chromium children listening, in which case the recorded pids alone free nothing.
+  const portPids = [endpoints.webPort, endpoints.workerPort, endpoints.cdpPort].flatMap((port) =>
+    listenersOnPort(port).filter((pid) =>
+      listenerLooksLikeVerification(pid, RUN_DIR, { isWebPort: port === endpoints.webPort }),
+    ),
+  )
   const pids = [
     ...new Set([
       ...(state && !corrupt ? recordedPids(state) : []),

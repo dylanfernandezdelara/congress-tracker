@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -22,7 +23,13 @@ import {
   workerArgsFor,
 } from '../lib/endpoints.mjs'
 import { ENERGY_HEADLINE, isAllowedApiPath, REQUIRED_HEADLINES, seedFeedProblems } from '../lib/feed.mjs'
-import { listenerLooksLikeVerification, portOwnershipProblem } from '../lib/process.mjs'
+import {
+  killPid,
+  listenerLooksLikeVerification,
+  pidAlive,
+  portOwnershipProblem,
+  teardownPids,
+} from '../lib/process.mjs'
 import { TEST_ONLY } from './verify-congress-tracker.mjs'
 
 test('corrupt-state cleanup only claims listeners that visibly belong to a verification run', () => {
@@ -262,3 +269,53 @@ test('verification stack uses dedicated ports beside the human dev stack', () =>
   assert.equal(args[args.indexOf('--port') + 1], '6101')
   assert.deepEqual(webDevArgs(), ['run', 'dev:web', '--', '--mode', 'verify-congress-tracker'])
 })
+
+test('teardownPids kills a process group whose recorded leader already exited', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-teardown-'))
+  const pidFile = path.join(dir, 'child.pid')
+  let leaderPid = 0
+  let childPid = 0
+  try {
+    // Leader (sh) forks a long-lived node child into its process group, then exits.
+    const leader = spawn(
+      'sh',
+      ['-c', `node -e "setInterval(() => {}, 1000)" & echo $! > "${pidFile}"; exit 0`],
+      { detached: true, stdio: 'ignore' },
+    )
+    leader.unref()
+    leaderPid = leader.pid
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('leader did not exit')), 5000)
+      leader.once('error', reject)
+      leader.once('exit', () => {
+        clearTimeout(timer)
+        resolve()
+      })
+    })
+    childPid = await waitFor(() => {
+      const text = fs.existsSync(pidFile) ? fs.readFileSync(pidFile, 'utf8').trim() : ''
+      return /^\d+$/.test(text) ? Number(text) : 0
+    }, 'child pid file')
+    assert.equal(pidAlive(leaderPid), false)
+    assert.equal(pidAlive(childPid), true)
+
+    assert.deepEqual(teardownPids([leaderPid], { graceMs: 3000 }), [])
+    // The orphan is reparented to init/launchd; kill(pid, 0) still succeeds on the zombie
+    // until it is reaped, so wait for that instead of asserting instantly.
+    await waitFor(() => !pidAlive(childPid), 'orphaned group member to die')
+  } finally {
+    if (leaderPid > 1) killPid(leaderPid, 'SIGKILL')
+    if (childPid > 1) killPid(childPid, 'SIGKILL')
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+async function waitFor(probe, what, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const value = probe()
+    if (value) return value
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
