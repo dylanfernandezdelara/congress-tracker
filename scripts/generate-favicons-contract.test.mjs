@@ -120,12 +120,23 @@ test('generateFavicons writes full-bleed high-res PNGs + SVG', () => {
   }
 })
 
+/**
+ * Hash of what a PNG encodes (dimensions, color type, decoded scanlines), not
+ * its bytes: zlib produces different deflate streams across Node versions.
+ * @param {Buffer} png
+ */
+function pngPixelSha(png) {
+  const { width, height, colorType } = readPngMeta(png)
+  return createHash('sha256')
+    .update(`${width}x${height}:${colorType}:`)
+    .update(inflatePngRgba(png))
+    .digest('hex')
+}
+
 test('checked-in favicon assets match generator output', () => {
   for (const asset of FAVICON_PNG_ASSETS) {
-    const expectedSha = createHash('sha256').update(renderFaviconAsset(asset.id)).digest('hex')
-    const committedSha = createHash('sha256')
-      .update(fs.readFileSync(path.join(publicDir, asset.file)))
-      .digest('hex')
+    const expectedSha = pngPixelSha(renderFaviconAsset(asset.id))
+    const committedSha = pngPixelSha(fs.readFileSync(path.join(publicDir, asset.file)))
     assert.equal(expectedSha, committedSha, `${asset.file} out of sync with generator`)
   }
   assert.equal(
