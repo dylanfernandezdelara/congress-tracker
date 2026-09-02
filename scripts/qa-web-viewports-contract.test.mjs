@@ -59,10 +59,14 @@ test('dev:web forwards Vite CLI flags through nested npm', () => {
   assert.equal(packageJson.scripts['dev:web'], 'npm --prefix web run dev --')
 })
 
-test('Vite binds 127.0.0.1:5173 with strictPort (docs/agent healthchecks)', () => {
+test('Vite binds 127.0.0.1:5173 by default with strictPort (docs/agent healthchecks)', () => {
   const viteConfig = fs.readFileSync(path.join(rootDir, 'web', 'vite.config.ts'), 'utf8')
   assert.match(viteConfig, /host:\s*'127\.0\.0\.1'/)
-  assert.match(viteConfig, /port:\s*5173/)
+  // Default stays 5173; VITE_DEV_PORT lets the verification helper run beside it.
+  assert.match(viteConfig, /process\.env\.VITE_DEV_PORT/)
+  assert.match(viteConfig, /return 5173/)
+  assert.match(viteConfig, /port:\s*devPort/)
+  assert.match(viteConfig, /VITE_WORKER_ORIGIN \?\? 'http:\/\/127\.0\.0\.1:8787'/)
   assert.match(viteConfig, /strictPort:\s*true/)
 })
 

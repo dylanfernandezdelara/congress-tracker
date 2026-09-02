@@ -5,6 +5,20 @@ import react from '@vitejs/plugin-react'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
+function parseViteDevPort(raw) {
+  if (raw === undefined || raw === '') return 5173
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    throw new Error(`VITE_DEV_PORT must be a positive integer (got ${JSON.stringify(raw)})`)
+  }
+  return n
+}
+
+// Defaults match the documented dev URLs (web :5173 -> worker :8787). The
+// verification helper overrides both so it can run beside a human dev stack.
+const devPort = parseViteDevPort(process.env.VITE_DEV_PORT)
+const workerOrigin = process.env.VITE_WORKER_ORIGIN ?? 'http://127.0.0.1:8787'
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -17,18 +31,19 @@ export default defineConfig({
     // many Linux/Cloud hosts, so docs/agents curling http://127.0.0.1:5173 fail
     // even though Vite printed "ready".
     host: '127.0.0.1',
-    port: 5173,
+    port: devPort,
     strictPort: true,
     fs: {
       allow: [repoRoot],
     },
-    // Same-origin API in dev (see web/src/api/config.ts). Worker must run on :8787.
+    // Same-origin API in dev (see web/src/api/config.ts). Worker must run on
+    // workerOrigin (default :8787).
     proxy: {
-      '/feed': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/stats': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/feed': { target: workerOrigin, changeOrigin: true },
+      '/stats': { target: workerOrigin, changeOrigin: true },
+      '/health': { target: workerOrigin, changeOrigin: true },
       '/debug': {
-        target: 'http://127.0.0.1:8787',
+        target: workerOrigin,
         changeOrigin: true,
         bypass(req) {
           const path = req.url ?? ''

@@ -115,6 +115,32 @@ test('seeded data is clearly marked as a local sample', () => {
   assert.match(sql, /local sample/)
 })
 
+function printCmd(extraEnv = {}) {
+  return execFileSync('bash', [seedScript], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    env: { ...process.env, SEED_PRINT_CMD: '1', ...extraEnv },
+  })
+}
+
+test('seed wipes live-ingested feed rows and supports isolated persist-to', () => {
+  const sql = printSql()
+  assert.match(sql, /DELETE FROM votes/)
+  assert.match(sql, /DELETE FROM bill_digests/)
+  assert.match(sql, /DELETE FROM bill_sponsors/)
+  assert.match(sql, /DELETE FROM bill_lifecycle/)
+  assert.match(sql, /DELETE FROM nominations/)
+  assert.match(sql, /DELETE FROM confirmation_votes/)
+  const isolated = printCmd({ SEED_PERSIST_TO: '/tmp/verify-d1-contract' })
+  assert.match(isolated, /--local/)
+  assert.match(isolated, /--persist-to \/tmp\/verify-d1-contract/)
+  assert.doesNotMatch(isolated, /--remote/)
+  const def = printCmd()
+  assert.match(def, /--local/)
+  assert.doesNotMatch(def, /--persist-to/)
+  assert.doesNotMatch(def, /--remote/)
+})
+
 test('seed includes long-waiting committee referrals for the pulse widget', () => {
   const sql = printSql()
   assert.match(sql, /HR', 9001, 'hsif00', 'sent'/)

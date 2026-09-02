@@ -39,12 +39,16 @@ re-run after `members-roster` / `member-votes` if those rails go empty.
 npm test
 ```
 
+#### Driving the real UI (agents)
+
+Use [`.cursor/skills/verify-congress-tracker/SKILL.md`](.cursor/skills/verify-congress-tracker/SKILL.md). Launch / doctor / drive / cleanup via `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker`. The helper uses isolated ports (5174/8788) and isolated sample D1, and exposes Chrome DevTools via `browser cdp|eval|console|network`.
+
 ### Cursor Cloud ship checklist (required for `web/` changes)
 
 Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHub Actions. Every agent session should follow this before opening or updating a PR:
 
 1. `npm test`
-2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`
+2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`. For behavior changes in `web/`, also prove the affected feature with the verify skill (`features/<feature>.md`) and keep evidence under `artifacts/verify/`.
 3. Run thermonuclear review per `.cursor/rules/pr-thermonuclear-review.mdc` (two Grok 4.6 thermos passes in one background launch, then synthesize); fix CRITICAL and WARNING findings; repeat until CLEAR. Never launch thermos on Grok 4.5 (`cursor-grok-4.5-high-fast`).
 4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask). If that URL’s feed lags production, run `npm run sync:preview-db` once (it exports production D1 and briefly makes live queries unavailable; do not run it on every preview upload).
 5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
@@ -152,6 +156,7 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI
 - `web/src/components/FeedRowDetail.tsx` — expanded feed row detail panel
 - `web/src/utils/feedRowLabels.ts` — topic, event line, procedural detection, teaser helpers
+- `.cursor/skills/verify-congress-tracker/` — isolated UI verification helper (ports 5174/8788)
 
 ## Key rules
 

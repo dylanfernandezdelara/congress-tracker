@@ -20,6 +20,10 @@ npm --prefix "${WEB_DIR}" ci
 echo "Installing Playwright Chromium for viewport QA..."
 npx --prefix "${ROOT_DIR}" playwright install chromium
 
+if ! command -v lsof >/dev/null 2>&1; then
+  echo "warning: lsof is not installed; the verify-congress-tracker skill needs it to check ports." >&2
+fi
+
 if [[ ! -f "${DEV_VARS}" ]]; then
   echo "Creating ${DEV_VARS} from example..."
   cp "${DEV_VARS_EXAMPLE}" "${DEV_VARS}"

@@ -9,7 +9,7 @@ npm run dev:worker
 npm run dev:web
 ```
 
-Open `http://127.0.0.1:5173`. The placeholder page confirms worker connectivity via `/health`.
+Open `http://127.0.0.1:5173` after `npm run seed` — that is the seeded feed UI (human `npm run dev:*` ports). For UI proof, use `.cursor/skills/verify-congress-tracker/SKILL.md` (isolated 5174/8788 stack).
 
 ## Verification
 
