@@ -1,3 +1,4 @@
+import { maxIsoDay } from '@congress-tracker/shared/iso-day'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,6 +11,8 @@ import {
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
 import { formatVoteDate } from '../utils/billLabels'
+import { chamberFloorDetail } from '../utils/feedQuiet'
+import { floorChipLabel } from '../utils/floorStatusCopy'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
@@ -45,6 +48,25 @@ function isoUtcDaysAgo(days: number): string {
   const d = new Date()
   d.setUTCDate(d.getUTCDate() - days)
   return d.toISOString().slice(0, 10)
+}
+
+/** Jane Doe confirmation `vote_date` from `stubHomeRouteDefaults`. */
+const STUB_CONFIRMATION_DAY = '2026-06-12'
+
+/**
+ * Chip copy Home actually renders: House session last, Senate session last
+ * plus confirmation days. Session stats are gated on `feedSettled`, so tests
+ * must `findBy` this string rather than `getBy` it after the feed notice.
+ */
+function expectedFloorChip(houseLast: string, senateLast: string): string {
+  const label = floorChipLabel(
+    chamberFloorDetail('House', houseLast),
+    chamberFloorDetail('Senate', maxIsoDay([senateLast, STUB_CONFIRMATION_DAY])),
+  )
+  if (!label) {
+    throw new Error(`expected a floor chip for House ${houseLast} / Senate ${senateLast}`)
+  }
+  return label
 }
 
 describe('Home', () => {
@@ -117,6 +139,8 @@ describe('Home', () => {
 
   it('explains a quiet floor so the timeline does not look stuck', async () => {
     const latest = isoUtcDaysAgo(10)
+    const chip = expectedFloorChip(latest, latest)
+    expect(chip).toBe('House & Senate in recess')
     stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
@@ -130,7 +154,7 @@ describe('Home', () => {
     expect(
       screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
-    expect(screen.getByText('House & Senate in recess')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: new RegExp(chip) })).toHaveTextContent(chip)
   })
 
   it('opens floor status with House and Senate return dates from In recess', async () => {
@@ -146,7 +170,11 @@ describe('Home', () => {
       ]),
     )
     renderHome()
-    fireEvent.click(await screen.findByRole('button', { name: /House & Senate in recess/ }))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: new RegExp(expectedFloorChip('2026-07-23', '2026-08-08')),
+      }),
+    )
     const dialog = await screen.findByRole('dialog', { name: 'Floor status' })
     expect(within(dialog).getByText('Back Monday, Aug 31')).toBeInTheDocument()
     expect(within(dialog).getByText('Back Monday, Sep 14')).toBeInTheDocument()
@@ -163,6 +191,8 @@ describe('Home', () => {
 
   it('omits the quiet notice when the newest vote is recent', async () => {
     const latest = isoUtcDaysAgo(1)
+    const chip = expectedFloorChip(latest, latest)
+    expect(chip).toBe('House & Senate working')
     stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
@@ -177,7 +207,7 @@ describe('Home', () => {
     expect(
       screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
-    expect(screen.getByText('House & Senate working')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: new RegExp(chip) })).toHaveTextContent(chip)
     expect(screen.queryByText(/in recess/i)).not.toBeInTheDocument()
   })
 
@@ -268,7 +298,11 @@ describe('Home', () => {
     )
     renderHome('/?chamber=House&q=housing')
     // Floor status waits on session watermarks; the heading renders before they land.
-    expect(await screen.findByText('House & Senate in recess')).toBeInTheDocument()
+    const defaultChip = expectedFloorChip('2026-06-05', '2026-06-05')
+    expect(defaultChip).toBe('House & Senate in recess')
+    expect(await screen.findByRole('button', { name: new RegExp(defaultChip) })).toHaveTextContent(
+      defaultChip,
+    )
     expect(screen.queryByText(/through Aug 8/)).not.toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
   })
@@ -301,11 +335,17 @@ describe('Home', () => {
     ).toBeInTheDocument()
     expect(screen.getByText(/1 of 1 passage vote · through Jun 5 · House/)).toBeInTheDocument()
     expect(screen.queryByText(/since Aug 8/)).not.toBeInTheDocument()
-    expect(screen.getByText('House & Senate in recess')).toBeInTheDocument()
+    const houseFilteredChip = expectedFloorChip('2026-06-05', '2026-06-05')
+    expect(houseFilteredChip).toBe('House & Senate in recess')
+    expect(await screen.findByRole('button', { name: new RegExp(houseFilteredChip) })).toHaveTextContent(
+      houseFilteredChip,
+    )
   })
 
   it('marks an in-session lull separately from recess', async () => {
     const latest = isoUtcDaysAgo(4)
+    const chip = expectedFloorChip(latest, latest)
+    expect(chip).toBe('House & Senate in session')
     stubHomeRouteDefaults(homeApi, { house: latest, senate: latest })
     fetchFeed.mockResolvedValue(
       pageResponse([
@@ -313,7 +353,7 @@ describe('Home', () => {
       ]),
     )
     renderHome()
-    expect(await screen.findByText('House & Senate in session')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: new RegExp(chip) })).toHaveTextContent(chip)
     expect(
       screen.getByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
