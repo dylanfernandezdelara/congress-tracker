@@ -14,12 +14,7 @@ import {
 import { maxIsoDay, parseIsoDay, utcIsoDay } from '@congress-tracker/shared/iso-day'
 
 import { formatVoteDate } from './billLabels'
-
-const FLOOR_STATUS_LABEL = {
-  working: 'Working',
-  in_session: 'In session',
-  in_recess: 'In recess',
-} as const satisfies Record<FloorWorkStatus, string>
+import { FLOOR_STATUS_LABEL } from './floorStatusCopy'
 
 function voteDaysByChamber(
   items: readonly {
@@ -35,14 +30,6 @@ function voteDaysByChamber(
     }
   }
   return { house, senate }
-}
-
-export function floorStatusLabel(
-  latestFloorDate: string | null | undefined,
-  now: Date = new Date(),
-): string | null {
-  const status = floorWorkStatus(latestFloorDate, now)
-  return status ? FLOOR_STATUS_LABEL[status] : null
 }
 
 export function feedQuietCopy(
@@ -102,7 +89,6 @@ export type TimelineThrough = 'session' | 'page'
 export type TimelineFloorChrome = {
   throughLabel: string | null
   notice: string | null
-  statusLabel: string | null
   house: ChamberFloorDetail
   senate: ChamberFloorDetail
 }
@@ -129,33 +115,29 @@ export function timelineFloorChrome(params: {
     house: votes.house,
     senate: votes.senate,
   })
-  const sessionActivityDay = maxIsoDayForChamber(params.chamber, {
-    house: [params.houseLast],
-    senate: [params.senateLast],
-    confirmation: params.confirmationVoteDates,
-  })
-  const pageActivityDay = maxIsoDayForChamber(params.chamber, {
-    house: votes.house,
-    senate: votes.senate,
-    confirmation: params.confirmationVoteDates,
-  })
   const throughDay = through === 'page' ? pagePassageDay : (sessionPassageDay ?? pagePassageDay)
-  const activityDay = sessionActivityDay ?? pageActivityDay
   const { throughLabel, notice } = feedQuietCopy(throughDay, now, params.chamber)
-  const houseActivity = maxIsoDayForChamber('House', {
-    house: [params.houseLast],
-    senate: [],
-  })
-  const senateActivity = maxIsoDayForChamber('Senate', {
-    house: [],
-    senate: [params.senateLast],
-    confirmation: params.confirmationVoteDates,
-  })
+  const house = chamberFloorDetail(
+    'House',
+    maxIsoDayForChamber('House', {
+      house: [params.houseLast],
+      senate: [],
+    }),
+    now,
+  )
+  const senate = chamberFloorDetail(
+    'Senate',
+    maxIsoDayForChamber('Senate', {
+      house: [],
+      senate: [params.senateLast],
+      confirmation: params.confirmationVoteDates,
+    }),
+    now,
+  )
   return {
     throughLabel,
     notice: through === 'session' ? notice : null,
-    statusLabel: floorStatusLabel(activityDay, now),
-    house: chamberFloorDetail('House', houseActivity, now),
-    senate: chamberFloorDetail('Senate', senateActivity, now),
+    house,
+    senate,
   }
 }
