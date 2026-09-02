@@ -37,26 +37,42 @@ afterEach(() => {
 })
 
 describe('FloorStatusChip', () => {
-  it('opens a sheet with per-chamber return dates', () => {
-    render(<FloorStatusChip label="In recess" house={detail('House')} senate={detail('Senate')} />)
+  it('shows which chamber the status belongs to', () => {
+    render(
+      <FloorStatusChip
+        label="House working · Senate in recess"
+        house={detail('House', { status: 'working', statusLabel: 'Working', returnsOn: null, periodLabel: null })}
+        senate={detail('Senate')}
+      />,
+    )
 
-    fireEvent.click(screen.getByRole('button', { name: /In recess/ }))
+    expect(screen.getByRole('button', { name: /House working · Senate in recess/ })).toHaveTextContent(
+      'House working · Senate in recess',
+    )
+  })
+
+  it('opens a concise sheet with per-chamber facts, not a long lead', () => {
+    render(
+      <FloorStatusChip label="House & Senate in recess" house={detail('House')} senate={detail('Senate')} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /House & Senate in recess/ }))
 
     const dialog = screen.getByRole('dialog', { name: 'Floor status' })
     expect(dialog).toBeInTheDocument()
-    expect(
-      within(dialog).getByText(
-        'House and Senate are both in recess, but they do not return together. The House is scheduled back Monday, Aug 31. The Senate is scheduled back Monday, Sep 14.',
-      ),
-    ).toBeInTheDocument()
+    expect(within(dialog).queryByText(/do not return together/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/set separate floor calendars/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('House & Senate in recess')).not.toBeInTheDocument()
 
     const house = within(dialog).getByRole('region', { name: 'House' })
+    expect(within(house).getByText('In recess')).toBeInTheDocument()
     expect(within(house).getByText('Back Monday, Aug 31')).toBeInTheDocument()
-    expect(within(house).getByText('Last floor activity Jul 23')).toBeInTheDocument()
+    expect(within(house).getByText('Last activity Jul 23 · District work period')).toBeInTheDocument()
 
     const senate = within(dialog).getByRole('region', { name: 'Senate' })
+    expect(within(senate).getByText('In recess')).toBeInTheDocument()
     expect(within(senate).getByText('Back Monday, Sep 14')).toBeInTheDocument()
-    expect(within(senate).getByText('Last floor activity Aug 8')).toBeInTheDocument()
+    expect(within(senate).getByText('Last activity Aug 8 · State work period')).toBeInTheDocument()
   })
 
   it('renders nothing without a status label', () => {

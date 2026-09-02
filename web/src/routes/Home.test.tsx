@@ -130,7 +130,7 @@ describe('Home', () => {
     expect(
       screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
-    expect(screen.getByText('In recess')).toBeInTheDocument()
+    expect(screen.getByText('House & Senate in recess')).toBeInTheDocument()
   })
 
   it('opens floor status with House and Senate return dates from In recess', async () => {
@@ -146,12 +146,12 @@ describe('Home', () => {
       ]),
     )
     renderHome()
-    fireEvent.click(await screen.findByRole('button', { name: /In recess/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /House & Senate in recess/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Floor status' })
-    expect(
-      within(dialog).getByText(/House is scheduled back Monday, Aug 31/),
-    ).toBeInTheDocument()
-    expect(within(dialog).getByText(/Senate is scheduled back Monday, Sep 14/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Back Monday, Aug 31')).toBeInTheDocument()
+    expect(within(dialog).getByText('Back Monday, Sep 14')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/do not return together/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/set separate floor calendars/)).not.toBeInTheDocument()
     expect(within(dialog).getByRole('link', { name: /2026 House Calendar/ })).toHaveAttribute(
       'href',
       'https://pressgallery.house.gov/schedules/2026-house-calendar',
@@ -177,8 +177,8 @@ describe('Home', () => {
     expect(
       screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
-    expect(screen.getByText('Working')).toBeInTheDocument()
-    expect(screen.queryByText('In recess')).not.toBeInTheDocument()
+    expect(screen.getByText('House & Senate working')).toBeInTheDocument()
+    expect(screen.queryByText(/in recess/i)).not.toBeInTheDocument()
   })
 
   it('dates the quiet floor from passage votes, not an executive-boosted first row', async () => {
@@ -268,7 +268,7 @@ describe('Home', () => {
     )
     renderHome('/?chamber=House&q=housing')
     // Floor status waits on session watermarks; the heading renders before they land.
-    expect(await screen.findByText('In recess')).toBeInTheDocument()
+    expect(await screen.findByText('House & Senate in recess')).toBeInTheDocument()
     expect(screen.queryByText(/through Aug 8/)).not.toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
   })
@@ -301,7 +301,7 @@ describe('Home', () => {
     ).toBeInTheDocument()
     expect(screen.getByText(/1 of 1 passage vote · through Jun 5 · House/)).toBeInTheDocument()
     expect(screen.queryByText(/since Aug 8/)).not.toBeInTheDocument()
-    expect(screen.getByText('In recess')).toBeInTheDocument()
+    expect(screen.getByText('House & Senate in recess')).toBeInTheDocument()
   })
 
   it('marks an in-session lull separately from recess', async () => {
@@ -313,12 +313,12 @@ describe('Home', () => {
       ]),
     )
     renderHome()
-    expect(await screen.findByText('In session')).toBeInTheDocument()
+    expect(await screen.findByText('House & Senate in session')).toBeInTheDocument()
     expect(
       screen.getByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
-    expect(screen.queryByText('In recess')).not.toBeInTheDocument()
-    expect(screen.queryByText('Working')).not.toBeInTheDocument()
+    expect(screen.queryByText(/in recess/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/working/i)).not.toBeInTheDocument()
   })
 
   it('stacks rail content below the feed on narrow viewports without duplicate fetches', async () => {

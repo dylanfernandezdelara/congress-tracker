@@ -360,7 +360,9 @@
     font-weight: 500;
     letter-spacing: -0.1px;
     line-height: 1.2;
-    white-space: nowrap;
+    max-width: 100%;
+    white-space: normal;
+    text-wrap: balance;
     color: hsl(var(--twc-secondary));
     font-family: inherit;
     cursor: pointer;
@@ -383,28 +385,12 @@
     gap: 0.35rem;
   }
 
-  .floor-status-sheet-kicker {
-    margin: 0;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: hsl(var(--twc-faint));
-  }
-
   .floor-status-sheet-title {
     margin: 0;
     font-size: 1.125rem;
     font-weight: 650;
     letter-spacing: -0.3px;
     color: hsl(var(--twc-foreground));
-  }
-
-  .floor-status-sheet-lead {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.45;
-    color: hsl(var(--twc-secondary));
   }
 
   .floor-status-chamber {

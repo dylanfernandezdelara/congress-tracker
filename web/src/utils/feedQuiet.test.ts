@@ -66,7 +66,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
-      statusLabel: 'Working',
+      statusLabel: 'House in recess · Senate working',
     })
   })
 
@@ -81,7 +81,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: null,
-      statusLabel: 'In recess',
+      statusLabel: null,
     })
   })
 
@@ -97,7 +97,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
-      statusLabel: 'In recess',
+      statusLabel: 'House & Senate in recess',
     })
   })
 
@@ -113,7 +113,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Aug 8',
       notice: 'No new House or Senate passage votes since Aug 8.',
-      statusLabel: 'In recess',
+      statusLabel: 'House & Senate in recess',
     })
   })
 
@@ -130,7 +130,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Apr 10',
       notice: null,
-      statusLabel: 'In recess',
+      statusLabel: 'House & Senate in recess',
     })
   })
 
@@ -150,7 +150,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Jul 23',
       notice: 'No new House passage votes since Jul 23.',
-      statusLabel: 'In recess',
+      statusLabel: 'House & Senate in recess',
     })
   })
 
@@ -174,7 +174,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: 'Jul 23',
       notice: null,
-      statusLabel: 'In recess',
+      statusLabel: 'House & Senate in recess',
     })
   })
 
@@ -195,7 +195,7 @@ describe('timelineFloorChrome', () => {
     ).toMatchObject({
       throughLabel: null,
       notice: null,
-      statusLabel: 'In recess',
+      statusLabel: 'House & Senate in recess',
     })
   })
 
