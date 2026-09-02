@@ -1,15 +1,15 @@
 ---
 name: verify-congress-tracker
-description: Drive the Congress Tracker web UI (Track Congress feed at 127.0.0.1:5173) the way a user does — launch the local Vite + Worker stack, exercise feed/search/filters/member sheets, and capture screenshots plus ARIA snapshots. Use when proving UI behavior, reproducing a feed bug, or verifying a change against the seeded local app.
+description: Drive the Congress Tracker web UI (Track Congress feed at 127.0.0.1:5174 by default) the way a user does — launch an isolated Vite + Worker stack, exercise feed/search/filters/member sheets, and capture screenshots plus ARIA snapshots. Use when proving UI behavior, reproducing a feed bug, or verifying a change against the seeded local app.
 ---
 
 # Verify Congress Tracker
 
-Primary surface: the **Track Congress** web UI (`web/`, Vite + React) at `http://127.0.0.1:5173`. Users read a chronological passage-vote feed, filter it, expand a bill, and open member profiles.
+Primary surface: the **Track Congress** web UI (`web/`, Vite + React) at the helper's web URL (default `http://127.0.0.1:5174`). Users read a chronological passage-vote feed, filter it, expand a bill, and open member profiles.
 
 Secondary surfaces (do not substitute for UI proof unless the mapped feature says so):
 
-- Worker JSON API on `http://127.0.0.1:8787` (Vite proxies `/feed`, `/stats`, `/health`, `/debug/*.json` to it).
+- Worker JSON API on the helper's worker URL (default `http://127.0.0.1:8788`; Vite proxies `/feed`, `/stats`, `/health`, `/debug/*.json` to it).
 - Ops page `/debug` (ingest monitor).
 - `npm run qa:web` — viewport clip checks that **mock** feed JSON. That is not this skill. Drive the real seeded stack.
 
@@ -17,7 +17,9 @@ Read `features/README.md` before driving. Prove the mapped entry points, not a c
 
 ## Launch
 
-Local D1 is a **single shared SQLite** under `workers/senate_data_worker/.wrangler/state`. Vite is `strictPort` **5173** and proxies to worker **8787**. Two stacks cannot run side by side. If either port is already listening, **refuse** — do not kill the user's session by process name, and do not attach to a server this run did not start.
+Verification uses its own ports (default Vite **5174**, worker **8788**, CDP **9223**) and its own D1, so it can run beside `npm run dev:*`. The user's 5173/8787 stack is never touched. If a **verification** port is already listening, **refuse** — do not kill by process name, and do not attach to a server this run did not start. Override with `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT`.
+
+Verification D1 is a disposable `--persist-to` store at `artifacts/verify/.run/d1` (absolute path; spawn cwd is the repo root). Launch **never** reads or writes `workers/senate_data_worker/.wrangler/state` (the human `npm run seed` / `dev:worker` store). Seed data is synthetic `(local sample)` / `LOCAL:*` — **not** a production dump. Never run `npm run sync:preview-db`, pipeline POSTs, or `d1 execute --remote` for this skill.
 
 From the repo root:
 
@@ -27,12 +29,12 @@ From the repo root:
 
 Launch will:
 
-1. Fail if `:5173` or `:8787` is already listening.
-2. Run `npm run seed` (writes `(local sample)` bills, members, laws, and confirmations into **local** D1 only; overwrites prior local sample/real-roster mix).
-3. Start the Worker with `wrangler dev --local` (same package as `npm run dev:worker`, plus `--local` so the `BROWSER` remote binding is not required). Then start `npm run dev:web`.
-4. Wait until `GET http://127.0.0.1:8787/health` and `GET http://127.0.0.1:5173` return HTTP 200.
+1. Fail if verification ports `:5174` or `:8788` (or `:9223`) are already listening.
+2. Run `npm run seed` with `SEED_PERSIST_TO` pointed at `artifacts/verify/.run/d1` (writes `(local sample)` bills, members, laws, and confirmations into that isolated store only).
+3. Start the Worker with `wrangler dev --local --persist-to artifacts/verify/.run/d1 --port 8788` (resolved to an absolute path). Then start `npm run dev:web -- --mode verify-congress-tracker` with `VITE_DEV_PORT=5174` and `VITE_WORKER_ORIGIN=http://127.0.0.1:8788`; the mode is only an ownership marker for cleanup and does not change app behavior.
+4. Wait until `GET http://127.0.0.1:8788/health` and `GET http://127.0.0.1:5174` return HTTP 200.
 
-Ready when stdout includes `ready. Run doctor` and doctor (below) exits 0. Worker `/health` may be `degraded` locally because ingest cron does not run — that is still driveable. Feed JSON must contain `(local sample)` headlines. `--local` means Senate.gov Browser Rendering is unavailable; do not use this instance to prove live ingest.
+Ready when stdout includes `ready. Run doctor` and doctor (below) exits 0. Worker `/health` may be `degraded` locally because ingest cron does not run — that is still driveable. Feed JSON must be sample-only (`(local sample)` on every item). `--local` means Senate.gov Browser Rendering is unavailable; do not use this instance to prove live ingest.
 
 Teardown is `cleanup` (below), not `pkill wrangler` / `pkill vite`.
 
@@ -50,7 +52,7 @@ Run first whenever anything looks off:
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker doctor
 ```
 
-Pass means: this run's worker and web PIDs are alive, both ports listen, Vite's `/health` proxy works, and `/feed/latest.json` includes the three seeded `(local sample)` headlines. Extra live rows are a warning (seed upserts samples but does not delete existing votes). `browser` and `api` reuse the ownership check. Fail means stop and launch (or cleanup a stale verification run) — do not drive an unknown process on those ports.
+Pass means: this run's worker and web PIDs are alive, both ports listen, Vite's `/health` proxy works, and `/feed/latest.json` is **sample-only** — every item has `(local sample)` in headline or title, including the three required fixtures. Any live/non-sample row is a **fail**. Empty feed is a fail. `browser` and `api` reuse the ownership check. Fail means stop and launch (or cleanup a stale verification run) — do not drive an unknown process on those ports.
 
 ## Drive
 
@@ -72,16 +74,19 @@ Harness: Playwright Chromium via the helper, **1280×800** so desktop rails moun
 | Pulse | region `Legislative pulse` |
 | Confirmations / laws | regions `Recent confirmations`, `New laws` |
 
-Recipe shape (every feature file uses this CLI):
+Drive using the exact commands in each feature's **Driving it** section. See `features/feed-timeline.md` for the timeline recipe. Do not invent shorthand.
+
+Inspect the page the way Chrome DevTools would (CDP on `http://127.0.0.1:9223`; Chromium is headless unless `VERIFY_HEADED=1`):
 
 ```bash
-./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser goto --path /
-./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role heading --name "Chronological timeline"
-./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "House"
-./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser fill --role searchbox --name "Search bills" --value "energy"
-./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser press --key Enter
-./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --aria --path artifacts/verify/<feature>/after.aria.txt
-./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/<feature>/after.png
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser url
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser find --role button --name "House"
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser scroll --role heading --name "Chronological timeline"
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser eval --js "document.title"
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser cdp --method Runtime.evaluate --params '{"expression":"1+1","returnByValue":true}'
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser console
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser network
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --aria
 ```
 
 `--name /regex/` is a JavaScript regex. `--exact` requires a full accessible-name match.
@@ -94,7 +99,7 @@ Do **not** intercept `/feed` or `/stats` (that is `qa:web`). Do **not** POST `/_
 
 `api` is GET-only and limited to `/feed`, `/stats`, `/health`, and `/debug/*.json`.
 
-Start Chromium once per run with `browser start` or the first `browser` command (CDP on `127.0.0.1:9223`, profile under `artifacts/verify/.run/`). If 9223 is taken, refuse.
+Start Chromium once per run with `browser start`, `browser console`, `browser network`, or any other first `browser` command (CDP on `http://127.0.0.1:9223`, profile under `artifacts/verify/.run/`). A detached tap records console + network JSONL. Use `browser cdp` / `browser eval` / `browser console` / `browser network` to inspect. If 9223 is taken, refuse.
 
 ## Evidence
 
@@ -116,10 +121,10 @@ Standards:
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker cleanup
 ```
 
-Sends SIGTERM (then SIGKILL) to the **worker, web, and browser PIDs this launch recorded**. Deletes `artifacts/verify/.run/` only after those PIDs are gone and ports 5173/8787/9223 are free; otherwise it keeps state and exits non-zero. Feature evidence directories stay. Never `pkill -f wrangler` / `vite` / `chrome`.
+Sends SIGTERM (then SIGKILL) to the **worker, web, browser, and tap PIDs this launch recorded**. Deletes `artifacts/verify/.run/` only after those PIDs are gone and the recorded verification ports are free (default 5174/8788/9223, or `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT` if launch used overrides); otherwise it keeps state and exits non-zero. Feature evidence directories stay. Never `pkill -f wrangler` / `vite` / `chrome`. `.run/` includes the isolated D1, Chrome profile, and console/network JSONL. If `state.json` is corrupt, cleanup recovers ports from the file (falling back to env/defaults per missing field) and only claims processes whose command line names this run.
 
 ## Helpers
 
-All commands above are `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker <subcommand>`. Implementation: `bin/verify-congress-tracker.mjs`. Run with no args for usage.
+All commands above are `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker <subcommand>`. Implementation: `bin/verify-congress-tracker.mjs` (browser/CDP in `lib/browser.mjs`; console/network tap in `lib/devtools-tap.mjs`). Run with no args for usage.
 
-If launch fails because ports are busy, stop. If seed or health fails, read `artifacts/verify/.run/seed.log`, `worker.log`, and `web.log` before retrying — run cleanup after every failed launch so ports are not left occupied.
+If launch fails because verification ports are busy, stop. If seed or health fails, read `artifacts/verify/.run/seed.log`, `worker.log`, and `web.log` before retrying — run cleanup after every failed launch so ports are not left occupied.

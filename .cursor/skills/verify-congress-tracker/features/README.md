@@ -4,10 +4,11 @@ This directory is the maintained source for verifying the user-facing behavior o
 
 ## Baseline preconditions
 
-- Launch with `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker launch` so Vite is at `http://127.0.0.1:5173` and the Worker is at `http://127.0.0.1:8787`.
-- Launch seeds local D1. Doctor checks feed JSON for `(local sample)`. The UI strips that suffix from bill headlines — drive the visible titles. Do not attach to a server this run did not start.
-- Ports 5173 and 8787 are exclusive. Local D1 is one SQLite store. Never start a second stack.
-- Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker doctor` and require the three seeded `(local sample)` headlines. A mixed live+sample feed is a warning; wipe `workers/senate_data_worker/.wrangler/state` if exclusivity proofs fail.
+- Launch with `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker launch` so Vite is at the helper's web URL (default `http://127.0.0.1:5174`) and the Worker is at `http://127.0.0.1:8788`.
+- Launch seeds an isolated `--persist-to artifacts/verify/.run/d1` store. It never touches the user's `workers/senate_data_worker/.wrangler/state`. Seed rows are synthetic `(local sample)` / `LOCAL:*`, not a production dump. Never `sync:preview-db` for this skill.
+- Doctor checks feed JSON for `(local sample)`. The UI strips that suffix from bill headlines — drive the visible titles. Do not attach to a server this run did not start.
+- Verification uses its own ports and its own D1, so it can run beside `npm run dev:*`. The user's 5173/8787 stack is never touched.
+- Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker doctor` and require the three seeded `(local sample)` headlines. Doctor **fails** if any feed item lacks `(local sample)` in headline/title.
 - Drive at 1280×800 (the helper's default) so left/right rails mount. Below 1024px those rails move under the feed.
 - Put the helper on your command line as `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker` from the repo root.
 
@@ -16,8 +17,8 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Start every recipe from `/` with chamber `All` and no search/filters unless the feature says otherwise.
 - Prefer ARIA roles and accessible names. Use `[data-feed-row-key]` / `[data-feed-topic]` only when a name is generated.
 - Treat every command as literal. Keep quoted names unchanged.
-- Run browser actions through `verify-congress-tracker browser`.
-- Run API reads through `verify-congress-tracker api GET`.
+- Run browser actions through `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser` (`click` / `fill` / `select` / `press` / `wait` plus `eval` / `cdp` / `console` / `network` for DevTools inspection).
+- Run API reads through `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker api GET`.
 - Cleanup must not remove `artifacts/verify/<feature>/` proof files.
 
 ## Proof and skip reporting
@@ -44,6 +45,6 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 - [Feed timeline](./feed-timeline.md) covers home load, expand-in-place bill detail, confirmations, and new laws.
 - [Search bills](./search-bills.md) covers searchbox submit, matches, empty state, and clear.
-- [Filter feed](./filter-feed.md) covers chamber radios and the Filters panel (state, party, topic, member).
+- [Filter feed](./filter-feed.md) covers chamber radios and the Filters panel (state, sponsor chamber, party, member, topic).
 - [Member spotlights](./member-spotlights.md) covers the Members in Congress rail and profile sheet.
 - [Theme](./theme.md) covers light/dark toggle and persistence on reload.

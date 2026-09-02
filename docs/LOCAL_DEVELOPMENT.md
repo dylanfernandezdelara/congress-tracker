@@ -55,9 +55,11 @@ This writes clearly-labeled `(local sample)` bills, passage votes, plain-English
 digests, and **left-rail House/Senate member spotlights** (defectors +
 portfolios) into the **local** D1 store
 (`workers/senate_data_worker/.wrangler/state`, via `wrangler d1 execute --local`).
-It never touches production/preview D1, needs no network, and is idempotent
-(safe to re-run). Vote dates are generated relative to today so they always
-fall inside the feed's 45-day lookback window.
+`npm run seed` restores sample-only **local** D1 (wipes locally ingested live
+votes); it never copies production or preview D1. `SEED_PERSIST_TO` is for the
+verification helper. Needs no network, and is idempotent (safe to re-run). Vote
+dates are generated relative to today so they always fall inside the feed's
+45-day lookback window.
 
 `npm run seed` also clears any previously synced **real** member roster from
 local D1. That matters because a full real roster hides `LOCAL:*` sample
@@ -111,6 +113,9 @@ restore offline sample spotlights for UI work.
   `/debug` to the worker on `:8787`, matching production/preview
   (one origin serves UI + API). Set `VITE_API_URL` only if you bypass the proxy
   (e.g. worker on a non-default port).
+- **`VITE_DEV_PORT` / `VITE_WORKER_ORIGIN`** override the Vite port and proxy
+  target (used by the verification helper to run on 5174→8788 beside your
+  `npm run dev:*` stack).
 - **Cron does not fire locally.** `wrangler dev` does not run the
   `0 10 * * *` schedule; trigger ingestion manually with the curl above, or use
   `npm run seed`.

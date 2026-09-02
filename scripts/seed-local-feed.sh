@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Seed the LOCAL D1 database with sample passage votes, digests, and left-rail
-# member spotlights (defectors + portfolios) so the UI matches production shape
-# without any API keys or network access.
+# Seed restores sample-only local D1: it never copies production or preview D1.
+# Live local ingest (votes, digests, sponsors, lifecycle, nominations,
+# confirmation votes) is wiped so the feed is not mixed with production-shaped
+# rows. Real member-roster rows are also cleared so LOCAL:* spotlights stay
+# visible after members-roster / member-votes.
 #
-# This only ever touches the local Miniflare D1 store under
-# workers/senate_data_worker/.wrangler/state (via `wrangler d1 execute --local`).
-# It never reaches production/preview D1.
-#
-# Re-running seed restores offline sample mode even after a real roster sync
-# (members-roster / member-votes): real bioguide rows are cleared so LOCAL:*
-# spotlights are not filtered out by hasRealMemberRoster.
+# Default persist is workers/senate_data_worker/.wrangler/state (`npm run seed`).
+# SEED_PERSIST_TO=<abs-dir> writes an isolated store instead (verification helper).
+# Always `--local`. Never `--remote`.
 #
 # Usage:
-#   npm run seed                 # write sample data into local D1
-#   SEED_PRINT_SQL=1 npm run seed  # print the SQL it would run, then exit
+#   npm run seed                      # write sample data into local D1
+#   SEED_PERSIST_TO=/abs/dir npm run seed
+#   SEED_PRINT_SQL=1 npm run seed     # print the SQL it would run, then exit
+#   SEED_PRINT_CMD=1 npm run seed     # print the wrangler command, then exit
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -238,6 +238,15 @@ CREATE TABLE IF NOT EXISTS confirmation_votes (
   vote_date TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number)
 );
+
+-- Offline sample mode: wipe live-ingested feed rows so seed replaces rather
+-- than merging production-shaped local ingest.
+DELETE FROM votes;
+DELETE FROM bill_digests;
+DELETE FROM bill_sponsors;
+DELETE FROM bill_lifecycle;
+DELETE FROM nominations;
+DELETE FROM confirmation_votes;
 
 -- Offline sample mode: drop real-roster rows so hasRealMemberRoster stays false
 -- and LOCAL:* defectors/portfolios remain visible in /stats/defectors.json and
@@ -513,6 +522,15 @@ if [[ "${SEED_PRINT_SQL:-}" == "1" ]]; then
   exit 0
 fi
 
+if [[ "${SEED_PRINT_CMD:-}" == "1" ]]; then
+  if [[ -n "${SEED_PERSIST_TO:-}" ]]; then
+    echo "npx wrangler d1 execute ${DB_NAME} --local --persist-to ${SEED_PERSIST_TO} --file <seed.sql>"
+  else
+    echo "npx wrangler d1 execute ${DB_NAME} --local --file <seed.sql>"
+  fi
+  exit 0
+fi
+
 SEED_FILE="$(mktemp -t seed-local-feed.XXXXXX.sql)"
 trap 'rm -f "${SEED_FILE}"' EXIT
 {
@@ -522,9 +540,15 @@ trap 'rm -f "${SEED_FILE}"' EXIT
 } >"${SEED_FILE}"
 
 echo "Seeding local D1 (${DB_NAME}) with sample passage votes, digests, and left-rail member spotlights..."
-# Run from the worker dir so --local resolves the same .wrangler/state store
-# that `npm run dev:worker` (wrangler dev) uses.
-( cd "${WORKER_DIR}" && npx wrangler d1 execute "${DB_NAME}" --local --file "${SEED_FILE}" )
+# --local only. SEED_PERSIST_TO (when set) keeps this off the default store.
+# Branch instead of an empty-array expand so macOS bash 3.2 + set -u is safe.
+if [[ -n "${SEED_PERSIST_TO:-}" ]]; then
+  mkdir -p "${SEED_PERSIST_TO}"
+  echo "Isolated persist dir: ${SEED_PERSIST_TO} (does not touch default .wrangler/state or production/preview D1)."
+  ( cd "${WORKER_DIR}" && npx wrangler d1 execute "${DB_NAME}" --local --persist-to "${SEED_PERSIST_TO}" --file "${SEED_FILE}" )
+else
+  ( cd "${WORKER_DIR}" && npx wrangler d1 execute "${DB_NAME}" --local --file "${SEED_FILE}" )
+fi
 
 cat <<'DONE'
 
