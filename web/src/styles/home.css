@@ -699,6 +699,7 @@
   }
 
   .tightness-dot-item {
+    --tightness-dot-radius: 0.35rem;
     position: absolute;
     top: 50%;
     width: 0.7rem;
@@ -787,6 +788,7 @@
   }
 
   .tightness--compact .tightness-dot-item {
+    --tightness-dot-radius: 0.3rem;
     width: 0.6rem;
     height: 0.6rem;
   }
@@ -902,6 +904,7 @@
       position: sticky;
       top: 64px;
       max-height: calc(100vh - 80px);
+      overflow-x: hidden;
       overflow-y: auto;
       overscroll-behavior: contain;
     }

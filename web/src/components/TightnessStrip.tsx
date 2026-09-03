@@ -103,7 +103,7 @@ function TightnessRow({
               key={key}
               className="tightness-dot-item"
               style={{
-                left: `${tightnessDotLeftPercent(dot)}%`,
+                left: `clamp(var(--tightness-dot-radius), ${tightnessDotLeftPercent(dot)}%, calc(100% - var(--tightness-dot-radius)))`,
                 transform: `translate(-50%, calc(-50% + ${offsets[index] ?? 0}px))`,
                 zIndex: selected
                   ? 4
