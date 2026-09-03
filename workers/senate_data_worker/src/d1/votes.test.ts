@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPANION_VOTES_PER_BILL } from "../constants";
+import { feedMembershipCteSql } from "./feed-membership";
 import {
   countFeedBills,
   getCompanionVotesForBills,
@@ -340,6 +341,8 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-06-24",
       20,
     ]);
+    expect(selectSql!.startsWith(feedMembershipCteSql())).toBe(true);
+    expect(countSql!.startsWith(feedMembershipCteSql())).toBe(true);
   });
 
   it("adds vote-chamber EXISTS or intro-source origin types", async () => {

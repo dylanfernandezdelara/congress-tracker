@@ -35,7 +35,7 @@ export type FeedFilterOptions = {
    * Passage-vote chamber, or originating chamber for intro-only bills
    * (no passage votes yet).
    */
-  chamber?: FeedChamberFilter | string;
+  chamber?: FeedChamberFilter;
   q?: string;
   /** Two-letter primary-sponsor state code. */
   state?: string;
@@ -63,7 +63,7 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
   const clauses: string[] = [];
   const binds: Array<string | number> = [];
 
-  if (options.chamber === "House" || options.chamber === "Senate") {
+  if (options.chamber) {
     const originTypes = originBillTypesSqlList(options.chamber);
     // Passage-vote chamber, or intro-arm rows that originated in that chamber.
     clauses.push(`(
@@ -79,16 +79,6 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
            combined.source = 'intro'
            AND combined.bill_type IN ${originTypes}
          )
-       )`);
-    binds.push(options.chamber);
-  } else if (options.chamber) {
-    clauses.push(`EXISTS (
-         SELECT 1 FROM votes v
-         WHERE v.is_passage = 1
-           AND v.chamber = ?
-           AND v.bill_congress = combined.bill_congress
-           AND UPPER(v.bill_type) = combined.bill_type
-           AND v.bill_number = combined.bill_number
        )`);
     binds.push(options.chamber);
   }

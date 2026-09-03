@@ -16,8 +16,8 @@ export const MEMBER_SEARCH_MAX_LIMIT = 20;
 /** Bills with executive signals stay feed-visible for this many days. */
 export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
 /**
- * Newest introductions to persist + hydrate per feed ingest (both chambers).
- * Caps Congress.gov detail/digest work so intros cannot drown passage votes.
+ * Shared intro cap: newest introductions to persist per ingest run, and the
+ * read-path LIMIT on the intro UNION arm (both chambers).
  */
 export const INTRO_FEED_MAX_NEW = 20;
 /** Congress.gov bill-list page size for intro discovery (`/v3/bill/{congress}/{type}`). */
