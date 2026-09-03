@@ -1,7 +1,8 @@
+import { isHouseOriginBillType } from '@congress-tracker/shared/bill-id'
+import { trimDisplayTitle } from '@congress-tracker/shared/feed-content'
 import { formatBillQueryParam } from '../utils/billDeepLink'
 import { formatSenateWaitingSince, formatShortBillId } from '../utils/billLabels'
 import type { SenateWaitingBill } from '../api/types'
-import { trimDisplayTitle } from '@congress-tracker/shared/feed-content'
 
 type SenateWaitingListProps = {
   items: SenateWaitingBill[]
@@ -20,6 +21,7 @@ export function SenateWaitingList({
   onOpenBill,
   compact = false,
 }: SenateWaitingListProps) {
+  const houseOriginItems = items.filter((item) => isHouseOriginBillType(item.bill_type))
   return (
     <section
       className={`senate-waiting${compact ? ' senate-waiting--compact' : ''}`}
@@ -37,11 +39,11 @@ export function SenateWaitingList({
           ) : null}
         </div>
       ) : null}
-      {!error && items.length === 0 && !loading ? (
+      {!error && houseOriginItems.length === 0 && !loading ? (
         <p className="text-xs text-faint">No House-passed bills are waiting in a Senate committee.</p>
       ) : !error ? (
         <ul className="senate-waiting-list">
-          {items.map((item) => {
+          {houseOriginItems.map((item) => {
             const billId = formatShortBillId(item.bill_type, item.bill_number)
             const title = trimDisplayTitle(item.headline || item.title || billId)
             const billParam = formatBillQueryParam({

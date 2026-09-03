@@ -26,6 +26,18 @@ const BILL_TYPE_TOOLTIPS: Record<string, string> = {
   S: 'Senate bill',
 }
 
+/** House-origin docket types. Senate-origin bills also use
+ *  `in_second_chamber_committee` when they sit in a House committee. */
+const HOUSE_ORIGIN_BILL_TYPES = new Set(['HR', 'HRES', 'HJRES', 'HCONRES'])
+
+function normalizeBillTypeCode(type: string): string {
+  return type.trim().toUpperCase().replace(/\./g, '')
+}
+
+export function isHouseOriginBillType(type: string): boolean {
+  return HOUSE_ORIGIN_BILL_TYPES.has(normalizeBillTypeCode(type))
+}
+
 const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
 const LOCAL_SAMPLE_LABEL = /\s*\(local sample\)\s*/gi
 

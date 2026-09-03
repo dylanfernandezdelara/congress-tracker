@@ -5,6 +5,7 @@ import {
   congressOrdinal,
   containsLocalSampleLabel,
   formatBillDocket,
+  isHouseOriginBillType,
   stripLocalSampleLabel,
 } from './bill-id'
 
@@ -58,6 +59,19 @@ describe('local sample labels', () => {
     expect(stripLocalSampleLabel('21st Century ROAD to Housing Act (local sample)')).toBe(
       '21st Century ROAD to Housing Act',
     )
+  })
+})
+
+describe('isHouseOriginBillType', () => {
+  it('keeps House docket types and drops Senate-origin codes', () => {
+    expect(isHouseOriginBillType('HR')).toBe(true)
+    expect(isHouseOriginBillType('hres')).toBe(true)
+    expect(isHouseOriginBillType('H.J.Res.')).toBe(true)
+    expect(isHouseOriginBillType('HCONRES')).toBe(true)
+    expect(isHouseOriginBillType('S')).toBe(false)
+    expect(isHouseOriginBillType('SRES')).toBe(false)
+    expect(isHouseOriginBillType('SJRES')).toBe(false)
+    expect(isHouseOriginBillType('SCONRES')).toBe(false)
   })
 })
 
