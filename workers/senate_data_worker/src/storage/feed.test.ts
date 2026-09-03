@@ -179,7 +179,8 @@ describe("buildFeedPage lifecycle attachment", () => {
         sponsorQ: undefined,
         party: undefined,
         policy: undefined,
-      }
+      },
+      true
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -197,7 +198,8 @@ describe("buildFeedPage lifecycle attachment", () => {
         sponsorQ: undefined,
         party: undefined,
         policy: undefined,
-      }
+      },
+      true
     );
   });
 
@@ -223,7 +225,8 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -241,7 +244,8 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
     );
   });
 
@@ -267,7 +271,8 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
@@ -285,7 +290,36 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
+    );
+  });
+
+  it("forwards includeIntros: false to feed bill select and count", async () => {
+    await buildFeedPage(createEnv(), {
+      limit: 50,
+      offset: 0,
+      includeIntros: false,
+      now: "2026-07-03",
+    });
+
+    expect(mockCountFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      "2026-06-27",
+      expect.any(Object),
+      false
+    );
+    expect(mockSelectFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      "2026-06-27",
+      50,
+      0,
+      expect.any(Object),
+      false
     );
   });
 
