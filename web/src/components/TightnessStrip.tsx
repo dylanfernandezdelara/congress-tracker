@@ -161,10 +161,10 @@ function ySlots(): number[] {
   return Array.from({ length: slots }, (_, slot) => (slot - (slots - 1) / 2) * STAGGER_STEP_PX)
 }
 
-/** Extra columns walk toward 50% so 0% / 100% piles do not clamp-fold on top of each other. */
-function columnShift(left: number, column: number): number {
-  const towardInterior = left < 50 ? 1 : -1
-  return Math.min(100, Math.max(0, left + column * STAGGER_X_STEP_PCT * towardInterior))
+/** Extra columns walk toward 50% from one cluster origin so true-x marks cannot collide. */
+function columnShift(origin: number, column: number): number {
+  const towardInterior = origin < 50 ? 1 : -1
+  return Math.min(100, Math.max(0, origin + column * STAGGER_X_STEP_PCT * towardInterior))
 }
 
 export function placementDistancePx(
@@ -192,6 +192,9 @@ export function tightnessPlacements(dots: TightnessDot[]): TightnessPlacement[] 
     if (size < 2) return
     const cluster = ranked.slice(clusterStart, end)
     const slots = ySlots()
+    const first = cluster[0]
+    const last = cluster[cluster.length - 1]
+    const origin = first && last ? (first.left < 50 ? first.left : last.left) : 0
     for (const [offset, item] of cluster.entries()) {
       if (!item) continue
       if (size <= slots.length) {
@@ -203,7 +206,7 @@ export function tightnessPlacements(dots: TightnessDot[]): TightnessPlacement[] 
       }
       placements[item.index] = {
         offsetY: slots[offset % slots.length] ?? 0,
-        leftPct: columnShift(item.left, Math.floor(offset / slots.length)),
+        leftPct: columnShift(origin, Math.floor(offset / slots.length)),
       }
     }
   }
