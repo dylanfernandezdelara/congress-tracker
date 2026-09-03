@@ -445,8 +445,28 @@ describe('Home', () => {
     expect(await screen.findByText(/No matches for “nomatch”/)).toBeInTheDocument()
     const tightnessMobile = container.querySelector('.home-tightness-mobile')
     expect(tightnessMobile).not.toBeNull()
+    expect(container.querySelector('.home-feed-empty')?.contains(tightnessMobile)).toBe(false)
+    expect(container.querySelector('.home-feed-secondary')?.contains(tightnessMobile)).toBe(true)
     expect(tightnessMobile!.querySelector('[data-tightness-row="house"]')).not.toBeNull()
     expect(tightnessMobile!.querySelector('[data-tightness-row="senate"]')).not.toBeNull()
+  })
+
+  it('keeps mobile closest-votes full-width beside a failed feed card', async () => {
+    mockViewport(false)
+    fetchFeed.mockRejectedValueOnce(new Error('network down'))
+    const { container } = renderHome()
+
+    expect(await screen.findByText("Couldn't load the feed.")).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', { name: /House bill H\.R\. 88, 210–208, party-line/ }),
+    ).toBeInTheDocument()
+    const tightnessMobile = container.querySelector('.home-tightness-mobile')
+    expect(tightnessMobile).not.toBeNull()
+    expect(tightnessMobile!.closest('.rounded-card')).toBeNull()
+    expect(container.querySelector('.home-feed-secondary')?.contains(tightnessMobile)).toBe(true)
+    expect(tightnessMobile!.querySelector('[data-tightness-row="house"]')).not.toBeNull()
+    expect(tightnessMobile!.querySelector('[data-tightness-row="senate"]')).not.toBeNull()
+    expect(screen.queryByText('No close House passage votes.')).not.toBeInTheDocument()
   })
 
   it('opens a Senate-waiting bill without leftover feed filters', async () => {

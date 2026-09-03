@@ -234,6 +234,7 @@
   }
 
   .home-tightness-mobile {
+    width: 100%;
     min-width: 0;
     scroll-margin-top: 4.5rem;
   }
