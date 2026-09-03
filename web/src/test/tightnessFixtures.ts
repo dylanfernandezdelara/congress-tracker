@@ -43,6 +43,31 @@ export function makeSenateWaitingBill(
   }
 }
 
+/**
+ * Production House lookback is bimodal: a chained 4% cluster of knife-edge
+ * rolls near 50% yea plus steamrolls near 100%. Used to prove stagger stays
+ * inside the ~2.5rem track instead of stacking onto the row labels.
+ */
+export function makeBimodalHouseDots(): TightnessDot[] {
+  const knifeEdge = [
+    0.5023, 0.5024, 0.5035, 0.5047, 0.5071, 0.5072, 0.5176, 0.5203, 0.5277, 0.534, 0.5395, 0.5524,
+  ]
+  const steamrolls = [0.9742, 0.9792, 0.985, 0.9952, 0.9976, 1]
+  return [...knifeEdge, ...steamrolls].map((yea_pct, index) => {
+    const total = 420
+    const yeas = Math.round(yea_pct * total)
+    return makeTightnessDot({
+      roll_number: 8000 + index,
+      bill_number: 100 + index,
+      yeas,
+      nays: total - yeas,
+      yea_pct,
+      cohesion: yea_pct > 0.9 ? 'bipartisan' : 'party-line',
+      headline: `House sample roll ${8000 + index}`,
+    })
+  })
+}
+
 export function makeTightnessStats(
   overrides: Partial<TightnessStatsResponse> = {},
 ): TightnessStatsResponse {
