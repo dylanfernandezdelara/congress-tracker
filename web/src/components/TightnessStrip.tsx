@@ -105,7 +105,9 @@ function TightnessRow({
               style={{
                 left: `${tightnessDotLeftPercent(dot)}%`,
                 transform: `translate(-50%, calc(-50% + ${offsets[index] ?? 0}px))`,
-                zIndex: selected ? 2 : 1,
+                zIndex: selected
+                  ? 4
+                  : 2 + Math.round((100 - tightnessDotLeftPercent(dot)) / 10),
               }}
             >
               <button
@@ -125,7 +127,7 @@ function TightnessRow({
 
 /** Nearby percents (50.2 vs 50.8) sit in different buckets but still overlap. */
 const STAGGER_CLUSTER_PCT = 4
-const STAGGER_STEP_PX = 6
+const STAGGER_STEP_PX = 10
 
 /** Nudge overlapping dots so a knife-edge cluster stays tappable. */
 export function staggerOffsets(dots: TightnessDot[]): number[] {
