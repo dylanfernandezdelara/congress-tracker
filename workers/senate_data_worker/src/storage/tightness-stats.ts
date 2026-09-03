@@ -1,3 +1,4 @@
+import { isHouseOriginBillType } from "../../../../shared/bill-id";
 import { voteCohesion, yeaShare } from "../../../../shared/vote-cohesion";
 import type {
   SenateWaitingBill,
@@ -130,6 +131,7 @@ export function senateWaitingFromFeed(items: FeedItem[]): SenateWaitingBill[] {
   const waiting: SenateWaitingBill[] = [];
   for (const item of items) {
     if (item.process?.current_status !== "in_second_chamber_committee") continue;
+    if (!isHouseOriginBillType(item.bill.type)) continue;
     waiting.push({
       congress: item.bill.congress,
       bill_type: item.bill.type,
