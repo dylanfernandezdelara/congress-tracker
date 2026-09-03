@@ -436,17 +436,50 @@ async function withPage(fn) {
     })
     if (disallowed) {
       await disallowed.goto(webUrl, { waitUntil: 'domcontentloaded' })
-      await disallowed.setViewportSize(VIEWPORT)
+      await disallowed.setViewportSize(viewportFromState(ready))
       throw new Error('page was on a disallowed URL; restored to home')
     }
     page = await context.newPage()
     await page.goto(webUrl, { waitUntil: 'domcontentloaded' })
   }
-  await page.setViewportSize(VIEWPORT)
+  await page.setViewportSize(viewportFromState(ready))
   return await fn(page)
 }
 
+function viewportFromState(state) {
+  const width = Number(state?.viewport?.width)
+  const height = Number(state?.viewport?.height)
+  return {
+    width: Number.isFinite(width) && width > 0 ? Math.round(width) : VIEWPORT.width,
+    height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
+  }
+}
+
+function persistViewportFromCdp(flags) {
+  if (flags.method !== 'Emulation.setDeviceMetricsOverride') return
+  let params = {}
+  if (typeof flags.params === 'string' && flags.params.trim()) {
+    try {
+      params = JSON.parse(flags.params)
+    } catch {
+      return
+    }
+  } else if (flags.params && typeof flags.params === 'object') {
+    params = flags.params
+  }
+  const width = Number(params.width)
+  const height = Number(params.height)
+  if (!Number.isFinite(width) || width <= 0) return
+  updateState({
+    viewport: {
+      width: Math.round(width),
+      height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
+    },
+  })
+}
+
 async function cmdBrowser(command, flags) {
+  if (command === 'cdp') persistViewportFromCdp(flags)
   const endpoints = endpointsFromState(requireOwnState())
   await runBrowserCommand(command, flags, {
     withPage,
@@ -522,6 +555,8 @@ export const TEST_ONLY = {
   resolveEvidencePath,
   EVIDENCE_ROOT,
   PERSIST_TO,
+  viewportFromState,
+  persistViewportFromCdp,
 }
 
 async function main(argv) {
