@@ -89,7 +89,7 @@ function TightnessRow({
     <div className="tightness-row" data-tightness-row={label.startsWith('House') ? 'house' : 'senate'}>
       <h3 className="tightness-row-label">{label}</h3>
       <ul className="tightness-track" aria-label={label}>
-        <span className="tightness-track-line" aria-hidden="true" />
+        <li className="tightness-track-line" aria-hidden="true" />
         {dots.length === 0 ? (
           <li className="tightness-empty-item">
             <p className="tightness-empty">{empty}</p>
@@ -106,7 +106,7 @@ function TightnessRow({
                 left: `clamp(var(--tightness-dot-radius), ${tightnessDotLeftPercent(dot)}%, calc(100% - var(--tightness-dot-radius)))`,
                 transform: `translate(-50%, calc(-50% + ${offsets[index] ?? 0}px))`,
                 zIndex: selected
-                  ? 4
+                  ? 20
                   : 2 + Math.round((100 - tightnessDotLeftPercent(dot)) / 10),
               }}
             >

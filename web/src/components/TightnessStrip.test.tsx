@@ -62,4 +62,26 @@ describe('TightnessStrip', () => {
     expect(transforms.some((value) => value.includes('-5px'))).toBe(true)
     expect(transforms.some((value) => value.includes('5px'))).toBe(true)
   })
+
+  it('keeps the selected knife-edge dot above its cluster', () => {
+    const house = [
+      makeTightnessDot(),
+      makeTightnessDot({
+        roll_number: 9005,
+        bill_number: 1,
+        yeas: 218,
+        nays: 210,
+        yea_pct: 218 / 428,
+        cohesion: 'bipartisan',
+      }),
+    ]
+    const selectedKey = 'bill:House:119:2:9010'
+    const { container } = render(
+      <TightnessStrip house={house} senate={[]} selectedKey={selectedKey} onSelect={vi.fn()} />,
+    )
+    const items = [...container.querySelectorAll('[data-tightness-row="house"] .tightness-dot-item')] as HTMLElement[]
+    const selected = items.find((item) => item.querySelector('.is-selected'))
+    const other = items.find((item) => !item.querySelector('.is-selected'))
+    expect(Number(selected?.style.zIndex)).toBeGreaterThan(Number(other?.style.zIndex))
+  })
 })

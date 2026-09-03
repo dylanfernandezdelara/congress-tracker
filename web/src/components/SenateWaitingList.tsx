@@ -6,6 +6,8 @@ import { trimDisplayTitle } from '@congress-tracker/shared/feed-content'
 type SenateWaitingListProps = {
   items: SenateWaitingBill[]
   loading?: boolean
+  error?: string | null
+  onRetry?: () => void
   onOpenBill?: (billParam: string) => void
   compact?: boolean
 }
@@ -13,6 +15,8 @@ type SenateWaitingListProps = {
 export function SenateWaitingList({
   items,
   loading = false,
+  error = null,
+  onRetry,
   onOpenBill,
   compact = false,
 }: SenateWaitingListProps) {
@@ -23,9 +27,19 @@ export function SenateWaitingList({
     >
       <h2 className="sidebar-section-title">House-passed, sitting in the Senate</h2>
       {loading ? <p className="text-xs text-faint">Loading Senate-waiting bills…</p> : null}
-      {items.length === 0 && !loading ? (
+      {error ? (
+        <div className="space-y-2">
+          <p className="text-xs text-fail">{error}</p>
+          {onRetry ? (
+            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {!error && items.length === 0 && !loading ? (
         <p className="text-xs text-faint">No House-passed bills are waiting in a Senate committee.</p>
-      ) : (
+      ) : !error ? (
         <ul className="senate-waiting-list">
           {items.map((item) => {
             const billId = formatShortBillId(item.bill_type, item.bill_number)
@@ -56,7 +70,7 @@ export function SenateWaitingList({
             )
           })}
         </ul>
-      )}
+      ) : null}
     </section>
   )
 }

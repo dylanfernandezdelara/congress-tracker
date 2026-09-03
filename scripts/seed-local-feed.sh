@@ -435,6 +435,8 @@ senate_rest = list(party_sequence([("R", 51), ("D", 45), ("I", 2)]))
 
 member_rows = []
 vote_rows = []
+r_i = 0
+d_i = 0
 
 for bid, name, chamber, party, state, district, ts in spotlight_members:
     member_rows.append(
@@ -447,11 +449,24 @@ for idx, party in enumerate(house_rest, start=1):
         f"  ('{bid}', 'Rep. Sample {idx} (local)', 'House', '{party}', 'TX', {idx % 50 + 1}, '{updated}')"
     )
     vote_rows.append(f"  ('House', 119, 2, 9001, '{bid}', 'Yea')")
-    # Knife-edge 9010 (210–208 party-line): R Yea / D Nay, with a few named crossovers later.
+    # Knife-edge 9010 (210–208 party-line): R Yea / D Nay. Rest + 4 spotlights
+    # must sum to that tally (house_rest idx 1–219 are R, 220+ are D).
     if party == "R":
-        knife = "Nay" if idx <= 5 else "Yea"
+        r_i += 1
+        if r_i <= 4:
+            knife = "Nay"
+        elif r_i <= 4 + 207:
+            knife = "Yea"
+        else:
+            knife = "Not Voting"
     elif party == "D":
-        knife = "Yea" if idx <= 2 else "Nay"
+        d_i += 1
+        if d_i <= 2:
+            knife = "Yea"
+        elif d_i <= 2 + 201:
+            knife = "Nay"
+        else:
+            knife = "Not Voting"
     else:
         knife = "Not Voting"
     vote_rows.append(f"  ('House', 119, 2, 9010, '{bid}', '{knife}')")

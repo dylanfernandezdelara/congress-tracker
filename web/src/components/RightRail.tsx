@@ -36,7 +36,13 @@ export function RightRail({
         error={error}
         onRetry={onRetry}
       />
-      <SenateWaitingList items={waiting} loading={loading} onOpenBill={onOpenWaitingBill} />
+      <SenateWaitingList
+        items={waiting}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        onOpenBill={onOpenWaitingBill}
+      />
     </div>
   )
 }

@@ -117,11 +117,7 @@ export default function Home() {
 
   const openWaitingBill = useCallback(
     (billParam: string) => {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev)
-        next.set('bill', billParam)
-        return next
-      })
+      setSearchParams({ bill: billParam })
     },
     [setSearchParams],
   )
@@ -198,6 +194,8 @@ export default function Home() {
     <SenateWaitingList
       items={senateWaiting}
       loading={tightnessLoading}
+      error={tightness.error}
+      onRetry={reloadStats}
       onOpenBill={openWaitingBill}
       compact={!isDesktop}
     />
@@ -292,6 +290,7 @@ export default function Home() {
             <button type="button" className="ghost-button" onClick={reloadAll}>
               Retry
             </button>
+            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
           </div>
         ) : null}
 
@@ -299,6 +298,7 @@ export default function Home() {
           <div className="home-feed-empty">
             <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
+            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
                 Clear search

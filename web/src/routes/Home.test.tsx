@@ -417,6 +417,14 @@ describe('Home', () => {
     expect(within(sections[0] as HTMLElement).getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
     expect(sections[1]).toHaveAttribute('aria-label', 'Members in Congress')
 
+    fireEvent.click(
+      within(secondary as HTMLElement).getByRole('button', {
+        name: /House-passed contracting bill waiting in the Senate/,
+      }),
+    )
+    expect(screen.getByTestId('search-params')).toHaveTextContent('bill=119-hr-33')
+    expect(screen.getByTestId('search-params').textContent).not.toContain('chamber=')
+
     expect(screen.getAllByRole('region', { name: 'Vote tightness' })).toHaveLength(1)
     expect(screen.getAllByRole('region', { name: 'Federal Control' })).toHaveLength(1)
     await waitFor(() => {
@@ -424,6 +432,34 @@ describe('Home', () => {
       expect(fetchRecentLaws).toHaveBeenCalledTimes(1)
       expect(fetchDefectors).toHaveBeenCalledTimes(2)
     })
+  })
+
+  it('keeps both tightness rows on mobile when the feed is empty', async () => {
+    mockViewport(false)
+    fetchFeed.mockResolvedValue(pageResponse([], { total: 0, has_more: false }))
+    const { container } = renderHome('/?q=nomatch')
+
+    expect(await screen.findByText(/No matches for “nomatch”/)).toBeInTheDocument()
+    const tightnessMobile = container.querySelector('.home-tightness-mobile')
+    expect(tightnessMobile).not.toBeNull()
+    expect(tightnessMobile!.querySelector('[data-tightness-row="house"]')).not.toBeNull()
+    expect(tightnessMobile!.querySelector('[data-tightness-row="senate"]')).not.toBeNull()
+  })
+
+  it('opens a Senate-waiting bill without leftover feed filters', async () => {
+    mockViewport(false)
+    renderHome('/?chamber=Senate&q=lands')
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /House-passed contracting bill waiting in the Senate/,
+      }),
+    )
+
+    const params = screen.getByTestId('search-params').textContent ?? ''
+    expect(params).toContain('bill=119-hr-33')
+    expect(params).not.toContain('chamber=')
+    expect(params).not.toContain('q=')
   })
 
   it('opens a member profile from a left-rail spotlight', async () => {

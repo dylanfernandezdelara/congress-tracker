@@ -23,4 +23,18 @@ describe('SenateWaitingList', () => {
     )
     expect(onOpenBill).toHaveBeenCalledWith('119-hr-33')
   })
+
+  it('shows a retry action instead of an empty list when the payload failed', () => {
+    const onRetry = vi.fn()
+    render(
+      <SenateWaitingList items={[]} error="Couldn't load tightness." onRetry={onRetry} />,
+    )
+
+    expect(screen.getByText("Couldn't load tightness.")).toBeInTheDocument()
+    expect(
+      screen.queryByText('No House-passed bills are waiting in a Senate committee.'),
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
 })
