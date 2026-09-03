@@ -679,7 +679,7 @@
 
   .tightness-track {
     position: relative;
-    height: 1.35rem;
+    height: 1.75rem;
     min-width: 0;
     margin: 0;
     padding: 0;
@@ -703,6 +703,7 @@
     height: 0.7rem;
     margin: 0;
     padding: 0;
+    z-index: 1;
   }
 
   .tightness-empty-item {
@@ -711,6 +712,7 @@
   }
 
   .tightness-dot {
+    position: relative;
     display: block;
     width: 100%;
     height: 100%;
@@ -721,6 +723,12 @@
     background: hsl(var(--twc-secondary));
     cursor: pointer;
     box-shadow: 0 0 0 1px hsl(var(--twc-border));
+  }
+
+  .tightness-dot::after {
+    content: '';
+    position: absolute;
+    inset: -14px -10px;
   }
 
   .tightness-dot:focus-visible {
@@ -778,7 +786,7 @@
   }
 
   .tightness--compact .tightness-track {
-    height: 1.1rem;
+    height: 1.55rem;
   }
 
   .tightness--compact .tightness-dot-item {
@@ -791,6 +799,7 @@
     flex-direction: column;
     gap: 0.65rem;
     min-width: 0;
+    overflow-x: hidden;
   }
 
   .senate-waiting-list {
@@ -831,6 +840,7 @@
     color: hsl(var(--twc-foreground));
     text-decoration: underline;
     text-decoration-color: hsl(var(--twc-link-decoration));
+    overflow-wrap: anywhere;
   }
 
   .senate-waiting-item:hover .senate-waiting-title,

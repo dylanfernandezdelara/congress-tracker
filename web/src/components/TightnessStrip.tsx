@@ -105,6 +105,7 @@ function TightnessRow({
               style={{
                 left: `${tightnessDotLeftPercent(dot)}%`,
                 transform: `translate(-50%, calc(-50% + ${offsets[index] ?? 0}px))`,
+                zIndex: selected ? 2 : 1,
               }}
             >
               <button
@@ -122,21 +123,35 @@ function TightnessRow({
   )
 }
 
+/** Nearby percents (50.2 vs 50.8) sit in different buckets but still overlap. */
+const STAGGER_CLUSTER_PCT = 4
+const STAGGER_STEP_PX = 6
+
 /** Nudge overlapping dots so a knife-edge cluster stays tappable. */
-function staggerOffsets(dots: TightnessDot[]): number[] {
-  const buckets = new Map<number, number[]>()
-  dots.forEach((dot, index) => {
-    const bucket = Math.round(tightnessDotLeftPercent(dot) / 3)
-    const list = buckets.get(bucket) ?? []
-    list.push(index)
-    buckets.set(bucket, list)
-  })
+export function staggerOffsets(dots: TightnessDot[]): number[] {
+  const ranked = dots
+    .map((dot, index) => ({ index, left: tightnessDotLeftPercent(dot) }))
+    .sort((a, b) => a.left - b.left || a.index - b.index)
+
   const offsets = dots.map(() => 0)
-  for (const indexes of buckets.values()) {
-    if (indexes.length < 2) continue
-    indexes.forEach((index, i) => {
-      offsets[index] = (i - (indexes.length - 1) / 2) * 5
-    })
+  let clusterStart = 0
+  const flush = (end: number) => {
+    const size = end - clusterStart
+    if (size < 2) return
+    for (let i = clusterStart; i < end; i += 1) {
+      const item = ranked[i]
+      if (!item) continue
+      offsets[item.index] = (i - clusterStart - (size - 1) / 2) * STAGGER_STEP_PX
+    }
+  }
+
+  for (let i = 1; i <= ranked.length; i += 1) {
+    const prev = ranked[i - 1]
+    const curr = ranked[i]
+    if (!prev || !curr || curr.left - prev.left > STAGGER_CLUSTER_PCT) {
+      flush(i)
+      clusterStart = i
+    }
   }
   return offsets
 }

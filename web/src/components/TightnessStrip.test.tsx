@@ -36,4 +36,30 @@ describe('TightnessStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: /House bill H\.R\. 88/ }))
     expect(onSelect).toHaveBeenCalledWith(house[0])
   })
+
+  it('staggers nearby knife-edge dots so both stay tappable', () => {
+    const onSelect = vi.fn()
+    const house = [
+      makeTightnessDot(),
+      makeTightnessDot({
+        roll_number: 9005,
+        bill_number: 1,
+        yeas: 218,
+        nays: 210,
+        yea_pct: 218 / 428,
+        cohesion: 'bipartisan',
+        headline: 'House passes a broad energy permitting and production package (local sample)',
+      }),
+    ]
+    const { container } = render(
+      <TightnessStrip house={house} senate={[]} selectedKey={null} onSelect={onSelect} compact />,
+    )
+
+    const items = [...container.querySelectorAll('[data-tightness-row="house"] .tightness-dot-item')]
+    expect(items).toHaveLength(2)
+    const transforms = items.map((item) => (item as HTMLElement).style.transform)
+    expect(transforms[0]).not.toBe(transforms[1])
+    expect(transforms.some((value) => value.includes('-3px'))).toBe(true)
+    expect(transforms.some((value) => value.includes('3px'))).toBe(true)
+  })
 })
