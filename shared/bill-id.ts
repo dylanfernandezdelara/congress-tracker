@@ -38,6 +38,16 @@ export function isHouseOriginBillType(type: string): boolean {
   return HOUSE_ORIGIN_BILL_TYPES.has(normalizeBillTypeCode(type))
 }
 
+const SENATE_ORIGIN_BILL_TYPES = new Set(['S', 'SRES', 'SJRES', 'SCONRES'])
+
+/** Originating chamber from docket type (H.R. → House, S. → Senate). */
+export function originChamberFromBillType(type: string): 'House' | 'Senate' | null {
+  const code = normalizeBillTypeCode(type)
+  if (HOUSE_ORIGIN_BILL_TYPES.has(code)) return 'House'
+  if (SENATE_ORIGIN_BILL_TYPES.has(code)) return 'Senate'
+  return null
+}
+
 const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
 const LOCAL_SAMPLE_LABEL = /\s*\(local sample\)\s*/gi
 

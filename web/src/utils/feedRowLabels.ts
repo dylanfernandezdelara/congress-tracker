@@ -1,4 +1,5 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
+import { originChamberFromBillType } from '@congress-tracker/shared/bill-id'
 import {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
@@ -48,6 +49,7 @@ export type FeedStatusKind =
   | 'failed'
   | 'procedural'
   | 'none'
+  | 'introduced'
   | 'law'
   | 'law_unsigned'
   | 'vetoed'
@@ -126,6 +128,12 @@ const FEED_KIND_UI: Record<FeedStatusKind, FeedKindUi> = {
     showMarginWhenPresent: false,
     showEventLine: true,
   },
+  introduced: {
+    badgeToneClass: '',
+    eventToneClass: '',
+    showMarginWhenPresent: false,
+    showEventLine: true,
+  },
 }
 
 function withPresentation(meta: FeedRowMeta, eventDisplay: string): FeedRowView {
@@ -173,17 +181,21 @@ export function getPrimaryPassageVote(item: FeedItem): FeedPassageVote | null {
   )
 }
 
-export function getFeedRowDisplayDate(item: FeedItem): { iso: string; kind: 'vote' | 'signal' } {
+export function getFeedRowDisplayDate(
+  item: FeedItem,
+): { iso: string; kind: 'vote' | 'signal' | 'intro' } {
   const signal = item.executive_signals?.[0]
   const signalDate = signal?.posted_at.slice(0, 10)
   const vote = getPrimaryPassageVote(item)
-  // Chronology uses activity (votes + executive). Fall back for older payloads that
-  // only sent latest_passage_date; never read null passage as a date string.
+  const introducedDate = item.lifecycle?.introduced_date?.slice(0, 10) ?? null
+  // Chronology uses activity (votes + executive + intro). Fall back for older
+  // payloads that only sent latest_passage_date; never read null passage as a date.
   const activityRaw = item.latest_activity_date ?? item.latest_passage_date
-  const activityDate = activityRaw?.slice(0, 10) ?? signalDate ?? vote?.date ?? ''
+  const activityDate =
+    activityRaw?.slice(0, 10) ?? signalDate ?? vote?.date ?? introducedDate ?? ''
 
   if (!activityDate) {
-    return { iso: '', kind: vote ? 'vote' : signalDate ? 'signal' : 'vote' }
+    return { iso: '', kind: vote ? 'vote' : signalDate ? 'signal' : introducedDate ? 'intro' : 'vote' }
   }
 
   if (signalDate && activityDate === signalDate) {
@@ -194,7 +206,14 @@ export function getFeedRowDisplayDate(item: FeedItem): { iso: string; kind: 'vot
     return { iso: vote.date, kind: 'vote' }
   }
 
-  return { iso: activityDate, kind: vote ? 'vote' : signalDate ? 'signal' : 'vote' }
+  if (introducedDate && activityDate === introducedDate) {
+    return { iso: introducedDate, kind: 'intro' }
+  }
+
+  return {
+    iso: activityDate,
+    kind: vote ? 'vote' : signalDate ? 'signal' : introducedDate ? 'intro' : 'vote',
+  }
 }
 
 export function isProceduralFeedItem(item: FeedItem): boolean {
@@ -330,6 +349,25 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
           processChip: null,
         },
         terminalStatus === 'became_law_unsigned' ? UNSIGNED_LAW_EVENT : 'No vote recorded',
+      )
+    }
+
+    const introducedDate = item.lifecycle?.introduced_date
+    const isIntroduced =
+      Boolean(introducedDate) || item.process?.current_status === 'introduced'
+    if (isIntroduced) {
+      const chamber = originChamberFromBillType(item.bill.type)
+      return withPresentation(
+        {
+          kind: 'introduced',
+          outcomeLabel: 'Introduced',
+          chamber,
+          margin: null,
+          billId,
+          presidentDeskChip: null,
+          processChip,
+        },
+        chamber ? `Introduced in the ${chamber}` : 'Introduced',
       )
     }
 

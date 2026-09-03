@@ -45,11 +45,21 @@ export interface FeedCompanionVote {
   date: string
 }
 
+/** Primary sponsor when ingest/seed has written `bill_sponsors`. */
+export interface FeedPrimarySponsor {
+  bioguide_id: string
+  name: string | null
+  party: string | null
+  state: string
+}
+
 export interface FeedItem {
   bill: FeedBill
   policy_area: string | null
   digest: BillDigestContent | null
   raw_summary_text: string | null
+  /** Present when a primary sponsor row exists for the bill. */
+  primary_sponsor?: FeedPrimarySponsor | null
   passage_votes: FeedPassageVote[]
   /** Non-passage rolls on the same bill, newest first. Omitted when empty. */
   companion_votes?: FeedCompanionVote[]
@@ -60,8 +70,9 @@ export interface FeedItem {
    */
   latest_passage_date: string | null
   /**
-   * Latest feed-sort activity date — max of passage votes and executive
-   * signal timestamps. Used for chronology / row ordering, not as a vote date.
+   * Latest feed-sort activity date — max of passage votes, executive
+   * signal timestamps, and introduction dates. Used for chronology / row
+   * ordering, not as a vote date.
    */
   latest_activity_date: string
   lifecycle: BillLifecycle | null

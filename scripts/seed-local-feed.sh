@@ -33,6 +33,7 @@ days_ago() {
   fi
 }
 
+D_TODAY="$(days_ago 0)"
 D_RECENT="$(days_ago 1)"
 D_MID="$(days_ago 4)"
 D_OLDER="$(days_ago 9)"
@@ -307,7 +308,11 @@ VALUES
   (119, 'hr', 33, 'Federal Contracting Sunshine Act (local sample)', 'Government Operations and Politics',
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"House-passed contracting bill waiting in the Senate (local sample)","what_it_does":"Requires more public reporting after a contract is awarded and sends the House-passed text to a Senate committee.","key_points":["Passed the House nearly unanimously","Now waits in a Senate committee","Adds contractor disclosure rules"],"terms_explained":[{"term":"Second chamber","plain":"The other house of Congress, which must still act before a bill can become law."}]}',
-   '${D_MID}T00:00:00.000Z', '${D_MID}T00:00:00.000Z');
+   '${D_MID}T00:00:00.000Z', '${D_MID}T00:00:00.000Z'),
+  (119, 's', 9901, 'Ban Artificial Superintelligence Act (local sample)', 'Science, Technology, Communications',
+   'Sample CRS-style summary seeded for local development. No live data was fetched.',
+   '{"headline":"Sanders introduces a ban on artificial superintelligence (local sample)","what_it_does":"Would prohibit developing or deploying artificial superintelligence systems and set enforcement rules for federal agencies.","key_points":["Bans creating or using artificial superintelligence","Applies to federal contractors and agencies","Leaves ordinary AI research outside the ban"],"terms_explained":[{"term":"Artificial superintelligence","plain":"A hypothetical AI system that would outperform humans at most cognitive work."}]}',
+   '${D_TODAY}T00:00:00.000Z', '${D_TODAY}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO bill_sponsors
   (congress, bill_type, bill_number, bioguide_id, state, full_name, party, is_primary, updated_at)
@@ -316,7 +321,8 @@ VALUES
   (119, 's', 47, 'LOCAL:S001', 'TX', 'Sen. Sample Crossover (local)', 'R', 1, '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, 'LOCAL:H001', 'CA', 'Rep. Sample Crossover (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z'),
   (119, 'hr', 88, 'LOCAL:H004', 'SC', 'Rep. Portfolio Loser (local)', 'R', 1, '${D_RECENT}T00:00:00.000Z'),
-  (119, 'hr', 33, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_MID}T00:00:00.000Z');
+  (119, 'hr', 33, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_MID}T00:00:00.000Z'),
+  (119, 's', 9901, 'LOCAL:S9901', 'VT', 'Sen. Bernard Sanders (local)', 'I', 1, '${D_TODAY}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO bill_lifecycle
   (congress, bill_type, bill_number, introduced_date, presented_date, signed_date, vetoed_date, became_law_date, law_kind, public_law, latest_action_date, latest_action_text, updated_at)
@@ -326,7 +332,9 @@ VALUES
   (119, 's', 47, '${D_OLDER}', '${D_MID}', NULL, NULL, '${D_MID}', 'law_unsigned', '119-2',
    '${D_MID}', 'Became Public Law No: 119-2 without signature. (local sample)', '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, '${D_OLDER}', '${D_RECENT}', NULL, NULL, NULL, NULL, NULL,
-   '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z');
+   '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z'),
+  (119, 's', 9901, '${D_TODAY}', NULL, NULL, NULL, NULL, NULL, NULL,
+   '${D_TODAY}', 'Introduced in Senate. (local sample)', '${D_TODAY}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO committee_roster
   (congress, system_code, chamber, name, committee_type, parent_system_code, updated_at)

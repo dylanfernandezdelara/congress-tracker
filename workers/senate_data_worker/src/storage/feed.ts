@@ -1,4 +1,9 @@
 import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS, FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
+import {
+  getPrimarySponsorsForBills,
+  sponsorMapKey,
+  type PrimarySponsorRow,
+} from "../d1/sponsors";
 import type { Env } from "../config";
 import {
   executiveBillMapKey,
@@ -34,7 +39,7 @@ import {
   type VoteRow,
 } from "../d1/votes";
 import { lifecycleRowToApi } from "../lifecycle/to-api";
-import { lookbackStartIso } from "../sources/congress-client";
+import { introLookbackStartIso, lookbackStartIso } from "../sources/congress-client";
 import type { RelatedExecutiveBill } from "../../../../shared/executive-api-types";
 import type { ExecutiveBillRole } from "../../../../shared/executive-api-types";
 import type { Chamber, FeedItem, FeedPageResponse } from "../types";
@@ -42,7 +47,7 @@ import type { Chamber, FeedItem, FeedPageResponse } from "../types";
 export interface FeedPageOptions {
   limit: number;
   offset: number;
-  /** When set, only bills with a passage vote in this chamber. */
+  /** Passage-vote chamber, or originating chamber for intro-only bills. */
   chamber?: Chamber;
   /** Optional free-text search (title, policy area, headline, bill id). */
   q?: string;
@@ -72,6 +77,7 @@ interface FeedItemAssemblyContext {
   textChangesByBill: Awaited<ReturnType<typeof getBillTextChangesForBills>>;
   companionVotesByBill: Map<string, VoteRow[]>;
   processByBill: Map<string, BillProcessSummary>;
+  sponsorsByBill: Map<string, PrimarySponsorRow>;
   linksByPost: ExecutivePostLinks;
 }
 
@@ -96,6 +102,7 @@ async function loadFeedItemAssemblyContext(
     textChangesByBill,
     companionVotesByBill,
     processByBill,
+    sponsorsByBill,
   ] = await Promise.all([
     getLifecyclesForBills(env.DB, billKeys),
     getDigestsForBills(
@@ -111,6 +118,7 @@ async function loadFeedItemAssemblyContext(
     getBillTextChangesForBills(env.DB, billKeys),
     getCompanionVotesForBills(env.DB, billKeys),
     getProcessSummariesForBills(env.DB, billKeys),
+    getPrimarySponsorsForBills(env.DB, billKeys),
   ]);
 
   const postIds = new Set<string>();
@@ -160,6 +168,7 @@ async function loadFeedItemAssemblyContext(
     textChangesByBill,
     companionVotesByBill,
     processByBill,
+    sponsorsByBill,
     linksByPost,
   };
 }
@@ -226,6 +235,18 @@ function assembleFeedItem(
   );
   const text_changes = textChangesRow ? rowToBillTextChanges(textChangesRow) : null;
 
+  const sponsorRow = ctx.sponsorsByBill.get(
+    sponsorMapKey(row.bill_congress, row.bill_type, row.bill_number)
+  );
+  const primary_sponsor = sponsorRow
+    ? {
+        bioguide_id: sponsorRow.bioguide_id,
+        name: sponsorRow.full_name,
+        party: sponsorRow.party,
+        state: sponsorRow.state,
+      }
+    : null;
+
   const companion_votes = (ctx.companionVotesByBill.get(key) ?? []).map((v) => ({
     chamber: v.chamber as Chamber,
     congress: v.congress,
@@ -248,6 +269,7 @@ function assembleFeedItem(
     policy_area: digestRow?.policy_area ?? null,
     digest: parseStoredDigest(digestRow?.digest_json ?? null),
     raw_summary_text: digestRow?.raw_summary_text ?? null,
+    ...(primary_sponsor ? { primary_sponsor } : {}),
     passage_votes: votes.map((v) => ({
       chamber: v.chamber as Chamber,
       congress: v.congress,
@@ -300,6 +322,9 @@ export async function buildFeedPage(
   await ensureSchema(env.DB);
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
   const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
+  const introLookback = introLookbackStartIso(
+    options.now instanceof Date ? options.now : options.now ? new Date(options.now) : undefined
+  );
   const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
   const offset = Math.max(0, options.offset);
   const filters = {
@@ -314,8 +339,8 @@ export async function buildFeedPage(
   };
   const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
-    countFeedBills(env.DB, lookback, executiveSince, filters),
-    selectFeedBills(env.DB, lookback, executiveSince, cappedLimit, offset, filters),
+    countFeedBills(env.DB, lookback, executiveSince, introLookback, filters),
+    selectFeedBills(env.DB, lookback, executiveSince, introLookback, cappedLimit, offset, filters),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 

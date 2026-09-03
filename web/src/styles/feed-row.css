@@ -197,7 +197,8 @@
   .feed-row-badge--law,
   .feed-row-badge--law_unsigned,
   .feed-row-badge--procedural,
-  .feed-row-badge--none {
+  .feed-row-badge--none,
+  .feed-row-badge--introduced {
     font-weight: 500;
     background-color: transparent;
   }
@@ -215,7 +216,8 @@
   }
 
   .feed-row-badge--procedural,
-  .feed-row-badge--none {
+  .feed-row-badge--none,
+  .feed-row-badge--introduced {
     color: hsl(var(--twc-secondary));
   }
 
@@ -241,7 +243,8 @@
 
   .feed-row-chip--executive,
   .feed-row-chip--president-desk,
-  .feed-row-chip--process {
+  .feed-row-chip--process,
+  .feed-row-chip--sponsor {
     border: none;
     color: hsl(var(--twc-secondary));
     background: transparent;

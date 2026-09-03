@@ -13,6 +13,7 @@ const mockGetLifecyclesForBills = vi.fn();
 const mockGetCompanionVotesForBills = vi.fn();
 const mockGetBillTextChangesForBills = vi.fn();
 const mockGetProcessSummariesForBills = vi.fn();
+const mockGetPrimarySponsorsForBills = vi.fn();
 const mockLookbackStartIso = vi.fn((days: number) => `lookback-${days}`);
 
 vi.mock("../d1/schema", () => ({
@@ -65,6 +66,14 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
   };
 });
 
+vi.mock("../d1/sponsors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/sponsors")>();
+  return {
+    ...actual,
+    getPrimarySponsorsForBills: (...args: unknown[]) => mockGetPrimarySponsorsForBills(...args),
+  };
+});
+
 vi.mock("../d1/bill-process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/bill-process")>();
   return {
@@ -76,6 +85,7 @@ vi.mock("../d1/bill-process", async (importOriginal) => {
 
 vi.mock("../sources/congress-client", () => ({
   lookbackStartIso: (days: number) => mockLookbackStartIso(days),
+  introLookbackStartIso: () => "lookback-intro-7",
 }));
 
 import { buildFeedPage } from "./feed";
@@ -145,6 +155,7 @@ describe("buildFeedPage lifecycle attachment", () => {
     mockGetCompanionVotesForBills.mockResolvedValue(new Map([["119:HR:6644", []]]));
     mockGetBillTextChangesForBills.mockResolvedValue(new Map());
     mockGetProcessSummariesForBills.mockResolvedValue(new Map());
+    mockGetPrimarySponsorsForBills.mockResolvedValue(new Map());
   });
 
   it("forwards optional chamber to feed bill select and count", async () => {
@@ -159,6 +170,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "lookback-intro-7",
       {
         chamber: "Senate",
         q: undefined,
@@ -174,6 +186,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "lookback-intro-7",
       50,
       0,
       {
@@ -201,6 +214,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "lookback-intro-7",
       {
       chamber: undefined,
       q: "housing",
@@ -216,6 +230,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "lookback-intro-7",
       50,
       0,
       {
@@ -243,6 +258,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "lookback-intro-7",
       {
       chamber: undefined,
       q: undefined,
@@ -258,6 +274,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "lookback-intro-7",
       50,
       0,
       {

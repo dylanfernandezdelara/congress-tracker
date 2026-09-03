@@ -10,6 +10,7 @@ export type {
   FeedItem,
   FeedPageResponse,
   FeedPassageVote,
+  FeedPrimarySponsor,
 } from '@congress-tracker/shared/feed-api-types'
 
 export type {

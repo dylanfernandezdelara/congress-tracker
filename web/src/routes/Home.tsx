@@ -326,7 +326,7 @@ export default function Home() {
                 <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
               </div>
               <p className="home-feed-count">
-                {items.length} of {total} passage {total === 1 ? 'vote' : 'votes'}
+                {items.length} of {total} {total === 1 ? 'bill' : 'bills'}
                 {floorChrome.throughLabel ? ` · through ${floorChrome.throughLabel}` : ''}
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>

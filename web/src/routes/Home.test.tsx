@@ -154,7 +154,7 @@ describe('Home', () => {
       await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`of 1 bill · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: new RegExp(chip) })).toHaveTextContent(chip)
   })
@@ -207,7 +207,7 @@ describe('Home', () => {
       screen.queryByText(/No new House or Senate passage votes since/),
     ).not.toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`of 1 bill · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: new RegExp(chip) })).toHaveTextContent(chip)
     expect(screen.queryByText(/in recess/i)).not.toBeInTheDocument()
@@ -231,7 +231,7 @@ describe('Home', () => {
       await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 2 passage votes · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`of 2 bills · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
     expect(screen.queryByText(/through Apr 10/)).not.toBeInTheDocument()
@@ -271,7 +271,7 @@ describe('Home', () => {
     renderHome('/?q=housing')
     expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 1 passage vote · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`of 1 bill · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
   })
@@ -335,7 +335,7 @@ describe('Home', () => {
     expect(
       await screen.findByText('No new House passage votes since Jun 5.'),
     ).toBeInTheDocument()
-    expect(screen.getByText(/1 of 1 passage vote · through Jun 5 · House/)).toBeInTheDocument()
+    expect(screen.getByText(/1 of 1 bill · through Jun 5 · House/)).toBeInTheDocument()
     expect(screen.queryByText(/since Aug 8/)).not.toBeInTheDocument()
     const houseFilteredChip = expectedFloorChip('2026-06-05', '2026-06-05')
     expect(houseFilteredChip).toBe('House & Senate in recess')
@@ -550,7 +550,7 @@ describe('Home', () => {
     })
     expect(await screen.findByText('House headline')).toBeInTheDocument()
     expect(screen.queryByText('Senate headline')).not.toBeInTheDocument()
-    expect(screen.getByText(/1 of 1 passage vote/)).toBeInTheDocument()
+    expect(screen.getByText(/1 of 1 bill/)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'House' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('search-params')).toHaveTextContent('chamber=House')
   })

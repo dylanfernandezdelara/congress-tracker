@@ -169,9 +169,9 @@ export interface FeedBillRow {
   bill_congress: number;
   bill_type: string;
   bill_number: number;
-  /** MAX of passage-vote dates only; null when the bill is executive-only. */
+  /** MAX of passage-vote dates only; null when the bill is executive- or intro-only. */
   latest_passage_date: string | null;
-  /** MAX of passage + executive sort dates (feed ordering). */
+  /** MAX of passage + executive + introduction sort dates (feed ordering). */
   latest_activity_date: string;
 }
 
@@ -200,6 +200,7 @@ export async function selectFeedBills(
   db: D1Database,
   voteLookbackDate: string,
   executiveSinceIso: string,
+  introLookbackDate: string,
   limit: number,
   offset = 0,
   filters: FeedFilterOptions = {}
@@ -209,6 +210,7 @@ export async function selectFeedBills(
   const binds: Array<string | number> = [
     voteLookbackDate,
     executiveSinceIso,
+    introLookbackDate,
     ...filter.binds,
     limit,
     offset,
@@ -227,6 +229,11 @@ export async function selectFeedBills(
          JOIN executive_posts p ON p.id = b.post_id
          WHERE p.posted_at >= ?
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
+         UNION ALL
+         SELECT l.congress AS bill_congress, UPPER(l.bill_type) AS bill_type, l.bill_number,
+                l.introduced_date AS sort_date, 2 AS executive_boost
+         FROM bill_lifecycle l
+         WHERE l.introduced_date >= ?
        )
        SELECT bill_congress, bill_type, bill_number,
               MAX(CASE WHEN executive_boost = 0 THEN sort_date END) AS latest_passage_date,
@@ -246,6 +253,7 @@ export async function countFeedBills(
   db: D1Database,
   voteLookbackDate: string,
   executiveSinceIso: string,
+  introLookbackDate: string,
   filters: FeedFilterOptions = {}
 ): Promise<number> {
   await ensureSchema(db);
@@ -253,6 +261,7 @@ export async function countFeedBills(
   const binds: Array<string | number> = [
     voteLookbackDate,
     executiveSinceIso,
+    introLookbackDate,
     ...filter.binds,
   ];
 
@@ -269,6 +278,10 @@ export async function countFeedBills(
          JOIN executive_posts p ON p.id = b.post_id
          WHERE p.posted_at >= ?
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
+         UNION
+         SELECT l.congress AS bill_congress, UPPER(l.bill_type) AS bill_type, l.bill_number
+         FROM bill_lifecycle l
+         WHERE l.introduced_date >= ?
        )
        SELECT COUNT(*) AS total FROM combined
        ${filter.sql}`

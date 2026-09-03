@@ -44,6 +44,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 ## Features
 
 - [Feed timeline](./feed-timeline.md) covers home load, expand-in-place bill detail, confirmations, and new laws.
+- [Introduced bills](./introduced-bills.md) covers intro-only rows (Introduced chip, search, `?bill=`).
 - [Search bills](./search-bills.md) covers searchbox submit, matches, empty state, and clear.
 - [Filter feed](./filter-feed.md) covers chamber radios and the Filters panel (state, sponsor chamber, party, member, topic).
 - [Member spotlights](./member-spotlights.md) covers the Members in Congress rail and profile sheet.

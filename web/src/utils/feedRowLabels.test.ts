@@ -65,9 +65,80 @@ describe('getFeedRowDisplayDate', () => {
 
     expect(getFeedRowDisplayDate(item)).toEqual({ iso: '2026-06-24', kind: 'signal' })
   })
+
+  it('uses introduced_date as an intro activity date', () => {
+    const item = makeFeedItem({
+      latest_passage_date: null,
+      latest_activity_date: '2026-09-03',
+      passage_votes: [],
+      lifecycle: {
+        introduced_date: '2026-09-03',
+        presented_date: null,
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: '2026-09-03',
+        latest_action_text: 'Introduced in Senate',
+        derived: { status: null, day_of_ten: null, deadline_date: null, becomes_law_on: null },
+      },
+    })
+
+    expect(getFeedRowDisplayDate(item)).toEqual({ iso: '2026-09-03', kind: 'intro' })
+  })
 })
 
 describe('getFeedRowView', () => {
+  it('labels intro-only rows as Introduced instead of No vote recorded', () => {
+    const item = makeFeedItem({
+      bill: {
+        congress: 119,
+        type: 'S',
+        number: 9901,
+        title: 'Ban Artificial Superintelligence Act',
+      },
+      digest: {
+        headline: 'Sanders introduces a ban on artificial superintelligence',
+        what_it_does: 'Would prohibit developing artificial superintelligence.',
+        key_points: [],
+        terms_explained: [],
+      },
+      latest_passage_date: null,
+      latest_activity_date: '2026-09-03',
+      passage_votes: [],
+      lifecycle: {
+        introduced_date: '2026-09-03',
+        presented_date: null,
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: '2026-09-03',
+        latest_action_text: 'Introduced in Senate',
+        derived: { status: null, day_of_ten: null, deadline_date: null, becomes_law_on: null },
+      },
+    })
+
+    expect(getFeedRowView(item)).toEqual({
+      meta: {
+        kind: 'introduced',
+        outcomeLabel: 'Introduced',
+        chamber: 'Senate',
+        margin: null,
+        billId: 'S. 9901',
+        presidentDeskChip: null,
+        processChip: null,
+      },
+      eventDisplay: 'Introduced in the Senate',
+      badgeToneClass: '',
+      showMarginChip: false,
+      showEventLine: true,
+      eventToneClass: '',
+    })
+  })
+
   it('returns meta and de-duplicated event copy for a substantive pass', () => {
     const item = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 2913, title: 'Authorize support for Ukraine' },

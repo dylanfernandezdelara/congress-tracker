@@ -143,6 +143,19 @@ test('seed wipes live-ingested feed rows and supports isolated persist-to', () =
   assert.doesNotMatch(def, /--remote/)
 })
 
+test('seed includes an intro-only Ban Artificial Superintelligence Act fixture', () => {
+  const sql = printSql()
+  assert.match(sql, /Ban Artificial Superintelligence Act \(local sample\)/)
+  assert.match(sql, /Sanders introduces a ban on artificial superintelligence \(local sample\)/)
+  assert.match(sql, /Sen\. Bernard Sanders \(local\)/)
+  assert.match(sql, /'s', 9901/)
+  assert.doesNotMatch(
+    sql,
+    /9001, 119, 's', 9901/,
+    'intro fixture must not have a passage vote',
+  )
+})
+
 test('seed includes knife-edge, Senate-waiting, and text-grew fixtures', () => {
   const sql = printSql()
   assert.match(sql, /210, 208/)

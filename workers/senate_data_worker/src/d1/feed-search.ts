@@ -30,7 +30,10 @@ export function stripBillIdQuery(q: string): string {
 }
 
 export type FeedFilterOptions = {
-  /** Passage-vote chamber (not sponsor chamber). */
+  /**
+   * Passage-vote chamber, or originating chamber for intro-only bills
+   * (no passage votes yet).
+   */
   chamber?: FeedChamberFilter | string;
   q?: string;
   /** Two-letter primary-sponsor state code. */
@@ -60,13 +63,30 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
   const binds: Array<string | number> = [];
 
   if (options.chamber) {
-    clauses.push(`EXISTS (
-         SELECT 1 FROM votes v
-         WHERE v.is_passage = 1
-           AND v.chamber = ?
-           AND v.bill_congress = combined.bill_congress
-           AND UPPER(v.bill_type) = combined.bill_type
-           AND v.bill_number = combined.bill_number
+    const originTypes =
+      options.chamber === "House"
+        ? "('HR','HRES','HJRES','HCONRES')"
+        : "('S','SRES','SJRES','SCONRES')";
+    // Passage-vote chamber, or intro-only bills that originated in that chamber.
+    clauses.push(`(
+         EXISTS (
+           SELECT 1 FROM votes v
+           WHERE v.is_passage = 1
+             AND v.chamber = ?
+             AND v.bill_congress = combined.bill_congress
+             AND UPPER(v.bill_type) = combined.bill_type
+             AND v.bill_number = combined.bill_number
+         )
+         OR (
+           combined.bill_type IN ${originTypes}
+           AND NOT EXISTS (
+             SELECT 1 FROM votes v2
+             WHERE v2.is_passage = 1
+               AND v2.bill_congress = combined.bill_congress
+               AND UPPER(v2.bill_type) = combined.bill_type
+               AND v2.bill_number = combined.bill_number
+           )
+         )
        )`);
     binds.push(options.chamber);
   }

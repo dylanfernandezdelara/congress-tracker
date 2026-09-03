@@ -29,7 +29,8 @@ import {
   refreshConfirmationEnrichment,
 } from "./refresh-confirmations";
 import { persistPublicLaws } from "./refresh-public-laws";
-import { refreshBillLifecycles } from "./refresh-lifecycles";
+import { persistRecentIntroductions } from "./refresh-introductions";
+import { mergeLifecycleRefreshCandidates, refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
 import { enqueueProcessBills } from "../d1/bill-process";
 import { hydrateProcessBills } from "./refresh-bill-process";
@@ -57,6 +58,9 @@ export interface RunFeedResult {
   confirmationWikipediaLookups: number;
   confirmationVoteContextsWritten: number;
   confirmationWarnings: string[];
+  introsDiscovered: number;
+  introsPersisted: number;
+  introWarnings: string[];
 }
 
 export async function runFeedPipeline(
@@ -126,7 +130,21 @@ export async function runFeedPipeline(
       );
     }
 
-    const bills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
+    const introResult = await persistRecentIntroductions(env, congress, trigger);
+    if (introResult.warnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_intro_discovery",
+          trigger,
+          discovered: introResult.discovered,
+          persisted: introResult.persisted,
+          warnings: introResult.warnings,
+        })
+      );
+    }
+
+    const votedBills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
+    const bills = mergeLifecycleRefreshCandidates(votedBills, introResult.bills);
     const model = await resolveOpenRouterModel(env);
 
     let digestsWritten = 0;
@@ -369,6 +387,9 @@ export async function runFeedPipeline(
       confirmationWikipediaLookups: confirmationEnrichment.wikipediaLookups,
       confirmationVoteContextsWritten: confirmationEnrichment.voteContextsWritten,
       confirmationWarnings: confirmationEnrichment.warnings,
+      introsDiscovered: introResult.discovered,
+      introsPersisted: introResult.persisted,
+      introWarnings: introResult.warnings,
     };
 
     try {
@@ -402,6 +423,11 @@ export async function runFeedPipeline(
         confirmationWikipediaLookups: result.confirmationWikipediaLookups,
         ...(confirmationEnrichment.warnings.length > 0
           ? { confirmation_warnings: confirmationEnrichment.warnings }
+          : {}),
+        introsDiscovered: result.introsDiscovered,
+        introsPersisted: result.introsPersisted,
+        ...(introResult.warnings.length > 0
+          ? { intro_warnings: introResult.warnings }
           : {}),
       });
     } catch (err: unknown) {
