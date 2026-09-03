@@ -65,8 +65,8 @@ export async function persistRecentIntroductions(
         becameLawDate: null,
         lawKind: null,
         publicLaw: null,
-        latestActionDate: bill.latestActionDate,
-        latestActionText: bill.latestActionText,
+        latestActionDate: null,
+        latestActionText: null,
       });
 
       const existing = await getDigest(env.DB, bill.congress, bill.type, bill.number);

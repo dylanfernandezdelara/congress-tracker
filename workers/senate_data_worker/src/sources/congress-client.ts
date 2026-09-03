@@ -1,5 +1,4 @@
-import { daysAgoLookbackStartIso, inclusiveLookbackStartIso } from "../../../../shared/lookback";
-import { INTRO_LOOKBACK_DAYS } from "../constants";
+import { daysAgoLookbackStartIso } from "../../../../shared/lookback";
 import { parseUsStateCode } from "../../../../shared/us-states";
 import type { Env } from "../config";
 import { PUBLIC_LAWS_PAGE_SIZE } from "../constants";
@@ -193,11 +192,6 @@ export async function fetchRecentPublicLaws(
 /** UTC start date for feed/vote lookback: today minus `days` (legacy days-ago window). */
 export function lookbackStartIso(days: number, asOf: Date = new Date()): string {
   return daysAgoLookbackStartIso(days, asOf);
-}
-
-/** Inclusive UTC start date for introduction feed membership (last N calendar days). */
-export function introLookbackStartIso(asOf: Date = new Date()): string {
-  return inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS, asOf);
 }
 
 export interface CongressCommitteeActivity {

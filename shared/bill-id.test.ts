@@ -6,6 +6,7 @@ import {
   containsLocalSampleLabel,
   formatBillDocket,
   isHouseOriginBillType,
+  originBillTypesSqlList,
   originChamberFromBillType,
   stripLocalSampleLabel,
 } from './bill-id'
@@ -83,6 +84,11 @@ describe('originChamberFromBillType', () => {
     expect(originChamberFromBillType('S')).toBe('Senate')
     expect(originChamberFromBillType('sres')).toBe('Senate')
     expect(originChamberFromBillType('xyz')).toBe(null)
+  })
+
+  it('exports matching SQL IN lists', () => {
+    expect(originBillTypesSqlList('House')).toBe("('HR','HRES','HJRES','HCONRES')")
+    expect(originBillTypesSqlList('Senate')).toBe("('S','SRES','SJRES','SCONRES')")
   })
 })
 

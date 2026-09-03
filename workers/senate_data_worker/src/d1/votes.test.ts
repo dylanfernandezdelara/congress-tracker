@@ -330,6 +330,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       50,
       0,
     ]);
@@ -337,10 +338,11 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
     ]);
   });
 
-  it("adds passage-only chamber EXISTS and binds chamber for select and count", async () => {
+  it("adds vote-chamber EXISTS or intro-source origin types", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([
       {
         bill_congress: 119,
@@ -366,12 +368,15 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(selectSql).toContain("v.is_passage = 1");
     expect(selectSql).toContain("v.chamber = ?");
     expect(selectSql).toContain("EXISTS");
+    expect(selectSql).toContain("source = 'intro'");
     expect(countSql).toContain("v.is_passage = 1");
     expect(countSql).toContain("v.chamber = ?");
+    expect(countSql).toContain("source = 'intro'");
     expect(bindsBySql.get(selectSql!)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       "House",
       10,
       5,
@@ -380,6 +385,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       "Senate",
     ]);
   });
@@ -413,8 +419,10 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
     );
     expect(selectSql).toMatch(
-      /MAX\s*\(\s*CASE\s+WHEN\s+executive_boost\s*=\s*0\s+THEN\s+sort_date\s+END\s*\)\s+AS\s+latest_passage_date/i
+      /MAX\s*\(\s*CASE\s+WHEN\s+source\s*=\s*'vote'\s+THEN\s+sort_date\s+END\s*\)\s+AS\s+latest_passage_date/i
     );
+    expect(selectSql).toContain("'intro' AS source");
+    expect(selectSql).toContain("NOT EXISTS");
     expect(selectSql).toMatch(/MAX\s*\(\s*sort_date\s*\)\s+AS\s+latest_activity_date/i);
     expect(selectSql).toMatch(/ORDER BY\s+latest_activity_date\s+DESC/i);
     expect(selectSql).not.toMatch(/ORDER BY\s+latest_passage_date\s+DESC/i);
@@ -440,6 +448,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       "NY",
       10,
       0,
@@ -448,6 +457,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       "NY",
     ]);
   });
@@ -466,7 +476,8 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       (sql) => sql.includes("WITH combined AS") && sql.includes("SELECT COUNT(*) AS total")
     )!;
     expect(selectSql).toContain("UNION ALL");
-    expect(selectSql).toContain("executive_boost");
+    expect(selectSql).toContain("'vote' AS source");
+    expect(selectSql).toContain("'executive' AS source");
     expect(selectSql).toContain("bill_lifecycle");
     expect(selectSql).toContain("introduced_date");
     expect(selectSql).toContain("bill_digests");
@@ -475,6 +486,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       "%hr1%",
       "%hr1%",
       "%hr1%",
@@ -486,6 +498,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       "%hr1%",
       "%hr1%",
       "%hr1%",
@@ -509,6 +522,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
+      20,
       "Senate",
       "%100\\%%",
       "%100\\%%",

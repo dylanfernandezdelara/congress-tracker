@@ -66,6 +66,8 @@ describe("persistRecentIntroductions", () => {
         billType: "S",
         billNumber: 9901,
         introducedDate: "2026-09-03",
+        latestActionDate: null,
+        latestActionText: null,
       })
     );
     expect(mockUpsertDigest).toHaveBeenCalledWith(

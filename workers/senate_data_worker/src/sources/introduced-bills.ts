@@ -1,13 +1,14 @@
+import { inclusiveLookbackStartIso } from "../../../../shared/lookback";
 import {
   INTRO_DETAIL_FETCHES_PER_RUN,
   INTRO_DISCOVERY_MAX_PAGES_PER_TYPE,
   INTRO_DISCOVERY_PAGE_SIZE,
   INTRO_FEED_MAX_NEW,
+  INTRO_LOOKBACK_DAYS,
 } from "../constants";
 import type { Env } from "../config";
 import { normalizeBillType } from "./bill-type";
 import { fetchJson, fetchJsonWithMeta, nextPageUrl } from "./http";
-import { introLookbackStartIso } from "./congress-client";
 
 /** Substantive bills only — resolutions would consume the intro cap. */
 export const INTRO_DISCOVERY_BILL_TYPES = ["hr", "s"] as const;
@@ -65,8 +66,13 @@ export function looksLikeIntroductionAction(text: string | null | undefined): bo
   const t = text.trim().toLowerCase();
   if (t.includes("introduced in")) return true;
   if (t.includes("read twice and referred")) return true;
-  if (/^referred to (the )?(house |senate )?(committee|comm\.)/.test(t)) return true;
   return false;
+}
+
+/** Same-day referral often replaces "Introduced in …" as latestAction. Last-resort detail hint. */
+export function looksLikeSameDayReferralAction(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return /^referred to (the )?(house |senate )?(committee|comm\.)/.test(text.trim().toLowerCase());
 }
 
 export function parseIntroducedBillListItem(raw: unknown): IntroducedBillListItem | null {
@@ -115,7 +121,10 @@ export function isIntroLookbackCandidate(
   if (item.introducedDate) return item.introducedDate >= lookbackDate;
   const actionDate = item.latestActionDate;
   if (!actionDate || actionDate < lookbackDate) return false;
-  return looksLikeIntroductionAction(item.latestActionText);
+  return (
+    looksLikeIntroductionAction(item.latestActionText) ||
+    looksLikeSameDayReferralAction(item.latestActionText)
+  );
 }
 
 function billKey(congress: number, type: string, number: number): string {
@@ -182,7 +191,8 @@ export async function fetchRecentIntroducedBills(
   } = {}
 ): Promise<RecentIntroducedBill[]> {
   const apiKey = env.CONGRESS_API_KEY;
-  const lookbackDate = options.lookbackDate ?? introLookbackStartIso(options.now);
+  const lookbackDate =
+    options.lookbackDate ?? inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS, options.now);
   const maxNew = options.maxNew ?? INTRO_FEED_MAX_NEW;
   const pageSize = options.pageSize ?? INTRO_DISCOVERY_PAGE_SIZE;
   const maxPages = options.maxPagesPerType ?? INTRO_DISCOVERY_MAX_PAGES_PER_TYPE;
@@ -217,13 +227,22 @@ export async function fetchRecentIntroducedBills(
   }
 
   dated.sort(sortIntros);
-  if (dated.length >= maxNew) return dated.slice(0, maxNew);
-
-  const remaining = Math.min(detailBudget, Math.max(0, maxNew - dated.length) + 5);
-  const toFetch = needsDetail
-    .slice()
-    .sort((a, b) => (b.latestActionDate ?? "").localeCompare(a.latestActionDate ?? ""))
-    .slice(0, remaining);
+  const oldestKept = dated[maxNew - 1]?.introducedDate ?? "";
+  const introPhrase = needsDetail.filter((item) =>
+    looksLikeIntroductionAction(item.latestActionText)
+  );
+  const referralOnly = needsDetail.filter(
+    (item) => !looksLikeIntroductionAction(item.latestActionText)
+  );
+  const byActionDateDesc = (a: IntroducedBillListItem, b: IntroducedBillListItem) =>
+    (b.latestActionDate ?? "").localeCompare(a.latestActionDate ?? "");
+  introPhrase.sort(byActionDateDesc);
+  referralOnly.sort(byActionDateDesc);
+  const ranked = [...introPhrase, ...referralOnly].filter((item) => {
+    if (dated.length < maxNew) return true;
+    return (item.latestActionDate ?? "") >= oldestKept;
+  });
+  const toFetch = ranked.slice(0, detailBudget);
 
   for (const item of toFetch) {
     const detail = await fetchBillIntroducedDate(env, {

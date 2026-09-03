@@ -85,7 +85,6 @@ vi.mock("../d1/bill-process", async (importOriginal) => {
 
 vi.mock("../sources/congress-client", () => ({
   lookbackStartIso: (days: number) => mockLookbackStartIso(days),
-  introLookbackStartIso: () => "lookback-intro-7",
 }));
 
 import { buildFeedPage } from "./feed";
@@ -170,7 +169,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "lookback-intro-7",
+      "2026-06-27",
       {
         chamber: "Senate",
         q: undefined,
@@ -186,7 +185,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "lookback-intro-7",
+      "2026-06-27",
       50,
       0,
       {
@@ -214,7 +213,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "lookback-intro-7",
+      "2026-06-27",
       {
       chamber: undefined,
       q: "housing",
@@ -230,7 +229,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "lookback-intro-7",
+      "2026-06-27",
       50,
       0,
       {
@@ -258,7 +257,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "lookback-intro-7",
+      "2026-06-27",
       {
       chamber: undefined,
       q: undefined,
@@ -274,7 +273,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
-      "lookback-intro-7",
+      "2026-06-27",
       50,
       0,
       {
@@ -337,6 +336,32 @@ describe("buildFeedPage lifecycle attachment", () => {
     mockGetLifecyclesForBills.mockResolvedValue(new Map());
     const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
     expect(page.items[0]?.lifecycle).toBeNull();
+  });
+
+  it("attaches primary_sponsor when a sponsor row exists", async () => {
+    mockGetPrimarySponsorsForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:6644",
+          {
+            congress: 119,
+            bill_type: "HR",
+            bill_number: 6644,
+            bioguide_id: "S000033",
+            full_name: "Sen. Bernard Sanders (local)",
+            party: "I",
+            state: "VT",
+          },
+        ],
+      ])
+    );
+    const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0, now: "2026-07-03" });
+    expect(page.items[0]?.primary_sponsor).toEqual({
+      bioguide_id: "S000033",
+      name: "Sen. Bernard Sanders (local)",
+      party: "I",
+      state: "VT",
+    });
   });
 
   it("preserves feed page response shape with batch reads", async () => {

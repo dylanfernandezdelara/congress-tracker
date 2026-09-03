@@ -1,3 +1,4 @@
+import { originBillTypesSqlList } from "../../../../shared/bill-id";
 import { FEED_SEARCH_MAX_LENGTH } from "../constants";
 import {
   partySqlAliases,
@@ -62,12 +63,9 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
   const clauses: string[] = [];
   const binds: Array<string | number> = [];
 
-  if (options.chamber) {
-    const originTypes =
-      options.chamber === "House"
-        ? "('HR','HRES','HJRES','HCONRES')"
-        : "('S','SRES','SJRES','SCONRES')";
-    // Passage-vote chamber, or intro-only bills that originated in that chamber.
+  if (options.chamber === "House" || options.chamber === "Senate") {
+    const originTypes = originBillTypesSqlList(options.chamber);
+    // Passage-vote chamber, or intro-arm rows that originated in that chamber.
     clauses.push(`(
          EXISTS (
            SELECT 1 FROM votes v
@@ -78,15 +76,19 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
              AND v.bill_number = combined.bill_number
          )
          OR (
-           combined.bill_type IN ${originTypes}
-           AND NOT EXISTS (
-             SELECT 1 FROM votes v2
-             WHERE v2.is_passage = 1
-               AND v2.bill_congress = combined.bill_congress
-               AND UPPER(v2.bill_type) = combined.bill_type
-               AND v2.bill_number = combined.bill_number
-           )
+           combined.source = 'intro'
+           AND combined.bill_type IN ${originTypes}
          )
+       )`);
+    binds.push(options.chamber);
+  } else if (options.chamber) {
+    clauses.push(`EXISTS (
+         SELECT 1 FROM votes v
+         WHERE v.is_passage = 1
+           AND v.chamber = ?
+           AND v.bill_congress = combined.bill_congress
+           AND UPPER(v.bill_type) = combined.bill_type
+           AND v.bill_number = combined.bill_number
        )`);
     binds.push(options.chamber);
   }

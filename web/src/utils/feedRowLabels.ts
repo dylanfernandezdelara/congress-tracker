@@ -64,6 +64,8 @@ export interface FeedRowMeta {
   presidentDeskChip: string | null
   /** Compact committee-process chip when useful, e.g. waiting in committee. */
   processChip: string | null
+  /** Sponsor name on intro rows (no tally identity). */
+  sponsorName?: string | null
 }
 
 export type FeedRowView = {
@@ -352,10 +354,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
       )
     }
 
-    const introducedDate = item.lifecycle?.introduced_date
-    const isIntroduced =
-      Boolean(introducedDate) || item.process?.current_status === 'introduced'
-    if (isIntroduced) {
+    if (getFeedRowDisplayDate(item).kind === 'intro') {
       const chamber = originChamberFromBillType(item.bill.type)
       return withPresentation(
         {
@@ -366,6 +365,7 @@ export function getFeedRowView(item: FeedItem): FeedRowView {
           billId,
           presidentDeskChip: null,
           processChip,
+          sponsorName: item.primary_sponsor?.name ?? null,
         },
         chamber ? `Introduced in the ${chamber}` : 'Introduced',
       )

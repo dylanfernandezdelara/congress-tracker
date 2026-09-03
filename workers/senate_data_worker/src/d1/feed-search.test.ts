@@ -114,7 +114,8 @@ describe("buildFeedFilterClause", () => {
     expect(sql).toContain("v.is_passage = 1");
     expect(sql).toContain("v.chamber = ?");
     expect(sql).toContain("('HR','HRES','HJRES','HCONRES')");
-    expect(sql).toContain("NOT EXISTS");
+    expect(sql).toContain("source = 'intro'");
+    expect(sql).not.toContain("NOT EXISTS");
     expect(binds[0]).toBe("House");
     expect(binds.slice(1)).toEqual(["%hr1%", "%hr1%", "%hr1%", "hr1%"]);
   });

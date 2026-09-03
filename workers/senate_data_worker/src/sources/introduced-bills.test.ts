@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isIntroLookbackCandidate,
   looksLikeIntroductionAction,
+  looksLikeSameDayReferralAction,
   parseIntroducedBillListItem,
   parseIntroducedBillsPage,
 } from "./introduced-bills";
@@ -14,6 +15,9 @@ describe("looksLikeIntroductionAction", () => {
     );
     expect(
       looksLikeIntroductionAction("Referred to the Committee on Energy and Commerce")
+    ).toBe(false);
+    expect(
+      looksLikeSameDayReferralAction("Referred to the Committee on Energy and Commerce")
     ).toBe(true);
     expect(looksLikeIntroductionAction("Passed Senate")).toBe(false);
     expect(looksLikeIntroductionAction(null)).toBe(false);

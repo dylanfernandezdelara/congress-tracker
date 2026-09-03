@@ -48,6 +48,12 @@ export function originChamberFromBillType(type: string): 'House' | 'Senate' | nu
   return null
 }
 
+/** SQL `IN (...)` list for House- or Senate-origin docket types. */
+export function originBillTypesSqlList(chamber: 'House' | 'Senate'): string {
+  const types = chamber === 'House' ? HOUSE_ORIGIN_BILL_TYPES : SENATE_ORIGIN_BILL_TYPES
+  return `(${[...types].map((code) => `'${code}'`).join(',')})`
+}
+
 const BOILERPLATE_TITLE_SUFFIX = /,?\s+and for other purposes\.?$/i
 const LOCAL_SAMPLE_LABEL = /\s*\(local sample\)\s*/gi
 

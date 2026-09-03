@@ -1,5 +1,5 @@
 import { cleanVoteQuestion } from "../../../../shared/vote-question";
-import { COMPANION_VOTES_PER_BILL } from "../constants";
+import { COMPANION_VOTES_PER_BILL, INTRO_FEED_MAX_NEW } from "../constants";
 import type { Chamber, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
 import { buildFeedFilterClause, type FeedFilterOptions } from "./feed-search";
@@ -196,6 +196,23 @@ export async function selectRecentVotedBills(
   return results ?? [];
 }
 
+/** Newest intro-only rows in the lookback. Voted bills stay on the vote arm. */
+function introOnlyMembershipSql(): string {
+  return `SELECT l.congress AS bill_congress, UPPER(l.bill_type) AS bill_type, l.bill_number,
+                l.introduced_date AS sort_date, 'intro' AS source
+         FROM bill_lifecycle l
+         WHERE l.introduced_date >= ?
+           AND NOT EXISTS (
+             SELECT 1 FROM votes v
+             WHERE v.is_passage = 1
+               AND v.bill_congress = l.congress
+               AND UPPER(v.bill_type) = UPPER(l.bill_type)
+               AND v.bill_number = l.bill_number
+           )
+         ORDER BY l.introduced_date DESC, l.bill_number DESC
+         LIMIT ?`;
+}
+
 export async function selectFeedBills(
   db: D1Database,
   voteLookbackDate: string,
@@ -211,6 +228,7 @@ export async function selectFeedBills(
     voteLookbackDate,
     executiveSinceIso,
     introLookbackDate,
+    INTRO_FEED_MAX_NEW,
     ...filter.binds,
     limit,
     offset,
@@ -219,24 +237,24 @@ export async function selectFeedBills(
   const { results } = await db
     .prepare(
       `WITH combined AS (
-         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number, MAX(vote_date) AS sort_date, 0 AS executive_boost
+         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number, MAX(vote_date) AS sort_date, 'vote' AS source
          FROM votes
          WHERE is_passage = 1 AND vote_date >= ?
          GROUP BY bill_congress, UPPER(bill_type), bill_number
          UNION ALL
-         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number, MAX(p.posted_at) AS sort_date, 1 AS executive_boost
+         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number, MAX(p.posted_at) AS sort_date, 'executive' AS source
          FROM executive_post_bills b
          JOIN executive_posts p ON p.id = b.post_id
          WHERE p.posted_at >= ?
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
          UNION ALL
-         SELECT l.congress AS bill_congress, UPPER(l.bill_type) AS bill_type, l.bill_number,
-                l.introduced_date AS sort_date, 2 AS executive_boost
-         FROM bill_lifecycle l
-         WHERE l.introduced_date >= ?
+         SELECT bill_congress, bill_type, bill_number, sort_date, source
+         FROM (
+           ${introOnlyMembershipSql()}
+         )
        )
        SELECT bill_congress, bill_type, bill_number,
-              MAX(CASE WHEN executive_boost = 0 THEN sort_date END) AS latest_passage_date,
+              MAX(CASE WHEN source = 'vote' THEN sort_date END) AS latest_passage_date,
               MAX(sort_date) AS latest_activity_date
        FROM combined
        ${filter.sql}
@@ -262,29 +280,35 @@ export async function countFeedBills(
     voteLookbackDate,
     executiveSinceIso,
     introLookbackDate,
+    INTRO_FEED_MAX_NEW,
     ...filter.binds,
   ];
 
   const row = await db
     .prepare(
       `WITH combined AS (
-         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number
+         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number, 'vote' AS source
          FROM votes
          WHERE is_passage = 1 AND vote_date >= ?
          GROUP BY bill_congress, UPPER(bill_type), bill_number
-         UNION
-         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number
+         UNION ALL
+         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number, 'executive' AS source
          FROM executive_post_bills b
          JOIN executive_posts p ON p.id = b.post_id
          WHERE p.posted_at >= ?
          GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
-         UNION
-         SELECT l.congress AS bill_congress, UPPER(l.bill_type) AS bill_type, l.bill_number
-         FROM bill_lifecycle l
-         WHERE l.introduced_date >= ?
+         UNION ALL
+         SELECT bill_congress, bill_type, bill_number, source
+         FROM (
+           ${introOnlyMembershipSql()}
+         )
        )
-       SELECT COUNT(*) AS total FROM combined
-       ${filter.sql}`
+       SELECT COUNT(*) AS total FROM (
+         SELECT bill_congress, bill_type, bill_number
+         FROM combined
+         ${filter.sql}
+         GROUP BY bill_congress, bill_type, bill_number
+       )`
     )
     .bind(...binds)
     .first<{ total: number }>();

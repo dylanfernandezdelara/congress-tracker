@@ -1,4 +1,5 @@
 import type { BillRef, BillSponsorRecord } from "../types";
+import { billLookupKey, type BillLookupKey } from "./votes";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
 
@@ -24,20 +25,7 @@ export async function billHasSponsors(
   return row != null;
 }
 
-/**
- * Replace stored primary sponsors for a bill.
- * No-ops when `sponsors` is empty so a transient empty Congress.gov parse cannot
- * wipe good rows (and leave the bill stuck in perpetual backfill).
- */
-export type SponsorBillKey = {
-  congress: number;
-  billType: string;
-  billNumber: number;
-};
-
-export function sponsorMapKey(congress: number, billType: string, billNumber: number): string {
-  return `${congress}:${normalizeBillType(billType)}:${billNumber}`;
-}
+export type SponsorBillKey = BillLookupKey;
 
 const SPONSOR_LOOKUP_CHUNK = 30;
 
@@ -62,7 +50,7 @@ export async function getPrimarySponsorsForBills(
 
   const unique = new Map<string, SponsorBillKey>();
   for (const bill of bills) {
-    unique.set(sponsorMapKey(bill.congress, bill.billType, bill.billNumber), {
+    unique.set(billLookupKey(bill.congress, bill.billType, bill.billNumber), {
       congress: bill.congress,
       billType: normalizeBillType(bill.billType),
       billNumber: bill.billNumber,
@@ -90,12 +78,17 @@ export async function getPrimarySponsorsForBills(
       .all<PrimarySponsorRow>();
 
     for (const row of results ?? []) {
-      map.set(sponsorMapKey(row.congress, row.bill_type, row.bill_number), row);
+      map.set(billLookupKey(row.congress, row.bill_type, row.bill_number), row);
     }
   }
   return map;
 }
 
+/**
+ * Replace stored primary sponsors for a bill.
+ * No-ops when `sponsors` is empty so a transient empty Congress.gov parse cannot
+ * wipe good rows (and leave the bill stuck in perpetual backfill).
+ */
 export async function replaceBillSponsors(
   db: D1Database,
   bill: BillRef,

@@ -382,7 +382,7 @@ export default function Home() {
                   {isLoadingMore ? 'Loading…' : 'Load more'}
                 </button>
                 <p className="feed-pagination-status">
-                  {items.length} of {total} votes
+                  {items.length} of {total} {total === 1 ? 'bill' : 'bills'}
                 </p>
               </nav>
             ) : null}

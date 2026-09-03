@@ -130,6 +130,7 @@ describe('getFeedRowView', () => {
         billId: 'S. 9901',
         presidentDeskChip: null,
         processChip: null,
+        sponsorName: null,
       },
       eventDisplay: 'Introduced in the Senate',
       badgeToneClass: '',
@@ -137,6 +138,39 @@ describe('getFeedRowView', () => {
       showEventLine: true,
       eventToneClass: '',
     })
+  })
+
+  it('does not label executive-only rows as Introduced just because lifecycle has a date', () => {
+    const item = makeFeedItem({
+      latest_passage_date: null,
+      latest_activity_date: '2026-06-24T14:26:00.000Z',
+      passage_votes: [],
+      lifecycle: {
+        introduced_date: '2026-06-20',
+        presented_date: null,
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: '2026-06-20',
+        latest_action_text: 'Introduced in House',
+        derived: { status: null, day_of_ten: null, deadline_date: null, becomes_law_on: null },
+      },
+      executive_signals: [
+        {
+          post_id: 'post-1',
+          posted_at: '2026-06-24T14:26:00.000Z',
+          summary: 'Executive post',
+          quote: 'Quote text',
+          source_url: 'https://example.com/post',
+          informal: false,
+        },
+      ],
+    })
+
+    expect(getFeedRowView(item).meta.kind).toBe('none')
+    expect(getFeedRowView(item).eventDisplay).toBe('No vote recorded')
   })
 
   it('returns meta and de-duplicated event copy for a substantive pass', () => {

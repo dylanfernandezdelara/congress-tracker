@@ -100,10 +100,8 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
               ) : null}
               {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
               <BillIdChip type={item.bill.type} number={item.bill.number} />
-              {item.primary_sponsor?.name ? (
-                <span className="feed-row-chip feed-row-chip--sponsor">
-                  {item.primary_sponsor.name}
-                </span>
+              {meta.sponsorName ? (
+                <span className="feed-row-chip feed-row-chip--sponsor">{meta.sponsorName}</span>
               ) : null}
               {meta.presidentDeskChip ? (
                 <span id={deskChipId} className="feed-row-chip feed-row-chip--president-desk">

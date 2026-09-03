@@ -1,7 +1,6 @@
 import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS, FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
 import {
   getPrimarySponsorsForBills,
-  sponsorMapKey,
   type PrimarySponsorRow,
 } from "../d1/sponsors";
 import type { Env } from "../config";
@@ -39,7 +38,9 @@ import {
   type VoteRow,
 } from "../d1/votes";
 import { lifecycleRowToApi } from "../lifecycle/to-api";
-import { introLookbackStartIso, lookbackStartIso } from "../sources/congress-client";
+import { inclusiveLookbackStartIso } from "../../../../shared/lookback";
+import { INTRO_LOOKBACK_DAYS } from "../constants";
+import { lookbackStartIso } from "../sources/congress-client";
 import type { RelatedExecutiveBill } from "../../../../shared/executive-api-types";
 import type { ExecutiveBillRole } from "../../../../shared/executive-api-types";
 import type { Chamber, FeedItem, FeedPageResponse } from "../types";
@@ -236,7 +237,7 @@ function assembleFeedItem(
   const text_changes = textChangesRow ? rowToBillTextChanges(textChangesRow) : null;
 
   const sponsorRow = ctx.sponsorsByBill.get(
-    sponsorMapKey(row.bill_congress, row.bill_type, row.bill_number)
+    billLookupKey(row.bill_congress, row.bill_type, row.bill_number)
   );
   const primary_sponsor = sponsorRow
     ? {
@@ -322,7 +323,8 @@ export async function buildFeedPage(
   await ensureSchema(env.DB);
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
   const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
-  const introLookback = introLookbackStartIso(
+  const introLookback = inclusiveLookbackStartIso(
+    INTRO_LOOKBACK_DAYS,
     options.now instanceof Date ? options.now : options.now ? new Date(options.now) : undefined
   );
   const cappedLimit = Math.min(options.limit, FEED_MAX_BILLS);
