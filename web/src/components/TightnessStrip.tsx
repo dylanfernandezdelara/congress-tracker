@@ -98,19 +98,17 @@ function TightnessRow({
         {dots.map((dot, index) => {
           const key = tightnessDotKey(dot)
           const selected = selectedKey === key
-          const placement = placements[index] ?? {
-            offsetY: 0,
-            leftPct: tightnessDotLeftPercent(dot),
-          }
+          const placement = placements[index]
+          if (!placement) return null
+          const trueLeft = tightnessDotLeftPercent(dot)
           return (
             <li
               key={key}
               className="tightness-dot-item"
               style={{
-                // 0–100 on the 50–100 axis; CSS maps it into [radius, 100%-radius].
-                ['--tightness-x' as string]: String(placement.leftPct),
+                left: `clamp(var(--tightness-dot-radius), ${placement.leftPct}%, calc(100% - var(--tightness-dot-radius)))`,
                 transform: `translate(-50%, calc(-50% + ${placement.offsetY}px))`,
-                zIndex: selected ? 20 : 2 + Math.round((100 - placement.leftPct) / 10),
+                zIndex: selected ? 20 : 2 + Math.round((100 - trueLeft) / 10),
               }}
             >
               <button
@@ -130,17 +128,20 @@ function TightnessRow({
 
 /** Nearby percents (50.2 vs 50.8) sit in different buckets but still overlap. */
 const STAGGER_CLUSTER_PCT = 4
-const STAGGER_STEP_PX = 10
+const STAGGER_STEP_PX = 12
 /**
  * A 4% neighbor gap chains the knife-edge pile (or the steamroll pile) into
  * one cluster. Unbounded 10px y-steps then overflow a ~2rem track onto the
- * row labels. Keep |y| inside the track (0.7rem dots + 2.25rem band leave
- * ~10px of headroom each side). The two piles sit ~85 axis-points apart, so
+ * row labels. Keep |y| inside the track (0.7rem dots + 2.5rem band leave
+ * ~12px of headroom each side). The two piles sit ~85 axis-points apart, so
  * they never join.
  */
-export const STAGGER_MAX_PX = 10
-/** Horizontal step for extra columns in a 3-row lattice (~dot width at 320px). */
-const STAGGER_X_STEP_PCT = 2.4
+export const STAGGER_MAX_PX = 12
+/** Narrowest rail we layout for; used so an x-step is at least one mark wide. */
+export const TIGHTNESS_MIN_TRACK_PX = 248
+export const TIGHTNESS_DOT_MARK_PX = 12
+/** One extra lattice column is at least a desktop mark wide on the narrow rail. */
+export const STAGGER_X_STEP_PCT = (TIGHTNESS_DOT_MARK_PX / TIGHTNESS_MIN_TRACK_PX) * 100
 
 function staggerSlotCount(): number {
   return Math.floor((2 * STAGGER_MAX_PX) / STAGGER_STEP_PX) + 1
@@ -160,10 +161,19 @@ function ySlots(): number[] {
   return Array.from({ length: slots }, (_, slot) => (slot - (slots - 1) / 2) * STAGGER_STEP_PX)
 }
 
-/** 0, +1, −1, +2, −2… so extra columns stay near the vote's true x. */
-function zigzagColumn(column: number): number {
-  if (column === 0) return 0
-  return Math.ceil(column / 2) * (column % 2 === 1 ? 1 : -1)
+/** Extra columns walk toward 50% so 0% / 100% piles do not clamp-fold on top of each other. */
+function columnShift(left: number, column: number): number {
+  const towardInterior = left < 50 ? 1 : -1
+  return Math.min(100, Math.max(0, left + column * STAGGER_X_STEP_PCT * towardInterior))
+}
+
+export function placementDistancePx(
+  a: TightnessPlacement,
+  b: TightnessPlacement,
+  trackPx = TIGHTNESS_MIN_TRACK_PX,
+): number {
+  const dx = ((a.leftPct - b.leftPct) / 100) * trackPx
+  return Math.hypot(dx, a.offsetY - b.offsetY)
 }
 
 /** Place overlapping dots so a knife-edge cluster stays tappable and in-track. */
@@ -191,12 +201,10 @@ export function tightnessPlacements(dots: TightnessDot[]): TightnessPlacement[] 
         }
         continue
       }
-      const offsetY = slots[offset % slots.length] ?? 0
-      const leftPct = Math.min(
-        100,
-        Math.max(0, item.left + zigzagColumn(Math.floor(offset / slots.length)) * STAGGER_X_STEP_PCT),
-      )
-      placements[item.index] = { offsetY, leftPct }
+      placements[item.index] = {
+        offsetY: slots[offset % slots.length] ?? 0,
+        leftPct: columnShift(item.left, Math.floor(offset / slots.length)),
+      }
     }
   }
 

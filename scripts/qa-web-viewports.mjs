@@ -146,13 +146,18 @@ async function auditHomePage(page) {
         let escaped = false
         let overlappedLabel = false
         let overlappedScale = false
+        const rects = []
         for (const dot of row.querySelectorAll('.tightness-dot-item')) {
           const rect = dot.getBoundingClientRect()
           if (rect.width <= 0 || rect.height <= 0) {
             issues.push(`${prefix} ${rowName} tightness dot not visible`)
             continue
           }
+          rects.push(rect)
           if (rect.top < trackRect.top - 1 || rect.bottom > trackRect.bottom + 1) {
+            escaped = true
+          }
+          if (rect.left < trackRect.left - 1 || rect.right > trackRect.right + 1) {
             escaped = true
           }
           if (
@@ -170,9 +175,21 @@ async function auditHomePage(page) {
             overlappedScale = true
           }
         }
+        let stacked = false
+        for (let i = 0; i < rects.length; i += 1) {
+          const first = rects[i]
+          for (let j = i + 1; j < rects.length; j += 1) {
+            const second = rects[j]
+            const dx = first.left + first.width / 2 - (second.left + second.width / 2)
+            const dy = first.top + first.height / 2 - (second.top + second.height / 2)
+            const minSep = Math.min(first.width, second.width) - 1
+            if (Math.hypot(dx, dy) < minSep) stacked = true
+          }
+        }
         if (escaped) issues.push(`${prefix} ${rowName} tightness dots escaped the track`)
         if (overlappedLabel) issues.push(`${prefix} ${rowName} tightness dots overlap the row label`)
         if (overlappedScale) issues.push(`${prefix} tightness dots overlap the 50%–100% scale`)
+        if (stacked) issues.push(`${prefix} ${rowName} tightness dots stack on top of each other`)
       }
     }
 

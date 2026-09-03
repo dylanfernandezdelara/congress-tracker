@@ -2,7 +2,14 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { makeBimodalHouseDots, makeTightnessDot } from '../test/tightnessFixtures'
-import { STAGGER_MAX_PX, tightnessPlacements, TightnessStrip } from './TightnessStrip'
+import {
+  STAGGER_MAX_PX,
+  TIGHTNESS_DOT_MARK_PX,
+  TIGHTNESS_MIN_TRACK_PX,
+  placementDistancePx,
+  tightnessPlacements,
+  TightnessStrip,
+} from './TightnessStrip'
 
 function offsetY(item: HTMLElement): number {
   const match = item.style.transform.match(/calc\(-50% \+ (-?[\d.]+)px\)/)
@@ -64,8 +71,8 @@ describe('TightnessStrip', () => {
     expect(items).toHaveLength(2)
     const offsets = items.map((item) => offsetY(item as HTMLElement))
     expect(offsets[0]).not.toBe(offsets[1])
-    expect(offsets.some((value) => value === -5)).toBe(true)
-    expect(offsets.some((value) => value === 5)).toBe(true)
+    expect(offsets.some((value) => value === -6)).toBe(true)
+    expect(offsets.some((value) => value === 6)).toBe(true)
     expect(offsets.every((value) => Math.abs(value) <= STAGGER_MAX_PX)).toBe(true)
   })
 
@@ -79,6 +86,17 @@ describe('TightnessStrip', () => {
     )
     const keys = new Set(placements.map((placement) => `${placement.leftPct.toFixed(2)}:${placement.offsetY}`))
     expect(keys.size).toBe(house.length)
+    let minDistance = Number.POSITIVE_INFINITY
+    for (let i = 0; i < placements.length; i += 1) {
+      const first = placements[i]
+      if (!first) continue
+      for (let j = i + 1; j < placements.length; j += 1) {
+        const second = placements[j]
+        if (!second) continue
+        minDistance = Math.min(minDistance, placementDistancePx(first, second))
+      }
+    }
+    expect(minDistance).toBeGreaterThanOrEqual(TIGHTNESS_DOT_MARK_PX - 0.5)
 
     const { container } = render(
       <TightnessStrip house={house} senate={[]} selectedKey={null} onSelect={vi.fn()} compact />,
@@ -89,11 +107,37 @@ describe('TightnessStrip', () => {
     expect(items).toHaveLength(house.length)
     for (const item of items) {
       expect(Math.abs(offsetY(item))).toBeLessThanOrEqual(STAGGER_MAX_PX)
-      expect(item.style.getPropertyValue('--tightness-x')).not.toBe('')
+      expect(item.style.left).toMatch(/clamp\(/)
     }
-    const lefts = items.map((item) => Number(item.style.getPropertyValue('--tightness-x')))
+    const lefts = items.map((item) => Number(item.style.left.match(/,\s*([\d.]+)%/)?.[1]))
     expect(Math.min(...lefts)).toBeLessThan(5)
     expect(Math.max(...lefts)).toBeGreaterThan(95)
+  })
+
+  it('does not clamp-fold a pile of identical knife-edge votes onto one mark', () => {
+    const house = Array.from({ length: 14 }, (_, index) =>
+      makeTightnessDot({
+        roll_number: 8100 + index,
+        bill_number: 200 + index,
+        yea_pct: 0.502,
+        yeas: 216,
+        nays: 214,
+      }),
+    )
+    const placements = tightnessPlacements(house)
+    const atOrigin = placements.filter((placement) => placement.leftPct === 0 && placement.offsetY === -STAGGER_MAX_PX)
+    expect(atOrigin).toHaveLength(0)
+    let minDistance = Number.POSITIVE_INFINITY
+    for (let i = 0; i < placements.length; i += 1) {
+      const first = placements[i]
+      if (!first) continue
+      for (let j = i + 1; j < placements.length; j += 1) {
+        const second = placements[j]
+        if (!second) continue
+        minDistance = Math.min(minDistance, placementDistancePx(first, second, TIGHTNESS_MIN_TRACK_PX))
+      }
+    }
+    expect(minDistance).toBeGreaterThanOrEqual(TIGHTNESS_DOT_MARK_PX - 0.5)
   })
 
   it('keeps the selected knife-edge dot above its cluster', () => {
