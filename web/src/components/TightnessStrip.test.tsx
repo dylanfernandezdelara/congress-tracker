@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { makeBimodalHouseDots, makeTightnessDot } from '../test/tightnessFixtures'
-import { STAGGER_MAX_PX, staggerOffsets, TightnessStrip } from './TightnessStrip'
+import { STAGGER_MAX_PX, tightnessPlacements, TightnessStrip } from './TightnessStrip'
 
 function offsetY(item: HTMLElement): number {
   const match = item.style.transform.match(/calc\(-50% \+ (-?[\d.]+)px\)/)
@@ -71,10 +71,14 @@ describe('TightnessStrip', () => {
 
   it('keeps a production-like knife-edge/steamroll pile inside the track', () => {
     const house = makeBimodalHouseDots()
-    const offsets = staggerOffsets(house)
+    const placements = tightnessPlacements(house)
     expect(house.length).toBeGreaterThanOrEqual(18)
-    expect(offsets.some((value) => Math.abs(value) > 0)).toBe(true)
-    expect(Math.max(...offsets.map((value) => Math.abs(value)))).toBeLessThanOrEqual(STAGGER_MAX_PX)
+    expect(placements.some((placement) => Math.abs(placement.offsetY) > 0)).toBe(true)
+    expect(Math.max(...placements.map((placement) => Math.abs(placement.offsetY)))).toBeLessThanOrEqual(
+      STAGGER_MAX_PX,
+    )
+    const keys = new Set(placements.map((placement) => `${placement.leftPct.toFixed(2)}:${placement.offsetY}`))
+    expect(keys.size).toBe(house.length)
 
     const { container } = render(
       <TightnessStrip house={house} senate={[]} selectedKey={null} onSelect={vi.fn()} compact />,

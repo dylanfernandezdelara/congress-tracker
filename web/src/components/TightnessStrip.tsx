@@ -83,7 +83,7 @@ function TightnessRow({
   onSelect: (dot: TightnessDot) => void
   empty: string
 }) {
-  const offsets = staggerOffsets(dots)
+  const placements = tightnessPlacements(dots)
 
   return (
     <div className="tightness-row" data-tightness-row={label.startsWith('House') ? 'house' : 'senate'}>
@@ -98,15 +98,19 @@ function TightnessRow({
         {dots.map((dot, index) => {
           const key = tightnessDotKey(dot)
           const selected = selectedKey === key
-          const leftPct = tightnessDotLeftPercent(dot)
+          const placement = placements[index] ?? {
+            offsetY: 0,
+            leftPct: tightnessDotLeftPercent(dot),
+          }
           return (
             <li
               key={key}
               className="tightness-dot-item"
               style={{
-                ['--tightness-x' as string]: String(leftPct),
-                transform: `translate(-50%, calc(-50% + ${offsets[index] ?? 0}px))`,
-                zIndex: selected ? 20 : 2 + Math.round((100 - leftPct) / 10),
+                // 0–100 on the 50–100 axis; CSS maps it into [radius, 100%-radius].
+                ['--tightness-x' as string]: String(placement.leftPct),
+                transform: `translate(-50%, calc(-50% + ${placement.offsetY}px))`,
+                zIndex: selected ? 20 : 2 + Math.round((100 - placement.leftPct) / 10),
               }}
             >
               <button
@@ -134,36 +138,81 @@ const STAGGER_STEP_PX = 10
  * band leave ~10px of headroom each side).
  */
 export const STAGGER_MAX_PX = 10
+/** Horizontal step used when a 3-slot y band is already full (~dot width at 320px). */
+const STAGGER_X_STEP_PCT = 2.4
 
 function staggerSlotCount(): number {
   return Math.floor((2 * STAGGER_MAX_PX) / STAGGER_STEP_PX) + 1
 }
 
 function clusterOffset(indexInCluster: number, clusterSize: number): number {
-  const slots = staggerSlotCount()
-  if (clusterSize <= slots) {
-    return (indexInCluster - (clusterSize - 1) / 2) * STAGGER_STEP_PX
-  }
-  const slot = indexInCluster % slots
-  return (slot - (slots - 1) / 2) * STAGGER_STEP_PX
+  return (indexInCluster - (clusterSize - 1) / 2) * STAGGER_STEP_PX
 }
 
-/** Nudge overlapping dots so a knife-edge cluster stays tappable and in-track. */
-export function staggerOffsets(dots: TightnessDot[]): number[] {
+export type TightnessPlacement = {
+  offsetY: number
+  leftPct: number
+}
+
+function ySlots(): number[] {
+  const slots = staggerSlotCount()
+  return Array.from({ length: slots }, (_, slot) => (slot - (slots - 1) / 2) * STAGGER_STEP_PX)
+}
+
+function packLargeCluster(
+  items: { index: number; left: number }[],
+  placements: TightnessPlacement[],
+): void {
+  const occupied: { x: number; y: number }[] = []
+  const slots = ySlots()
+  const collides = (x: number, y: number) =>
+    occupied.some(
+      (dot) => Math.abs(dot.x - x) < STAGGER_X_STEP_PCT && Math.abs(dot.y - y) < STAGGER_STEP_PX,
+    )
+
+  for (const item of items) {
+    let placed: TightnessPlacement | null = null
+    for (const step of [0, 1, -1, 2, -2, 3, -3, 4, -4]) {
+      const leftPct = Math.min(100, Math.max(0, item.left + step * STAGGER_X_STEP_PCT))
+      for (const offsetY of slots) {
+        if (collides(leftPct, offsetY)) continue
+        placed = { offsetY, leftPct }
+        break
+      }
+      if (placed) break
+    }
+    const next = placed ?? { offsetY: 0, leftPct: item.left }
+    placements[item.index] = next
+    occupied.push({ x: next.leftPct, y: next.offsetY })
+  }
+}
+
+/** Place overlapping dots so a knife-edge cluster stays tappable and in-track. */
+export function tightnessPlacements(dots: TightnessDot[]): TightnessPlacement[] {
   const ranked = dots
     .map((dot, index) => ({ index, left: tightnessDotLeftPercent(dot) }))
     .sort((a, b) => a.left - b.left || a.index - b.index)
 
-  const offsets = dots.map(() => 0)
+  const placements: TightnessPlacement[] = dots.map((dot) => ({
+    offsetY: 0,
+    leftPct: tightnessDotLeftPercent(dot),
+  }))
   let clusterStart = 0
   const flush = (end: number) => {
     const size = end - clusterStart
     if (size < 2) return
-    for (let i = clusterStart; i < end; i += 1) {
-      const item = ranked[i]
-      if (!item) continue
-      offsets[item.index] = clusterOffset(i - clusterStart, size)
+    const cluster = ranked.slice(clusterStart, end)
+    if (size <= staggerSlotCount()) {
+      for (const [offset, item] of cluster.entries()) {
+        if (!item) continue
+        placements[item.index] = {
+          offsetY: clusterOffset(offset, size),
+          leftPct: item.left,
+        }
+      }
+      return
     }
+    packLargeCluster(cluster, placements)
   }
 
   for (let i = 1; i <= ranked.length; i += 1) {
@@ -174,5 +223,10 @@ export function staggerOffsets(dots: TightnessDot[]): number[] {
       clusterStart = i
     }
   }
-  return offsets
+  return placements
+}
+
+/** Nudge overlapping dots so a knife-edge cluster stays tappable and in-track. */
+export function staggerOffsets(dots: TightnessDot[]): number[] {
+  return tightnessPlacements(dots).map((placement) => placement.offsetY)
 }
