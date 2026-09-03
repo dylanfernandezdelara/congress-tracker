@@ -681,7 +681,9 @@
 
   .tightness-track {
     position: relative;
-    height: 1.75rem;
+    /* Tall enough for a 3-slot ±10px stagger plus 0.7rem dots, so a bimodal
+       knife-edge/steamroll pile stays on the line instead of the labels. */
+    height: 2.25rem;
     min-width: 0;
     margin: 0;
     padding: 0;
@@ -689,6 +691,7 @@
   }
 
   .tightness-track-line {
+    display: block;
     position: absolute;
     left: 0;
     right: 0;
@@ -704,8 +707,13 @@
 
   .tightness-dot-item {
     --tightness-dot-radius: 0.35rem;
+    display: block;
     position: absolute;
     top: 50%;
+    left: calc(
+      var(--tightness-dot-radius) + var(--tightness-x, 0) *
+        (100% - 2 * var(--tightness-dot-radius)) / 100
+    );
     width: 0.7rem;
     height: 0.7rem;
     margin: 0;
@@ -788,7 +796,7 @@
   }
 
   .tightness--compact .tightness-track {
-    height: 2rem;
+    height: 2.25rem;
   }
 
   .tightness--compact .tightness-dot-item {

@@ -14,11 +14,14 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const baseUrl = process.env.QA_WEB_URL ?? 'http://127.0.0.1:5173'
 const outDir = path.resolve(rootDir, process.env.QA_WEB_OUT_DIR ?? 'artifacts/qa-viewports')
 
+const IPHONE_SAFARI_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1'
+
 const VIEWPORTS = [
-  { id: 'mobile-narrow', width: 320, height: 568, label: 'iPhone SE' },
-  { id: 'mobile', width: 390, height: 844, label: 'iPhone 14' },
-  { id: 'desktop', width: 1280, height: 800, label: 'Desktop' },
-  { id: 'desktop-wide', width: 1440, height: 900, label: 'Desktop wide' },
+  { id: 'mobile-narrow', width: 320, height: 568, label: 'iPhone SE', mobile: true },
+  { id: 'mobile', width: 390, height: 844, label: 'iPhone 14', mobile: true },
+  { id: 'desktop', width: 1280, height: 800, label: 'Desktop', mobile: false },
+  { id: 'desktop-wide', width: 1440, height: 900, label: 'Desktop wide', mobile: false },
 ]
 
 const THEMES = ['light', 'dark']
@@ -126,6 +129,53 @@ async function auditHomePage(page) {
     }
     // Below the desktop rail breakpoint, Home stacks former rail content under the feed
     // (.home-mobile-rails). Desktop keeps sticky .home-rail columns instead.
+    const collectTightnessDotsInTrack = (root, prefix) => {
+      if (!root) return
+      const scale = root.querySelector('.tightness-scale-label')
+      const scaleRect = scale?.getBoundingClientRect()
+      for (const row of root.querySelectorAll('[data-tightness-row]')) {
+        const rowName = row.getAttribute('data-tightness-row') || 'row'
+        const track = row.querySelector('.tightness-track')
+        const label = row.querySelector('.tightness-row-label')
+        if (!track) {
+          issues.push(`${prefix} ${rowName} tightness track missing`)
+          continue
+        }
+        const trackRect = track.getBoundingClientRect()
+        const labelRect = label?.getBoundingClientRect()
+        let escaped = false
+        let overlappedLabel = false
+        let overlappedScale = false
+        for (const dot of row.querySelectorAll('.tightness-dot-item')) {
+          const rect = dot.getBoundingClientRect()
+          if (rect.width <= 0 || rect.height <= 0) {
+            issues.push(`${prefix} ${rowName} tightness dot not visible`)
+            continue
+          }
+          if (rect.top < trackRect.top - 1 || rect.bottom > trackRect.bottom + 1) {
+            escaped = true
+          }
+          if (
+            labelRect &&
+            rect.bottom > labelRect.top + 0.5 &&
+            rect.top < labelRect.bottom - 0.5
+          ) {
+            overlappedLabel = true
+          }
+          if (
+            scaleRect &&
+            rect.bottom > scaleRect.top + 0.5 &&
+            rect.top < scaleRect.bottom - 0.5
+          ) {
+            overlappedScale = true
+          }
+        }
+        if (escaped) issues.push(`${prefix} ${rowName} tightness dots escaped the track`)
+        if (overlappedLabel) issues.push(`${prefix} ${rowName} tightness dots overlap the row label`)
+        if (overlappedScale) issues.push(`${prefix} tightness dots overlap the 50%–100% scale`)
+      }
+    }
+
     if (viewportWidth < 1024) {
       const mobileRails = document.querySelector('.home-mobile-rails')
       if (!mobileRails) {
@@ -156,6 +206,7 @@ async function auditHomePage(page) {
         if (!senateRow) issues.push('Senate tightness row missing on mobile')
         if (houseRow) collectHorizontalClipping(houseRow.getBoundingClientRect(), 'House tightness row')
         if (senateRow) collectHorizontalClipping(senateRow.getBoundingClientRect(), 'Senate tightness row')
+        collectTightnessDotsInTrack(tightnessMobile, 'mobile')
       }
       const senateWaiting = document.querySelector(
         '.home-feed-secondary [aria-label="House-passed, sitting in the Senate"]',
@@ -182,6 +233,7 @@ async function auditHomePage(page) {
         if (!senateRow) issues.push('Senate tightness row missing on desktop')
         if (houseRow) collectHorizontalClipping(houseRow.getBoundingClientRect(), 'House tightness row')
         if (senateRow) collectHorizontalClipping(senateRow.getBoundingClientRect(), 'Senate tightness row')
+        collectTightnessDotsInTrack(tightnessRail, 'desktop')
       }
     }
     if (!feedRow) issues.push('feed row missing')
@@ -325,33 +377,52 @@ const MOCK_NOTABLE_VOTES = {
   notable: [],
 }
 
+function extraTightnessDots(base, percents, rollStart) {
+  return percents.map((yea_pct, index) => {
+    const total = 420
+    const yeas = Math.round(yea_pct * total)
+    return {
+      ...base,
+      roll_number: rollStart + index,
+      bill_number: (base.bill_number ?? 100) + index + 1,
+      yeas,
+      nays: total - yeas,
+      yea_pct,
+      cohesion: yea_pct > 0.9 ? 'bipartisan' : 'party-line',
+      headline: `${base.chamber} sample roll ${rollStart + index}`,
+    }
+  })
+}
+
+const MOCK_TIGHTNESS_HOUSE_KNIFE = {
+  kind: 'bill',
+  chamber: 'House',
+  congress: 119,
+  session: 2,
+  roll_number: 9010,
+  vote_date: '2026-06-05',
+  yeas: 210,
+  nays: 208,
+  yea_pct: 210 / 418,
+  cohesion: 'party-line',
+  party_splits: [
+    { party: 'R', yeas: 207, nays: 5, party_line: 'yea' },
+    { party: 'D', yeas: 2, nays: 203, party_line: 'nay' },
+  ],
+  member_votes_available: true,
+  bill_type: 'HR',
+  bill_number: 88,
+  headline: 'House passes a knife-edge resolution',
+  nominee_name: null,
+  position_title: null,
+}
+
 const MOCK_TIGHTNESS = {
   congress: 119,
   session: 2,
   as_of: '2026-06-14T00:00:00.000Z',
   house_passage: [
-    {
-      kind: 'bill',
-      chamber: 'House',
-      congress: 119,
-      session: 2,
-      roll_number: 9010,
-      vote_date: '2026-06-05',
-      yeas: 210,
-      nays: 208,
-      yea_pct: 210 / 418,
-      cohesion: 'party-line',
-      party_splits: [
-        { party: 'R', yeas: 207, nays: 5, party_line: 'yea' },
-        { party: 'D', yeas: 2, nays: 203, party_line: 'nay' },
-      ],
-      member_votes_available: true,
-      bill_type: 'HR',
-      bill_number: 88,
-      headline: 'House passes a knife-edge resolution',
-      nominee_name: null,
-      position_title: null,
-    },
+    MOCK_TIGHTNESS_HOUSE_KNIFE,
     {
       kind: 'bill',
       chamber: 'House',
@@ -374,6 +445,12 @@ const MOCK_TIGHTNESS = {
       nominee_name: null,
       position_title: null,
     },
+    ...extraTightnessDots(
+      MOCK_TIGHTNESS_HOUSE_KNIFE,
+      [0.5023, 0.5024, 0.5035, 0.5047, 0.5071, 0.5072, 0.5176, 0.5203, 0.5277, 0.534, 0.5395, 0.5524],
+      9100,
+    ),
+    ...extraTightnessDots(MOCK_TIGHTNESS_HOUSE_KNIFE, [0.9742, 0.9792, 0.985, 0.9952, 0.9976], 9200),
   ],
   senate: [
     {
@@ -420,6 +497,32 @@ const MOCK_TIGHTNESS = {
       nominee_name: null,
       position_title: null,
     },
+    ...extraTightnessDots(
+      {
+        kind: 'nominee',
+        chamber: 'Senate',
+        congress: 119,
+        session: 2,
+        roll_number: 9300,
+        vote_date: '2026-06-12',
+        yeas: 51,
+        nays: 49,
+        yea_pct: 0.51,
+        cohesion: 'party-line',
+        party_splits: [
+          { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
+          { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
+        ],
+        member_votes_available: true,
+        bill_type: null,
+        bill_number: null,
+        headline: 'Senate sample confirmation',
+        nominee_name: 'Sample Nominee',
+        position_title: 'Sample post',
+      },
+      [0.5051, 0.5053, 0.5102, 0.5155, 0.5158, 0.5204, 0.5269, 0.5368],
+      9300,
+    ),
   ],
   senate_waiting: [
     {
@@ -690,6 +793,9 @@ async function main() {
         const page = await browser.newPage({
           viewport: { width: viewport.width, height: viewport.height },
           deviceScaleFactor: viewport.width < 500 ? 2 : 1,
+          isMobile: Boolean(viewport.mobile),
+          hasTouch: Boolean(viewport.mobile),
+          userAgent: viewport.mobile ? IPHONE_SAFARI_UA : undefined,
         })
 
         await installApiMocks(page)

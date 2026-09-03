@@ -98,16 +98,15 @@ function TightnessRow({
         {dots.map((dot, index) => {
           const key = tightnessDotKey(dot)
           const selected = selectedKey === key
+          const leftPct = tightnessDotLeftPercent(dot)
           return (
             <li
               key={key}
               className="tightness-dot-item"
               style={{
-                left: `clamp(var(--tightness-dot-radius), ${tightnessDotLeftPercent(dot)}%, calc(100% - var(--tightness-dot-radius)))`,
+                ['--tightness-x' as string]: String(leftPct),
                 transform: `translate(-50%, calc(-50% + ${offsets[index] ?? 0}px))`,
-                zIndex: selected
-                  ? 20
-                  : 2 + Math.round((100 - tightnessDotLeftPercent(dot)) / 10),
+                zIndex: selected ? 20 : 2 + Math.round((100 - leftPct) / 10),
               }}
             >
               <button
@@ -128,8 +127,28 @@ function TightnessRow({
 /** Nearby percents (50.2 vs 50.8) sit in different buckets but still overlap. */
 const STAGGER_CLUSTER_PCT = 4
 const STAGGER_STEP_PX = 10
+/**
+ * Live lookback is bimodal (knife-edge ~50% vs steamrolls ~100%). A 4% gap
+ * chains those into one cluster; unbounded 10px steps then overflow a ~2rem
+ * track onto the row labels. Keep |y| inside the track (0.7rem dots + 2.25rem
+ * band leave ~10px of headroom each side).
+ */
+export const STAGGER_MAX_PX = 10
 
-/** Nudge overlapping dots so a knife-edge cluster stays tappable. */
+function staggerSlotCount(): number {
+  return Math.floor((2 * STAGGER_MAX_PX) / STAGGER_STEP_PX) + 1
+}
+
+function clusterOffset(indexInCluster: number, clusterSize: number): number {
+  const slots = staggerSlotCount()
+  if (clusterSize <= slots) {
+    return (indexInCluster - (clusterSize - 1) / 2) * STAGGER_STEP_PX
+  }
+  const slot = indexInCluster % slots
+  return (slot - (slots - 1) / 2) * STAGGER_STEP_PX
+}
+
+/** Nudge overlapping dots so a knife-edge cluster stays tappable and in-track. */
 export function staggerOffsets(dots: TightnessDot[]): number[] {
   const ranked = dots
     .map((dot, index) => ({ index, left: tightnessDotLeftPercent(dot) }))
@@ -143,7 +162,7 @@ export function staggerOffsets(dots: TightnessDot[]): number[] {
     for (let i = clusterStart; i < end; i += 1) {
       const item = ranked[i]
       if (!item) continue
-      offsets[item.index] = (i - clusterStart - (size - 1) / 2) * STAGGER_STEP_PX
+      offsets[item.index] = clusterOffset(i - clusterStart, size)
     }
   }
 

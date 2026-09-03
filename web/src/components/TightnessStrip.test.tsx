@@ -1,8 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { makeTightnessDot } from '../test/tightnessFixtures'
-import { TightnessStrip } from './TightnessStrip'
+import { makeBimodalHouseDots, makeTightnessDot } from '../test/tightnessFixtures'
+import { STAGGER_MAX_PX, staggerOffsets, TightnessStrip } from './TightnessStrip'
+
+function offsetY(item: HTMLElement): number {
+  const match = item.style.transform.match(/calc\(-50% \+ (-?[\d.]+)px\)/)
+  return match?.[1] ? Number(match[1]) : Number.NaN
+}
 
 describe('TightnessStrip', () => {
   it('always renders House and Senate rows as tap targets', () => {
@@ -57,10 +62,34 @@ describe('TightnessStrip', () => {
 
     const items = [...container.querySelectorAll('[data-tightness-row="house"] .tightness-dot-item')]
     expect(items).toHaveLength(2)
-    const transforms = items.map((item) => (item as HTMLElement).style.transform)
-    expect(transforms[0]).not.toBe(transforms[1])
-    expect(transforms.some((value) => value.includes('-5px'))).toBe(true)
-    expect(transforms.some((value) => value.includes('5px'))).toBe(true)
+    const offsets = items.map((item) => offsetY(item as HTMLElement))
+    expect(offsets[0]).not.toBe(offsets[1])
+    expect(offsets.some((value) => value === -5)).toBe(true)
+    expect(offsets.some((value) => value === 5)).toBe(true)
+    expect(offsets.every((value) => Math.abs(value) <= STAGGER_MAX_PX)).toBe(true)
+  })
+
+  it('keeps a production-like knife-edge/steamroll pile inside the track', () => {
+    const house = makeBimodalHouseDots()
+    const offsets = staggerOffsets(house)
+    expect(house.length).toBeGreaterThanOrEqual(18)
+    expect(offsets.some((value) => Math.abs(value) > 0)).toBe(true)
+    expect(Math.max(...offsets.map((value) => Math.abs(value)))).toBeLessThanOrEqual(STAGGER_MAX_PX)
+
+    const { container } = render(
+      <TightnessStrip house={house} senate={[]} selectedKey={null} onSelect={vi.fn()} compact />,
+    )
+    const items = [
+      ...container.querySelectorAll('[data-tightness-row="house"] .tightness-dot-item'),
+    ] as HTMLElement[]
+    expect(items).toHaveLength(house.length)
+    for (const item of items) {
+      expect(Math.abs(offsetY(item))).toBeLessThanOrEqual(STAGGER_MAX_PX)
+      expect(item.style.getPropertyValue('--tightness-x')).not.toBe('')
+    }
+    const lefts = items.map((item) => Number(item.style.getPropertyValue('--tightness-x')))
+    expect(Math.min(...lefts)).toBeLessThan(5)
+    expect(Math.max(...lefts)).toBeGreaterThan(95)
   })
 
   it('keeps the selected knife-edge dot above its cluster', () => {
