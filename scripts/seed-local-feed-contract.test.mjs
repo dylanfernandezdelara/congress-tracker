@@ -30,6 +30,7 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_lifecycle/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS nominations/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS confirmation_votes/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_text_changes/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_committee_events/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS bill_floor_events/)
   assert.match(sql, /CREATE TABLE IF NOT EXISTS committee_roster/)
@@ -40,6 +41,7 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /INSERT OR REPLACE INTO bill_lifecycle/)
   assert.match(sql, /INSERT OR REPLACE INTO nominations/)
   assert.match(sql, /INSERT OR REPLACE INTO confirmation_votes/)
+  assert.match(sql, /INSERT OR REPLACE INTO bill_text_changes/)
   assert.match(sql, /INSERT INTO bill_committee_events/)
   assert.match(sql, /INSERT INTO bill_floor_events/)
   assert.match(sql, /INSERT OR REPLACE INTO committee_roster/)
@@ -139,6 +141,16 @@ test('seed wipes live-ingested feed rows and supports isolated persist-to', () =
   assert.match(def, /--local/)
   assert.doesNotMatch(def, /--persist-to/)
   assert.doesNotMatch(def, /--remote/)
+})
+
+test('seed includes knife-edge, Senate-waiting, and text-grew fixtures', () => {
+  const sql = printSql()
+  assert.match(sql, /210, 208/)
+  assert.match(sql, /House passes a knife-edge resolution \(local sample\)/)
+  assert.match(sql, /House-passed contracting bill waiting in the Senate \(local sample\)/)
+  assert.match(sql, /HR', 33, 'sshr00', 'sent'/)
+  assert.match(sql, /Public spending dashboard details/)
+  assert.match(sql, /9010, 'LOCAL:H001', 'Yea'/)
 })
 
 test('seed includes long-waiting committee referrals for the pulse widget', () => {

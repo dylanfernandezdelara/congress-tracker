@@ -71,7 +71,8 @@ Harness: Playwright Chromium via the helper, **1280×800** so desktop rails moun
 | Sponsor state | combobox/select `Filter by sponsor state` |
 | Theme | button `Switch to dark theme` / `Switch to light theme` |
 | Members rail | region `Members in Congress`; button `Open profile for <name>` |
-| Pulse | region `Legislative pulse` |
+| Vote tightness | region `Vote tightness` (House + Senate rows; desktop right rail, mobile under the timeline) |
+| Senate-waiting | region `House-passed, sitting in the Senate` |
 | Confirmations / laws | regions `Recent confirmations`, `New laws` |
 
 Drive using the exact commands in each feature's **Driving it** section. See `features/feed-timeline.md` for the timeline recipe. Do not invent shorthand.

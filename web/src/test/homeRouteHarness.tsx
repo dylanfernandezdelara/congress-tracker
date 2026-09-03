@@ -5,6 +5,7 @@ import type { Mock } from 'vitest'
 import { AppLayout } from '../layouts/AppLayout'
 import Home from '../routes/Home'
 import { makeFeedItem } from './feedItemFixtures'
+import { makeTightnessStats } from './tightnessFixtures'
 
 function SearchParamsProbe() {
   const [params] = useSearchParams()
@@ -23,6 +24,8 @@ export type HomeApiMocks = {
   fetchPolicyAreas: Mock
   fetchSessionStats: Mock
   fetchPulseStats: Mock
+  fetchTightnessStats: Mock
+  fetchVoteDefectors: Mock
   fetchPortfolioStats: Mock
 }
 
@@ -247,28 +250,38 @@ export function stubHomeRouteDefaults(
       close_votes: [],
       policy_heat: [],
       this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
-      waiting_in_committee: [
-        {
-          system_code: 'hsif00',
-          name: 'Energy and Commerce',
-          chamber: 'House',
-          waiting: 2,
-        },
-      ],
+      waiting_in_committee: [],
     },
     senate: {
       close_votes: [],
       policy_heat: [],
       this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
-      waiting_in_committee: [
-        {
-          system_code: 'sshr00',
-          name: 'HELP',
-          chamber: 'Senate',
-          waiting: 1,
-        },
-      ],
+      waiting_in_committee: [],
     },
+  })
+  api.fetchTightnessStats?.mockResolvedValue(makeTightnessStats())
+  api.fetchVoteDefectors?.mockResolvedValue({
+    chamber: 'House',
+    congress: 119,
+    session: 2,
+    roll_number: 9010,
+    defectors: [
+      {
+        bioguide_id: 'LOCAL:H001',
+        name: 'Rep. Sample Crossover (local)',
+        party: 'D',
+        state: 'CA',
+        position: 'yea',
+        party_line: 'nay',
+        congress_gov_url: null,
+      },
+    ],
+    party_splits: [
+      { party: 'R', yeas: 207, nays: 5, party_line: 'yea' },
+      { party: 'D', yeas: 2, nays: 203, party_line: 'nay' },
+    ],
+    member_votes_available: true,
+    as_of: '2026-07-23T00:00:00.000Z',
   })
   api.fetchPortfolioStats.mockResolvedValue({
     gainers: [],

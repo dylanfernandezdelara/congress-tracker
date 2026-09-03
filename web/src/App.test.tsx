@@ -106,6 +106,24 @@ vi.mock('./api/client', () => ({
       waiting_in_committee: [],
     },
   }),
+  fetchTightnessStats: vi.fn().mockResolvedValue({
+    congress: 119,
+    session: 2,
+    as_of: '2026-06-14T00:00:00.000Z',
+    house_passage: [],
+    senate: [],
+    senate_waiting: [],
+  }),
+  fetchVoteDefectors: vi.fn().mockResolvedValue({
+    chamber: 'House',
+    congress: 119,
+    session: 2,
+    roll_number: 1,
+    defectors: [],
+    party_splits: [],
+    member_votes_available: false,
+    as_of: '2026-06-14T00:00:00.000Z',
+  }),
   fetchDefectors: vi.fn().mockResolvedValue({ defectors: [] }),
   fetchPolicyAreas: vi.fn().mockResolvedValue({ items: [] }),
   fetchMembersSearch: vi.fn().mockResolvedValue({ items: [], q: '', limit: 8 }),
@@ -123,6 +141,6 @@ describe('App routing', () => {
 
     expect(screen.getByRole('heading', { name: 'Track Congress' })).toBeInTheDocument()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-    expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
+    expect(await screen.findByRole('region', { name: 'Vote tightness' })).toBeInTheDocument()
   })
 })

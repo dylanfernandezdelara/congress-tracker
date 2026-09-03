@@ -55,7 +55,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const helper = path.join(here, 'verify-congress-tracker')
 const rootDir = path.resolve(here, '../../../..')
 const seedScript = path.join(rootDir, 'scripts', 'seed-local-feed.sh')
-const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO } = TEST_ONLY
+const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, viewportFromState } = TEST_ONLY
 
 test('helper wrapper is executable', () => {
   const stat = fs.statSync(helper)
@@ -117,6 +117,18 @@ test('api paths are read-only public JSON', () => {
   assert.equal(isAllowedApiPath('/@fs/workers/senate_data_worker/.dev.vars'), false)
   assert.equal(isAllowedApiPath('/feed/../@fs/workers/senate_data_worker/.dev.vars'), false)
   assert.equal(isAllowedApiPath('https://example.com/feed'), false)
+})
+
+test('browser commands reuse a persisted CDP viewport instead of resetting to 1280', () => {
+  assert.deepEqual(viewportFromState({ viewport: { width: 390, height: 844 } }), {
+    width: 390,
+    height: 844,
+  })
+  assert.deepEqual(viewportFromState({ viewport: { width: 320, height: 568 } }), {
+    width: 320,
+    height: 568,
+  })
+  assert.deepEqual(viewportFromState({}), { width: 1280, height: 800 })
 })
 
 test('evidence paths cannot escape artifacts/verify', () => {

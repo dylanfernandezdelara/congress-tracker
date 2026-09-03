@@ -27,6 +27,8 @@ const homeApi = vi.hoisted(() => ({
   fetchPolicyAreas: vi.fn(),
   fetchSessionStats: vi.fn(),
   fetchPulseStats: vi.fn(),
+  fetchTightnessStats: vi.fn(),
+  fetchVoteDefectors: vi.fn(),
   fetchPortfolioStats: vi.fn(),
 }))
 
@@ -39,7 +41,8 @@ const {
   fetchDefectors,
   fetchMemberProfile,
   fetchSessionStats,
-  fetchPulseStats,
+  fetchTightnessStats,
+  fetchVoteDefectors,
 } = homeApi
 
 vi.mock('../api/client', () => homeApi)
@@ -92,20 +95,19 @@ describe('Home', () => {
     ).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Congressional passage votes' })).not.toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
-    expect(await screen.findByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Vote tightness' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('region', { name: 'House-passed, sitting in the Senate' }),
+    ).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'New laws' })).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
-    expect(screen.getByLabelText('Legislative pulse')).toBeInTheDocument()
-    const waitingHeadings = await screen.findAllByRole('heading', { name: 'Waiting in committee' })
-    expect(waitingHeadings).toHaveLength(2)
-    const closeHeadings = screen.getAllByRole('heading', { name: 'Close votes' })
-    expect(closeHeadings.length).toBeGreaterThan(0)
-    expect(
-      waitingHeadings[0]!.compareDocumentPosition(closeHeadings[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-    expect(screen.getByText('Energy and Commerce')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Legislative pulse')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Notable votes' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'House passage' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Senate bills & nominees' })).toBeInTheDocument()
+    expect(screen.getByText('House-passed contracting bill waiting in the Senate')).toBeInTheDocument()
     expect(fetchCommitteesLeaderboard).not.toHaveBeenCalled()
-    expect(await screen.findAllByText('No close votes yet this session.')).toHaveLength(2)
+    expect(fetchTightnessStats).toHaveBeenCalled()
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Recent confirmations' })).toBeInTheDocument()
     expect(screen.getByText('Jane Doe confirmed as Energy Secretary')).toBeInTheDocument()
@@ -390,20 +392,74 @@ describe('Home', () => {
       secondary!.compareDocumentPosition(mobileRails!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
 
-    const sections = mobileRails!.querySelectorAll(':scope > .home-mobile-rail-section')
-    expect(sections).toHaveLength(4)
-    expect(within(sections[0] as HTMLElement).getByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
-    expect(sections[1]).toHaveAttribute('aria-label', 'Legislative pulse')
-    expect(within(sections[2] as HTMLElement).getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
-    expect(sections[3]).toHaveAttribute('aria-label', 'Members in Congress')
+    const tightnessMobile = container.querySelector('.home-tightness-mobile')
+    expect(tightnessMobile).not.toBeNull()
+    expect(feedSection!.contains(tightnessMobile)).toBe(true)
+    expect(within(tightnessMobile as HTMLElement).getByRole('heading', { name: 'House passage' })).toBeInTheDocument()
+    expect(
+      within(tightnessMobile as HTMLElement).getByRole('heading', { name: 'Senate bills & nominees' }),
+    ).toBeInTheDocument()
+    expect(
+      tightnessMobile!.querySelector('[data-tightness-row="house"]'),
+    ).not.toBeNull()
+    expect(
+      tightnessMobile!.querySelector('[data-tightness-row="senate"]'),
+    ).not.toBeNull()
 
-    expect(screen.getAllByRole('region', { name: 'Notable votes' })).toHaveLength(1)
+    expect(
+      within(secondary as HTMLElement).getByRole('region', {
+        name: 'House-passed, sitting in the Senate',
+      }),
+    ).toBeInTheDocument()
+
+    const sections = mobileRails!.querySelectorAll(':scope > .home-mobile-rail-section')
+    expect(sections).toHaveLength(2)
+    expect(within(sections[0] as HTMLElement).getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
+    expect(sections[1]).toHaveAttribute('aria-label', 'Members in Congress')
+
+    fireEvent.click(
+      within(secondary as HTMLElement).getByRole('button', {
+        name: /House-passed contracting bill waiting in the Senate/,
+      }),
+    )
+    expect(screen.getByTestId('search-params')).toHaveTextContent('bill=119-hr-33')
+    expect(screen.getByTestId('search-params').textContent).not.toContain('chamber=')
+
+    expect(screen.getAllByRole('region', { name: 'Vote tightness' })).toHaveLength(1)
     expect(screen.getAllByRole('region', { name: 'Federal Control' })).toHaveLength(1)
     await waitFor(() => {
-      expect(fetchNotableVotes).toHaveBeenCalledTimes(1)
+      expect(fetchTightnessStats).toHaveBeenCalledTimes(1)
       expect(fetchRecentLaws).toHaveBeenCalledTimes(1)
       expect(fetchDefectors).toHaveBeenCalledTimes(2)
     })
+  })
+
+  it('keeps both tightness rows on mobile when the feed is empty', async () => {
+    mockViewport(false)
+    fetchFeed.mockResolvedValue(pageResponse([], { total: 0, has_more: false }))
+    const { container } = renderHome('/?q=nomatch')
+
+    expect(await screen.findByText(/No matches for “nomatch”/)).toBeInTheDocument()
+    const tightnessMobile = container.querySelector('.home-tightness-mobile')
+    expect(tightnessMobile).not.toBeNull()
+    expect(tightnessMobile!.querySelector('[data-tightness-row="house"]')).not.toBeNull()
+    expect(tightnessMobile!.querySelector('[data-tightness-row="senate"]')).not.toBeNull()
+  })
+
+  it('opens a Senate-waiting bill without leftover feed filters', async () => {
+    mockViewport(false)
+    renderHome('/?chamber=Senate&q=lands')
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /House-passed contracting bill waiting in the Senate/,
+      }),
+    )
+
+    const params = screen.getByTestId('search-params').textContent ?? ''
+    expect(params).toContain('bill=119-hr-33')
+    expect(params).not.toContain('chamber=')
+    expect(params).not.toContain('q=')
   })
 
   it('opens a member profile from a left-rail spotlight', async () => {
@@ -569,30 +625,22 @@ describe('Home', () => {
     })
   })
 
-  it('opens an in-place bill sheet from a notable vote without scrolling the feed', async () => {
-    const scrollIntoView = vi.fn()
-    HTMLElement.prototype.scrollIntoView = scrollIntoView
-
+  it('opens a vote-level defector sheet from a tightness dot tap', async () => {
+    mockViewport(false)
     renderHome()
 
-    expect(await screen.findByText('Notable vote headline for sidebar')).toBeInTheDocument()
+    const knifeEdge = await screen.findByRole('button', {
+      name: /House bill H\.R\. 88, 210–208, party-line/,
+    })
+    fireEvent.click(knifeEdge)
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Open bill details for Notable vote headline for sidebar',
-      }),
-    )
-
-    expect(
-      screen.getByRole('dialog', { name: 'Notable vote headline for sidebar' }),
-    ).toBeInTheDocument()
-    expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('bill=')
-    expect(scrollIntoView).not.toHaveBeenCalled()
-    expect(
-      within(screen.getByRole('dialog', { name: 'Notable vote headline for sidebar' })).getByText(
-        /It does something important/i,
-      ),
-    ).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: 'H.R. 88' })
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Who broke with their party' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(fetchVoteDefectors).toHaveBeenCalled()
+      expect(within(dialog).getByText('Rep. Sample Crossover (local)')).toBeInTheDocument()
+    })
   })
 
   it('does not start stats fetches until the first feed page settles', async () => {
@@ -608,7 +656,7 @@ describe('Home', () => {
 
     expect(fetchFeed).toHaveBeenCalledTimes(1)
     expect(fetchSessionStats).not.toHaveBeenCalled()
-    expect(fetchPulseStats).not.toHaveBeenCalled()
+    expect(fetchTightnessStats).not.toHaveBeenCalled()
     expect(fetchDefectors).not.toHaveBeenCalled()
     expect(fetchNotableVotes).not.toHaveBeenCalled()
     expect(fetchRecentLaws).not.toHaveBeenCalled()
@@ -626,9 +674,8 @@ describe('Home', () => {
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     await waitFor(() => {
       expect(fetchSessionStats).toHaveBeenCalled()
-      expect(fetchPulseStats).toHaveBeenCalled()
+      expect(fetchTightnessStats).toHaveBeenCalled()
       expect(fetchDefectors).toHaveBeenCalled()
-      expect(fetchNotableVotes).toHaveBeenCalled()
       expect(fetchRecentLaws).toHaveBeenCalled()
       expect(fetchRecentConfirmations).toHaveBeenCalled()
     })
@@ -641,9 +688,8 @@ describe('Home', () => {
     expect(await screen.findByText("Couldn't load the feed.")).toBeInTheDocument()
     await waitFor(() => {
       expect(fetchSessionStats).toHaveBeenCalled()
-      expect(fetchPulseStats).toHaveBeenCalled()
+      expect(fetchTightnessStats).toHaveBeenCalled()
       expect(fetchDefectors).toHaveBeenCalled()
-      expect(fetchNotableVotes).toHaveBeenCalled()
       expect(fetchRecentLaws).toHaveBeenCalled()
       expect(fetchRecentConfirmations).toHaveBeenCalled()
     })

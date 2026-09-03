@@ -3,14 +3,14 @@ import { useState } from 'react'
 import {
   fetchDefectors,
   fetchPortfolioStats,
-  fetchPulseStats,
   fetchSessionStats,
+  fetchTightnessStats,
 } from '../api/client'
 import type {
   DefectorEntry,
   PortfolioMovers,
-  PulseStatsResponse,
   SessionStatsResponse,
+  TightnessStatsResponse,
 } from '../api/types'
 import { useAsyncData } from './useAsyncData'
 
@@ -75,11 +75,11 @@ export function useStatsData(options: UseStatsDataOptions = {}) {
     mapError: () => "Couldn't load session stats.",
   })
 
-  const pulse = useAsyncData<PulseStatsResponse>({
+  const tightness = useAsyncData<TightnessStatsResponse>({
     deps: [retryKey],
     enabled,
-    load: fetchPulseStats,
-    mapError: () => "Couldn't load legislative pulse.",
+    load: fetchTightnessStats,
+    mapError: () => "Couldn't load vote tightness.",
   })
 
   const defectors = useAsyncData<ChamberPair<DefectorEntry[]>>({
@@ -113,7 +113,7 @@ export function useStatsData(options: UseStatsDataOptions = {}) {
   return {
     reload,
     session: withGateLoading(session, enabled),
-    pulse: withGateLoading(pulse, enabled),
+    tightness: withGateLoading(tightness, enabled),
     defectors: withGateLoading(defectors, enabled),
     portfolios: withGateLoading(portfolios, enabled),
   }
