@@ -46,31 +46,34 @@ export function TightnessStrip({
             </button>
           ) : null}
         </div>
-      ) : null}
-      <TightnessChamber
-        chamber="house"
-        label="House passage"
-        rows={houseRows}
-        cap={HOUSE_MARGIN_CAP}
-        selectedKey={selectedKey}
-        onSelect={onSelect}
-        empty="No close House passage votes."
-      />
-      <TightnessChamber
-        chamber="senate"
-        label="Senate bills & nominees"
-        rows={senateRows}
-        cap={SENATE_MARGIN_CAP}
-        selectedKey={selectedKey}
-        onSelect={onSelect}
-        empty="No close Senate votes."
-      />
-      <p className="tightness-legend">
-        <span className="tightness-legend-swatch tightness-bar-fill--party-line" aria-hidden="true" />
-        Party-line
-        <span className="tightness-legend-swatch tightness-bar-fill--bipartisan" aria-hidden="true" />
-        Bipartisan
-      </p>
+      ) : (
+        <>
+          <TightnessChamber
+            chamber="house"
+            label="House passage"
+            rows={houseRows}
+            cap={HOUSE_MARGIN_CAP}
+            selectedKey={selectedKey}
+            onSelect={onSelect}
+            empty="No close House passage votes."
+          />
+          <TightnessChamber
+            chamber="senate"
+            label="Senate bills & nominees"
+            rows={senateRows}
+            cap={SENATE_MARGIN_CAP}
+            selectedKey={selectedKey}
+            onSelect={onSelect}
+            empty="No close Senate votes."
+          />
+          <p className="tightness-legend">
+            <span className="tightness-legend-swatch tightness-bar-fill--party-line" aria-hidden="true" />
+            Party-line
+            <span className="tightness-legend-swatch tightness-bar-fill--bipartisan" aria-hidden="true" />
+            Bipartisan
+          </p>
+        </>
+      )}
     </section>
   )
 }

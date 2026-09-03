@@ -135,6 +135,28 @@ describe('TightnessStrip', () => {
     expect(screen.queryByText(/H\.R\. \d+ · 51–49/)).not.toBeInTheDocument()
   })
 
+  it('hides empty closest-vote rows when a load error is set', () => {
+    const onRetry = vi.fn()
+    const { container } = render(
+      <TightnessStrip
+        house={[]}
+        senate={[]}
+        selectedKey={null}
+        onSelect={vi.fn()}
+        error="Couldn't load vote tightness."
+        onRetry={onRetry}
+      />,
+    )
+
+    expect(screen.getByText("Couldn't load vote tightness.")).toBeInTheDocument()
+    expect(container.querySelector('[data-tightness-row="house"]')).toBeNull()
+    expect(container.querySelector('[data-tightness-row="senate"]')).toBeNull()
+    expect(screen.queryByText('No close House passage votes.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No close Senate votes.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(onRetry).toHaveBeenCalled()
+  })
+
   it('marks the selected row without stacking z-index tricks', () => {
     const house = [makeTightnessDot(), makeTightnessDot({ roll_number: 9005, bill_number: 1, yeas: 218, nays: 210 })]
     const { container } = render(
