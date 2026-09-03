@@ -625,7 +625,7 @@ describe('Home', () => {
     })
   })
 
-  it('opens a vote-level defector sheet from a tightness dot tap', async () => {
+  it('opens a vote-level defector sheet from a closest-vote bar tap', async () => {
     mockViewport(false)
     renderHome()
 

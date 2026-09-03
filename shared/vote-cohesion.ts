@@ -8,13 +8,9 @@ export function yeaShare(yeas: number, nays: number): number | null {
   return yeas / total
 }
 
-/**
- * Position on the 50%–100% tightness axis (0 = 50% yea, 1 = 100% yea).
- * Votes below 50% clamp to the knife-edge end.
- */
-export function tightnessAxisPosition(yeaPct: number | null): number {
-  if (yeaPct == null) return 0
-  return Math.min(1, Math.max(0, (yeaPct - 0.5) / 0.5))
+/** Absolute vote gap. Closest-vote bars use this scale, never yea%. */
+export function voteMargin(yeas: number, nays: number): number {
+  return Math.abs(yeas - nays)
 }
 
 /**

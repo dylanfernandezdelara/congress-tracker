@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { tightnessAxisPosition, voteCohesion, yeaShare } from './vote-cohesion'
+import { voteCohesion, voteMargin, yeaShare } from './vote-cohesion'
 
 describe('yeaShare', () => {
   it('returns the yea fraction of the recorded tally', () => {
@@ -13,16 +13,12 @@ describe('yeaShare', () => {
   })
 })
 
-describe('tightnessAxisPosition', () => {
-  it('maps 50% to the left edge and 100% to the right', () => {
-    expect(tightnessAxisPosition(0.5)).toBe(0)
-    expect(tightnessAxisPosition(1)).toBe(1)
-    expect(tightnessAxisPosition(0.75)).toBe(0.5)
-  })
-
-  it('clamps failed or empty rolls to the knife-edge end', () => {
-    expect(tightnessAxisPosition(0.49)).toBe(0)
-    expect(tightnessAxisPosition(null)).toBe(0)
+describe('voteMargin', () => {
+  it('is the absolute yea–nay gap', () => {
+    expect(voteMargin(210, 208)).toBe(2)
+    expect(voteMargin(212, 206)).toBe(6)
+    expect(voteMargin(218, 201)).toBe(17)
+    expect(voteMargin(421, 1)).toBe(420)
   })
 })
 

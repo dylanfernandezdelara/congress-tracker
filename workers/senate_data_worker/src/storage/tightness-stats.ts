@@ -1,4 +1,4 @@
-import { tightnessAxisPosition, voteCohesion, yeaShare } from "../../../../shared/vote-cohesion";
+import { voteCohesion, voteMargin, yeaShare } from "../../../../shared/vote-cohesion";
 import type {
   SenateWaitingBill,
   TightnessDot,
@@ -67,6 +67,7 @@ function toBillDot(args: {
     vote_date: vote.date,
     yeas: vote.yeas,
     nays: vote.nays,
+    result: vote.result,
     yea_pct: yeaShare(vote.yeas, vote.nays),
     cohesion: voteCohesion(partySplits),
     party_splits: partySplits,
@@ -81,8 +82,8 @@ function toBillDot(args: {
 
 function sortDots(dots: TightnessDot[]): TightnessDot[] {
   return [...dots].sort((a, b) => {
-    const axis = tightnessAxisPosition(a.yea_pct) - tightnessAxisPosition(b.yea_pct);
-    if (axis !== 0) return axis;
+    const margin = voteMargin(a.yeas, a.nays) - voteMargin(b.yeas, b.nays);
+    if (margin !== 0) return margin;
     return b.vote_date.localeCompare(a.vote_date) || a.roll_number - b.roll_number;
   });
 }
@@ -212,6 +213,7 @@ export async function buildTightnessStats(
     vote_date: item.vote_date,
     yeas: item.yeas,
     nays: item.nays,
+    result: item.result,
     yea_pct: yeaShare(item.yeas, item.nays),
     cohesion: voteCohesion(item.party_splits),
     party_splits: item.party_splits,

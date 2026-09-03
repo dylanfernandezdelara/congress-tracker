@@ -36,7 +36,7 @@ Preconditions:
 
 ## Gotchas
 
-- Rails (`Members in Congress`, `Vote tightness`) are beside the feed only at ≥1024px. A 390px run still has the timeline; tightness stacks under the heading and Senate-waiting is in the secondary stack.
+- Rails (`Members in Congress`, `Vote tightness`) are beside the feed only at ≥1024px. A 390px run still has the timeline; closest-vote bars stack under the heading and Senate-waiting is in the secondary stack.
 - `npm run qa:web` intercepts feed JSON with a fake "Sample Act". That path does not prove this feature.
 - Feed lookback is 45 days. Seed dates are relative to today; do not assert calendar dates from an old screenshot.
 - Expand is a toggle on the row button, not a navigation. Proof is the details region on the same URL (except `?bill=`).

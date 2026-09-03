@@ -129,67 +129,58 @@ async function auditHomePage(page) {
     }
     // Below the desktop rail breakpoint, Home stacks former rail content under the feed
     // (.home-mobile-rails). Desktop keeps sticky .home-rail columns instead.
-    const collectTightnessDotsInTrack = (root, prefix) => {
+    const collectTightnessBars = (root, prefix) => {
       if (!root) return
-      const scale = root.querySelector('.tightness-scale-label')
-      const scaleRect = scale?.getBoundingClientRect()
+      if (root.querySelector('.tightness-scale-label') || /50%\s*yea/.test(root.textContent || '')) {
+        issues.push(`${prefix} 50%–100% scale chrome still present`)
+      }
       for (const row of root.querySelectorAll('[data-tightness-row]')) {
         const rowName = row.getAttribute('data-tightness-row') || 'row'
-        const track = row.querySelector('.tightness-track')
-        const label = row.querySelector('.tightness-row-label')
-        if (!track) {
-          issues.push(`${prefix} ${rowName} tightness track missing`)
+        const list = row.querySelector('.tightness-bars')
+        if (!list) {
+          issues.push(`${prefix} ${rowName} tightness bars missing`)
           continue
         }
-        const trackRect = track.getBoundingClientRect()
-        const labelRect = label?.getBoundingClientRect()
-        let escaped = false
-        let overlappedLabel = false
-        let overlappedScale = false
-        const rects = []
-        for (const dot of row.querySelectorAll('.tightness-dot-item')) {
-          const rect = dot.getBoundingClientRect()
-          if (rect.width <= 0 || rect.height <= 0) {
-            issues.push(`${prefix} ${rowName} tightness dot not visible`)
+        const buttons = [...row.querySelectorAll('.tightness-bar-row')]
+        const limit = rowName === 'house' ? 4 : 3
+        if (buttons.length > limit) {
+          issues.push(`${prefix} ${rowName} tightness bars exceed ${limit}`)
+        }
+        if (buttons.length === 0 && !row.querySelector('.tightness-empty')) {
+          issues.push(`${prefix} ${rowName} tightness bars empty without a fallback`)
+        }
+        for (const button of buttons) {
+          const label = button.querySelector('.tightness-bar-label')
+          const track = button.querySelector('.tightness-bar-track')
+          const fill = button.querySelector('.tightness-bar-fill')
+          const text = label?.textContent ?? ''
+          if (!text.trim()) {
+            issues.push(`${prefix} ${rowName} tightness bar label missing`)
+          }
+          if (text.includes('421–1') || text.includes('421-1')) {
+            issues.push(`${prefix} steamroll 421–1 appeared in tightness bars`)
+          }
+          if (!track || !fill) {
+            issues.push(`${prefix} ${rowName} tightness bar track missing`)
             continue
           }
-          rects.push(rect)
-          if (rect.top < trackRect.top - 1 || rect.bottom > trackRect.bottom + 1) {
-            escaped = true
+          const buttonRect = button.getBoundingClientRect()
+          const trackRect = track.getBoundingClientRect()
+          const fillRect = fill.getBoundingClientRect()
+          collectHorizontalClipping(buttonRect, `${prefix} ${rowName} tightness bar`)
+          if (buttonRect.height < 27) {
+            issues.push(`${prefix} ${rowName} tightness bar tap target is shorter than 28px`)
           }
-          if (rect.left < trackRect.left - 1 || rect.right > trackRect.right + 1) {
-            escaped = true
+          if (fillRect.height < 6 || fillRect.height > 10) {
+            issues.push(`${prefix} ${rowName} tightness bar is not 8px tall`)
           }
-          if (
-            labelRect &&
-            rect.bottom > labelRect.top + 0.5 &&
-            rect.top < labelRect.bottom - 0.5
-          ) {
-            overlappedLabel = true
+          if (Math.abs(fillRect.left - trackRect.left) > 1) {
+            issues.push(`${prefix} ${rowName} tightness bar is x-shifted`)
           }
-          if (
-            scaleRect &&
-            rect.bottom > scaleRect.top + 0.5 &&
-            rect.top < scaleRect.bottom - 0.5
-          ) {
-            overlappedScale = true
+          if (fillRect.width > trackRect.width + 1) {
+            issues.push(`${prefix} ${rowName} tightness bar escaped the track`)
           }
         }
-        let stacked = false
-        for (let i = 0; i < rects.length; i += 1) {
-          const first = rects[i]
-          for (let j = i + 1; j < rects.length; j += 1) {
-            const second = rects[j]
-            const dx = first.left + first.width / 2 - (second.left + second.width / 2)
-            const dy = first.top + first.height / 2 - (second.top + second.height / 2)
-            const minSep = Math.min(first.width, second.width) - 1
-            if (Math.hypot(dx, dy) < minSep) stacked = true
-          }
-        }
-        if (escaped) issues.push(`${prefix} ${rowName} tightness dots escaped the track`)
-        if (overlappedLabel) issues.push(`${prefix} ${rowName} tightness dots overlap the row label`)
-        if (overlappedScale) issues.push(`${prefix} tightness dots overlap the 50%–100% scale`)
-        if (stacked) issues.push(`${prefix} ${rowName} tightness dots stack on top of each other`)
       }
     }
 
@@ -223,7 +214,7 @@ async function auditHomePage(page) {
         if (!senateRow) issues.push('Senate tightness row missing on mobile')
         if (houseRow) collectHorizontalClipping(houseRow.getBoundingClientRect(), 'House tightness row')
         if (senateRow) collectHorizontalClipping(senateRow.getBoundingClientRect(), 'Senate tightness row')
-        collectTightnessDotsInTrack(tightnessMobile, 'mobile')
+        collectTightnessBars(tightnessMobile, 'mobile')
       }
       const senateWaiting = document.querySelector(
         '.home-feed-secondary [aria-label="House-passed, sitting in the Senate"]',
@@ -250,7 +241,7 @@ async function auditHomePage(page) {
         if (!senateRow) issues.push('Senate tightness row missing on desktop')
         if (houseRow) collectHorizontalClipping(houseRow.getBoundingClientRect(), 'House tightness row')
         if (senateRow) collectHorizontalClipping(senateRow.getBoundingClientRect(), 'Senate tightness row')
-        collectTightnessDotsInTrack(tightnessRail, 'desktop')
+        collectTightnessBars(tightnessRail, 'desktop')
       }
     }
     if (!feedRow) issues.push('feed row missing')
@@ -420,6 +411,7 @@ const MOCK_TIGHTNESS_HOUSE_KNIFE = {
   vote_date: '2026-06-05',
   yeas: 210,
   nays: 208,
+  result: 'Passed',
   yea_pct: 210 / 418,
   cohesion: 'party-line',
   party_splits: [
@@ -441,6 +433,17 @@ const MOCK_TIGHTNESS = {
   house_passage: [
     MOCK_TIGHTNESS_HOUSE_KNIFE,
     {
+      ...MOCK_TIGHTNESS_HOUSE_KNIFE,
+      roll_number: 9013,
+      bill_number: 99,
+      yeas: 212,
+      nays: 206,
+      result: 'Failed',
+      yea_pct: 212 / 418,
+      vote_date: '2026-06-03',
+      headline: 'House fails a close spending rule',
+    },
+    {
       kind: 'bill',
       chamber: 'House',
       congress: 119,
@@ -449,6 +452,7 @@ const MOCK_TIGHTNESS = {
       vote_date: '2026-06-04',
       yeas: 421,
       nays: 1,
+      result: 'Passed',
       yea_pct: 421 / 422,
       cohesion: 'bipartisan',
       party_splits: [
@@ -479,6 +483,7 @@ const MOCK_TIGHTNESS = {
       vote_date: '2026-06-12',
       yeas: 58,
       nays: 40,
+      result: 'Confirmed',
       yea_pct: 58 / 98,
       cohesion: 'party-line',
       party_splits: [
@@ -501,6 +506,7 @@ const MOCK_TIGHTNESS = {
       vote_date: '2026-06-05',
       yeas: 68,
       nays: 32,
+      result: 'Passed',
       yea_pct: 68 / 100,
       cohesion: 'bipartisan',
       party_splits: [
@@ -524,6 +530,7 @@ const MOCK_TIGHTNESS = {
         vote_date: '2026-06-12',
         yeas: 51,
         nays: 49,
+        result: 'Confirmed',
         yea_pct: 0.51,
         cohesion: 'party-line',
         party_splits: [

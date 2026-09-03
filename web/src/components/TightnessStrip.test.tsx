@@ -1,40 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { makeBimodalHouseDots, makeTightnessDot } from '../test/tightnessFixtures'
-import {
-  STAGGER_MAX_PX,
-  TIGHTNESS_DOT_MARK_PX,
-  TIGHTNESS_MIN_TRACK_PX,
-  placementDistancePx,
-  tightnessPlacements,
-  TightnessStrip,
-} from './TightnessStrip'
+import { makeTightnessDot } from '../test/tightnessFixtures'
+import { TightnessStrip } from './TightnessStrip'
 
-function offsetY(item: HTMLElement): number {
-  const match = item.style.transform.match(/calc\(-50% \+ (-?[\d.]+)px\)/)
-  return match?.[1] ? Number(match[1]) : Number.NaN
-}
-
-function minPlacementDistance(
-  placements: { leftPct: number; offsetY: number }[],
-  trackPx = TIGHTNESS_MIN_TRACK_PX,
-): number {
-  let minDistance = Number.POSITIVE_INFINITY
-  for (let i = 0; i < placements.length; i += 1) {
-    const first = placements[i]
-    if (!first) continue
-    for (let j = i + 1; j < placements.length; j += 1) {
-      const second = placements[j]
-      if (!second) continue
-      minDistance = Math.min(minDistance, placementDistancePx(first, second, trackPx))
-    }
-  }
-  return minDistance
+function barWidth(button: HTMLElement): number {
+  return Number(button.style.getPropertyValue('--tightness-bar'))
 }
 
 describe('TightnessStrip', () => {
-  it('always renders House and Senate rows as tap targets', () => {
+  it('renders closest-vote bars as whole-row tap targets', () => {
     const onSelect = vi.fn()
     const house = [makeTightnessDot()]
     const senate = [
@@ -42,6 +17,9 @@ describe('TightnessStrip', () => {
         kind: 'nominee',
         chamber: 'Senate',
         roll_number: 9101,
+        yeas: 51,
+        nays: 49,
+        yea_pct: 51 / 100,
         bill_type: null,
         bill_number: null,
         nominee_name: 'Jane Doe',
@@ -58,121 +36,118 @@ describe('TightnessStrip', () => {
     )
 
     expect(screen.getByRole('region', { name: 'Vote tightness' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Closest votes' })).toBeInTheDocument()
+    expect(screen.queryByText(/50% yea/)).not.toBeInTheDocument()
+    expect(container.querySelector('.tightness-scale-label')).toBeNull()
     expect(container.querySelector('[data-tightness-row="house"]')).not.toBeNull()
     expect(container.querySelector('[data-tightness-row="senate"]')).not.toBeNull()
     expect(screen.getByRole('heading', { name: 'Senate bills & nominees' })).toBeInTheDocument()
+    expect(screen.getByText('H.R. 88 · 210–208')).toBeInTheDocument()
+    expect(screen.getByText('PN · Jane Doe · 51–49')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /House bill H\.R\. 88/ }))
+    const houseRow = screen.getByRole('button', { name: /House bill H\.R\. 88, 210–208, party-line/ })
+    expect(houseRow.style.transform).toBe('')
+    expect(houseRow.style.getPropertyValue('--tightness-x')).toBe('')
+    fireEvent.click(houseRow)
     expect(onSelect).toHaveBeenCalledWith(house[0])
   })
 
-  it('staggers nearby knife-edge dots so both stay tappable', () => {
-    const onSelect = vi.fn()
+  it('encodes bar width as vote gap with no x-shift or stagger', () => {
     const house = [
       makeTightnessDot(),
       makeTightnessDot({
         roll_number: 9005,
         bill_number: 1,
         yeas: 218,
-        nays: 210,
-        yea_pct: 218 / 428,
+        nays: 201,
+        yea_pct: 218 / 419,
         cohesion: 'bipartisan',
-        headline: 'House passes a broad energy permitting and production package (local sample)',
+        vote_date: '2026-07-21',
+      }),
+      makeTightnessDot({
+        roll_number: 9013,
+        bill_number: 99,
+        yeas: 212,
+        nays: 206,
+        result: 'Failed',
+        yea_pct: 212 / 418,
+        vote_date: '2026-07-20',
+      }),
+      makeTightnessDot({
+        roll_number: 9012,
+        bill_number: 33,
+        yeas: 421,
+        nays: 1,
+        yea_pct: 421 / 422,
+        cohesion: 'bipartisan',
+        vote_date: '2026-07-21',
       }),
     ]
     const { container } = render(
-      <TightnessStrip house={house} senate={[]} selectedKey={null} onSelect={onSelect} compact />,
+      <TightnessStrip house={house} senate={[]} selectedKey={null} onSelect={vi.fn()} />,
     )
 
-    const items = [...container.querySelectorAll('[data-tightness-row="house"] .tightness-dot-item')]
-    expect(items).toHaveLength(2)
-    const offsets = items.map((item) => offsetY(item as HTMLElement))
-    expect(offsets[0]).not.toBe(offsets[1])
-    expect(offsets.some((value) => value === -6)).toBe(true)
-    expect(offsets.some((value) => value === 6)).toBe(true)
-    expect(offsets.every((value) => Math.abs(value) <= STAGGER_MAX_PX)).toBe(true)
-  })
-
-  it('keeps a production-like knife-edge/steamroll pile inside the track', () => {
-    const house = makeBimodalHouseDots()
-    const placements = tightnessPlacements(house)
-    expect(house.length).toBeGreaterThanOrEqual(18)
-    expect(placements.some((placement) => Math.abs(placement.offsetY) > 0)).toBe(true)
-    expect(Math.max(...placements.map((placement) => Math.abs(placement.offsetY)))).toBeLessThanOrEqual(
-      STAGGER_MAX_PX,
-    )
-    const keys = new Set(placements.map((placement) => `${placement.leftPct.toFixed(2)}:${placement.offsetY}`))
-    expect(keys.size).toBe(house.length)
-    expect(minPlacementDistance(placements)).toBeGreaterThanOrEqual(TIGHTNESS_DOT_MARK_PX - 0.5)
-
-    const { container } = render(
-      <TightnessStrip house={house} senate={[]} selectedKey={null} onSelect={vi.fn()} compact />,
-    )
-    const items = [
-      ...container.querySelectorAll('[data-tightness-row="house"] .tightness-dot-item'),
+    const buttons = [
+      ...container.querySelectorAll('[data-tightness-row="house"] .tightness-bar-row'),
     ] as HTMLElement[]
-    expect(items).toHaveLength(house.length)
-    for (const item of items) {
-      expect(Math.abs(offsetY(item))).toBeLessThanOrEqual(STAGGER_MAX_PX)
-      expect(item.style.getPropertyValue('--tightness-x')).not.toBe('')
+    expect(buttons).toHaveLength(3)
+    expect(screen.getByText('H.R. 88 · 210–208')).toBeInTheDocument()
+    expect(screen.getByText('H.R. 99 · 212–206 failed')).toBeInTheDocument()
+    expect(screen.getByText('H.R. 1 · 218–201')).toBeInTheDocument()
+    expect(screen.queryByText(/421–1/)).not.toBeInTheDocument()
+
+    const widths = buttons.map((button) => barWidth(button))
+    expect(widths[0]).toBeLessThan(widths[1]!)
+    expect(widths[1]).toBeLessThan(widths[2]!)
+    expect(widths).toEqual([2 / 20, 6 / 20, 17 / 20])
+    for (const button of buttons) {
+      expect(button.style.transform).toBe('')
+      expect(button.style.getPropertyValue('--tightness-x')).toBe('')
     }
-    const lefts = items.map((item) => Number(item.style.getPropertyValue('--tightness-x')))
-    expect(Math.min(...lefts)).toBeLessThan(5)
-    expect(Math.max(...lefts)).toBeGreaterThan(95)
   })
 
-  it('does not clamp-fold a pile of identical knife-edge votes onto one mark', () => {
-    const house = Array.from({ length: 14 }, (_, index) =>
+  it('keeps rendered rows at or under 4 House and 3 Senate', () => {
+    const house = Array.from({ length: 8 }, (_, index) =>
       makeTightnessDot({
         roll_number: 8100 + index,
         bill_number: 200 + index,
-        yea_pct: 0.502,
-        yeas: 216,
-        nays: 214,
+        yeas: 210 + index,
+        nays: 208,
       }),
     )
-    const placements = tightnessPlacements(house)
-    const atOrigin = placements.filter((placement) => placement.leftPct === 0 && placement.offsetY === -STAGGER_MAX_PX)
-    expect(atOrigin).toHaveLength(0)
-    expect(minPlacementDistance(placements)).toBeGreaterThanOrEqual(TIGHTNESS_DOT_MARK_PX - 0.5)
-  })
-
-  it('keeps a 30-vote close pile at least one mark apart', () => {
-    const house = Array.from({ length: 30 }, (_, index) =>
+    const senate = Array.from({ length: 6 }, (_, index) =>
       makeTightnessDot({
-        roll_number: 8200 + index,
-        bill_number: 300 + index,
-        yea_pct: 0.501 + index * 0.001,
-        yeas: 216,
-        nays: 214,
+        kind: 'nominee',
+        chamber: 'Senate',
+        roll_number: 9100 + index,
+        yeas: 51 + index,
+        nays: 49,
+        bill_type: null,
+        bill_number: null,
+        nominee_name: `Nominee ${index}`,
       }),
     )
-    const placements = tightnessPlacements(house)
-    expect(minPlacementDistance(placements)).toBeGreaterThanOrEqual(TIGHTNESS_DOT_MARK_PX - 0.5)
-    expect(Math.max(...placements.map((placement) => Math.abs(placement.offsetY)))).toBeLessThanOrEqual(
-      STAGGER_MAX_PX,
-    )
-  })
-
-  it('keeps the selected knife-edge dot above its cluster', () => {
-    const house = [
-      makeTightnessDot(),
-      makeTightnessDot({
-        roll_number: 9005,
-        bill_number: 1,
-        yeas: 218,
-        nays: 210,
-        yea_pct: 218 / 428,
-        cohesion: 'bipartisan',
-      }),
-    ]
-    const selectedKey = 'bill:House:119:2:9010'
     const { container } = render(
-      <TightnessStrip house={house} senate={[]} selectedKey={selectedKey} onSelect={vi.fn()} />,
+      <TightnessStrip house={house} senate={senate} selectedKey={null} onSelect={vi.fn()} />,
     )
-    const items = [...container.querySelectorAll('[data-tightness-row="house"] .tightness-dot-item')] as HTMLElement[]
-    const selected = items.find((item) => item.querySelector('.is-selected'))
-    const other = items.find((item) => !item.querySelector('.is-selected'))
-    expect(Number(selected?.style.zIndex)).toBeGreaterThan(Number(other?.style.zIndex))
+    expect(container.querySelectorAll('[data-tightness-row="house"] .tightness-bar-row')).toHaveLength(4)
+    expect(container.querySelectorAll('[data-tightness-row="senate"] .tightness-bar-row')).toHaveLength(3)
+    expect(screen.getByText('PN · Nominee 0 · 51–49')).toBeInTheDocument()
+    expect(screen.queryByText(/H\.R\. \d+ · 51–49/)).not.toBeInTheDocument()
+  })
+
+  it('marks the selected row without stacking z-index tricks', () => {
+    const house = [makeTightnessDot(), makeTightnessDot({ roll_number: 9005, bill_number: 1, yeas: 218, nays: 210 })]
+    const { container } = render(
+      <TightnessStrip
+        house={house}
+        senate={[]}
+        selectedKey="bill:House:119:2:9010"
+        onSelect={vi.fn()}
+      />,
+    )
+    const selected = container.querySelector('.tightness-bar-row.is-selected')
+    expect(selected).not.toBeNull()
+    expect(selected?.getAttribute('aria-pressed')).toBe('true')
   })
 })
