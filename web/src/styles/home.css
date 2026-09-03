@@ -764,14 +764,6 @@
     border-radius: 999px;
   }
 
-  .tightness--compact {
-    gap: 0.55rem;
-  }
-
-  .tightness--compact .tightness-row {
-    gap: 0.3rem;
-  }
-
   .senate-waiting {
     display: flex;
     flex-direction: column;

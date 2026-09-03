@@ -1,5 +1,5 @@
 import { formatBillQueryParam } from '../utils/billDeepLink'
-import { formatDaysSinceHousePassage, formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import { formatSenateWaitingSince, formatShortBillId } from '../utils/billLabels'
 import type { SenateWaitingBill } from '../api/types'
 import { trimDisplayTitle } from '@congress-tracker/shared/feed-content'
 
@@ -60,9 +60,7 @@ export function SenateWaitingList({
                   <span className="senate-waiting-title">{title}</span>
                   <span className="senate-waiting-meta">
                     {item.senate_committee ?? item.current_label ?? 'Senate committee'}
-                    {item.house_passage_date
-                      ? ` · ${formatDaysSinceHousePassage(item.house_passage_date) ?? `House ${formatVoteDate(item.house_passage_date)}`}`
-                      : ''}
+                    {item.house_passage_date ? ` · ${formatSenateWaitingSince(item.house_passage_date)}` : ''}
                     {item.text_grew ? ' · Text grew' : ''}
                   </span>
                 </button>

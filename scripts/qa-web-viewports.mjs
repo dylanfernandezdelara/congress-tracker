@@ -142,7 +142,7 @@ async function auditHomePage(page) {
           continue
         }
         const buttons = [...row.querySelectorAll('.tightness-bar-row')]
-        const limit = rowName === 'house' ? 4 : 3
+        const limit = rowName === 'house' ? 4 : 3 // HOUSE_CLOSEST_LIMIT / SENATE_CLOSEST_LIMIT
         if (buttons.length > limit) {
           issues.push(`${prefix} ${rowName} tightness bars exceed ${limit}`)
         }

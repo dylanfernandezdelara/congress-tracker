@@ -161,8 +161,8 @@ export interface TightnessDot {
   vote_date: string
   yeas: number
   nays: number
-  /** Official roll result when known (`Passed`, `Failed`, `Confirmed`). */
-  result: string | null
+  /** Official roll result (`Passed`, `Failed`, `Confirmed`). */
+  result: string
   /** Yea share of yeas+nays, 0–1. Null when the roll has no recorded votes. */
   yea_pct: number | null
   cohesion: VoteCohesion

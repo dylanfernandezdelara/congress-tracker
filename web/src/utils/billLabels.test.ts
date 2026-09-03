@@ -6,6 +6,7 @@ import {
   formatCoverageDate,
   formatDateRange,
   formatDaysSinceHousePassage,
+  formatSenateWaitingSince,
   formatVoteDate,
   formatWeekdayVoteDate,
 } from './billLabels'
@@ -32,6 +33,8 @@ describe('calendarDaysSince', () => {
     expect(formatDaysSinceHousePassage('2026-09-03', now)).toBe('House passed today')
     expect(formatDaysSinceHousePassage('2026-09-02', now)).toBe('1 day since House passage')
     expect(formatDaysSinceHousePassage('2026-07-21', now)).toBe('44 days since House passage')
+    expect(formatSenateWaitingSince('2026-07-21', now)).toBe('44 days since House passage')
+    expect(formatSenateWaitingSince('2026-09-10', now)).toBe('House Sep 10')
   })
 })
 

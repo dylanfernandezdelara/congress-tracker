@@ -19,7 +19,6 @@ type TightnessStripProps = {
   loading?: boolean
   error?: string | null
   onRetry?: () => void
-  compact?: boolean
 }
 
 export function TightnessStrip({
@@ -30,16 +29,12 @@ export function TightnessStrip({
   loading = false,
   error = null,
   onRetry,
-  compact = false,
 }: TightnessStripProps) {
   const houseRows = selectClosestVotes(house, HOUSE_MARGIN_CAP, HOUSE_CLOSEST_LIMIT)
   const senateRows = selectClosestVotes(senate, SENATE_MARGIN_CAP, SENATE_CLOSEST_LIMIT)
 
   return (
-    <section
-      className={`tightness${compact ? ' tightness--compact' : ''}`}
-      aria-label="Vote tightness"
-    >
+    <section className="tightness" aria-label="Vote tightness">
       <h2 className="sidebar-section-title">Closest votes</h2>
       {loading ? <p className="text-xs text-faint">Loading closest votes…</p> : null}
       {error ? (
@@ -55,7 +50,7 @@ export function TightnessStrip({
       <TightnessChamber
         chamber="house"
         label="House passage"
-        dots={houseRows}
+        rows={houseRows}
         cap={HOUSE_MARGIN_CAP}
         selectedKey={selectedKey}
         onSelect={onSelect}
@@ -64,7 +59,7 @@ export function TightnessStrip({
       <TightnessChamber
         chamber="senate"
         label="Senate bills & nominees"
-        dots={senateRows}
+        rows={senateRows}
         cap={SENATE_MARGIN_CAP}
         selectedKey={selectedKey}
         onSelect={onSelect}
@@ -83,7 +78,7 @@ export function TightnessStrip({
 function TightnessChamber({
   chamber,
   label,
-  dots,
+  rows,
   cap,
   selectedKey,
   onSelect,
@@ -91,7 +86,7 @@ function TightnessChamber({
 }: {
   chamber: 'house' | 'senate'
   label: string
-  dots: TightnessDot[]
+  rows: TightnessDot[]
   cap: number
   selectedKey: string | null
   onSelect: (dot: TightnessDot) => void
@@ -101,12 +96,12 @@ function TightnessChamber({
     <div className="tightness-row" data-tightness-row={chamber}>
       <h3 className="tightness-row-label">{label}</h3>
       <ul className="tightness-bars" aria-label={label}>
-        {dots.length === 0 ? (
+        {rows.length === 0 ? (
           <li>
             <p className="tightness-empty">{empty}</p>
           </li>
         ) : null}
-        {dots.map((dot) => {
+        {rows.map((dot) => {
           const key = tightnessDotKey(dot)
           const selected = selectedKey === key
           const width = tightnessBarWidth(dot, cap)

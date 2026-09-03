@@ -30,6 +30,10 @@ export function formatDaysSinceHousePassage(iso: string, now = new Date()): stri
   return `${days} days since House passage`
 }
 
+export function formatSenateWaitingSince(iso: string, now = new Date()): string {
+  return formatDaysSinceHousePassage(iso, now) ?? `House ${formatVoteDate(iso)}`
+}
+
 /** `Aug 19`, `Aug 19–24`, `Aug 19 – Sep 2`, or `Jan 10, 2025 – Jan 15, 2026`. */
 export function formatDateRange(start: string | null, end: string | null): string | null {
   if (!start && !end) return null

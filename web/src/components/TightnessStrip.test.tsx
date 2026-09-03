@@ -31,7 +31,6 @@ describe('TightnessStrip', () => {
         senate={senate}
         selectedKey={null}
         onSelect={onSelect}
-        compact
       />,
     )
 

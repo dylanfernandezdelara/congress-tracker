@@ -51,7 +51,7 @@ describe('tightnessLabels', () => {
     ).toMatch(/Senate nominee Pam Bondi, 51–49/)
   })
 
-  it('appends failed when nays meet or beat yeas', () => {
+  it('appends failed from the official roll result', () => {
     const failed = makeTightnessDot({
       roll_number: 9013,
       yeas: 212,

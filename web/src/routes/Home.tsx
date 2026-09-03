@@ -186,7 +186,6 @@ export default function Home() {
       loading={tightnessLoading}
       error={tightness.error}
       onRetry={reloadStats}
-      compact={!isDesktop}
     />
   )
 

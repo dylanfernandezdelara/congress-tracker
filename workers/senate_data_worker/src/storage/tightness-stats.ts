@@ -1,4 +1,4 @@
-import { voteCohesion, voteMargin, yeaShare } from "../../../../shared/vote-cohesion";
+import { voteCohesion, yeaShare } from "../../../../shared/vote-cohesion";
 import type {
   SenateWaitingBill,
   TightnessDot,
@@ -78,14 +78,6 @@ function toBillDot(args: {
     nominee_name: null,
     position_title: null,
   };
-}
-
-function sortDots(dots: TightnessDot[]): TightnessDot[] {
-  return [...dots].sort((a, b) => {
-    const margin = voteMargin(a.yeas, a.nays) - voteMargin(b.yeas, b.nays);
-    if (margin !== 0) return margin;
-    return b.vote_date.localeCompare(a.vote_date) || a.roll_number - b.roll_number;
-  });
 }
 
 async function loadPassagePartySplits(
@@ -228,8 +220,8 @@ export async function buildTightnessStats(
   return {
     congress,
     session,
-    house_passage: sortDots(house_passage),
-    senate: sortDots([...senateBills, ...senateNominees]),
+    house_passage,
+    senate: [...senateBills, ...senateNominees],
     senate_waiting: senateWaitingFromFeed(feed.items),
     as_of: asOf,
   };
