@@ -681,6 +681,9 @@
     position: relative;
     height: 1.35rem;
     min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .tightness-track-line {
@@ -693,17 +696,29 @@
     transform: translateY(-50%);
   }
 
-  .tightness-dot {
+  .tightness-dot-item {
     position: absolute;
     top: 50%;
     width: 0.7rem;
     height: 0.7rem;
     margin: 0;
     padding: 0;
+  }
+
+  .tightness-empty-item {
+    position: relative;
+    list-style: none;
+  }
+
+  .tightness-dot {
+    display: block;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
     border: 1.5px solid hsl(var(--twc-card));
     border-radius: 999px;
     background: hsl(var(--twc-secondary));
-    transform: translate(-50%, -50%);
     cursor: pointer;
     box-shadow: 0 0 0 1px hsl(var(--twc-border));
   }
@@ -766,7 +781,7 @@
     height: 1.1rem;
   }
 
-  .tightness--compact .tightness-dot {
+  .tightness--compact .tightness-dot-item {
     width: 0.6rem;
     height: 0.6rem;
   }

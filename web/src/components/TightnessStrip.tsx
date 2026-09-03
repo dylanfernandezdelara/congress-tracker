@@ -88,29 +88,36 @@ function TightnessRow({
   return (
     <div className="tightness-row" data-tightness-row={label.startsWith('House') ? 'house' : 'senate'}>
       <h3 className="tightness-row-label">{label}</h3>
-      <div className="tightness-track" role="list" aria-label={label}>
+      <ul className="tightness-track" aria-label={label}>
         <span className="tightness-track-line" aria-hidden="true" />
-        {dots.length === 0 ? <p className="tightness-empty">{empty}</p> : null}
+        {dots.length === 0 ? (
+          <li className="tightness-empty-item">
+            <p className="tightness-empty">{empty}</p>
+          </li>
+        ) : null}
         {dots.map((dot, index) => {
           const key = tightnessDotKey(dot)
           const selected = selectedKey === key
           return (
-            <button
+            <li
               key={key}
-              type="button"
-              role="listitem"
-              className={`tightness-dot tightness-dot--${dot.cohesion}${selected ? ' is-selected' : ''}`}
+              className="tightness-dot-item"
               style={{
                 left: `${tightnessDotLeftPercent(dot)}%`,
                 transform: `translate(-50%, calc(-50% + ${offsets[index] ?? 0}px))`,
               }}
-              aria-label={tightnessDotAriaLabel(dot)}
-              aria-pressed={selected}
-              onClick={() => onSelect(dot)}
-            />
+            >
+              <button
+                type="button"
+                className={`tightness-dot tightness-dot--${dot.cohesion}${selected ? ' is-selected' : ''}`}
+                aria-label={tightnessDotAriaLabel(dot)}
+                aria-pressed={selected}
+                onClick={() => onSelect(dot)}
+              />
+            </li>
           )
         })}
-      </div>
+      </ul>
     </div>
   )
 }
