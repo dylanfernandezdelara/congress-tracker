@@ -45,27 +45,30 @@ export function TightnessStrip({
             </button>
           ) : null}
         </div>
-      ) : null}
-      <TightnessRow
-        label="House passage"
-        dots={house}
-        selectedKey={selectedKey}
-        onSelect={onSelect}
-        empty="No recent House passage votes."
-      />
-      <TightnessRow
-        label="Senate bills & nominees"
-        dots={senate}
-        selectedKey={selectedKey}
-        onSelect={onSelect}
-        empty="No recent Senate votes."
-      />
-      <p className="tightness-legend">
-        <span className="tightness-legend-swatch tightness-dot--party-line" aria-hidden="true" />
-        Party-line
-        <span className="tightness-legend-swatch tightness-dot--bipartisan" aria-hidden="true" />
-        Bipartisan
-      </p>
+      ) : (
+        <>
+          <TightnessRow
+            label="House passage"
+            dots={house}
+            selectedKey={selectedKey}
+            onSelect={onSelect}
+            empty="No recent House passage votes."
+          />
+          <TightnessRow
+            label="Senate bills & nominees"
+            dots={senate}
+            selectedKey={selectedKey}
+            onSelect={onSelect}
+            empty="No recent Senate votes."
+          />
+          <p className="tightness-legend">
+            <span className="tightness-legend-swatch tightness-dot--party-line" aria-hidden="true" />
+            Party-line
+            <span className="tightness-legend-swatch tightness-dot--bipartisan" aria-hidden="true" />
+            Bipartisan
+          </p>
+        </>
+      )}
     </section>
   )
 }

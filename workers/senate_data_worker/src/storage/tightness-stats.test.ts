@@ -103,6 +103,54 @@ describe("senateWaitingFromFeed", () => {
       house_passage_date: "2026-07-22",
     });
   });
+
+  it("drops Senate-origin bills that sit in a House committee", () => {
+    const waiting = senateWaitingFromFeed([
+      houseItem({
+        bill: { congress: 119, type: "S", number: 47, title: "Public lands" },
+        process: {
+          current_status: "in_second_chamber_committee",
+          current_label: "In Energy and Commerce Committee · waiting for the committee to act",
+          stages: [
+            {
+              date: "2026-07-18",
+              label: "Sent to Energy and Commerce Committee",
+              activity_key: "sent",
+              chamber: "House",
+              committee_name: "Energy and Commerce Committee",
+              system_code: "hsif00",
+              parent_system_code: null,
+              is_subcommittee: false,
+              tally_text: null,
+            },
+          ],
+        },
+      }),
+      houseItem({
+        bill: { congress: 119, type: "HRES", number: 12, title: "House resolution" },
+        process: {
+          current_status: "in_second_chamber_committee",
+          current_label: "In Homeland Security and Governmental Affairs Committee · waiting for the committee to act",
+          stages: [
+            {
+              date: "2026-07-22",
+              label: "Sent to Homeland Security and Governmental Affairs Committee",
+              activity_key: "sent",
+              chamber: "Senate",
+              committee_name: "Homeland Security and Governmental Affairs Committee",
+              system_code: "ssga00",
+              parent_system_code: null,
+              is_subcommittee: false,
+              tally_text: null,
+            },
+          ],
+        },
+      }),
+    ]);
+
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0]).toMatchObject({ bill_type: "HRES", bill_number: 12 });
+  });
 });
 
 describe("buildTightnessStats", () => {

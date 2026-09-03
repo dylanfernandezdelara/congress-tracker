@@ -51,6 +51,12 @@ function itemTextGrew(item: FeedItem): boolean {
   return (item.text_changes?.added_provisions.length ?? 0) > 0;
 }
 
+/** House-origin docket types (HR, HRES, HJRES, HCONRES). Senate-origin bills
+ *  also use `in_second_chamber_committee` when they sit in a House committee. */
+function isHouseOriginBill(billType: string): boolean {
+  return billType.toUpperCase().startsWith("H");
+}
+
 function toBillDot(args: {
   vote: FeedItem["passage_votes"][number];
   item: FeedItem;
@@ -137,6 +143,7 @@ export function senateWaitingFromFeed(items: FeedItem[]): SenateWaitingBill[] {
   const waiting: SenateWaitingBill[] = [];
   for (const item of items) {
     if (item.process?.current_status !== "in_second_chamber_committee") continue;
+    if (!isHouseOriginBill(item.bill.type)) continue;
     waiting.push({
       congress: item.bill.congress,
       bill_type: item.bill.type,

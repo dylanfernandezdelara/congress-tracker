@@ -84,4 +84,26 @@ describe('TightnessStrip', () => {
     const other = items.find((item) => !item.querySelector('.is-selected'))
     expect(Number(selected?.style.zIndex)).toBeGreaterThan(Number(other?.style.zIndex))
   })
+
+  it('hides empty rows when a load error is set', () => {
+    const onRetry = vi.fn()
+    const { container } = render(
+      <TightnessStrip
+        house={[]}
+        senate={[]}
+        selectedKey={null}
+        onSelect={vi.fn()}
+        error="Couldn't load tightness."
+        onRetry={onRetry}
+      />,
+    )
+
+    expect(screen.getByText("Couldn't load tightness.")).toBeInTheDocument()
+    expect(container.querySelector('[data-tightness-row="house"]')).toBeNull()
+    expect(container.querySelector('[data-tightness-row="senate"]')).toBeNull()
+    expect(screen.queryByText('No recent House passage votes.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No recent Senate votes.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(onRetry).toHaveBeenCalled()
+  })
 })

@@ -148,8 +148,11 @@ export default function Home() {
 
   const showFeed = items.length > 0
   const showSkeleton = isInitialLoading && items.length === 0
+  const showFeedErrorCard = Boolean(feedError && items.length === 0)
   const listRefreshing = isInitialLoading && items.length > 0
   const inFlight = isInitialLoading || isLoadingMore
+  const showEmptyFeed = !showSkeleton && !feedError && total === 0 && !inFlight
+  const showMobileTightnessFallback = !isDesktop && (showFeedErrorCard || showEmptyFeed)
   const recentLawsLoading = !feedSettled || recentLaws.isLoading
   const recentConfirmationsLoading = !feedSettled || recentConfirmations.isLoading
 
@@ -284,21 +287,19 @@ export default function Home() {
 
         {showSkeleton ? <FeedSkeleton /> : null}
 
-        {feedError && items.length === 0 ? (
+        {showFeedErrorCard ? (
           <div className="flex flex-col items-center gap-3 rounded-card border border-border bg-card px-6 py-8 text-center">
             <p className="text-[13px] text-secondary">{feedError}</p>
             <button type="button" className="ghost-button" onClick={reloadAll}>
               Retry
             </button>
-            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
           </div>
         ) : null}
 
-        {!showSkeleton && !feedError && total === 0 && !inFlight ? (
+        {showEmptyFeed ? (
           <div className="home-feed-empty">
             <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
-            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
                 Clear search
@@ -319,6 +320,10 @@ export default function Home() {
               </button>
             ) : null}
           </div>
+        ) : null}
+
+        {showMobileTightnessFallback ? (
+          <div className="home-tightness-mobile">{tightnessStrip}</div>
         ) : null}
 
         {showFeed ? (
