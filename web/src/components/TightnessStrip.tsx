@@ -132,13 +132,14 @@ function TightnessRow({
 const STAGGER_CLUSTER_PCT = 4
 const STAGGER_STEP_PX = 10
 /**
- * Live lookback is bimodal (knife-edge ~50% vs steamrolls ~100%). A 4% gap
- * chains those into one cluster; unbounded 10px steps then overflow a ~2rem
- * track onto the row labels. Keep |y| inside the track (0.7rem dots + 2.25rem
- * band leave ~10px of headroom each side).
+ * A 4% neighbor gap chains the knife-edge pile (or the steamroll pile) into
+ * one cluster. Unbounded 10px y-steps then overflow a ~2rem track onto the
+ * row labels. Keep |y| inside the track (0.7rem dots + 2.25rem band leave
+ * ~10px of headroom each side). The two piles sit ~85 axis-points apart, so
+ * they never join.
  */
 export const STAGGER_MAX_PX = 10
-/** Horizontal step used when a 3-slot y band is already full (~dot width at 320px). */
+/** Horizontal step for extra columns in a 3-row lattice (~dot width at 320px). */
 const STAGGER_X_STEP_PCT = 2.4
 
 function staggerSlotCount(): number {
@@ -159,32 +160,10 @@ function ySlots(): number[] {
   return Array.from({ length: slots }, (_, slot) => (slot - (slots - 1) / 2) * STAGGER_STEP_PX)
 }
 
-function packLargeCluster(
-  items: { index: number; left: number }[],
-  placements: TightnessPlacement[],
-): void {
-  const occupied: { x: number; y: number }[] = []
-  const slots = ySlots()
-  const collides = (x: number, y: number) =>
-    occupied.some(
-      (dot) => Math.abs(dot.x - x) < STAGGER_X_STEP_PCT && Math.abs(dot.y - y) < STAGGER_STEP_PX,
-    )
-
-  for (const item of items) {
-    let placed: TightnessPlacement | null = null
-    for (const step of [0, 1, -1, 2, -2, 3, -3, 4, -4]) {
-      const leftPct = Math.min(100, Math.max(0, item.left + step * STAGGER_X_STEP_PCT))
-      for (const offsetY of slots) {
-        if (collides(leftPct, offsetY)) continue
-        placed = { offsetY, leftPct }
-        break
-      }
-      if (placed) break
-    }
-    const next = placed ?? { offsetY: 0, leftPct: item.left }
-    placements[item.index] = next
-    occupied.push({ x: next.leftPct, y: next.offsetY })
-  }
+/** 0, +1, −1, +2, −2… so extra columns stay near the vote's true x. */
+function zigzagColumn(column: number): number {
+  if (column === 0) return 0
+  return Math.ceil(column / 2) * (column % 2 === 1 ? 1 : -1)
 }
 
 /** Place overlapping dots so a knife-edge cluster stays tappable and in-track. */
@@ -202,17 +181,23 @@ export function tightnessPlacements(dots: TightnessDot[]): TightnessPlacement[] 
     const size = end - clusterStart
     if (size < 2) return
     const cluster = ranked.slice(clusterStart, end)
-    if (size <= staggerSlotCount()) {
-      for (const [offset, item] of cluster.entries()) {
-        if (!item) continue
+    const slots = ySlots()
+    for (const [offset, item] of cluster.entries()) {
+      if (!item) continue
+      if (size <= slots.length) {
         placements[item.index] = {
           offsetY: clusterOffset(offset, size),
           leftPct: item.left,
         }
+        continue
       }
-      return
+      const offsetY = slots[offset % slots.length] ?? 0
+      const leftPct = Math.min(
+        100,
+        Math.max(0, item.left + zigzagColumn(Math.floor(offset / slots.length)) * STAGGER_X_STEP_PCT),
+      )
+      placements[item.index] = { offsetY, leftPct }
     }
-    packLargeCluster(cluster, placements)
   }
 
   for (let i = 1; i <= ranked.length; i += 1) {
@@ -224,9 +209,4 @@ export function tightnessPlacements(dots: TightnessDot[]): TightnessPlacement[] 
     }
   }
   return placements
-}
-
-/** Nudge overlapping dots so a knife-edge cluster stays tappable and in-track. */
-export function staggerOffsets(dots: TightnessDot[]): number[] {
-  return tightnessPlacements(dots).map((placement) => placement.offsetY)
 }
