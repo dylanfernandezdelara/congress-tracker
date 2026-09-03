@@ -107,9 +107,9 @@ describe('TightnessStrip', () => {
     expect(items).toHaveLength(house.length)
     for (const item of items) {
       expect(Math.abs(offsetY(item))).toBeLessThanOrEqual(STAGGER_MAX_PX)
-      expect(item.style.left).toMatch(/clamp\(/)
+      expect(item.style.getPropertyValue('--tightness-x')).not.toBe('')
     }
-    const lefts = items.map((item) => Number(item.style.left.match(/,\s*([\d.]+)%/)?.[1]))
+    const lefts = items.map((item) => Number(item.style.getPropertyValue('--tightness-x')))
     expect(Math.min(...lefts)).toBeLessThan(5)
     expect(Math.max(...lefts)).toBeGreaterThan(95)
   })

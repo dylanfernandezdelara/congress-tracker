@@ -106,7 +106,9 @@ function TightnessRow({
               key={key}
               className="tightness-dot-item"
               style={{
-                left: `clamp(var(--tightness-dot-radius), ${placement.leftPct}%, calc(100% - var(--tightness-dot-radius)))`,
+                // 0–100 on the 50–100 axis. CSS insets into [radius, 100%-radius]
+                // with a unitless ratio so WebKit does not drop the length.
+                ['--tightness-x' as string]: String(placement.leftPct),
                 transform: `translate(-50%, calc(-50% + ${placement.offsetY}px))`,
                 zIndex: selected ? 20 : 2 + Math.round((100 - trueLeft) / 10),
               }}

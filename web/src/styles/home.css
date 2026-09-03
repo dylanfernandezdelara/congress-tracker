@@ -710,6 +710,10 @@
     display: block;
     position: absolute;
     top: 50%;
+    left: calc(
+      var(--tightness-dot-radius) + (var(--tightness-x, 0) / 100) *
+        (100% - 2 * var(--tightness-dot-radius))
+    );
     width: 0.7rem;
     height: 0.7rem;
     margin: 0;
