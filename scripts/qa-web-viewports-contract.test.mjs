@@ -88,6 +88,8 @@ test('qa:web covers home across the viewport/theme matrix', () => {
   assert.match(qa, /Track Congress/)
   assert.match(qa, /MOCK_TIGHTNESS/)
   assert.match(qa, /collectTightnessDotsInTrack/)
+  assert.match(qa, /tightness dots stack on top of each other/)
+  assert.match(qa, /rect\.left < trackRect\.left/)
   assert.match(qa, /IPHONE_SAFARI_UA/)
   assert.match(qa, /Senate tightness row/)
   assert.match(qa, /House tightness row/)

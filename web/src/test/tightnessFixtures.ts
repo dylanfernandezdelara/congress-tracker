@@ -46,7 +46,7 @@ export function makeSenateWaitingBill(
 /**
  * Production House lookback is bimodal: a chained 4% cluster of knife-edge
  * rolls near 50% yea plus steamrolls near 100%. Used to prove stagger stays
- * inside the ~2.25rem track instead of stacking onto the row labels.
+ * inside the ~2.5rem track instead of stacking onto the row labels.
  */
 export function makeBimodalHouseDots(): TightnessDot[] {
   const knifeEdge = [
