@@ -107,4 +107,32 @@ describe("fetchRecentIntroducedBills", () => {
     expect(result.map((bill) => bill.number)).toEqual([2, 3]);
     expect(mockFetchJson).not.toHaveBeenCalled();
   });
+
+  it("keeps dated list intros when a detail fetch throws", async () => {
+    mockFetchJsonWithMeta
+      .mockResolvedValueOnce({
+        data: {
+          bills: [
+            listBill("hr", 1, { introducedDate: "2026-09-01" }),
+            listBill("hr", 9901, {
+              introducedDate: null,
+              latestAction: { actionDate: "2026-09-03", text: "Introduced in House" },
+            }),
+          ],
+        },
+      })
+      .mockResolvedValueOnce({ data: { bills: [] } });
+    mockFetchJson.mockRejectedValue(new Error("HTTP 500"));
+
+    const result = await fetchRecentIntroducedBills(createEnv(), 119, {
+      lookbackDate: "2026-08-28",
+      maxNew: 20,
+      maxPagesPerType: 1,
+      detailFetches: 5,
+    });
+
+    expect(result).toEqual([
+      expect.objectContaining({ type: "HR", number: 1, introducedDate: "2026-09-01" }),
+    ]);
+  });
 });

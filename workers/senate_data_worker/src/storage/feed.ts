@@ -66,6 +66,12 @@ export interface FeedPageOptions {
   policy?: string;
   /** Injectable clock for ten-day derivation tests. */
   now?: Date | string;
+  /**
+   * When false, omit the intro UNION arm (vote + executive only). Tightness
+   * and Senate-waiting reuse the 50-row feed and must not lose passage rows
+   * to 7-day introductions.
+   */
+  includeIntros?: boolean;
 }
 
 type ExecutivePostLinks = Awaited<ReturnType<typeof getExecutivePostBillsForPosts>>;
@@ -323,6 +329,7 @@ export async function buildFeedPage(
   await ensureSchema(env.DB);
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
   const executiveSince = lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS);
+  const includeIntros = options.includeIntros !== false;
   const introLookback = inclusiveLookbackStartIso(
     INTRO_LOOKBACK_DAYS,
     options.now instanceof Date ? options.now : options.now ? new Date(options.now) : undefined
@@ -341,8 +348,17 @@ export async function buildFeedPage(
   };
   const now = options.now ?? new Date();
   const [total, bills] = await Promise.all([
-    countFeedBills(env.DB, lookback, executiveSince, introLookback, filters),
-    selectFeedBills(env.DB, lookback, executiveSince, introLookback, cappedLimit, offset, filters),
+    countFeedBills(env.DB, lookback, executiveSince, introLookback, filters, includeIntros),
+    selectFeedBills(
+      env.DB,
+      lookback,
+      executiveSince,
+      introLookback,
+      cappedLimit,
+      offset,
+      filters,
+      includeIntros
+    ),
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 

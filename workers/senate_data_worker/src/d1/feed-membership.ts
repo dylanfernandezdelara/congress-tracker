@@ -19,9 +19,18 @@ function introOnlyMembershipSql(): string {
 
 /**
  * Vote ∪ executive ∪ intro feed membership. Select and count share this CTE so
- * a fourth source cannot drift between the two queries.
+ * a fourth source cannot drift between the two queries. Tightness/Senate-waiting
+ * omit the intro arm so 7-day intros cannot evict older passage rows.
  */
-export function feedMembershipCteSql(): string {
+export function feedMembershipCteSql(includeIntros = true): string {
+  const introArm = includeIntros
+    ? `
+         UNION ALL
+         SELECT bill_congress, bill_type, bill_number, sort_date, source
+         FROM (
+           ${introOnlyMembershipSql()}
+         )`
+    : "";
   return `WITH combined AS (
          SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number, MAX(vote_date) AS sort_date, 'vote' AS source
          FROM votes
@@ -32,19 +41,16 @@ export function feedMembershipCteSql(): string {
          FROM executive_post_bills b
          JOIN executive_posts p ON p.id = b.post_id
          WHERE p.posted_at >= ?
-         GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
-         UNION ALL
-         SELECT bill_congress, bill_type, bill_number, sort_date, source
-         FROM (
-           ${introOnlyMembershipSql()}
-         )
+         GROUP BY b.bill_congress, UPPER(b.bill_type), bill_number${introArm}
        )`;
 }
 
 export function feedMembershipBinds(
   voteLookbackDate: string,
   executiveSinceIso: string,
-  introLookbackDate: string
+  introLookbackDate: string,
+  includeIntros = true
 ): Array<string | number> {
+  if (!includeIntros) return [voteLookbackDate, executiveSinceIso];
   return [voteLookbackDate, executiveSinceIso, introLookbackDate, INTRO_FEED_MAX_NEW];
 }

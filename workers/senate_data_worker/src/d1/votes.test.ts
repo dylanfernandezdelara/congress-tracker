@@ -345,6 +345,30 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(countSql!.startsWith(feedMembershipCteSql())).toBe(true);
   });
 
+  it("omits the intro UNION arm when includeIntros is false", async () => {
+    const { db, preparedSql, bindsBySql } = createMockDb([]);
+    await selectFeedBills(
+      db,
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      50,
+      0,
+      {},
+      false
+    );
+    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", {}, false);
+
+    const selectSql = preparedSql.find((sql) => sql.includes("LIMIT ? OFFSET ?"))!;
+    const countSql = preparedSql.find((sql) => sql.includes("SELECT COUNT(*) AS total"))!;
+    expect(selectSql).not.toContain("bill_lifecycle");
+    expect(selectSql).not.toContain("'intro' AS source");
+    expect(countSql).not.toContain("bill_lifecycle");
+    expect(selectSql.startsWith(feedMembershipCteSql(false))).toBe(true);
+    expect(bindsBySql.get(selectSql)).toEqual(["2026-05-01", "2026-06-01T00:00:00.000Z", 50, 0]);
+    expect(bindsBySql.get(countSql)).toEqual(["2026-05-01", "2026-06-01T00:00:00.000Z"]);
+  });
+
   it("adds vote-chamber EXISTS or intro-source origin types", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([
       {

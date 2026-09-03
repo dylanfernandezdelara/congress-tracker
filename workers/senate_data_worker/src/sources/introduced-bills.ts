@@ -245,17 +245,30 @@ export async function fetchRecentIntroducedBills(
   const toFetch = ranked.slice(0, detailBudget);
 
   for (const item of toFetch) {
-    const detail = await fetchBillIntroducedDate(env, {
-      congress: item.congress,
-      type: item.type,
-      number: item.number,
-    });
-    if (!detail.introducedDate || detail.introducedDate < lookbackDate) continue;
-    dated.push({
-      ...item,
-      title: detail.title ?? item.title,
-      introducedDate: detail.introducedDate,
-    });
+    try {
+      const detail = await fetchBillIntroducedDate(env, {
+        congress: item.congress,
+        type: item.type,
+        number: item.number,
+      });
+      if (!detail.introducedDate || detail.introducedDate < lookbackDate) continue;
+      dated.push({
+        ...item,
+        title: detail.title ?? item.title,
+        introducedDate: detail.introducedDate,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        JSON.stringify({
+          event: "intro_detail_fetch_failed",
+          congress: item.congress,
+          type: item.type,
+          number: item.number,
+          error: message,
+        })
+      );
+    }
   }
 
   dated.sort(sortIntros);

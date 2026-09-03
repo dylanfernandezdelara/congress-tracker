@@ -159,7 +159,7 @@ export async function buildTightnessStats(
 ): Promise<TightnessStatsResponse> {
   await ensureSchema(env.DB);
   const [feed, confirmations] = await Promise.all([
-    buildFeedPage(env, { limit: FEED_MAX_BILLS, offset: 0 }),
+    buildFeedPage(env, { limit: FEED_MAX_BILLS, offset: 0, includeIntros: false }),
     buildRecentConfirmations(env, congress, session, TIGHTNESS_CONFIRMATION_LIMIT, asOf),
   ]);
 

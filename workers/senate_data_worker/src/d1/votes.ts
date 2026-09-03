@@ -204,12 +204,13 @@ export async function selectFeedBills(
   introLookbackDate: string,
   limit: number,
   offset = 0,
-  filters: FeedFilterOptions = {}
+  filters: FeedFilterOptions = {},
+  includeIntros = true
 ): Promise<FeedBillRow[]> {
   await ensureSchema(db);
   const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
-    ...feedMembershipBinds(voteLookbackDate, executiveSinceIso, introLookbackDate),
+    ...feedMembershipBinds(voteLookbackDate, executiveSinceIso, introLookbackDate, includeIntros),
     ...filter.binds,
     limit,
     offset,
@@ -217,7 +218,7 @@ export async function selectFeedBills(
 
   const { results } = await db
     .prepare(
-      `${feedMembershipCteSql()}
+      `${feedMembershipCteSql(includeIntros)}
        SELECT bill_congress, bill_type, bill_number,
               MAX(CASE WHEN source = 'vote' THEN sort_date END) AS latest_passage_date,
               MAX(sort_date) AS latest_activity_date
@@ -237,18 +238,19 @@ export async function countFeedBills(
   voteLookbackDate: string,
   executiveSinceIso: string,
   introLookbackDate: string,
-  filters: FeedFilterOptions = {}
+  filters: FeedFilterOptions = {},
+  includeIntros = true
 ): Promise<number> {
   await ensureSchema(db);
   const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
-    ...feedMembershipBinds(voteLookbackDate, executiveSinceIso, introLookbackDate),
+    ...feedMembershipBinds(voteLookbackDate, executiveSinceIso, introLookbackDate, includeIntros),
     ...filter.binds,
   ];
 
   const row = await db
     .prepare(
-      `${feedMembershipCteSql()}
+      `${feedMembershipCteSql(includeIntros)}
        SELECT COUNT(*) AS total FROM (
          SELECT bill_congress, bill_type, bill_number
          FROM combined
