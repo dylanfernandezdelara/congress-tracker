@@ -226,14 +226,14 @@
      symmetric padding, no per-section margins to reconcile. */
   .home-feed-secondary > .recent-laws,
   .home-feed-secondary > .recent-confirmations,
-  .home-feed-secondary > .senate-waiting {
+  .home-feed-secondary > .senate-waiting,
+  .home-feed-secondary > .home-tightness-mobile {
     margin: 0;
     padding: 1.5rem 0;
     border-top: 1px solid hsl(var(--twc-border));
   }
 
   .home-tightness-mobile {
-    margin: 0 0 1rem;
     min-width: 0;
     scroll-margin-top: 4.5rem;
   }
