@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { tightnessAxisPosition, voteCohesion, yeaShare } from './vote-cohesion'
+import {
+  HOUSE_CLOSEST_LIMIT,
+  HOUSE_MARGIN_CAP,
+  SENATE_CLOSEST_LIMIT,
+  SENATE_MARGIN_CAP,
+  compareClosestVotes,
+  selectClosestVotes,
+  voteCohesion,
+  voteMargin,
+  yeaShare,
+} from './vote-cohesion'
 
 describe('yeaShare', () => {
   it('returns the yea fraction of the recorded tally', () => {
@@ -13,16 +23,50 @@ describe('yeaShare', () => {
   })
 })
 
-describe('tightnessAxisPosition', () => {
-  it('maps 50% to the left edge and 100% to the right', () => {
-    expect(tightnessAxisPosition(0.5)).toBe(0)
-    expect(tightnessAxisPosition(1)).toBe(1)
-    expect(tightnessAxisPosition(0.75)).toBe(0.5)
+describe('voteMargin', () => {
+  it('is the absolute yea–nay gap', () => {
+    expect(voteMargin(210, 208)).toBe(2)
+    expect(voteMargin(212, 206)).toBe(6)
+    expect(voteMargin(218, 201)).toBe(17)
+    expect(voteMargin(421, 1)).toBe(420)
+  })
+})
+
+describe('selectClosestVotes', () => {
+  it('sorts closest first and drops the steamroll tail', () => {
+    const selected = selectClosestVotes(
+      [
+        { yeas: 421, nays: 1, vote_date: '2026-07-21', roll_number: 9012 },
+        { yeas: 218, nays: 201, vote_date: '2026-07-21', roll_number: 9005 },
+        { yeas: 210, nays: 208, vote_date: '2026-07-22', roll_number: 9010 },
+        { yeas: 212, nays: 206, vote_date: '2026-07-20', roll_number: 9013 },
+      ],
+      HOUSE_MARGIN_CAP,
+      HOUSE_CLOSEST_LIMIT,
+    )
+    expect(selected.map((roll) => `${roll.yeas}–${roll.nays}`)).toEqual([
+      '210–208',
+      '212–206',
+      '218–201',
+    ])
   })
 
-  it('clamps failed or empty rolls to the knife-edge end', () => {
-    expect(tightnessAxisPosition(0.49)).toBe(0)
-    expect(tightnessAxisPosition(null)).toBe(0)
+  it('caps House at 4 and Senate at 3', () => {
+    const house = Array.from({ length: 8 }, (_, index) => ({
+      yeas: 210 + index,
+      nays: 208,
+      vote_date: '2026-07-22',
+      roll_number: 8100 + index,
+    }))
+    const senate = Array.from({ length: 6 }, (_, index) => ({
+      yeas: 51 + index,
+      nays: 49,
+      vote_date: '2026-07-22',
+      roll_number: 9100 + index,
+    }))
+    expect(selectClosestVotes(house, HOUSE_MARGIN_CAP, HOUSE_CLOSEST_LIMIT)).toHaveLength(4)
+    expect(selectClosestVotes(senate, SENATE_MARGIN_CAP, SENATE_CLOSEST_LIMIT)).toHaveLength(3)
+    expect(compareClosestVotes(house[0]!, house[1]!)).toBeLessThan(0)
   })
 })
 

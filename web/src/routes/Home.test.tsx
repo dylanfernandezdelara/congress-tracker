@@ -394,7 +394,10 @@ describe('Home', () => {
 
     const tightnessMobile = container.querySelector('.home-tightness-mobile')
     expect(tightnessMobile).not.toBeNull()
-    expect(feedSection!.contains(tightnessMobile)).toBe(true)
+    expect(secondary!.contains(tightnessMobile)).toBe(true)
+    expect(
+      feedSection!.compareDocumentPosition(tightnessMobile!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(within(tightnessMobile as HTMLElement).getByRole('heading', { name: 'House passage' })).toBeInTheDocument()
     expect(
       within(tightnessMobile as HTMLElement).getByRole('heading', { name: 'Senate bills & nominees' }),
@@ -625,7 +628,7 @@ describe('Home', () => {
     })
   })
 
-  it('opens a vote-level defector sheet from a tightness dot tap', async () => {
+  it('opens a vote-level defector sheet from a closest-vote bar tap', async () => {
     mockViewport(false)
     renderHome()
 

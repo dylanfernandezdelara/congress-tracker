@@ -226,14 +226,14 @@
      symmetric padding, no per-section margins to reconcile. */
   .home-feed-secondary > .recent-laws,
   .home-feed-secondary > .recent-confirmations,
-  .home-feed-secondary > .senate-waiting {
+  .home-feed-secondary > .senate-waiting,
+  .home-feed-secondary > .home-tightness-mobile {
     margin: 0;
     padding: 1.5rem 0;
     border-top: 1px solid hsl(var(--twc-border));
   }
 
   .home-tightness-mobile {
-    margin: 0 0 1rem;
     min-width: 0;
     scroll-margin-top: 4.5rem;
   }
@@ -651,23 +651,10 @@
     scroll-margin-top: 4.5rem;
   }
 
-  .tightness-scale-label {
-    margin: 0;
-    font-size: 11px;
-    letter-spacing: 0.02em;
-    color: hsl(var(--twc-faint));
-    font-variant-numeric: tabular-nums;
-  }
-
-  .tightness-scale-mid {
-    margin: 0 0.35rem;
-    color: hsl(var(--twc-secondary));
-  }
-
   .tightness-row {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.4rem;
     min-width: 0;
   }
 
@@ -679,86 +666,77 @@
     color: hsl(var(--twc-foreground));
   }
 
-  .tightness-track {
-    position: relative;
-    /* Tall enough for a 3-slot ±12px stagger plus 0.7rem dots, so a bimodal
-       knife-edge/steamroll pile stays on the line instead of the labels. */
-    height: 2.5rem;
+  .tightness-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
     min-width: 0;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .tightness-track-line {
-    display: block;
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 1px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    background: hsl(var(--twc-border));
-    transform: translateY(-50%);
-    pointer-events: none;
-  }
-
-  .tightness-dot-item {
-    --tightness-dot-radius: 0.35rem;
-    display: block;
-    position: absolute;
-    top: 50%;
-    left: calc(
-      var(--tightness-dot-radius) + (var(--tightness-x, 0) / 100) *
-        (100% - 2 * var(--tightness-dot-radius))
-    );
-    width: 0.7rem;
-    height: 0.7rem;
-    margin: 0;
-    padding: 0;
-    z-index: 1;
-  }
-
-  .tightness-empty-item {
-    position: relative;
-    list-style: none;
-  }
-
-  .tightness-dot {
-    position: relative;
-    display: block;
+  .tightness-bar-row {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.2rem;
     width: 100%;
-    height: 100%;
+    min-height: 28px;
     margin: 0;
-    padding: 0;
-    border: 1.5px solid hsl(var(--twc-card));
-    border-radius: 999px;
-    background: hsl(var(--twc-secondary));
+    padding: 0.2rem 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: left;
     cursor: pointer;
-    box-shadow: 0 0 0 1px hsl(var(--twc-border));
     scroll-margin-top: 4.5rem;
   }
 
-  .tightness-dot:focus-visible {
+  .tightness-bar-row:focus-visible {
     outline: 2px solid hsl(var(--twc-foreground));
     outline-offset: 2px;
   }
 
-  .tightness-dot.is-selected {
-    box-shadow: 0 0 0 2px hsl(var(--twc-foreground));
+  .tightness-bar-row.is-selected {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
   }
 
-  .tightness-dot--party-line {
-    background: hsl(var(--twc-foreground));
+  .tightness-bar-label {
+    font-size: 12px;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--twc-foreground));
+    overflow-wrap: anywhere;
   }
 
-  .tightness-dot--bipartisan {
+  .tightness-bar-track {
+    display: block;
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: hsl(var(--twc-border));
+    overflow: hidden;
+  }
+
+  .tightness-bar-fill {
+    display: block;
+    width: calc(var(--tightness-bar, 0) * 100%);
+    height: 8px;
+    border-radius: 999px;
     background: hsl(var(--twc-secondary));
   }
 
-  .tightness-dot--unknown {
+  .tightness-bar-fill--party-line {
+    background: hsl(var(--twc-foreground));
+  }
+
+  .tightness-bar-fill--bipartisan {
+    background: hsl(var(--twc-secondary));
+  }
+
+  .tightness-bar-fill--unknown {
     background: hsl(var(--twc-faint));
   }
 
@@ -781,28 +759,9 @@
 
   .tightness-legend-swatch {
     display: inline-block;
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 0.7rem;
+    height: 8px;
     border-radius: 999px;
-    box-shadow: 0 0 0 1px hsl(var(--twc-border));
-  }
-
-  .tightness--compact {
-    gap: 0.55rem;
-  }
-
-  .tightness--compact .tightness-row {
-    gap: 0.4rem;
-  }
-
-  .tightness--compact .tightness-track {
-    height: 2.5rem;
-  }
-
-  .tightness--compact .tightness-dot-item {
-    --tightness-dot-radius: 0.3rem;
-    width: 0.6rem;
-    height: 0.6rem;
   }
 
   .senate-waiting {

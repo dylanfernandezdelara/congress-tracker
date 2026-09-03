@@ -8,13 +8,39 @@ export function yeaShare(yeas: number, nays: number): number | null {
   return yeas / total
 }
 
-/**
- * Position on the 50%–100% tightness axis (0 = 50% yea, 1 = 100% yea).
- * Votes below 50% clamp to the knife-edge end.
- */
-export function tightnessAxisPosition(yeaPct: number | null): number {
-  if (yeaPct == null) return 0
-  return Math.min(1, Math.max(0, (yeaPct - 0.5) / 0.5))
+/** Absolute vote gap. Closest-vote bars use this scale, never yea%. */
+export function voteMargin(yeas: number, nays: number): number {
+  return Math.abs(yeas - nays)
+}
+
+export const HOUSE_MARGIN_CAP = 20
+export const SENATE_MARGIN_CAP = 10
+export const HOUSE_CLOSEST_LIMIT = 4
+export const SENATE_CLOSEST_LIMIT = 3
+
+export type ClosestVoteRoll = {
+  yeas: number
+  nays: number
+  vote_date: string
+  roll_number: number
+}
+
+export function compareClosestVotes(a: ClosestVoteRoll, b: ClosestVoteRoll): number {
+  const margin = voteMargin(a.yeas, a.nays) - voteMargin(b.yeas, b.nays)
+  if (margin !== 0) return margin
+  return b.vote_date.localeCompare(a.vote_date) || a.roll_number - b.roll_number
+}
+
+/** Closest rolls first; drop the steamroll tail beyond the chamber cap. */
+export function selectClosestVotes<T extends ClosestVoteRoll>(
+  rolls: T[],
+  cap: number,
+  limit: number,
+): T[] {
+  return rolls
+    .filter((roll) => voteMargin(roll.yeas, roll.nays) <= cap)
+    .sort(compareClosestVotes)
+    .slice(0, limit)
 }
 
 /**

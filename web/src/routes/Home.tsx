@@ -186,7 +186,6 @@ export default function Home() {
       loading={tightnessLoading}
       error={tightness.error}
       onRetry={reloadStats}
-      compact={!isDesktop}
     />
   )
 
@@ -290,7 +289,6 @@ export default function Home() {
             <button type="button" className="ghost-button" onClick={reloadAll}>
               Retry
             </button>
-            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
           </div>
         ) : null}
 
@@ -298,7 +296,6 @@ export default function Home() {
           <div className="home-feed-empty">
             <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
             <p className="text-[13px] text-faint">{emptyCopy}</p>
-            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
                 Clear search
@@ -334,7 +331,6 @@ export default function Home() {
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
-            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
             {floorChrome.notice ? (
               <p className="home-feed-quiet" role="status">
                 {floorChrome.notice}
@@ -394,6 +390,7 @@ export default function Home() {
         ) : null}
 
         <div className="home-feed-secondary">
+          {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
           {!isDesktop ? senateWaitingList : null}
           <RecentConfirmationsSection
             confirmations={recentConfirmations.data?.confirmations ?? null}

@@ -223,6 +223,7 @@ describe("buildTightnessStats", () => {
     const knife = body.house_passage.find((dot) => dot.roll_number === 288);
     const steamroll = body.house_passage.find((dot) => dot.roll_number === 252);
     expect(knife?.kind).toBe("bill");
+    expect(knife?.result).toBe("Passed");
     expect(knife?.cohesion).toBe("party-line");
     expect(steamroll?.cohesion).toBe("bipartisan");
     expect(body.senate.map((dot) => dot.kind).sort()).toEqual(["bill", "nominee"]);

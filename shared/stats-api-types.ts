@@ -151,7 +151,7 @@ export type VoteCohesion = 'party-line' | 'bipartisan' | 'unknown'
 /** Passage bill vs Senate nomination — so a 50–49 confirm is not read as a bill. */
 export type TightnessKind = 'bill' | 'nominee'
 
-/** One recent roll placed on the 50%–100% yea tightness strip. */
+/** One recent roll for closest-vote margin bars (gap = |yeas−nays|). */
 export interface TightnessDot {
   kind: TightnessKind
   chamber: StatsChamber
@@ -161,6 +161,8 @@ export interface TightnessDot {
   vote_date: string
   yeas: number
   nays: number
+  /** Official roll result (`Passed`, `Failed`, `Confirmed`). */
+  result: string
   /** Yea share of yeas+nays, 0–1. Null when the roll has no recorded votes. */
   yea_pct: number | null
   cohesion: VoteCohesion
@@ -188,7 +190,7 @@ export interface SenateWaitingBill {
 
 /**
  * Recent-lookback tightness + Senate-waiting payload (`GET /stats/tightness.json`).
- * One round trip so the strip can color party-line vs bipartisan without N+1.
+ * One round trip so closest-vote bars can color party-line vs bipartisan without N+1.
  */
 export interface TightnessStatsResponse {
   congress: number

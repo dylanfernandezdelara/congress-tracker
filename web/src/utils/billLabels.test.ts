@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  calendarDaysSince,
   formatBillDocket,
   formatCoverageDate,
   formatDateRange,
+  formatDaysSinceHousePassage,
+  formatSenateWaitingSince,
   formatVoteDate,
   formatWeekdayVoteDate,
 } from './billLabels'
@@ -18,6 +21,20 @@ describe('formatBillDocket', () => {
 describe('formatVoteDate', () => {
   it('formats ISO dates as short month and day', () => {
     expect(formatVoteDate('2026-06-30')).toBe('Jun 30')
+  })
+})
+
+describe('calendarDaysSince', () => {
+  it('counts whole days from an ISO date', () => {
+    const now = new Date('2026-09-03T15:00:00')
+    expect(calendarDaysSince('2026-09-03', now)).toBe(0)
+    expect(calendarDaysSince('2026-09-02', now)).toBe(1)
+    expect(calendarDaysSince('2026-07-21', now)).toBe(44)
+    expect(formatDaysSinceHousePassage('2026-09-03', now)).toBe('House passed today')
+    expect(formatDaysSinceHousePassage('2026-09-02', now)).toBe('1 day since House passage')
+    expect(formatDaysSinceHousePassage('2026-07-21', now)).toBe('44 days since House passage')
+    expect(formatSenateWaitingSince('2026-07-21', now)).toBe('44 days since House passage')
+    expect(formatSenateWaitingSince('2026-09-10', now)).toBe('House Sep 10')
   })
 })
 

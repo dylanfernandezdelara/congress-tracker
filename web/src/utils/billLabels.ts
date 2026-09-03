@@ -11,6 +11,29 @@ export function formatVoteDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/** Whole calendar days from an ISO date (`YYYY-MM-DD`) to `now`. */
+export function calendarDaysSince(iso: string, now = new Date()): number | null {
+  const day = iso.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null
+  const then = new Date(`${day}T12:00:00`)
+  if (Number.isNaN(then.getTime())) return null
+  const start = Date.UTC(then.getFullYear(), then.getMonth(), then.getDate())
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((today - start) / 86_400_000)
+}
+
+export function formatDaysSinceHousePassage(iso: string, now = new Date()): string | null {
+  const days = calendarDaysSince(iso, now)
+  if (days == null || days < 0) return null
+  if (days === 0) return 'House passed today'
+  if (days === 1) return '1 day since House passage'
+  return `${days} days since House passage`
+}
+
+export function formatSenateWaitingSince(iso: string, now = new Date()): string {
+  return formatDaysSinceHousePassage(iso, now) ?? `House ${formatVoteDate(iso)}`
+}
+
 /** `Aug 19`, `Aug 19–24`, `Aug 19 – Sep 2`, or `Jan 10, 2025 – Jan 15, 2026`. */
 export function formatDateRange(start: string | null, end: string | null): string | null {
   if (!start && !end) return null
