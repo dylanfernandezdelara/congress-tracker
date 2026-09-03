@@ -41,8 +41,8 @@ Tokens live as `--twc-*` HSL channels in `web/src/styles/base.css`.
 
 ## Layout
 
-- **Desktop (≥1024px):** three-column shell — left rail (Federal Control bars + member spotlights) · dense feed · right rail (pulse + compact notable votes)
-- **Mobile:** single-column feed; rails hidden
+- **Desktop (≥1024px):** three-column shell — left rail (Federal Control bars + member spotlights) · dense feed · right rail (vote tightness + House-passed Senate-waiting)
+- **Mobile:** no right rail; both tightness rows stack short under Chronological timeline; Senate-waiting sits in the secondary stack
 - Hairline dividers instead of shadows; one soft shadow only on the member profile sheet
 - Theme toggle in header; `localStorage.theme` wins over `prefers-color-scheme`
 

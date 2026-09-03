@@ -23,6 +23,8 @@ const homeApi = vi.hoisted(() => ({
   fetchPolicyAreas: vi.fn(),
   fetchSessionStats: vi.fn(),
   fetchPulseStats: vi.fn(),
+  fetchTightnessStats: vi.fn(),
+  fetchVoteDefectors: vi.fn(),
   fetchPortfolioStats: vi.fn(),
 }))
 

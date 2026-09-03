@@ -64,6 +64,17 @@ vi.mock("../storage/recent-confirmations", async (importOriginal) => {
   };
 });
 
+const mockBuildTightnessStats = vi.fn();
+
+vi.mock("../storage/tightness-stats", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../storage/tightness-stats")>();
+  return {
+    ...actual,
+    buildTightnessStats: (...args: Parameters<typeof actual.buildTightnessStats>) =>
+      mockBuildTightnessStats(...args),
+  };
+});
+
 const mockWithPipelineLease = vi.fn(
   async <T>(_db: D1Database, fn: () => Promise<T>, _options?: unknown) => fn()
 );
@@ -225,6 +236,17 @@ describe("HTTP API", () => {
           key_points: [],
           congress_gov_url: `https://www.congress.gov/nomination/${congress}th-congress/${100 + i}`,
         })),
+        as_of: asOf ?? "2026-07-28T00:00:00.000Z",
+      })
+    );
+    mockBuildTightnessStats.mockReset();
+    mockBuildTightnessStats.mockImplementation(
+      async (_env, congress: number, session: number, asOf?: string) => ({
+        congress,
+        session,
+        house_passage: [],
+        senate: [],
+        senate_waiting: [],
         as_of: asOf ?? "2026-07-28T00:00:00.000Z",
       })
     );
@@ -655,6 +677,23 @@ describe("HTTP API", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({ congress: 119, session: 2, house: { close_votes: [] } });
+  });
+
+  it("returns tightness stats", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/tightness.json"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(200);
+    expect(mockBuildTightnessStats).toHaveBeenCalled();
+    const body = await response.json();
+    expect(body).toMatchObject({
+      congress: 119,
+      session: 2,
+      house_passage: [],
+      senate: [],
+      senate_waiting: [],
+    });
   });
 
   it("requires chamber for defectors", async () => {

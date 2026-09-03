@@ -225,10 +225,16 @@
   /* Same stack model as .home-mobile-rail-section: dividers via top rules,
      symmetric padding, no per-section margins to reconcile. */
   .home-feed-secondary > .recent-laws,
-  .home-feed-secondary > .recent-confirmations {
+  .home-feed-secondary > .recent-confirmations,
+  .home-feed-secondary > .senate-waiting {
     margin: 0;
     padding: 1.5rem 0;
     border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  .home-tightness-mobile {
+    margin: 0 0 1rem;
+    min-width: 0;
   }
 
   .recent-confirmations-detail {
@@ -634,6 +640,211 @@
 
   .notable-compact-member:hover {
     color: hsl(var(--twc-foreground));
+  }
+
+  .tightness {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
+  }
+
+  .tightness-scale-label {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: hsl(var(--twc-faint));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tightness-scale-mid {
+    margin: 0 0.35rem;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .tightness-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .tightness-row-label {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .tightness-track {
+    position: relative;
+    height: 1.35rem;
+    min-width: 0;
+  }
+
+  .tightness-track-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: hsl(var(--twc-border));
+    transform: translateY(-50%);
+  }
+
+  .tightness-dot {
+    position: absolute;
+    top: 50%;
+    width: 0.7rem;
+    height: 0.7rem;
+    margin: 0;
+    padding: 0;
+    border: 1.5px solid hsl(var(--twc-card));
+    border-radius: 999px;
+    background: hsl(var(--twc-secondary));
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    box-shadow: 0 0 0 1px hsl(var(--twc-border));
+  }
+
+  .tightness-dot:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+  }
+
+  .tightness-dot.is-selected {
+    box-shadow: 0 0 0 2px hsl(var(--twc-foreground));
+  }
+
+  .tightness-dot--party-line {
+    background: hsl(var(--twc-foreground));
+  }
+
+  .tightness-dot--bipartisan {
+    background: hsl(var(--twc-secondary));
+  }
+
+  .tightness-dot--unknown {
+    background: hsl(var(--twc-faint));
+  }
+
+  .tightness-empty {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--twc-faint));
+  }
+
+  .tightness-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.65rem;
+    margin: 0;
+    font-size: 11px;
+    color: hsl(var(--twc-faint));
+  }
+
+  .tightness-legend-swatch {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    box-shadow: 0 0 0 1px hsl(var(--twc-border));
+  }
+
+  .tightness--compact {
+    gap: 0.55rem;
+  }
+
+  .tightness--compact .tightness-row {
+    gap: 0.2rem;
+  }
+
+  .tightness--compact .tightness-track {
+    height: 1.1rem;
+  }
+
+  .tightness--compact .tightness-dot {
+    width: 0.6rem;
+    height: 0.6rem;
+  }
+
+  .senate-waiting {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  .senate-waiting-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .senate-waiting-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .senate-waiting-bill {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--twc-faint));
+  }
+
+  .senate-waiting-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-foreground));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--twc-link-decoration));
+  }
+
+  .senate-waiting-item:hover .senate-waiting-title,
+  .senate-waiting-item:focus-visible .senate-waiting-title {
+    color: hsl(var(--twc-secondary));
+  }
+
+  .senate-waiting-item:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+  }
+
+  .senate-waiting-meta {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--twc-faint));
+  }
+
+  .senate-waiting--compact {
+    gap: 0.4rem;
+  }
+
+  .senate-waiting--compact .senate-waiting-list {
+    gap: 0.4rem;
+  }
+
+  .senate-waiting--compact .senate-waiting-title {
+    font-size: 12px;
   }
 
   /* Below the desktop rail breakpoint, rail content stacks under the feed. */

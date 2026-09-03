@@ -238,6 +238,19 @@ CREATE TABLE IF NOT EXISTS confirmation_votes (
   vote_date TEXT NOT NULL,
   PRIMARY KEY (chamber, congress, session, roll_number)
 );
+CREATE TABLE IF NOT EXISTS bill_text_changes (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  summary_version TEXT,
+  summary_version_date TEXT,
+  latest_version TEXT,
+  latest_version_date TEXT,
+  added_json TEXT,
+  more_added_count INTEGER NOT NULL DEFAULT 0,
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number)
+);
 
 -- Offline sample mode: wipe live-ingested feed rows so seed replaces rather
 -- than merging production-shaped local ingest.
@@ -247,6 +260,7 @@ DELETE FROM bill_sponsors;
 DELETE FROM bill_lifecycle;
 DELETE FROM nominations;
 DELETE FROM confirmation_votes;
+DELETE FROM bill_text_changes;
 
 -- Offline sample mode: drop real-roster rows so hasRealMemberRoster stays false
 -- and LOCAL:* defectors/portfolios remain visible in /stats/defectors.json and
@@ -267,7 +281,9 @@ VALUES
   ('House', 119, 2, 9005, 119, 'hr', 1, 'On Agreeing to the Resolution', 'Passed', 218, 210, '${D_RECENT}', 0),
   ('Senate', 119, 2, 9002, 119, 's', 47, 'On Passage of the Bill', 'Passed', 68, 32, '${D_MID}', 1),
   ('Senate', 119, 2, 9006, 119, 's', 47, 'On the Cloture Motion', 'Agreed to', 60, 37, '${D_MID}', 0),
-  ('House', 119, 2, 9003, 119, 'hr', 22, 'On Passage', 'Passed', 314, 117, '${D_OLDER}', 1);
+  ('House', 119, 2, 9003, 119, 'hr', 22, 'On Passage', 'Passed', 314, 117, '${D_OLDER}', 1),
+  ('House', 119, 2, 9010, 119, 'hr', 88, 'On Passage', 'Passed', 210, 208, '${D_RECENT}', 1),
+  ('House', 119, 2, 9012, 119, 'hr', 33, 'On Passage', 'Passed', 421, 1, '${D_MID}', 1);
 
 INSERT OR REPLACE INTO bill_digests
   (congress, bill_type, number, title, policy_area, raw_summary_text, digest_json, created_at, updated_at)
@@ -283,14 +299,24 @@ VALUES
   (119, 'hr', 22, 'Government Accountability and Savings Act (local sample)', 'Government Operations and Politics',
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"House passes a federal spending oversight bill (local sample)","what_it_does":"Adds reporting requirements for large federal contracts and creates a public dashboard for tracking agency spending.","key_points":["Requires agencies to publish contract performance data","Stands up a public spending dashboard","Adds penalties for repeated reporting failures"],"terms_explained":[{"term":"Federal contract","plain":"An agreement where the government pays a company to provide goods or services."},{"term":"Oversight","plain":"Monitoring done to make sure money and programs are used as intended."}]}',
-   '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z');
+   '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z'),
+  (119, 'hr', 88, 'Knife-Edge Floor Resolution Act (local sample)', 'Congress',
+   'Sample CRS-style summary seeded for local development. No live data was fetched.',
+   '{"headline":"House passes a knife-edge resolution (local sample)","what_it_does":"Sets a near-tie House rule for the rest of the session and leaves almost no votes to spare.","key_points":["Passes on a 210-208 tally","Holds nearly every majority vote","Leaves a handful of cross-party defections"],"terms_explained":[{"term":"Knife-edge","plain":"A vote so close that a few switches would flip the result."}]}',
+   '${D_RECENT}T00:00:00.000Z', '${D_RECENT}T00:00:00.000Z'),
+  (119, 'hr', 33, 'Federal Contracting Sunshine Act (local sample)', 'Government Operations and Politics',
+   'Sample CRS-style summary seeded for local development. No live data was fetched.',
+   '{"headline":"House-passed contracting bill waiting in the Senate (local sample)","what_it_does":"Requires more public reporting after a contract is awarded and sends the House-passed text to a Senate committee.","key_points":["Passed the House nearly unanimously","Now waits in a Senate committee","Adds contractor disclosure rules"],"terms_explained":[{"term":"Second chamber","plain":"The other house of Congress, which must still act before a bill can become law."}]}',
+   '${D_MID}T00:00:00.000Z', '${D_MID}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO bill_sponsors
   (congress, bill_type, bill_number, bioguide_id, state, full_name, party, is_primary, updated_at)
 VALUES
   (119, 'hr', 1, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_RECENT}T00:00:00.000Z'),
   (119, 's', 47, 'LOCAL:S001', 'TX', 'Sen. Sample Crossover (local)', 'R', 1, '${D_MID}T00:00:00.000Z'),
-  (119, 'hr', 22, 'LOCAL:H001', 'CA', 'Rep. Sample Crossover (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z');
+  (119, 'hr', 22, 'LOCAL:H001', 'CA', 'Rep. Sample Crossover (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z'),
+  (119, 'hr', 88, 'LOCAL:H004', 'SC', 'Rep. Portfolio Loser (local)', 'R', 1, '${D_RECENT}T00:00:00.000Z'),
+  (119, 'hr', 33, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_MID}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO bill_lifecycle
   (congress, bill_type, bill_number, introduced_date, presented_date, signed_date, vetoed_date, became_law_date, law_kind, public_law, latest_action_date, latest_action_text, updated_at)
@@ -324,6 +350,9 @@ VALUES
   (119, 'HR', 1, 'hsif00', 'advanced', '${D_MID}T18:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Reported By', '47-0'),
   (119, 'HR', 22, 'hsba00', 'sent', '${D_OLDER}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Referred To', NULL),
   (119, 'HR', 22, 'hsba00', 'worked_on', '${D_RECENT}T12:00:00.000Z', 'House', 'Financial Services Committee', NULL, 'Markup By', NULL),
+  (119, 'HR', 33, 'hsif00', 'sent', '${D_OLDER}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Referred To', NULL),
+  (119, 'HR', 33, 'hsif00', 'advanced', '${D_MID}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Reported By', '47-0'),
+  (119, 'HR', 33, 'sshr00', 'sent', '${D_RECENT}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Referred To', NULL),
   (119, 'S', 47, 'sshr00', 'sent', '${D_OLDER}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Referred To', NULL),
   (119, 'S', 47, 'sshr00', 'released', '${D_MID}T12:00:00.000Z', 'Senate', 'Health, Education, Labor, and Pensions Committee', NULL, 'Discharged From', NULL),
   (119, 'HR', 9001, 'hsif00', 'sent', '${D_STUCK}T12:00:00.000Z', 'House', 'Energy and Commerce Committee', NULL, 'Referred To', NULL),
@@ -338,7 +367,15 @@ VALUES
   (119, 'HR', 1, 'calendar', '${D_MID}T20:00:00.000Z', 'House', 'Placed on the House calendar', 'Placed on the Union Calendar, Calendar No. 12. (local sample)', NULL),
   (119, 'HR', 1, 'received', '${D_RECENT}T18:00:00.000Z', 'Senate', 'Received in the Senate', 'Received in the Senate. (local sample)', NULL),
   (119, 'S', 47, 'considered', '${D_MID}T08:00:00.000Z', 'Senate', 'Debated in the Senate', 'Measure laid before Senate by unanimous consent. (local sample)', 'unanimous consent'),
-  (119, 'HR', 22, 'calendar', '${D_OLDER}T16:00:00.000Z', 'House', 'Placed on the House calendar', 'Placed on the Union Calendar. (local sample)', NULL);
+  (119, 'HR', 22, 'calendar', '${D_OLDER}T16:00:00.000Z', 'House', 'Placed on the House calendar', 'Placed on the Union Calendar. (local sample)', NULL),
+  (119, 'HR', 33, 'calendar', '${D_MID}T16:00:00.000Z', 'House', 'Placed on the House calendar', 'Placed on the Union Calendar. (local sample)', NULL),
+  (119, 'HR', 33, 'received', '${D_RECENT}T10:00:00.000Z', 'Senate', 'Received in the Senate', 'Received in the Senate. (local sample)', NULL);
+
+INSERT OR REPLACE INTO bill_text_changes
+  (congress, bill_type, bill_number, summary_version, summary_version_date, latest_version, latest_version_date, added_json, more_added_count, checked_at)
+VALUES
+  (119, 'HR', 22, 'Introduced in House', '${D_OLDER}', 'Engrossed in House', '${D_OLDER}',
+   '[{"label":"Sec. 4.","heading":"Public spending dashboard details"}]', 0, '${D_OLDER}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO nominations
   (congress, nomination_number, part_number, citation, description, organization, position_title,
@@ -410,6 +447,14 @@ for idx, party in enumerate(house_rest, start=1):
         f"  ('{bid}', 'Rep. Sample {idx} (local)', 'House', '{party}', 'TX', {idx % 50 + 1}, '{updated}')"
     )
     vote_rows.append(f"  ('House', 119, 2, 9001, '{bid}', 'Yea')")
+    # Knife-edge 9010 (210–208 party-line): R Yea / D Nay, with a few named crossovers later.
+    if party == "R":
+        knife = "Nay" if idx <= 5 else "Yea"
+    elif party == "D":
+        knife = "Yea" if idx <= 2 else "Nay"
+    else:
+        knife = "Not Voting"
+    vote_rows.append(f"  ('House', 119, 2, 9010, '{bid}', '{knife}')")
 
 for idx, party in enumerate(senate_rest, start=1):
     bid = f"LOCAL:SR{idx:03d}"
@@ -423,6 +468,14 @@ for bid, _, chamber, _, _, _, _ in spotlight_members:
         roll = 9001 if bid in ("LOCAL:H001", "LOCAL:H002") else 9003
         position = "Nay" if bid == "LOCAL:H001" else "Yea"
         vote_rows.append(f"  ('House', 119, 2, {roll}, '{bid}', '{position}')")
+        # Extra 9010 votes do not replace 9001/9003, so H001 stays the 9001 crossover spotlight.
+        if bid == "LOCAL:H001":
+            knife = "Yea"  # D voting Yea against a Nay caucus
+        elif bid == "LOCAL:H004":
+            knife = "Nay"  # R voting Nay against a Yea caucus
+        else:
+            knife = "Nay"  # other House D spotlights stay with the D line
+        vote_rows.append(f"  ('House', 119, 2, 9010, '{bid}', '{knife}')")
     else:
         position = "Nay" if bid == "LOCAL:S001" else "Yea"
         vote_rows.append(f"  ('Senate', 119, 2, 9002, '{bid}', '{position}')")

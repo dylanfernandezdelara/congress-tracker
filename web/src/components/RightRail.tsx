@@ -1,124 +1,42 @@
-import type { ChamberPulse, CommitteeLeaderboardRow, PulseStatsResponse } from '../api/types'
-import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import type { SenateWaitingBill, TightnessDot } from '../api/types'
+import { SenateWaitingList } from './SenateWaitingList'
+import { TightnessStrip } from './TightnessStrip'
 
 type RightRailProps = {
-  pulse: PulseStatsResponse | null
+  house: TightnessDot[]
+  senate: TightnessDot[]
+  waiting: SenateWaitingBill[]
+  selectedKey: string | null
+  onSelectDot: (dot: TightnessDot) => void
+  onOpenWaitingBill?: (billParam: string) => void
   loading: boolean
   error: string | null
   onRetry?: () => void
 }
 
-function WaitingInCommittee({ items }: { items: CommitteeLeaderboardRow[] }) {
-  return (
-    <div className="sidebar-widget space-y-2">
-      <h3 className="text-[12px] font-medium text-foreground">Waiting in committee</h3>
-      {items.length === 0 ? (
-        <p className="text-xs text-faint">No long-waiting referrals yet.</p>
-      ) : (
-        <ol className="space-y-1 text-[12px] text-secondary">
-          {items.map((row) => (
-            <li key={row.system_code}>
-              {row.name}{' '}
-              <span className="text-faint">
-                ({row.waiting} waiting)
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
-  )
-}
-
-function ChamberPulseSection({
-  title,
-  data,
-}: {
-  title: string
-  data: ChamberPulse | undefined
-}) {
-  if (!data) return null
-
-  return (
-    <section className="sidebar-chamber space-y-4">
-      <h2 className="sidebar-kicker">{title}</h2>
-
-      <WaitingInCommittee items={data.waiting_in_committee ?? []} />
-
-      <div className="sidebar-widget space-y-2">
-        <h3 className="text-[12px] font-medium text-foreground">Close votes</h3>
-        {data.close_votes.length === 0 ? (
-          <p className="text-xs text-faint">No close votes yet this session.</p>
-        ) : (
-          <ol className="space-y-2 text-[12px] text-secondary">
-            {data.close_votes.map((v) => (
-              <li key={`${v.chamber}-${v.roll_number}-${v.vote_date}`}>
-                <span className="font-medium text-foreground">
-                  {formatShortBillId(v.bill_type, v.bill_number)}
-                </span>
-                <span className="text-faint tabular-nums">
-                  {' '}
-                  · {v.yeas}–{v.nays} ({v.margin}) · {formatVoteDate(v.vote_date)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-
-      <div className="sidebar-widget space-y-2">
-        <h3 className="text-[12px] font-medium text-foreground">Policy heat</h3>
-        {data.policy_heat.length === 0 ? (
-          <p className="text-xs text-faint">No policy areas tagged yet.</p>
-        ) : (
-          <ol className="space-y-1 text-[12px] text-secondary">
-            {data.policy_heat.map((p) => (
-              <li key={p.policy_area}>
-                {p.policy_area} <span className="text-faint">({p.bill_count})</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-
-      <div className="sidebar-widget space-y-2">
-        <h3 className="text-[12px] font-medium text-foreground">This week</h3>
-        <p className="text-[12px] text-secondary">
-          {data.this_week.count} passage {data.this_week.count === 1 ? 'vote' : 'votes'}
-          {data.this_week.headline ? (
-            <>
-              {' '}
-              — <span className="text-foreground">{data.this_week.headline}</span>
-            </>
-          ) : null}
-        </p>
-      </div>
-    </section>
-  )
-}
-
-export function RightRail({ pulse, loading, error, onRetry }: RightRailProps) {
+export function RightRail({
+  house,
+  senate,
+  waiting,
+  selectedKey,
+  onSelectDot,
+  onOpenWaitingBill,
+  loading,
+  error,
+  onRetry,
+}: RightRailProps) {
   return (
     <div className="sidebar-panel space-y-6">
-      <h2 className="sidebar-section-title">Legislative pulse</h2>
-      {loading ? <p className="text-xs text-faint">Loading pulse…</p> : null}
-      {error ? (
-        <div className="space-y-2">
-          <p className="text-xs text-fail">{error}</p>
-          {onRetry ? (
-            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-              Retry
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {pulse ? (
-        <>
-          <ChamberPulseSection title="House" data={pulse.house} />
-          <div className="border-t border-border" />
-          <ChamberPulseSection title="Senate" data={pulse.senate} />
-        </>
-      ) : null}
+      <TightnessStrip
+        house={house}
+        senate={senate}
+        selectedKey={selectedKey}
+        onSelect={onSelectDot}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+      />
+      <SenateWaitingList items={waiting} loading={loading} onOpenBill={onOpenWaitingBill} />
     </div>
   )
 }

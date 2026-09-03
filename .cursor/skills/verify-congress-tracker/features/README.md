@@ -47,4 +47,5 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Search bills](./search-bills.md) covers searchbox submit, matches, empty state, and clear.
 - [Filter feed](./filter-feed.md) covers chamber radios and the Filters panel (state, sponsor chamber, party, member, topic).
 - [Member spotlights](./member-spotlights.md) covers the Members in Congress rail and profile sheet.
+- [Vote tightness](./right-rail-tightness.md) covers the two-row tightness strip, Senate-waiting list, tap-to-open defectors, and Text grew.
 - [Theme](./theme.md) covers light/dark toggle and persistence on reload.

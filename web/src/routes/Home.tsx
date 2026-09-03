@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 
-import { fetchNotableVotes, fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
+import { fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
 import type {
-  NotableVotesResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
+  TightnessDot,
 } from '../api/types'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
@@ -15,16 +16,19 @@ import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
 import { FloorStatusChip } from '../components/FloorStatusChip'
 import { LeftSidebar } from '../components/LeftSidebar'
-import { NotableVotesSection } from '../components/NotableVotesSection'
 import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
 import { RecentLawsSection } from '../components/RecentLawsSection'
 import { RightRail } from '../components/RightRail'
+import { SenateWaitingList } from '../components/SenateWaitingList'
+import { TightnessDefectorSheet } from '../components/TightnessDefectorSheet'
+import { TightnessStrip } from '../components/TightnessStrip'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
+import { tightnessDotKey } from '../utils/tightnessLabels'
 import {
   advancedFilterCount,
   advancedFilterSummary,
@@ -95,9 +99,32 @@ export default function Home() {
   const sponsorName = sponsorProfile?.name ?? null
 
   const [railRetryKey, setRailRetryKey] = useState(0)
-  const { reload: reloadStats, session, pulse, defectors, portfolios } = useStatsData({
+  const { reload: reloadStats, session, tightness, defectors, portfolios } = useStatsData({
     enabled: feedSettled,
   })
+  const [, setSearchParams] = useSearchParams()
+  const [selectedDot, setSelectedDot] = useState<TightnessDot | null>(null)
+  const [defectorSheetKey, setDefectorSheetKey] = useState(0)
+
+  const openTightnessDot = useCallback((dot: TightnessDot) => {
+    setSelectedDot(dot)
+    setDefectorSheetKey((key) => key + 1)
+  }, [])
+
+  const closeTightnessDot = useCallback(() => {
+    setSelectedDot(null)
+  }, [])
+
+  const openWaitingBill = useCallback(
+    (billParam: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('bill', billParam)
+        return next
+      })
+    },
+    [setSearchParams],
+  )
 
   const handleReloadFeed = useCallback(() => {
     reloadFeed()
@@ -108,13 +135,6 @@ export default function Home() {
     handleReloadFeed()
     reloadStats()
   }, [handleReloadFeed, reloadStats])
-
-  const notableVotes = useAsyncData<NotableVotesResponse>({
-    deps: [railRetryKey],
-    enabled: feedSettled,
-    load: () => fetchNotableVotes(3),
-    mapError: () => "Couldn't load notable votes.",
-  })
 
   const recentLaws = useAsyncData<RecentLawsResponse>({
     deps: [railRetryKey],
@@ -134,7 +154,6 @@ export default function Home() {
   const showSkeleton = isInitialLoading && items.length === 0
   const listRefreshing = isInitialLoading && items.length > 0
   const inFlight = isInitialLoading || isLoadingMore
-  const notableLoading = !feedSettled || notableVotes.isLoading
   const recentLawsLoading = !feedSettled || recentLaws.isLoading
   const recentConfirmationsLoading = !feedSettled || recentConfirmations.isLoading
 
@@ -156,22 +175,45 @@ export default function Home() {
     />
   )
 
-  const legislativePulse = (
-    <RightRail
-      pulse={pulse.data}
-      loading={pulse.isLoading}
-      error={pulse.error}
+  const tightnessLoading = tightness.isLoading
+  const selectedKey = selectedDot ? tightnessDotKey(selectedDot) : null
+  const tightnessHouse = tightness.data?.house_passage ?? []
+  const tightnessSenate = tightness.data?.senate ?? []
+  const senateWaiting = tightness.data?.senate_waiting ?? []
+
+  const tightnessStrip = (
+    <TightnessStrip
+      house={tightnessHouse}
+      senate={tightnessSenate}
+      selectedKey={selectedKey}
+      onSelect={openTightnessDot}
+      loading={tightnessLoading}
+      error={tightness.error}
       onRetry={reloadStats}
+      compact={!isDesktop}
     />
   )
 
-  const notableVotesSection = (
-    <NotableVotesSection
-      variant="compact"
-      notable={notableVotes.data?.notable ?? null}
-      loading={notableLoading}
-      error={notableVotes.error}
-      onRetry={handleReloadFeed}
+  const senateWaitingList = (
+    <SenateWaitingList
+      items={senateWaiting}
+      loading={tightnessLoading}
+      onOpenBill={openWaitingBill}
+      compact={!isDesktop}
+    />
+  )
+
+  const legislativeContext = (
+    <RightRail
+      house={tightnessHouse}
+      senate={tightnessSenate}
+      waiting={senateWaiting}
+      selectedKey={selectedKey}
+      onSelectDot={openTightnessDot}
+      onOpenWaitingBill={openWaitingBill}
+      loading={tightnessLoading}
+      error={tightness.error}
+      onRetry={reloadStats}
     />
   )
 
@@ -292,6 +334,7 @@ export default function Home() {
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
             </div>
+            {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
             {floorChrome.notice ? (
               <p className="home-feed-quiet" role="status">
                 {floorChrome.notice}
@@ -351,6 +394,7 @@ export default function Home() {
         ) : null}
 
         <div className="home-feed-secondary">
+          {!isDesktop ? senateWaitingList : null}
           <RecentConfirmationsSection
             confirmations={recentConfirmations.data?.confirmations ?? null}
             loading={recentConfirmationsLoading}
@@ -367,10 +411,6 @@ export default function Home() {
 
         {!isDesktop ? (
           <div className="home-mobile-rails">
-            <div className="home-mobile-rail-section">{notableVotesSection}</div>
-            <section className="home-mobile-rail-section" aria-label="Legislative pulse">
-              {legislativePulse}
-            </section>
             <div className="home-mobile-rail-section">{federalControl}</div>
             <section className="home-mobile-rail-section" aria-label="Members in Congress">
               {memberSpotlights}
@@ -381,12 +421,16 @@ export default function Home() {
 
       {isDesktop ? (
         <aside className="home-rail home-rail--right" aria-label="Legislative context">
-          <div className="home-rail-stack">
-            <section aria-label="Legislative pulse">{legislativePulse}</section>
-            {notableVotesSection}
-          </div>
+          <div className="home-rail-stack">{legislativeContext}</div>
         </aside>
       ) : null}
+
+      <TightnessDefectorSheet
+        open={selectedDot != null}
+        dot={selectedDot}
+        selectionKey={defectorSheetKey}
+        onClose={closeTightnessDot}
+      />
     </div>
   )
 }

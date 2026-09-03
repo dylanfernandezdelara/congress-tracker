@@ -54,6 +54,7 @@ import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-heal
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
 import { buildPulseStats } from "../storage/pulse-stats";
+import { buildTightnessStats } from "../storage/tightness-stats";
 import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
 import { buildCommitteesLeaderboard } from "../storage/committee-leaderboard";
@@ -71,6 +72,7 @@ import type {
   NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
+  TightnessStatsResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
   SessionStatsResponse,
@@ -620,6 +622,17 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
         return { congress, session, ...pulse, as_of: asOf };
       },
       "pulse stats unavailable"
+    );
+  },
+  "/stats/tightness.json": ({ env, json }) => {
+    const congress = congressNumber(env);
+    const session = sessionNumber(env);
+    const asOf = new Date().toISOString();
+    return handleStatsJson(
+      json,
+      async (): Promise<TightnessStatsResponse> =>
+        buildTightnessStats(env, congress, session, asOf),
+      "tightness stats unavailable"
     );
   },
   "/stats/notable.json": ({ env, url, json, ctx }) => {

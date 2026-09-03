@@ -13,7 +13,7 @@ Members in Congress shows House and Senate spotlights (cross-party votes and dis
 - On desktop (≥1024px), use the left rail `Members in Congress`.
 - Below 1024px, scroll under the feed to the same region in the stacked rails.
 - Choose a spotlight name button (`Open profile for …`).
-- Notable-vote defector names also open the same profile sheet (right rail `Notable votes`).
+- Tightness-dot taps open a vote-level defector sheet (`Who broke with their party`), not the member profile.
 
 ## Driving it with verify-congress-tracker
 

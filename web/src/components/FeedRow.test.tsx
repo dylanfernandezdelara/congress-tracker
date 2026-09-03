@@ -100,6 +100,28 @@ describe('FeedRow', () => {
     expect(screen.getByRole('button', { name: /198–230/ })).toBeInTheDocument()
   })
 
+  it('shows a Text grew mark when added_provisions exist', () => {
+    render(
+      <FeedRow
+        item={makeFeedItem({
+          text_changes: {
+            summary_version: 'Introduced',
+            summary_version_date: '2026-06-01',
+            latest_version: 'Engrossed',
+            latest_version_date: '2026-06-04',
+            added_provisions: [{ label: 'Sec. 4.', heading: 'Public spending dashboard details' }],
+            more_added_count: 0,
+          },
+        })}
+        isExpanded={false}
+        onToggle={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('Text grew')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Text grew/ })).toBeInTheDocument()
+  })
+
   it('includes the summary in the toggle accessible description', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 

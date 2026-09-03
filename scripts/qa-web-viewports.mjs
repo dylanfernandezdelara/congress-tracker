@@ -55,6 +55,14 @@ const MOCK_FEED = {
       ],
       latest_passage_date: '2026-06-05',
       latest_activity_date: '2026-06-05',
+      text_changes: {
+        summary_version: 'Introduced',
+        summary_version_date: '2026-06-01',
+        latest_version: 'Engrossed',
+        latest_version_date: '2026-06-04',
+        added_provisions: [{ label: 'Sec. 4.', heading: 'Public spending dashboard details' }],
+        more_added_count: 0,
+      },
     },
   ],
   total: 1,
@@ -131,19 +139,55 @@ async function auditHomePage(page) {
       if (!membersSidebar) {
         issues.push('members section missing on feed page below desktop breakpoint')
       }
-      if (!document.querySelector('[aria-label="Legislative pulse"]')) {
-        issues.push('legislative pulse missing on feed page below desktop breakpoint')
-      }
-      if (!document.querySelector('[aria-label="Notable votes"]')) {
-        issues.push('notable votes missing on feed page below desktop breakpoint')
-      }
       if (document.querySelector('.home-rail--left, .home-rail--right')) {
         issues.push('desktop rails mounted on feed page below desktop breakpoint')
       }
-    } else if (!membersSidebar) {
-      issues.push('members section missing on feed page at desktop breakpoint')
+      if (document.querySelector('.home-rail--right')) {
+        issues.push('right rail mounted on mobile')
+      }
+      const tightnessMobile = document.querySelector('.home-tightness-mobile')
+      if (!tightnessMobile) {
+        issues.push('mobile tightness stack missing under the timeline')
+      } else {
+        collectHorizontalClipping(tightnessMobile.getBoundingClientRect(), 'mobile vote tightness')
+        const houseRow = tightnessMobile.querySelector('[data-tightness-row="house"]')
+        const senateRow = tightnessMobile.querySelector('[data-tightness-row="senate"]')
+        if (!houseRow) issues.push('House tightness row missing on mobile')
+        if (!senateRow) issues.push('Senate tightness row missing on mobile')
+        if (houseRow) collectHorizontalClipping(houseRow.getBoundingClientRect(), 'House tightness row')
+        if (senateRow) collectHorizontalClipping(senateRow.getBoundingClientRect(), 'Senate tightness row')
+      }
+      const senateWaiting = document.querySelector(
+        '.home-feed-secondary [aria-label="House-passed, sitting in the Senate"]',
+      )
+      if (!senateWaiting) {
+        issues.push('Senate-waiting list missing in the mobile secondary stack')
+      } else {
+        collectHorizontalClipping(senateWaiting.getBoundingClientRect(), 'Senate-waiting list')
+      }
+    } else {
+      if (!membersSidebar) {
+        issues.push('members section missing on feed page at desktop breakpoint')
+      }
+      if (!document.querySelector('.home-rail--right')) {
+        issues.push('desktop right rail missing')
+      }
+      const tightnessRail = document.querySelector('.home-rail--right [aria-label="Vote tightness"]')
+      if (!tightnessRail) {
+        issues.push('vote tightness missing on desktop right rail')
+      } else {
+        const houseRow = tightnessRail.querySelector('[data-tightness-row="house"]')
+        const senateRow = tightnessRail.querySelector('[data-tightness-row="senate"]')
+        if (!houseRow) issues.push('House tightness row missing on desktop')
+        if (!senateRow) issues.push('Senate tightness row missing on desktop')
+        if (houseRow) collectHorizontalClipping(houseRow.getBoundingClientRect(), 'House tightness row')
+        if (senateRow) collectHorizontalClipping(senateRow.getBoundingClientRect(), 'Senate tightness row')
+      }
     }
     if (!feedRow) issues.push('feed row missing')
+    if (!document.querySelector('.feed-row-chip--text-grew')) {
+      issues.push('Text grew mark missing on a feed row with added_provisions')
+    }
 
     if (heading) collectFullClipping(heading.getBoundingClientRect(), 'page heading')
 
@@ -279,6 +323,117 @@ const MOCK_NOTABLE_VOTES = {
   detection_method: 'heuristic',
   as_of: '2026-06-14T00:00:00.000Z',
   notable: [],
+}
+
+const MOCK_TIGHTNESS = {
+  congress: 119,
+  session: 2,
+  as_of: '2026-06-14T00:00:00.000Z',
+  house_passage: [
+    {
+      kind: 'bill',
+      chamber: 'House',
+      congress: 119,
+      session: 2,
+      roll_number: 9010,
+      vote_date: '2026-06-05',
+      yeas: 210,
+      nays: 208,
+      yea_pct: 210 / 418,
+      cohesion: 'party-line',
+      party_splits: [
+        { party: 'R', yeas: 207, nays: 5, party_line: 'yea' },
+        { party: 'D', yeas: 2, nays: 203, party_line: 'nay' },
+      ],
+      member_votes_available: true,
+      bill_type: 'HR',
+      bill_number: 88,
+      headline: 'House passes a knife-edge resolution',
+      nominee_name: null,
+      position_title: null,
+    },
+    {
+      kind: 'bill',
+      chamber: 'House',
+      congress: 119,
+      session: 2,
+      roll_number: 9012,
+      vote_date: '2026-06-04',
+      yeas: 421,
+      nays: 1,
+      yea_pct: 421 / 422,
+      cohesion: 'bipartisan',
+      party_splits: [
+        { party: 'R', yeas: 218, nays: 0, party_line: 'yea' },
+        { party: 'D', yeas: 203, nays: 1, party_line: 'yea' },
+      ],
+      member_votes_available: true,
+      bill_type: 'HR',
+      bill_number: 33,
+      headline: 'House-passed contracting bill waiting in the Senate',
+      nominee_name: null,
+      position_title: null,
+    },
+  ],
+  senate: [
+    {
+      kind: 'nominee',
+      chamber: 'Senate',
+      congress: 119,
+      session: 2,
+      roll_number: 9101,
+      vote_date: '2026-06-12',
+      yeas: 58,
+      nays: 40,
+      yea_pct: 58 / 98,
+      cohesion: 'party-line',
+      party_splits: [
+        { party: 'R', yeas: 53, nays: 0, party_line: 'yea' },
+        { party: 'D', yeas: 5, nays: 40, party_line: 'nay' },
+      ],
+      member_votes_available: true,
+      bill_type: null,
+      bill_number: null,
+      headline: 'Jane Doe confirmed as Energy Secretary',
+      nominee_name: 'Jane Doe',
+      position_title: 'Secretary of Energy',
+    },
+    {
+      kind: 'bill',
+      chamber: 'Senate',
+      congress: 119,
+      session: 2,
+      roll_number: 9002,
+      vote_date: '2026-06-05',
+      yeas: 68,
+      nays: 32,
+      yea_pct: 68 / 100,
+      cohesion: 'bipartisan',
+      party_splits: [
+        { party: 'R', yeas: 40, nays: 10, party_line: 'yea' },
+        { party: 'D', yeas: 28, nays: 22, party_line: 'yea' },
+      ],
+      member_votes_available: true,
+      bill_type: 'S',
+      bill_number: 2,
+      headline: 'Plain headline for readers',
+      nominee_name: null,
+      position_title: null,
+    },
+  ],
+  senate_waiting: [
+    {
+      congress: 119,
+      bill_type: 'HR',
+      bill_number: 33,
+      headline: 'House-passed contracting bill waiting in the Senate',
+      title: 'Federal Contracting Sunshine Act',
+      senate_committee: 'Health, Education, Labor, and Pensions Committee',
+      current_label: 'In Health, Education, Labor, and Pensions Committee · waiting for the committee to act',
+      house_passage_date: '2026-06-04',
+      text_grew: false,
+    },
+  ],
 }
 
 const MOCK_PULSE_STATS = {
@@ -486,6 +641,14 @@ async function installApiMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_PULSE_STATS),
+    })
+  })
+
+  await page.route('**/stats/tightness.json', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_TIGHTNESS),
     })
   })
 

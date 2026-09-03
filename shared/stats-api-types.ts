@@ -145,6 +145,61 @@ export interface PulseStatsResponse {
   as_of: string
 }
 
+/** How the two major parties lined up on one roll. */
+export type VoteCohesion = 'party-line' | 'bipartisan' | 'unknown'
+
+/** Passage bill vs Senate nomination — so a 50–49 confirm is not read as a bill. */
+export type TightnessKind = 'bill' | 'nominee'
+
+/** One recent roll placed on the 50%–100% yea tightness strip. */
+export interface TightnessDot {
+  kind: TightnessKind
+  chamber: StatsChamber
+  congress: number
+  session: number
+  roll_number: number
+  vote_date: string
+  yeas: number
+  nays: number
+  /** Yea share of yeas+nays, 0–1. Null when the roll has no recorded votes. */
+  yea_pct: number | null
+  cohesion: VoteCohesion
+  party_splits: RollPartySplit[]
+  member_votes_available: boolean
+  bill_type: string | null
+  bill_number: number | null
+  headline: string | null
+  nominee_name: string | null
+  position_title: string | null
+}
+
+/** House-passed bill whose process status is still `in_second_chamber_committee`. */
+export interface SenateWaitingBill {
+  congress: number
+  bill_type: string
+  bill_number: number
+  headline: string | null
+  title: string | null
+  senate_committee: string | null
+  current_label: string | null
+  house_passage_date: string | null
+  text_grew: boolean
+}
+
+/**
+ * Recent-lookback tightness + Senate-waiting payload (`GET /stats/tightness.json`).
+ * One round trip so the strip can color party-line vs bipartisan without N+1.
+ */
+export interface TightnessStatsResponse {
+  congress: number
+  session: number
+  house_passage: TightnessDot[]
+  /** Senate passage votes plus recent nomination confirmations, labeled by `kind`. */
+  senate: TightnessDot[]
+  senate_waiting: SenateWaitingBill[]
+  as_of: string
+}
+
 export interface DefectorEntry {
   bioguide_id: string
   name: string

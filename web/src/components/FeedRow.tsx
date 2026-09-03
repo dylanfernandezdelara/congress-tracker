@@ -11,6 +11,7 @@ import {
   getFeedSummaryContent,
   getFeedTopic,
 } from '../utils/feedRowLabels'
+import { feedItemTextGrew } from '../utils/textGrew'
 import { BillIdChip } from './BillIdChip'
 import { ExpandChevron } from './ExpandChevron'
 import { FeedRowDate } from './FeedRowDate'
@@ -33,6 +34,7 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
   const policyAreaId = useId()
   const marginId = useId()
   const deskChipId = useId()
+  const textGrewId = useId()
   const eventId = useId()
   const summaryId = useId()
   const detailId = useId()
@@ -45,6 +47,7 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
   const policyArea = item.policy_area
   const isProcedural = meta.kind === 'procedural'
   const executiveSignal = item.executive_signals?.[0]
+  const textGrew = feedItemTextGrew(item)
 
   const rowKey = feedRowKey(item)
 
@@ -59,7 +62,7 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
@@ -101,6 +104,11 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
               ) : null}
               {executiveSignal ? (
                 <span className="feed-row-chip feed-row-chip--executive">Executive</span>
+              ) : null}
+              {textGrew ? (
+                <span id={textGrewId} className="feed-row-chip feed-row-chip--text-grew">
+                  Text grew
+                </span>
               ) : null}
             </div>
 

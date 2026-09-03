@@ -12,6 +12,7 @@ import type {
   PolicyAreasResponse,
   PortfoliosResponse,
   PulseStatsResponse,
+  TightnessStatsResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
   SessionStatsResponse,
@@ -125,6 +126,10 @@ export async function fetchCommitteesLeaderboard(
 
 export async function fetchPulseStats(): Promise<PulseStatsResponse> {
   return fetchJson<PulseStatsResponse>('/stats/pulse.json')
+}
+
+export async function fetchTightnessStats(): Promise<TightnessStatsResponse> {
+  return fetchJson<TightnessStatsResponse>('/stats/tightness.json')
 }
 
 export async function fetchDefectors(chamber: 'House' | 'Senate'): Promise<DefectorsResponse> {

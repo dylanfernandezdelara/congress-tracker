@@ -247,6 +247,11 @@
     background: transparent;
   }
 
+  .feed-row-chip--text-grew {
+    color: hsl(var(--twc-foreground));
+    font-weight: 500;
+  }
+
   .feed-row-bill-prefix {
     text-decoration: none;
     cursor: help;
