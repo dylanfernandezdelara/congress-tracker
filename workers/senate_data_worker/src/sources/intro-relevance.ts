@@ -9,6 +9,11 @@ export type IntroRelevanceFields = {
   primarySponsorBioguide: string | null;
 };
 
+export type IntroRankKey = IntroRelevanceFields & {
+  introducedDate: string;
+  number: number;
+};
+
 /**
  * Small prominence set for intro ranking (+2). Household names plus chamber
  * floor leadership — not a completeness roster.
@@ -60,6 +65,14 @@ export const SUBSTANTIVE_TITLE_TOKENS = [
   "tariff",
 ] as const;
 
+const SUBSTANTIVE_TITLE_MATCHERS: RegExp[] = SUBSTANTIVE_TITLE_TOKENS.map((token) => {
+  if (token.includes(" ")) {
+    return new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  }
+  if (token === "appropriat") return /\bappropriat/i;
+  return new RegExp(`\\b${token}\\b`, "i");
+});
+
 const VANITY_POLICY_AREAS = new Set([
   "private legislation",
   "commemorations",
@@ -68,8 +81,10 @@ const VANITY_POLICY_AREAS = new Set([
 ]);
 
 const PRIVATE_RELIEF = /^for the relief of\b/i;
-const COMMEMORATIVE_TOKEN = /commemorative (coin|medal|stamp)/i;
 const GOLD_MEDAL = /congressional gold medal/i;
+const GOLD_MEDAL_ACT = /gold medal act\b/i;
+const COMMEMORATIVE_TOKEN = /commemorative (coin|medal|stamp)/i;
+const COMMEMORATIVE_ACT = /commemorative (coin|medal|stamp) act\b/i;
 
 function normalizePolicy(policyArea: string | null): string | null {
   const trimmed = policyArea?.trim();
@@ -94,12 +109,7 @@ export function hasNamedActShape(title: string | null): boolean {
 
 export function hasSubstantiveTitleToken(title: string | null): boolean {
   if (!title) return false;
-  const t = title.toLowerCase();
-  return SUBSTANTIVE_TITLE_TOKENS.some((token) => {
-    if (token.includes(" ")) return t.includes(token);
-    if (token === "appropriat") return /\bappropriat/.test(t);
-    return new RegExp(`\\b${token}\\b`, "i").test(title);
-  });
+  return SUBSTANTIVE_TITLE_MATCHERS.some((re) => re.test(title));
 }
 
 function isPostalFacilityNamingTitle(title: string): boolean {
@@ -111,26 +121,23 @@ function isPostalFacilityNamingTitle(title: string): boolean {
 }
 
 /**
- * Congressional Gold Medal when the title is only that honor.
- * A named Act that is not just “… Gold Medal Act” can still survive.
+ * Drop when the title *is* the honor. A named Act that only mentions the honor
+ * survives (mention ≠ vehicle). A “… Honor Act” survives only if leftover
+ * tokens are still a named Act with a substantive word.
  */
-export function isOnlyCongressionalGoldMedal(title: string): boolean {
-  if (!GOLD_MEDAL.test(title)) return false;
-  const trimmed = title.trim();
-  if (/gold medal act\b/i.test(trimmed) && /^(a bill\s+)?to\b/i.test(trimmed) === false) {
-    const withoutHonor = trimmed.replace(/congressional gold medal/gi, " ");
-    if (hasSubstantiveTitleToken(withoutHonor) && hasNamedActShape(withoutHonor)) return false;
-  }
-  if (hasNamedActShape(trimmed) && !/gold medal act\b/i.test(trimmed)) return false;
-  return true;
+function isHonorOnlyTitle(title: string, honor: RegExp, honorIsTheAct: RegExp): boolean {
+  if (!honor.test(title)) return false;
+  if (hasNamedActShape(title) && !honorIsTheAct.test(title)) return false;
+  const remainder = title.replace(honor, " ");
+  return !(hasNamedActShape(remainder) && hasSubstantiveTitleToken(remainder));
 }
 
-/** Commemorative coin/medal/stamp when that honor is the whole title. */
+export function isOnlyCongressionalGoldMedal(title: string): boolean {
+  return isHonorOnlyTitle(title, GOLD_MEDAL, GOLD_MEDAL_ACT);
+}
+
 export function isOnlyCommemorativeHonor(title: string): boolean {
-  if (!COMMEMORATIVE_TOKEN.test(title)) return false;
-  const withoutHonor = title.replace(/commemorative (coin|medal|stamp)/gi, " ");
-  if (hasNamedActShape(title) && hasSubstantiveTitleToken(withoutHonor)) return false;
-  return true;
+  return isHonorOnlyTitle(title, COMMEMORATIVE_TOKEN, COMMEMORATIVE_ACT);
 }
 
 export function isJunkIntroTitle(title: string | null): boolean {
@@ -163,6 +170,18 @@ export function scoreIntroRelevance(fields: IntroRelevanceFields): number {
   return score;
 }
 
+export function rankIntro(item: IntroRankKey): {
+  score: number;
+  introducedDate: string;
+  number: number;
+} {
+  return {
+    score: scoreIntroRelevance(item),
+    introducedDate: item.introducedDate,
+    number: item.number,
+  };
+}
+
 export function compareIntroRelevance(
   a: { score: number; introducedDate: string; number: number },
   b: { score: number; introducedDate: string; number: number }
@@ -171,4 +190,13 @@ export function compareIntroRelevance(
   const byDate = b.introducedDate.localeCompare(a.introducedDate);
   if (byDate !== 0) return byDate;
   return b.number - a.number;
+}
+
+export function compareIntroItems(a: IntroRankKey, b: IntroRankKey): number {
+  return compareIntroRelevance(rankIntro(a), rankIntro(b));
+}
+
+/** Rank then cap. Soft score never drops an under-cap survivor. */
+export function selectIntroPersistSet<T extends IntroRankKey>(items: T[], maxNew: number): T[] {
+  return [...items].sort(compareIntroItems).slice(0, maxNew);
 }

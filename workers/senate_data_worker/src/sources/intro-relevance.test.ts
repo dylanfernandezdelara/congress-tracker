@@ -7,6 +7,7 @@ import {
   isJunkIntroTitle,
   PROMINENT_INTRO_SPONSOR_BIOGUIDES,
   scoreIntroRelevance,
+  selectIntroPersistSet,
 } from "./intro-relevance";
 
 describe("hard excludes", () => {
@@ -49,6 +50,15 @@ describe("hard excludes", () => {
     expect(
       isJunkIntroTitle("National Security Authorization Act of 2026 including a Congressional Gold Medal")
     ).toBe(false);
+  });
+
+  it("drops a pure Gold Medal Act vehicle and keeps one with leftover substance", () => {
+    expect(isJunkIntroTitle("Jane Doe Congressional Gold Medal Act")).toBe(true);
+    expect(isJunkIntroTitle("National Security Congressional Gold Medal Act")).toBe(false);
+  });
+
+  it("does not hard-drop a named Act that merely mentions a commemorative coin", () => {
+    expect(isJunkIntroTitle("Housing Reform Act including a commemorative coin")).toBe(false);
   });
 });
 
@@ -110,5 +120,28 @@ describe("soft score (rank only)", () => {
     };
     expect(low.score).toBe(0);
     expect(compareIntroRelevance(high, low)).toBeLessThan(0);
+  });
+
+  it("selectIntroPersistSet ranks then caps without dropping under-cap survivors", () => {
+    const kept = selectIntroPersistSet(
+      [
+        {
+          title: "A bill to amend title 5",
+          policyArea: null,
+          primarySponsorBioguide: null,
+          introducedDate: "2026-09-02",
+          number: 3,
+        },
+        {
+          title: "Ban Artificial Superintelligence Act",
+          policyArea: null,
+          primarySponsorBioguide: "S000033",
+          introducedDate: "2026-09-01",
+          number: 9901,
+        },
+      ],
+      12
+    );
+    expect(kept.map((item) => item.number)).toEqual([9901, 3]);
   });
 });

@@ -9,12 +9,7 @@ import {
 import type { Env } from "../config";
 import { normalizeBillType } from "./bill-type";
 import { fetchJson, fetchJsonWithMeta, nextPageUrl } from "./http";
-import {
-  compareIntroRelevance,
-  isHardExcludedIntro,
-  scoreIntroRelevance,
-  type IntroRelevanceFields,
-} from "./intro-relevance";
+import { compareIntroItems, isHardExcludedIntro, selectIntroPersistSet } from "./intro-relevance";
 
 /** Substantive bills only — resolutions would consume the intro cap. */
 export const INTRO_DISCOVERY_BILL_TYPES = ["hr", "s"] as const;
@@ -74,18 +69,6 @@ function primarySponsorBioguide(raw: unknown): string | null {
   const first = asRecord(raw[0]);
   const id = asString(first?.bioguideId);
   return id ? id.toUpperCase() : null;
-}
-
-function relevanceFields(item: {
-  title: string | null;
-  policyArea: string | null;
-  primarySponsorBioguide: string | null;
-}): IntroRelevanceFields {
-  return {
-    title: item.title,
-    policyArea: item.policyArea,
-    primarySponsorBioguide: item.primarySponsorBioguide,
-  };
 }
 
 /**
@@ -164,13 +147,6 @@ function billKey(congress: number, type: string, number: number): string {
   return `${congress}:${normalizeBillType(type)}:${number}`;
 }
 
-function sortRankedIntros(a: RecentIntroducedBill, b: RecentIntroducedBill): number {
-  return compareIntroRelevance(
-    { score: scoreIntroRelevance(relevanceFields(a)), introducedDate: a.introducedDate, number: a.number },
-    { score: scoreIntroRelevance(relevanceFields(b)), introducedDate: b.introducedDate, number: b.number }
-  );
-}
-
 function introListUrl(
   congress: number,
   billType: string,
@@ -191,26 +167,20 @@ function introListUrl(
 async function fetchBillIntroDetail(
   env: Env,
   bill: { congress: number; type: string; number: number }
-): Promise<{
-  introducedDate: string | null;
-  title: string | null;
-  policyArea: string | null;
-  primarySponsorBioguide: string | null;
-}> {
+): Promise<IntroducedBillListItem | null> {
   const apiKey = env.CONGRESS_API_KEY;
   const seg = bill.type.toLowerCase();
   const data = await fetchJson<unknown>(
     `https://api.congress.gov/v3/bill/${bill.congress}/${seg}/${bill.number}` +
       `?format=json&api_key=${apiKey}`
   );
-  const root = asRecord(data);
-  const detail = asRecord(root?.bill);
-  return {
-    introducedDate: isoDate(detail?.introducedDate),
-    title: asString(detail?.title),
-    policyArea: policyAreaName(detail?.policyArea),
-    primarySponsorBioguide: primarySponsorBioguide(detail?.sponsors),
-  };
+  const raw = asRecord(asRecord(data)?.bill) ?? {};
+  return parseIntroducedBillListItem({
+    ...raw,
+    congress: raw.congress ?? bill.congress,
+    type: raw.type ?? bill.type,
+    number: raw.number ?? bill.number,
+  });
 }
 
 /**
@@ -252,7 +222,7 @@ export async function fetchRecentIntroducedBills(
       for (const item of page.bills) {
         if (item.congress !== congress) continue;
         if (!isIntroLookbackCandidate(item, lookbackDate)) continue;
-        if (isHardExcludedIntro(relevanceFields(item))) continue;
+        if (isHardExcludedIntro(item)) continue;
         byKey.set(billKey(item.congress, item.type, item.number), item);
       }
       url = page.nextUrl ? nextPageUrl(page.nextUrl, apiKey) : null;
@@ -284,12 +254,12 @@ export async function fetchRecentIntroducedBills(
     (b.latestActionDate ?? "").localeCompare(a.latestActionDate ?? "");
   introPhrase.sort(byActionDateDesc);
   referralOnly.sort(byActionDateDesc);
-  datedNeedEnrich.sort((a, b) => {
-    const byScore =
-      scoreIntroRelevance(relevanceFields(b)) - scoreIntroRelevance(relevanceFields(a));
-    if (byScore !== 0) return byScore;
-    return (b.introducedDate ?? "").localeCompare(a.introducedDate ?? "");
-  });
+  datedNeedEnrich.sort((a, b) =>
+    compareIntroItems(
+      { ...a, introducedDate: a.introducedDate ?? "" },
+      { ...b, introducedDate: b.introducedDate ?? "" }
+    )
+  );
   const toFetch = [...introPhrase, ...referralOnly, ...datedNeedEnrich].slice(0, detailBudget);
 
   for (const item of toFetch) {
@@ -299,25 +269,20 @@ export async function fetchRecentIntroducedBills(
         type: item.type,
         number: item.number,
       });
-      const title = detail.title ?? item.title;
-      const policyArea = detail.policyArea ?? item.policyArea;
-      const primarySponsorBioguide = detail.primarySponsorBioguide ?? item.primarySponsorBioguide;
-      if (
-        isHardExcludedIntro({
-          title,
-          policyArea,
-          primarySponsorBioguide,
-        })
-      ) {
+      if (!detail) continue;
+      const merged = {
+        ...item,
+        title: detail.title ?? item.title,
+        policyArea: detail.policyArea ?? item.policyArea,
+        primarySponsorBioguide: detail.primarySponsorBioguide ?? item.primarySponsorBioguide,
+      };
+      if (isHardExcludedIntro(merged)) {
         datedByKey.delete(billKey(item.congress, item.type, item.number));
         continue;
       }
       if (!detail.introducedDate || detail.introducedDate < lookbackDate) continue;
       datedByKey.set(billKey(item.congress, item.type, item.number), {
-        ...item,
-        title,
-        policyArea,
-        primarySponsorBioguide,
+        ...merged,
         introducedDate: detail.introducedDate,
       });
     } catch (err: unknown) {
@@ -334,9 +299,5 @@ export async function fetchRecentIntroducedBills(
     }
   }
 
-  const survivors = [...datedByKey.values()].filter(
-    (item) => !isHardExcludedIntro(relevanceFields(item))
-  );
-  survivors.sort(sortRankedIntros);
-  return survivors.slice(0, maxNew);
+  return selectIntroPersistSet([...datedByKey.values()], maxNew);
 }
