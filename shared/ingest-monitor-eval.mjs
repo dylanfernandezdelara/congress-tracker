@@ -43,6 +43,11 @@ export function isDegradedChamberWarning(warning) {
   return DEGRADED_CHAMBER_WARNING.some((test) => test(warning));
 }
 
+/** Soft intro list-fetch failure persisted on feed success records. */
+export function isIntroListFailureWarning(warning) {
+  return /intro list failed:/i.test(warning);
+}
+
 export function classifyChamberWarningSeverity(warnings) {
   if (!warnings || warnings.length === 0) return "none";
   if (warnings.some(isChamberHardSkipWarning)) return "failed";
@@ -144,8 +149,19 @@ export function evaluateIngestMonitorStatus(params) {
     };
   }
 
-  if (warningSeverity === "degraded") {
-    let message = `Partial chamber ingest: ${warnings.join("; ")}`;
+  const introWarnings = params.introWarnings ?? [];
+  const introSoftFail = introWarnings.some(isIntroListFailureWarning);
+  const introMessage = introSoftFail
+    ? `Intro discovery soft-failed: ${introWarnings.filter(isIntroListFailureWarning).join("; ")}`
+    : "";
+
+  if (warningSeverity === "degraded" || introSoftFail) {
+    const parts = [];
+    if (warningSeverity === "degraded") {
+      parts.push(`Partial chamber ingest: ${warnings.join("; ")}`);
+    }
+    if (introMessage) parts.push(introMessage);
+    let message = parts.join(" ");
     if (menu?.stale) {
       message = `${message} Senate menu cache is stale (${menu.age_hours}h old); refresh daily while Worker→Senate.gov is 403.`;
     }

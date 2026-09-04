@@ -73,6 +73,8 @@ function feedRunMetrics(run: FeedPipelineRunRecord): RunMetric[] {
     { label: 'Votes upserted', value: run.votesUpserted },
     { label: 'Digests written', value: run.digestsWritten },
     { label: 'Digests skipped', value: run.digestsSkipped },
+    { label: 'Intros discovered', value: run.introsDiscovered ?? '—' },
+    { label: 'Intros persisted', value: run.introsPersisted ?? '—' },
     { label: 'House source latest', value: run.house_source_latest_date ?? '—' },
     { label: 'Senate source latest', value: run.senate_source_latest_date ?? '—' },
   ]

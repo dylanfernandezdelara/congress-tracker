@@ -426,9 +426,7 @@ export async function runFeedPipeline(
           : {}),
         introsDiscovered: result.introsDiscovered,
         introsPersisted: result.introsPersisted,
-        ...(introResult.warnings.length > 0
-          ? { intro_warnings: introResult.warnings }
-          : {}),
+        intro_warnings: introResult.warnings,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

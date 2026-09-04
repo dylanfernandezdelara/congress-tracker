@@ -112,6 +112,6 @@ describe("persistRecentIntroductions", () => {
     mockFetchRecentIntroducedBills.mockRejectedValue(new Error("HTTP 429"));
     const result = await persistRecentIntroductions(createEnv(), 119, "admin");
     expect(result.bills).toEqual([]);
-    expect(result.warnings[0]).toContain("HTTP 429");
+    expect(result.warnings[0]).toMatch(/Intro list failed:.*HTTP 429/);
   });
 });

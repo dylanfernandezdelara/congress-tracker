@@ -31,7 +31,7 @@ function sanitizeFailureRecord(
   };
 }
 
-function sanitizeChamberWarnings(
+function sanitizeWarnings(
   warnings: readonly string[] | null | undefined
 ): string[] {
   if (!warnings?.length) return [];
@@ -42,10 +42,17 @@ function sanitizeRunRecord(
   record: FeedPipelineRunRecord | null
 ): FeedPipelineRunRecord | null {
   if (!record) return null;
-  if (!record.chamber_warnings?.length) return record;
+  const hasChamber = Boolean(record.chamber_warnings?.length);
+  const hasIntro = Boolean(record.intro_warnings?.length);
+  if (!hasChamber && !hasIntro) return record;
   return {
     ...record,
-    chamber_warnings: sanitizeChamberWarnings(record.chamber_warnings),
+    ...(hasChamber
+      ? { chamber_warnings: sanitizeWarnings(record.chamber_warnings) }
+      : {}),
+    ...(hasIntro
+      ? { intro_warnings: sanitizeWarnings(record.intro_warnings) }
+      : {}),
   };
 }
 
@@ -59,6 +66,7 @@ export function evaluateIngestMonitorStatus<
   lastFailure: FeedPipelineFailureRecord | null;
   chamberWarnings?: readonly string[] | null;
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
+  introWarnings?: readonly string[] | null;
 }): {
   status: IngestMonitorStatus;
   message: string;
@@ -102,7 +110,8 @@ export function buildIngestMonitorPayload(params: {
   // after menu refresh). Scheduled freshness still comes from scheduledSuccess;
   // sticky scheduled hard-skip warnings must not keep paging after a newer clean run.
   const newestSuccess = params.lastSuccess ?? scheduledSuccess;
-  const publicWarnings = sanitizeChamberWarnings(newestSuccess?.chamber_warnings);
+  const publicWarnings = sanitizeWarnings(newestSuccess?.chamber_warnings);
+  const publicIntroWarnings = sanitizeWarnings(newestSuccess?.intro_warnings);
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
@@ -110,6 +119,7 @@ export function buildIngestMonitorPayload(params: {
     lastFailure: params.lastFailure,
     chamberWarnings: publicWarnings,
     senateVoteMenuCache: params.senateVoteMenuCache ?? null,
+    introWarnings: publicIntroWarnings,
   });
 
   const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);

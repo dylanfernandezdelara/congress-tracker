@@ -331,6 +331,7 @@ async function checkHealthViaD1(congress, session) {
     lastFailure: failure,
     chamberWarnings: newest?.chamber_warnings ?? [],
     senateVoteMenuCache,
+    introWarnings: newest?.intro_warnings ?? [],
   });
 
   console.log(

@@ -14,6 +14,7 @@ export {
   isIngestMonitorHealthy,
   isIngestMonitorOpsAcceptable,
   isDegradedChamberWarning,
+  isIntroListFailureWarning,
   isIngestTruncationWarning,
   isSenateCacheFallbackWarning,
   resolveScheduledSuccess,

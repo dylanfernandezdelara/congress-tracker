@@ -99,9 +99,15 @@ const mockPersistRecentIntroductions = vi.fn(async (..._args: unknown[]) => ({
   persisted: 0,
   warnings: [] as string[],
 }));
+const mockRecordFeedPipelineSuccess = vi.fn(async (..._args: unknown[]) => undefined);
 
 vi.mock("./refresh-introductions", () => ({
   persistRecentIntroductions: (...args: unknown[]) => mockPersistRecentIntroductions(...args),
+}));
+
+vi.mock("../d1/pipeline-state", () => ({
+  recordFeedPipelineSuccess: (...args: unknown[]) => mockRecordFeedPipelineSuccess(...args),
+  recordFeedPipelineFailure: vi.fn(async () => undefined),
 }));
 
 vi.mock("./refresh-bill-text-changes", () => ({
@@ -432,6 +438,28 @@ describe("runFeedPipeline digest retry", () => {
       { congress: 119, type: "S", number: 9901 }
     );
     expect(result.digestsWritten).toBe(1);
+  });
+
+  it("always persists intros* and intro_warnings on the success record", async () => {
+    mockGetDigest.mockResolvedValue(completeDigest);
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [],
+      discovered: 0,
+      persisted: 0,
+      warnings: [],
+    });
+
+    await runFeedPipeline(createEnv());
+
+    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalledWith(
+      expect.anything(),
+      "admin",
+      expect.objectContaining({
+        introsDiscovered: 0,
+        introsPersisted: 0,
+        intro_warnings: [],
+      })
+    );
   });
 
 });

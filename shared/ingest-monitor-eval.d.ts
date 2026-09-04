@@ -22,6 +22,7 @@ export function isChamberHardSkipWarning(warning: string): boolean;
 export function isSenateCacheFallbackWarning(warning: string): boolean;
 export function isIngestTruncationWarning(warning: string): boolean;
 export function isDegradedChamberWarning(warning: string): boolean;
+export function isIntroListFailureWarning(warning: string): boolean;
 
 export function classifyChamberWarningSeverity(
   warnings: readonly string[]
@@ -46,6 +47,7 @@ export function evaluateIngestMonitorStatus<
   lastFailure: FeedPipelineFailureRecord | null;
   chamberWarnings?: readonly string[] | null;
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
+  introWarnings?: readonly string[] | null;
   sanitizeFailureError?: (error: string) => string;
 }): {
   status: IngestMonitorStatus;
