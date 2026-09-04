@@ -43,6 +43,24 @@ export function isDegradedChamberWarning(warning) {
   return DEGRADED_CHAMBER_WARNING.some((test) => test(warning));
 }
 
+/** Soft intro discovery failure persisted on post-#168 feed success records. */
+export function isIntroListFailureWarning(warning) {
+  return /intro list failed:/i.test(warning);
+}
+
+/**
+ * Post-#168 runs persist `introsDiscovered`. Legacy last_success records omit
+ * the key — do not degrade those. Soft-fail is list discovery failure (prefix
+ * or discovered=0 with intro_warnings), not a quiet 0-intro day.
+ */
+export function isIntroDiscoverySoftFailure(introsDiscovered, introWarnings) {
+  if (typeof introsDiscovered !== "number") return false;
+  const warnings = introWarnings ?? [];
+  if (warnings.length === 0) return false;
+  if (warnings.some(isIntroListFailureWarning)) return true;
+  return introsDiscovered === 0;
+}
+
 export function classifyChamberWarningSeverity(warnings) {
   if (!warnings || warnings.length === 0) return "none";
   if (warnings.some(isChamberHardSkipWarning)) return "failed";
@@ -144,8 +162,21 @@ export function evaluateIngestMonitorStatus(params) {
     };
   }
 
-  if (warningSeverity === "degraded") {
-    let message = `Partial chamber ingest: ${warnings.join("; ")}`;
+  const introSoftFail = isIntroDiscoverySoftFailure(
+    params.introsDiscovered,
+    params.introWarnings
+  );
+  const introMessage = introSoftFail
+    ? `Intro discovery soft-failed: ${(params.introWarnings ?? []).join("; ")}`
+    : "";
+
+  if (warningSeverity === "degraded" || introSoftFail) {
+    const parts = [];
+    if (warningSeverity === "degraded") {
+      parts.push(`Partial chamber ingest: ${warnings.join("; ")}`);
+    }
+    if (introMessage) parts.push(introMessage);
+    let message = parts.join(" ");
     if (menu?.stale) {
       message = `${message} Senate menu cache is stale (${menu.age_hours}h old); refresh daily while Worker→Senate.gov is 403.`;
     }

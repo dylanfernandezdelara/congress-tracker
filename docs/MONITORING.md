@@ -34,8 +34,8 @@ unreachable, `npm run refresh:senate-menu` falls back to D1 for cache writes and
 
 | Status | Meaning |
 |--------|---------|
-| `ok` | Last scheduled success within 26h, no chamber source warnings, menu cache fresh (<48h) |
-| `degraded` | Scheduled success within window with Senate D1 menu **cache fallback**, **and/or** menu cache stale (>48h) |
+| `ok` | Last scheduled success within 26h, no chamber source warnings, no intro-list soft-fail, menu cache fresh (<48h) |
+| `degraded` | Scheduled success within window with Senate D1 menu **cache fallback**, **and/or** menu cache stale (>48h), **and/or** intro discovery soft-fail |
 | `stale` | Last scheduled success older than 26h |
 | `failed` | Failure newer than last scheduled success, hard chamber soft-skip (`* ingest skipped:`), **or** menu cache nearing expiry (>6d) / expired (>7d) |
 | `unknown` | No scheduled success yet |
@@ -52,6 +52,18 @@ without rewrites are expected.
 
 House ingest that hits the per-run detail cap records `House ingest truncated:…`
 and is **`degraded`** (newest-first fetch still lands the current week's rolls).
+
+Intro discovery (Congress.gov `/v3/bill/{congress}/{hr|s}` list, shipped in #168)
+always persists `introsDiscovered`, `introsPersisted`, and `intro_warnings` on
+the success record — including zeros / empty arrays. Morning ops should read
+`data.ingest.status`, `last_success.introsDiscovered` / `introsPersisted`,
+`last_success.intro_warnings`, and Observability events
+`feed_pipeline_failed` / `feed_pipeline_intro_list_failed`. A post-#168 run
+that records `Intro list failed:…` (or `introsDiscovered: 0` with non-empty
+`intro_warnings`) is **`degraded`**. Pre-#168 `last_success` rows omit the
+`intros*` keys and stay `ok` when otherwise fresh — do not treat missing fields
+on those legacy records as a failure. A quiet day (`introsDiscovered: 0`, empty
+warnings) stays `ok`. Per-bill persist warnings do not flip status.
 A warning that a chamber **source listed latest YYYY-MM-DD is newer than stored**
 is **`failed`** — listed/menu dates got ahead of D1. Successful runs persist
 `house_source_latest_date` / `senate_source_latest_date` on `last_success` for
@@ -110,7 +122,7 @@ Severity split (important while Senate.gov 403 persists):
 | Severity | Status | Action |
 |----------|--------|--------|
 | Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken, no scheduled success, hard chamber skip, **or** menu cache nearing expiry / expired |
-| Tracked / known | `degraded` (Senate **cache fallback** and/or menu cache stale >48h) | Confirm `senate_fetch_browser_rendering_fallback` / menu cache write in Workers Logs; page only if Browser Rendering **and** D1 cache both fail, or cache nears 7d. Break-glass: `npm run refresh:senate-menu`. Do **not** page forever on expected 403→BR/cache. |
+| Tracked / known | `degraded` (Senate **cache fallback**, menu cache stale >48h, and/or intro list soft-fail) | Confirm `senate_fetch_browser_rendering_fallback` / menu cache write, or `feed_pipeline_intro_list_failed` + `last_success.intro_warnings`, in Workers Logs; page only if Browser Rendering **and** D1 cache both fail, cache nears 7d, or intro list stays failed across runs. Break-glass: `npm run refresh:senate-menu`. Do **not** page forever on expected 403→BR/cache. |
 | Clear | `ok` | No action |
 
 `degraded` covers expected Worker→Senate.gov 403 → Browser Rendering (or D1
@@ -118,7 +130,8 @@ menu cache fallback) and stale-but-usable cache (>48h). A soft-fail that skips
 an entire chamber (`* ingest skipped:`) or a menu cache within 24h of the 7d
 hard expiry is **`failed`** so uptime checks and `CHECK_HEALTH=1` still page.
 
-1. **Workers Observability** — `feed_pipeline_failed` / cron strings; also check
+1. **Workers Observability** — `feed_pipeline_failed` /
+   `feed_pipeline_intro_list_failed` / cron strings; also check
    `last_skipped` (lease skips leave no failure log). Alert only when
    `last_skipped` exists and
    `last_scheduled_success.completed_at` is missing or not after

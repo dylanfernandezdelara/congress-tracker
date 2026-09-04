@@ -38,7 +38,7 @@ export async function persistRecentIntroductions(
     listed = await fetchRecentIntroducedBills(env, congress);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    warnings.push(message);
+    warnings.push(`Intro list failed: ${message}`);
     console.warn(
       JSON.stringify({
         event: "feed_pipeline_intro_list_failed",
