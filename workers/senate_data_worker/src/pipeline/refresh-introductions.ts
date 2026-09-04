@@ -76,7 +76,7 @@ export async function persistRecentIntroductions(
           billType: bill.type,
           number: bill.number,
           title: bill.title,
-          policyArea: null,
+          policyArea: bill.policyArea ?? null,
           rawSummaryText: null,
           digest: null,
         });

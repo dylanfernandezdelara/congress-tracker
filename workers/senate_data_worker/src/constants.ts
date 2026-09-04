@@ -16,10 +16,10 @@ export const MEMBER_SEARCH_MAX_LIMIT = 20;
 /** Bills with executive signals stay feed-visible for this many days. */
 export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
 /**
- * Shared intro cap: newest introductions to persist per ingest run, and the
- * read-path LIMIT on the intro UNION arm (both chambers).
+ * Shared intro cap after hard-filter + soft-rank: persist and the intro UNION
+ * LIMIT (both chambers). Soft score ranks; it does not drop under-cap survivors.
  */
-export const INTRO_FEED_MAX_NEW = 20;
+export const INTRO_FEED_MAX_NEW = 12;
 /** Congress.gov bill-list page size for intro discovery (`/v3/bill/{congress}/{type}`). */
 export const INTRO_DISCOVERY_PAGE_SIZE = 250;
 /** List pages per bill type (hr, s) per run. fromDateTime already limits to the lookback. */

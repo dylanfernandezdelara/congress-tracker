@@ -9,6 +9,12 @@ import {
 import type { Env } from "../config";
 import { normalizeBillType } from "./bill-type";
 import { fetchJson, fetchJsonWithMeta, nextPageUrl } from "./http";
+import {
+  compareIntroRelevance,
+  isHardExcludedIntro,
+  scoreIntroRelevance,
+  type IntroRelevanceFields,
+} from "./intro-relevance";
 
 /** Substantive bills only — resolutions would consume the intro cap. */
 export const INTRO_DISCOVERY_BILL_TYPES = ["hr", "s"] as const;
@@ -21,6 +27,8 @@ export interface IntroducedBillListItem {
   introducedDate: string | null;
   latestActionDate: string | null;
   latestActionText: string | null;
+  policyArea: string | null;
+  primarySponsorBioguide: string | null;
 }
 
 export interface RecentIntroducedBill extends IntroducedBillListItem {
@@ -55,6 +63,29 @@ function isoDate(value: unknown): string | null {
   if (!raw) return null;
   const day = raw.slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+}
+
+function policyAreaName(raw: unknown): string | null {
+  return asString(asRecord(raw)?.name);
+}
+
+function primarySponsorBioguide(raw: unknown): string | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const first = asRecord(raw[0]);
+  const id = asString(first?.bioguideId);
+  return id ? id.toUpperCase() : null;
+}
+
+function relevanceFields(item: {
+  title: string | null;
+  policyArea: string | null;
+  primarySponsorBioguide: string | null;
+}): IntroRelevanceFields {
+  return {
+    title: item.title,
+    policyArea: item.policyArea,
+    primarySponsorBioguide: item.primarySponsorBioguide,
+  };
 }
 
 /**
@@ -93,6 +124,8 @@ export function parseIntroducedBillListItem(raw: unknown): IntroducedBillListIte
     introducedDate: isoDate(bill.introducedDate),
     latestActionDate: isoDate(latestAction?.actionDate),
     latestActionText: asString(latestAction?.text),
+    policyArea: policyAreaName(bill.policyArea),
+    primarySponsorBioguide: primarySponsorBioguide(bill.sponsors),
   };
 }
 
@@ -131,10 +164,11 @@ function billKey(congress: number, type: string, number: number): string {
   return `${congress}:${normalizeBillType(type)}:${number}`;
 }
 
-function sortIntros(a: RecentIntroducedBill, b: RecentIntroducedBill): number {
-  const byDate = b.introducedDate.localeCompare(a.introducedDate);
-  if (byDate !== 0) return byDate;
-  return b.number - a.number;
+function sortRankedIntros(a: RecentIntroducedBill, b: RecentIntroducedBill): number {
+  return compareIntroRelevance(
+    { score: scoreIntroRelevance(relevanceFields(a)), introducedDate: a.introducedDate, number: a.number },
+    { score: scoreIntroRelevance(relevanceFields(b)), introducedDate: b.introducedDate, number: b.number }
+  );
 }
 
 function introListUrl(
@@ -154,29 +188,37 @@ function introListUrl(
   );
 }
 
-async function fetchBillIntroducedDate(
+async function fetchBillIntroDetail(
   env: Env,
   bill: { congress: number; type: string; number: number }
-): Promise<{ introducedDate: string | null; title: string | null }> {
+): Promise<{
+  introducedDate: string | null;
+  title: string | null;
+  policyArea: string | null;
+  primarySponsorBioguide: string | null;
+}> {
   const apiKey = env.CONGRESS_API_KEY;
   const seg = bill.type.toLowerCase();
-  const data = await fetchJson<{ bill?: { introducedDate?: string; title?: string } }>(
+  const data = await fetchJson<unknown>(
     `https://api.congress.gov/v3/bill/${bill.congress}/${seg}/${bill.number}` +
       `?format=json&api_key=${apiKey}`
   );
+  const root = asRecord(data);
+  const detail = asRecord(root?.bill);
   return {
-    introducedDate: isoDate(data.bill?.introducedDate),
-    title: data.bill?.title?.trim() || null,
+    introducedDate: isoDate(detail?.introducedDate),
+    title: asString(detail?.title),
+    policyArea: policyAreaName(detail?.policyArea),
+    primarySponsorBioguide: primarySponsorBioguide(detail?.sponsors),
   };
 }
 
 /**
  * Recently introduced H.R. / S. bills from Congress.gov.
  *
- * The list endpoint filters by `updateDate` (`fromDateTime`) and sorts by
- * `updateDate` only — it does not accept `introducedDate` sort/filter. We
- * keep rows whose `introducedDate` (list or detail) falls in the lookback,
- * then cap by newest introduction.
+ * Discover in-window rows, hard-drop junk titles (and Private Legislation
+ * when detail has it), soft-rank survivors, then cap. Soft score never drops
+ * a hard-exclude survivor that still fits under the cap.
  */
 export async function fetchRecentIntroducedBills(
   env: Env,
@@ -210,51 +252,72 @@ export async function fetchRecentIntroducedBills(
       for (const item of page.bills) {
         if (item.congress !== congress) continue;
         if (!isIntroLookbackCandidate(item, lookbackDate)) continue;
+        if (isHardExcludedIntro(relevanceFields(item))) continue;
         byKey.set(billKey(item.congress, item.type, item.number), item);
       }
       url = page.nextUrl ? nextPageUrl(page.nextUrl, apiKey) : null;
     }
   }
 
-  const dated: RecentIntroducedBill[] = [];
-  const needsDetail: IntroducedBillListItem[] = [];
+  const datedByKey = new Map<string, RecentIntroducedBill>();
+  const needsDate: IntroducedBillListItem[] = [];
+  const datedNeedEnrich: IntroducedBillListItem[] = [];
   for (const item of byKey.values()) {
     if (item.introducedDate && item.introducedDate >= lookbackDate) {
-      dated.push({ ...item, introducedDate: item.introducedDate });
+      datedByKey.set(billKey(item.congress, item.type, item.number), {
+        ...item,
+        introducedDate: item.introducedDate,
+      });
+      if (!item.policyArea || !item.primarySponsorBioguide) datedNeedEnrich.push(item);
     } else {
-      needsDetail.push(item);
+      needsDate.push(item);
     }
   }
 
-  dated.sort(sortIntros);
-  const oldestKept = dated[maxNew - 1]?.introducedDate ?? "";
-  const introPhrase = needsDetail.filter((item) =>
+  const introPhrase = needsDate.filter((item) =>
     looksLikeIntroductionAction(item.latestActionText)
   );
-  const referralOnly = needsDetail.filter(
+  const referralOnly = needsDate.filter(
     (item) => !looksLikeIntroductionAction(item.latestActionText)
   );
   const byActionDateDesc = (a: IntroducedBillListItem, b: IntroducedBillListItem) =>
     (b.latestActionDate ?? "").localeCompare(a.latestActionDate ?? "");
   introPhrase.sort(byActionDateDesc);
   referralOnly.sort(byActionDateDesc);
-  const ranked = [...introPhrase, ...referralOnly].filter((item) => {
-    if (dated.length < maxNew) return true;
-    return (item.latestActionDate ?? "") >= oldestKept;
+  datedNeedEnrich.sort((a, b) => {
+    const byScore =
+      scoreIntroRelevance(relevanceFields(b)) - scoreIntroRelevance(relevanceFields(a));
+    if (byScore !== 0) return byScore;
+    return (b.introducedDate ?? "").localeCompare(a.introducedDate ?? "");
   });
-  const toFetch = ranked.slice(0, detailBudget);
+  const toFetch = [...introPhrase, ...referralOnly, ...datedNeedEnrich].slice(0, detailBudget);
 
   for (const item of toFetch) {
     try {
-      const detail = await fetchBillIntroducedDate(env, {
+      const detail = await fetchBillIntroDetail(env, {
         congress: item.congress,
         type: item.type,
         number: item.number,
       });
+      const title = detail.title ?? item.title;
+      const policyArea = detail.policyArea ?? item.policyArea;
+      const primarySponsorBioguide = detail.primarySponsorBioguide ?? item.primarySponsorBioguide;
+      if (
+        isHardExcludedIntro({
+          title,
+          policyArea,
+          primarySponsorBioguide,
+        })
+      ) {
+        datedByKey.delete(billKey(item.congress, item.type, item.number));
+        continue;
+      }
       if (!detail.introducedDate || detail.introducedDate < lookbackDate) continue;
-      dated.push({
+      datedByKey.set(billKey(item.congress, item.type, item.number), {
         ...item,
-        title: detail.title ?? item.title,
+        title,
+        policyArea,
+        primarySponsorBioguide,
         introducedDate: detail.introducedDate,
       });
     } catch (err: unknown) {
@@ -271,6 +334,9 @@ export async function fetchRecentIntroducedBills(
     }
   }
 
-  dated.sort(sortIntros);
-  return dated.slice(0, maxNew);
+  const survivors = [...datedByKey.values()].filter(
+    (item) => !isHardExcludedIntro(relevanceFields(item))
+  );
+  survivors.sort(sortRankedIntros);
+  return survivors.slice(0, maxNew);
 }

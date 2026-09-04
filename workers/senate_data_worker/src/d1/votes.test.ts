@@ -331,7 +331,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       50,
       0,
     ]);
@@ -339,7 +339,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
     ]);
     expect(selectSql!.startsWith(feedMembershipCteSql())).toBe(true);
     expect(countSql!.startsWith(feedMembershipCteSql())).toBe(true);
@@ -403,7 +403,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       "House",
       10,
       5,
@@ -412,7 +412,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       "Senate",
     ]);
   });
@@ -475,7 +475,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       "NY",
       10,
       0,
@@ -484,7 +484,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       "NY",
     ]);
   });
@@ -513,7 +513,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       "%hr1%",
       "%hr1%",
       "%hr1%",
@@ -525,7 +525,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       "%hr1%",
       "%hr1%",
       "%hr1%",
@@ -549,7 +549,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
       "2026-06-24",
-      20,
+      12,
       "Senate",
       "%100\\%%",
       "%100\\%%",

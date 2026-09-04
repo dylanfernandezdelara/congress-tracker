@@ -43,6 +43,24 @@ describe("parseIntroducedBillListItem", () => {
       introducedDate: "2026-09-03",
       latestActionDate: "2026-09-03",
       latestActionText: "Introduced in Senate",
+      policyArea: null,
+      primarySponsorBioguide: null,
+    });
+  });
+
+  it("reads list policyArea and primary sponsor bioguide", () => {
+    expect(
+      parseIntroducedBillListItem({
+        congress: 119,
+        type: "s",
+        number: 9901,
+        title: "Ban Artificial Superintelligence Act",
+        policyArea: { name: "Science, Technology, Communications" },
+        sponsors: [{ bioguideId: "s000033" }],
+      })
+    ).toMatchObject({
+      policyArea: "Science, Technology, Communications",
+      primarySponsorBioguide: "S000033",
     });
   });
 
@@ -65,6 +83,8 @@ describe("isIntroLookbackCandidate", () => {
           introducedDate: "2026-09-01",
           latestActionDate: "2026-09-02",
           latestActionText: "Referred to the Committee on Finance",
+          policyArea: null,
+          primarySponsorBioguide: null,
         },
         lookback
       )
@@ -82,6 +102,8 @@ describe("isIntroLookbackCandidate", () => {
           introducedDate: "2026-01-15",
           latestActionDate: "2026-09-01",
           latestActionText: "Reported by committee",
+          policyArea: null,
+          primarySponsorBioguide: null,
         },
         lookback
       )
@@ -99,6 +121,8 @@ describe("isIntroLookbackCandidate", () => {
           introducedDate: null,
           latestActionDate: "2026-09-01",
           latestActionText: "Introduced in Senate",
+          policyArea: null,
+          primarySponsorBioguide: null,
         },
         lookback
       )
