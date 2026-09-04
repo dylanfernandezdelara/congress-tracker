@@ -25,8 +25,10 @@ export const INTRO_DISCOVERY_PAGE_SIZE = 250;
 /** List pages per bill type (hr, s) per run. fromDateTime already limits to the lookback. */
 export const INTRO_DISCOVERY_MAX_PAGES_PER_TYPE = 2;
 /**
- * Extra bill-detail fetches when the list payload omits `introducedDate`.
- * List items that already carry a lookback `introducedDate` do not spend this.
+ * Extra bill-detail fetches per intro run (same `/v3/bill/{congress}/{type}/{number}`).
+ * Spend order: undated intro-phrase, undated same-day referral, then dated rows
+ * missing policyArea or primary sponsor (so Private Legislation can fail closed).
+ * Soft score still fails open when those fields stay missing.
  */
 export const INTRO_DETAIL_FETCHES_PER_RUN = 25;
 /** Homepage statuses fetched per executive ingest run. */
