@@ -1,4 +1,7 @@
-import { DatabaseSync } from "node:sqlite";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { INTRO_FEED_MAX_NEW } from "../constants";
 import {
@@ -6,6 +9,28 @@ import {
   selectIntroPersistSet,
 } from "../sources/intro-relevance";
 import { feedMembershipCteSql, introOnlyMembershipSql } from "./feed-membership";
+
+/** CI is Node 20 (`node:sqlite` is 22.5+). Drive the real SQL with the sqlite3 CLI. */
+function bindSql(sql: string, values: Array<string | number>): string {
+  let i = 0;
+  return sql.replace(/\?/g, () => {
+    const value = values[i++];
+    if (value === undefined) throw new Error("missing SQL bind");
+    return typeof value === "number" ? String(value) : `'${String(value).replace(/'/g, "''")}'`;
+  });
+}
+
+function querySqliteJson(setupSql: string, query: string): Array<Record<string, unknown>> {
+  const dir = mkdtempSync(join(tmpdir(), "intro-rank-"));
+  const dbPath = join(dir, "t.sqlite");
+  try {
+    execFileSync("sqlite3", [dbPath], { input: setupSql, encoding: "utf8" });
+    const raw = execFileSync("sqlite3", ["-json", dbPath, query], { encoding: "utf8" }).trim();
+    return raw ? (JSON.parse(raw) as Array<Record<string, unknown>>) : [];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 describe("intro feed membership ranking", () => {
   it("orders the intro UNION by persist score, not introduced_date alone", () => {
@@ -42,8 +67,12 @@ describe("intro feed membership ranking", () => {
   });
 
   it("read-path SQL keeps an older high-score intro when newer low-score intros fill the date slot", () => {
-    const db = new DatabaseSync(":memory:");
-    db.exec(`
+    const genericRows = Array.from({ length: 12 }, (_, i) => {
+      const n = i + 1;
+      return `INSERT INTO bill_lifecycle (congress, bill_type, bill_number, introduced_date) VALUES (119, 'HR', ${n}, '2026-09-03');
+INSERT INTO bill_digests (congress, bill_type, number, title, policy_area) VALUES (119, 'HR', ${n}, 'A bill to amend title 5, United States Code', NULL);`;
+    }).join("\n");
+    const setupSql = `
       CREATE TABLE bill_lifecycle (
         congress INTEGER NOT NULL,
         bill_type TEXT NOT NULL,
@@ -70,31 +99,17 @@ describe("intro feed membership ranking", () => {
         bill_type TEXT NOT NULL,
         bill_number INTEGER NOT NULL
       );
-    `);
-    const insertLifecycle = db.prepare(
-      `INSERT INTO bill_lifecycle (congress, bill_type, bill_number, introduced_date)
-       VALUES (?, ?, ?, ?)`
+      ${genericRows}
+      INSERT INTO bill_lifecycle (congress, bill_type, bill_number, introduced_date) VALUES (119, 'S', 9901, '2026-09-01');
+      INSERT INTO bill_digests (congress, bill_type, number, title, policy_area)
+        VALUES (119, 'S', 9901, 'Ban Artificial Superintelligence Act', 'Science, Technology, Communications');
+      INSERT INTO bill_sponsors (congress, bill_type, bill_number, bioguide_id, is_primary)
+        VALUES (119, 'S', 9901, 'S000033', 1);
+    `;
+    const rows = querySqliteJson(
+      setupSql,
+      bindSql(introOnlyMembershipSql(), ["2026-08-28", INTRO_FEED_MAX_NEW])
     );
-    const insertDigest = db.prepare(
-      `INSERT INTO bill_digests (congress, bill_type, number, title, policy_area)
-       VALUES (?, ?, ?, ?, ?)`
-    );
-    const insertSponsor = db.prepare(
-      `INSERT INTO bill_sponsors (congress, bill_type, bill_number, bioguide_id, is_primary)
-       VALUES (?, ?, ?, ?, 1)`
-    );
-    for (let i = 1; i <= 12; i += 1) {
-      insertLifecycle.run(119, "HR", i, "2026-09-03");
-      insertDigest.run(119, "HR", i, "A bill to amend title 5, United States Code", null);
-    }
-    insertLifecycle.run(119, "S", 9901, "2026-09-01");
-    insertDigest.run(119, "S", 9901, "Ban Artificial Superintelligence Act", "Science, Technology, Communications");
-    insertSponsor.run(119, "S", 9901, "S000033");
-
-    const rows = db.prepare(introOnlyMembershipSql()).all("2026-08-28", INTRO_FEED_MAX_NEW) as Array<{
-      bill_type: string;
-      bill_number: number;
-    }>;
     expect(rows).toHaveLength(12);
     expect(rows[0]).toMatchObject({ bill_type: "S", bill_number: 9901 });
     expect(rows.some((row) => row.bill_number === 9901)).toBe(true);

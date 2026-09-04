@@ -42,6 +42,12 @@ describe("hard excludes", () => {
       })
     ).toBe(false);
     expect(isJunkIntroTitle("USPS Privacy Protection Act")).toBe(false);
+    expect(
+      isJunkIntroTitle("To designate additional United States Postal Service employees as essential workers")
+    ).toBe(false);
+    expect(
+      isJunkIntroTitle("A bill to name the Postmaster General as chair of the Postal Regulatory Commission")
+    ).toBe(false);
   });
 
   it("drops commemorative coin/medal/stamp-only and pure Gold Medal honors", () => {
