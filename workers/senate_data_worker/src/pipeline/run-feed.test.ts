@@ -99,7 +99,7 @@ const mockPersistRecentIntroductions = vi.fn(async (..._args: unknown[]) => ({
   persisted: 0,
   warnings: [] as string[],
 }));
-const mockRecordFeedPipelineSuccess = vi.fn(async () => undefined);
+const mockRecordFeedPipelineSuccess = vi.fn(async (..._args: unknown[]) => undefined);
 
 vi.mock("./refresh-introductions", () => ({
   persistRecentIntroductions: (...args: unknown[]) => mockPersistRecentIntroductions(...args),
