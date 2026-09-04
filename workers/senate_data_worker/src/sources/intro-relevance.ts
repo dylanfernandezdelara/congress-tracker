@@ -80,7 +80,8 @@ const VANITY_POLICY_AREAS = new Set([
   "sports and recreation",
 ]);
 
-const PRIVATE_RELIEF = /^for the relief of\b/i;
+/** House “For the relief of …” and Senate “A bill for the relief of …”. */
+const PRIVATE_RELIEF = /^(?:(?:a bill|an act)\s+)?for the relief of\b/i;
 const GOLD_MEDAL = /congressional gold medal/i;
 const GOLD_MEDAL_ACT = /gold medal act\b/i;
 const COMMEMORATIVE_TOKEN = /commemorative (coin|medal|stamp)/i;

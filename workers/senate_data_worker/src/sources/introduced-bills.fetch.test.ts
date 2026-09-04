@@ -70,6 +70,10 @@ describe("fetchRecentIntroducedBills", () => {
               title: "For the relief of Jane Doe",
               introducedDate: "2026-09-03",
             }),
+            listBill("s", 52, {
+              title: "A bill for the relief of Jane Doe",
+              introducedDate: "2026-09-03",
+            }),
             listBill("hr", 51, {
               title:
                 "To designate the facility of the United States Postal Service located at 100 Main Street as the Jane Doe Post Office Building",

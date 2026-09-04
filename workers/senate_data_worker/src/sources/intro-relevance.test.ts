@@ -16,6 +16,9 @@ describe("hard excludes", () => {
     expect(isHardExcludedIntro({ title: "For the relief of Jane Doe", policyArea: null, primarySponsorBioguide: null })).toBe(
       true
     );
+    expect(isJunkIntroTitle("A bill for the relief of Jane Doe")).toBe(true);
+    expect(isJunkIntroTitle("A Bill For The Relief Of Jane Doe")).toBe(true);
+    expect(isJunkIntroTitle("An Act for the relief of Jane Doe")).toBe(true);
   });
 
   it("drops USPS / Post Office facility designation titles", () => {
