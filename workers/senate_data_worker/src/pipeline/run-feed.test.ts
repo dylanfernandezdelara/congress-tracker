@@ -93,6 +93,17 @@ vi.mock("./ensure-member-roster", () => ({
   ensureMemberRoster: () => mockEnsureMemberRoster(),
 }));
 
+const mockPersistRecentIntroductions = vi.fn(async (..._args: unknown[]) => ({
+  bills: [] as Array<{ bill_congress: number; bill_type: string; bill_number: number }>,
+  discovered: 0,
+  persisted: 0,
+  warnings: [] as string[],
+}));
+
+vi.mock("./refresh-introductions", () => ({
+  persistRecentIntroductions: (...args: unknown[]) => mockPersistRecentIntroductions(...args),
+}));
+
 vi.mock("./refresh-bill-text-changes", () => ({
   refreshBillTextChanges: (...args: unknown[]) => mockRefreshBillTextChanges(...args),
 }));
@@ -396,6 +407,31 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.lifecycleRefreshed).toBe(0);
     expect(result.lifecycleWarnings).toHaveLength(1);
     expect(result.lifecycleWarnings[0]).toContain("congress.gov down");
+  });
+
+  it("hydrates intro-only bills discovered beside passage votes", async () => {
+    mockSelectRecentVotedBills.mockResolvedValue([billRow]);
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [{ bill_congress: 119, bill_type: "S", bill_number: 9901 }],
+      discovered: 1,
+      persisted: 1,
+      warnings: [],
+    });
+    mockGetDigest.mockImplementation(async (_db, _c, type, number) => {
+      if (type === "S" && number === 9901) return null;
+      return completeDigest;
+    });
+    mockBillHasSponsors.mockResolvedValue(true);
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.introsDiscovered).toBe(1);
+    expect(result.introsPersisted).toBe(1);
+    expect(mockFetchBillSummaryBundle).toHaveBeenCalledWith(
+      expect.anything(),
+      { congress: 119, type: "S", number: 9901 }
+    );
+    expect(result.digestsWritten).toBe(1);
   });
 
 });

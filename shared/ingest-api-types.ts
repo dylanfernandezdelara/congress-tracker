@@ -28,6 +28,9 @@ export interface FeedPipelineRunRecord {
   confirmationBackgroundsRewritten?: number;
   confirmationWikipediaLookups?: number;
   confirmation_warnings?: string[];
+  introsDiscovered?: number;
+  introsPersisted?: number;
+  intro_warnings?: string[];
 }
 
 export interface FeedPipelineFailureRecord {

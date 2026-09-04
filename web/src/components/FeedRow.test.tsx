@@ -432,4 +432,52 @@ describe('FeedRow', () => {
       'https://truthsocial.com/@realDonaldTrump/116805545512296111',
     )
   })
+
+  it('shows an Introduced chip and sponsor for intro-only bills', () => {
+    const item = makeFeedItem({
+      bill: {
+        congress: 119,
+        type: 'S',
+        number: 9901,
+        title: 'Ban Artificial Superintelligence Act',
+      },
+      digest: {
+        headline: 'Sanders introduces a ban on artificial superintelligence',
+        what_it_does: 'Would prohibit developing artificial superintelligence.',
+        key_points: [],
+        terms_explained: [],
+      },
+      latest_passage_date: null,
+      latest_activity_date: '2026-09-03',
+      passage_votes: [],
+      primary_sponsor: {
+        bioguide_id: 'S000033',
+        name: 'Sen. Bernard Sanders (local)',
+        party: 'I',
+        state: 'VT',
+      },
+      lifecycle: {
+        introduced_date: '2026-09-03',
+        presented_date: null,
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: '2026-09-03',
+        latest_action_text: 'Introduced in Senate',
+        derived: { status: null, day_of_ten: null, deadline_date: null, becomes_law_on: null },
+      },
+    })
+
+    const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+
+    const badge = container.querySelector('.feed-row-badge--introduced')
+    expect(badge?.textContent).toBe('Introduced')
+    expect(screen.getByText('Introduced in the Senate')).toBeInTheDocument()
+    expect(screen.getByText('Sen. Bernard Sanders (local)')).toBeInTheDocument()
+    expect(screen.getByText('Sanders introduces a ban on artificial superintelligence')).toBeInTheDocument()
+    expect(screen.queryByText('No vote recorded')).not.toBeInTheDocument()
+    expect(container.querySelector('.feed-row-date-secondary')?.textContent).toBe('Introduced')
+  })
 })

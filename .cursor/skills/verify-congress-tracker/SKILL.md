@@ -40,7 +40,7 @@ Teardown is `cleanup` (below), not `pkill wrangler` / `pkill vite`.
 
 Seeded fixtures this skill assumes (API JSON still contains `(local sample)`; `trimDisplayTitle` strips that suffix from **bill** headlines in the UI):
 
-- Visible bill topics: `House passes a broad energy permitting and production package`, `Senate passes a public lands conservation and access bill`, `House passes a federal spending oversight bill`.
+- Visible bill topics: `House passes a broad energy permitting and production package`, `Senate passes a public lands conservation and access bill`, `House passes a federal spending oversight bill`, `Sanders introduces a ban on artificial superintelligence`.
 - Members: `Rep. Sample Crossover (local)`, `Rep. Sample Loyal (local)`, `Sen. Sample Crossover (local)`, `Sen. Sample Loyal (local)`.
 - Confirmation heading (keeps the seed suffix): `Jane Doe confirmed as Energy Secretary (local sample)`.
 

@@ -2,6 +2,7 @@ import { cleanVoteQuestion } from "../../../../shared/vote-question";
 import { COMPANION_VOTES_PER_BILL } from "../constants";
 import type { Chamber, NonPassageVoteStub, PassageVote } from "../types";
 import { voteKey } from "../vote-key";
+import { feedMembershipBinds, feedMembershipCteSql } from "./feed-membership";
 import { buildFeedFilterClause, type FeedFilterOptions } from "./feed-search";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
@@ -169,9 +170,9 @@ export interface FeedBillRow {
   bill_congress: number;
   bill_type: string;
   bill_number: number;
-  /** MAX of passage-vote dates only; null when the bill is executive-only. */
+  /** MAX of passage-vote dates only; null when the bill is executive- or intro-only. */
   latest_passage_date: string | null;
-  /** MAX of passage + executive sort dates (feed ordering). */
+  /** MAX of passage + executive + introduction sort dates (feed ordering). */
   latest_activity_date: string;
 }
 
@@ -200,15 +201,16 @@ export async function selectFeedBills(
   db: D1Database,
   voteLookbackDate: string,
   executiveSinceIso: string,
+  introLookbackDate: string,
   limit: number,
   offset = 0,
-  filters: FeedFilterOptions = {}
+  filters: FeedFilterOptions = {},
+  includeIntros = true
 ): Promise<FeedBillRow[]> {
   await ensureSchema(db);
   const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
-    voteLookbackDate,
-    executiveSinceIso,
+    ...feedMembershipBinds(voteLookbackDate, executiveSinceIso, introLookbackDate, includeIntros),
     ...filter.binds,
     limit,
     offset,
@@ -216,20 +218,9 @@ export async function selectFeedBills(
 
   const { results } = await db
     .prepare(
-      `WITH combined AS (
-         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number, MAX(vote_date) AS sort_date, 0 AS executive_boost
-         FROM votes
-         WHERE is_passage = 1 AND vote_date >= ?
-         GROUP BY bill_congress, UPPER(bill_type), bill_number
-         UNION ALL
-         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number, MAX(p.posted_at) AS sort_date, 1 AS executive_boost
-         FROM executive_post_bills b
-         JOIN executive_posts p ON p.id = b.post_id
-         WHERE p.posted_at >= ?
-         GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
-       )
+      `${feedMembershipCteSql(includeIntros)}
        SELECT bill_congress, bill_type, bill_number,
-              MAX(CASE WHEN executive_boost = 0 THEN sort_date END) AS latest_passage_date,
+              MAX(CASE WHEN source = 'vote' THEN sort_date END) AS latest_passage_date,
               MAX(sort_date) AS latest_activity_date
        FROM combined
        ${filter.sql}
@@ -246,32 +237,26 @@ export async function countFeedBills(
   db: D1Database,
   voteLookbackDate: string,
   executiveSinceIso: string,
-  filters: FeedFilterOptions = {}
+  introLookbackDate: string,
+  filters: FeedFilterOptions = {},
+  includeIntros = true
 ): Promise<number> {
   await ensureSchema(db);
   const filter = buildFeedFilterClause(filters);
   const binds: Array<string | number> = [
-    voteLookbackDate,
-    executiveSinceIso,
+    ...feedMembershipBinds(voteLookbackDate, executiveSinceIso, introLookbackDate, includeIntros),
     ...filter.binds,
   ];
 
   const row = await db
     .prepare(
-      `WITH combined AS (
-         SELECT bill_congress, UPPER(bill_type) AS bill_type, bill_number
-         FROM votes
-         WHERE is_passage = 1 AND vote_date >= ?
-         GROUP BY bill_congress, UPPER(bill_type), bill_number
-         UNION
-         SELECT b.bill_congress, UPPER(b.bill_type) AS bill_type, b.bill_number
-         FROM executive_post_bills b
-         JOIN executive_posts p ON p.id = b.post_id
-         WHERE p.posted_at >= ?
-         GROUP BY b.bill_congress, UPPER(b.bill_type), b.bill_number
-       )
-       SELECT COUNT(*) AS total FROM combined
-       ${filter.sql}`
+      `${feedMembershipCteSql(includeIntros)}
+       SELECT COUNT(*) AS total FROM (
+         SELECT bill_congress, bill_type, bill_number
+         FROM combined
+         ${filter.sql}
+         GROUP BY bill_congress, bill_type, bill_number
+       )`
     )
     .bind(...binds)
     .first<{ total: number }>();

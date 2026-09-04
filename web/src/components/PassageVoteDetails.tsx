@@ -157,7 +157,7 @@ export function PassageVoteDetails({
   if (votes.length === 0) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-faint">No passage vote recorded yet.</p>
+        <p className="text-sm text-faint">No floor vote yet.</p>
         <CompanionVotes votes={companionVotes} />
       </div>
     )

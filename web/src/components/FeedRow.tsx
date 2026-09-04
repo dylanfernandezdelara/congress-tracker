@@ -69,7 +69,13 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
           <FeedRowDate
             dateTime={displayDate.iso}
             primary={formatVoteDate(displayDate.iso)}
-            secondary={displayDate.kind === 'signal' ? `${PRESIDENT_LAST_NAME} post` : undefined}
+            secondary={
+              displayDate.kind === 'signal'
+                ? `${PRESIDENT_LAST_NAME} post`
+                : displayDate.kind === 'intro'
+                  ? 'Introduced'
+                  : undefined
+            }
           />
 
           <div className="feed-row-main">
@@ -94,6 +100,9 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
               ) : null}
               {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
               <BillIdChip type={item.bill.type} number={item.bill.number} />
+              {meta.sponsorName ? (
+                <span className="feed-row-chip feed-row-chip--sponsor">{meta.sponsorName}</span>
+              ) : null}
               {meta.presidentDeskChip ? (
                 <span id={deskChipId} className="feed-row-chip feed-row-chip--president-desk">
                   {meta.presidentDeskChip}

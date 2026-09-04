@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPANION_VOTES_PER_BILL } from "../constants";
+import { feedMembershipCteSql } from "./feed-membership";
 import {
   countFeedBills,
   getCompanionVotesForBills,
@@ -312,14 +313,15 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
 
   it("omits chamber/q filters when not provided", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([]);
-    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", 50, 0);
-    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z");
+    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", 50, 0);
+    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24");
 
     const feedSql = preparedSql.filter((s) => s.includes("WITH combined AS"));
     expect(feedSql.length).toBeGreaterThanOrEqual(2);
     for (const sql of feedSql) {
       expect(sql).not.toContain("v.chamber = ?");
-      expect(sql).not.toContain("bill_digests");
+      expect(sql).not.toContain("$.headline");
+      expect(sql).not.toContain("LOWER(d.policy_area) LIKE");
       expect(sql).toMatch(/is_passage = 1/);
     }
     const selectSql = feedSql.find((sql) => sql.includes("LIMIT ? OFFSET ?"));
@@ -329,13 +331,46 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(bindsBySql.get(selectSql!)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       50,
       0,
     ]);
-    expect(bindsBySql.get(countSql!)).toEqual(["2026-05-01", "2026-06-01T00:00:00.000Z"]);
+    expect(bindsBySql.get(countSql!)).toEqual([
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
+    ]);
+    expect(selectSql!.startsWith(feedMembershipCteSql())).toBe(true);
+    expect(countSql!.startsWith(feedMembershipCteSql())).toBe(true);
   });
 
-  it("adds passage-only chamber EXISTS and binds chamber for select and count", async () => {
+  it("omits the intro UNION arm when includeIntros is false", async () => {
+    const { db, preparedSql, bindsBySql } = createMockDb([]);
+    await selectFeedBills(
+      db,
+      "2026-05-01",
+      "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      50,
+      0,
+      {},
+      false
+    );
+    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", {}, false);
+
+    const selectSql = preparedSql.find((sql) => sql.includes("LIMIT ? OFFSET ?"))!;
+    const countSql = preparedSql.find((sql) => sql.includes("SELECT COUNT(*) AS total"))!;
+    expect(selectSql).not.toContain("bill_lifecycle");
+    expect(selectSql).not.toContain("'intro' AS source");
+    expect(countSql).not.toContain("bill_lifecycle");
+    expect(selectSql.startsWith(feedMembershipCteSql(false))).toBe(true);
+    expect(bindsBySql.get(selectSql)).toEqual(["2026-05-01", "2026-06-01T00:00:00.000Z", 50, 0]);
+    expect(bindsBySql.get(countSql)).toEqual(["2026-05-01", "2026-06-01T00:00:00.000Z"]);
+  });
+
+  it("adds vote-chamber EXISTS or intro-source origin types", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([
       {
         bill_congress: 119,
@@ -345,10 +380,12 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
         latest_activity_date: "2026-06-10",
       },
     ]);
-    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", 10, 5, {
+    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", 10, 5, {
       chamber: "House",
     });
-    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", { chamber: "Senate" });
+    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", {
+      chamber: "Senate",
+    });
 
     const selectSql = preparedSql.find(
       (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
@@ -359,11 +396,15 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(selectSql).toContain("v.is_passage = 1");
     expect(selectSql).toContain("v.chamber = ?");
     expect(selectSql).toContain("EXISTS");
+    expect(selectSql).toContain("source = 'intro'");
     expect(countSql).toContain("v.is_passage = 1");
     expect(countSql).toContain("v.chamber = ?");
+    expect(countSql).toContain("source = 'intro'");
     expect(bindsBySql.get(selectSql!)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       "House",
       10,
       5,
@@ -371,6 +412,8 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(bindsBySql.get(countSql!)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       "Senate",
     ]);
   });
@@ -390,6 +433,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       db,
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
       50,
       0
     );
@@ -403,8 +447,10 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
     );
     expect(selectSql).toMatch(
-      /MAX\s*\(\s*CASE\s+WHEN\s+executive_boost\s*=\s*0\s+THEN\s+sort_date\s+END\s*\)\s+AS\s+latest_passage_date/i
+      /MAX\s*\(\s*CASE\s+WHEN\s+source\s*=\s*'vote'\s+THEN\s+sort_date\s+END\s*\)\s+AS\s+latest_passage_date/i
     );
+    expect(selectSql).toContain("'intro' AS source");
+    expect(selectSql).toContain("NOT EXISTS");
     expect(selectSql).toMatch(/MAX\s*\(\s*sort_date\s*\)\s+AS\s+latest_activity_date/i);
     expect(selectSql).toMatch(/ORDER BY\s+latest_activity_date\s+DESC/i);
     expect(selectSql).not.toMatch(/ORDER BY\s+latest_passage_date\s+DESC/i);
@@ -412,10 +458,10 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
 
   it("adds sponsor-state EXISTS and binds state for select and count", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([]);
-    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", 10, 0, {
+    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", 10, 0, {
       state: "NY",
     });
-    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", { state: "NY" });
+    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", { state: "NY" });
 
     const selectSql = preparedSql.find(
       (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
@@ -429,6 +475,8 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(bindsBySql.get(selectSql)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       "NY",
       10,
       0,
@@ -436,16 +484,18 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(bindsBySql.get(countSql)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       "NY",
     ]);
   });
 
   it("adds q search binds for title/policy/headline/bill-id and keeps executive UNION ALL", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([]);
-    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", 20, 0, {
+    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", 20, 0, {
       q: "hr1",
     });
-    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", { q: "hr1" });
+    await countFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", { q: "hr1" });
 
     const selectSql = preparedSql.find(
       (sql) => sql.includes("WITH combined AS") && sql.includes("LIMIT ? OFFSET ?")
@@ -454,12 +504,17 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
       (sql) => sql.includes("WITH combined AS") && sql.includes("SELECT COUNT(*) AS total")
     )!;
     expect(selectSql).toContain("UNION ALL");
-    expect(selectSql).toContain("executive_boost");
+    expect(selectSql).toContain("'vote' AS source");
+    expect(selectSql).toContain("'executive' AS source");
+    expect(selectSql).toContain("bill_lifecycle");
+    expect(selectSql).toContain("introduced_date");
     expect(selectSql).toContain("bill_digests");
     expect(selectSql).toContain("$.headline");
     expect(bindsBySql.get(selectSql)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       "%hr1%",
       "%hr1%",
       "%hr1%",
@@ -470,6 +525,8 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(bindsBySql.get(countSql)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       "%hr1%",
       "%hr1%",
       "%hr1%",
@@ -479,7 +536,7 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
 
   it("ANDs chamber with q and escapes LIKE wildcards in q", async () => {
     const { db, preparedSql, bindsBySql } = createMockDb([]);
-    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", 5, 0, {
+    await selectFeedBills(db, "2026-05-01", "2026-06-01T00:00:00.000Z", "2026-06-24", 5, 0, {
       chamber: "Senate",
       q: "100%",
     });
@@ -492,6 +549,8 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(bindsBySql.get(selectSql)).toEqual([
       "2026-05-01",
       "2026-06-01T00:00:00.000Z",
+      "2026-06-24",
+      12,
       "Senate",
       "%100\\%%",
       "%100\\%%",

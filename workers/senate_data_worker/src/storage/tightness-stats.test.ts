@@ -279,5 +279,9 @@ describe("buildTightnessStats", () => {
     expect(nominee?.nominee_name).toBe("Pam Bondi");
     expect(nominee?.cohesion).toBe("party-line");
     expect(mockSelectMemberVotesForRollKeys).toHaveBeenCalledTimes(1);
+    expect(mockBuildFeedPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ includeIntros: false })
+    );
   });
 });

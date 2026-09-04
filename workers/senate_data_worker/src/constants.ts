@@ -1,5 +1,5 @@
 /** Feed and pipeline tuning (module constants, not env). */
-export { VOTE_LOOKBACK_DAYS } from "../../../shared/feed-constants";
+export { INTRO_LOOKBACK_DAYS, VOTE_LOOKBACK_DAYS } from "../../../shared/feed-constants";
 export {
   TEXT_CHANGES_MAX_LISTED_PROVISIONS,
   TEXT_CHANGES_MAX_STORED_PROVISIONS,
@@ -15,6 +15,24 @@ export const MEMBER_SEARCH_DEFAULT_LIMIT = 8;
 export const MEMBER_SEARCH_MAX_LIMIT = 20;
 /** Bills with executive signals stay feed-visible for this many days. */
 export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
+/**
+ * Shared intro cap after hard-filter + soft-rank: persist and the intro UNION
+ * LIMIT (both chambers). Persist and the read-path UNION both rank by soft
+ * score, then introduced date, then number. Soft score does not drop under-cap
+ * survivors.
+ */
+export const INTRO_FEED_MAX_NEW = 12;
+/** Congress.gov bill-list page size for intro discovery (`/v3/bill/{congress}/{type}`). */
+export const INTRO_DISCOVERY_PAGE_SIZE = 250;
+/** List pages per bill type (hr, s) per run. fromDateTime already limits to the lookback. */
+export const INTRO_DISCOVERY_MAX_PAGES_PER_TYPE = 2;
+/**
+ * Extra bill-detail fetches per intro run (same `/v3/bill/{congress}/{type}/{number}`).
+ * Spend order: undated intro-phrase, undated same-day referral, then dated rows
+ * missing policyArea or primary sponsor (so Private Legislation can fail closed).
+ * Soft score still fails open when those fields stay missing.
+ */
+export const INTRO_DETAIL_FETCHES_PER_RUN = 25;
 /** Homepage statuses fetched per executive ingest run. */
 export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 /** Minimum LLM confidence to auto-link a bill. */

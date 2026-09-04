@@ -1,3 +1,4 @@
+import { originBillTypesSqlList } from "../../../../shared/bill-id";
 import { FEED_SEARCH_MAX_LENGTH } from "../constants";
 import {
   partySqlAliases,
@@ -30,8 +31,11 @@ export function stripBillIdQuery(q: string): string {
 }
 
 export type FeedFilterOptions = {
-  /** Passage-vote chamber (not sponsor chamber). */
-  chamber?: FeedChamberFilter | string;
+  /**
+   * Passage-vote chamber, or originating chamber for intro-only bills
+   * (no passage votes yet).
+   */
+  chamber?: FeedChamberFilter;
   q?: string;
   /** Two-letter primary-sponsor state code. */
   state?: string;
@@ -60,13 +64,21 @@ export function buildFeedFilterClause(options: FeedFilterOptions = {}): {
   const binds: Array<string | number> = [];
 
   if (options.chamber) {
-    clauses.push(`EXISTS (
-         SELECT 1 FROM votes v
-         WHERE v.is_passage = 1
-           AND v.chamber = ?
-           AND v.bill_congress = combined.bill_congress
-           AND UPPER(v.bill_type) = combined.bill_type
-           AND v.bill_number = combined.bill_number
+    const originTypes = originBillTypesSqlList(options.chamber);
+    // Passage-vote chamber, or intro-arm rows that originated in that chamber.
+    clauses.push(`(
+         EXISTS (
+           SELECT 1 FROM votes v
+           WHERE v.is_passage = 1
+             AND v.chamber = ?
+             AND v.bill_congress = combined.bill_congress
+             AND UPPER(v.bill_type) = combined.bill_type
+             AND v.bill_number = combined.bill_number
+         )
+         OR (
+           combined.source = 'intro'
+           AND combined.bill_type IN ${originTypes}
+         )
        )`);
     binds.push(options.chamber);
   }

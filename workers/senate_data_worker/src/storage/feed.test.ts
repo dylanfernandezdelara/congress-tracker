@@ -13,6 +13,7 @@ const mockGetLifecyclesForBills = vi.fn();
 const mockGetCompanionVotesForBills = vi.fn();
 const mockGetBillTextChangesForBills = vi.fn();
 const mockGetProcessSummariesForBills = vi.fn();
+const mockGetPrimarySponsorsForBills = vi.fn();
 const mockLookbackStartIso = vi.fn((days: number) => `lookback-${days}`);
 
 vi.mock("../d1/schema", () => ({
@@ -62,6 +63,14 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
   return {
     ...actual,
     getLifecyclesForBills: (...args: unknown[]) => mockGetLifecyclesForBills(...args),
+  };
+});
+
+vi.mock("../d1/sponsors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/sponsors")>();
+  return {
+    ...actual,
+    getPrimarySponsorsForBills: (...args: unknown[]) => mockGetPrimarySponsorsForBills(...args),
   };
 });
 
@@ -145,6 +154,7 @@ describe("buildFeedPage lifecycle attachment", () => {
     mockGetCompanionVotesForBills.mockResolvedValue(new Map([["119:HR:6644", []]]));
     mockGetBillTextChangesForBills.mockResolvedValue(new Map());
     mockGetProcessSummariesForBills.mockResolvedValue(new Map());
+    mockGetPrimarySponsorsForBills.mockResolvedValue(new Map());
   });
 
   it("forwards optional chamber to feed bill select and count", async () => {
@@ -159,6 +169,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "2026-06-27",
       {
         chamber: "Senate",
         q: undefined,
@@ -168,12 +179,14 @@ describe("buildFeedPage lifecycle attachment", () => {
         sponsorQ: undefined,
         party: undefined,
         policy: undefined,
-      }
+      },
+      true
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "2026-06-27",
       50,
       0,
       {
@@ -185,7 +198,8 @@ describe("buildFeedPage lifecycle attachment", () => {
         sponsorQ: undefined,
         party: undefined,
         policy: undefined,
-      }
+      },
+      true
     );
   });
 
@@ -201,6 +215,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "2026-06-27",
       {
       chamber: undefined,
       q: "housing",
@@ -210,12 +225,14 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "2026-06-27",
       50,
       0,
       {
@@ -227,7 +244,8 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
     );
   });
 
@@ -243,6 +261,7 @@ describe("buildFeedPage lifecycle attachment", () => {
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "2026-06-27",
       {
       chamber: undefined,
       q: undefined,
@@ -252,12 +271,14 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
     );
     expect(mockSelectFeedBills).toHaveBeenCalledWith(
       expect.anything(),
       "lookback-45",
       "lookback-14",
+      "2026-06-27",
       50,
       0,
       {
@@ -269,7 +290,36 @@ describe("buildFeedPage lifecycle attachment", () => {
       sponsorQ: undefined,
       party: undefined,
       policy: undefined,
-    }
+    },
+      true
+    );
+  });
+
+  it("forwards includeIntros: false to feed bill select and count", async () => {
+    await buildFeedPage(createEnv(), {
+      limit: 50,
+      offset: 0,
+      includeIntros: false,
+      now: "2026-07-03",
+    });
+
+    expect(mockCountFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      "2026-06-27",
+      expect.any(Object),
+      false
+    );
+    expect(mockSelectFeedBills).toHaveBeenCalledWith(
+      expect.anything(),
+      "lookback-45",
+      "lookback-14",
+      "2026-06-27",
+      50,
+      0,
+      expect.any(Object),
+      false
     );
   });
 
@@ -320,6 +370,32 @@ describe("buildFeedPage lifecycle attachment", () => {
     mockGetLifecyclesForBills.mockResolvedValue(new Map());
     const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
     expect(page.items[0]?.lifecycle).toBeNull();
+  });
+
+  it("attaches primary_sponsor when a sponsor row exists", async () => {
+    mockGetPrimarySponsorsForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:6644",
+          {
+            congress: 119,
+            bill_type: "HR",
+            bill_number: 6644,
+            bioguide_id: "S000033",
+            full_name: "Sen. Bernard Sanders (local)",
+            party: "I",
+            state: "VT",
+          },
+        ],
+      ])
+    );
+    const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0, now: "2026-07-03" });
+    expect(page.items[0]?.primary_sponsor).toEqual({
+      bioguide_id: "S000033",
+      name: "Sen. Bernard Sanders (local)",
+      party: "I",
+      state: "VT",
+    });
   });
 
   it("preserves feed page response shape with batch reads", async () => {
