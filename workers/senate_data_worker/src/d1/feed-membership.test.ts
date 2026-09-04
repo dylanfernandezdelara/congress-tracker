@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 import { INTRO_FEED_MAX_NEW } from "../constants";
 import {
   introRelevanceScoreSql,
-  selectIntroPersistSet,
+  scoreIntroRelevance,
+  type IntroRelevanceFields,
 } from "../sources/intro-relevance";
 import { feedMembershipCteSql, introOnlyMembershipSql } from "./feed-membership";
 
@@ -42,28 +43,6 @@ describe("intro feed membership ranking", () => {
     expect(sql).toContain(`${scoreSql} DESC, l.introduced_date DESC, l.bill_number DESC`);
     expect(sql).toContain("LIMIT ?");
     expect(INTRO_FEED_MAX_NEW).toBe(12);
-  });
-
-  it("keeps an older high-score intro in the persist/feed cap when newer low-score intros arrive", () => {
-    const newerLow = Array.from({ length: 12 }, (_, i) => ({
-      title: "A bill to amend title 5, United States Code",
-      policyArea: null,
-      primarySponsorBioguide: null,
-      introducedDate: "2026-09-03",
-      number: i + 1,
-    }));
-    const olderAsi = {
-      title: "Ban Artificial Superintelligence Act",
-      policyArea: "Science, Technology, Communications",
-      primarySponsorBioguide: "S000033",
-      introducedDate: "2026-09-01",
-      number: 9901,
-    };
-    const kept = selectIntroPersistSet([...newerLow, olderAsi], INTRO_FEED_MAX_NEW);
-    expect(kept).toHaveLength(12);
-    expect(kept[0]).toMatchObject({ number: 9901, title: "Ban Artificial Superintelligence Act" });
-    expect(kept.some((bill) => bill.number === 9901)).toBe(true);
-    expect(kept.filter((bill) => /to amend title 5/i.test(bill.title ?? "")).length).toBe(11);
   });
 
   it("read-path SQL keeps an older high-score intro when newer low-score intros fill the date slot", () => {
@@ -113,6 +92,67 @@ INSERT INTO bill_digests (congress, bill_type, number, title, policy_area) VALUE
     expect(rows).toHaveLength(12);
     expect(rows[0]).toMatchObject({ bill_type: "S", bill_number: 9901 });
     expect(rows.some((row) => row.bill_number === 9901)).toBe(true);
+  });
+
+  it("SQL score expression matches scoreIntroRelevance for the same fields", () => {
+    const fixtures: IntroRelevanceFields[] = [
+      {
+        title: "Ban Artificial Superintelligence Act",
+        policyArea: "Science, Technology, Communications",
+        primarySponsorBioguide: "S000033",
+      },
+      {
+        title: "Ban Artificial Superintelligence Act",
+        policyArea: null,
+        primarySponsorBioguide: "C001125",
+      },
+      {
+        title: "A bill to amend title 5, United States Code",
+        policyArea: null,
+        primarySponsorBioguide: null,
+      },
+      {
+        title: "USPS Privacy Protection Act",
+        policyArea: "Government Operations and Politics",
+        primarySponsorBioguide: null,
+      },
+      {
+        title: "United States Postal Service Reform Act",
+        policyArea: "   ",
+        primarySponsorBioguide: null,
+      },
+      {
+        title: "Inappropriate Data Use Act",
+        policyArea: null,
+        primarySponsorBioguide: null,
+      },
+      {
+        title: "Housing Reform Act;",
+        policyArea: "Housing and Community Development",
+        primarySponsorBioguide: "S000148",
+      },
+    ];
+    const scoreSql = introRelevanceScoreSql("title", "policy_area", "bioguide_id");
+    const values = fixtures
+      .map((fields, i) => {
+        const title = fields.title === null ? "NULL" : `'${fields.title.replace(/'/g, "''")}'`;
+        const policy = fields.policyArea === null ? "NULL" : `'${fields.policyArea.replace(/'/g, "''")}'`;
+        const bio =
+          fields.primarySponsorBioguide === null
+            ? "NULL"
+            : `'${fields.primarySponsorBioguide.replace(/'/g, "''")}'`;
+        return `(${i}, ${title}, ${policy}, ${bio})`;
+      })
+      .join(",\n");
+    const rows = querySqliteJson(
+      `CREATE TABLE t (id INTEGER, title TEXT, policy_area TEXT, bioguide_id TEXT);
+       INSERT INTO t (id, title, policy_area, bioguide_id) VALUES ${values};`,
+      `SELECT id, ${scoreSql} AS score FROM t ORDER BY id`
+    );
+    expect(rows).toHaveLength(fixtures.length);
+    for (const [i, fields] of fixtures.entries()) {
+      expect(Number(rows[i]?.score), fields.title ?? "null title").toBe(scoreIntroRelevance(fields));
+    }
   });
 });
 

@@ -65,13 +65,22 @@ export const SUBSTANTIVE_TITLE_TOKENS = [
   "tariff",
 ] as const;
 
-const SUBSTANTIVE_TITLE_MATCHERS: RegExp[] = SUBSTANTIVE_TITLE_TOKENS.map((token) => {
-  if (token.includes(" ")) {
-    return new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-  }
-  if (token === "appropriat") return /\bappropriat/i;
-  return new RegExp(`\\b${token}\\b`, "i");
-});
+/** Punctuation folded to spaces so JS `\\b` and SQL space-padding agree. */
+const TITLE_PUNCT_CHARS = [",", ".", "-", ":", ";", "(", ")", "'"] as const;
+
+type SubstantiveTokenKind = "phrase" | "prefix" | "word";
+
+function substantiveTokenKind(token: string): SubstantiveTokenKind {
+  if (token.includes(" ")) return "phrase";
+  if (token === "appropriat") return "prefix";
+  return "word";
+}
+
+function padNormalizedIntroTitle(title: string): string {
+  let folded = title.toLowerCase();
+  for (const ch of TITLE_PUNCT_CHARS) folded = folded.split(ch).join(" ");
+  return ` ${folded.replace(/\s+/g, " ").trim()} `;
+}
 
 const VANITY_POLICY_AREAS = new Set([
   "private legislation",
@@ -104,13 +113,20 @@ export function isPrivateLegislationPolicy(policyArea: string | null): boolean {
 /** Named/short-title Act — not a bare “To amend …” vehicle. */
 export function hasNamedActShape(title: string | null): boolean {
   if (!title) return false;
-  if (!/\bAct\b/i.test(title)) return false;
+  if (!padNormalizedIntroTitle(title).includes(" act ")) return false;
   return !/^(a bill\s+)?to amend\b/i.test(title.trim());
 }
 
 export function hasSubstantiveTitleToken(title: string | null): boolean {
   if (!title) return false;
-  return SUBSTANTIVE_TITLE_MATCHERS.some((re) => re.test(title));
+  const lower = title.toLowerCase();
+  const padded = padNormalizedIntroTitle(title);
+  return SUBSTANTIVE_TITLE_TOKENS.some((token) => {
+    const kind = substantiveTokenKind(token);
+    if (kind === "phrase") return lower.includes(token);
+    if (kind === "prefix") return padded.includes(` ${token}`);
+    return padded.includes(` ${token} `);
+  });
 }
 
 /**
@@ -173,7 +189,7 @@ export function scoreIntroRelevance(fields: IntroRelevanceFields): number {
   if (hasSubstantiveTitleToken(fields.title)) score += 2;
   const bioguide = fields.primarySponsorBioguide?.trim().toUpperCase() ?? "";
   if (bioguide && PROMINENT_INTRO_SPONSOR_BIOGUIDES.has(bioguide)) score += 2;
-  if (fields.policyArea && !isVanityAdjacentPolicy(fields.policyArea)) score += 1;
+  if (normalizePolicy(fields.policyArea) && !isVanityAdjacentPolicy(fields.policyArea)) score += 1;
   return score;
 }
 
@@ -213,12 +229,30 @@ function sqlStringLit(value: string): string {
 }
 
 function sqlNormalizedTitle(titleExpr: string): string {
-  return `(' ' || LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${titleExpr}, ''), ',', ' '), '.', ' '), '-', ' '), ':', ' ')) || ' ')`;
+  let folded = `LOWER(COALESCE(${titleExpr}, ''))`;
+  for (const ch of TITLE_PUNCT_CHARS) {
+    folded = `REPLACE(${folded}, ${sqlStringLit(ch)}, ' ')`;
+  }
+  return `(' ' || ${folded} || ' ')`;
+}
+
+function sqlTokenPredicate(titleExpr: string, titleNorm: string, token: string): string {
+  const kind = substantiveTokenKind(token);
+  if (kind === "phrase") {
+    return `LOWER(COALESCE(${titleExpr}, '')) LIKE ${sqlStringLit(`%${token}%`)}`;
+  }
+  if (kind === "prefix") {
+    return `${titleNorm} LIKE ${sqlStringLit(`% ${token}%`)}`;
+  }
+  return `${titleNorm} LIKE ${sqlStringLit(`% ${token} %`)}`;
 }
 
 /**
  * SQLite expression matching {@link scoreIntroRelevance} so the feed UNION
  * can ORDER BY the same rank the persist cap uses.
+ *
+ * `titleExpr` / `policyExpr` / `bioguideExpr` are SQL identifier fragments
+ * from our code (e.g. `d.title`), not request binds.
  */
 export function introRelevanceScoreSql(
   titleExpr: string,
@@ -227,15 +261,9 @@ export function introRelevanceScoreSql(
 ): string {
   const titleNorm = sqlNormalizedTitle(titleExpr);
   const actShape = `(${titleNorm} LIKE '% act %' AND LOWER(TRIM(COALESCE(${titleExpr}, ''))) NOT LIKE 'to amend%' AND LOWER(TRIM(COALESCE(${titleExpr}, ''))) NOT LIKE 'a bill to amend%')`;
-  const tokenMatch = `(${SUBSTANTIVE_TITLE_TOKENS.map((token) => {
-    if (token.includes(" ")) {
-      return `LOWER(COALESCE(${titleExpr}, '')) LIKE ${sqlStringLit(`%${token}%`)}`;
-    }
-    if (token === "appropriat") {
-      return `LOWER(COALESCE(${titleExpr}, '')) LIKE '%appropriat%'`;
-    }
-    return `${titleNorm} LIKE ${sqlStringLit(`% ${token} %`)}`;
-  }).join(" OR ")})`;
+  const tokenMatch = `(${SUBSTANTIVE_TITLE_TOKENS.map((token) =>
+    sqlTokenPredicate(titleExpr, titleNorm, token)
+  ).join(" OR ")})`;
   const bios = [...PROMINENT_INTRO_SPONSOR_BIOGUIDES].map(sqlStringLit).join(", ");
   const sponsor = `(UPPER(TRIM(COALESCE(${bioguideExpr}, ''))) IN (${bios}))`;
   const vanity = [...VANITY_POLICY_AREAS].map(sqlStringLit).join(", ");
