@@ -1,10 +1,26 @@
 import { INTRO_FEED_MAX_NEW } from "../constants";
+import { introRelevanceScoreSql } from "../sources/intro-relevance";
 
-/** Newest intro-only rows in the lookback. Voted bills stay on the vote arm. */
-function introOnlyMembershipSql(): string {
+const INTRO_SCORE_SQL = introRelevanceScoreSql("d.title", "d.policy_area", "s.bioguide_id");
+
+/** Intro-only rows in the lookback, ranked like persist (score → date → number). */
+export function introOnlyMembershipSql(): string {
   return `SELECT l.congress AS bill_congress, UPPER(l.bill_type) AS bill_type, l.bill_number,
                 l.introduced_date AS sort_date, 'intro' AS source
          FROM bill_lifecycle l
+         LEFT JOIN bill_digests d
+           ON d.congress = l.congress
+          AND UPPER(d.bill_type) = UPPER(l.bill_type)
+          AND d.number = l.bill_number
+         LEFT JOIN (
+           SELECT congress, UPPER(bill_type) AS bill_type, bill_number, MIN(bioguide_id) AS bioguide_id
+           FROM bill_sponsors
+           WHERE is_primary = 1
+           GROUP BY congress, UPPER(bill_type), bill_number
+         ) s
+           ON s.congress = l.congress
+          AND s.bill_type = UPPER(l.bill_type)
+          AND s.bill_number = l.bill_number
          WHERE l.introduced_date >= ?
            AND NOT EXISTS (
              SELECT 1 FROM votes v
@@ -13,7 +29,7 @@ function introOnlyMembershipSql(): string {
                AND UPPER(v.bill_type) = UPPER(l.bill_type)
                AND v.bill_number = l.bill_number
            )
-         ORDER BY l.introduced_date DESC, l.bill_number DESC
+         ORDER BY ${INTRO_SCORE_SQL} DESC, l.introduced_date DESC, l.bill_number DESC
          LIMIT ?`;
 }
 

@@ -17,7 +17,9 @@ export const MEMBER_SEARCH_MAX_LIMIT = 20;
 export const EXECUTIVE_SIGNAL_LOOKBACK_DAYS = 14;
 /**
  * Shared intro cap after hard-filter + soft-rank: persist and the intro UNION
- * LIMIT (both chambers). Soft score ranks; it does not drop under-cap survivors.
+ * LIMIT (both chambers). Persist and the read-path UNION both rank by soft
+ * score, then introduced date, then number. Soft score does not drop under-cap
+ * survivors.
  */
 export const INTRO_FEED_MAX_NEW = 12;
 /** Congress.gov bill-list page size for intro discovery (`/v3/bill/{congress}/{type}`). */

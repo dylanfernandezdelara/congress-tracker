@@ -29,6 +29,18 @@ describe("hard excludes", () => {
     ).toBe(true);
   });
 
+  it("does not hard-drop a USPS policy title that uses designate or name", () => {
+    expect(isJunkIntroTitle("United States Postal Service Reform Act")).toBe(false);
+    expect(
+      isHardExcludedIntro({
+        title: "To designate the United States Postal Service as a critical infrastructure agency",
+        policyArea: "Government Operations and Politics",
+        primarySponsorBioguide: null,
+      })
+    ).toBe(false);
+    expect(isJunkIntroTitle("USPS Privacy Protection Act")).toBe(false);
+  });
+
   it("drops commemorative coin/medal/stamp-only and pure Gold Medal honors", () => {
     expect(isJunkIntroTitle("To provide for the minting of a commemorative coin honoring Jane Doe")).toBe(
       true

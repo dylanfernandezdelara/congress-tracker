@@ -112,10 +112,16 @@ export function hasSubstantiveTitleToken(title: string | null): boolean {
   return SUBSTANTIVE_TITLE_MATCHERS.some((re) => re.test(title));
 }
 
+/**
+ * Facility designation/naming only — not USPS policy bills that happen to
+ * mention the Postal Service plus designate/name.
+ */
 function isPostalFacilityNamingTitle(title: string): boolean {
   const t = title.toLowerCase();
   const namesFacility =
-    /united states postal service/.test(t) || /\busps\b/.test(t) || /post office building/.test(t);
+    /facility of the (united states )?postal service/.test(t) ||
+    /\busps facility\b/.test(t) ||
+    /post office building/.test(t);
   if (!namesFacility) return false;
   return /designat|nam(?:e|ing)\b/.test(t);
 }
@@ -199,4 +205,39 @@ export function compareIntroItems(a: IntroRankKey, b: IntroRankKey): number {
 /** Rank then cap. Soft score never drops an under-cap survivor. */
 export function selectIntroPersistSet<T extends IntroRankKey>(items: T[], maxNew: number): T[] {
   return [...items].sort(compareIntroItems).slice(0, maxNew);
+}
+
+function sqlStringLit(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function sqlNormalizedTitle(titleExpr: string): string {
+  return `(' ' || LOWER(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${titleExpr}, ''), ',', ' '), '.', ' '), '-', ' '), ':', ' ')) || ' ')`;
+}
+
+/**
+ * SQLite expression matching {@link scoreIntroRelevance} so the feed UNION
+ * can ORDER BY the same rank the persist cap uses.
+ */
+export function introRelevanceScoreSql(
+  titleExpr: string,
+  policyExpr: string,
+  bioguideExpr: string
+): string {
+  const titleNorm = sqlNormalizedTitle(titleExpr);
+  const actShape = `(${titleNorm} LIKE '% act %' AND LOWER(TRIM(COALESCE(${titleExpr}, ''))) NOT LIKE 'to amend%' AND LOWER(TRIM(COALESCE(${titleExpr}, ''))) NOT LIKE 'a bill to amend%')`;
+  const tokenMatch = `(${SUBSTANTIVE_TITLE_TOKENS.map((token) => {
+    if (token.includes(" ")) {
+      return `LOWER(COALESCE(${titleExpr}, '')) LIKE ${sqlStringLit(`%${token}%`)}`;
+    }
+    if (token === "appropriat") {
+      return `LOWER(COALESCE(${titleExpr}, '')) LIKE '%appropriat%'`;
+    }
+    return `${titleNorm} LIKE ${sqlStringLit(`% ${token} %`)}`;
+  }).join(" OR ")})`;
+  const bios = [...PROMINENT_INTRO_SPONSOR_BIOGUIDES].map(sqlStringLit).join(", ");
+  const sponsor = `(UPPER(TRIM(COALESCE(${bioguideExpr}, ''))) IN (${bios}))`;
+  const vanity = [...VANITY_POLICY_AREAS].map(sqlStringLit).join(", ");
+  const policyBoost = `(TRIM(COALESCE(${policyExpr}, '')) != '' AND LOWER(TRIM(${policyExpr})) NOT IN (${vanity}))`;
+  return `(CASE WHEN ${actShape} THEN 3 ELSE 0 END + CASE WHEN ${tokenMatch} THEN 2 ELSE 0 END + CASE WHEN ${sponsor} THEN 2 ELSE 0 END + CASE WHEN ${policyBoost} THEN 1 ELSE 0 END)`;
 }

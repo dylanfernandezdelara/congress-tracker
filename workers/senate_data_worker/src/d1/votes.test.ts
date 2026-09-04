@@ -320,7 +320,8 @@ describe("selectFeedBills / countFeedBills chamber + q filters", () => {
     expect(feedSql.length).toBeGreaterThanOrEqual(2);
     for (const sql of feedSql) {
       expect(sql).not.toContain("v.chamber = ?");
-      expect(sql).not.toContain("bill_digests");
+      expect(sql).not.toContain("$.headline");
+      expect(sql).not.toContain("LOWER(d.policy_area) LIKE");
       expect(sql).toMatch(/is_passage = 1/);
     }
     const selectSql = feedSql.find((sql) => sql.includes("LIMIT ? OFFSET ?"));
