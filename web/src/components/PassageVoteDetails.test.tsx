@@ -85,11 +85,14 @@ describe('PassageVoteDetails', () => {
       />,
     )
 
-    expect(screen.getByRole('link', { name: 'Chris Coons' })).toHaveAttribute(
+    const linkedName = screen.getByRole('link', { name: 'Chris Coons' })
+    expect(linkedName).toHaveAttribute(
       'href',
       'https://www.congress.gov/member/chris-coons/C001088',
     )
+    expect(linkedName.closest('li')).toHaveTextContent(/^Chris Coons\s*D-DE$/)
     expect(screen.queryByRole('link', { name: 'Local Sample' })).not.toBeInTheDocument()
-    expect(screen.getByText('Local Sample')).toBeInTheDocument()
+    const plainName = screen.getByText('Local Sample')
+    expect(plainName.closest('li')).toHaveTextContent(/^Local Sample\s*R-TX$/)
   })
 })
