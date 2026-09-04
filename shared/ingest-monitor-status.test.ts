@@ -6,7 +6,6 @@ import {
   isDegradedChamberWarning,
   isIngestMonitorHealthy,
   isIngestMonitorOpsAcceptable,
-  isIntroDiscoverySoftFailure,
   isIntroListFailureWarning,
   isIngestTruncationWarning,
   isSenateCacheFallbackWarning,
@@ -87,11 +86,7 @@ describe("ingest monitor status helpers", () => {
     ).toBe(false);
     expect(isIntroListFailureWarning("Intro list failed: HTTP 429")).toBe(true);
     expect(isIntroListFailureWarning("S. 9901: upsert failed")).toBe(false);
-    expect(isIntroDiscoverySoftFailure(undefined, ["Intro list failed: HTTP 429"])).toBe(false);
-    expect(isIntroDiscoverySoftFailure(0, [])).toBe(false);
-    expect(isIntroDiscoverySoftFailure(0, ["Intro list failed: HTTP 429"])).toBe(true);
-    expect(isIntroDiscoverySoftFailure(3, ["S. 9901: upsert failed"])).toBe(false);
-    expect(isIntroDiscoverySoftFailure(2, ["Intro list failed: HTTP 403"])).toBe(true);
+    expect(isIntroListFailureWarning("HTTP 429")).toBe(false);
   });
 });
 
@@ -102,54 +97,54 @@ describe("evaluateIngestMonitorStatus intro discovery", () => {
     trigger: "scheduled" as const,
   };
 
-  it("stays ok for a healthy intro run", () => {
-    const result = evaluateIngestMonitorStatus({
-      now,
-      staleAfterHours: 26,
-      scheduledSuccess,
-      lastFailure: null,
-      introsDiscovered: 4,
-      introsPersisted: 4,
-      introWarnings: [],
-    });
-    expect(result.status).toBe("ok");
+  it("stays ok when intro warnings are empty or unprefixed", () => {
+    expect(
+      evaluateIngestMonitorStatus({
+        now,
+        staleAfterHours: 26,
+        scheduledSuccess,
+        lastFailure: null,
+        introWarnings: [],
+      }).status
+    ).toBe("ok");
+    expect(
+      evaluateIngestMonitorStatus({
+        now,
+        staleAfterHours: 26,
+        scheduledSuccess,
+        lastFailure: null,
+        introWarnings: ["HTTP 429"],
+      }).status
+    ).toBe("ok");
+    expect(
+      evaluateIngestMonitorStatus({
+        now,
+        staleAfterHours: 26,
+        scheduledSuccess,
+        lastFailure: null,
+        introWarnings: ["S. 9901: upsert failed"],
+      }).status
+    ).toBe("ok");
+    expect(
+      evaluateIngestMonitorStatus({
+        now,
+        staleAfterHours: 26,
+        scheduledSuccess,
+        lastFailure: null,
+      }).status
+    ).toBe("ok");
   });
 
-  it("stays ok for a quiet 0-intro day with empty warnings", () => {
+  it("marks degraded on Intro list failed: prefix", () => {
     const result = evaluateIngestMonitorStatus({
       now,
       staleAfterHours: 26,
       scheduledSuccess,
       lastFailure: null,
-      introsDiscovered: 0,
-      introsPersisted: 0,
-      introWarnings: [],
-    });
-    expect(result.status).toBe("ok");
-  });
-
-  it("marks degraded on intro list soft-fail", () => {
-    const result = evaluateIngestMonitorStatus({
-      now,
-      staleAfterHours: 26,
-      scheduledSuccess,
-      lastFailure: null,
-      introsDiscovered: 0,
-      introsPersisted: 0,
       introWarnings: ["Intro list failed: HTTP 429"],
     });
     expect(result.status).toBe("degraded");
     expect(result.message).toContain("Intro discovery soft-failed");
     expect(result.message).toContain("HTTP 429");
-  });
-
-  it("stays ok for legacy last_success without intros* fields", () => {
-    const result = evaluateIngestMonitorStatus({
-      now,
-      staleAfterHours: 26,
-      scheduledSuccess,
-      lastFailure: null,
-    });
-    expect(result.status).toBe("ok");
   });
 });

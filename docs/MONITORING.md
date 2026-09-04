@@ -58,12 +58,12 @@ always persists `introsDiscovered`, `introsPersisted`, and `intro_warnings` on
 the success record — including zeros / empty arrays. Morning ops should read
 `data.ingest.status`, `last_success.introsDiscovered` / `introsPersisted`,
 `last_success.intro_warnings`, and Observability events
-`feed_pipeline_failed` / `feed_pipeline_intro_list_failed`. A post-#168 run
-that records `Intro list failed:…` (or `introsDiscovered: 0` with non-empty
-`intro_warnings`) is **`degraded`**. Pre-#168 `last_success` rows omit the
+`feed_pipeline_failed` / `feed_pipeline_intro_list_failed`. A run that records
+`Intro list failed:…` is **`degraded`**. Pre-#168 `last_success` rows omit the
 `intros*` keys and stay `ok` when otherwise fresh — do not treat missing fields
 on those legacy records as a failure. A quiet day (`introsDiscovered: 0`, empty
-warnings) stays `ok`. Per-bill persist warnings do not flip status.
+warnings) stays `ok`. Per-bill persist warnings and unprefixed leftover strings
+do not flip status.
 A warning that a chamber **source listed latest YYYY-MM-DD is newer than stored**
 is **`failed`** — listed/menu dates got ahead of D1. Successful runs persist
 `house_source_latest_date` / `senate_source_latest_date` on `last_success` for

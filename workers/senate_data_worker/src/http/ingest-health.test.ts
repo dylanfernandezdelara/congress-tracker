@@ -202,67 +202,6 @@ describe("evaluateIngestMonitorStatus", () => {
     expect(result.status).toBe("degraded");
     expect(result.message).toContain("stale");
   });
-
-  it("stays ok for a healthy intro run", () => {
-    const result = evaluateIngestMonitorStatus({
-      now,
-      staleAfterHours: 26,
-      scheduledSuccess: {
-        completed_at: "2026-06-23T10:05:00.000Z",
-        trigger: "scheduled",
-        votesUpserted: 0,
-        votesSkipped: 10,
-        billsSelected: 5,
-        digestsWritten: 2,
-        digestsSkipped: 3,
-      },
-      lastFailure: null,
-      introsDiscovered: 3,
-      introsPersisted: 3,
-      introWarnings: [],
-    });
-    expect(result.status).toBe("ok");
-  });
-
-  it("marks degraded on intro list soft-fail", () => {
-    const result = evaluateIngestMonitorStatus({
-      now,
-      staleAfterHours: 26,
-      scheduledSuccess: {
-        completed_at: "2026-06-23T10:05:00.000Z",
-        trigger: "scheduled",
-        votesUpserted: 0,
-        votesSkipped: 10,
-        billsSelected: 5,
-        digestsWritten: 2,
-        digestsSkipped: 3,
-      },
-      lastFailure: null,
-      introsDiscovered: 0,
-      introsPersisted: 0,
-      introWarnings: ["Intro list failed: HTTP 429"],
-    });
-    expect(result.status).toBe("degraded");
-    expect(result.message).toContain("Intro discovery soft-failed");
-  });
-
-  it("stays ok for legacy last_success without intros* fields", () => {
-    const result = evaluateIngestMonitorStatus({
-      now,
-      staleAfterHours: 26,
-      scheduledSuccess: {
-        completed_at: "2026-06-23T10:05:00.000Z",
-        trigger: "scheduled",
-        votesUpserted: 0,
-        votesSkipped: 10,
-        billsSelected: 5,
-        digestsWritten: 2,
-        digestsSkipped: 3,
-      },
-      lastFailure: null,
-    });
-    expect(result.status).toBe("ok");
-  });
 });
 
 describe("buildIngestMonitorPayload", () => {

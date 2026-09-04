@@ -43,22 +43,9 @@ export function isDegradedChamberWarning(warning) {
   return DEGRADED_CHAMBER_WARNING.some((test) => test(warning));
 }
 
-/** Soft intro discovery failure persisted on post-#168 feed success records. */
+/** Soft intro list-fetch failure persisted on feed success records. */
 export function isIntroListFailureWarning(warning) {
   return /intro list failed:/i.test(warning);
-}
-
-/**
- * Post-#168 runs persist `introsDiscovered`. Legacy last_success records omit
- * the key — do not degrade those. Soft-fail is list discovery failure (prefix
- * or discovered=0 with intro_warnings), not a quiet 0-intro day.
- */
-export function isIntroDiscoverySoftFailure(introsDiscovered, introWarnings) {
-  if (typeof introsDiscovered !== "number") return false;
-  const warnings = introWarnings ?? [];
-  if (warnings.length === 0) return false;
-  if (warnings.some(isIntroListFailureWarning)) return true;
-  return introsDiscovered === 0;
 }
 
 export function classifyChamberWarningSeverity(warnings) {
@@ -162,12 +149,10 @@ export function evaluateIngestMonitorStatus(params) {
     };
   }
 
-  const introSoftFail = isIntroDiscoverySoftFailure(
-    params.introsDiscovered,
-    params.introWarnings
-  );
+  const introWarnings = params.introWarnings ?? [];
+  const introSoftFail = introWarnings.some(isIntroListFailureWarning);
   const introMessage = introSoftFail
-    ? `Intro discovery soft-failed: ${(params.introWarnings ?? []).join("; ")}`
+    ? `Intro discovery soft-failed: ${introWarnings.filter(isIntroListFailureWarning).join("; ")}`
     : "";
 
   if (warningSeverity === "degraded" || introSoftFail) {

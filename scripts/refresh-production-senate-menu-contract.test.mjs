@@ -111,20 +111,7 @@ test("refresh script shares ingest evaluator with Worker (no forked FSM)", async
       trigger: "scheduled",
     },
     lastFailure: null,
-    introsDiscovered: 0,
-    introsPersisted: 0,
     introWarnings: ["Intro list failed: HTTP 429"],
   });
   assert.equal(introSoftFail.status, "degraded");
-
-  const legacyOk = evaluateIngestMonitorStatus({
-    now,
-    staleAfterHours: 26,
-    scheduledSuccess: {
-      completed_at: "2026-06-23T10:05:00.000Z",
-      trigger: "scheduled",
-    },
-    lastFailure: null,
-  });
-  assert.equal(legacyOk.status, "ok");
 });

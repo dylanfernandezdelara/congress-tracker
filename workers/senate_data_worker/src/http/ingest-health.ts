@@ -31,7 +31,7 @@ function sanitizeFailureRecord(
   };
 }
 
-function sanitizeChamberWarnings(
+function sanitizeWarnings(
   warnings: readonly string[] | null | undefined
 ): string[] {
   if (!warnings?.length) return [];
@@ -48,10 +48,10 @@ function sanitizeRunRecord(
   return {
     ...record,
     ...(hasChamber
-      ? { chamber_warnings: sanitizeChamberWarnings(record.chamber_warnings) }
+      ? { chamber_warnings: sanitizeWarnings(record.chamber_warnings) }
       : {}),
     ...(hasIntro
-      ? { intro_warnings: sanitizeChamberWarnings(record.intro_warnings) }
+      ? { intro_warnings: sanitizeWarnings(record.intro_warnings) }
       : {}),
   };
 }
@@ -66,8 +66,6 @@ export function evaluateIngestMonitorStatus<
   lastFailure: FeedPipelineFailureRecord | null;
   chamberWarnings?: readonly string[] | null;
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
-  introsDiscovered?: number | null;
-  introsPersisted?: number | null;
   introWarnings?: readonly string[] | null;
 }): {
   status: IngestMonitorStatus;
@@ -112,8 +110,8 @@ export function buildIngestMonitorPayload(params: {
   // after menu refresh). Scheduled freshness still comes from scheduledSuccess;
   // sticky scheduled hard-skip warnings must not keep paging after a newer clean run.
   const newestSuccess = params.lastSuccess ?? scheduledSuccess;
-  const publicWarnings = sanitizeChamberWarnings(newestSuccess?.chamber_warnings);
-  const publicIntroWarnings = sanitizeChamberWarnings(newestSuccess?.intro_warnings);
+  const publicWarnings = sanitizeWarnings(newestSuccess?.chamber_warnings);
+  const publicIntroWarnings = sanitizeWarnings(newestSuccess?.intro_warnings);
   const evaluated = evaluateIngestMonitorStatus({
     now: params.now,
     staleAfterHours: params.staleAfterHours,
@@ -121,8 +119,6 @@ export function buildIngestMonitorPayload(params: {
     lastFailure: params.lastFailure,
     chamberWarnings: publicWarnings,
     senateVoteMenuCache: params.senateVoteMenuCache ?? null,
-    introsDiscovered: newestSuccess?.introsDiscovered,
-    introsPersisted: newestSuccess?.introsPersisted,
     introWarnings: publicIntroWarnings,
   });
 
