@@ -724,13 +724,6 @@
     color: hsl(var(--twc-faint));
   }
 
-  .feed-row-share-bar {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    margin: -0.35rem 0 0.5rem;
-  }
-
   .feed-row-sponsor {
     margin: 0 0 0.85rem;
     font-size: 13px;
@@ -753,6 +746,7 @@
 
   .feed-row-share {
     position: relative;
+    align-self: flex-end;
     display: flex;
     flex-shrink: 0;
     align-items: center;
@@ -779,33 +773,19 @@
     inset: -6px;
   }
 
-  .feed-row-copy-link,
-  .bill-share-sheet-share {
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    font: inherit;
-    font-size: 13px;
-    font-weight: 400;
-    letter-spacing: -0.15px;
-    color: hsl(var(--twc-secondary));
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-color: hsl(var(--twc-link-decoration));
-  }
-
-  .feed-row-share:hover,
-  .feed-row-copy-link:hover,
-  .bill-share-sheet-share:hover {
+  .feed-row-share:hover {
     color: hsl(var(--twc-foreground));
   }
 
-  .feed-row-share:focus-visible,
-  .feed-row-copy-link:focus-visible,
-  .bill-share-sheet-share:focus-visible {
+  .feed-row-share:focus-visible {
     outline: 2px solid hsl(var(--twc-foreground));
     outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .feed-row-share:hover {
+      border-color: hsl(var(--twc-border-hover));
+    }
   }
 
   @keyframes feed-row-detail-enter {

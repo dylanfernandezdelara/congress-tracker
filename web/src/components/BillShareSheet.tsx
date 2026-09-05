@@ -53,7 +53,7 @@ export function BillShareSheet({
             Share
           </button>
         ) : null}
-        <button type="button" className="feed-row-copy-link" onClick={onCopy}>
+        <button type="button" className="bill-share-sheet-copy" onClick={onCopy}>
           {copied ? 'Copied' : 'Copy link'}
         </button>
       </div>

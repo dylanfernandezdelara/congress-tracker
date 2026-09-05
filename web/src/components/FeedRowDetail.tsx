@@ -95,17 +95,15 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
 
   return (
     <div className="feed-row-detail">
-      <div className="feed-row-share-bar">
-        <button
-          type="button"
-          className="feed-row-share"
-          onClick={openShareSheet}
-          aria-label="Share"
-          title="Share"
-        >
-          <ShareIcon />
-        </button>
-      </div>
+      <button
+        type="button"
+        className="feed-row-share"
+        onClick={openShareSheet}
+        aria-label="Share"
+        title="Share"
+      >
+        <ShareIcon />
+      </button>
 
       {sponsorLine ? (
         <p className="feed-row-sponsor" aria-labelledby={sponsorHeadingId}>
