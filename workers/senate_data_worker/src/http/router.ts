@@ -50,6 +50,7 @@ import {
 import { normalizeFeedSearchQuery } from "../d1/feed-search";
 import { searchMembers } from "../d1/members";
 import { listPolicyAreas } from "../d1/policy-areas";
+import { tryRewriteBillOg } from "./bill-og";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
@@ -875,6 +876,8 @@ export async function handlePublicFetch(
   }
 
   if (env.ASSETS && !isApiPath(pathname)) {
+    const rewritten = await tryRewriteBillOg(request, env);
+    if (rewritten) return rewritten;
     return env.ASSETS.fetch(request);
   }
 

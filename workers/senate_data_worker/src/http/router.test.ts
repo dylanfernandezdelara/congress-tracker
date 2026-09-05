@@ -1015,6 +1015,55 @@ describe("HTTP API", () => {
     expect(response).toBe(assetResponse);
   });
 
+  it("rewrites bill OG tags on HTML navigations to /?bill=", async () => {
+    const shell = `<!DOCTYPE html><html><head>
+      <meta property="og:title" content="Track Congress" />
+      <meta property="og:description" content="Site" />
+      <meta property="og:url" content="https://trackcongress.org/" />
+      <meta name="twitter:title" content="Track Congress" />
+      <meta name="twitter:description" content="Site" />
+      <link rel="canonical" href="https://trackcongress.org/" />
+    </head><body></body></html>`;
+    const ASSETS = {
+      fetch: vi.fn(async () =>
+        new Response(shell, { headers: { "content-type": "text/html; charset=utf-8" } })
+      ),
+    };
+    const stmt = {
+      bind: vi.fn(() => stmt),
+      first: vi.fn(async () => ({
+        congress: 119,
+        bill_type: "HR",
+        number: 1,
+        title: "Energy Act",
+        policy_area: null,
+        raw_summary_text: null,
+        digest_json: JSON.stringify({
+          headline: "House passes a broad energy package",
+          what_it_does: "Speeds permitting.",
+          key_points: [],
+          terms_explained: [],
+        }),
+      })),
+      all: vi.fn(async () => ({ results: [] })),
+      run: vi.fn(async () => ({ success: true, meta: {} })),
+    };
+    const DB = {
+      exec: vi.fn(async () => {}),
+      prepare: vi.fn(() => stmt),
+    };
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/?bill=119-hr-1", {
+        headers: { Accept: "text/html" },
+      }),
+      createMockEnv({ ASSETS, DB }) as any
+    );
+    expect(ASSETS.fetch).toHaveBeenCalledOnce();
+    const html = await response.text();
+    expect(html).toContain('property="og:title" content="House passes a broad energy package"');
+    expect(html).not.toContain('property="og:title" content="Track Congress"');
+  });
+
   it("keeps JSON 404s for unknown API paths even when ASSETS is bound", async () => {
     const ASSETS = { fetch: vi.fn(async () => new Response("html")) };
     const response = await handlePublicFetch(

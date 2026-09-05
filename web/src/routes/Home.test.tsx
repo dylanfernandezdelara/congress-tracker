@@ -923,7 +923,7 @@ describe('Home', () => {
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
   })
 
-  it('scopes deep links to the active chamber filter', async () => {
+  it('resolves a deep-linked bill hidden by the chamber filter via bill-id search', async () => {
     const houseItem = makeFeedItem({
       bill: { congress: 119, type: 'HR', number: 1, title: 'House bill' },
       digest: {
@@ -947,23 +947,30 @@ describe('Home', () => {
       ],
     })
 
-    fetchFeed.mockImplementation(async (options: { chamber?: 'House' | 'Senate' }) => {
+    fetchFeed.mockImplementation(async (options: { chamber?: 'House' | 'Senate'; q?: string }) => {
+      if (options.q === 'H.R. 1') {
+        return pageResponse([houseItem], { total: 1 })
+      }
       if (options.chamber === 'Senate') {
         return pageResponse([], { total: 0 })
       }
       return pageResponse([houseItem], { total: 1 })
     })
 
+    const scrollIntoView = vi.fn()
+    HTMLElement.prototype.scrollIntoView = scrollIntoView
+
     renderHome('/?chamber=Senate&bill=119-hr-1')
 
-    expect(
-      await screen.findByText('That bill is no longer in the recent feed.'),
-    ).toBeInTheDocument()
+    const toggle = await screen.findByRole('button', { name: /House only bill/i })
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
     expect(fetchFeed).toHaveBeenCalledWith({
       limit: 15,
       offset: 0,
-      chamber: 'Senate',
+      q: 'H.R. 1',
     })
-    expect(screen.queryByText('House only bill')).not.toBeInTheDocument()
+    expect(screen.queryByText('That bill is no longer in the recent feed.')).not.toBeInTheDocument()
   })
 })

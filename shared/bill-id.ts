@@ -34,6 +34,34 @@ function normalizeBillTypeCode(type: string): string {
   return type.trim().toUpperCase().replace(/\./g, '')
 }
 
+const BILL_QUERY_TYPES = new Set(Object.keys(TYPE_LABELS))
+
+/** Canonical share/deep-link form: `119-hr-1` (type lowercased). */
+export function formatBillQueryParam(bill: {
+  congress: number
+  type: string
+  number: number
+}): string {
+  return `${bill.congress}-${normalizeBillTypeCode(bill.type).toLowerCase()}-${bill.number}`
+}
+
+/** Parse `119-hr-1` / `119-HR-1` into congress + canonical type + number. */
+export function parseBillQueryParam(
+  raw: string | null | undefined,
+): { congress: number; type: string; number: number } | null {
+  if (raw == null) return null
+  const match = raw
+    .trim()
+    .toLowerCase()
+    .match(/^(\d{1,4})-([a-z]+)-(\d{1,6})$/)
+  if (!match) return null
+  const congress = Number.parseInt(match[1], 10)
+  const type = match[2].toUpperCase()
+  const number = Number.parseInt(match[3], 10)
+  if (!BILL_QUERY_TYPES.has(type) || congress <= 0 || number <= 0) return null
+  return { congress, type, number }
+}
+
 export function isHouseOriginBillType(type: string): boolean {
   return HOUSE_ORIGIN_BILL_TYPES.has(normalizeBillTypeCode(type))
 }
