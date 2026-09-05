@@ -34,8 +34,8 @@ unreachable, `npm run refresh:senate-menu` falls back to D1 for cache writes and
 
 | Status | Meaning |
 |--------|---------|
-| `ok` | Last scheduled success within 26h, no chamber source warnings, no intro-list soft-fail, menu cache fresh (<48h) |
-| `degraded` | Scheduled success within window with Senate D1 menu **cache fallback**, **and/or** menu cache stale (>48h), **and/or** intro discovery soft-fail |
+| `ok` | Last scheduled success within 26h, no chamber source warnings, no intro-list soft-fail, menu cache fresh (<48h), and every feed-visible bill has a complete digest |
+| `degraded` | Scheduled success within window with Senate D1 menu **cache fallback**, **and/or** menu cache stale (>48h), **and/or** intro discovery soft-fail, **and/or** any feed-visible bill missing a complete digest |
 | `stale` | Last scheduled success older than 26h |
 | `failed` | Failure newer than last scheduled success, hard chamber soft-skip (`* ingest skipped:`), **or** menu cache nearing expiry (>6d) / expired (>7d) |
 | `unknown` | No scheduled success yet |
@@ -47,8 +47,10 @@ Top-level `/health` `status` is `degraded` whenever ingest status is not `ok`.
 vote?", not "is ingest running?" A large `floor_quiet_days` with status `ok`
 is August recess (or any quiet stretch): Clerk House rolls and Senate.gov menu
 have nothing newer. Do **not** page that as a stuck timeline. `missing_digest_count`
-is scoped to bills inside the 45-day feed window; older session-backfill rows
-without rewrites are expected.
+matches `/feed/latest` membership (passage votes ∪ executive-linked bills ∪
+intros), including bills with no `bill_digests` row. Older session-backfill
+rows outside that membership are expected to lack rewrites. A count above 0
+marks ingest **`degraded`** (it no longer stays `ok` with only an annotation).
 
 House ingest that hits the per-run detail cap records `House ingest truncated:…`
 and is **`degraded`** (newest-first fetch still lands the current week's rolls).
@@ -122,7 +124,7 @@ Severity split (important while Senate.gov 403 persists):
 | Severity | Status | Action |
 |----------|--------|--------|
 | Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken, no scheduled success, hard chamber skip, **or** menu cache nearing expiry / expired |
-| Tracked / known | `degraded` (Senate **cache fallback**, menu cache stale >48h, and/or intro list soft-fail) | Confirm `senate_fetch_browser_rendering_fallback` / menu cache write, or `feed_pipeline_intro_list_failed` + `last_success.intro_warnings`, in Workers Logs; page only if Browser Rendering **and** D1 cache both fail, cache nears 7d, or intro list stays failed across runs. Break-glass: `npm run refresh:senate-menu`. Do **not** page forever on expected 403→BR/cache. |
+| Tracked / known | `degraded` (Senate **cache fallback**, menu cache stale >48h, intro list soft-fail, and/or feed bills missing digests) | Confirm `senate_fetch_browser_rendering_fallback` / menu cache write, or `feed_pipeline_intro_list_failed` + `last_success.intro_warnings`, in Workers Logs; page only if Browser Rendering **and** D1 cache both fail, cache nears 7d, or intro list stays failed across runs. Break-glass: `npm run refresh:senate-menu`. Missing-digest degrade: run `POST /__pipeline/run/feed` (or `digest-refresh` for named bills) on workers.dev; title-only rewrite covers intros/resolutions without CRS. Do **not** page forever on expected 403→BR/cache. |
 | Clear | `ok` | No action |
 
 `degraded` covers expected Worker→Senate.gov 403 → Browser Rendering (or D1

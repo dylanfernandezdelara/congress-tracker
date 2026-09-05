@@ -1,7 +1,12 @@
 import { ensureSchema } from "./schema";
 import { congressNumber, type Env } from "../config";
-import { VOTE_LOOKBACK_DAYS } from "../constants";
-import { daysAgoLookbackStartIso } from "../../../../shared/lookback";
+import {
+  EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
+  INTRO_LOOKBACK_DAYS,
+  VOTE_LOOKBACK_DAYS,
+} from "../constants";
+import { daysAgoLookbackStartIso, inclusiveLookbackStartIso } from "../../../../shared/lookback";
+import { feedMembershipBinds, feedMembershipCteSql } from "./feed-membership";
 import type {
   ExecutivePipelineRunRecord,
   FeedPipelineFailureRecord,
@@ -260,13 +265,13 @@ export async function getLatestPassageVoteDate(env: Env): Promise<string | null>
 }
 
 /**
- * Count incomplete digests for bills that can appear on the chronological
- * timeline (passage vote inside the lookback window). Session-backfill rows
- * outside that window are expected to lack rewrites and must not look like
- * a stuck feed.
+ * Count incomplete digests for every bill that can appear on
+ * `/feed/latest` (passage ∪ executive-linked ∪ intros). Session-backfill
+ * rows outside that membership are expected to lack rewrites and must not
+ * look like a stuck feed.
  *
- * Mirrors `parseStoredDigest`: null JSON, invalid JSON, or JSON lacking a
- * non-empty headline/what_it_does.
+ * Mirrors `parseStoredDigest`: missing digest row, null JSON, invalid JSON,
+ * or JSON lacking a non-empty headline/what_it_does.
  *
  * D1/`json_extract` throws on malformed JSON, so invalid rows are gated with
  * `json_valid` and extracts only run over a CASE-nullified payload.
@@ -276,41 +281,40 @@ export async function getMissingDigestCount(
   asOf: Date = new Date()
 ): Promise<number> {
   await ensureSchema(env.DB);
-  const lookback = daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf);
+  const voteLookback = daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf);
+  const executiveSince = daysAgoLookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS, asOf);
+  const introLookback = inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS, asOf);
   const row = await env.DB
     .prepare(
-      `SELECT COUNT(*) AS missing_count
-       FROM bill_digests d
-       WHERE d.congress = ?1
-         AND EXISTS (
-           SELECT 1
-           FROM votes v
-           WHERE v.bill_congress = d.congress
-             AND UPPER(v.bill_type) = UPPER(d.bill_type)
-             AND v.bill_number = d.number
-             AND v.is_passage = 1
-             AND v.vote_date >= ?2
-         )
-         AND (
-           d.digest_json IS NULL
-           OR json_valid(d.digest_json) = 0
-           OR COALESCE(
-                json_extract(
-                  CASE WHEN json_valid(d.digest_json) = 1 THEN d.digest_json END,
-                  '$.headline'
-                ),
-                ''
-              ) = ''
-           OR COALESCE(
-                json_extract(
-                  CASE WHEN json_valid(d.digest_json) = 1 THEN d.digest_json END,
-                  '$.what_it_does'
-                ),
-                ''
-              ) = ''
-         )`
+      `${feedMembershipCteSql(true)}
+       SELECT COUNT(*) AS missing_count
+       FROM (
+         SELECT bill_congress, bill_type, bill_number
+         FROM combined
+         GROUP BY bill_congress, bill_type, bill_number
+       ) f
+       LEFT JOIN bill_digests d
+         ON d.congress = f.bill_congress
+        AND UPPER(d.bill_type) = UPPER(f.bill_type)
+        AND d.number = f.bill_number
+       WHERE d.digest_json IS NULL
+          OR json_valid(d.digest_json) = 0
+          OR COALESCE(
+               json_extract(
+                 CASE WHEN json_valid(d.digest_json) = 1 THEN d.digest_json END,
+                 '$.headline'
+               ),
+               ''
+             ) = ''
+          OR COALESCE(
+               json_extract(
+                 CASE WHEN json_valid(d.digest_json) = 1 THEN d.digest_json END,
+                 '$.what_it_does'
+               ),
+               ''
+             ) = ''`
     )
-    .bind(congressNumber(env), lookback)
+    .bind(...feedMembershipBinds(voteLookback, executiveSince, introLookback, true))
     .first<{ missing_count: number }>();
   return row?.missing_count ?? 0;
 }

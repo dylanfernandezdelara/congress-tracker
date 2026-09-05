@@ -6,7 +6,8 @@ import {
 } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { getDigest, upsertDigest, parseStoredDigest } from "../d1/digests";
+import { digestMapKey, getDigest, parseStoredDigest, upsertDigest } from "../d1/digests";
+import { orderBillsMissingDigestFirst } from "./digest-priority";
 import {
   recordFeedPipelineFailure,
   recordFeedPipelineSuccess,
@@ -153,14 +154,26 @@ export async function runFeedPipeline(
     let newRewrites = 0;
     const digestWarnings: string[] = [];
 
+    const digestByKey = new Map<string, Awaited<ReturnType<typeof getDigest>>>();
     for (const row of bills) {
+      const existing = await getDigest(
+        env.DB,
+        row.bill_congress,
+        row.bill_type,
+        row.bill_number
+      );
+      digestByKey.set(
+        digestMapKey(row.bill_congress, row.bill_type, row.bill_number),
+        existing
+      );
+    }
+    const digestQueue = orderBillsMissingDigestFirst(bills, digestByKey);
+
+    for (const row of digestQueue) {
       try {
-        const existing = await getDigest(
-          env.DB,
-          row.bill_congress,
-          row.bill_type,
-          row.bill_number
-        );
+        const existing =
+          digestByKey.get(digestMapKey(row.bill_congress, row.bill_type, row.bill_number)) ??
+          null;
         const hasCompleteDigest = parseStoredDigest(existing?.digest_json ?? null) !== null;
         const hasSponsors = await billHasSponsors(
           env.DB,
@@ -215,7 +228,11 @@ export async function runFeedPipeline(
         }
 
         let digest = null;
-        if (bundle.rawSummaryText) {
+        // Prefer CRS; if Congress.gov has no summary yet, rewrite from title.
+        const canRewriteFromSource = Boolean(
+          bundle.rawSummaryText?.trim() || bundle.title?.trim()
+        );
+        if (canRewriteFromSource) {
           digest = await rewriteSummary(
             env,
             {

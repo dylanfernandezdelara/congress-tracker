@@ -614,6 +614,64 @@ describe("buildIngestMonitorPayload", () => {
     expect(payload.last_success?.intro_warnings?.[0]).not.toContain("secret");
   });
 
+  it("marks degraded when feed-visible bills are missing complete digests", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-23T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 29,
+      digestsWritten: 19,
+      digestsSkipped: 10,
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-23",
+      missingDigestCount: 14,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("degraded");
+    expect(payload.missing_digest_count).toBe(14);
+    expect(payload.message).toContain("14 feed bill(s) missing digests");
+  });
+
+  it("does not override failed ingest status when digests are also missing", () => {
+    const lastScheduled = {
+      completed_at: "2026-06-22T10:05:00.000Z",
+      trigger: "scheduled" as const,
+      votesUpserted: 0,
+      votesSkipped: 10,
+      billsSelected: 5,
+      digestsWritten: 0,
+      digestsSkipped: 5,
+    };
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-06-23",
+      missingDigestCount: 2,
+      lastSuccess: lastScheduled,
+      lastScheduledSuccess: lastScheduled,
+      lastFailure: {
+        failed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        error: "Congress API down",
+      },
+      lastSkipped: null,
+    });
+
+    expect(payload.status).toBe("failed");
+    expect(payload.missing_digest_count).toBe(2);
+    expect(payload.message).not.toContain("missing digests");
+  });
+
   it("stays ok for a legacy last_success without intros* when otherwise fresh", () => {
     const lastScheduled = {
       completed_at: "2026-06-23T10:05:00.000Z",

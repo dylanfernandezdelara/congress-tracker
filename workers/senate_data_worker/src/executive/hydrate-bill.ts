@@ -31,7 +31,10 @@ export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<
   if (!bundle) return false;
 
   let digest = null;
-  if (env.OPENROUTER_API_KEY?.trim() && bundle.rawSummaryText) {
+  const canRewriteFromSource = Boolean(
+    bundle.rawSummaryText?.trim() || bundle.title?.trim()
+  );
+  if (env.OPENROUTER_API_KEY?.trim() && canRewriteFromSource) {
     digest = await rewriteSummary(env, {
       title: bundle.title,
       billLabel: formatBillDocket(bill.type, bill.number, bill.congress),

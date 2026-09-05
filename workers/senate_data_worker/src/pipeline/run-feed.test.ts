@@ -440,6 +440,77 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsWritten).toBe(1);
   });
 
+  it("rewrites a title-only digest when CRS text is missing", async () => {
+    mockGetDigest.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "To designate a post office in Springfield",
+      policyArea: "Government Operations and Politics",
+      rawSummaryText: null,
+      introducedDate: "2026-09-01",
+      sponsors: [],
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(1);
+    expect(result.digestsWritten).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        title: "To designate a post office in Springfield",
+        policyArea: "Government Operations and Politics",
+        rawSummary: null,
+      }),
+      expect.anything()
+    );
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        digest: expect.objectContaining({ headline: "Rewritten headline" }),
+        rawSummaryText: null,
+      })
+    );
+  });
+
+  it("spends the rewrite budget on bills missing digests before complete rows", async () => {
+    mockSelectRecentVotedBills.mockResolvedValue([
+      { bill_congress: 119, bill_type: "HR", bill_number: 1, latest_passage_date: "2026-06-01" },
+      { bill_congress: 119, bill_type: "HRES", bill_number: 1498, latest_passage_date: "2026-06-02" },
+      { bill_congress: 119, bill_type: "HR", bill_number: 10216, latest_passage_date: "2026-06-03" },
+    ]);
+    mockGetDigest.mockImplementation(async (_db, _c, type, number) => {
+      if (type === "HR" && number === 1) {
+        return {
+          ...completeDigest,
+          digest_json: JSON.stringify({
+            headline: "Done",
+            what_it_does: "Already complete",
+          }),
+        };
+      }
+      return null;
+    });
+    mockFetchBillSummaryBundle.mockImplementation(async (_env, bill: { type: string; number: number }) => ({
+      title: `${bill.type} ${bill.number}`,
+      policyArea: "Defense",
+      rawSummaryText: null,
+      introducedDate: "2026-06-01",
+      sponsors: [],
+    }));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(2);
+    expect(result.digestsSkipped).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledTimes(2);
+    const rewrittenLabels = mockRewriteSummary.mock.calls.map(
+      (call) => (call[1] as { billLabel: string }).billLabel
+    );
+    expect(rewrittenLabels.some((label) => label.includes("1498"))).toBe(true);
+    expect(rewrittenLabels.some((label) => label.includes("10216"))).toBe(true);
+    expect(rewrittenLabels.some((label) => /H\.R\.\s*1\b/.test(label))).toBe(false);
+  });
+
   it("always persists intros* and intro_warnings on the success record", async () => {
     mockGetDigest.mockResolvedValue(completeDigest);
     mockPersistRecentIntroductions.mockResolvedValue({

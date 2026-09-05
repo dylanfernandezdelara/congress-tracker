@@ -94,7 +94,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 
 ## API
 
-- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`); top-level `status` is `ok` only when ingest is healthy
+- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`); top-level `status` is `ok` only when ingest is healthy. Ingest is `degraded` when any feed-visible bill lacks a complete digest (`missing_digest_count` matches `/feed/latest`, including intros)
 - `GET /debug/ingest.json` — detailed ingest monitor payload
 - `GET /feed/latest.json?limit=&offset=&chamber=House|Senate&state=NY&sponsor_chamber=House|Senate&sponsor=&sponsor_q=&party=D|R|I&policy=&q=` — paginated feed (`{ items, total, limit, offset, has_more }`; `total` capped at 50). Membership is passage votes (45d) ∪ executive-linked bills (14d) ∪ introductions (`introduced_date` in the last 7 days, ingest-capped). Optional filters AND together: `chamber` = passage-vote chamber, or originating chamber for intro-only bills; `state` = primary sponsor USPS state (needs `bill_sponsors` from feed ingest); `sponsor_chamber` = House/Senate of the primary sponsor (joins `members`); `sponsor` = primary sponsor bioguide (or `LOCAL:` seed id); `sponsor_q` = sponsor/member name substring; `party` = primary sponsor party; `policy` = exact digest `policy_area`; `q` = case-insensitive substring on title, policy area, digest headline, and normalized bill id. Sponsor facets share one EXISTS so they apply to the same primary sponsor. **Not** a bare array.
 - `GET /stats/members.json?q=&chamber=House|Senate&state=NY&limit=` — member autocomplete for sponsor filters (`{ items, q, limit }`; excludes `LIS:` placeholders; keeps `LOCAL:` seed members)
@@ -110,7 +110,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/feed` (cron also runs feed + member-votes daily at 10:00 UTC)
 - `POST /__pipeline/senate-vote-menu` — admin upload of Senate LIS vote-menu XML into D1 cache (`?run_feed=1` to chain ingest); break-glass when Browser Rendering + D1 cache both fail. Daily cron uses the Worker `BROWSER` binding to fetch senate.gov after plain `fetch` 403s. Ops script: `npm run refresh:senate-menu`
 - `POST /__pipeline/purge-cache` — zone-wide Cloudflare edge cache purge (admin; also runs automatically after successful pipeline writes when `CACHE_PURGE_TOKEN` is set)
-- `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin)
+- `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin). Uses CRS when present; otherwise title + policy-area fallback (same as daily feed). Cap `DIGEST_REFRESH_MAX_BILLS` (25). Daily/admin `POST /__pipeline/run/feed` also fills missing feed digests first (up to `DIGEST_MAX_NEW_REWRITES`)
 - `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)
 - `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin; also chained after daily feed cron)
 - `POST /__pipeline/run/process-backfill` — capped/resumable committee-process discovery + hydration (admin; re-invoke until `bills_remaining` is 0)

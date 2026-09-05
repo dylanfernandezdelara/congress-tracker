@@ -43,9 +43,9 @@ export async function runDigestRefreshPipeline(
     try {
       const bundle = await fetchBillSummaryBundle(env, bill);
       await replaceBillSponsors(env.DB, bill, bundle.sponsors);
-      if (!bundle.rawSummaryText) {
+      if (!bundle.rawSummaryText?.trim() && !bundle.title?.trim()) {
         skipped += 1;
-        failures.push({ bill: key, reason: "no_crs_summary" });
+        failures.push({ bill: key, reason: "no_title_or_crs" });
         continue;
       }
 

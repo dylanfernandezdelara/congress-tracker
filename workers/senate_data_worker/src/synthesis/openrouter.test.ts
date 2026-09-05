@@ -137,4 +137,51 @@ describe("rewriteSummary", () => {
     expect(secondBody.messages[0]?.content).toContain('"terms_explained": []');
     expect(secondBody.max_tokens).toBeLessThan(firstBody.max_tokens);
   });
+
+  it("rewrites from title and policy area when CRS text is missing", async () => {
+    const titleOnly = JSON.stringify({
+      headline: "Names a Springfield post office",
+      what_it_does: "This bill names a post office in Springfield.",
+      key_points: ["Names a local post office", "Does not describe further changes"],
+      terms_explained: [],
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: titleOnly } }] }), {
+        status: 200,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = { OPENROUTER_API_KEY: "test-key", OPENROUTER_MODEL: "openrouter/free" } as Env;
+    const digest = await rewriteSummary(env, {
+      title: "To designate a post office in Springfield",
+      billLabel: "H.R. 10216 · 119th Congress",
+      policyArea: "Government Operations and Politics",
+      rawSummary: null,
+    });
+
+    expect(digest?.headline).toBe("Names a Springfield post office");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? "{}")) as {
+      messages: Array<{ content: string }>;
+    };
+    expect(body.messages[0]?.content).toContain("title-only rewrite");
+    expect(body.messages[0]?.content).not.toContain("Use only facts from the summary and metadata above.");
+  });
+
+  it("returns null when neither title nor CRS text is available", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const env = { OPENROUTER_API_KEY: "test-key", OPENROUTER_MODEL: "openrouter/free" } as Env;
+
+    await expect(
+      rewriteSummary(env, {
+        title: "   ",
+        billLabel: "H.R. 1 · 119th Congress",
+        policyArea: null,
+        rawSummary: null,
+      })
+    ).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

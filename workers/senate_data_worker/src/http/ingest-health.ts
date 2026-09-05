@@ -138,6 +138,10 @@ export function buildIngestMonitorPayload(params: {
     canAnnotate && annotations.length > 0
       ? [evaluated.message, ...annotations].join(" ")
       : evaluated.message;
+  const status =
+    params.missingDigestCount > 0 && evaluated.status === "ok"
+      ? "degraded"
+      : evaluated.status;
 
   const executive = params.executive
     ? buildExecutiveIngestMonitorPayload({
@@ -151,7 +155,7 @@ export function buildIngestMonitorPayload(params: {
     : undefined;
 
   return {
-    status: evaluated.status,
+    status,
     message,
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,
