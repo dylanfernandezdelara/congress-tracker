@@ -28,25 +28,36 @@ function existingFor(
   return digestByKey.get(digestMapKey(row.bill_congress, row.bill_type, row.bill_number)) ?? null;
 }
 
+interface DigestLookup {
+  map: Map<string, DigestRow>;
+  /** Bills whose digest row could not be read; never treat as incomplete. */
+  untrustedKeys: Set<string>;
+}
+
 async function loadDigestMap(
   env: Env,
   bills: LifecycleBillRow[],
   warnings: string[]
-): Promise<Map<string, DigestRow>> {
+): Promise<DigestLookup> {
   try {
-    return await getDigestsForBills(
-      env.DB,
-      bills.map((row) => ({
-        congress: row.bill_congress,
-        billType: row.bill_type,
-        number: row.bill_number,
-      }))
-    );
+    return {
+      map: await getDigestsForBills(
+        env.DB,
+        bills.map((row) => ({
+          congress: row.bill_congress,
+          billType: row.bill_type,
+          number: row.bill_number,
+        }))
+      ),
+      untrustedKeys: new Set(),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     warnings.push(`bulk digest lookup failed: ${message}`);
     const map = new Map<string, DigestRow>();
+    const untrustedKeys = new Set<string>();
     for (const row of bills) {
+      const key = digestMapKey(row.bill_congress, row.bill_type, row.bill_number);
       try {
         const existing = await getDigest(
           env.DB,
@@ -55,16 +66,17 @@ async function loadDigestMap(
           row.bill_number
         );
         if (existing) {
-          map.set(digestMapKey(row.bill_congress, row.bill_type, row.bill_number), existing);
+          map.set(key, existing);
         }
       } catch (rowErr) {
+        untrustedKeys.add(key);
         const rowMessage = rowErr instanceof Error ? rowErr.message : String(rowErr);
         warnings.push(
           `${billLabel(row.bill_type, row.bill_number, row.bill_congress)}: ${rowMessage}`
         );
       }
     }
-    return map;
+    return { map, untrustedKeys };
   }
 }
 
@@ -91,12 +103,17 @@ export async function refreshFeedDigests(
   let newRewrites = 0;
   const warnings: string[] = [];
 
-  const digestByKey = await loadDigestMap(env, bills, warnings);
+  const { map: digestByKey, untrustedKeys } = await loadDigestMap(env, bills, warnings);
 
   const incomplete: LifecycleBillRow[] = [];
   const crsUpgrade: LifecycleBillRow[] = [];
   const complete: LifecycleBillRow[] = [];
   for (const row of bills) {
+    const key = digestMapKey(row.bill_congress, row.bill_type, row.bill_number);
+    if (untrustedKeys.has(key)) {
+      skipped += 1;
+      continue;
+    }
     const existing = existingFor(digestByKey, row);
     if (!parseStoredDigest(existing?.digest_json ?? null)) {
       incomplete.push(row);

@@ -277,11 +277,14 @@ describe("pipeline-state", () => {
             expect(sql).toContain("FROM executive_post_bills");
             expect(sql).toContain("FROM bill_lifecycle");
             expect(sql).toContain("LEFT JOIN bill_digests");
-            expect(state.args).toHaveLength(4);
+            expect(sql).toContain("ORDER BY latest_activity_date DESC");
+            expect(sql).toContain("LIMIT ?");
+            expect(state.args).toHaveLength(5);
             expect(String(state.args[0])).toMatch(/^\d{4}-\d{2}-\d{2}$/);
             expect(String(state.args[1])).toMatch(/^\d{4}-\d{2}-\d{2}$/);
             expect(String(state.args[2])).toMatch(/^\d{4}-\d{2}-\d{2}$/);
             expect(state.args[3]).toBe(12);
+            expect(state.args[4]).toBe(50);
             return { missing_count: 14 };
           }),
           run: vi.fn(async () => ({ success: true, meta: { duration: 0 } })),

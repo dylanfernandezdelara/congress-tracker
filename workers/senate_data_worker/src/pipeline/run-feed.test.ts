@@ -20,6 +20,7 @@ const mockGetDigestsForBills = vi.fn(
 );
 const mockUpsertDigest = vi.fn();
 const mockSelectRecentVotedBills = vi.fn();
+const mockSelectFeedBills = vi.fn();
 const mockSelectExistingVoteKeys = vi.fn();
 const mockUpsertVote = vi.fn();
 const mockBillHasSponsors = vi.fn();
@@ -62,6 +63,7 @@ vi.mock("../d1/votes", () => ({
   upsertVote: (...args: unknown[]) => mockUpsertVote(...args),
   upsertNonPassageVoteStub: vi.fn(async () => undefined),
   selectRecentVotedBills: (...args: unknown[]) => mockSelectRecentVotedBills(...args),
+  selectFeedBills: (...args: unknown[]) => mockSelectFeedBills(...args),
 }));
 
 vi.mock("../d1/lifecycle", async (importOriginal) => {
@@ -186,6 +188,7 @@ describe("runFeedPipeline digest retry", () => {
       chamberWarnings: [],
     });
     mockSelectRecentVotedBills.mockResolvedValue([billRow]);
+    mockSelectFeedBills.mockResolvedValue([]);
     mockPersistRecentIntroductions.mockResolvedValue({
       bills: [],
       discovered: 0,
@@ -611,7 +614,50 @@ describe("runFeedPipeline digest retry", () => {
     const result = await runFeedPipeline(createEnv());
 
     expect(result.digestWarnings.some((warning) => warning.includes("D1 timeout"))).toBe(true);
+    expect(result.digestsRewritten).toBe(0);
+    expect(result.digestsWritten).toBe(0);
+    expect(mockRewriteSummary).not.toHaveBeenCalled();
+    expect(mockUpsertDigest).not.toHaveBeenCalled();
+    expect(mockFetchBillSummaryBundle).not.toHaveBeenCalled();
     expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
+  });
+
+  it("still rewrites a trusted missing row when only the bulk digest lookup fails", async () => {
+    mockGetDigestsForBills.mockRejectedValueOnce(new Error("D1 timeout"));
+    mockGetDigest.mockResolvedValue(null);
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestWarnings.some((warning) => warning.includes("bulk digest lookup failed"))).toBe(
+      true
+    );
+    expect(result.digestsRewritten).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledOnce();
+    expect(mockUpsertDigest).toHaveBeenCalledOnce();
+    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
+  });
+
+  it("rewrites executive-only feed-window bills that have no passage vote", async () => {
+    mockSelectRecentVotedBills.mockResolvedValue([]);
+    mockSelectFeedBills.mockResolvedValue([
+      {
+        bill_congress: 119,
+        bill_type: "HR",
+        bill_number: 5555,
+        latest_passage_date: null,
+        latest_activity_date: "2026-09-01",
+      },
+    ]);
+    mockGetDigest.mockResolvedValue(null);
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(mockFetchBillSummaryBundle).toHaveBeenCalledWith(
+      expect.anything(),
+      { congress: 119, type: "HR", number: 5555 }
+    );
+    expect(result.digestsRewritten).toBe(1);
+    expect(result.digestsWritten).toBe(1);
   });
 
   it("always persists intros* and intro_warnings on the success record", async () => {

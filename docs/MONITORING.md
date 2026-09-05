@@ -47,10 +47,11 @@ Top-level `/health` `status` is `degraded` whenever ingest status is not `ok`.
 vote?", not "is ingest running?" A large `floor_quiet_days` with status `ok`
 is August recess (or any quiet stretch): Clerk House rolls and Senate.gov menu
 have nothing newer. Do **not** page that as a stuck timeline. `missing_digest_count`
-matches `/feed/latest` membership (passage votes ∪ executive-linked bills ∪
-intros), including bills with no `bill_digests` row. Older session-backfill
-rows outside that membership are expected to lack rewrites. A count above 0
-marks ingest **`degraded`** (it no longer stays `ok` with only an annotation).
+matches the first `FEED_MAX_BILLS` `/feed/latest` window (passage votes ∪
+executive-linked bills ∪ intros, ordered by latest activity), including bills
+with no `bill_digests` row. Older session-backfill rows and bills ranked past
+that window are expected to lack rewrites. A count above 0 marks ingest
+**`degraded`** (it no longer stays `ok` with only an annotation).
 
 House ingest that hits the per-run detail cap records `House ingest truncated:…`
 and is **`degraded`** (newest-first fetch still lands the current week's rolls).

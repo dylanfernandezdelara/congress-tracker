@@ -1,5 +1,7 @@
 import {
+  EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
   FEED_MAX_BILLS,
+  INTRO_LOOKBACK_DAYS,
   PROCESS_MAX_HYDRATIONS_PER_RUN,
   VOTE_LOOKBACK_DAYS,
 } from "../constants";
@@ -10,10 +12,12 @@ import {
   recordFeedPipelineSuccess,
 } from "../d1/pipeline-state";
 import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
+import { inclusiveLookbackStartIso } from "../../../../shared/lookback";
 import {
   selectExistingVoteKeys,
   upsertNonPassageVoteStub,
   upsertVote,
+  selectFeedBills,
   selectRecentVotedBills,
 } from "../d1/votes";
 import { ensureMemberRoster } from "./ensure-member-roster";
@@ -140,7 +144,18 @@ export async function runFeedPipeline(
     }
 
     const votedBills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
-    const bills = mergeLifecycleRefreshCandidates(votedBills, introResult.bills);
+    const feedWindowBills = await selectFeedBills(
+      env.DB,
+      lookback,
+      lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS),
+      inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS),
+      FEED_MAX_BILLS
+    );
+    const bills = mergeLifecycleRefreshCandidates(
+      votedBills,
+      introResult.bills,
+      feedWindowBills
+    );
     const model = await resolveOpenRouterModel(env);
     let digestResult = {
       written: 0,

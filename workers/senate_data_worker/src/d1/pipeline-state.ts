@@ -2,6 +2,7 @@ import { ensureSchema } from "./schema";
 import { congressNumber, type Env } from "../config";
 import {
   EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
+  FEED_MAX_BILLS,
   INTRO_LOOKBACK_DAYS,
   VOTE_LOOKBACK_DAYS,
 } from "../constants";
@@ -265,10 +266,11 @@ export async function getLatestPassageVoteDate(env: Env): Promise<string | null>
 }
 
 /**
- * Count incomplete digests for every bill that can appear on
- * `/feed/latest` (passage ∪ executive-linked ∪ intros). Session-backfill
- * rows outside that membership are expected to lack rewrites and must not
- * look like a stuck feed.
+ * Count incomplete digests in the same first `FEED_MAX_BILLS` window as
+ * `/feed/latest` (passage ∪ executive-linked ∪ intros, ordered by latest
+ * activity). Uncapped membership would stay degraded after a busy stretch
+ * because daily rewrite only visits that window. Session-backfill rows
+ * outside the window are expected to lack rewrites.
  *
  * Mirrors `parseStoredDigest`: missing digest row, null JSON, invalid JSON,
  * or JSON lacking a non-empty headline/what_it_does.
@@ -290,8 +292,14 @@ export async function getMissingDigestCount(
        SELECT COUNT(*) AS missing_count
        FROM (
          SELECT bill_congress, bill_type, bill_number
-         FROM combined
-         GROUP BY bill_congress, bill_type, bill_number
+         FROM (
+           SELECT bill_congress, bill_type, bill_number,
+                  MAX(sort_date) AS latest_activity_date
+           FROM combined
+           GROUP BY bill_congress, bill_type, bill_number
+           ORDER BY latest_activity_date DESC
+           LIMIT ?
+         ) windowed
        ) f
        LEFT JOIN bill_digests d
          ON d.congress = f.bill_congress
@@ -314,7 +322,7 @@ export async function getMissingDigestCount(
                ''
              ) = ''`
     )
-    .bind(...feedMembershipBinds(voteLookback, executiveSince, introLookback, true))
+    .bind(...feedMembershipBinds(voteLookback, executiveSince, introLookback, true), FEED_MAX_BILLS)
     .first<{ missing_count: number }>();
   return row?.missing_count ?? 0;
 }
