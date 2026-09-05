@@ -86,26 +86,44 @@ function needsCrsUpgrade(existing: DigestRow | null): boolean {
   );
 }
 
+export interface RefreshFeedDigestsOptions {
+  /**
+   * Bills in the first `/feed/latest` page (same window as
+   * `getMissingDigestCount`). Incomplete rows here consume
+   * `DIGEST_MAX_NEW_REWRITES` before other incompletes so older
+   * passage votes cannot starve visible executive/intro holes.
+   */
+  prioritize?: Iterable<LifecycleBillRow>;
+}
+
 /**
  * Fill missing feed digests first (CRS when present, otherwise title),
  * then upgrade title-only rows when CRS arrives, then sponsor-backfill
  * complete CRS-backed rows. Incomplete work consumes DIGEST_MAX_NEW_REWRITES
- * before optional CRS upgrades.
+ * before optional CRS upgrades. Feed-window incompletes (see `prioritize`)
+ * spend that budget before non-visible voted bills.
  */
 export async function refreshFeedDigests(
   env: Env,
   bills: LifecycleBillRow[],
-  model: string
+  model: string,
+  options: RefreshFeedDigestsOptions = {}
 ): Promise<RefreshFeedDigestsResult> {
   let written = 0;
   let skipped = 0;
   let rewritten = 0;
   let newRewrites = 0;
   const warnings: string[] = [];
+  const priorityKeys = new Set(
+    [...(options.prioritize ?? [])].map((row) =>
+      digestMapKey(row.bill_congress, row.bill_type, row.bill_number)
+    )
+  );
 
   const { map: digestByKey, untrustedKeys } = await loadDigestMap(env, bills, warnings);
 
-  const incomplete: LifecycleBillRow[] = [];
+  const incompletePriority: LifecycleBillRow[] = [];
+  const incompleteRest: LifecycleBillRow[] = [];
   const crsUpgrade: LifecycleBillRow[] = [];
   const complete: LifecycleBillRow[] = [];
   for (const row of bills) {
@@ -116,13 +134,18 @@ export async function refreshFeedDigests(
     }
     const existing = existingFor(digestByKey, row);
     if (!parseStoredDigest(existing?.digest_json ?? null)) {
-      incomplete.push(row);
+      if (priorityKeys.has(key)) {
+        incompletePriority.push(row);
+      } else {
+        incompleteRest.push(row);
+      }
     } else if (needsCrsUpgrade(existing)) {
       crsUpgrade.push(row);
     } else {
       complete.push(row);
     }
   }
+  const incomplete = [...incompletePriority, ...incompleteRest];
 
   for (const row of incomplete) {
     try {

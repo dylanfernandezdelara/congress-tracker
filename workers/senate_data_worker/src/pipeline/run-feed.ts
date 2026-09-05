@@ -164,7 +164,9 @@ export async function runFeedPipeline(
       warnings: [] as string[],
     };
     try {
-      digestResult = await refreshFeedDigests(env, bills, model);
+      digestResult = await refreshFeedDigests(env, bills, model, {
+        prioritize: feedWindowBills,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       digestResult.warnings.push(`digest refresh failed: ${message}`);

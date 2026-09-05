@@ -637,6 +637,46 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
   });
 
+  it("spends the rewrite budget on feed-window incompletes before non-visible voted bills", async () => {
+    const voted = Array.from({ length: 20 }, (_, i) => ({
+      bill_congress: 119,
+      bill_type: "HR",
+      bill_number: i + 1,
+      latest_passage_date: "2026-06-01",
+    }));
+    mockSelectRecentVotedBills.mockResolvedValue(voted);
+    mockSelectFeedBills.mockResolvedValue([
+      {
+        bill_congress: 119,
+        bill_type: "S",
+        bill_number: 9902,
+        latest_passage_date: null,
+        latest_activity_date: "2026-09-04",
+      },
+    ]);
+    mockGetDigest.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockImplementation(async (_env, bill: { type: string; number: number }) => ({
+      title: `${bill.type} ${bill.number}`,
+      policyArea: "Defense",
+      rawSummaryText: null,
+      introducedDate: "2026-06-01",
+      sponsors: [],
+    }));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(20);
+    expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
+    const rewrittenLabels = mockRewriteSummary.mock.calls.map(
+      (call) => (call[1] as { billLabel: string }).billLabel
+    );
+    expect(rewrittenLabels.some((label) => label.includes("9902"))).toBe(true);
+    expect(rewrittenLabels.some((label) => /H\.R\.\s*20\b/.test(label))).toBe(false);
+    expect(mockRewriteSummary.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ title: "S 9902" })
+    );
+  });
+
   it("rewrites executive-only feed-window bills that have no passage vote", async () => {
     mockSelectRecentVotedBills.mockResolvedValue([]);
     mockSelectFeedBills.mockResolvedValue([
