@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 import { useAnimatedDismiss } from '../hooks/useAnimatedDismiss'
 import {
@@ -29,8 +30,11 @@ type AnimatedSheetProps = {
 }
 
 /**
- * Shared bottom/centered sheet chrome used by member profiles and notable
- * bill details: backdrop, animated panel, focus trap, and body scroll lock.
+ * Shared bottom/centered sheet chrome used by member profiles, notable
+ * bills, and bill share: backdrop, animated panel, focus trap, and body
+ * scroll lock. Always portaled to `document.body` so `position: fixed`
+ * is viewport-relative even when a caller sits under a CSS transform
+ * (feed-row detail enter animation).
  */
 export function AnimatedSheet({
   open,
@@ -96,7 +100,7 @@ export function AnimatedSheet({
     </button>
   )
 
-  return (
+  return createPortal(
     <div
       ref={rootRef}
       className={`sheet-root${isClosing ? ' sheet-root--closing' : ''}`}
@@ -120,6 +124,7 @@ export function AnimatedSheet({
         {children}
         {footerDismiss ? <div className="sheet-footer">{dismissButton}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
