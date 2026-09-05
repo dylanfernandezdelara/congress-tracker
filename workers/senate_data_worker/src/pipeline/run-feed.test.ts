@@ -171,6 +171,12 @@ describe("runFeedPipeline digest retry", () => {
       chamberWarnings: [],
     });
     mockSelectRecentVotedBills.mockResolvedValue([billRow]);
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [],
+      discovered: 0,
+      persisted: 0,
+      warnings: [],
+    });
     mockBillHasSponsors.mockResolvedValue(true);
     mockReplaceBillSponsors.mockResolvedValue(undefined);
     mockFetchBillSummaryBundle.mockResolvedValue({
@@ -441,6 +447,12 @@ describe("runFeedPipeline digest retry", () => {
   });
 
   it("rewrites a title-only digest when CRS text is missing", async () => {
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [],
+      discovered: 0,
+      persisted: 0,
+      warnings: [],
+    });
     mockGetDigest.mockResolvedValue(null);
     mockFetchBillSummaryBundle.mockResolvedValue({
       title: "To designate a post office in Springfield",
@@ -473,6 +485,12 @@ describe("runFeedPipeline digest retry", () => {
   });
 
   it("spends the rewrite budget on bills missing digests before complete rows", async () => {
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [],
+      discovered: 0,
+      persisted: 0,
+      warnings: [],
+    });
     mockSelectRecentVotedBills.mockResolvedValue([
       { bill_congress: 119, bill_type: "HR", bill_number: 1, latest_passage_date: "2026-06-01" },
       { bill_congress: 119, bill_type: "HRES", bill_number: 1498, latest_passage_date: "2026-06-02" },
