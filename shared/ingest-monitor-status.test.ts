@@ -144,7 +144,7 @@ describe("evaluateIngestMonitorStatus intro discovery", () => {
       missingDigestCount: 14,
     });
     expect(result.status).toBe("degraded");
-    expect(result.message).toBe("Scheduled ingest completed within the expected window.");
+    expect(result.message).toBe("14 feed bill(s) missing digests.");
   });
 
   it("marks degraded on Intro list failed: prefix", () => {

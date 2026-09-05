@@ -1,5 +1,5 @@
 import type { Env } from "../config";
-import { getDigest, parseStoredDigest, upsertDigest } from "../d1/digests";
+import { getDigest, needsCrsUpgrade, parseStoredDigest, upsertDigest } from "../d1/digests";
 import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
 import { rewriteSummary } from "../synthesis/openrouter";
@@ -18,7 +18,8 @@ async function fetchAndPersistSponsors(env: Env, bill: BillRef): Promise<Awaited
 
 export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<boolean> {
   const existing = await getDigest(env.DB, bill.congress, bill.type, bill.number);
-  if (parseStoredDigest(existing?.digest_json ?? null)) {
+  const complete = parseStoredDigest(existing?.digest_json ?? null);
+  if (complete && !needsCrsUpgrade(existing)) {
     if (!(await billHasSponsors(env.DB, bill.congress, bill.type, bill.number))) {
       await fetchAndPersistSponsors(env, bill);
     }
@@ -29,11 +30,36 @@ export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<
   const bundle = await fetchAndPersistSponsors(env, bill);
   if (!bundle) return false;
 
+  const label = formatBillDocket(bill.type, bill.number, bill.congress);
+  if (needsCrsUpgrade(existing)) {
+    if (bundle.rawSummaryText?.trim() && env.OPENROUTER_API_KEY?.trim()) {
+      const digest = await rewriteSummary(env, {
+        title: bundle.title,
+        billLabel: label,
+        policyArea: bundle.policyArea,
+        rawSummary: bundle.rawSummaryText,
+      });
+      if (digest) {
+        await upsertDigest(env.DB, {
+          congress: bill.congress,
+          billType: bill.type,
+          number: bill.number,
+          title: bundle.title,
+          policyArea: bundle.policyArea,
+          rawSummaryText: bundle.rawSummaryText,
+          digest,
+        });
+      }
+    }
+    await ingestPassageVotesForBill(env, bill);
+    return true;
+  }
+
   let digest = null;
   if (env.OPENROUTER_API_KEY?.trim()) {
     digest = await rewriteSummary(env, {
       title: bundle.title,
-      billLabel: formatBillDocket(bill.type, bill.number, bill.congress),
+      billLabel: label,
       policyArea: bundle.policyArea,
       rawSummary: bundle.rawSummaryText,
     });

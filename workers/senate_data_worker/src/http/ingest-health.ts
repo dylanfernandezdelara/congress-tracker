@@ -132,15 +132,11 @@ export function buildIngestMonitorPayload(params: {
       `Floor has been quiet since ${quietDay} (${quietDays} day(s) with no new passage votes).`
     );
   }
-  if (params.missingDigestCount > 0) {
-    annotations.push(`${params.missingDigestCount} feed bill(s) missing digests.`);
-  }
   const canAnnotate = evaluated.status === "ok" || evaluated.status === "degraded";
   const message =
     canAnnotate && annotations.length > 0
       ? [evaluated.message, ...annotations].join(" ")
       : evaluated.message;
-  const status = evaluated.status;
 
   const executive = params.executive
     ? buildExecutiveIngestMonitorPayload({
@@ -154,7 +150,7 @@ export function buildIngestMonitorPayload(params: {
     : undefined;
 
   return {
-    status,
+    status: evaluated.status,
     message,
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,

@@ -43,7 +43,7 @@ export async function runDigestRefreshPipeline(
     try {
       const bundle = await fetchBillSummaryBundle(env, bill);
       await replaceBillSponsors(env.DB, bill, bundle.sponsors);
-      if (!hasDigestRewriteSource({ title: bundle.title, rawSummaryText: bundle.rawSummaryText })) {
+      if (!hasDigestRewriteSource({ title: bundle.title, rawSummary: bundle.rawSummaryText })) {
         skipped += 1;
         failures.push({ bill: key, reason: "no_title_or_crs" });
         continue;
