@@ -61,9 +61,14 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function replaceOnce(html: string, pattern: RegExp, replacement: string): string | null {
-  if (!pattern.test(html)) return null;
-  return html.replace(pattern, replacement);
+function replaceOnce(
+  html: string,
+  pattern: RegExp,
+  inject: (prefix: string, suffix: string) => string
+): string | null {
+  const match = pattern.exec(html);
+  if (!match?.[1] || match[2] == null) return null;
+  return html.replace(pattern, (_full, prefix: string, suffix: string) => inject(prefix, suffix));
 }
 
 function replaceMeta(
@@ -85,7 +90,7 @@ function replaceMeta(
     ),
   ];
   for (const pattern of patterns) {
-    const next = replaceOnce(html, pattern, `$1${escaped}$2`);
+    const next = replaceOnce(html, pattern, (prefix, suffix) => `${prefix}${escaped}${suffix}`);
     if (next !== null) return next;
   }
   return null;
@@ -96,12 +101,17 @@ function replaceCanonical(html: string, url: string): string | null {
   return replaceOnce(
     html,
     /(<link\s+[^>]*rel="canonical"[^>]*href=")[^"]*(")/i,
-    `$1${escaped}$2`
+    (prefix, suffix) => `${prefix}${escaped}${suffix}`
   );
 }
 
 function replaceDocumentTitle(html: string, title: string): string | null {
-  return replaceOnce(html, /(<title>)[\s\S]*?(<\/title>)/i, `$1${escapeHtmlAttr(title)}$2`);
+  const escaped = escapeHtmlAttr(title);
+  return replaceOnce(
+    html,
+    /(<title>)[\s\S]*?(<\/title>)/i,
+    (prefix, suffix) => `${prefix}${escaped}${suffix}`
+  );
 }
 
 export function rewriteShareMeta(
@@ -155,6 +165,9 @@ export function ogFieldsFromDigest(
 
 function billOgHeaders(shell: Response): Headers {
   const headers = new Headers(shell.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+  headers.delete("etag");
   headers.set("content-type", "text/html; charset=utf-8");
   headers.set("cache-control", BILL_OG_CACHE_CONTROL);
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {

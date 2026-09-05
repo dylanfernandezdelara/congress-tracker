@@ -109,6 +109,20 @@ describe("bill OG rewrite", () => {
     expect(html).not.toContain("<title>Track Congress</title>");
   });
 
+  it("keeps dollar amounts in rewritten meta content", () => {
+    const html = rewriteShareMeta(SITE_HTML, {
+      title: "Appropriates $10 million",
+      description: 'Provides $1 billion and $2.5 million.',
+      url: `${PRODUCTION_ORIGIN}/?bill=119-hr-4795`,
+    });
+    expect(metaContent(html, "property", "og:title")).toBe("Appropriates $10 million");
+    expect(metaContent(html, "property", "og:description")).toBe(
+      "Provides $1 billion and $2.5 million."
+    );
+    expect(html).toContain("<title>Appropriates $10 million</title>");
+    expect(html).not.toContain('content="<meta');
+  });
+
   it("throws when the shell is missing a share tag", () => {
     expect(() =>
       rewriteShareMeta("<html><head></head></html>", {
