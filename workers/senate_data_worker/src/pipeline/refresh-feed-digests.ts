@@ -2,6 +2,7 @@ import { DIGEST_MAX_NEW_REWRITES } from "../constants";
 import type { Env } from "../config";
 import {
   digestMapKey,
+  getDigest,
   getDigestsForBills,
   parseStoredDigest,
   upsertDigest,
@@ -27,10 +28,57 @@ function existingFor(
   return digestByKey.get(digestMapKey(row.bill_congress, row.bill_type, row.bill_number)) ?? null;
 }
 
+async function loadDigestMap(
+  env: Env,
+  bills: LifecycleBillRow[],
+  warnings: string[]
+): Promise<Map<string, DigestRow>> {
+  try {
+    return await getDigestsForBills(
+      env.DB,
+      bills.map((row) => ({
+        congress: row.bill_congress,
+        billType: row.bill_type,
+        number: row.bill_number,
+      }))
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    warnings.push(`bulk digest lookup failed: ${message}`);
+    const map = new Map<string, DigestRow>();
+    for (const row of bills) {
+      try {
+        const existing = await getDigest(
+          env.DB,
+          row.bill_congress,
+          row.bill_type,
+          row.bill_number
+        );
+        if (existing) {
+          map.set(digestMapKey(row.bill_congress, row.bill_type, row.bill_number), existing);
+        }
+      } catch (rowErr) {
+        const rowMessage = rowErr instanceof Error ? rowErr.message : String(rowErr);
+        warnings.push(
+          `${billLabel(row.bill_type, row.bill_number, row.bill_congress)}: ${rowMessage}`
+        );
+      }
+    }
+    return map;
+  }
+}
+
+function needsCrsUpgrade(existing: DigestRow | null): boolean {
+  return Boolean(
+    parseStoredDigest(existing?.digest_json ?? null) && !existing?.raw_summary_text?.trim()
+  );
+}
+
 /**
  * Fill missing feed digests first (CRS when present, otherwise title),
- * then backfill sponsors on rows that already have a complete digest.
- * Incomplete work consumes DIGEST_MAX_NEW_REWRITES before any complete-row I/O.
+ * then upgrade title-only rows when CRS arrives, then sponsor-backfill
+ * complete CRS-backed rows. Incomplete work consumes DIGEST_MAX_NEW_REWRITES
+ * before optional CRS upgrades.
  */
 export async function refreshFeedDigests(
   env: Env,
@@ -43,22 +91,19 @@ export async function refreshFeedDigests(
   let newRewrites = 0;
   const warnings: string[] = [];
 
-  const digestByKey = await getDigestsForBills(
-    env.DB,
-    bills.map((row) => ({
-      congress: row.bill_congress,
-      billType: row.bill_type,
-      number: row.bill_number,
-    }))
-  );
+  const digestByKey = await loadDigestMap(env, bills, warnings);
 
   const incomplete: LifecycleBillRow[] = [];
+  const crsUpgrade: LifecycleBillRow[] = [];
   const complete: LifecycleBillRow[] = [];
   for (const row of bills) {
-    if (parseStoredDigest(existingFor(digestByKey, row)?.digest_json ?? null)) {
-      complete.push(row);
-    } else {
+    const existing = existingFor(digestByKey, row);
+    if (!parseStoredDigest(existing?.digest_json ?? null)) {
       incomplete.push(row);
+    } else if (needsCrsUpgrade(existing)) {
+      crsUpgrade.push(row);
+    } else {
+      complete.push(row);
     }
   }
 
@@ -130,6 +175,60 @@ export async function refreshFeedDigests(
         rewritten += 1;
         newRewrites += 1;
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `${billLabel(row.bill_type, row.bill_number, row.bill_congress)}: ${message}`
+      );
+    }
+  }
+
+  for (const row of crsUpgrade) {
+    try {
+      const billRef = {
+        congress: row.bill_congress,
+        type: row.bill_type,
+        number: row.bill_number,
+      };
+      const bundle = await fetchBillSummaryBundle(env, billRef);
+      await replaceBillSponsors(env.DB, billRef, bundle.sponsors);
+
+      if (!bundle.rawSummaryText?.trim()) {
+        skipped += 1;
+        continue;
+      }
+      if (newRewrites >= DIGEST_MAX_NEW_REWRITES) {
+        skipped += 1;
+        continue;
+      }
+
+      const digest = await rewriteSummary(
+        env,
+        {
+          title: bundle.title,
+          billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
+          policyArea: bundle.policyArea,
+          rawSummary: bundle.rawSummaryText,
+        },
+        model
+      );
+      if (!digest) {
+        skipped += 1;
+        continue;
+      }
+
+      await upsertDigest(env.DB, {
+        congress: row.bill_congress,
+        billType: row.bill_type,
+        number: row.bill_number,
+        title: bundle.title,
+        policyArea: bundle.policyArea,
+        rawSummaryText: bundle.rawSummaryText,
+        digest,
+      });
+      written += 1;
+      rewritten += 1;
+      newRewrites += 1;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       warnings.push(

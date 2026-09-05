@@ -142,7 +142,18 @@ export async function runFeedPipeline(
     const votedBills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
     const bills = mergeLifecycleRefreshCandidates(votedBills, introResult.bills);
     const model = await resolveOpenRouterModel(env);
-    const digestResult = await refreshFeedDigests(env, bills, model);
+    let digestResult = {
+      written: 0,
+      skipped: 0,
+      rewritten: 0,
+      warnings: [] as string[],
+    };
+    try {
+      digestResult = await refreshFeedDigests(env, bills, model);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      digestResult.warnings.push(`digest refresh failed: ${message}`);
+    }
     const digestsWritten = digestResult.written;
     const digestsSkipped = digestResult.skipped;
     const digestsRewritten = digestResult.rewritten;

@@ -544,6 +544,76 @@ describe("runFeedPipeline digest retry", () => {
     expect(rewrittenLabels.some((label) => /H\.R\.\s*1\b/.test(label))).toBe(false);
   });
 
+  it("upgrades a title-only digest when CRS text later appears", async () => {
+    mockGetDigest.mockResolvedValue({
+      ...completeDigest,
+      raw_summary_text: null,
+      digest_json: JSON.stringify({
+        headline: "Names a Springfield post office",
+        what_it_does: "This bill names a post office in Springfield.",
+      }),
+    });
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "To designate a post office in Springfield",
+      policyArea: "Government Operations and Politics",
+      rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
+      introducedDate: "2026-09-01",
+      sponsors: [],
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rawSummary: "This bill designates the Springfield facility as the Example Post Office.",
+      }),
+      expect.anything()
+    );
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
+      })
+    );
+  });
+
+  it("does not rewrite a title-only digest when CRS is still missing", async () => {
+    mockGetDigest.mockResolvedValue({
+      ...completeDigest,
+      raw_summary_text: null,
+      digest_json: JSON.stringify({
+        headline: "Names a Springfield post office",
+        what_it_does: "This bill names a post office in Springfield.",
+      }),
+    });
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "To designate a post office in Springfield",
+      policyArea: "Government Operations and Politics",
+      rawSummaryText: null,
+      introducedDate: "2026-09-01",
+      sponsors: [],
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(0);
+    expect(result.digestsSkipped).toBe(1);
+    expect(mockRewriteSummary).not.toHaveBeenCalled();
+    expect(mockUpsertDigest).not.toHaveBeenCalled();
+  });
+
+  it("keeps the feed run successful when bulk digest lookup fails", async () => {
+    mockGetDigestsForBills.mockRejectedValueOnce(new Error("D1 timeout"));
+    mockGetDigest.mockRejectedValue(new Error("D1 timeout"));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestWarnings.some((warning) => warning.includes("D1 timeout"))).toBe(true);
+    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
+  });
+
   it("always persists intros* and intro_warnings on the success record", async () => {
     mockGetDigest.mockResolvedValue(completeDigest);
     mockPersistRecentIntroductions.mockResolvedValue({
