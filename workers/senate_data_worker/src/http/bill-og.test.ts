@@ -22,6 +22,14 @@ const SITE_HTML = readFileSync(
   "utf8"
 );
 
+function metaContent(html: string, kind: "property" | "name", key: string): string | null {
+  const quoted = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = html.match(
+    new RegExp(`${kind}="${quoted}"[\\s\\S]*?content="([^"]*)"`, "i")
+  );
+  return match?.[1] ?? null;
+}
+
 function digestRow(overrides: Partial<DigestRow> = {}): DigestRow {
   return {
     congress: 119,
@@ -89,15 +97,15 @@ describe("bill OG rewrite", () => {
       description: "Speeds energy permits.",
       url: `${PRODUCTION_ORIGIN}/?bill=119-hr-4795`,
     });
-    expect(html).toContain('property="og:title" content="Permitting &amp; &quot;jobs&quot;"');
-    expect(html).toContain('property="og:description" content="Speeds energy permits."');
-    expect(html).toContain(`property="og:url" content="${PRODUCTION_ORIGIN}/?bill=119-hr-4795"`);
-    expect(html).toContain('name="twitter:title" content="Permitting &amp; &quot;jobs&quot;"');
-    expect(html).toContain('name="twitter:description" content="Speeds energy permits."');
+    expect(metaContent(html, "property", "og:title")).toBe("Permitting &amp; &quot;jobs&quot;");
+    expect(metaContent(html, "property", "og:description")).toBe("Speeds energy permits.");
+    expect(metaContent(html, "property", "og:url")).toBe(`${PRODUCTION_ORIGIN}/?bill=119-hr-4795`);
+    expect(metaContent(html, "name", "twitter:title")).toBe("Permitting &amp; &quot;jobs&quot;");
+    expect(metaContent(html, "name", "twitter:description")).toBe("Speeds energy permits.");
     expect(html).toContain('rel="canonical" href="https://trackcongress.org/?bill=119-hr-4795"');
     expect(html).toContain("<title>Permitting &amp; &quot;jobs&quot;</title>");
-    expect(html).toContain('property="og:image" content="https://trackcongress.org/og-image.png"');
-    expect(html).not.toContain('property="og:title" content="Track Congress"');
+    expect(metaContent(html, "property", "og:image")).toBe("https://trackcongress.org/og-image.png");
+    expect(metaContent(html, "property", "og:title")).not.toBe("Track Congress");
     expect(html).not.toContain("<title>Track Congress</title>");
   });
 
@@ -151,8 +159,10 @@ describe("bill OG rewrite", () => {
     );
     expect(response).not.toBeNull();
     const html = await response!.text();
-    expect(html).toContain('property="og:title" content="House passes a permitting package"');
-    expect(html).toContain('property="og:description" content="Speeds energy permits and production."');
+    expect(metaContent(html, "property", "og:title")).toBe("House passes a permitting package");
+    expect(metaContent(html, "property", "og:description")).toBe(
+      "Speeds energy permits and production."
+    );
     expect(response!.headers.get("cache-control")).toBe(BILL_OG_CACHE_CONTROL);
     expect(response!.headers.get("X-Robots-Tag")).toBe("noindex");
     expect(response!.headers.get("Content-Security-Policy")).toBe(

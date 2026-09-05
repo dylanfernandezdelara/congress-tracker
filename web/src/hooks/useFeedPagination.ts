@@ -217,7 +217,11 @@ export function useFeedPagination() {
         if (requestId !== requestIdRef.current) return
         if (deepLinkBillRef.current !== target) return
         const match = page.items.find((item) => itemMatchesBillParam(item, target))
-        if (!match) return
+        if (!match) {
+          deepLinkPhaseRef.current = 'done'
+          setBillMissingNotice(true)
+          return
+        }
         setItems((prev) => {
           if (prev.some((item) => itemMatchesBillParam(item, target))) return prev
           return [match, ...prev]
