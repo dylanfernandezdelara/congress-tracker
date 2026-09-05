@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
@@ -276,7 +276,7 @@ describe('FeedRowDetail', () => {
     })
   })
 
-  it('copies a shareable bill link to the clipboard', async () => {
+  it('copies paste-ready share text to the clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     vi.mocked(fetchVoteDefectors).mockResolvedValue({
@@ -298,11 +298,13 @@ describe('FeedRowDetail', () => {
       expect(writeText).toHaveBeenCalled()
     })
     const copied = String(writeText.mock.calls[0]?.[0] ?? '')
+    expect(copied).toContain('Plain headline for readers')
+    expect(copied).toContain('It does something important in plain language.')
     expect(copied).toContain('bill=119-s-2')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
 
-  it('copies an explicit shareUrl when provided', async () => {
+  it('copies an explicit shareUrl inside paste-ready text', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
 
@@ -316,10 +318,61 @@ describe('FeedRowDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(
-        'https://www.congress.gov/bill/119th-congress/senate-bill/2',
-      )
+      expect(writeText).toHaveBeenCalled()
     })
+    const copied = String(writeText.mock.calls[0]?.[0] ?? '')
+    expect(copied).toContain('https://www.congress.gov/bill/119th-congress/senate-bill/2')
+    expect(copied).toContain('Plain headline for readers')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+
+  it('opens a share sheet that previews title, body, and URL', async () => {
+    render(<FeedRowDetail item={makeFeedItem()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
+    expect(dialog).toHaveTextContent('Plain headline for readers')
+    expect(dialog).toHaveTextContent('It does something important in plain language.')
+    expect(dialog).toHaveTextContent('bill=119-s-2')
+  })
+
+  it('shares via navigator.share from the preview sheet', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { share, clipboard: { writeText: vi.fn() } })
+
+    render(<FeedRowDetail item={makeFeedItem()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Share' }))
+
+    await waitFor(() => {
+      expect(share).toHaveBeenCalled()
+    })
+    expect(share.mock.calls[0]?.[0]).toMatchObject({
+      title: 'Plain headline for readers',
+      text: 'It does something important in plain language.',
+    })
+    expect(String((share.mock.calls[0]?.[0] as { url?: string }).url)).toContain('bill=119-s-2')
+  })
+
+  it('shows the primary sponsor above the fold when the payload has one', async () => {
+    render(
+      <FeedRowDetail
+        item={makeFeedItem({
+          primary_sponsor: {
+            bioguide_id: 'LOCAL:H002',
+            name: 'Rep. Sample Loyal (local)',
+            party: 'D',
+            state: 'NY',
+          },
+        })}
+      />,
+    )
+
+    expect(screen.getByText(/Sponsored by/)).toBeInTheDocument()
+    expect(screen.getByText(/Rep\. Sample Loyal \(local\) · D-NY/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
+    })
   })
 })

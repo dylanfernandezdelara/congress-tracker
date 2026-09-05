@@ -5,9 +5,11 @@ import {
   congressOrdinal,
   containsLocalSampleLabel,
   formatBillDocket,
+  formatBillQueryParam,
   isHouseOriginBillType,
   originBillTypesSqlList,
   originChamberFromBillType,
+  parseBillQueryParam,
   stripLocalSampleLabel,
 } from './bill-id'
 
@@ -96,5 +98,26 @@ describe('formatBillDocket', () => {
   it('formats concurrent and joint resolutions with ordinal congress', () => {
     expect(formatBillDocket('hconres', 84, 119)).toBe('H.Con.Res. 84 · 119th Congress')
     expect(formatBillDocket('HJRES', 12, 119)).toBe('H.J.Res. 12 · 119th Congress')
+  })
+})
+
+describe('bill query param', () => {
+  it('formats congress-type-number with a lowercase type', () => {
+    expect(formatBillQueryParam({ congress: 119, type: 'HR', number: 1 })).toBe('119-hr-1')
+    expect(formatBillQueryParam({ congress: 119, type: 'H.J.Res.', number: 12 })).toBe(
+      '119-hjres-12',
+    )
+  })
+
+  it('parses share params case-insensitively and rejects unknown types', () => {
+    expect(parseBillQueryParam('119-HR-4795')).toEqual({
+      congress: 119,
+      type: 'HR',
+      number: 4795,
+    })
+    expect(parseBillQueryParam(' 119-s-2 ')).toEqual({ congress: 119, type: 'S', number: 2 })
+    expect(parseBillQueryParam('119-xyz-1')).toBeNull()
+    expect(parseBillQueryParam('hr-1')).toBeNull()
+    expect(parseBillQueryParam('')).toBeNull()
   })
 })

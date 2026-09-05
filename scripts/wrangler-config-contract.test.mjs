@@ -32,6 +32,7 @@ function parseWranglerConfig(filePath) {
   const congressMatch = content.match(/^CONGRESS\s*=\s*"([^"]+)"/m)
   const sessionMatch = content.match(/^SESSION\s*=\s*"([^"]+)"/m)
   const assetsMatch = content.match(/\[assets\][\s\S]*?^directory\s*=\s*"([^"]+)"/m)
+  const runWorkerFirstMatch = content.match(/^run_worker_first\s*=\s*(true|false)/m)
 
   const observabilitySection = content.match(
     /\[observability\]\s*\nenabled\s*=\s*(true|false)\s*\nhead_sampling_rate\s*=\s*([0-9.]+)/,
@@ -56,6 +57,7 @@ function parseWranglerConfig(filePath) {
     congress: congressMatch?.[1],
     session: sessionMatch?.[1],
     assetsDirectory: assetsMatch?.[1],
+    runWorkerFirst: runWorkerFirstMatch?.[1] === 'true',
     observabilityEnabled: observabilitySection?.[1] === 'true',
     observabilityHeadSamplingRate: observabilitySection
       ? Number(observabilitySection[2])
@@ -192,4 +194,6 @@ test('wrangler.toml entrypoints differ by design between root and worker configs
   assert.equal(worker.main, 'src/worker.ts')
   assert.equal(root.assetsDirectory, 'web/dist')
   assert.equal(worker.assetsDirectory, '../../web/dist')
+  assert.equal(root.runWorkerFirst, true)
+  assert.equal(worker.runWorkerFirst, true)
 })

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeedItem, FeedPageResponse } from "../types";
 import {
@@ -1013,6 +1016,51 @@ describe("HTTP API", () => {
     );
     expect(ASSETS.fetch).toHaveBeenCalledOnce();
     expect(response).toBe(assetResponse);
+  });
+
+  it("rewrites bill OG tags on HTML navigations to /?bill=", async () => {
+    const shell = readFileSync(
+      path.resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../../web/index.html"),
+      "utf8"
+    );
+    const ASSETS = {
+      fetch: vi.fn(async () =>
+        new Response(shell, { headers: { "content-type": "text/html; charset=utf-8" } })
+      ),
+    };
+    const stmt = {
+      bind: vi.fn(() => stmt),
+      first: vi.fn(async () => ({
+        congress: 119,
+        bill_type: "HR",
+        number: 1,
+        title: "Energy Act",
+        policy_area: null,
+        raw_summary_text: null,
+        digest_json: JSON.stringify({
+          headline: "House passes a broad energy package",
+          what_it_does: "Speeds permitting.",
+          key_points: [],
+          terms_explained: [],
+        }),
+      })),
+      all: vi.fn(async () => ({ results: [] })),
+      run: vi.fn(async () => ({ success: true, meta: {} })),
+    };
+    const DB = {
+      exec: vi.fn(async () => {}),
+      prepare: vi.fn(() => stmt),
+    };
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/?bill=119-hr-1", {
+        headers: { Accept: "text/html" },
+      }),
+      createMockEnv({ ASSETS, DB }) as any
+    );
+    expect(ASSETS.fetch).toHaveBeenCalledOnce();
+    const html = await response.text();
+    expect(html).toContain('property="og:title" content="House passes a broad energy package"');
+    expect(html).not.toContain('property="og:title" content="Track Congress"');
   });
 
   it("keeps JSON 404s for unknown API paths even when ASSETS is bound", async () => {

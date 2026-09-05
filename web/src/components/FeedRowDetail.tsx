@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 
 import type { FeedItem } from '../api/types'
-import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
+import {
+  buildBillSharePayload,
+  copyTextToClipboard,
+  shareBillViaNavigator,
+} from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
+import { formatPrimarySponsorLine } from '../utils/sponsorLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
+import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 import { FeedSummarySections } from './FeedSummarySections'
@@ -15,7 +21,7 @@ import { PassageVoteDetails } from './PassageVoteDetails'
 
 type FeedRowDetailProps = {
   item: FeedItem
-  /** Override for the footer "Copy link" target; defaults to the timeline deep link. */
+  /** Override for the share URL; defaults to the timeline deep link. */
   shareUrl?: string
 }
 
@@ -57,6 +63,11 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
       : null
   const defectorsByRoll = useRollDefectors(item.passage_votes)
   const [copied, setCopied] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareKey, setShareKey] = useState(0)
+  const sponsorHeadingId = useId()
+  const sharePayload = buildBillSharePayload(item, shareUrl)
+  const sponsorLine = formatPrimarySponsorLine(item.primary_sponsor)
 
   useEffect(() => {
     if (!copied) return
@@ -65,12 +76,52 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   }, [copied])
 
   const handleCopyLink = async () => {
-    const ok = await copyTextToClipboard(shareUrl ?? buildBillShareUrl(item))
+    const ok = await copyTextToClipboard(sharePayload.clipboardText)
     if (ok) setCopied(true)
+  }
+
+  const handleShare = async () => {
+    const result = await shareBillViaNavigator(sharePayload)
+    if (result === 'unavailable') {
+      await handleCopyLink()
+    }
+  }
+
+  const openShareSheet = () => {
+    setShareKey((key) => key + 1)
+    setShareOpen(true)
   }
 
   return (
     <div className="feed-row-detail">
+      <div className="feed-row-share-bar">
+        <button
+          type="button"
+          className="feed-row-share"
+          onClick={openShareSheet}
+        >
+          Share
+        </button>
+        <button
+          type="button"
+          className="feed-row-copy-link"
+          onClick={() => {
+            void handleCopyLink()
+          }}
+        >
+          {copied && !shareOpen ? 'Copied' : 'Copy link'}
+        </button>
+      </div>
+
+      {sponsorLine ? (
+        <p className="feed-row-sponsor" aria-labelledby={sponsorHeadingId}>
+          <span id={sponsorHeadingId} className="feed-row-sponsor-label">
+            Sponsored by
+          </span>{' '}
+          {sponsorLine}
+        </p>
+      ) : null}
+
       <FeedSummarySections content={summary} />
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
@@ -110,16 +161,21 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
         >
           Read on congress.gov ↗
         </a>
-        <button
-          type="button"
-          className="feed-row-copy-link"
-          onClick={() => {
-            void handleCopyLink()
-          }}
-        >
-          {copied ? 'Copied' : 'Copy link'}
-        </button>
       </footer>
+
+      <BillShareSheet
+        open={shareOpen}
+        selectionKey={shareKey}
+        payload={sharePayload}
+        copied={copied}
+        onClose={() => setShareOpen(false)}
+        onShare={() => {
+          void handleShare()
+        }}
+        onCopy={() => {
+          void handleCopyLink()
+        }}
+      />
     </div>
   )
 }
