@@ -20,7 +20,8 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .theme-toggle:hover {
+    .theme-toggle:hover,
+    .feed-row-share:hover {
       border-color: hsl(var(--twc-border-hover));
     }
   }

@@ -726,10 +726,9 @@
 
   .feed-row-share-bar {
     display: flex;
-    flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
-    gap: 0.75rem 1.25rem;
-    margin: 0 0 0.75rem;
+    margin: -0.35rem 0 0.5rem;
   }
 
   .feed-row-sponsor {
@@ -752,7 +751,34 @@
     padding-top: 1rem;
   }
 
-  .feed-row-share,
+  .feed-row-share {
+    position: relative;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: hsl(var(--twc-secondary));
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .feed-row-share-icon {
+    display: block;
+  }
+
+  .feed-row-share::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+
   .feed-row-copy-link,
   .bill-share-sheet-share {
     margin: 0;

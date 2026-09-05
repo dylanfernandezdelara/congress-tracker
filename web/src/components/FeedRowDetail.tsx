@@ -15,6 +15,7 @@ import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
+import { ShareIcon } from './ShareIcon'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 import { FeedSummarySections } from './FeedSummarySections'
 import { PassageVoteDetails } from './PassageVoteDetails'
@@ -99,17 +100,10 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
           type="button"
           className="feed-row-share"
           onClick={openShareSheet}
+          aria-label="Share"
+          title="Share"
         >
-          Share
-        </button>
-        <button
-          type="button"
-          className="feed-row-copy-link"
-          onClick={() => {
-            void handleCopyLink()
-          }}
-        >
-          {copied && !shareOpen ? 'Copied' : 'Copy link'}
+          <ShareIcon />
         </button>
       </div>
 
