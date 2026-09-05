@@ -1,27 +1,27 @@
 import {
-  DIGEST_MAX_NEW_REWRITES,
+  EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
   FEED_MAX_BILLS,
+  INTRO_LOOKBACK_DAYS,
   PROCESS_MAX_HYDRATIONS_PER_RUN,
   VOTE_LOOKBACK_DAYS,
 } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { getDigest, upsertDigest, parseStoredDigest } from "../d1/digests";
 import {
   recordFeedPipelineFailure,
   recordFeedPipelineSuccess,
 } from "../d1/pipeline-state";
 import type { FeedPipelineTrigger } from "../../../../shared/ingest-api-types";
+import { inclusiveLookbackStartIso } from "../../../../shared/lookback";
 import {
   selectExistingVoteKeys,
   upsertNonPassageVoteStub,
   upsertVote,
+  selectFeedBills,
   selectRecentVotedBills,
 } from "../d1/votes";
-import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
-import { billLabel } from "./bill-label";
 import { ensureMemberRoster } from "./ensure-member-roster";
-import { fetchBillSummaryBundle, fetchRecentPublicLaws, lookbackStartIso } from "../sources/congress-client";
+import { fetchRecentPublicLaws, lookbackStartIso } from "../sources/congress-client";
 import type { PublicLawRecord } from "../sources/public-laws";
 import { ingestPassageVotesByChamber } from "./ingest-chambers";
 import {
@@ -30,12 +30,12 @@ import {
 } from "./refresh-confirmations";
 import { persistPublicLaws } from "./refresh-public-laws";
 import { persistRecentIntroductions } from "./refresh-introductions";
+import { refreshFeedDigests } from "./refresh-feed-digests";
 import { mergeLifecycleRefreshCandidates, refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
 import { enqueueProcessBills } from "../d1/bill-process";
 import { hydrateProcessBills } from "./refresh-bill-process";
 import { resolveOpenRouterModel } from "../synthesis/model";
-import { rewriteSummary } from "../synthesis/openrouter";
 
 export interface RunFeedResult {
   votesUpserted: number;
@@ -144,118 +144,37 @@ export async function runFeedPipeline(
     }
 
     const votedBills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
-    const bills = mergeLifecycleRefreshCandidates(votedBills, introResult.bills);
+    const feedWindowBills = await selectFeedBills(
+      env.DB,
+      lookback,
+      lookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS),
+      inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS),
+      FEED_MAX_BILLS
+    );
+    const bills = mergeLifecycleRefreshCandidates(
+      votedBills,
+      introResult.bills,
+      feedWindowBills
+    );
     const model = await resolveOpenRouterModel(env);
-
-    let digestsWritten = 0;
-    let digestsSkipped = 0;
-    let digestsRewritten = 0;
-    let newRewrites = 0;
-    const digestWarnings: string[] = [];
-
-    for (const row of bills) {
-      try {
-        const existing = await getDigest(
-          env.DB,
-          row.bill_congress,
-          row.bill_type,
-          row.bill_number
-        );
-        const hasCompleteDigest = parseStoredDigest(existing?.digest_json ?? null) !== null;
-        const hasSponsors = await billHasSponsors(
-          env.DB,
-          row.bill_congress,
-          row.bill_type,
-          row.bill_number
-        );
-
-        if (hasCompleteDigest && hasSponsors) {
-          digestsSkipped += 1;
-          continue;
-        }
-
-        const billRef = {
-          congress: row.bill_congress,
-          type: row.bill_type,
-          number: row.bill_number,
-        };
-        const bundle = await fetchBillSummaryBundle(env, billRef);
-        await replaceBillSponsors(env.DB, billRef, bundle.sponsors);
-
-        // Digest already good — only sponsor backfill was needed.
-        if (hasCompleteDigest) {
-          digestsSkipped += 1;
-          continue;
-        }
-
-        const metadataChanged =
-          !existing?.raw_summary_text ||
-          existing.title !== bundle.title ||
-          existing.policy_area !== bundle.policyArea;
-
-        const canRewrite = newRewrites < DIGEST_MAX_NEW_REWRITES;
-
-        if (!canRewrite) {
-          if (metadataChanged) {
-            await upsertDigest(env.DB, {
-              congress: row.bill_congress,
-              billType: row.bill_type,
-              number: row.bill_number,
-              title: bundle.title,
-              policyArea: bundle.policyArea,
-              rawSummaryText: bundle.rawSummaryText,
-              digest: null,
-              preserveDigestJson: existing?.digest_json ?? null,
-            });
-            digestsWritten += 1;
-          } else {
-            digestsSkipped += 1;
-          }
-          continue;
-        }
-
-        let digest = null;
-        if (bundle.rawSummaryText) {
-          digest = await rewriteSummary(
-            env,
-            {
-              title: bundle.title,
-              billLabel: billLabel(row.bill_type, row.bill_number, row.bill_congress),
-              policyArea: bundle.policyArea,
-              rawSummary: bundle.rawSummaryText,
-            },
-            model
-          );
-        }
-
-        if (digest === null && !metadataChanged) {
-          digestsSkipped += 1;
-          continue;
-        }
-
-        await upsertDigest(env.DB, {
-          congress: row.bill_congress,
-          billType: row.bill_type,
-          number: row.bill_number,
-          title: bundle.title,
-          policyArea: bundle.policyArea,
-          rawSummaryText: bundle.rawSummaryText,
-          digest,
-          preserveDigestJson: digest === null ? existing?.digest_json ?? null : null,
-        });
-        digestsWritten += 1;
-
-        if (digest !== null) {
-          digestsRewritten += 1;
-          newRewrites += 1;
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        digestWarnings.push(
-          `${billLabel(row.bill_type, row.bill_number, row.bill_congress)}: ${message}`
-        );
-      }
+    let digestResult = {
+      written: 0,
+      skipped: 0,
+      rewritten: 0,
+      warnings: [] as string[],
+    };
+    try {
+      digestResult = await refreshFeedDigests(env, bills, model, {
+        prioritize: feedWindowBills,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      digestResult.warnings.push(`digest refresh failed: ${message}`);
     }
+    const digestsWritten = digestResult.written;
+    const digestsSkipped = digestResult.skipped;
+    const digestsRewritten = digestResult.rewritten;
+    const digestWarnings = digestResult.warnings;
 
     if (digestWarnings.length > 0) {
       console.warn(

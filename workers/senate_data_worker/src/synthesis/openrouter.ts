@@ -71,15 +71,21 @@ export async function rewriteSummary(
     title: string | null;
     billLabel: string;
     policyArea: string | null;
-    rawSummary: string;
+    rawSummary: string | null;
   },
   modelOverride?: string
 ): Promise<BillDigestContent | null> {
+  const title = params.title?.trim() || null;
+  const rawSummary = params.rawSummary?.trim()
+    ? truncateCrsSummaryForRewrite(params.rawSummary)
+    : "";
+  if (!rawSummary && !title) return null;
+
   const model = modelOverride ?? (await resolveOpenRouterModel(env));
-  const rawSummary = truncateCrsSummaryForRewrite(params.rawSummary);
-  const acronyms = extractAcronyms(rawSummary);
+  const acronymSource = rawSummary || [title, params.policyArea].filter(Boolean).join(" ");
+  const acronyms = extractAcronyms(acronymSource);
   const promptBase = {
-    title: params.title,
+    title,
     billLabel: params.billLabel,
     policyArea: params.policyArea,
     rawSummary,

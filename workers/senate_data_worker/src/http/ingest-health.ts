@@ -67,6 +67,7 @@ export function evaluateIngestMonitorStatus<
   chamberWarnings?: readonly string[] | null;
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
   introWarnings?: readonly string[] | null;
+  missingDigestCount?: number;
 }): {
   status: IngestMonitorStatus;
   message: string;
@@ -120,6 +121,7 @@ export function buildIngestMonitorPayload(params: {
     chamberWarnings: publicWarnings,
     senateVoteMenuCache: params.senateVoteMenuCache ?? null,
     introWarnings: publicIntroWarnings,
+    missingDigestCount: params.missingDigestCount,
   });
 
   const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
@@ -129,9 +131,6 @@ export function buildIngestMonitorPayload(params: {
     annotations.push(
       `Floor has been quiet since ${quietDay} (${quietDays} day(s) with no new passage votes).`
     );
-  }
-  if (params.missingDigestCount > 0) {
-    annotations.push(`${params.missingDigestCount} feed bill(s) missing digests.`);
   }
   const canAnnotate = evaluated.status === "ok" || evaluated.status === "degraded";
   const message =

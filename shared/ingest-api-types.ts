@@ -70,6 +70,7 @@ export interface IngestMonitorPayload {
    * not that ingest is stuck.
    */
   floor_quiet_days: number | null;
+  /** Feed-visible bills (passage ∪ executive ∪ intros) lacking a complete digest. */
   missing_digest_count: number;
   last_success: FeedPipelineRunRecord | null;
   last_failure: FeedPipelineFailureRecord | null;

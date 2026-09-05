@@ -135,6 +135,18 @@ describe("evaluateIngestMonitorStatus intro discovery", () => {
     ).toBe("ok");
   });
 
+  it("marks degraded when feed-visible bills are missing complete digests", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess,
+      lastFailure: null,
+      missingDigestCount: 14,
+    });
+    expect(result.status).toBe("degraded");
+    expect(result.message).toBe("14 feed bill(s) missing digests.");
+  });
+
   it("marks degraded on Intro list failed: prefix", () => {
     const result = evaluateIngestMonitorStatus({
       now,

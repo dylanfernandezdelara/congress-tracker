@@ -1,12 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
-import type { DigestRow } from "../d1/digests";
+import { digestMapKey, type DigestRow } from "../d1/digests";
 
 const mockGetDigest = vi.fn<
   (db: D1Database, congress: number, billType: string, number: number) => Promise<DigestRow | null>
 >();
+const mockGetDigestsForBills = vi.fn(
+  async (
+    db: D1Database,
+    bills: Array<{ congress: number; billType: string; number: number }>
+  ) => {
+    const map = new Map<string, DigestRow>();
+    for (const bill of bills) {
+      const row = await mockGetDigest(db, bill.congress, bill.billType, bill.number);
+      if (row) map.set(digestMapKey(bill.congress, bill.billType, bill.number), row);
+    }
+    return map;
+  }
+);
 const mockUpsertDigest = vi.fn();
 const mockSelectRecentVotedBills = vi.fn();
+const mockSelectFeedBills = vi.fn();
 const mockSelectExistingVoteKeys = vi.fn();
 const mockUpsertVote = vi.fn();
 const mockBillHasSponsors = vi.fn();
@@ -33,6 +47,8 @@ vi.mock("../d1/digests", async (importOriginal) => {
   return {
     ...actual,
     getDigest: (...args: Parameters<typeof mockGetDigest>) => mockGetDigest(...args),
+    getDigestsForBills: (...args: Parameters<typeof mockGetDigestsForBills>) =>
+      mockGetDigestsForBills(...args),
     upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
   };
 });
@@ -47,6 +63,7 @@ vi.mock("../d1/votes", () => ({
   upsertVote: (...args: unknown[]) => mockUpsertVote(...args),
   upsertNonPassageVoteStub: vi.fn(async () => undefined),
   selectRecentVotedBills: (...args: unknown[]) => mockSelectRecentVotedBills(...args),
+  selectFeedBills: (...args: unknown[]) => mockSelectFeedBills(...args),
 }));
 
 vi.mock("../d1/lifecycle", async (importOriginal) => {
@@ -171,6 +188,13 @@ describe("runFeedPipeline digest retry", () => {
       chamberWarnings: [],
     });
     mockSelectRecentVotedBills.mockResolvedValue([billRow]);
+    mockSelectFeedBills.mockResolvedValue([]);
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [],
+      discovered: 0,
+      persisted: 0,
+      warnings: [],
+    });
     mockBillHasSponsors.mockResolvedValue(true);
     mockReplaceBillSponsors.mockResolvedValue(undefined);
     mockFetchBillSummaryBundle.mockResolvedValue({
@@ -437,6 +461,242 @@ describe("runFeedPipeline digest retry", () => {
       expect.anything(),
       { congress: 119, type: "S", number: 9901 }
     );
+    expect(result.digestsWritten).toBe(1);
+  });
+
+  it("rewrites a title-only digest when CRS text is missing", async () => {
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [],
+      discovered: 0,
+      persisted: 0,
+      warnings: [],
+    });
+    mockGetDigest.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "To designate a post office in Springfield",
+      policyArea: "Government Operations and Politics",
+      rawSummaryText: null,
+      introducedDate: "2026-09-01",
+      sponsors: [],
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(1);
+    expect(result.digestsWritten).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        title: "To designate a post office in Springfield",
+        policyArea: "Government Operations and Politics",
+        rawSummary: null,
+      }),
+      expect.anything()
+    );
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        digest: expect.objectContaining({ headline: "Rewritten headline" }),
+        rawSummaryText: null,
+      })
+    );
+  });
+
+  it("spends the rewrite budget on bills missing digests before complete rows", async () => {
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [],
+      discovered: 0,
+      persisted: 0,
+      warnings: [],
+    });
+    mockSelectRecentVotedBills.mockResolvedValue([
+      { bill_congress: 119, bill_type: "HR", bill_number: 1, latest_passage_date: "2026-06-01" },
+      { bill_congress: 119, bill_type: "HRES", bill_number: 1498, latest_passage_date: "2026-06-02" },
+      { bill_congress: 119, bill_type: "HR", bill_number: 10216, latest_passage_date: "2026-06-03" },
+    ]);
+    mockGetDigest.mockImplementation(async (_db, _c, type, number) => {
+      if (type === "HR" && number === 1) {
+        return {
+          ...completeDigest,
+          digest_json: JSON.stringify({
+            headline: "Done",
+            what_it_does: "Already complete",
+          }),
+        };
+      }
+      return null;
+    });
+    mockFetchBillSummaryBundle.mockImplementation(async (_env, bill: { type: string; number: number }) => ({
+      title: `${bill.type} ${bill.number}`,
+      policyArea: "Defense",
+      rawSummaryText: null,
+      introducedDate: "2026-06-01",
+      sponsors: [],
+    }));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(2);
+    expect(result.digestsSkipped).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledTimes(2);
+    const rewrittenLabels = mockRewriteSummary.mock.calls.map(
+      (call) => (call[1] as { billLabel: string }).billLabel
+    );
+    expect(rewrittenLabels.some((label) => label.includes("1498"))).toBe(true);
+    expect(rewrittenLabels.some((label) => label.includes("10216"))).toBe(true);
+    expect(rewrittenLabels.some((label) => /H\.R\.\s*1\b/.test(label))).toBe(false);
+  });
+
+  it("upgrades a title-only digest when CRS text later appears", async () => {
+    mockGetDigest.mockResolvedValue({
+      ...completeDigest,
+      raw_summary_text: null,
+      digest_json: JSON.stringify({
+        headline: "Names a Springfield post office",
+        what_it_does: "This bill names a post office in Springfield.",
+      }),
+    });
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "To designate a post office in Springfield",
+      policyArea: "Government Operations and Politics",
+      rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
+      introducedDate: "2026-09-01",
+      sponsors: [],
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rawSummary: "This bill designates the Springfield facility as the Example Post Office.",
+      }),
+      expect.anything()
+    );
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
+      })
+    );
+  });
+
+  it("does not rewrite a title-only digest when CRS is still missing", async () => {
+    mockGetDigest.mockResolvedValue({
+      ...completeDigest,
+      raw_summary_text: null,
+      digest_json: JSON.stringify({
+        headline: "Names a Springfield post office",
+        what_it_does: "This bill names a post office in Springfield.",
+      }),
+    });
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "To designate a post office in Springfield",
+      policyArea: "Government Operations and Politics",
+      rawSummaryText: null,
+      introducedDate: "2026-09-01",
+      sponsors: [],
+    });
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(0);
+    expect(result.digestsSkipped).toBe(1);
+    expect(mockRewriteSummary).not.toHaveBeenCalled();
+    expect(mockUpsertDigest).not.toHaveBeenCalled();
+  });
+
+  it("keeps the feed run successful when bulk digest lookup fails", async () => {
+    mockGetDigestsForBills.mockRejectedValueOnce(new Error("D1 timeout"));
+    mockGetDigest.mockRejectedValue(new Error("D1 timeout"));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestWarnings.some((warning) => warning.includes("D1 timeout"))).toBe(true);
+    expect(result.digestsRewritten).toBe(0);
+    expect(result.digestsWritten).toBe(0);
+    expect(mockRewriteSummary).not.toHaveBeenCalled();
+    expect(mockUpsertDigest).not.toHaveBeenCalled();
+    expect(mockFetchBillSummaryBundle).not.toHaveBeenCalled();
+    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
+  });
+
+  it("still rewrites a trusted missing row when only the bulk digest lookup fails", async () => {
+    mockGetDigestsForBills.mockRejectedValueOnce(new Error("D1 timeout"));
+    mockGetDigest.mockResolvedValue(null);
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestWarnings.some((warning) => warning.includes("bulk digest lookup failed"))).toBe(
+      true
+    );
+    expect(result.digestsRewritten).toBe(1);
+    expect(mockRewriteSummary).toHaveBeenCalledOnce();
+    expect(mockUpsertDigest).toHaveBeenCalledOnce();
+    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
+  });
+
+  it("spends the rewrite budget on feed-window incompletes before non-visible voted bills", async () => {
+    const voted = Array.from({ length: 20 }, (_, i) => ({
+      bill_congress: 119,
+      bill_type: "HR",
+      bill_number: i + 1,
+      latest_passage_date: "2026-06-01",
+    }));
+    mockSelectRecentVotedBills.mockResolvedValue(voted);
+    mockSelectFeedBills.mockResolvedValue([
+      {
+        bill_congress: 119,
+        bill_type: "S",
+        bill_number: 9902,
+        latest_passage_date: null,
+        latest_activity_date: "2026-09-04",
+      },
+    ]);
+    mockGetDigest.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockImplementation(async (_env, bill: { type: string; number: number }) => ({
+      title: `${bill.type} ${bill.number}`,
+      policyArea: "Defense",
+      rawSummaryText: null,
+      introducedDate: "2026-06-01",
+      sponsors: [],
+    }));
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsRewritten).toBe(20);
+    expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
+    const rewrittenLabels = mockRewriteSummary.mock.calls.map(
+      (call) => (call[1] as { billLabel: string }).billLabel
+    );
+    expect(rewrittenLabels.some((label) => label.includes("9902"))).toBe(true);
+    expect(rewrittenLabels.some((label) => /H\.R\.\s*20\b/.test(label))).toBe(false);
+    expect(mockRewriteSummary.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ title: "S 9902" })
+    );
+  });
+
+  it("rewrites executive-only feed-window bills that have no passage vote", async () => {
+    mockSelectRecentVotedBills.mockResolvedValue([]);
+    mockSelectFeedBills.mockResolvedValue([
+      {
+        bill_congress: 119,
+        bill_type: "HR",
+        bill_number: 5555,
+        latest_passage_date: null,
+        latest_activity_date: "2026-09-01",
+      },
+    ]);
+    mockGetDigest.mockResolvedValue(null);
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(mockFetchBillSummaryBundle).toHaveBeenCalledWith(
+      expect.anything(),
+      { congress: 119, type: "HR", number: 5555 }
+    );
+    expect(result.digestsRewritten).toBe(1);
     expect(result.digestsWritten).toBe(1);
   });
 

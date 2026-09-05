@@ -15,9 +15,13 @@ vi.mock("../synthesis/openrouter", () => ({
   rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
 }));
 
-vi.mock("../d1/digests", () => ({
-  upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
-}));
+vi.mock("../d1/digests", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/digests")>();
+  return {
+    ...actual,
+    upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
+  };
+});
 
 vi.mock("../d1/sponsors", () => ({
   replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
@@ -95,7 +99,7 @@ describe("runDigestRefreshPipeline", () => {
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
 
-  it("records failures when CRS text is missing", async () => {
+  it("rewrites from title when CRS text is missing", async () => {
     mockFetchBillSummaryBundle.mockResolvedValue({
       title: "Sample Act",
       policyArea: null,
@@ -108,9 +112,37 @@ describe("runDigestRefreshPipeline", () => {
       { congress: 119, type: "S", number: 2 },
     ]);
 
+    expect(result.refreshed).toBe(1);
+    expect(result.skipped).toBe(0);
+    expect(result.failures).toEqual([]);
+    expect(mockRewriteSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        title: "Sample Act",
+        rawSummary: null,
+      }),
+      expect.anything()
+    );
+    expect(mockUpsertDigest).toHaveBeenCalledOnce();
+  });
+
+  it("records failures when both title and CRS text are missing", async () => {
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: null,
+      policyArea: null,
+      rawSummaryText: null,
+      introducedDate: null,
+      sponsors: [],
+    });
+
+    const result = await runDigestRefreshPipeline(createEnv(), [
+      { congress: 119, type: "S", number: 2 },
+    ]);
+
     expect(result.refreshed).toBe(0);
     expect(result.skipped).toBe(1);
-    expect(result.failures[0]).toMatchObject({ bill: "S2", reason: "no_crs_summary" });
+    expect(result.failures[0]).toMatchObject({ bill: "S2", reason: "no_title_or_crs" });
+    expect(mockRewriteSummary).not.toHaveBeenCalled();
     expect(mockReplaceBillSponsors).toHaveBeenCalledOnce();
   });
 });

@@ -155,6 +155,10 @@ export function evaluateIngestMonitorStatus(params) {
     ? `Intro discovery soft-failed: ${introWarnings.filter(isIntroListFailureWarning).join("; ")}`
     : "";
 
+  const missingDigestCount = Number(params.missingDigestCount) || 0;
+  const missingDigestNote =
+    missingDigestCount > 0 ? `${missingDigestCount} feed bill(s) missing digests.` : "";
+
   if (warningSeverity === "degraded" || introSoftFail) {
     const parts = [];
     if (warningSeverity === "degraded") {
@@ -165,6 +169,7 @@ export function evaluateIngestMonitorStatus(params) {
     if (menu?.stale) {
       message = `${message} Senate menu cache is stale (${menu.age_hours}h old); refresh daily while Worker→Senate.gov is 403.`;
     }
+    if (missingDigestNote) message = `${message} ${missingDigestNote}`;
     return {
       status: "degraded",
       message,
@@ -173,9 +178,20 @@ export function evaluateIngestMonitorStatus(params) {
   }
 
   if (menu?.stale) {
+    const message = missingDigestNote
+      ? `Senate vote menu D1 cache is stale (age ${menu.age_hours}h); refresh with npm run refresh:senate-menu. ${missingDigestNote}`
+      : `Senate vote menu D1 cache is stale (age ${menu.age_hours}h); refresh with npm run refresh:senate-menu.`;
     return {
       status: "degraded",
-      message: `Senate vote menu D1 cache is stale (age ${menu.age_hours}h); refresh with npm run refresh:senate-menu.`,
+      message,
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+
+  if (missingDigestNote) {
+    return {
+      status: "degraded",
+      message: missingDigestNote,
       last_scheduled_success: lastScheduledSuccess,
     };
   }
