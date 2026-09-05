@@ -20,6 +20,9 @@ import {
 } from '../utils/feedAdvancedFilters'
 
 const SEARCH_DEBOUNCE_MS = 300
+/** Unfiltered `q=` lookup after filters hide a shared bill. Feed `total` is capped at 50. */
+const DEEP_LINK_LOOKUP_LIMIT = 50
+type DeepLinkPhase = 'searching' | 'lookup' | 'done'
 
 type FeedFilters = AdvancedFeedFilters & {
   chamber: ChamberFilter | null
@@ -98,12 +101,9 @@ export function useFeedPagination() {
   const appendLockRef = useRef(false)
   const lastFeedModeRef = useRef<'replace' | 'append'>('replace')
   const deepLinkBillRef = useRef<string | null>(null)
-  const deepLinkPhaseRef = useRef<'idle' | 'searching' | 'done'>('done')
+  const deepLinkPhaseRef = useRef<DeepLinkPhase>('done')
   /** Filters+bill tuple currently being searched or already resolved for deep link. */
   const deepLinkQueryRef = useRef<string | null>(null)
-  /** One extra unfiltered `q=` lookup after filtered pages are exhausted. */
-  const deepLinkLookupRef = useRef<'idle' | 'needed' | 'tried'>('idle')
-  const deepLinkLookupLockRef = useRef(false)
   const filtersRef = useRef(filters)
   filtersRef.current = filters
   const expandedRowKeyRef = useRef<string | null>(expandedRowKey)
@@ -121,8 +121,6 @@ export function useFeedPagination() {
     deepLinkPhaseRef.current = 'done'
     deepLinkBillRef.current = null
     deepLinkQueryRef.current = null
-    deepLinkLookupRef.current = 'idle'
-    deepLinkLookupLockRef.current = false
   }, [])
 
   const replaceSearchParams = useCallback(
@@ -205,6 +203,37 @@ export function useFeedPagination() {
       }
     },
     [pageSize],
+  )
+
+  const lookupDeepLinkBill = useCallback(
+    async (target: string, q: string) => {
+      if (appendLockRef.current) return
+      appendLockRef.current = true
+      const requestId = ++requestIdRef.current
+      lastFeedModeRef.current = 'append'
+      setIsLoadingMore(true)
+      try {
+        const page = await fetchFeed({ limit: DEEP_LINK_LOOKUP_LIMIT, offset: 0, q })
+        if (requestId !== requestIdRef.current) return
+        if (deepLinkBillRef.current !== target) return
+        const match = page.items.find((item) => itemMatchesBillParam(item, target))
+        if (!match) return
+        setItems((prev) => {
+          if (prev.some((item) => itemMatchesBillParam(item, target))) return prev
+          return [match, ...prev]
+        })
+      } catch {
+        if (requestId !== requestIdRef.current) return
+        // Keep previously loaded rows; do not treat a failed lookup as missing.
+        deepLinkPhaseRef.current = 'done'
+      } finally {
+        if (requestId === requestIdRef.current) {
+          appendLockRef.current = false
+          setIsLoadingMore(false)
+        }
+      }
+    },
+    [],
   )
 
   const reloadFeed = useCallback(() => {
@@ -363,15 +392,14 @@ export function useFeedPagination() {
     deepLinkQueryRef.current = queryKey
     deepLinkBillRef.current = billParam
     deepLinkPhaseRef.current = 'searching'
-    deepLinkLookupRef.current = 'needed'
-    deepLinkLookupLockRef.current = false
     setBillMissingNotice(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- filterDepsKey covers filter identity
   }, [billParam, filterDepsKey, clearDeepLinkState])
 
   // Deep-link: after pages load, find the bill or keep appending until exhausted.
   useEffect(() => {
-    if (deepLinkPhaseRef.current !== 'searching') return
+    const phase = deepLinkPhaseRef.current
+    if (phase !== 'searching' && phase !== 'lookup') return
     if (isInitialLoading || isLoadingMore) return
     // Don't treat a failed fetch as "bill missing".
     if (feedError) return
@@ -387,7 +415,6 @@ export function useFeedPagination() {
       const rowKey = feedRowKey(found)
       setExpandedKey(rowKey)
       deepLinkPhaseRef.current = 'done'
-      deepLinkLookupRef.current = 'tried'
       // Scroll after paint so the expanded panel is in the DOM.
       requestAnimationFrame(() => {
         scrollRowIntoView(rowKey)
@@ -395,51 +422,21 @@ export function useFeedPagination() {
       return
     }
 
-    if (hasMore) {
-      void loadFeedPage(nextOffset, 'append', filtersRef.current)
-      return
-    }
-
-    // Filtered pages are exhausted. One unfiltered bill-id search so a share
-    // landing is not a dead homepage when filters hid an in-feed bill.
-    if (deepLinkLookupRef.current === 'needed' && !deepLinkLookupLockRef.current) {
+    if (phase === 'searching') {
+      if (hasMore) {
+        void loadFeedPage(nextOffset, 'append', filtersRef.current)
+        return
+      }
+      // Filtered pages are exhausted. One unfiltered bill-id search so a share
+      // landing is not a dead homepage when filters hid an in-feed bill.
       const q = billSearchQueryFromParam(target)
       if (!q) {
-        deepLinkLookupRef.current = 'tried'
         deepLinkPhaseRef.current = 'done'
         setBillMissingNotice(true)
         return
       }
-      deepLinkLookupRef.current = 'tried'
-      deepLinkLookupLockRef.current = true
-      const requestId = ++requestIdRef.current
-      lastFeedModeRef.current = 'append'
-      setIsLoadingMore(true)
-      void fetchFeed({ limit: pageSize, offset: 0, q })
-        .then((page) => {
-          if (requestId !== requestIdRef.current) return
-          if (deepLinkBillRef.current !== target) return
-          const match = page.items.find((item) => itemMatchesBillParam(item, target))
-          if (!match) {
-            deepLinkPhaseRef.current = 'done'
-            setBillMissingNotice(true)
-            return
-          }
-          setItems((prev) => {
-            if (prev.some((item) => itemMatchesBillParam(item, target))) return prev
-            return [match, ...prev]
-          })
-        })
-        .catch(() => {
-          if (requestId !== requestIdRef.current) return
-          // Keep previously loaded rows; do not treat a failed lookup as missing.
-          deepLinkPhaseRef.current = 'done'
-        })
-        .finally(() => {
-          if (requestId !== requestIdRef.current) return
-          deepLinkLookupLockRef.current = false
-          setIsLoadingMore(false)
-        })
+      deepLinkPhaseRef.current = 'lookup'
+      void lookupDeepLinkBill(target, q)
       return
     }
 
@@ -452,8 +449,8 @@ export function useFeedPagination() {
     isLoadingMore,
     feedError,
     loadFeedPage,
+    lookupDeepLinkBill,
     nextOffset,
-    pageSize,
     setExpandedKey,
   ])
 
@@ -472,7 +469,7 @@ export function useFeedPagination() {
     searchQuery: filters.q,
     searchDraft: draftQuery,
     items,
-    total,
+    total: Math.max(total, items.length),
     hasMore,
     feedError,
     isInitialLoading,

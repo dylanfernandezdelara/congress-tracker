@@ -1,13 +1,16 @@
+import { parseBillQueryParam } from "../../../../shared/bill-id";
+import { SECURITY_HEADERS } from "../../../../shared/security-headers";
 import {
-  formatBillQueryParam,
-  parseBillQueryParam,
-} from "../../../../shared/bill-id";
-import { truncateAtSentenceBoundary } from "../../../../shared/digest-format";
+  OG_DESCRIPTION_MAX_CHARS,
+  PRODUCTION_ORIGIN,
+  buildBillOgFields,
+  buildShareCopy,
+  parseShareDigestJson,
+} from "../../../../shared/share-copy";
 import type { Env } from "../config";
 import { getDigest, type DigestRow } from "../d1/digests";
 
-export const PRODUCTION_ORIGIN = "https://trackcongress.org";
-export const OG_DESCRIPTION_MAX_CHARS = 180;
+export { OG_DESCRIPTION_MAX_CHARS, PRODUCTION_ORIGIN };
 export const BILL_OG_CACHE_CONTROL = "public, max-age=300";
 
 const SPA_SHELL_PATHS = new Set(["/", "/index.html"]);
@@ -58,12 +61,17 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function replaceOnce(html: string, pattern: RegExp, replacement: string): string | null {
+  if (!pattern.test(html)) return null;
+  return html.replace(pattern, replacement);
+}
+
 function replaceMeta(
   html: string,
   kind: "property" | "name",
   key: string,
   value: string
-): string {
+): string | null {
   const escaped = escapeHtmlAttr(value);
   const quotedKey = escapeRegExp(key);
   const patterns = [
@@ -77,33 +85,54 @@ function replaceMeta(
     ),
   ];
   for (const pattern of patterns) {
-    if (pattern.test(html)) {
-      return html.replace(pattern, `$1${escaped}$2`);
-    }
+    const next = replaceOnce(html, pattern, `$1${escaped}$2`);
+    if (next !== null) return next;
   }
-  return html;
+  return null;
 }
 
-function replaceCanonical(html: string, url: string): string {
+function replaceCanonical(html: string, url: string): string | null {
   const escaped = escapeHtmlAttr(url);
-  const pattern = /(<link\s+[^>]*rel="canonical"[^>]*href=")[^"]*(")/i;
-  if (pattern.test(html)) {
-    return html.replace(pattern, `$1${escaped}$2`);
-  }
-  return html;
+  return replaceOnce(
+    html,
+    /(<link\s+[^>]*rel="canonical"[^>]*href=")[^"]*(")/i,
+    `$1${escaped}$2`
+  );
+}
+
+function replaceDocumentTitle(html: string, title: string): string | null {
+  return replaceOnce(html, /(<title>)[\s\S]*?(<\/title>)/i, `$1${escapeHtmlAttr(title)}$2`);
 }
 
 export function rewriteShareMeta(
   html: string,
   fields: { title: string; description: string; url: string }
 ): string {
+  const steps: Array<[string, (current: string) => string | null]> = [
+    ["og:title", (current) => replaceMeta(current, "property", "og:title", fields.title)],
+    [
+      "og:description",
+      (current) => replaceMeta(current, "property", "og:description", fields.description),
+    ],
+    ["og:url", (current) => replaceMeta(current, "property", "og:url", fields.url)],
+    ["twitter:title", (current) => replaceMeta(current, "name", "twitter:title", fields.title)],
+    [
+      "twitter:description",
+      (current) => replaceMeta(current, "name", "twitter:description", fields.description),
+    ],
+    ["canonical", (current) => replaceCanonical(current, fields.url)],
+    ["title", (current) => replaceDocumentTitle(current, fields.title)],
+  ];
   let next = html;
-  next = replaceMeta(next, "property", "og:title", fields.title);
-  next = replaceMeta(next, "property", "og:description", fields.description);
-  next = replaceMeta(next, "property", "og:url", fields.url);
-  next = replaceMeta(next, "name", "twitter:title", fields.title);
-  next = replaceMeta(next, "name", "twitter:description", fields.description);
-  next = replaceCanonical(next, fields.url);
+  const missing: string[] = [];
+  for (const [label, apply] of steps) {
+    const result = apply(next);
+    if (result === null) missing.push(label);
+    else next = result;
+  }
+  if (missing.length > 0) {
+    throw new Error(`bill OG rewrite missed tags: ${missing.join(", ")}`);
+  }
   return next;
 }
 
@@ -112,32 +141,26 @@ export function ogFieldsFromDigest(
   bill: { congress: number; type: string; number: number }
 ): { title: string; description: string; url: string } | null {
   if (!row) return null;
-  let headline: string | null = null;
-  let whatItDoes: string | null = null;
-  if (row.digest_json) {
-    try {
-      const parsed = JSON.parse(row.digest_json) as {
-        headline?: unknown;
-        what_it_does?: unknown;
-      };
-      if (typeof parsed.headline === "string" && parsed.headline.trim()) {
-        headline = parsed.headline.trim();
-      }
-      if (typeof parsed.what_it_does === "string" && parsed.what_it_does.trim()) {
-        whatItDoes = parsed.what_it_does.trim();
-      }
-    } catch {
-      // Keep title-only fallbacks below.
-    }
+  const parsed = parseShareDigestJson(row.digest_json);
+  const copy = buildShareCopy({
+    headline: parsed.headline,
+    whatItDoes: parsed.whatItDoes,
+    crsSummary: row.raw_summary_text,
+    title: row.title,
+    bill,
+  });
+  if (!copy.title && !copy.text) return null;
+  return buildBillOgFields(copy, bill);
+}
+
+function billOgHeaders(shell: Response): Headers {
+  const headers = new Headers(shell.headers);
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.set("cache-control", BILL_OG_CACHE_CONTROL);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
   }
-  const title = headline || row.title?.trim() || null;
-  const description = whatItDoes || row.title?.trim() || title;
-  if (!title && !description) return null;
-  return {
-    title: title || "Track Congress",
-    description: truncateAtSentenceBoundary(description || title || "", OG_DESCRIPTION_MAX_CHARS),
-    url: `${PRODUCTION_ORIGIN}/?bill=${formatBillQueryParam(bill)}`,
-  };
+  return headers;
 }
 
 /**
@@ -169,12 +192,14 @@ export async function tryRewriteBillOg(
   const fields = ogFieldsFromDigest(row, parsed);
   if (!fields) return shell;
 
-  const html = rewriteShareMeta(await shell.text(), fields);
-  return new Response(html, {
-    status: shell.status,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": BILL_OG_CACHE_CONTROL,
-    },
-  });
+  const shellHtml = await shell.text();
+  try {
+    const html = rewriteShareMeta(shellHtml, fields);
+    return new Response(html, {
+      status: shell.status,
+      headers: billOgHeaders(shell),
+    });
+  } catch {
+    return new Response(shellHtml, { status: shell.status, headers: shell.headers });
+  }
 }

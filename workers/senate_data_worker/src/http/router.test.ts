@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeedItem, FeedPageResponse } from "../types";
 import {
@@ -1016,14 +1019,10 @@ describe("HTTP API", () => {
   });
 
   it("rewrites bill OG tags on HTML navigations to /?bill=", async () => {
-    const shell = `<!DOCTYPE html><html><head>
-      <meta property="og:title" content="Track Congress" />
-      <meta property="og:description" content="Site" />
-      <meta property="og:url" content="https://trackcongress.org/" />
-      <meta name="twitter:title" content="Track Congress" />
-      <meta name="twitter:description" content="Site" />
-      <link rel="canonical" href="https://trackcongress.org/" />
-    </head><body></body></html>`;
+    const shell = readFileSync(
+      path.resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../../web/index.html"),
+      "utf8"
+    );
     const ASSETS = {
       fetch: vi.fn(async () =>
         new Response(shell, { headers: { "content-type": "text/html; charset=utf-8" } })

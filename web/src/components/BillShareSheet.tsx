@@ -7,7 +7,7 @@ import { AnimatedSheet } from './AnimatedSheet'
 type BillShareSheetProps = {
   open: boolean
   selectionKey: number
-  payload: BillSharePayload | null
+  payload: BillSharePayload
   copied: boolean
   onClose: () => void
   onShare: () => void
@@ -24,7 +24,6 @@ export function BillShareSheet({
   onCopy,
 }: BillShareSheetProps) {
   const titleId = useId()
-  if (!payload) return null
 
   return (
     <AnimatedSheet

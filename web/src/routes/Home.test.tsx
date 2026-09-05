@@ -967,10 +967,12 @@ describe('Home', () => {
       expect(toggle).toHaveAttribute('aria-expanded', 'true')
     })
     expect(fetchFeed).toHaveBeenCalledWith({
-      limit: 15,
+      limit: 50,
       offset: 0,
       q: 'H.R. 1',
     })
     expect(screen.queryByText('That bill is no longer in the recent feed.')).not.toBeInTheDocument()
+    expect(screen.queryByText(/No Senate passage votes/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/1 of 1 bill/)).toBeInTheDocument()
   })
 })

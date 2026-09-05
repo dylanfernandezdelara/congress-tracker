@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
+import { SECURITY_HEADERS } from "../../../../shared/security-headers";
 import { createMockEnv } from "./test-fixtures";
 import {
   acceptPrefersHtml,
@@ -13,19 +17,10 @@ import {
 } from "./bill-og";
 import type { DigestRow } from "../d1/digests";
 
-const SITE_HTML = `<!DOCTYPE html>
-<html>
-  <head>
-    <link rel="canonical" href="https://trackcongress.org/" />
-    <meta property="og:url" content="https://trackcongress.org/" />
-    <meta property="og:title" content="Track Congress" />
-    <meta property="og:description" content="Site-wide description." />
-    <meta property="og:image" content="https://trackcongress.org/og-image.png" />
-    <meta name="twitter:title" content="Track Congress" />
-    <meta name="twitter:description" content="Site-wide description." />
-  </head>
-  <body><div id="root"></div></body>
-</html>`;
+const SITE_HTML = readFileSync(
+  path.resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../../web/index.html"),
+  "utf8"
+);
 
 function digestRow(overrides: Partial<DigestRow> = {}): DigestRow {
   return {
@@ -88,7 +83,7 @@ describe("bill OG rewrite", () => {
     );
   });
 
-  it("rewrites og/twitter/canonical and keeps og:image", () => {
+  it("rewrites the production SPA shell including the document title", () => {
     const html = rewriteShareMeta(SITE_HTML, {
       title: 'Permitting & "jobs"',
       description: "Speeds energy permits.",
@@ -98,8 +93,22 @@ describe("bill OG rewrite", () => {
     expect(html).toContain('property="og:description" content="Speeds energy permits."');
     expect(html).toContain(`property="og:url" content="${PRODUCTION_ORIGIN}/?bill=119-hr-4795"`);
     expect(html).toContain('name="twitter:title" content="Permitting &amp; &quot;jobs&quot;"');
+    expect(html).toContain('name="twitter:description" content="Speeds energy permits."');
     expect(html).toContain('rel="canonical" href="https://trackcongress.org/?bill=119-hr-4795"');
+    expect(html).toContain("<title>Permitting &amp; &quot;jobs&quot;</title>");
     expect(html).toContain('property="og:image" content="https://trackcongress.org/og-image.png"');
+    expect(html).not.toContain('property="og:title" content="Track Congress"');
+    expect(html).not.toContain("<title>Track Congress</title>");
+  });
+
+  it("throws when the shell is missing a share tag", () => {
+    expect(() =>
+      rewriteShareMeta("<html><head></head></html>", {
+        title: "Energy",
+        description: "Permits",
+        url: `${PRODUCTION_ORIGIN}/?bill=119-hr-1`,
+      })
+    ).toThrow(/missed tags/);
   });
 
   it("builds OG fields from digest or title-only fallbacks", () => {
@@ -124,7 +133,10 @@ describe("bill OG rewrite", () => {
   it("rewrites the SPA shell when a digest exists", async () => {
     const ASSETS = {
       fetch: vi.fn(async () => new Response(SITE_HTML, {
-        headers: { "content-type": "text/html; charset=utf-8" },
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "X-Robots-Tag": "noindex",
+        },
       })),
     };
     const env = createMockEnv({
@@ -142,6 +154,13 @@ describe("bill OG rewrite", () => {
     expect(html).toContain('property="og:title" content="House passes a permitting package"');
     expect(html).toContain('property="og:description" content="Speeds energy permits and production."');
     expect(response!.headers.get("cache-control")).toBe(BILL_OG_CACHE_CONTROL);
+    expect(response!.headers.get("X-Robots-Tag")).toBe("noindex");
+    expect(response!.headers.get("Content-Security-Policy")).toBe(
+      SECURITY_HEADERS["Content-Security-Policy"]
+    );
+    expect(response!.headers.get("X-Content-Type-Options")).toBe(
+      SECURITY_HEADERS["X-Content-Type-Options"]
+    );
     expect(ASSETS.fetch).toHaveBeenCalledOnce();
   });
 

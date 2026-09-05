@@ -93,7 +93,7 @@ describe('billDeepLink', () => {
     const prompt = vi.spyOn(window, 'prompt').mockReturnValue('https://example.test/')
 
     await expect(copyTextToClipboard('https://example.test/')).resolves.toBe(true)
-    expect(prompt).toHaveBeenCalledWith('Copy link', 'https://example.test/')
+    expect(prompt).toHaveBeenCalledWith('Copy share text', 'https://example.test/')
   })
 
   it('shares via navigator.share and treats cancel as cancelled', async () => {

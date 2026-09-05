@@ -21,7 +21,7 @@ import { PassageVoteDetails } from './PassageVoteDetails'
 
 type FeedRowDetailProps = {
   item: FeedItem
-  /** Override for the footer "Copy link" target; defaults to the timeline deep link. */
+  /** Override for the share URL; defaults to the timeline deep link. */
   shareUrl?: string
 }
 

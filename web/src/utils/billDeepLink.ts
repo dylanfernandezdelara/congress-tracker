@@ -1,19 +1,13 @@
 import {
-  formatBillDocket,
   formatBillQueryParam,
   formatShortBillId,
   parseBillQueryParam,
-  trimDisplayTitle,
 } from '@congress-tracker/shared/bill-id'
-import { formatExpandedCrsLead } from '@congress-tracker/shared/digest-format'
+import { PRODUCTION_ORIGIN, buildShareCopy } from '@congress-tracker/shared/share-copy'
 
 import type { FeedItem } from '../api/types'
-import { getFeedSummaryContent, getFeedTopic } from './feedRowLabels'
 
-export { formatBillQueryParam, parseBillQueryParam }
-
-/** Canonical production origin for share URLs and OG tags. */
-export const PRODUCTION_ORIGIN = 'https://trackcongress.org'
+export { formatBillQueryParam, parseBillQueryParam, PRODUCTION_ORIGIN }
 
 export function feedRowKey(item: FeedItem): string {
   return `${item.bill.congress}-${item.bill.type}-${item.bill.number}`
@@ -34,11 +28,11 @@ export function billShareOrigin(href = window.location.href): string {
   return url.origin
 }
 
-export function buildBillShareUrl(item: FeedItem, href = window.location.href): string {
+export function buildBillShareUrl(item: Pick<FeedItem, 'bill'>, href = window.location.href): string {
   return `${billShareOrigin(href)}/?bill=${formatBillQueryParam(item.bill)}`
 }
 
-/** `q=` value that matches feed bill-id search (`H.R. 1` → `hr1`). */
+/** `q=` value that matches feed bill-id search (`119-hr-1` → `H.R. 1`). */
 export function billSearchQueryFromParam(billParam: string): string | null {
   const parsed = parseBillQueryParam(billParam)
   if (parsed) return formatShortBillId(parsed.type, parsed.number)
@@ -58,15 +52,14 @@ export function buildBillSharePayload(
   urlOverride?: string,
   href = window.location.href,
 ): BillSharePayload {
-  const feedItem = item as FeedItem
-  const title = getFeedTopic(feedItem)
-  const summary = getFeedSummaryContent(feedItem)
-  const text =
-    summary.whatItDoes ||
-    (summary.crsSummary ? formatExpandedCrsLead(summary.crsSummary) : null) ||
-    (item.bill.title ? trimDisplayTitle(item.bill.title) : null) ||
-    formatBillDocket(item.bill.type, item.bill.number, item.bill.congress)
-  const url = urlOverride ?? buildBillShareUrl(feedItem, href)
+  const { title, text } = buildShareCopy({
+    headline: item.digest?.headline,
+    whatItDoes: item.digest?.what_it_does,
+    crsSummary: item.raw_summary_text,
+    title: item.bill.title,
+    bill: item.bill,
+  })
+  const url = urlOverride ?? buildBillShareUrl(item, href)
   return {
     title,
     text,
@@ -105,6 +98,6 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   } catch {
     // Fall through to prompt.
   }
-  const result = window.prompt('Copy link', text)
+  const result = window.prompt('Copy share text', text)
   return result !== null
 }
