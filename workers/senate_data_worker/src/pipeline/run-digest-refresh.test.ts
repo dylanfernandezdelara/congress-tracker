@@ -15,9 +15,13 @@ vi.mock("../synthesis/openrouter", () => ({
   rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
 }));
 
-vi.mock("../d1/digests", () => ({
-  upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
-}));
+vi.mock("../d1/digests", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/digests")>();
+  return {
+    ...actual,
+    upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
+  };
+});
 
 vi.mock("../d1/sponsors", () => ({
   replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),

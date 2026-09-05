@@ -15,6 +15,16 @@ export function parseStoredDigest(json: string | null): BillDigestContent | null
   }
 }
 
+/** True when OpenRouter can write a digest from CRS and/or the bill title. */
+export function hasDigestRewriteSource(params: {
+  title?: string | null;
+  rawSummary?: string | null;
+  rawSummaryText?: string | null;
+}): boolean {
+  const raw = params.rawSummary ?? params.rawSummaryText ?? null;
+  return Boolean(params.title?.trim() || raw?.trim());
+}
+
 export interface DigestRow {
   congress: number;
   bill_type: string;

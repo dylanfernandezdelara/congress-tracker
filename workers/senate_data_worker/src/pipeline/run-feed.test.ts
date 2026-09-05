@@ -1,10 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
-import type { DigestRow } from "../d1/digests";
+import { digestMapKey, type DigestRow } from "../d1/digests";
 
 const mockGetDigest = vi.fn<
   (db: D1Database, congress: number, billType: string, number: number) => Promise<DigestRow | null>
 >();
+const mockGetDigestsForBills = vi.fn(
+  async (
+    db: D1Database,
+    bills: Array<{ congress: number; billType: string; number: number }>
+  ) => {
+    const map = new Map<string, DigestRow>();
+    for (const bill of bills) {
+      const row = await mockGetDigest(db, bill.congress, bill.billType, bill.number);
+      if (row) map.set(digestMapKey(bill.congress, bill.billType, bill.number), row);
+    }
+    return map;
+  }
+);
 const mockUpsertDigest = vi.fn();
 const mockSelectRecentVotedBills = vi.fn();
 const mockSelectExistingVoteKeys = vi.fn();
@@ -33,6 +46,8 @@ vi.mock("../d1/digests", async (importOriginal) => {
   return {
     ...actual,
     getDigest: (...args: Parameters<typeof mockGetDigest>) => mockGetDigest(...args),
+    getDigestsForBills: (...args: Parameters<typeof mockGetDigestsForBills>) =>
+      mockGetDigestsForBills(...args),
     upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
   };
 });

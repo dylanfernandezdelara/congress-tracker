@@ -67,6 +67,7 @@ export function evaluateIngestMonitorStatus<
   chamberWarnings?: readonly string[] | null;
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
   introWarnings?: readonly string[] | null;
+  missingDigestCount?: number;
 }): {
   status: IngestMonitorStatus;
   message: string;
@@ -120,6 +121,7 @@ export function buildIngestMonitorPayload(params: {
     chamberWarnings: publicWarnings,
     senateVoteMenuCache: params.senateVoteMenuCache ?? null,
     introWarnings: publicIntroWarnings,
+    missingDigestCount: params.missingDigestCount,
   });
 
   const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
@@ -138,10 +140,7 @@ export function buildIngestMonitorPayload(params: {
     canAnnotate && annotations.length > 0
       ? [evaluated.message, ...annotations].join(" ")
       : evaluated.message;
-  const status =
-    params.missingDigestCount > 0 && evaluated.status === "ok"
-      ? "degraded"
-      : evaluated.status;
+  const status = evaluated.status;
 
   const executive = params.executive
     ? buildExecutiveIngestMonitorPayload({

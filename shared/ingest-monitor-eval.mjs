@@ -180,6 +180,15 @@ export function evaluateIngestMonitorStatus(params) {
     };
   }
 
+  const missingDigestCount = Number(params.missingDigestCount) || 0;
+  if (missingDigestCount > 0) {
+    return {
+      status: "degraded",
+      message: "Scheduled ingest completed within the expected window.",
+      last_scheduled_success: lastScheduledSuccess,
+    };
+  }
+
   return {
     status: "ok",
     message: "Scheduled ingest completed within the expected window.",

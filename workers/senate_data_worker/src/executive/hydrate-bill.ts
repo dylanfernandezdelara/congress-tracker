@@ -1,6 +1,5 @@
 import type { Env } from "../config";
-import { getDigest } from "../d1/digests";
-import { upsertDigest } from "../d1/digests";
+import { getDigest, parseStoredDigest, upsertDigest } from "../d1/digests";
 import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
 import { rewriteSummary } from "../synthesis/openrouter";
@@ -19,7 +18,7 @@ async function fetchAndPersistSponsors(env: Env, bill: BillRef): Promise<Awaited
 
 export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<boolean> {
   const existing = await getDigest(env.DB, bill.congress, bill.type, bill.number);
-  if (existing?.title && existing.raw_summary_text) {
+  if (parseStoredDigest(existing?.digest_json ?? null)) {
     if (!(await billHasSponsors(env.DB, bill.congress, bill.type, bill.number))) {
       await fetchAndPersistSponsors(env, bill);
     }
@@ -31,10 +30,7 @@ export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<
   if (!bundle) return false;
 
   let digest = null;
-  const canRewriteFromSource = Boolean(
-    bundle.rawSummaryText?.trim() || bundle.title?.trim()
-  );
-  if (env.OPENROUTER_API_KEY?.trim() && canRewriteFromSource) {
+  if (env.OPENROUTER_API_KEY?.trim()) {
     digest = await rewriteSummary(env, {
       title: bundle.title,
       billLabel: formatBillDocket(bill.type, bill.number, bill.congress),

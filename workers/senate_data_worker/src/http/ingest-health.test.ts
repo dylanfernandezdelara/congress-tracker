@@ -104,6 +104,26 @@ describe("evaluateIngestMonitorStatus", () => {
     expect(result.status).toBe("unknown");
   });
 
+  it("marks degraded when feed-visible bills are missing complete digests", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess: {
+        completed_at: "2026-06-23T10:05:00.000Z",
+        trigger: "scheduled",
+        votesUpserted: 0,
+        votesSkipped: 10,
+        billsSelected: 29,
+        digestsWritten: 19,
+        digestsSkipped: 10,
+      },
+      lastFailure: null,
+      missingDigestCount: 14,
+    });
+    expect(result.status).toBe("degraded");
+    expect(result.message).toBe("Scheduled ingest completed within the expected window.");
+  });
+
   it("marks degraded for Senate cache-fallback chamber warnings", () => {
     const result = evaluateIngestMonitorStatus({
       now,

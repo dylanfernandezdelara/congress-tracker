@@ -48,6 +48,7 @@ export function evaluateIngestMonitorStatus<
   chamberWarnings?: readonly string[] | null;
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
   introWarnings?: readonly string[] | null;
+  missingDigestCount?: number;
   sanitizeFailureError?: (error: string) => string;
 }): {
   status: IngestMonitorStatus;

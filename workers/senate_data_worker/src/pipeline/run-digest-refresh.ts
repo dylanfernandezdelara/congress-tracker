@@ -1,7 +1,7 @@
 import { DIGEST_REFRESH_MAX_BILLS } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { upsertDigest } from "../d1/digests";
+import { hasDigestRewriteSource, upsertDigest } from "../d1/digests";
 import { replaceBillSponsors } from "../d1/sponsors";
 import { billLabel } from "./bill-label";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
@@ -43,7 +43,7 @@ export async function runDigestRefreshPipeline(
     try {
       const bundle = await fetchBillSummaryBundle(env, bill);
       await replaceBillSponsors(env.DB, bill, bundle.sponsors);
-      if (!bundle.rawSummaryText?.trim() && !bundle.title?.trim()) {
+      if (!hasDigestRewriteSource({ title: bundle.title, rawSummaryText: bundle.rawSummaryText })) {
         skipped += 1;
         failures.push({ bill: key, reason: "no_title_or_crs" });
         continue;
