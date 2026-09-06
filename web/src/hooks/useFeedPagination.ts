@@ -5,6 +5,7 @@ import { fetchFeed } from '../api/client'
 import type { FeedItem, FeedPageResponse } from '../api/types'
 import { FEED_PAGE_SIZE } from '../constants/feed'
 import {
+  billSearchQueryFromParam,
   feedRowKey,
   formatBillQueryParam,
   itemMatchesBillParam,
@@ -19,6 +20,9 @@ import {
 } from '../utils/feedAdvancedFilters'
 
 const SEARCH_DEBOUNCE_MS = 300
+/** Unfiltered `q=` lookup after filters hide a shared bill. Feed `total` is capped at 50. */
+const DEEP_LINK_LOOKUP_LIMIT = 50
+type DeepLinkPhase = 'searching' | 'lookup' | 'done'
 
 type FeedFilters = AdvancedFeedFilters & {
   chamber: ChamberFilter | null
@@ -97,7 +101,7 @@ export function useFeedPagination() {
   const appendLockRef = useRef(false)
   const lastFeedModeRef = useRef<'replace' | 'append'>('replace')
   const deepLinkBillRef = useRef<string | null>(null)
-  const deepLinkPhaseRef = useRef<'idle' | 'searching' | 'done'>('done')
+  const deepLinkPhaseRef = useRef<DeepLinkPhase>('done')
   /** Filters+bill tuple currently being searched or already resolved for deep link. */
   const deepLinkQueryRef = useRef<string | null>(null)
   const filtersRef = useRef(filters)
@@ -199,6 +203,41 @@ export function useFeedPagination() {
       }
     },
     [pageSize],
+  )
+
+  const lookupDeepLinkBill = useCallback(
+    async (target: string, q: string) => {
+      if (appendLockRef.current) return
+      appendLockRef.current = true
+      const requestId = ++requestIdRef.current
+      lastFeedModeRef.current = 'append'
+      setIsLoadingMore(true)
+      try {
+        const page = await fetchFeed({ limit: DEEP_LINK_LOOKUP_LIMIT, offset: 0, q })
+        if (requestId !== requestIdRef.current) return
+        if (deepLinkBillRef.current !== target) return
+        const match = page.items.find((item) => itemMatchesBillParam(item, target))
+        if (!match) {
+          deepLinkPhaseRef.current = 'done'
+          setBillMissingNotice(true)
+          return
+        }
+        setItems((prev) => {
+          if (prev.some((item) => itemMatchesBillParam(item, target))) return prev
+          return [match, ...prev]
+        })
+      } catch {
+        if (requestId !== requestIdRef.current) return
+        // Keep previously loaded rows; do not treat a failed lookup as missing.
+        deepLinkPhaseRef.current = 'done'
+      } finally {
+        if (requestId === requestIdRef.current) {
+          appendLockRef.current = false
+          setIsLoadingMore(false)
+        }
+      }
+    },
+    [],
   )
 
   const reloadFeed = useCallback(() => {
@@ -363,7 +402,8 @@ export function useFeedPagination() {
 
   // Deep-link: after pages load, find the bill or keep appending until exhausted.
   useEffect(() => {
-    if (deepLinkPhaseRef.current !== 'searching') return
+    const phase = deepLinkPhaseRef.current
+    if (phase !== 'searching' && phase !== 'lookup') return
     if (isInitialLoading || isLoadingMore) return
     // Don't treat a failed fetch as "bill missing".
     if (feedError) return
@@ -386,8 +426,21 @@ export function useFeedPagination() {
       return
     }
 
-    if (hasMore) {
-      void loadFeedPage(nextOffset, 'append', filtersRef.current)
+    if (phase === 'searching') {
+      if (hasMore) {
+        void loadFeedPage(nextOffset, 'append', filtersRef.current)
+        return
+      }
+      // Filtered pages are exhausted. One unfiltered bill-id search so a share
+      // landing is not a dead homepage when filters hid an in-feed bill.
+      const q = billSearchQueryFromParam(target)
+      if (!q) {
+        deepLinkPhaseRef.current = 'done'
+        setBillMissingNotice(true)
+        return
+      }
+      deepLinkPhaseRef.current = 'lookup'
+      void lookupDeepLinkBill(target, q)
       return
     }
 
@@ -400,6 +453,7 @@ export function useFeedPagination() {
     isLoadingMore,
     feedError,
     loadFeedPage,
+    lookupDeepLinkBill,
     nextOffset,
     setExpandedKey,
   ])
@@ -419,7 +473,7 @@ export function useFeedPagination() {
     searchQuery: filters.q,
     searchDraft: draftQuery,
     items,
-    total,
+    total: Math.max(total, items.length),
     hasMore,
     feedError,
     isInitialLoading,

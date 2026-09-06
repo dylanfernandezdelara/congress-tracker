@@ -292,7 +292,7 @@ export default function Home() {
           </div>
         ) : null}
 
-        {!showSkeleton && !feedError && total === 0 && !inFlight ? (
+        {!showSkeleton && !feedError && !showFeed && !inFlight ? (
           <div className="home-feed-empty">
             <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
             <p className="text-[13px] text-faint">{emptyCopy}</p>

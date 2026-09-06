@@ -23,7 +23,9 @@ export {
   congressOrdinal,
   formatBillDocket,
   formatBillIdParts,
+  formatBillQueryParam,
   formatShortBillId,
+  parseBillQueryParam,
   stripLocalSampleLabel,
   trimDisplayTitle,
 } from './bill-id'

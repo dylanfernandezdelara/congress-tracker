@@ -30,6 +30,9 @@ remote = true
 directory = "../../web/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+# Worker-first so `/?bill=` can rewrite OG. An include-list disables SPA
+# Sec-Fetch-Mode routing and would serve index.html for /feed/*.json.
+run_worker_first = true
 
 [triggers]
 crons = ["0 10 * * *", "20 * * * *"]

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import type { FeedItem, RecentLawItem } from '../api/types'
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { RecentLawsSection } from './RecentLawsSection'
 
 vi.mock('../api/client', () => ({
@@ -96,6 +97,7 @@ describe('RecentLawsSection', () => {
     vi.clearAllMocks()
     vi.unstubAllGlobals()
     clearRollDefectorsCache()
+    resetSheetLayerForTests()
   })
 
   it('renders feed-style rows with headline, law meta, bill id, and date', () => {
@@ -271,13 +273,15 @@ describe('RecentLawsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand details for H.R. 1' }))
     expect(screen.getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy link' }))
     await waitFor(() => {
       expect(writeText).toHaveBeenCalled()
     })
     const copied = String(writeText.mock.calls[0]?.[0] ?? '')
     expect(copied).toContain('bill=119-hr-1')
-    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+    expect(await within(dialog).findByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
 
   it('copies the congress.gov URL for aged-out laws', async () => {
@@ -292,14 +296,16 @@ describe('RecentLawsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand details for H.R. 1' }))
     expect(screen.getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy link' }))
     await waitFor(() => {
       expect(writeText).toHaveBeenCalled()
     })
     const copied = String(writeText.mock.calls[0]?.[0] ?? '')
     expect(copied).toContain('/bill/119th-congress/house-bill/1')
     expect(copied).not.toContain('bill=')
-    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+    expect(await within(dialog).findByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
 
   it('falls back to Became law when law_kind is null', () => {
