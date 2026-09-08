@@ -43,7 +43,7 @@ describe('MemberProfileTrigger', () => {
     expect(screen.getByText('Sen. Placeholder').tagName).toBe('SPAN')
   })
 
-  it('opens the member profile for a real bioguide', () => {
+  it('opens the member profile for a real bioguide', async () => {
     vi.mocked(fetchMemberProfile).mockResolvedValue({
       ...seed,
       chamber: 'House',
@@ -68,5 +68,8 @@ describe('MemberProfileTrigger', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open profile for Brian Fitzpatrick' }))
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
   })
 })
