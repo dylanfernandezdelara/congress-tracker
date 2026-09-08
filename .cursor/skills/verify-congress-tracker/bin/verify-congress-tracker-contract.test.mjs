@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from '../lib/args.mjs'
 import {
   ACCESSIBLE_NAME_MAX,
+  accessibleNameSource,
   clipAccessibleName,
   describeLocator,
   formatInteractiveLine,
@@ -164,6 +165,17 @@ test('interactive role set includes searchbox and option', () => {
   assert.ok(INTERACTIVE_ROLES.includes('option'))
   assert.equal(ACCESSIBLE_NAME_MAX, 120)
   assert.equal(clipAccessibleName('  Search   bills  '), 'Search bills')
+  assert.equal(
+    clipAccessibleName(
+      accessibleNameSource({
+        getAttribute: (key) => (key === 'placeholder' ? 'Search bills' : ''),
+        labels: [{ innerText: 'Search bills', textContent: 'Search bills' }],
+        innerText: '',
+        textContent: '',
+      }),
+    ),
+    'Search bills',
+  )
 })
 
 test('getLocator rejects a stale --ref', async () => {

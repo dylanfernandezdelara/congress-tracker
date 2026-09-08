@@ -83,6 +83,18 @@ export function clipAccessibleName(raw, max = ACCESSIBLE_NAME_MAX) {
     .slice(0, max)
 }
 
+/** In-page name source. Mirrored in collectInteractiveElements / summarizeMatch evaluate bodies. */
+export function accessibleNameSource(node) {
+  const ariaLabel = node.getAttribute?.('aria-label') || ''
+  let labelText = ''
+  if (node.labels && node.labels[0]) {
+    labelText = String(node.labels[0].innerText || node.labels[0].textContent || '').trim()
+  }
+  const placeholder = node.getAttribute?.('placeholder') || ''
+  const title = node.getAttribute?.('title') || ''
+  return ariaLabel || labelText || placeholder || title || node.innerText || node.textContent || ''
+}
+
 export function normalizeRef(raw) {
   if (raw === undefined || raw === null || String(raw).trim() === '') {
     throw new Error('ref is required')
@@ -177,7 +189,15 @@ async function summarizeMatch(locator) {
   return locator.evaluate(
     (node, maxName) => {
       const tag = node.tagName.toLowerCase()
-      const name = (node.getAttribute('aria-label') || node.innerText || node.textContent || '')
+      const ariaLabel = node.getAttribute('aria-label') || ''
+      let labelText = ''
+      if (node.labels && node.labels[0]) {
+        labelText = (node.labels[0].innerText || node.labels[0].textContent || '').trim()
+      }
+      const placeholder = node.getAttribute('placeholder') || ''
+      const title = node.getAttribute('title') || ''
+      const raw = ariaLabel || labelText || placeholder || title || node.innerText || node.textContent || ''
+      const name = String(raw)
         .trim()
         .replace(/\s+/g, ' ')
         .slice(0, maxName)
@@ -239,7 +259,15 @@ export async function collectInteractiveElements(page) {
         const disabled =
           (node instanceof HTMLElement && 'disabled' in node && Boolean(node.disabled)) ||
           node.getAttribute('aria-disabled') === 'true'
-        const name = (node.getAttribute('aria-label') || node.innerText || node.textContent || '')
+        const ariaLabel = node.getAttribute('aria-label') || ''
+        let labelText = ''
+        if (node.labels && node.labels[0]) {
+          labelText = (node.labels[0].innerText || node.labels[0].textContent || '').trim()
+        }
+        const placeholder = node.getAttribute('placeholder') || ''
+        const title = node.getAttribute('title') || ''
+        const raw = ariaLabel || labelText || placeholder || title || node.innerText || node.textContent || ''
+        const name = String(raw)
           .trim()
           .replace(/\s+/g, ' ')
           .slice(0, maxName)
