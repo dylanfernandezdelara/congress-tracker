@@ -10,7 +10,7 @@ import { ensureSchema } from "./schema";
 
 const SPONSORED_BILL_LIMIT = 5;
 
-export function profileBillId(congress: number, billType: string, billNumber: number): string {
+function profileBillId(congress: number, billType: string, billNumber: number): string {
   return formatBillQueryParam({
     congress,
     type: normalizeBillType(billType),

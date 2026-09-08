@@ -52,7 +52,12 @@ export function ProfileBillRow({
       <Link
         to={{ pathname: '/', search: `?${next}` }}
         className={linkClass}
-        onClick={() => {
+        onClick={(event) => {
+          // Modified clicks open a new tab; React Router leaves this page alone,
+          // so the sheet should stay put too.
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+            return
+          }
           queueMicrotask(() => onAfterNavigate?.())
         }}
       >

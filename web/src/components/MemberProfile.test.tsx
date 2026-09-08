@@ -631,6 +631,27 @@ describe('MemberProfile', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('keeps the sheet open when an in-feed bill link is opened in a new tab', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+      ).toBeInTheDocument()
+    })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    fireEvent.click(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+      { metaKey: true },
+    )
+    await Promise.resolve()
+    expect(dialog.closest('.sheet-root')).not.toHaveAttribute('inert')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('renders a stale pre-enrichment payload without throwing', async () => {
     fetchMemberProfileMock.mockResolvedValue({
       ...profile,
