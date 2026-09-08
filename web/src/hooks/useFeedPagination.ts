@@ -447,6 +447,7 @@ export function useFeedPagination() {
     deepLinkPhaseRef.current = 'done'
     setBillMissingNotice(true)
   }, [
+    billParam,
     items,
     hasMore,
     isInitialLoading,
