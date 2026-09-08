@@ -16,6 +16,7 @@ import {
   type DefectorPartyGroup,
 } from '../utils/partySplit'
 import { CompanionVotes } from './CompanionVotes'
+import { MemberProfileTrigger } from './MemberProfileTrigger'
 
 export function VoteSplitBar({
   chamber,
@@ -67,18 +68,17 @@ function DefectorGroup({ group }: { group: DefectorPartyGroup }) {
       <ul className="feed-row-defectors-list">
         {visible.map((defector: VoteDefectorEntry) => (
           <li key={defector.bioguide_id} className="feed-row-defector">
-            {defector.congress_gov_url ? (
-              <a
-                href={defector.congress_gov_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="feed-row-defector-name congress-link"
-              >
-                {defector.name}
-              </a>
-            ) : (
-              <span className="feed-row-defector-name">{defector.name}</span>
-            )}
+            <MemberProfileTrigger
+              seed={{
+                bioguide_id: defector.bioguide_id,
+                name: defector.name,
+                party: defector.party,
+                state: defector.state,
+              }}
+              className="feed-row-defector-name"
+            >
+              {defector.name}
+            </MemberProfileTrigger>
             <span className="feed-row-defector-meta">
               {defector.party}-{defector.state}
             </span>

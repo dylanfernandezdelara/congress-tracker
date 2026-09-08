@@ -17,7 +17,7 @@ npm run setup # same as ./scripts/cursor-cloud-setup.sh (Cursor Cloud runs this 
 
 Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONGRESS_API_KEY`, `OPENROUTER_API_KEY`, and optionally `OPENROUTER_MODEL`.
 
-`npm run setup` also installs root Playwright tooling used by `npm run qa:web`.
+`npm run setup` also installs root Playwright tooling used by `npm run qa:web`, and creates a placeholder `web/dist` from `web/index.html` so wrangler `[assets]` can start (`npm run build:web` produces real assets).
 
 Local ↔ Cursor Cloud parity: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md). Quick check: `npm run verify:local`.
 
@@ -28,7 +28,7 @@ re-run after `members-roster` / `member-votes` if those rails go empty.
 ### Local development
 
 - **Seed sample data (required for local UI):** `npm run seed`
-- Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
+- Worker: `npm run dev:worker` (`http://127.0.0.1:8787`; needs `web/dist` — `npm run setup` creates a placeholder, `npm run build:web` makes real assets)
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
 - Trigger live ingestion (needs API keys): `curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed`
 - Feed JSON: `http://127.0.0.1:8787/feed/latest.json?limit=50&offset=0` (paginated object; read `items`)
@@ -48,7 +48,7 @@ Use [`.cursor/skills/verify-congress-tracker/SKILL.md`](.cursor/skills/verify-co
 Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHub Actions. Every agent session should follow this before opening or updating a PR:
 
 1. `npm test`
-2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`. For behavior changes in `web/`, also prove the affected feature with the verify skill (`features/<feature>.md`) and keep evidence under `artifacts/verify/`.
+2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`. For behavior changes in `web/`, also prove the affected feature with the verify skill (`.cursor/skills/verify-congress-tracker/SKILL.md`) and keep evidence under `artifacts/verify/`.
 3. Run thermonuclear review per `.cursor/rules/pr-thermonuclear-review.mdc` (two Grok 4.6 thermos passes in one background launch, then synthesize); fix CRITICAL and WARNING findings; repeat until CLEAR. Never launch thermos on Grok 4.5 (`cursor-grok-4.5-high-fast`).
 4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask). If that URL’s feed lags production, run `npm run sync:preview-db` once (it exports production D1 and briefly makes live queries unavailable; do not run it on every preview upload).
 5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
@@ -165,11 +165,14 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI
 - `web/src/components/FeedRowDetail.tsx` — expanded feed row detail panel
 - `web/src/utils/feedRowLabels.ts` — topic, event line, procedural detection, teaser helpers
+- `web/src/components/ui/` — vendored shadcn/ui primitives (added via `components.json`; add new primitives with `npx shadcn@latest add <name>` from `web/`)
 - `.cursor/skills/verify-congress-tracker/` — isolated UI verification helper (ports 5174/8788)
 
 ## Key rules
 
 - Prefer commands in this file over guessing root-level npm scripts.
+- Prefer existing shadcn/ui primitives in `web/src/components/ui/` over hand-rolled components.
+- Inside `AnimatedSheet` panels, use `.sheet-section` / `.sheet-section-title` for section layout (the panel already supplies card chrome); shadcn `Card` is for standalone page surfaces, not nested inside sheets.
 - Default to `npm test` for verification.
 - Never commit secrets from `.dev.vars`.
 - `FEED_MAX_BILLS` and `DIGEST_MAX_NEW_REWRITES` are module constants in `workers/senate_data_worker/src/constants.ts`. `VOTE_LOOKBACK_DAYS` lives in `shared/feed-constants.ts` (worker re-exports; web imports for empty-state copy).

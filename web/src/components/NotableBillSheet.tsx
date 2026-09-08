@@ -6,7 +6,6 @@ import { toFeedSummaryContent } from '../utils/feedRowLabels'
 import { notableVoteTitle } from '../utils/notableVoteLabels'
 import { AnimatedSheet } from './AnimatedSheet'
 import { FeedSummarySections } from './FeedSummarySections'
-import type { MemberProfileSeed } from './MemberProfile'
 import { NotableVoteDefectors } from './NotableVoteDefectors'
 
 type NotableBillSheetProps = {
@@ -14,7 +13,6 @@ type NotableBillSheetProps = {
   entry: NotableVoteEntry | null
   selectionKey: number
   onClose: () => void
-  onOpenProfile: (seed: MemberProfileSeed) => void
 }
 
 export function NotableBillSheet({
@@ -22,7 +20,6 @@ export function NotableBillSheet({
   entry,
   selectionKey,
   onClose,
-  onOpenProfile,
 }: NotableBillSheetProps) {
   const titleId = useId()
 
@@ -60,11 +57,7 @@ export function NotableBillSheet({
 
       <section className="sheet-section" aria-label="Party-line breaks">
         <h3 className="sheet-section-title">Party-line breaks</h3>
-        <NotableVoteDefectors
-          entry={entry}
-          onOpenProfile={onOpenProfile}
-          emptyClassName="sheet-muted"
-        />
+        <NotableVoteDefectors entry={entry} emptyClassName="sheet-muted" />
       </section>
 
       <a

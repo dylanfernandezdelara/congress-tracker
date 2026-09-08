@@ -629,18 +629,18 @@
   .notable-compact-member {
     align-self: flex-start;
     margin-top: 0.15rem;
-    padding: 0;
-    border: none;
-    background: transparent;
     font-size: 12px;
     font-weight: 500;
     color: hsl(var(--twc-secondary));
-    cursor: pointer;
+  }
+
+  /* Link affordance only when the name actually opens a profile. */
+  .member-profile-trigger.notable-compact-member {
     text-decoration: underline;
     text-decoration-color: hsl(var(--twc-link-decoration));
   }
 
-  .notable-compact-member:hover {
+  .member-profile-trigger.notable-compact-member:hover {
     color: hsl(var(--twc-foreground));
   }
 

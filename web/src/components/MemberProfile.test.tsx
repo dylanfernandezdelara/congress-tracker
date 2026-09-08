@@ -55,6 +55,7 @@ vi.mock('../api/client', () => ({
   fetchMemberProfile: vi.fn(),
 }))
 
+import { ApiError } from '../api/fetchJson'
 import { fetchMemberProfile } from '../api/client'
 
 const fetchMemberProfileMock = vi.mocked(fetchMemberProfile)
@@ -88,14 +89,22 @@ describe('MemberProfile', () => {
     render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Voting record' })).toBeInTheDocument()
     expect(screen.getByText('Frequent cross-voter')).toBeInTheDocument()
+    expect(screen.getByText('BF')).toBeInTheDocument()
+    expect(screen.getByText('Republican')).toBeInTheDocument()
+    expect(screen.getByText('R-PA')).toBeInTheDocument()
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
+    expect(screen.getByText('Republican')).toBeInTheDocument()
+    expect(screen.getByText('House')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('30 / 12')).toBeInTheDocument()
     expect(screen.getByText(/S\. 2/)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Recent party-line breaks' })).toBeInTheDocument()
+    expect(screen.getByText(/voted Yea \(party Nay\)/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toHaveAttribute(
       'href',
       'https://www.congress.gov/member/brian-fitzpatrick/F000466',
@@ -110,7 +119,78 @@ describe('MemberProfile', () => {
 
     expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
     expect(screen.getByText('PA-1')).toBeInTheDocument()
+    expect(screen.getByText('Republican')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
+  })
+
+  it('shows a loading message while session stats are in flight', () => {
+    fetchMemberProfileMock.mockReturnValue(new Promise(() => undefined))
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    expect(screen.getByText('Loading session voting stats…')).toBeInTheDocument()
+    expect(screen.getByText('R-PA')).toBeInTheDocument()
+  })
+
+  it('shows the fetch error when the profile request fails', async () => {
+    fetchMemberProfileMock.mockRejectedValue(new Error('member profile unavailable'))
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('member profile unavailable')).toBeInTheDocument()
+    })
+  })
+
+  it('shows a member-specific message when the profile is 404', async () => {
+    fetchMemberProfileMock.mockRejectedValue(
+      new ApiError('No data found. Data may not be available yet.', 404, 'Not Found'),
+    )
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Profile not available for this member')).toBeInTheDocument()
+    })
+  })
+
+  it('omits the cross-vote hint and derives a photo when the seed lacks those fields', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, photo_url: '', cross_vote_label: 'rare' })
+
+    render(
+      <MemberProfile
+        open
+        seed={{
+          bioguide_id: seed.bioguide_id,
+          name: seed.name,
+          party: seed.party,
+          state: seed.state,
+        }}
+        selectionKey={1}
+        onClose={() => undefined}
+      />,
+    )
+
+    expect(screen.queryByText('Frequent cross-voter')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rare party-line break')).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('Rare party-line break')).toBeInTheDocument()
+    })
+    expect(screen.getByText('PA-1')).toBeInTheDocument()
+  })
+
+  it('shows the unavailable message when member votes are missing', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, member_votes_available: false })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Per-member vote history is not available for this session yet.'),
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('region', { name: 'Recent party-line breaks' })).not.toBeInTheDocument()
   })
 
   it('closes on Escape and backdrop click after the exit animation', async () => {
@@ -211,5 +291,96 @@ describe('MemberProfile', () => {
 
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+  })
+
+  it('labels a Senate seat as Senator · state', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      chamber: 'Senate',
+      district: null,
+      state: 'TX',
+    })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Senator · TX')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('heading', { level: 3, name: /Voting record/ })).toBeInTheDocument()
+  })
+
+  it('labels a House at-large seat when district is 0', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, district: 0, state: 'AK' })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('AK at-large')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('AK-0')).not.toBeInTheDocument()
+    expect(screen.queryByText('Representative from AK')).not.toBeInTheDocument()
+  })
+
+  it('does not treat a null House district as at-large', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, district: null, state: 'SC' })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Representative from SC')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('SC at-large')).not.toBeInTheDocument()
+  })
+
+  it('labels a numbered House district as state-district', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('heading', { level: 2, name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Recent party-line breaks' })).toBeInTheDocument()
+  })
+
+  it('falls back to initials when photo_url is empty and does not render an img', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, photo_url: '' })
+
+    render(
+      <MemberProfile
+        open
+        seed={{ ...seed, photo_url: '' }}
+        selectionKey={1}
+        onClose={() => undefined}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+    expect(screen.getByText('BF')).toBeInTheDocument()
+    expect(screen.getByText('BF')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' }).querySelector('img')).toBeNull()
+  })
+
+  it('renders Other for an unrecognized party code', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, party: '?' })
+
+    render(
+      <MemberProfile
+        open
+        seed={{ ...seed, party: '?' }}
+        selectionKey={1}
+        onClose={() => undefined}
+      />,
+    )
+
+    expect(screen.getByText('Other')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Other')).toBeInTheDocument()
+    expect(screen.queryByText('Republican')).not.toBeInTheDocument()
   })
 })

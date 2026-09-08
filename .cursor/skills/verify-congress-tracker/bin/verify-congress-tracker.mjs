@@ -40,6 +40,15 @@ import {
   waitForPort,
 } from '../lib/process.mjs'
 import { createStateStore, salvageEndpointsFromText, salvagePidsFromText } from '../lib/run-state.mjs'
+import { tailFile } from '../lib/tail-file.mjs'
+import {
+  applyViewport,
+  DEFAULT_METRICS,
+  deviceMetricsFromState,
+  parseViewportFlags,
+  viewportFromCdpFlags,
+} from '../lib/viewport.mjs'
+import { ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(here, '../../../..')
@@ -50,7 +59,6 @@ const PERSIST_TO = path.join(RUN_DIR, 'd1')
 const CONSOLE_JSONL = path.join(RUN_DIR, 'console.jsonl')
 const NETWORK_JSONL = path.join(RUN_DIR, 'network.jsonl')
 const TAP_SCRIPT = path.join(here, '../lib/devtools-tap.mjs')
-const VIEWPORT = { width: 1280, height: 800 }
 const { readState, writeState, updateState, readStateOrCorrupt } = createStateStore(STATE_PATH)
 
 function usage() {
@@ -62,22 +70,26 @@ function usage() {
   verify-congress-tracker browser start
   verify-congress-tracker browser goto [--path /] [--url <url>]
   verify-congress-tracker browser url
-  verify-congress-tracker browser find (--role <role> --name <name> | --selector <sel>) [--exact]
-  verify-congress-tracker browser scroll (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N]
-  verify-congress-tracker browser click (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N]
-  verify-congress-tracker browser fill (--role <role> --name <name> | --selector <sel>) --value <value> [--exact] [--nth N]
-  verify-congress-tracker browser select (--role <role> --name <name> | --name <label> | --selector <sel>) --value <value> [--exact] [--nth N]
+  verify-congress-tracker browser find (--role <role> --name <name> [--exact] | --selector <sel> | --ref <ref>)
+  verify-congress-tracker browser scroll (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>)
+  verify-congress-tracker browser click (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>)
+  verify-congress-tracker browser fill (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>) --value <value>
+  verify-congress-tracker browser select (--role <role> --name <name> [--exact] [--nth N] | --name <label> | --selector <sel> [--nth N] | --ref <ref>) --value <value>
   verify-congress-tracker browser press --key <key>
-  verify-congress-tracker browser wait (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N] [--timeout-ms 15000]
+  verify-congress-tracker browser wait (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>) [--timeout-ms 15000]
   verify-congress-tracker browser eval --js <expression>
   verify-congress-tracker browser cdp --method <CDP.Method> [--params <json-object>]
+  verify-congress-tracker browser viewport --width <n> --height <n> [--device-scale-factor <n>] [--mobile]
   verify-congress-tracker browser console
   verify-congress-tracker browser network
-  verify-congress-tracker browser snapshot --aria [--path <file-under-artifacts/verify>]
+  verify-congress-tracker browser snapshot (--aria | --interactive) [--path <file-under-artifacts/verify>]
   verify-congress-tracker browser screenshot --path <file-under-artifacts/verify> [--full-page]
 
   api GET is read-only and limited to /feed, /stats, /health, and /debug/*.json.
-  --name /regex/ is a JavaScript regex. Snapshot writes an ARIA snapshot to stdout or --path (--aria is required).
+  --name /regex/ is a JavaScript regex. Snapshot writes an ARIA tree (--aria) or one interactive line per
+  [ref] (--interactive: button, link, textbox, combobox, radio, checkbox, tab, searchbox, option) to stdout
+  or --path. --ref targets data-verify-ref from the last --interactive snapshot (unique; not combined with
+  --nth/--exact; stale after re-render). browser viewport persists a complete metrics object; withPage applies it.
   browser console and browser network start Chromium + the DevTools tap if needed.
 `)
   throw new UsageError()
@@ -176,6 +188,12 @@ async function waitHttpOk(url, timeoutMs, label) {
   throw new Error(`${label} not ready at ${url} (${last})`)
 }
 
+function errorWithLogTail(err, logPath) {
+  const message = err instanceof Error ? err.message : String(err)
+  const tail = tailFile(logPath, 15)
+  return new Error(tail ? `${message}\n${tail}` : message)
+}
+
 function seedLocal(persistTo) {
   console.log(
     'Seeding isolated verification D1 (SEED_PERSIST_TO artifacts/verify/.run/d1; never touches .wrangler/state or production/preview D1).',
@@ -223,7 +241,7 @@ async function cmdLaunch() {
     runId: new Date().toISOString().replace(/[:.]/g, '-'),
     repoRoot: REPO_ROOT,
     ...endpoints,
-    viewport: VIEWPORT,
+    viewport: { ...DEFAULT_METRICS },
     persistTo: PERSIST_TO,
     seeded: false,
     pids: {},
@@ -232,6 +250,12 @@ async function cmdLaunch() {
 
   seedLocal(PERSIST_TO)
   updateState({ seeded: true, persistTo: PERSIST_TO, ...endpoints })
+
+  if (ensureWebDistPlaceholder(REPO_ROOT)) {
+    console.log(
+      'created placeholder web/dist from web/index.html (wrangler [assets] needs the directory; Vite serves the UI)',
+    )
+  }
 
   const workerPid = spawnLogged(
     'npm',
@@ -248,10 +272,16 @@ async function cmdLaunch() {
 
   try {
     await waitHttpOk(`${endpoints.workerUrl}/health`, 90_000, 'worker')
+  } catch (err) {
+    teardownPids(recordedPids(readState()))
+    throw errorWithLogTail(err, path.join(RUN_DIR, 'worker.log'))
+  }
+
+  try {
     await waitHttpOk(endpoints.webUrl, 60_000, 'web')
   } catch (err) {
     teardownPids(recordedPids(readState()))
-    throw err
+    throw errorWithLogTail(err, path.join(RUN_DIR, 'web.log'))
   }
 
   const health = await fetchJson(`${endpoints.workerUrl}/health`)
@@ -436,50 +466,29 @@ async function withPage(fn) {
     })
     if (disallowed) {
       await disallowed.goto(webUrl, { waitUntil: 'domcontentloaded' })
-      await disallowed.setViewportSize(viewportFromState(ready))
+      await applyViewport(disallowed, deviceMetricsFromState(ready))
       throw new Error('page was on a disallowed URL; restored to home')
     }
     page = await context.newPage()
     await page.goto(webUrl, { waitUntil: 'domcontentloaded' })
   }
-  await page.setViewportSize(viewportFromState(ready))
-  return await fn(page)
-}
-
-function viewportFromState(state) {
-  const width = Number(state?.viewport?.width)
-  const height = Number(state?.viewport?.height)
-  return {
-    width: Number.isFinite(width) && width > 0 ? Math.round(width) : VIEWPORT.width,
-    height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
-  }
+  const metrics = await applyViewport(page, deviceMetricsFromState(ready))
+  return await fn(page, metrics)
 }
 
 function persistViewportFromCdp(flags) {
-  if (flags.method !== 'Emulation.setDeviceMetricsOverride') return
-  let params = {}
-  if (typeof flags.params === 'string' && flags.params.trim()) {
-    try {
-      params = JSON.parse(flags.params)
-    } catch {
-      return
-    }
-  } else if (flags.params && typeof flags.params === 'object') {
-    params = flags.params
-  }
-  const width = Number(params.width)
-  const height = Number(params.height)
-  if (!Number.isFinite(width) || width <= 0) return
-  updateState({
-    viewport: {
-      width: Math.round(width),
-      height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
-    },
-  })
+  const viewport = viewportFromCdpFlags(flags)
+  if (!viewport) return
+  updateState({ viewport })
+}
+
+function persistViewportFromFlags(flags) {
+  updateState({ viewport: parseViewportFlags(flags) })
 }
 
 async function cmdBrowser(command, flags) {
   if (command === 'cdp') persistViewportFromCdp(flags)
+  if (command === 'viewport') persistViewportFromFlags(flags)
   const endpoints = endpointsFromState(requireOwnState())
   await runBrowserCommand(command, flags, {
     withPage,
@@ -555,8 +564,6 @@ export const TEST_ONLY = {
   resolveEvidencePath,
   EVIDENCE_ROOT,
   PERSIST_TO,
-  viewportFromState,
-  persistViewportFromCdp,
 }
 
 async function main(argv) {

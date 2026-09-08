@@ -6,6 +6,7 @@ import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { DefectorEntry, PortfolioMovers, SessionStatsResponse } from '../api/types'
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
+import { renderWithMemberProfile } from '../test/memberProfileHarness'
 import { LeftSidebar } from './LeftSidebar'
 
 vi.mock('../api/client', () => ({
@@ -125,7 +126,7 @@ describe('LeftSidebar', () => {
     const defectors = asyncResult(chamberPair([houseDefector], [] as DefectorEntry[]))
     const portfolios = asyncResult(chamberPair(emptyPortfolios, emptyPortfolios))
 
-    render(
+    renderWithMemberProfile(
       <LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />,
     )
 
@@ -138,7 +139,7 @@ describe('LeftSidebar', () => {
     expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toBeInTheDocument()
   })
 
-  it('falls back to an external link when bioguide id is missing', () => {
+  it('renders missing and LIS: bioguide names as plain text', () => {
     const defectors = asyncResult(
       chamberPair(
         [
@@ -148,22 +149,26 @@ describe('LeftSidebar', () => {
             name: 'No Id Member',
           },
         ],
-        [] as DefectorEntry[],
+        [
+          {
+            ...houseDefector,
+            bioguide_id: 'LIS:S123',
+            name: 'Placeholder Senator',
+            state: 'VT',
+          },
+        ],
       ),
     )
     const portfolios = asyncResult(chamberPair(emptyPortfolios, emptyPortfolios))
 
-    render(
-      <LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />,
-    )
+    render(<LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />)
 
-    const link = screen.getByRole('link', { name: 'No Id Member' })
-    expect(link).toHaveAttribute(
-      'href',
-      'https://www.congress.gov/member/brian-fitzpatrick/F000466',
-    )
-    expect(
-      screen.queryByRole('button', { name: 'Open profile for No Id Member' }),
-    ).not.toBeInTheDocument()
+    for (const name of ['No Id Member', 'Placeholder Senator']) {
+      expect(screen.getByText(name)).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: `Open profile for ${name}` }),
+      ).not.toBeInTheDocument()
+    }
   })
 })

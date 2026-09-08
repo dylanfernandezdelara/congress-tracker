@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 
+import { ApiError } from '../api/fetchJson'
 import { getCachedMemberProfile, loadMemberProfile } from '../api/memberProfileCache'
 import type { MemberProfileResponse } from '../api/types'
+
+const PROFILE_NOT_FOUND_MESSAGE = 'Profile not available for this member'
 
 type UseMemberProfileResult = {
   /** Synchronous cache read for the requested member; prefetched data renders on the first frame. */
@@ -35,7 +38,12 @@ export function useMemberProfile(bioguideId: string | null): UseMemberProfileRes
         if (!cancelled) {
           setSettled({
             bioguideId,
-            error: err instanceof Error ? err.message : 'Could not load member profile',
+            error:
+              err instanceof ApiError && err.status === 404
+                ? PROFILE_NOT_FOUND_MESSAGE
+                : err instanceof Error
+                  ? err.message
+                  : 'Could not load member profile',
           })
         }
       })

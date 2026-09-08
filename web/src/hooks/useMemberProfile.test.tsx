@@ -7,6 +7,7 @@ vi.mock('../api/client', () => ({
   fetchMemberProfile: vi.fn(),
 }))
 
+import { ApiError } from '../api/fetchJson'
 import { fetchMemberProfile } from '../api/client'
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import { useMemberProfile } from './useMemberProfile'
@@ -65,6 +66,19 @@ describe('useMemberProfile', () => {
     expect(result.current.error).toBeNull()
     expect(result.current.profile).toBeNull()
     expect(result.current.isPending).toBe(true)
+  })
+
+  it('maps a 404 into member-specific copy', async () => {
+    fetchMemberProfileMock.mockRejectedValue(
+      new ApiError('No data found. Data may not be available yet.', 404, 'Not Found'),
+    )
+
+    const { result } = renderHook(() => useMemberProfile('LIS:S123'))
+
+    await waitFor(() => {
+      expect(result.current.error).toBe('Profile not available for this member')
+    })
+    expect(result.current.isPending).toBe(false)
   })
 
   it('returns idle state for a null id', () => {
