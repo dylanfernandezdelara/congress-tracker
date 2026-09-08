@@ -727,19 +727,13 @@
   .feed-row-detail-topbar {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
     gap: 0.75rem;
-  }
-
-  .feed-row-detail-topbar-spacer {
-    flex: 1 1 auto;
   }
 
   .feed-row-sponsor {
     margin: 0;
     flex: 1 1 auto;
     min-width: 0;
-    padding-top: 0.4rem;
     font-size: 13px;
     line-height: 1.4;
     color: hsl(var(--twc-secondary));
@@ -767,6 +761,8 @@
     width: 32px;
     height: 32px;
     margin: 0;
+    margin-left: auto;
+    /* Centers the 18px glyph inside the 32px control on the 13px/1.4 sponsor line. */
     margin-top: -6px;
     padding: 0;
     border: 1px solid transparent;

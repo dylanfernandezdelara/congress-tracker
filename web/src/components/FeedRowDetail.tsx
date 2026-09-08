@@ -103,9 +103,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
             </span>{' '}
             {sponsorLine}
           </p>
-        ) : (
-          <span className="feed-row-detail-topbar-spacer" aria-hidden="true" />
-        )}
+        ) : null}
         <button
           type="button"
           className="feed-row-share"
