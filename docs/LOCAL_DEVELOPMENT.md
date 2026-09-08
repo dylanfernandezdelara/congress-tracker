@@ -167,16 +167,16 @@ cd /tmp/wt-<name> && npm run setup   # each worktree needs its own node_modules 
 
 Run the ship checklist inside that worktree. Paste the **version** URL that
 `npm run preview` prints; it is unique per upload. The branch alias it also
-requests is truncated to 34 characters, so two long branch names can share
-one alias. Files are isolated but ports are not: if two worktrees run the
+requests is truncated (`scripts/preview-upload.mjs`), so two long branch
+names can share one alias. Files are isolated but ports are not: if two worktrees run the
 checklist at once, give the second `VITE_DEV_PORT` (with a matching
 `QA_WEB_URL` for `qa:web`) and different `VERIFY_*_PORT` values (Launch
 section of
 [`.cursor/skills/verify-congress-tracker/SKILL.md`](../.cursor/skills/verify-congress-tracker/SKILL.md)).
 
 Merge order matters: after each squash-merge, `git fetch origin main` and
-merge (or rebase) it into the remaining worktrees before their next thermos
-round, so review sees the diff against the real base. Once a PR is merged,
+merge (or rebase) it into the remaining worktrees before their next
+thermonuclear review round, so review sees the diff against the real base. Once a PR is merged,
 remove its worktree from the primary checkout (the clone you added it from):
 
 ```bash
