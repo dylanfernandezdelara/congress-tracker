@@ -43,7 +43,8 @@ import { createStateStore, salvageEndpointsFromText, salvagePidsFromText } from 
 import { tailFile } from '../lib/tail-file.mjs'
 import {
   applyViewport,
-  DEFAULT_VIEWPORT,
+  DEFAULT_METRICS,
+  deviceMetricsFromState,
   parseViewportFlags,
   viewportFromCdpFlags,
 } from '../lib/viewport.mjs'
@@ -69,13 +70,13 @@ function usage() {
   verify-congress-tracker browser start
   verify-congress-tracker browser goto [--path /] [--url <url>]
   verify-congress-tracker browser url
-  verify-congress-tracker browser find (--role <role> --name <name> | --selector <sel>) [--exact]
-  verify-congress-tracker browser scroll (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N]
+  verify-congress-tracker browser find (--role <role> --name <name> [--exact] | --selector <sel> | --ref <ref>)
+  verify-congress-tracker browser scroll (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>)
   verify-congress-tracker browser click (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>)
   verify-congress-tracker browser fill (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>) --value <value>
-  verify-congress-tracker browser select (--role <role> --name <name> | --name <label> | --selector <sel>) --value <value> [--exact] [--nth N]
+  verify-congress-tracker browser select (--role <role> --name <name> [--exact] [--nth N] | --name <label> | --selector <sel> [--nth N] | --ref <ref>) --value <value>
   verify-congress-tracker browser press --key <key>
-  verify-congress-tracker browser wait (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N] [--timeout-ms 15000]
+  verify-congress-tracker browser wait (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>) [--timeout-ms 15000]
   verify-congress-tracker browser eval --js <expression>
   verify-congress-tracker browser cdp --method <CDP.Method> [--params <json-object>]
   verify-congress-tracker browser viewport --width <n> --height <n> [--device-scale-factor <n>] [--mobile]
@@ -240,7 +241,7 @@ async function cmdLaunch() {
     runId: new Date().toISOString().replace(/[:.]/g, '-'),
     repoRoot: REPO_ROOT,
     ...endpoints,
-    viewport: { ...DEFAULT_VIEWPORT, deviceScaleFactor: 1, mobile: false },
+    viewport: { ...DEFAULT_METRICS },
     persistTo: PERSIST_TO,
     seeded: false,
     pids: {},
@@ -465,14 +466,14 @@ async function withPage(fn) {
     })
     if (disallowed) {
       await disallowed.goto(webUrl, { waitUntil: 'domcontentloaded' })
-      await applyViewport(disallowed, ready)
+      await applyViewport(disallowed, deviceMetricsFromState(ready))
       throw new Error('page was on a disallowed URL; restored to home')
     }
     page = await context.newPage()
     await page.goto(webUrl, { waitUntil: 'domcontentloaded' })
   }
-  await applyViewport(page, ready)
-  return await fn(page)
+  const metrics = await applyViewport(page, deviceMetricsFromState(ready))
+  return await fn(page, metrics)
 }
 
 function persistViewportFromCdp(flags) {

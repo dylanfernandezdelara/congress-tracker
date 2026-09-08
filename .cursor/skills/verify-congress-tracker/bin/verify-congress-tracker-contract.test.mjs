@@ -9,14 +9,15 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from '../lib/args.mjs'
 import {
   ACCESSIBLE_NAME_MAX,
-  accessibleNameSource,
-  clipAccessibleName,
   describeLocator,
+  formatActionTarget,
   formatInteractiveLine,
   getLocator,
+  implicitRole,
   INTERACTIVE_ROLES,
   isAllowedCdpMethod,
   jsLooksLikeNavigation,
+  nameFromNode,
   normalizeRef,
   parseName,
 } from '../lib/browser.mjs'
@@ -39,11 +40,11 @@ import {
 } from '../lib/process.mjs'
 import {
   applyViewport,
+  DEFAULT_METRICS,
   deviceMetricsFromState,
+  normalizeMetrics,
   parseViewportFlags,
-  shouldClearDeviceMetrics,
   viewportFromCdpFlags,
-  viewportFromState,
 } from '../lib/viewport.mjs'
 import { FALLBACK_WEB_DIST_HTML, ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 import { TEST_ONLY } from './verify-congress-tracker.mjs'
@@ -71,7 +72,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const helper = path.join(here, 'verify-congress-tracker')
 const rootDir = path.resolve(here, '../../../..')
 const seedScript = path.join(rootDir, 'scripts', 'seed-local-feed.sh')
-const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, persistViewportFromCdp } = TEST_ONLY
+const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO } = TEST_ONLY
 
 test('helper wrapper is executable', () => {
   const stat = fs.statSync(helper)
@@ -101,7 +102,11 @@ test('usage documents selector, nth, GET-only api, and DevTools commands', () =>
     assert.match(text, /--name <label>/)
     assert.match(text, /--ref/)
     assert.match(text, /fill \(--role/)
-    assert.match(text, /select .*\[--nth N\]/)
+    assert.match(text, /browser find.*--ref/)
+    assert.match(text, /browser scroll.*--ref/)
+    assert.match(text, /browser wait.*--ref/)
+    assert.match(text, /browser select.*--ref/)
+    assert.match(text, /select .*--value/)
     assert.match(text, /searchbox/)
     assert.doesNotMatch(text, /--ref <ref>\) \[--exact\]/)
   }
@@ -130,14 +135,23 @@ test('describeLocator applies nth to selector and rejects a bad nth', () => {
 
 test('describeLocator and normalizeRef accept @eN snapshot refs', () => {
   assert.deepEqual(describeLocator({ ref: '@e12' }), { kind: 'ref', ref: 'e12' })
-  assert.deepEqual(describeLocator({ ref: 'e3', role: 'button', name: 'House' }), {
-    kind: 'ref',
-    ref: 'e3',
-  })
+  assert.throws(
+    () => describeLocator({ ref: 'e3', role: 'button', name: 'House' }),
+    /--ref cannot be combined with --role\/--name\/--selector\/--nth\/--exact/,
+  )
+  assert.throws(
+    () => describeLocator({ ref: 'e3', selector: '.feed-row' }),
+    /--ref cannot be combined/,
+  )
+  assert.throws(() => describeLocator({ ref: 'e3', nth: '0' }), /--ref cannot be combined/)
+  assert.throws(() => describeLocator({ ref: 'e3', exact: true }), /--ref cannot be combined/)
   assert.equal(normalizeRef('@e1'), 'e1')
   assert.equal(normalizeRef('e9'), 'e9')
   assert.throws(() => normalizeRef('12'), /invalid ref/)
   assert.throws(() => normalizeRef(''), /ref is required/)
+  assert.equal(formatActionTarget({ ref: '@e12' }), '--ref e12')
+  assert.equal(formatActionTarget({ role: 'button', name: 'House' }), 'button House')
+  assert.equal(formatActionTarget({ selector: '.feed-row' }), '.feed-row')
 })
 
 test('interactive snapshot lines are compact and include set state', () => {
@@ -164,17 +178,87 @@ test('interactive role set includes searchbox and option', () => {
   assert.ok(INTERACTIVE_ROLES.includes('searchbox'))
   assert.ok(INTERACTIVE_ROLES.includes('option'))
   assert.equal(ACCESSIBLE_NAME_MAX, 120)
-  assert.equal(clipAccessibleName('  Search   bills  '), 'Search bills')
+})
+
+test('nameFromNode uses aria-label, labelledby, label, placeholder, title, then text', () => {
+  const emptyAttr = () => ''
   assert.equal(
-    clipAccessibleName(
-      accessibleNameSource({
-        getAttribute: (key) => (key === 'placeholder' ? 'Search bills' : ''),
-        labels: [{ innerText: 'Search bills', textContent: 'Search bills' }],
-        innerText: '',
-        textContent: '',
-      }),
-    ),
+    nameFromNode({
+      getAttribute: (key) => (key === 'aria-label' ? '  From  aria  ' : ''),
+      labels: [{ innerText: 'From label' }],
+      placeholder: 'From placeholder',
+      innerText: 'From text',
+    }, 120),
+    'From aria',
+  )
+  assert.equal(
+    nameFromNode({
+      getAttribute: (key) => (key === 'aria-labelledby' ? 'a b' : ''),
+      ownerDocument: {
+        getElementById: (id) => (id === 'a' ? { innerText: 'Hello' } : { innerText: 'world' }),
+      },
+      labels: [{ innerText: 'From label' }],
+      innerText: 'From text',
+    }, 120),
+    'Hello world',
+  )
+  assert.equal(
+    nameFromNode({
+      getAttribute: emptyAttr,
+      labels: [{ innerText: 'Search bills', textContent: 'Search bills' }],
+      placeholder: 'ignored',
+      innerText: '',
+      textContent: '',
+    }, 120),
     'Search bills',
+  )
+  assert.equal(
+    nameFromNode({
+      getAttribute: (key) => (key === 'placeholder' ? 'Search bills' : ''),
+      labels: [],
+      innerText: '',
+    }, 120),
+    'Search bills',
+  )
+  assert.equal(
+    nameFromNode({
+      getAttribute: (key) => (key === 'title' ? 'Hover name' : ''),
+      labels: [],
+      innerText: 'Visible',
+    }, 120),
+    'Hover name',
+  )
+  assert.equal(
+    nameFromNode({
+      getAttribute: emptyAttr,
+      labels: [],
+      innerText: 'abcdefghijklmnopqrstuvwxyz',
+    }, 8),
+    'abcdefgh',
+  )
+})
+
+test('implicitRole maps native controls and explicit role', () => {
+  assert.equal(
+    implicitRole({ tagName: 'INPUT', type: 'search', getAttribute: (key) => (key === 'type' ? 'search' : '') }),
+    'searchbox',
+  )
+  assert.equal(
+    implicitRole({ tagName: 'INPUT', getAttribute: (key) => (key === 'type' ? 'checkbox' : '') }),
+    'checkbox',
+  )
+  assert.equal(
+    implicitRole({ tagName: 'A', getAttribute: (key) => (key === 'href' ? '/' : ''), hasAttribute: (key) => key === 'href' }),
+    'link',
+  )
+  assert.equal(implicitRole({ tagName: 'BUTTON', getAttribute: () => '' }), 'button')
+  assert.equal(
+    implicitRole({ tagName: 'DIV', getAttribute: (key) => (key === 'role' ? 'tab' : '') }),
+    'tab',
+  )
+  assert.equal(
+    implicitRole({ tagName: 'INPUT', getAttribute: (key) => (key === 'type' ? 'hidden' : '') }),
+    'generic',
   )
 })
 
@@ -206,6 +290,13 @@ test('parseViewportFlags writes a complete metrics object', () => {
   })
   assert.throws(() => parseViewportFlags({ width: '0', height: '844' }), /--width/)
   assert.throws(() => parseViewportFlags({ width: '390' }), /--height/)
+  assert.deepEqual(normalizeMetrics({}), { ...DEFAULT_METRICS })
+  assert.deepEqual(normalizeMetrics({ width: 390, height: 844 }), {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
 })
 
 test('api paths are read-only public JSON', () => {
@@ -228,30 +319,29 @@ test('persistViewportFromCdp records dsf and mobile from CDP params', () => {
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   )
   assert.equal(viewportFromCdpFlags({ method: 'Runtime.evaluate', params: '{}' }), null)
-  assert.equal(typeof persistViewportFromCdp, 'function')
 })
 
 test('browser commands reuse a persisted CDP viewport instead of resetting to 1280', () => {
-  assert.deepEqual(viewportFromState({ viewport: { width: 390, height: 844 } }), {
+  assert.deepEqual(deviceMetricsFromState({ viewport: { width: 390, height: 844 } }), {
     width: 390,
     height: 844,
+    deviceScaleFactor: 1,
+    mobile: false,
   })
-  assert.deepEqual(viewportFromState({ viewport: { width: 320, height: 568 } }), {
+  assert.deepEqual(deviceMetricsFromState({ viewport: { width: 320, height: 568 } }), {
     width: 320,
     height: 568,
+    deviceScaleFactor: 1,
+    mobile: false,
   })
-  assert.deepEqual(viewportFromState({}), { width: 1280, height: 800 })
+  assert.deepEqual(deviceMetricsFromState({}), { ...DEFAULT_METRICS })
   assert.deepEqual(
     deviceMetricsFromState({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true } }),
     { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   )
-  assert.equal(
-    shouldClearDeviceMetrics(deviceMetricsFromState({ viewport: { width: 1280, height: 800 } })),
-    true,
-  )
 })
 
-test('applyViewport clears device metrics when restoring desktop', async () => {
+test('applyViewport always sends a complete device-metrics override', async () => {
   const sent = []
   const page = {
     setViewportSize: async (size) => {
@@ -265,12 +355,23 @@ test('applyViewport clears device metrics when restoring desktop', async () => {
       }),
     }),
   }
-  await applyViewport(page, { viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true } })
-  assert.equal(sent[1][0], 'Emulation.setDeviceMetricsOverride')
+  await applyViewport(page, { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
+  assert.deepEqual(sent[1], [
+    'Emulation.setDeviceMetricsOverride',
+    { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  ])
   sent.length = 0
-  await applyViewport(page, { viewport: { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false } })
+  const restored = await applyViewport(page, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
   assert.deepEqual(sent[0], ['setViewportSize', { width: 1280, height: 800 }])
-  assert.equal(sent[1][0], 'Emulation.clearDeviceMetricsOverride')
+  assert.deepEqual(sent[1], [
+    'Emulation.setDeviceMetricsOverride',
+    { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false },
+  ])
+  assert.equal(
+    sent.some(([method]) => method === 'Emulation.clearDeviceMetricsOverride'),
+    false,
+  )
+  assert.deepEqual(restored, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
 })
 
 test('evidence paths cannot escape artifacts/verify', () => {
@@ -434,6 +535,11 @@ test('ensureWebDistPlaceholder writes a minimal shell when web/index.html is mis
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('browser command does not parse viewport flags', () => {
+  const source = fs.readFileSync(path.join(here, '../lib/browser.mjs'), 'utf8')
+  assert.doesNotMatch(source, /parseViewportFlags/)
 })
 
 test('launch appends worker.log or web.log tails on any startup failure', () => {

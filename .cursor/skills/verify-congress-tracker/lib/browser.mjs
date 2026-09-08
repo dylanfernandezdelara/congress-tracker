@@ -5,7 +5,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { isAllowedAppUrl } from './endpoints.mjs'
-import { parseViewportFlags } from './viewport.mjs'
 
 const CDP_PREFIXES = [
   'Runtime.',
@@ -38,23 +37,11 @@ export const INTERACTIVE_ROLES = [
   'option',
 ]
 
+const INTERACTIVE_NATIVE_TAGS = 'button, input, textarea, select, option, a[href]'
 const INTERACTIVE_CANDIDATE_SELECTOR = [
-  'button',
-  'input',
-  'textarea',
-  'select',
-  'option',
-  'a[href]',
-  '[role="button"]',
-  '[role="link"]',
-  '[role="textbox"]',
-  '[role="searchbox"]',
-  '[role="combobox"]',
-  '[role="radio"]',
-  '[role="checkbox"]',
-  '[role="tab"]',
-  '[role="option"]',
-].join(',')
+  INTERACTIVE_NATIVE_TAGS,
+  ...INTERACTIVE_ROLES.map((role) => `[role="${role}"]`),
+].join(', ')
 
 export function isAllowedCdpMethod(method) {
   if (typeof method !== 'string' || method.length === 0) return false
@@ -76,23 +63,66 @@ export function jsLooksLikeNavigation(js) {
   )
 }
 
-export function clipAccessibleName(raw, max = ACCESSIBLE_NAME_MAX) {
-  return String(raw ?? '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .slice(0, max)
+/** Closure-free: Playwright serializes this via toString for in-page evaluate. */
+export function nameFromNode(node, maxName) {
+  if (!node) return ''
+  const limit = typeof maxName === 'number' && maxName > 0 ? maxName : 120
+  const clip = (value) => {
+    const text = String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!text) return ''
+    return text.length > limit ? text.slice(0, limit) : text
+  }
+  const labelledBy = node.getAttribute?.('aria-labelledby') || ''
+  let labelledByText = ''
+  if (labelledBy && node.ownerDocument) {
+    labelledByText = labelledBy
+      .split(/\s+/)
+      .map((id) => node.ownerDocument.getElementById(id)?.innerText || '')
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+  const fromLabel =
+    node.labels && node.labels.length
+      ? Array.from(node.labels)
+          .map((label) => label.innerText || label.textContent || '')
+          .join(' ')
+      : ''
+  return clip(
+    node.getAttribute?.('aria-label') ||
+      labelledByText ||
+      fromLabel ||
+      node.placeholder ||
+      node.getAttribute?.('placeholder') ||
+      node.getAttribute?.('title') ||
+      node.innerText ||
+      node.textContent,
+  )
 }
 
-/** In-page name source. Mirrored in collectInteractiveElements / summarizeMatch evaluate bodies. */
-export function accessibleNameSource(node) {
-  const ariaLabel = node.getAttribute?.('aria-label') || ''
-  let labelText = ''
-  if (node.labels && node.labels[0]) {
-    labelText = String(node.labels[0].innerText || node.labels[0].textContent || '').trim()
+/** Closure-free: Playwright serializes this via toString for in-page evaluate. */
+export function implicitRole(node) {
+  if (!node) return 'generic'
+  const explicit = (node.getAttribute?.('role') || '').trim()
+  if (explicit) return explicit
+  const tag = String(node.tagName || '').toLowerCase()
+  const type = String(node.type || node.getAttribute?.('type') || '').toLowerCase()
+  if (tag === 'a' && (node.getAttribute?.('href') || node.hasAttribute?.('href'))) return 'link'
+  if (tag === 'button') return 'button'
+  if (tag === 'textarea') return 'textbox'
+  if (tag === 'select') return 'combobox'
+  if (tag === 'option') return 'option'
+  if (tag === 'input') {
+    if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') return 'button'
+    if (type === 'checkbox') return 'checkbox'
+    if (type === 'radio') return 'radio'
+    if (type === 'search') return 'searchbox'
+    if (type === 'hidden' || type === 'file' || type === 'range' || type === 'color') return 'generic'
+    return 'textbox'
   }
-  const placeholder = node.getAttribute?.('placeholder') || ''
-  const title = node.getAttribute?.('title') || ''
-  return ariaLabel || labelText || placeholder || title || node.innerText || node.textContent || ''
+  return 'generic'
 }
 
 export function normalizeRef(raw) {
@@ -118,6 +148,9 @@ export function formatInteractiveLine(entry) {
 
 export function describeLocator(flags, { all = false } = {}) {
   if (flags.ref) {
+    if (flags.role || flags.name || flags.selector || flags.nth != null || flags.exact === true) {
+      throw new Error('--ref cannot be combined with --role/--name/--selector/--nth/--exact')
+    }
     return { kind: 'ref', ref: normalizeRef(flags.ref) }
   }
   if (!flags.selector && !flags.role && !flags.name) {
@@ -136,6 +169,12 @@ export function describeLocator(flags, { all = false } = {}) {
     return { kind: 'role', role: flags.role, name: flags.name, exact: Boolean(flags.exact), nth }
   }
   return { kind: 'label', name: flags.name, nth }
+}
+
+export function formatActionTarget(flags) {
+  if (flags.ref) return `--ref ${normalizeRef(flags.ref)}`
+  if (flags.selector) return String(flags.selector)
+  return `${flags.role || ''} ${flags.name || ''}`.trim()
 }
 
 function staleRefError(ref) {
@@ -186,55 +225,22 @@ function printJsonlOrEmpty(filePath) {
 }
 
 async function summarizeMatch(locator) {
-  return locator.evaluate(
-    (node, maxName) => {
-      const tag = node.tagName.toLowerCase()
-      const ariaLabel = node.getAttribute('aria-label') || ''
-      let labelText = ''
-      if (node.labels && node.labels[0]) {
-        labelText = (node.labels[0].innerText || node.labels[0].textContent || '').trim()
-      }
-      const placeholder = node.getAttribute('placeholder') || ''
-      const title = node.getAttribute('title') || ''
-      const raw = ariaLabel || labelText || placeholder || title || node.innerText || node.textContent || ''
-      const name = String(raw)
-        .trim()
-        .replace(/\s+/g, ' ')
-        .slice(0, maxName)
-      const expanded = node.getAttribute('aria-expanded')
-      return { tag, name, expanded }
-    },
-    ACCESSIBLE_NAME_MAX,
-  )
+  const [name, meta] = await Promise.all([
+    locator.evaluate(nameFromNode, ACCESSIBLE_NAME_MAX),
+    locator.evaluate((node) => ({
+      tag: node.tagName.toLowerCase(),
+      expanded: node.getAttribute('aria-expanded'),
+    })),
+  ])
+  return { name, ...meta }
 }
 
 export async function collectInteractiveElements(page) {
   const entries = await page.evaluate(
-    ({ roles, maxName, selector }) => {
+    ({ roles, maxName, selector, nameSrc, roleSrc }) => {
+      const nameFromNode = new Function(`return (${nameSrc})`)()
+      const implicitRole = new Function(`return (${roleSrc})`)()
       const roleSet = new Set(roles)
-
-      function implicitRole(el) {
-        const explicit = el.getAttribute('role')
-        if (explicit) return explicit
-        const tag = el.tagName.toLowerCase()
-        const type = (el.getAttribute('type') || '').toLowerCase()
-        if (tag === 'button') return 'button'
-        if (tag === 'a' && el.hasAttribute('href')) return 'link'
-        if (tag === 'textarea') return 'textbox'
-        if (tag === 'select') return 'combobox'
-        if (tag === 'option') return 'option'
-        if (tag === 'input') {
-          if (type === 'search') return 'searchbox'
-          if (type === 'checkbox') return 'checkbox'
-          if (type === 'radio') return 'radio'
-          if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') {
-            return 'button'
-          }
-          if (type === 'hidden' || type === 'file' || type === 'range' || type === 'color') return null
-          return 'textbox'
-        }
-        return null
-      }
 
       document.querySelectorAll('[data-verify-ref]').forEach((node) => node.removeAttribute('data-verify-ref'))
 
@@ -242,6 +248,9 @@ export async function collectInteractiveElements(page) {
       const collected = []
       for (const node of document.querySelectorAll(selector)) {
         if (seen.has(node)) continue
+        if (node.hidden || node.getAttribute('aria-hidden') === 'true' || node.getClientRects().length === 0) {
+          continue
+        }
         const role = implicitRole(node)
         if (!role || !roleSet.has(role)) continue
         seen.add(node)
@@ -259,25 +268,15 @@ export async function collectInteractiveElements(page) {
         const disabled =
           (node instanceof HTMLElement && 'disabled' in node && Boolean(node.disabled)) ||
           node.getAttribute('aria-disabled') === 'true'
-        const ariaLabel = node.getAttribute('aria-label') || ''
-        let labelText = ''
-        if (node.labels && node.labels[0]) {
-          labelText = (node.labels[0].innerText || node.labels[0].textContent || '').trim()
-        }
-        const placeholder = node.getAttribute('placeholder') || ''
-        const title = node.getAttribute('title') || ''
-        const raw = ariaLabel || labelText || placeholder || title || node.innerText || node.textContent || ''
-        const name = String(raw)
-          .trim()
-          .replace(/\s+/g, ' ')
-          .slice(0, maxName)
-        return { ref, role, name, expanded, checked, disabled }
+        return { ref, role, name: nameFromNode(node, maxName), expanded, checked, disabled }
       })
     },
     {
       roles: INTERACTIVE_ROLES,
       maxName: ACCESSIBLE_NAME_MAX,
       selector: INTERACTIVE_CANDIDATE_SELECTOR,
+      nameSrc: nameFromNode.toString(),
+      roleSrc: implicitRole.toString(),
     },
   )
   return entries
@@ -358,10 +357,7 @@ export async function runBrowserCommand(command, flags, ctx) {
     await withPage(async (page) => {
       const locator = await getLocator(page, flags)
       await locator.scrollIntoViewIfNeeded()
-      const target = flags.ref
-        ? `--ref ${normalizeRef(flags.ref)}`
-        : `${flags.role || flags.selector} ${flags.name || ''}`.trim()
-      console.log(`scrolled ${target}`)
+      console.log(`scrolled ${formatActionTarget(flags)}`)
     })
     return
   }
@@ -370,10 +366,7 @@ export async function runBrowserCommand(command, flags, ctx) {
     await withPage(async (page) => {
       const locator = await getLocator(page, flags)
       await locator.click()
-      const target = flags.ref
-        ? `--ref ${normalizeRef(flags.ref)}`
-        : `${flags.role || flags.selector} ${flags.name || ''}`.trim()
-      console.log(`clicked ${target}`)
+      console.log(`clicked ${formatActionTarget(flags)}`)
     })
     return
   }
@@ -383,19 +376,15 @@ export async function runBrowserCommand(command, flags, ctx) {
     await withPage(async (page) => {
       const locator = await getLocator(page, flags)
       await locator.fill(flags.value)
-      const target = flags.ref ? `--ref ${normalizeRef(flags.ref)}` : flags.name || flags.selector
-      console.log(`filled ${target}`)
+      console.log(`filled ${formatActionTarget(flags)}`)
     })
     return
   }
 
   if (command === 'viewport') {
-    const viewport = parseViewportFlags(flags)
-    await withPage(async () => {
+    await withPage(async (_page, metrics) => {
       console.log(
-        `viewport ${viewport.width}x${viewport.height}${viewport.mobile ? ' mobile' : ''}${
-          viewport.deviceScaleFactor !== 1 ? ` dsf=${viewport.deviceScaleFactor}` : ''
-        }`,
+        `viewport ${metrics.width}x${metrics.height} dsf=${metrics.deviceScaleFactor} mobile=${metrics.mobile}`,
       )
     })
     return
@@ -406,8 +395,7 @@ export async function runBrowserCommand(command, flags, ctx) {
     await withPage(async (page) => {
       const locator = await getLocator(page, flags)
       await locator.selectOption(flags.value)
-      const target = flags.ref ? `--ref ${normalizeRef(flags.ref)}` : flags.name || flags.selector
-      console.log(`selected ${target}=${flags.value}`)
+      console.log(`selected ${formatActionTarget(flags)}=${flags.value}`)
     })
     return
   }
@@ -426,10 +414,7 @@ export async function runBrowserCommand(command, flags, ctx) {
     await withPage(async (page) => {
       const locator = await getLocator(page, flags)
       await locator.waitFor({ timeout })
-      const target = flags.ref
-        ? `--ref ${normalizeRef(flags.ref)}`
-        : `${flags.role || flags.selector} ${flags.name || ''}`.trim()
-      console.log(`waited for ${target}`)
+      console.log(`waited for ${formatActionTarget(flags)}`)
     })
     return
   }

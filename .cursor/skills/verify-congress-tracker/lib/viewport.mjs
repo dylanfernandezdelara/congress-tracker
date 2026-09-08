@@ -1,7 +1,25 @@
 /**
- * Single owner of verification viewport parse, state, and CDP apply/clear.
+ * Single owner of verification viewport parse, state, and CDP apply.
  */
-export const DEFAULT_VIEWPORT = { width: 1280, height: 800 }
+export const DEFAULT_METRICS = Object.freeze({
+  width: 1280,
+  height: 800,
+  deviceScaleFactor: 1,
+  mobile: false,
+})
+
+export function normalizeMetrics({ width, height, deviceScaleFactor, mobile } = {}) {
+  const nextWidth = Number(width)
+  const nextHeight = Number(height)
+  const nextScale = Number(deviceScaleFactor)
+  return {
+    width: Number.isFinite(nextWidth) && nextWidth > 0 ? Math.round(nextWidth) : DEFAULT_METRICS.width,
+    height: Number.isFinite(nextHeight) && nextHeight > 0 ? Math.round(nextHeight) : DEFAULT_METRICS.height,
+    deviceScaleFactor:
+      Number.isFinite(nextScale) && nextScale > 0 ? nextScale : DEFAULT_METRICS.deviceScaleFactor,
+    mobile: mobile === true,
+  }
+}
 
 export function parseViewportFlags(flags) {
   const width = Number(flags.width)
@@ -12,41 +30,27 @@ export function parseViewportFlags(flags) {
   if (!Number.isFinite(height) || height <= 0) {
     throw new Error('viewport requires --height > 0')
   }
-  const dsfRaw = flags['device-scale-factor']
-  let deviceScaleFactor = 1
-  if (dsfRaw !== undefined) {
-    const dsf = Number(dsfRaw)
+  if (flags['device-scale-factor'] !== undefined) {
+    const dsf = Number(flags['device-scale-factor'])
     if (!Number.isFinite(dsf) || dsf <= 0) {
       throw new Error('--device-scale-factor must be > 0')
     }
-    deviceScaleFactor = dsf
   }
-  return {
-    width: Math.round(width),
-    height: Math.round(height),
-    deviceScaleFactor,
-    mobile: Boolean(flags.mobile),
-  }
-}
-
-export function viewportFromState(state) {
-  const width = Number(state?.viewport?.width)
-  const height = Number(state?.viewport?.height)
-  return {
-    width: Number.isFinite(width) && width > 0 ? Math.round(width) : DEFAULT_VIEWPORT.width,
-    height: Number.isFinite(height) && height > 0 ? Math.round(height) : DEFAULT_VIEWPORT.height,
-  }
+  return normalizeMetrics({
+    width,
+    height,
+    deviceScaleFactor: flags['device-scale-factor'],
+    mobile: flags.mobile === true,
+  })
 }
 
 export function deviceMetricsFromState(state) {
-  const viewport = viewportFromState(state)
-  const dsf = Number(state?.viewport?.deviceScaleFactor)
-  return {
-    width: viewport.width,
-    height: viewport.height,
-    deviceScaleFactor: Number.isFinite(dsf) && dsf > 0 ? dsf : 1,
-    mobile: Boolean(state?.viewport?.mobile),
-  }
+  return normalizeMetrics({
+    width: state?.viewport?.width,
+    height: state?.viewport?.height,
+    deviceScaleFactor: state?.viewport?.deviceScaleFactor,
+    mobile: state?.viewport?.mobile,
+  })
 }
 
 export function viewportFromCdpFlags(flags) {
@@ -64,34 +68,31 @@ export function viewportFromCdpFlags(flags) {
     return null
   }
   const width = Number(params.width)
-  const height = Number(params.height)
   if (!Number.isFinite(width) || width <= 0) return null
-  const dsf = Number(params.deviceScaleFactor)
-  return {
-    width: Math.round(width),
-    height: Number.isFinite(height) && height > 0 ? Math.round(height) : DEFAULT_VIEWPORT.height,
-    deviceScaleFactor: Number.isFinite(dsf) && dsf > 0 ? dsf : 1,
-    mobile: Boolean(params.mobile),
-  }
-}
-
-export function shouldClearDeviceMetrics(metrics) {
-  return !metrics.mobile && metrics.deviceScaleFactor === 1
-}
-
-export async function applyViewport(page, state) {
-  const metrics = deviceMetricsFromState(state)
-  await page.setViewportSize({ width: metrics.width, height: metrics.height })
-  const session = await page.context().newCDPSession(page)
-  if (shouldClearDeviceMetrics(metrics)) {
-    await session.send('Emulation.clearDeviceMetricsOverride')
-    return metrics
-  }
-  await session.send('Emulation.setDeviceMetricsOverride', {
-    width: metrics.width,
-    height: metrics.height,
-    deviceScaleFactor: metrics.deviceScaleFactor,
-    mobile: metrics.mobile,
+  return normalizeMetrics({
+    width,
+    height: params.height,
+    deviceScaleFactor: params.deviceScaleFactor,
+    mobile: params.mobile,
   })
-  return metrics
+}
+
+function defaultSession(page) {
+  return page.context().newCDPSession(page)
+}
+
+export async function applyViewport(page, metrics, sessionFactory = defaultSession) {
+  const next = normalizeMetrics(metrics)
+  await page.setViewportSize({ width: next.width, height: next.height })
+  const session = await sessionFactory(page)
+  // Always replace the override. Playwright's setViewportSize is the same CDP
+  // method and caches the last size; clearDeviceMetricsOverride would wipe it
+  // while leaving that cache intact, so the next 1280×800 set is a no-op.
+  await session.send('Emulation.setDeviceMetricsOverride', {
+    width: next.width,
+    height: next.height,
+    deviceScaleFactor: next.deviceScaleFactor,
+    mobile: next.mobile,
+  })
+  return next
 }
