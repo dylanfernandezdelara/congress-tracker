@@ -6,7 +6,6 @@ import { partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { congressOrdinal, formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { useMemberProfile } from '../hooks/useMemberProfile'
@@ -96,7 +95,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       <div className="flex items-center gap-3.5">
         <MemberAvatar key={seed.bioguide_id} name={name} photoUrl={photoUrl} variant="profile" />
         <div className="flex min-w-0 flex-col gap-1.5">
-          <h2 id={titleId} className="member-profile-name">
+          <h2 id={titleId} className="m-0 text-lg font-bold leading-tight tracking-tight">
             {name}
           </h2>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -109,75 +108,63 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
 
       <Separator />
 
-      <section aria-label="Voting behavior">
-        <Card>
-          <CardHeader>
-            <h3 className="font-semibold leading-none tracking-tight">{votingRecordTitle(profile)}</h3>
-            <CardDescription>{hint}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {phase.kind === 'ready' ? (
-              <dl className="grid grid-cols-3 gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-[0.6875rem] text-faint">Passage votes</dt>
-                  <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
-                    {phase.profile.votes_cast}
-                  </dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-[0.6875rem] text-faint">Yea · Nay</dt>
-                  <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
-                    {phase.profile.yea_count} / {phase.profile.nay_count}
-                  </dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-[0.6875rem] text-faint">Party-line breaks</dt>
-                  <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
-                    {phase.profile.cross_vote_count}
-                  </dd>
-                </div>
-              </dl>
-            ) : null}
-            {phase.kind === 'loading' ? (
-              <p className="text-muted-foreground">Loading session voting stats…</p>
-            ) : null}
-            {phase.kind === 'error' ? (
-              <p className="text-muted-foreground">{phase.message}</p>
-            ) : null}
-            {phase.kind === 'unavailable' ? (
-              <p className="text-muted-foreground">
-                Per-member vote history is not available for this session yet.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+      <section className="sheet-section" aria-label="Voting behavior">
+        <h3 className="sheet-section-title">{votingRecordTitle(profile)}</h3>
+        <p className="sheet-muted">{hint}</p>
+        {phase.kind === 'ready' ? (
+          <dl className="mt-1.5 grid grid-cols-3 gap-2">
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[0.6875rem] text-faint">Passage votes</dt>
+              <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
+                {phase.profile.votes_cast}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[0.6875rem] text-faint">Yea · Nay</dt>
+              <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
+                {phase.profile.yea_count} / {phase.profile.nay_count}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[0.6875rem] text-faint">Party-line breaks</dt>
+              <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
+                {phase.profile.cross_vote_count}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+        {phase.kind === 'loading' ? (
+          <p className="text-muted-foreground">Loading session voting stats…</p>
+        ) : null}
+        {phase.kind === 'error' ? (
+          <p className="text-muted-foreground">{phase.message}</p>
+        ) : null}
+        {phase.kind === 'unavailable' ? (
+          <p className="text-muted-foreground">
+            Per-member vote history is not available for this session yet.
+          </p>
+        ) : null}
       </section>
 
       {phase.kind === 'ready' && phase.profile.recent_cross_votes.length > 0 ? (
-        <section aria-label="Recent party-line breaks">
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold leading-none tracking-tight">Recent party-line breaks</h3>
-            </CardHeader>
-            <CardContent>
-              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                {phase.profile.recent_cross_votes.map((vote) => (
-                  <li
-                    key={`${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`}
-                    className="flex flex-col gap-0.5"
-                  >
-                    <span className="text-[0.8125rem] font-semibold">
-                      {formatBillDocket(vote.bill_type, vote.bill_number, vote.bill_congress)}
-                    </span>
-                    <span className="text-xs text-secondary">
-                      {vote.chamber} · {formatVoteDate(vote.vote_date)} · voted{' '}
-                      {positionWord(vote.position)} (party {positionWord(vote.party_line)})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+        <section className="sheet-section" aria-label="Recent party-line breaks">
+          <h3 className="sheet-section-title">Recent party-line breaks</h3>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {phase.profile.recent_cross_votes.map((vote) => (
+              <li
+                key={`${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`}
+                className="flex flex-col gap-0.5"
+              >
+                <span className="text-[0.8125rem] font-semibold">
+                  {formatBillDocket(vote.bill_type, vote.bill_number, vote.bill_congress)}
+                </span>
+                <span className="text-xs text-secondary">
+                  {vote.chamber} · {formatVoteDate(vote.vote_date)} · voted{' '}
+                  {positionWord(vote.position)} (party {positionWord(vote.party_line)})
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

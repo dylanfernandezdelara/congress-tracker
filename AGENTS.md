@@ -165,6 +165,7 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 
 - Prefer commands in this file over guessing root-level npm scripts.
 - Prefer existing shadcn/ui primitives in `web/src/components/ui/` over hand-rolled components.
+- Inside `AnimatedSheet` panels, use `.sheet-section` / `.sheet-section-title` for section layout (the panel already supplies card chrome); shadcn `Card` is for standalone page surfaces, not nested inside sheets.
 - Default to `npm test` for verification.
 - Never commit secrets from `.dev.vars`.
 - `FEED_MAX_BILLS` and `DIGEST_MAX_NEW_REWRITES` are module constants in `workers/senate_data_worker/src/constants.ts`. `VOTE_LOOKBACK_DAYS` lives in `shared/feed-constants.ts` (worker re-exports; web imports for empty-state copy).

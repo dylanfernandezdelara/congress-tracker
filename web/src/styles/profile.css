@@ -1,12 +1,4 @@
 @layer components {
-  .member-profile-name {
-    margin: 0;
-    font-size: 1.125rem;
-    font-weight: 700;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
-  }
-
   .notable-vote-defector-button {
     display: flex;
     align-items: center;

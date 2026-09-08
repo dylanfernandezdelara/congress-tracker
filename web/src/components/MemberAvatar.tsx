@@ -1,6 +1,5 @@
 import { memberInitials } from '../utils/memberPhoto'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { cn } from '@/lib/utils'
 
 const VARIANT_CLASSES = {
   defector: {
@@ -9,7 +8,7 @@ const VARIANT_CLASSES = {
   },
   profile: {
     root: 'h-16 w-16',
-    fallback: '',
+    fallback: 'text-lg font-bold text-secondary',
   },
 } as const
 
@@ -25,9 +24,17 @@ export function MemberAvatar({ name, photoUrl, variant }: MemberAvatarProps) {
   const showPhoto = Boolean(photoUrl)
 
   return (
-    <Avatar className={cn(classes.root)} aria-hidden="true">
-      {showPhoto ? <AvatarImage src={photoUrl} alt="" /> : null}
-      <AvatarFallback className={cn(classes.fallback)} aria-hidden="true">
+    <Avatar className={classes.root} aria-hidden="true">
+      {showPhoto ? (
+        <AvatarImage
+          src={photoUrl}
+          alt=""
+          className="object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : null}
+      <AvatarFallback className={classes.fallback} aria-hidden="true">
         {memberInitials(name)}
       </AvatarFallback>
     </Avatar>
