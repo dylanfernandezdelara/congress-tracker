@@ -38,6 +38,8 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /INSERT OR REPLACE INTO bill_digests/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_sponsors/)
   assert.match(sql, /LOCAL:H002', 'NY'/)
+  assert.match(sql, /LOCAL:H003', 'CA'/)
+  assert.match(sql, /LOCAL:S002', 'TX'/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_lifecycle/)
   assert.match(sql, /INSERT OR REPLACE INTO nominations/)
   assert.match(sql, /INSERT OR REPLACE INTO confirmation_votes/)

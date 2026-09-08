@@ -312,7 +312,15 @@ VALUES
   (119, 's', 9901, 'Ban Artificial Superintelligence Act (local sample)', 'Science, Technology, Communications',
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"Sanders introduces a ban on artificial superintelligence (local sample)","what_it_does":"Would prohibit developing or deploying artificial superintelligence systems and set enforcement rules for federal agencies.","key_points":["Bans creating or using artificial superintelligence","Applies to federal contractors and agencies","Leaves ordinary AI research outside the ban"],"terms_explained":[{"term":"Artificial superintelligence","plain":"A hypothetical AI system that would outperform humans at most cognitive work."}]}',
-   '${D_TODAY}T00:00:00.000Z', '${D_TODAY}T00:00:00.000Z');
+   '${D_TODAY}T00:00:00.000Z', '${D_TODAY}T00:00:00.000Z'),
+  (119, 'hr', 55, 'Member Portfolio Transparency Act (local sample)', 'Government Operations and Politics',
+   'Sample CRS-style summary seeded for local development. No live data was fetched.',
+   '{"headline":"House bill would publish member portfolio snapshots (local sample)","what_it_does":"Would require more frequent public reporting of members stock trades and year-end holdings.","key_points":["Adds quarterly portfolio snapshots","Puts trade reports on a public dashboard","Applies to members and senior staff"],"terms_explained":[{"term":"Portfolio snapshot","plain":"A dated list of what someone owns so the public can see changes over time."}]}',
+   '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z'),
+  (119, 's', 55, 'Senate Ethics Disclosure Companion Act (local sample)', 'Government Operations and Politics',
+   'Sample CRS-style summary seeded for local development. No live data was fetched.',
+   '{"headline":"Senate companion tightens ethics disclosure rules (local sample)","what_it_does":"Would align Senate disclosure deadlines with the House portfolio-reporting bill.","key_points":["Matches House reporting deadlines","Covers Senate staff as well as senators","Keeps existing penalties for late filings"],"terms_explained":[{"term":"Companion bill","plain":"A similar bill introduced in the other chamber so both houses can work on the same idea."}]}',
+   '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO bill_sponsors
   (congress, bill_type, bill_number, bioguide_id, state, full_name, party, is_primary, updated_at)
@@ -322,7 +330,9 @@ VALUES
   (119, 'hr', 22, 'LOCAL:H001', 'CA', 'Rep. Sample Crossover (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z'),
   (119, 'hr', 88, 'LOCAL:H004', 'SC', 'Rep. Portfolio Loser (local)', 'R', 1, '${D_RECENT}T00:00:00.000Z'),
   (119, 'hr', 33, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_MID}T00:00:00.000Z'),
-  (119, 's', 9901, 'LOCAL:S9901', 'VT', 'Sen. Bernard Sanders (local)', 'I', 1, '${D_TODAY}T00:00:00.000Z');
+  (119, 's', 9901, 'LOCAL:S9901', 'VT', 'Sen. Bernard Sanders (local)', 'I', 1, '${D_TODAY}T00:00:00.000Z'),
+  (119, 'hr', 55, 'LOCAL:H003', 'CA', 'Rep. Portfolio Gainer (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z'),
+  (119, 's', 55, 'LOCAL:S002', 'TX', 'Sen. Sample Loyal (local)', 'R', 1, '${D_OLDER}T00:00:00.000Z');
 
 INSERT OR REPLACE INTO bill_lifecycle
   (congress, bill_type, bill_number, introduced_date, presented_date, signed_date, vetoed_date, became_law_date, law_kind, public_law, latest_action_date, latest_action_text, updated_at)
@@ -333,6 +343,14 @@ VALUES
    '${D_MID}', 'Became Public Law No: 119-2 without signature. (local sample)', '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, '${D_OLDER}', '${D_RECENT}', NULL, NULL, NULL, NULL, NULL,
    '${D_RECENT}', 'Presented to President. (local sample)', '${D_RECENT}T00:00:00.000Z'),
+  (119, 'hr', 33, '${D_OLDER}', NULL, NULL, NULL, NULL, NULL, NULL,
+   '${D_MID}', 'Received in the Senate. (local sample)', '${D_MID}T00:00:00.000Z'),
+  (119, 'hr', 88, '${D_RECENT}', NULL, NULL, NULL, NULL, NULL, NULL,
+   '${D_RECENT}', 'Passed the House. (local sample)', '${D_RECENT}T00:00:00.000Z'),
+  (119, 'hr', 55, '${D_OLDER}', NULL, NULL, NULL, NULL, NULL, NULL,
+   '${D_OLDER}', 'Introduced in House. (local sample)', '${D_OLDER}T00:00:00.000Z'),
+  (119, 's', 55, '${D_OLDER}', NULL, NULL, NULL, NULL, NULL, NULL,
+   '${D_OLDER}', 'Introduced in Senate. (local sample)', '${D_OLDER}T00:00:00.000Z'),
   (119, 's', 9901, '${D_TODAY}', NULL, NULL, NULL, NULL, NULL, NULL,
    '${D_TODAY}', 'Introduced in Senate. (local sample)', '${D_TODAY}T00:00:00.000Z');
 
