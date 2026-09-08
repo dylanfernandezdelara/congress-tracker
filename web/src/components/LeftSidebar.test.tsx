@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
@@ -6,6 +6,7 @@ import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { DefectorEntry, PortfolioMovers, SessionStatsResponse } from '../api/types'
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
+import { renderWithMemberProfile } from '../test/memberProfileHarness'
 import { LeftSidebar } from './LeftSidebar'
 
 vi.mock('../api/client', () => ({
@@ -125,7 +126,7 @@ describe('LeftSidebar', () => {
     const defectors = asyncResult(chamberPair([houseDefector], [] as DefectorEntry[]))
     const portfolios = asyncResult(chamberPair(emptyPortfolios, emptyPortfolios))
 
-    render(
+    renderWithMemberProfile(
       <LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />,
     )
 
@@ -153,7 +154,7 @@ describe('LeftSidebar', () => {
     )
     const portfolios = asyncResult(chamberPair(emptyPortfolios, emptyPortfolios))
 
-    render(
+    renderWithMemberProfile(
       <LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />,
     )
 

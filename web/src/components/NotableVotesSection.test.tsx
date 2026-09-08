@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
+import { renderWithMemberProfile } from '../test/memberProfileHarness'
 import { NotableVotesSection } from './NotableVotesSection'
 
 vi.mock('../api/client', () => ({
@@ -55,7 +56,7 @@ function sampleEntry(overrides: Partial<NotableVoteEntry> = {}): NotableVoteEntr
 
 describe('NotableVotesSection', () => {
   it('shows chamber, vote date, and short bill id in meta', () => {
-    render(<NotableVotesSection notable={[sampleEntry()]} />)
+    renderWithMemberProfile(<NotableVotesSection notable={[sampleEntry()]} />)
 
     expect(
       screen.getByText((_, node) => node?.textContent === 'House · Jun 9 · S. 2'),
@@ -64,7 +65,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('opens an in-place bill sheet when the notable headline is clicked', () => {
-    render(<NotableVotesSection notable={[sampleEntry()]} />)
+    renderWithMemberProfile(<NotableVotesSection notable={[sampleEntry()]} />)
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -85,7 +86,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('opens a bill sheet from the compact headline without changing the page URL', () => {
-    render(<NotableVotesSection variant="compact" notable={[sampleEntry()]} />)
+    renderWithMemberProfile(<NotableVotesSection variant="compact" notable={[sampleEntry()]} />)
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -109,7 +110,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('shows defector avatars when cross-voters are present', () => {
-    render(
+    renderWithMemberProfile(
       <NotableVotesSection
         notable={[
           sampleEntry({
@@ -135,7 +136,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('opens a member profile when a notable defector is clicked', async () => {
-    render(
+    renderWithMemberProfile(
       <NotableVotesSection
         notable={[
           sampleEntry({
@@ -165,7 +166,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('prefetches visible defector profiles so the sheet opens without loading', async () => {
-    render(
+    renderWithMemberProfile(
       <NotableVotesSection
         notable={[
           sampleEntry({
@@ -197,7 +198,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('states when no members broke with their party', () => {
-    render(
+    renderWithMemberProfile(
       <NotableVotesSection
         notable={[
           sampleEntry({
@@ -214,7 +215,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('states when per-member vote data is not ingested yet', () => {
-    render(
+    renderWithMemberProfile(
       <NotableVotesSection
         notable={[
           sampleEntry({
@@ -229,7 +230,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('stacks a member profile on top of an open bill sheet', async () => {
-    render(
+    renderWithMemberProfile(
       <NotableVotesSection
         notable={[
           sampleEntry({
@@ -277,7 +278,7 @@ describe('NotableVotesSection', () => {
   })
 
   it('shows an empty state when there are no notable votes', () => {
-    render(<NotableVotesSection notable={[]} />)
+    renderWithMemberProfile(<NotableVotesSection notable={[]} />)
 
     expect(screen.getByRole('region', { name: 'Notable votes' })).toBeInTheDocument()
     expect(screen.getByText('No notable votes yet this session.')).toBeInTheDocument()

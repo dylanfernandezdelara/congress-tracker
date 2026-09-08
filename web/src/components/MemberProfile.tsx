@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
+import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
 import { partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import { Badge } from '@/components/ui/badge'
@@ -15,8 +16,14 @@ import { PartyBadge } from './PartyBadge'
 
 export type MemberProfileSeed = Pick<
   NotableVoteEntry['defectors'][number],
-  'bioguide_id' | 'name' | 'party' | 'state' | 'photo_url' | 'cross_vote_count' | 'cross_vote_label'
->
+  'bioguide_id' | 'name' | 'party' | 'state'
+> &
+  Partial<
+    Pick<
+      NotableVoteEntry['defectors'][number],
+      'photo_url' | 'cross_vote_count' | 'cross_vote_label'
+    >
+  >
 
 type MemberProfileProps = {
   open: boolean
@@ -80,8 +87,10 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
 
   const name = profile?.name ?? seed.name
   const party = profile?.party ?? seed.party
-  const photoUrl = profile?.photo_url || seed.photo_url
-  const hint = crossVoteHint(profile?.cross_vote_label ?? seed.cross_vote_label)
+  const seedPhoto = seed.photo_url ?? bioguidePhotoUrl(seed.bioguide_id) ?? ''
+  const photoUrl = profile?.photo_url || seedPhoto
+  const hintLabel = profile?.cross_vote_label ?? seed.cross_vote_label
+  const hint = hintLabel ? crossVoteHint(hintLabel) : null
   const phase = statsPhase(profile, isPending, error)
 
   return (
@@ -110,7 +119,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
 
       <section className="sheet-section" aria-label="Voting record">
         <h3 className="sheet-section-title">{votingRecordTitle(profile)}</h3>
-        <p className="sheet-muted">{hint}</p>
+        {hint ? <p className="sheet-muted">{hint}</p> : null}
         {phase.kind === 'ready' ? (
           <dl className="mt-1.5 grid grid-cols-3 gap-2">
             <div className="flex flex-col gap-0.5">

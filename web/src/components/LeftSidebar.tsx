@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import { bioguidePhotoUrl, congressGovMemberUrl } from '@congress-tracker/shared/member-photo'
 import { crossVoteLabel } from '@congress-tracker/shared/notable-votes'
@@ -13,7 +13,9 @@ import type {
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
 import { formatBillDocket, formatCoverageDate } from '../utils/billLabels'
-import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
+import { canOpenMemberProfile } from '../utils/memberProfileOpen'
+import type { MemberProfileSeed } from './MemberProfile'
+import { useOpenMemberProfile } from './MemberProfileProvider'
 
 type LeftSidebarProps = {
   session: UseAsyncDataResult<SessionStatsResponse>
@@ -136,7 +138,7 @@ function MemberSpotlightCard({
   onOpenProfile: (seed: MemberProfileSeed) => void
 }) {
   const meta = formatPartyState(member.party || null, member.state || null)
-  const canOpenProfile = member.bioguide_id.trim().length > 0
+  const canOpenProfile = canOpenMemberProfile(member.bioguide_id)
 
   let nameEl: ReactNode
   if (canOpenProfile) {
@@ -248,13 +250,7 @@ function ChamberSection({
 }
 
 export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSidebarProps) {
-  const [selection, setSelection] = useState<{ seed: MemberProfileSeed; key: number } | null>(
-    null,
-  )
-
-  const openProfile = useCallback((seed: MemberProfileSeed) => {
-    setSelection((prev) => ({ seed, key: (prev?.key ?? 0) + 1 }))
-  }, [])
+  const openProfile = useOpenMemberProfile()
 
   const coverage =
     session.data && session.data.house.date_range.last
@@ -308,12 +304,6 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         onOpenProfile={openProfile}
       />
       {disclaimer ? <p className="sidebar-disclaimer">{disclaimer}</p> : null}
-      <MemberProfile
-        open={selection !== null}
-        seed={selection?.seed ?? null}
-        selectionKey={selection?.key ?? 0}
-        onClose={() => setSelection(null)}
-      />
     </div>
   )
 }

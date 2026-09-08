@@ -4,7 +4,8 @@ import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { notableVoteTitle } from '../utils/notableVoteLabels'
-import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
+import type { MemberProfileSeed } from './MemberProfile'
+import { useOpenMemberProfile } from './MemberProfileProvider'
 import { NotableBillSheet } from './NotableBillSheet'
 import { NotableVoteDefectors } from './NotableVoteDefectors'
 
@@ -18,12 +19,6 @@ type NotableVotesSectionProps = {
 }
 
 type BillOverlay = { entry: NotableVoteEntry; key: number }
-type MemberOverlay = { seed: MemberProfileSeed; key: number }
-
-type OverlayState = {
-  bill: BillOverlay | null
-  member: MemberOverlay | null
-}
 
 function NotableVoteHeadline({
   title,
@@ -138,10 +133,6 @@ function NotableVoteCompactItem({
   )
 }
 
-function nextOverlayKey(state: OverlayState): number {
-  return Math.max(state.bill?.key ?? 0, state.member?.key ?? 0) + 1
-}
-
 export function NotableVotesSection({
   notable,
   loading = false,
@@ -149,7 +140,8 @@ export function NotableVotesSection({
   onRetry,
   variant = 'cards',
 }: NotableVotesSectionProps) {
-  const [overlays, setOverlays] = useState<OverlayState>({ bill: null, member: null })
+  const [bill, setBill] = useState<BillOverlay | null>(null)
+  const openProfile = useOpenMemberProfile()
 
   useEffect(() => {
     if (!notable) return
@@ -161,49 +153,23 @@ export function NotableVotesSection({
   }, [notable])
 
   /* Profile stacks on top of an open bill sheet (Escape returns to the bill). */
-  const openProfile = useCallback((seed: MemberProfileSeed) => {
-    setOverlays((prev) => ({
-      ...prev,
-      member: { seed, key: nextOverlayKey(prev) },
-    }))
-  }, [])
-
   const openBill = useCallback((entry: NotableVoteEntry) => {
-    setOverlays((prev) => ({
-      ...prev,
-      bill: { entry, key: nextOverlayKey(prev) },
-    }))
+    setBill((prev) => ({ entry, key: (prev?.key ?? 0) + 1 }))
   }, [])
 
   const closeBill = useCallback(() => {
-    setOverlays((prev) => ({ ...prev, bill: null }))
+    setBill(null)
   }, [])
 
-  const closeMember = useCallback(() => {
-    setOverlays((prev) => ({ ...prev, member: null }))
-  }, [])
-
-  const overlayNodes = (
-    <>
-      {overlays.bill ? (
-        <NotableBillSheet
-          open
-          entry={overlays.bill.entry}
-          selectionKey={overlays.bill.key}
-          onClose={closeBill}
-          onOpenProfile={openProfile}
-        />
-      ) : null}
-      {overlays.member ? (
-        <MemberProfile
-          open
-          seed={overlays.member.seed}
-          selectionKey={overlays.member.key}
-          onClose={closeMember}
-        />
-      ) : null}
-    </>
-  )
+  const overlayNodes = bill ? (
+    <NotableBillSheet
+      open
+      entry={bill.entry}
+      selectionKey={bill.key}
+      onClose={closeBill}
+      onOpenProfile={openProfile}
+    />
+  ) : null
 
   if (error) {
     const className = variant === 'compact' ? 'notable-compact' : 'home-enrichment'
