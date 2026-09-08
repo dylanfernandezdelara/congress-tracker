@@ -75,7 +75,16 @@ afterEach(() => {
 describe('MemberProfileProvider', () => {
   it('renders a single profile sheet shared by multiple openers', async () => {
     fetchMemberProfileMock.mockImplementation(async (id: string) =>
-      id === seedB.bioguide_id ? { ...profileA, ...seedB, district: 12 } : profileA,
+      id === seedB.bioguide_id
+        ? {
+            ...profileA,
+            bioguide_id: seedB.bioguide_id,
+            name: seedB.name,
+            party: seedB.party,
+            state: seedB.state,
+            district: 12,
+          }
+        : profileA,
     )
 
     render(
