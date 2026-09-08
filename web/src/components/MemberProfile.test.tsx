@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
@@ -13,12 +13,27 @@ const routerFuture = {
   v7_relativeSplatPath: true,
 } as const
 
-function renderProfile(ui: ReactElement) {
-  const view = render(<MemoryRouter future={routerFuture}>{ui}</MemoryRouter>)
+function SearchParamsProbe() {
+  const [params] = useSearchParams()
+  return <div data-testid="search-params">{params.toString()}</div>
+}
+
+function renderProfile(ui: ReactElement, initialEntry = '/') {
+  const view = render(
+    <MemoryRouter initialEntries={[initialEntry]} future={routerFuture}>
+      <SearchParamsProbe />
+      {ui}
+    </MemoryRouter>,
+  )
   return {
     ...view,
     rerender(next: ReactElement) {
-      view.rerender(<MemoryRouter future={routerFuture}>{next}</MemoryRouter>)
+      view.rerender(
+        <MemoryRouter initialEntries={[initialEntry]} future={routerFuture}>
+          <SearchParamsProbe />
+          {next}
+        </MemoryRouter>,
+      )
     },
   }
 }
@@ -116,7 +131,7 @@ describe('MemberProfile', () => {
     const { container } = renderProfile(
       <MemberProfile open={false} seed={seed} selectionKey={1} onClose={() => undefined} />,
     )
-    expect(container).toBeEmptyDOMElement()
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 
   it('shows seed identity immediately and loads session stats', async () => {
@@ -549,19 +564,49 @@ describe('MemberProfile', () => {
     await waitFor(() => {
       expect(screen.getByText('Referred to the House Committee on Oversight.')).toBeInTheDocument()
     })
-    expect(
-      screen.getByRole('link', {
-        name: 'Senate passes a public lands conservation and access bill (opens Congress.gov)',
-      }),
-    ).toHaveAttribute('href', 'https://www.congress.gov/bill/119th-congress/senate-bill/2')
+    const congressGovCross = screen.getByRole('link', {
+      name: /Senate passes a public lands conservation and access bill.*opens Congress\.gov/,
+    })
+    expect(congressGovCross).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/bill/119th-congress/senate-bill/2',
+    )
+    expect(congressGovCross).toHaveAttribute('rel', 'noopener noreferrer')
     expect(
       screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
     ).toHaveAttribute('href', '/?bill=119-hr-22')
-    expect(
-      screen.getByRole('link', {
-        name: 'House bill would publish member portfolio snapshots (opens Congress.gov)',
-      }),
-    ).toHaveAttribute('href', 'https://www.congress.gov/bill/119th-congress/house-bill/99')
+    const congressGovSponsored = screen.getByRole('link', {
+      name: /House bill would publish member portfolio snapshots.*opens Congress\.gov/,
+    })
+    expect(congressGovSponsored).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/bill/119th-congress/house-bill/99',
+    )
+    expect(congressGovSponsored).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('keeps current filters when an in-feed row sets bill', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+
+    renderProfile(
+      <MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />,
+      '/?chamber=House&q=energy',
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+      ).toBeInTheDocument()
+    })
+    fireEvent.click(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+    )
+    await waitFor(() => {
+      const search = screen.getByTestId('search-params').textContent ?? ''
+      expect(search).toContain('chamber=House')
+      expect(search).toContain('q=energy')
+      expect(search).toContain('bill=119-hr-22')
+    })
   })
 
   it('closes the sheet after an in-feed bill link navigates', async () => {
@@ -575,12 +620,15 @@ describe('MemberProfile', () => {
         screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
       ).toBeInTheDocument()
     })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
     fireEvent.click(
       screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
     )
     await waitFor(() => {
-      expect(onClose).toHaveBeenCalled()
+      expect(dialog.closest('.sheet-root')).toHaveAttribute('inert')
     })
+    endAnimation(dialog, 'sheet-sink')
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('renders a stale pre-enrichment payload without throwing', async () => {

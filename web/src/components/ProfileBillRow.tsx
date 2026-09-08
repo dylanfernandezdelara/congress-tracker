@@ -1,9 +1,15 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+
+import { congressGovBillUrl, getBillColloquialName } from '../utils/billLabels'
 
 type ProfileBillRowProps = {
-  title: string
-  href: string
+  billId: string
+  congress: number
+  billType: string
+  billNumber: number
+  title?: string | null
+  headline?: string | null
   inFeed: boolean
   onAfterNavigate?: () => void
   children: ReactNode
@@ -12,31 +18,45 @@ type ProfileBillRowProps = {
 const linkClass = 'flex min-w-0 flex-col gap-0.5 no-underline'
 
 export function ProfileBillRow({
+  billId,
+  congress,
+  billType,
+  billNumber,
   title,
-  href,
+  headline,
   inFeed,
   onAfterNavigate,
   children,
 }: ProfileBillRowProps) {
-  const headline = (
+  const [searchParams] = useSearchParams()
+  const displayTitle = getBillColloquialName({
+    congress,
+    type: billType,
+    number: billNumber,
+    title,
+    headline,
+  })
+  const headlineEl = (
     <span
       className="line-clamp-2 text-[0.8125rem] font-semibold text-foreground"
-      title={title}
+      title={displayTitle}
     >
-      {title}
+      {displayTitle}
     </span>
   )
 
   if (inFeed) {
+    const next = new URLSearchParams(searchParams)
+    next.set('bill', billId)
     return (
       <Link
-        to={href}
+        to={{ pathname: '/', search: `?${next}` }}
         className={linkClass}
         onClick={() => {
           queueMicrotask(() => onAfterNavigate?.())
         }}
       >
-        {headline}
+        {headlineEl}
         {children}
       </Link>
     )
@@ -44,14 +64,14 @@ export function ProfileBillRow({
 
   return (
     <a
-      href={href}
+      href={congressGovBillUrl(congress, billType, billNumber)}
       className={linkClass}
       target="_blank"
-      rel="noreferrer"
-      aria-label={`${title} (opens Congress.gov)`}
+      rel="noopener noreferrer"
     >
-      {headline}
+      {headlineEl}
       {children}
+      <span className="sr-only"> — opens Congress.gov</span>
     </a>
   )
 }
