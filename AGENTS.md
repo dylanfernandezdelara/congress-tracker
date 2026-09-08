@@ -29,6 +29,7 @@ re-run after `members-roster` / `member-votes` if those rails go empty.
 
 - **Seed sample data (required for local UI):** `npm run seed`
 - Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
+- `npm run dev:worker` needs `web/dist` to exist (wrangler `[assets]`); `npm run setup` builds it, or run `npm run build:web` once.
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
 - Trigger live ingestion (needs API keys): `curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed`
 - Feed JSON: `http://127.0.0.1:8787/feed/latest.json?limit=50&offset=0` (paginated object; read `items`)

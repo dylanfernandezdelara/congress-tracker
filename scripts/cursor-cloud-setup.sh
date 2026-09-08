@@ -20,6 +20,9 @@ npm --prefix "${WEB_DIR}" ci
 echo "Installing Playwright Chromium for viewport QA..."
 npx --prefix "${ROOT_DIR}" playwright install chromium
 
+echo "Building web bundle (wrangler [assets] requires web/dist to exist)..."
+npm --prefix "${WEB_DIR}" run build
+
 if ! command -v lsof >/dev/null 2>&1; then
   echo "warning: lsof is not installed; the verify-congress-tracker skill needs it to check ports." >&2
 fi

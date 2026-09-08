@@ -61,6 +61,14 @@ test('cursor-cloud setup does not overwrite an existing .dev.vars', () => {
   assert.match(devVars, /^ALLOWED_ORIGIN=https:\/\/example\.com$/m)
 })
 
+test('cursor-cloud setup builds web/dist for wrangler assets', () => {
+  const script = read(setupScript)
+  assert.match(script, /Building web bundle \(wrangler \[assets\] requires web\/dist to exist\)/)
+  assert.match(script, /npm --prefix "\$\{WEB_DIR\}" run build/)
+  const { output } = runSetupFixture()
+  assert.match(output, /Building web bundle/)
+})
+
 test('.dev.vars.example documents local CORS without secrets', () => {
   const example = read(devVarsExample)
   assert.match(example, /^ALLOWED_ORIGIN=\*$/m)

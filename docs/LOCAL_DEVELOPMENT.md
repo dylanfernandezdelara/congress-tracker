@@ -21,6 +21,10 @@ npm run dev:worker   # http://127.0.0.1:8787  (API + ingestion)
 npm run dev:web      # http://127.0.0.1:5173  (React feed UI)
 ```
 
+`npm run setup` builds `web/dist` because the Worker's `[assets]` directory
+must exist before `npm run dev:worker`; if you skipped setup, run
+`npm run build:web` once.
+
 Open `http://127.0.0.1:5173` — the seeded sample bills and member spotlights
 appear immediately, no API keys required.
 

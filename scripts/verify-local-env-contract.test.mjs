@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const verifyScript = path.join(rootDir, 'scripts', 'verify-local-env.sh')
 
-function runVerify({ withDeps, withDevVars } = {}) {
+function runVerify({ withDeps, withDevVars, withWebDist } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-local-env-'))
   const scriptsDir = path.join(dir, 'scripts')
   const workerDir = path.join(dir, 'workers', 'senate_data_worker')
@@ -27,6 +27,9 @@ function runVerify({ withDeps, withDevVars } = {}) {
   }
   if (withDevVars) {
     fs.writeFileSync(path.join(workerDir, '.dev.vars'), 'ALLOWED_ORIGIN=*\n', 'utf8')
+  }
+  if (withWebDist) {
+    fs.mkdirSync(path.join(webDir, 'dist'), { recursive: true })
   }
 
   try {
@@ -64,4 +67,14 @@ test('warns (not fails) when .dev.vars is missing but deps are installed', () =>
   const { code, stdout } = runVerify({ withDeps: true, withDevVars: false })
   assert.equal(code, 0, 'missing .dev.vars should be a warning, not a hard failure')
   assert.match(stdout, /npm run seed/)
+})
+
+test('warns when web/dist is missing and reports ok when it exists', () => {
+  const missing = runVerify({ withDeps: true, withDevVars: true })
+  assert.equal(missing.code, 0)
+  assert.match(missing.stdout, /web\/dist missing — run 'npm run build:web' before 'npm run dev:worker'/)
+
+  const present = runVerify({ withDeps: true, withDevVars: true, withWebDist: true })
+  assert.equal(present.code, 0)
+  assert.match(present.stdout, /\[ok\] web\/dist present/)
 })

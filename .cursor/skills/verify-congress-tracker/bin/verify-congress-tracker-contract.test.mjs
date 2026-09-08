@@ -55,7 +55,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const helper = path.join(here, 'verify-congress-tracker')
 const rootDir = path.resolve(here, '../../../..')
 const seedScript = path.join(rootDir, 'scripts', 'seed-local-feed.sh')
-const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, viewportFromState } = TEST_ONLY
+const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, viewportFromState, ensureWebDist } = TEST_ONLY
 
 test('helper wrapper is executable', () => {
   const stat = fs.statSync(helper)
@@ -245,6 +245,25 @@ test('dead recorded Chrome is not an ownership problem when CDP is free', () => 
     }),
     null,
   )
+})
+
+test('ensureWebDist creates a placeholder once and does not clobber a real build', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-web-dist-'))
+  try {
+    assert.equal(fs.existsSync(path.join(dir, 'web', 'dist')), false)
+    assert.equal(ensureWebDist(dir), true)
+    const indexPath = path.join(dir, 'web', 'dist', 'index.html')
+    assert.ok(fs.existsSync(indexPath))
+    assert.match(fs.readFileSync(indexPath, 'utf8'), /placeholder/)
+
+    const markerPath = path.join(dir, 'web', 'dist', 'marker.txt')
+    fs.writeFileSync(markerPath, 'survives', 'utf8')
+    assert.equal(ensureWebDist(dir), false)
+    assert.equal(fs.readFileSync(markerPath, 'utf8'), 'survives')
+    assert.match(fs.readFileSync(indexPath, 'utf8'), /placeholder/)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('launch seeds and serves isolated persist-to D1', () => {
