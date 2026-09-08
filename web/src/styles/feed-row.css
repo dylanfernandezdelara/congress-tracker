@@ -162,20 +162,32 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 0;
+    /* Separator width (middot + gutters); the ::before below centers in it. */
+    --feed-meta-sep: 1rem;
+    column-gap: var(--feed-meta-sep);
     row-gap: 0.35rem;
     min-width: 0;
+    /* Clips the leading ::before of a chip that wrapped to a new line, so
+       lines never start or end with a middot. Do not remove or split into
+       overflow-x only: a visible value on one axis computes to auto. */
+    overflow: hidden;
+    /* Keeps that overflow clip from shaving the vertically centered middot. */
+    padding-block: 0.05rem;
     font-size: 12px;
     line-height: 1.3;
     color: hsl(var(--twc-secondary));
   }
 
-  /* Trailing separators stay with the preceding chip when the row wraps,
-     so a new line never starts with a lone middot. */
-  .feed-row-meta-row > *:not(:last-child)::after {
+  .feed-row-meta-row > * {
+    position: relative;
+  }
+
+  .feed-row-meta-row > *:not(:first-child)::before {
     content: '·';
-    margin-left: 0.5rem;
-    margin-right: 0.5rem;
+    position: absolute;
+    left: calc(var(--feed-meta-sep) / -2);
+    top: 50%;
+    transform: translate(-50%, -50%);
     color: hsl(var(--twc-faint));
   }
 
