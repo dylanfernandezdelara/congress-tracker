@@ -88,7 +88,7 @@ describe('MemberProfile', () => {
     render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Voting behavior' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Voting record' })).toBeInTheDocument()
     expect(screen.getByText('Frequent cross-voter')).toBeInTheDocument()
     expect(screen.getByText('BF')).toBeInTheDocument()
     expect(screen.getByText('Republican')).toBeInTheDocument()

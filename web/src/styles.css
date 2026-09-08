@@ -7,7 +7,6 @@
 @import './styles/home.css';
 @import './styles/feed-filters.css';
 @import './styles/sheet.css';
-@import './styles/profile.css';
 
 @tailwind base;
 @tailwind components;

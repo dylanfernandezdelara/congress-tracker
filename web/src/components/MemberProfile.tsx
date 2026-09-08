@@ -108,7 +108,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
 
       <Separator />
 
-      <section className="sheet-section" aria-label="Voting behavior">
+      <section className="sheet-section" aria-label="Voting record">
         <h3 className="sheet-section-title">{votingRecordTitle(profile)}</h3>
         <p className="sheet-muted">{hint}</p>
         {phase.kind === 'ready' ? (
@@ -134,13 +134,13 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
           </dl>
         ) : null}
         {phase.kind === 'loading' ? (
-          <p className="text-muted-foreground">Loading session voting stats…</p>
+          <p className="sheet-muted">Loading session voting stats…</p>
         ) : null}
         {phase.kind === 'error' ? (
-          <p className="text-muted-foreground">{phase.message}</p>
+          <p className="sheet-muted">{phase.message}</p>
         ) : null}
         {phase.kind === 'unavailable' ? (
-          <p className="text-muted-foreground">
+          <p className="sheet-muted">
             Per-member vote history is not available for this session yet.
           </p>
         ) : null}
@@ -169,7 +169,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       ) : null}
 
       {profile?.congress_gov_url ? (
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="outline" size="sm" className="self-start">
           <a href={profile.congress_gov_url} target="_blank" rel="noopener noreferrer">
             View on Congress.gov
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
