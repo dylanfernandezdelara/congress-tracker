@@ -16,6 +16,7 @@ export {
   normalizeDigestLead,
   truncateAtSentenceBoundary,
   truncateAtWordBoundary,
+  truncateWords,
 } from './digest-format'
 
 export {

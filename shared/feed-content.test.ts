@@ -94,6 +94,41 @@ The resolution recommends levels and amounts for FY2027-FY2036 for federal reven
     ).toBe("Amends Title 18 U.S.C. Section 401 to add penalties.");
   });
 
+  it("does not cut the first sentence on place or name-suffix abbreviations", () => {
+    expect(
+      formatCollapsedDigestLead(
+        'This measure is titled "St. Croix National Heritage Area Act" and does not yet have an official summary.'
+      )
+    ).toBe(
+      'This measure is titled "St. Croix National Heritage Area Act" and does not yet have an official summary.'
+    );
+    expect(
+      normalizeDigestLead(
+        "Names the Martin Luther King, Jr. Memorial Post Office. Signage follows."
+      )
+    ).toBe("Names the Martin Luther King, Jr. Memorial Post Office.");
+  });
+
+  it("still splits when an abbreviation ends a sentence before a common opener", () => {
+    expect(
+      splitSentences(
+        "This bill honors Martin Luther King, Jr. The Postmaster General shall install signage."
+      )
+    ).toEqual([
+      "This bill honors Martin Luther King, Jr.",
+      "The Postmaster General shall install signage.",
+    ]);
+    expect(
+      splitSentences("They live on Oak St. The city council must post notice.")
+    ).toEqual(["They live on Oak St.", "The city council must post notice."]);
+    expect(
+      splitSentences("This bill provides relief to Acme Inc. It also requires annual reports.")
+    ).toEqual([
+      "This bill provides relief to Acme Inc.",
+      "It also requires annual reports.",
+    ]);
+  });
+
   it("does not cut the first sentence on a name initial", () => {
     expect(
       formatCollapsedDigestLead(

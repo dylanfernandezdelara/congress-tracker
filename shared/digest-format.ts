@@ -29,6 +29,13 @@ function protectAbbreviations(text: string): string {
     .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, '$1§')
     // Honorifics before a name ("Dr. Jane Doe") are not sentence ends.
     .replace(/\b(Dr|Mr|Mrs|Ms|Prof|Rev|Hon|Gen|Adm|Gov|Sen|Rep|Lt|Col|Capt|Maj|Sgt)\.(?=\s+[A-Z])/g, '$1§')
+    // Place prefixes and name suffixes ("St. Croix", "King, Jr. Memorial") continue
+    // the phrase unless the next word is a common sentence opener, so
+    // "…honors Martin Luther King, Jr. The Postmaster…" still splits.
+    .replace(
+      /\b(St|Mt|Ft|Jr|Sr)\.(?=\s+(?!(?:The|This|These|Those|It|Its|They|That|Such|Each|Any|No|A|An)\b)[A-Z])/g,
+      '$1§',
+    )
 }
 
 function restoreAbbreviations(text: string): string {

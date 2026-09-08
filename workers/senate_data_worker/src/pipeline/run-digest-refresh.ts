@@ -1,13 +1,19 @@
 import { DIGEST_REFRESH_MAX_BILLS } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { hasDigestRewriteSource, upsertDigest } from "../d1/digests";
+import {
+  classifyDigestPhase,
+  getDigest,
+  hasDigestRewriteSource,
+  upsertDigest,
+} from "../d1/digests";
 import { replaceBillSponsors } from "../d1/sponsors";
 import { billLabel } from "./bill-label";
 import { fetchBillSummaryBundle } from "../sources/congress-client";
 import { parseBillQueryList } from "../sources/parse-bill-query";
 import { resolveOpenRouterModel } from "../synthesis/model";
 import { rewriteSummary } from "../synthesis/openrouter";
+import { buildTitleFallbackDigest } from "../synthesis/title-fallback-digest";
 import type { BillRef } from "../types";
 
 export interface DigestRefreshFailure {
@@ -20,6 +26,8 @@ export interface RunDigestRefreshResult {
   requested: number;
   refreshed: number;
   skipped: number;
+  /** Deterministic title fallbacks stored for bills whose LLM rewrite missed. */
+  fallbacksWritten: number;
   failures: DigestRefreshFailure[];
 }
 
@@ -36,6 +44,7 @@ export async function runDigestRefreshPipeline(
   const failures: DigestRefreshFailure[] = [];
   let refreshed = 0;
   let skipped = 0;
+  let fallbacksWritten = 0;
 
   for (const bill of limited) {
     const key = formatBillKey(bill);
@@ -62,7 +71,29 @@ export async function runDigestRefreshPipeline(
 
       if (!digest) {
         skipped += 1;
-        failures.push({ bill: key, reason: "openrouter_rewrite_failed" });
+        // Never overwrite a stored LLM digest with a fallback; only fill holes
+        // (or refresh an existing fallback) so the bill leaves missing_digest_count.
+        const existing = await getDigest(env.DB, bill.congress, bill.type, bill.number);
+        const phase = classifyDigestPhase(existing);
+        const fallback =
+          phase === "incomplete" || phase === "fallback_upgrade"
+            ? buildTitleFallbackDigest({ title: bundle.title, rawSummary: bundle.rawSummaryText })
+            : null;
+        if (fallback) {
+          await upsertDigest(env.DB, {
+            congress: bill.congress,
+            billType: bill.type,
+            number: bill.number,
+            title: bundle.title,
+            policyArea: bundle.policyArea,
+            rawSummaryText: bundle.rawSummaryText,
+            digest: fallback,
+          });
+          fallbacksWritten += 1;
+          failures.push({ bill: key, reason: "openrouter_rewrite_failed_title_fallback_written" });
+        } else {
+          failures.push({ bill: key, reason: "openrouter_rewrite_failed" });
+        }
         continue;
       }
 
@@ -98,6 +129,7 @@ export async function runDigestRefreshPipeline(
     requested: bills.length,
     refreshed,
     skipped,
+    fallbacksWritten,
     failures,
   };
 }

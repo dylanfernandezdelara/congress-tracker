@@ -111,7 +111,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/feed` (cron also runs feed + member-votes daily at 10:00 UTC)
 - `POST /__pipeline/senate-vote-menu` — admin upload of Senate LIS vote-menu XML into D1 cache (`?run_feed=1` to chain ingest); break-glass when Browser Rendering + D1 cache both fail. Daily cron uses the Worker `BROWSER` binding to fetch senate.gov after plain `fetch` 403s. Ops script: `npm run refresh:senate-menu`
 - `POST /__pipeline/purge-cache` — zone-wide Cloudflare edge cache purge (admin; also runs automatically after successful pipeline writes when `CACHE_PURGE_TOKEN` is set)
-- `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin). Uses CRS when present; otherwise title + policy-area fallback (same as daily feed). Cap `DIGEST_REFRESH_MAX_BILLS` (25). Daily/admin `POST /__pipeline/run/feed` also fills missing feed digests first (up to `DIGEST_MAX_NEW_REWRITES`)
+- `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin). Uses CRS when present; otherwise title + policy-area LLM rewrite (same as daily feed). On an LLM miss it stores a deterministic title fallback only when no LLM digest exists (`fallbacksWritten`, failure reason `openrouter_rewrite_failed_title_fallback_written`). Cap `DIGEST_REFRESH_MAX_BILLS` (25). Daily/admin `POST /__pipeline/run/feed` also fills missing feed digests first (up to `DIGEST_MAX_NEW_REWRITES`)
 - `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)
 - `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin; also chained after daily feed cron)
 - `POST /__pipeline/run/process-backfill` — capped/resumable committee-process discovery + hydration (admin; re-invoke until `bills_remaining` is 0)
@@ -137,7 +137,14 @@ never shares a minute with the daily feed cron (both share one write lease).
 `wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
 `workers/senate_data_worker` only after `wrangler versions upload` previews. The feed pipeline
 only upserts **new** passage votes (skips known roll-call keys) and writes digests for bills
-that do not yet have one (capped by `DIGEST_MAX_NEW_REWRITES`). Because Congress.gov lists House
+that do not yet have one (capped by `DIGEST_MAX_NEW_REWRITES`). When OpenRouter returns no
+parseable digest for a bill that has a title or CRS text, every digest writer (feed refresh,
+executive hydrate, admin `digest-refresh`) stores a deterministic title fallback built in
+`synthesis/title-fallback-digest.ts` (worker-only `source: "title_fallback"` marker in
+`digest_json`, stripped from the public feed) instead of a NULL tombstone. Admin `digest-refresh`
+writes a fallback only when no LLM digest exists. The feed refresh
+records a `digest_warnings` entry and retries the LLM for stored fallbacks on the next run.
+Because Congress.gov lists House
 votes oldest-first, daily runs scan list pages until the lookback window is reached (~5 list
 requests per run for the current session). Ingest success/failure is persisted in D1
 (`pipeline_state`) and surfaced on `GET /health` (`data.ingest`) and `GET /debug/ingest.json`;
