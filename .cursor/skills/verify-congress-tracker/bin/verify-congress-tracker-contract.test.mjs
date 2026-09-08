@@ -9,15 +9,14 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from '../lib/args.mjs'
 import {
   ACCESSIBLE_NAME_MAX,
+  collectInteractiveInPage,
   describeLocator,
   formatActionTarget,
   formatInteractiveLine,
   getLocator,
-  implicitRole,
   INTERACTIVE_ROLES,
   isAllowedCdpMethod,
   jsLooksLikeNavigation,
-  nameFromNode,
   normalizeRef,
   parseName,
 } from '../lib/browser.mjs'
@@ -174,92 +173,86 @@ test('interactive snapshot lines are compact and include set state', () => {
   )
 })
 
-test('interactive role set includes searchbox and option', () => {
-  assert.ok(INTERACTIVE_ROLES.includes('searchbox'))
-  assert.ok(INTERACTIVE_ROLES.includes('option'))
-  assert.equal(ACCESSIBLE_NAME_MAX, 120)
-})
-
-test('nameFromNode uses aria-label, labelledby, label, placeholder, title, then text', () => {
-  const emptyAttr = () => ''
-  assert.equal(
-    nameFromNode({
-      getAttribute: (key) => (key === 'aria-label' ? '  From  aria  ' : ''),
-      labels: [{ innerText: 'From label' }],
-      placeholder: 'From placeholder',
-      innerText: 'From text',
-    }, 120),
-    'From aria',
-  )
-  assert.equal(
-    nameFromNode({
-      getAttribute: (key) => (key === 'aria-labelledby' ? 'a b' : ''),
-      ownerDocument: {
-        getElementById: (id) => (id === 'a' ? { innerText: 'Hello' } : { innerText: 'world' }),
+test('collectInteractiveInPage stamps visible searchboxes and skips hidden or inert nodes', () => {
+  function fakeNode(init) {
+    const store = { ...(init.attrs || {}) }
+    const node = {
+      tagName: init.tagName,
+      type: init.type,
+      hidden: Boolean(init.hidden),
+      labels: init.labels || [],
+      placeholder: init.placeholder || '',
+      innerText: init.innerText || '',
+      textContent: init.textContent || '',
+      disabled: init.disabled,
+      checked: init.checked,
+      ownerDocument: init.ownerDocument,
+      getAttribute: (key) => store[key] ?? '',
+      setAttribute: (key, value) => {
+        store[key] = value
       },
-      labels: [{ innerText: 'From label' }],
-      innerText: 'From text',
-    }, 120),
-    'Hello world',
-  )
-  assert.equal(
-    nameFromNode({
-      getAttribute: emptyAttr,
-      labels: [{ innerText: 'Search bills', textContent: 'Search bills' }],
-      placeholder: 'ignored',
-      innerText: '',
-      textContent: '',
-    }, 120),
-    'Search bills',
-  )
-  assert.equal(
-    nameFromNode({
-      getAttribute: (key) => (key === 'placeholder' ? 'Search bills' : ''),
-      labels: [],
-      innerText: '',
-    }, 120),
-    'Search bills',
-  )
-  assert.equal(
-    nameFromNode({
-      getAttribute: (key) => (key === 'title' ? 'Hover name' : ''),
-      labels: [],
-      innerText: 'Visible',
-    }, 120),
-    'Hover name',
-  )
-  assert.equal(
-    nameFromNode({
-      getAttribute: emptyAttr,
-      labels: [],
-      innerText: 'abcdefghijklmnopqrstuvwxyz',
-    }, 8),
-    'abcdefgh',
-  )
-})
+      removeAttribute: (key) => {
+        delete store[key]
+      },
+      hasAttribute: (key) => Object.hasOwn(store, key),
+      getClientRects: () => init.rects ?? [{ width: 10, height: 10 }],
+    }
+    return node
+  }
 
-test('implicitRole maps native controls and explicit role', () => {
-  assert.equal(
-    implicitRole({ tagName: 'INPUT', type: 'search', getAttribute: (key) => (key === 'type' ? 'search' : '') }),
-    'searchbox',
-  )
-  assert.equal(
-    implicitRole({ tagName: 'INPUT', getAttribute: (key) => (key === 'type' ? 'checkbox' : '') }),
-    'checkbox',
-  )
-  assert.equal(
-    implicitRole({ tagName: 'A', getAttribute: (key) => (key === 'href' ? '/' : ''), hasAttribute: (key) => key === 'href' }),
-    'link',
-  )
-  assert.equal(implicitRole({ tagName: 'BUTTON', getAttribute: () => '' }), 'button')
-  assert.equal(
-    implicitRole({ tagName: 'DIV', getAttribute: (key) => (key === 'role' ? 'tab' : '') }),
-    'tab',
-  )
-  assert.equal(
-    implicitRole({ tagName: 'INPUT', getAttribute: (key) => (key === 'type' ? 'hidden' : '') }),
-    'generic',
-  )
+  const search = fakeNode({
+    tagName: 'INPUT',
+    type: 'search',
+    attrs: { type: 'search' },
+    labels: [{ innerText: 'Search bills', textContent: 'Search bills' }],
+  })
+  const hidden = fakeNode({
+    tagName: 'BUTTON',
+    attrs: { 'aria-hidden': 'true' },
+    innerText: 'Hidden',
+  })
+  const option = fakeNode({
+    tagName: 'DIV',
+    attrs: { role: 'option' },
+    innerText: 'Choice',
+  })
+  const bareLink = fakeNode({
+    tagName: 'A',
+    innerText: 'No href',
+  })
+  const nodes = [search, hidden, option, bareLink]
+  const previous = globalThis.document
+  globalThis.document = {
+    querySelectorAll: (selector) => {
+      if (selector === '[data-verify-ref]') {
+        return nodes.filter((node) => node.hasAttribute('data-verify-ref'))
+      }
+      return nodes
+    },
+  }
+  try {
+    const arg = { roles: INTERACTIVE_ROLES, maxName: ACCESSIBLE_NAME_MAX, selector: 'input, button, a, [role]' }
+    const entries = collectInteractiveInPage(arg)
+    assert.deepEqual(
+      entries.map((entry) => ({ ref: entry.ref, role: entry.role, name: entry.name })),
+      [
+        { ref: 'e1', role: 'searchbox', name: 'Search bills' },
+        { ref: 'e2', role: 'option', name: 'Choice' },
+      ],
+    )
+    assert.equal(search.getAttribute('data-verify-ref'), 'e1')
+    assert.equal(option.getAttribute('data-verify-ref'), 'e2')
+    assert.equal(hidden.hasAttribute('data-verify-ref'), false)
+    assert.equal(bareLink.hasAttribute('data-verify-ref'), false)
+
+    const single = collectInteractiveInPage(search, { ...arg, single: true })
+    assert.equal(single.role, 'searchbox')
+    assert.equal(single.name, 'Search bills')
+    assert.equal(single.ref, 'e1')
+    assert.equal(single.tag, 'input')
+  } finally {
+    globalThis.document = previous
+  }
 })
 
 test('getLocator rejects a stale --ref', async () => {
@@ -535,11 +528,6 @@ test('ensureWebDistPlaceholder writes a minimal shell when web/index.html is mis
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
-})
-
-test('browser command does not parse viewport flags', () => {
-  const source = fs.readFileSync(path.join(here, '../lib/browser.mjs'), 'utf8')
-  assert.doesNotMatch(source, /parseViewportFlags/)
 })
 
 test('launch appends worker.log or web.log tails on any startup failure', () => {

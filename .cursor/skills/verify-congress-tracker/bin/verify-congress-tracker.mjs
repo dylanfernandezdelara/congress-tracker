@@ -564,7 +564,6 @@ export const TEST_ONLY = {
   resolveEvidencePath,
   EVIDENCE_ROOT,
   PERSIST_TO,
-  persistViewportFromCdp,
 }
 
 async function main(argv) {

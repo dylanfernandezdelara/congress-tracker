@@ -63,66 +63,113 @@ export function jsLooksLikeNavigation(js) {
   )
 }
 
-/** Closure-free: Playwright serializes this via toString for in-page evaluate. */
-export function nameFromNode(node, maxName) {
-  if (!node) return ''
-  const limit = typeof maxName === 'number' && maxName > 0 ? maxName : 120
-  const clip = (value) => {
-    const text = String(value || '')
-      .replace(/\s+/g, ' ')
-      .trim()
-    if (!text) return ''
-    return text.length > limit ? text.slice(0, limit) : text
+/**
+ * Closure-free in-page collector. Playwright serializes the whole function
+ * (`page.evaluate` / `locator.evaluate`); nested helpers travel with it.
+ * `page.evaluate(fn, arg)` calls `fn(arg)`. `locator.evaluate(fn, arg)` calls `fn(element, arg)`.
+ */
+export function collectInteractiveInPage(nodeOrArg, maybeArg) {
+  function nameFromNode(node, maxName) {
+    if (!node) return ''
+    const clip = (value) => {
+      const text = String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (!text) return ''
+      return text.length > maxName ? text.slice(0, maxName) : text
+    }
+    const labelledBy = node.getAttribute?.('aria-labelledby') || ''
+    let labelledByText = ''
+    if (labelledBy && node.ownerDocument) {
+      labelledByText = labelledBy
+        .split(/\s+/)
+        .map((id) => node.ownerDocument.getElementById(id)?.innerText || '')
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    }
+    const fromLabel =
+      node.labels && node.labels.length
+        ? Array.from(node.labels)
+            .map((label) => label.innerText || label.textContent || '')
+            .join(' ')
+        : ''
+    return clip(
+      node.getAttribute?.('aria-label') ||
+        labelledByText ||
+        fromLabel ||
+        node.placeholder ||
+        node.getAttribute?.('placeholder') ||
+        node.getAttribute?.('title') ||
+        node.innerText ||
+        node.textContent,
+    )
   }
-  const labelledBy = node.getAttribute?.('aria-labelledby') || ''
-  let labelledByText = ''
-  if (labelledBy && node.ownerDocument) {
-    labelledByText = labelledBy
-      .split(/\s+/)
-      .map((id) => node.ownerDocument.getElementById(id)?.innerText || '')
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-  }
-  const fromLabel =
-    node.labels && node.labels.length
-      ? Array.from(node.labels)
-          .map((label) => label.innerText || label.textContent || '')
-          .join(' ')
-      : ''
-  return clip(
-    node.getAttribute?.('aria-label') ||
-      labelledByText ||
-      fromLabel ||
-      node.placeholder ||
-      node.getAttribute?.('placeholder') ||
-      node.getAttribute?.('title') ||
-      node.innerText ||
-      node.textContent,
-  )
-}
 
-/** Closure-free: Playwright serializes this via toString for in-page evaluate. */
-export function implicitRole(node) {
-  if (!node) return 'generic'
-  const explicit = (node.getAttribute?.('role') || '').trim()
-  if (explicit) return explicit
-  const tag = String(node.tagName || '').toLowerCase()
-  const type = String(node.type || node.getAttribute?.('type') || '').toLowerCase()
-  if (tag === 'a' && (node.getAttribute?.('href') || node.hasAttribute?.('href'))) return 'link'
-  if (tag === 'button') return 'button'
-  if (tag === 'textarea') return 'textbox'
-  if (tag === 'select') return 'combobox'
-  if (tag === 'option') return 'option'
-  if (tag === 'input') {
-    if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') return 'button'
-    if (type === 'checkbox') return 'checkbox'
-    if (type === 'radio') return 'radio'
-    if (type === 'search') return 'searchbox'
-    if (type === 'hidden' || type === 'file' || type === 'range' || type === 'color') return 'generic'
-    return 'textbox'
+  function implicitRole(node) {
+    if (!node) return 'generic'
+    const explicit = (node.getAttribute?.('role') || '').trim()
+    if (explicit) return explicit
+    const tag = String(node.tagName || '').toLowerCase()
+    const type = String(node.type || node.getAttribute?.('type') || '').toLowerCase()
+    if (tag === 'a' && (node.getAttribute?.('href') || node.hasAttribute?.('href'))) return 'link'
+    if (tag === 'button') return 'button'
+    if (tag === 'textarea') return 'textbox'
+    if (tag === 'select') return 'combobox'
+    if (tag === 'option') return 'option'
+    if (tag === 'input') {
+      if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') return 'button'
+      if (type === 'checkbox') return 'checkbox'
+      if (type === 'radio') return 'radio'
+      if (type === 'search') return 'searchbox'
+      if (type === 'hidden' || type === 'file' || type === 'range' || type === 'color') return 'generic'
+      return 'textbox'
+    }
+    return 'generic'
   }
-  return 'generic'
+
+  function describe(node, index, stamp) {
+    const role = implicitRole(node)
+    const ref = `e${index + 1}`
+    if (stamp) node.setAttribute('data-verify-ref', ref)
+    const tag = String(node.tagName || '').toLowerCase()
+    const type = String(node.type || node.getAttribute?.('type') || '').toLowerCase()
+    const expanded = node.getAttribute?.('aria-expanded')
+    const isCheckable = tag === 'input' && (type === 'checkbox' || type === 'radio')
+    const checked = isCheckable ? (node.checked ? 'true' : 'false') : node.getAttribute?.('aria-checked')
+    const disabled = Boolean(node.disabled) || node.getAttribute?.('aria-disabled') === 'true'
+    return {
+      ref,
+      role,
+      name: nameFromNode(node, arg.maxName),
+      tag,
+      expanded,
+      checked,
+      disabled,
+    }
+  }
+
+  const single = maybeArg != null
+  const arg = single ? maybeArg : nodeOrArg
+  if (single) {
+    return describe(nodeOrArg, 0, false)
+  }
+
+  const roleSet = new Set(arg.roles)
+  document.querySelectorAll('[data-verify-ref]').forEach((node) => node.removeAttribute('data-verify-ref'))
+  const seen = new Set()
+  const collected = []
+  for (const node of document.querySelectorAll(arg.selector)) {
+    if (seen.has(node)) continue
+    if (node.hidden || node.getAttribute('aria-hidden') === 'true' || node.getClientRects().length === 0) {
+      continue
+    }
+    const role = implicitRole(node)
+    if (!role || !roleSet.has(role)) continue
+    seen.add(node)
+    collected.push(node)
+  }
+  return collected.map((node, index) => describe(node, index, true))
 }
 
 export function normalizeRef(raw) {
@@ -224,62 +271,18 @@ function printJsonlOrEmpty(filePath) {
   process.stdout.write(text.endsWith('\n') ? text : `${text}\n`)
 }
 
+const INTERACTIVE_EVAL_ARG = {
+  roles: INTERACTIVE_ROLES,
+  maxName: ACCESSIBLE_NAME_MAX,
+  selector: INTERACTIVE_CANDIDATE_SELECTOR,
+}
+
 async function summarizeMatch(locator) {
-  const [name, meta] = await Promise.all([
-    locator.evaluate(nameFromNode, ACCESSIBLE_NAME_MAX),
-    locator.evaluate((node) => ({
-      tag: node.tagName.toLowerCase(),
-      expanded: node.getAttribute('aria-expanded'),
-    })),
-  ])
-  return { name, ...meta }
+  return locator.evaluate(collectInteractiveInPage, { ...INTERACTIVE_EVAL_ARG, single: true })
 }
 
 export async function collectInteractiveElements(page) {
-  const entries = await page.evaluate(
-    ({ roles, maxName, selector, nameSrc, roleSrc }) => {
-      const nameFromNode = new Function(`return (${nameSrc})`)()
-      const implicitRole = new Function(`return (${roleSrc})`)()
-      const roleSet = new Set(roles)
-
-      document.querySelectorAll('[data-verify-ref]').forEach((node) => node.removeAttribute('data-verify-ref'))
-
-      const seen = new Set()
-      const collected = []
-      for (const node of document.querySelectorAll(selector)) {
-        if (seen.has(node)) continue
-        if (node.hidden || node.getAttribute('aria-hidden') === 'true' || node.getClientRects().length === 0) {
-          continue
-        }
-        const role = implicitRole(node)
-        if (!role || !roleSet.has(role)) continue
-        seen.add(node)
-        collected.push({ node, role })
-      }
-
-      return collected.map(({ node, role }, index) => {
-        const ref = `e${index + 1}`
-        node.setAttribute('data-verify-ref', ref)
-        const expanded = node.getAttribute('aria-expanded')
-        const ariaChecked = node.getAttribute('aria-checked')
-        const isCheckable =
-          node instanceof HTMLInputElement && (node.type === 'checkbox' || node.type === 'radio')
-        const checked = isCheckable ? (node.checked ? 'true' : 'false') : ariaChecked
-        const disabled =
-          (node instanceof HTMLElement && 'disabled' in node && Boolean(node.disabled)) ||
-          node.getAttribute('aria-disabled') === 'true'
-        return { ref, role, name: nameFromNode(node, maxName), expanded, checked, disabled }
-      })
-    },
-    {
-      roles: INTERACTIVE_ROLES,
-      maxName: ACCESSIBLE_NAME_MAX,
-      selector: INTERACTIVE_CANDIDATE_SELECTOR,
-      nameSrc: nameFromNode.toString(),
-      roleSrc: implicitRole.toString(),
-    },
-  )
-  return entries
+  return page.evaluate(collectInteractiveInPage, INTERACTIVE_EVAL_ARG)
 }
 
 async function assertStayedOnApp(page, webUrl) {
