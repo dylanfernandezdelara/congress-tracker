@@ -40,6 +40,8 @@ import {
   waitForPort,
 } from '../lib/process.mjs'
 import { createStateStore, salvageEndpointsFromText, salvagePidsFromText } from '../lib/run-state.mjs'
+import { tailFile } from '../lib/tail-file.mjs'
+import { ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(here, '../../../..')
@@ -176,26 +178,10 @@ async function waitHttpOk(url, timeoutMs, label) {
   throw new Error(`${label} not ready at ${url} (${last})`)
 }
 
-const WEB_DIST_PLACEHOLDER =
-  '<!-- placeholder: verification stack serves the UI from Vite; run npm run build:web for real assets -->\n'
-
-function ensureWebDist(repoRoot) {
-  const distDir = path.join(repoRoot, 'web', 'dist')
-  if (fs.existsSync(distDir)) return false
-  fs.mkdirSync(distDir, { recursive: true })
-  fs.writeFileSync(path.join(distDir, 'index.html'), WEB_DIST_PLACEHOLDER)
-  return true
-}
-
-function tailFile(filePath, lineCount) {
-  try {
-    const text = fs.readFileSync(filePath, 'utf8')
-    const lines = text.split('\n')
-    if (lines[lines.length - 1] === '') lines.pop()
-    return lines.slice(-lineCount).join('\n')
-  } catch {
-    return ''
-  }
+function errorWithLogTail(err, logPath) {
+  const message = err instanceof Error ? err.message : String(err)
+  const tail = tailFile(logPath, 15)
+  return new Error(tail ? `${message}\n${tail}` : message)
 }
 
 function seedLocal(persistTo) {
@@ -255,8 +241,10 @@ async function cmdLaunch() {
   seedLocal(PERSIST_TO)
   updateState({ seeded: true, persistTo: PERSIST_TO, ...endpoints })
 
-  if (ensureWebDist(REPO_ROOT)) {
-    console.log('created placeholder web/dist (wrangler [assets] requires it; Vite serves the UI)')
+  if (ensureWebDistPlaceholder(REPO_ROOT)) {
+    console.log(
+      'created placeholder web/dist from web/index.html (wrangler [assets] needs the directory; Vite serves the UI)',
+    )
   }
 
   const workerPid = spawnLogged(
@@ -274,13 +262,16 @@ async function cmdLaunch() {
 
   try {
     await waitHttpOk(`${endpoints.workerUrl}/health`, 90_000, 'worker')
+  } catch (err) {
+    teardownPids(recordedPids(readState()))
+    throw errorWithLogTail(err, path.join(RUN_DIR, 'worker.log'))
+  }
+
+  try {
     await waitHttpOk(endpoints.webUrl, 60_000, 'web')
   } catch (err) {
     teardownPids(recordedPids(readState()))
-    const message = err instanceof Error ? err.message : String(err)
-    if (!message.startsWith('worker not ready')) throw err
-    const tail = tailFile(path.join(RUN_DIR, 'worker.log'), 15)
-    throw new Error(tail ? `${message}\n${tail}` : message)
+    throw errorWithLogTail(err, path.join(RUN_DIR, 'web.log'))
   }
 
   const health = await fetchJson(`${endpoints.workerUrl}/health`)
@@ -586,7 +577,7 @@ export const TEST_ONLY = {
   PERSIST_TO,
   viewportFromState,
   persistViewportFromCdp,
-  ensureWebDist,
+  ensureWebDistPlaceholder,
 }
 
 async function main(argv) {

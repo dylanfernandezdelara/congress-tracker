@@ -20,8 +20,29 @@ npm --prefix "${WEB_DIR}" ci
 echo "Installing Playwright Chromium for viewport QA..."
 npx --prefix "${ROOT_DIR}" playwright install chromium
 
-echo "Building web bundle (wrangler [assets] requires web/dist to exist)..."
-npm --prefix "${WEB_DIR}" run build
+# wrangler [assets] needs web/dist to exist. Do not run tsc/vite here — setup
+# must stay cheap and must not fail closed on a web typecheck. A real bundle
+# comes from `npm run build:web`. Do not clobber an existing dist.
+if [[ ! -d "${WEB_DIR}/dist" ]]; then
+  echo "Creating placeholder web/dist from web/index.html (wrangler [assets] needs the directory; Vite serves the UI)..."
+  mkdir -p "${WEB_DIR}/dist"
+  if [[ -f "${WEB_DIR}/index.html" ]]; then
+    cp "${WEB_DIR}/index.html" "${WEB_DIR}/dist/index.html"
+  else
+    cat > "${WEB_DIR}/dist/index.html" <<'EOF'
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Track Congress</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+EOF
+  fi
+fi
 
 if ! command -v lsof >/dev/null 2>&1; then
   echo "warning: lsof is not installed; the verify-congress-tracker skill needs it to check ports." >&2

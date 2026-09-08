@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const verifyScript = path.join(rootDir, 'scripts', 'verify-local-env.sh')
 
-function runVerify({ withDeps, withDevVars, withWebDist } = {}) {
+function runVerify({ withDeps, withDevVars, webDist } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-local-env-'))
   const scriptsDir = path.join(dir, 'scripts')
   const workerDir = path.join(dir, 'workers', 'senate_data_worker')
@@ -28,7 +28,13 @@ function runVerify({ withDeps, withDevVars, withWebDist } = {}) {
   if (withDevVars) {
     fs.writeFileSync(path.join(workerDir, '.dev.vars'), 'ALLOWED_ORIGIN=*\n', 'utf8')
   }
-  if (withWebDist) {
+  if (webDist === 'placeholder') {
+    fs.mkdirSync(path.join(webDir, 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(webDir, 'dist', 'index.html'), '<!DOCTYPE html>\n', 'utf8')
+  } else if (webDist === 'built') {
+    fs.mkdirSync(path.join(webDir, 'dist', 'assets'), { recursive: true })
+    fs.writeFileSync(path.join(webDir, 'dist', 'index.html'), '<!DOCTYPE html>\n', 'utf8')
+  } else if (webDist === 'empty') {
     fs.mkdirSync(path.join(webDir, 'dist'), { recursive: true })
   }
 
@@ -69,12 +75,16 @@ test('warns (not fails) when .dev.vars is missing but deps are installed', () =>
   assert.match(stdout, /npm run seed/)
 })
 
-test('warns when web/dist is missing and reports ok when it exists', () => {
+test('distinguishes missing, placeholder, and built web/dist', () => {
   const missing = runVerify({ withDeps: true, withDevVars: true })
   assert.equal(missing.code, 0)
-  assert.match(missing.stdout, /web\/dist missing — run 'npm run build:web' before 'npm run dev:worker'/)
+  assert.match(missing.stdout, /web\/dist missing — run 'npm run setup' or 'npm run build:web' before 'npm run dev:worker'/)
 
-  const present = runVerify({ withDeps: true, withDevVars: true, withWebDist: true })
-  assert.equal(present.code, 0)
-  assert.match(present.stdout, /\[ok\] web\/dist present/)
+  const placeholder = runVerify({ withDeps: true, withDevVars: true, webDist: 'placeholder' })
+  assert.equal(placeholder.code, 0)
+  assert.match(placeholder.stdout, /\[ok\] web\/dist: placeholder \(run npm run build:web for real assets\)/)
+
+  const built = runVerify({ withDeps: true, withDevVars: true, webDist: 'built' })
+  assert.equal(built.code, 0)
+  assert.match(built.stdout, /\[ok\] web\/dist: built/)
 })

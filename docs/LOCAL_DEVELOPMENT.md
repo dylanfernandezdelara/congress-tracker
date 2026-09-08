@@ -8,7 +8,7 @@ behave the same way so you can move between the two without surprises.
 ## TL;DR
 
 ```bash
-npm run setup        # install all deps + Playwright + scaffold .dev.vars
+npm run setup        # install all deps + Playwright + scaffold .dev.vars + placeholder web/dist
 npm run seed         # required: fill local D1 with sample feed + left-rail data
 npm run verify:local # preflight check that everything is wired up
 ```
@@ -21,9 +21,11 @@ npm run dev:worker   # http://127.0.0.1:8787  (API + ingestion)
 npm run dev:web      # http://127.0.0.1:5173  (React feed UI)
 ```
 
-`npm run setup` builds `web/dist` because the Worker's `[assets]` directory
-must exist before `npm run dev:worker`; if you skipped setup, run
-`npm run build:web` once.
+`npm run setup` creates a placeholder `web/dist` by copying `web/index.html`
+so wrangler `[assets]` can start (`npm run dev:worker`). That placeholder is
+not a real Vite build — run `npm run build:web` for production assets. If
+you skipped setup, run `npm run setup` or `npm run build:web` before the
+worker.
 
 Open `http://127.0.0.1:5173` — the seeded sample bills and member spotlights
 appear immediately, no API keys required.
