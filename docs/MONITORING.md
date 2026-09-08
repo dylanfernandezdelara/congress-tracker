@@ -54,18 +54,23 @@ that window are expected to lack rewrites. A count above 0 marks ingest
 **`degraded`** (it no longer stays `ok` with only an annotation).
 
 An OpenRouter miss (non-2xx, empty, or unparseable JSON in both prompt modes)
-for a feed bill that has a title or CRS text no longer leaves `digest_json`
-NULL. The daily ingest writes a deterministic **title fallback** digest
-(`digest.source = "title_fallback"`: headline = title, lead = CRS opening
-sentence or a sentence restating the title; never invented CRS content) and
-records `…OpenRouter rewrite returned no digest; wrote deterministic title
-fallback digest` in `last_success.digest_warnings` (also the
-`feed_pipeline_partial_digest_refresh` log event). The next run retries the LLM
-for every stored fallback (after new incompletes, before CRS upgrades) and
-warns again if it still misses. Bills over the per-run rewrite budget also get
-a fallback, summarized in one `rewrite budget (N) spent…` warning. Only a bill
-with neither title nor CRS text stays empty, and that is warned per bill.
-Digest warnings never change `status`; `missing_digest_count` does.
+for a bill that has a title or CRS text no longer leaves `digest_json` NULL.
+Every digest writer (daily feed refresh, hourly executive hydrate, admin
+`digest-refresh`) stores a deterministic **title fallback** digest instead:
+headline = title, lead = CRS opening sentence or a sentence restating the
+title; never invented CRS content. The row carries a worker-only
+`source: "title_fallback"` marker in `digest_json` that the public feed strips.
+The daily feed refresh records `…OpenRouter rewrite returned no digest; wrote
+deterministic title fallback digest` in `last_success.digest_warnings` (also
+the `feed_pipeline_partial_digest_refresh` log event); executive hydrate logs
+`executive_bill_digest_title_fallback`; `digest-refresh` reports
+`openrouter_rewrite_failed_title_fallback_written` (it never replaces a stored
+LLM digest with a fallback). The next daily run retries the LLM for every
+stored fallback (after new incompletes, before CRS upgrades) and warns again if
+it still misses. Bills over the per-run rewrite budget also get a fallback,
+summarized in one `rewrite budget (N) spent…` warning. Only a bill with
+neither title nor CRS text stays empty, and that is warned per bill. Digest
+warnings never change `status`; `missing_digest_count` does.
 
 House ingest that hits the per-run detail cap records `House ingest truncated:…`
 and is **`degraded`** (newest-first fetch still lands the current week's rolls).
