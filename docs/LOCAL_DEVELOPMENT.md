@@ -167,13 +167,14 @@ cd /tmp/wt-<name> && npm run setup   # each worktree needs its own node_modules 
 Run the ship checklist inside that worktree. `npm run preview` prints a
 per-branch alias URL, so parallel previews do not collide. If two worktrees
 need the verify helper at the same time, give the second one different
-`VERIFY_*_PORT` values (see the skill's Launch section).
+`VERIFY_*_PORT` values (Launch section of
+[`.cursor/skills/verify-congress-tracker/SKILL.md`](../.cursor/skills/verify-congress-tracker/SKILL.md)).
 
 Merge order matters: after each squash-merge, `git fetch origin main` and
 merge (or rebase) it into the remaining worktrees before their next thermos
-round, so review sees the diff against the real base. When a PR is merged:
+round, so review sees the diff against the real base. Once a PR is merged,
+remove its worktree from the primary checkout (the clone you added it from):
 
 ```bash
-gh pr merge <n> --squash --delete-branch   # prints a worktree warning; that is expected
-cd /workspace && git worktree remove --force /tmp/wt-<name> && git branch -D cursor/<name>-<suffix>
+git worktree remove --force /tmp/wt-<name> && git branch -D cursor/<name>-<suffix>
 ```
