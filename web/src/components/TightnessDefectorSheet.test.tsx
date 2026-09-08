@@ -136,6 +136,7 @@ describe('TightnessDefectorSheet', () => {
     const trigger = await screen.findByRole('button', {
       name: 'Open profile for Rep. Sample Crossover (local)',
     })
+    trigger.focus()
     fireEvent.click(trigger)
 
     const profile = screen.getByRole('dialog', { name: 'Rep. Sample Crossover (local)' })

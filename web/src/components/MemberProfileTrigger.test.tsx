@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
@@ -10,6 +10,8 @@ import { MemberProfileTrigger } from './MemberProfileTrigger'
 vi.mock('../api/client', () => ({
   fetchMemberProfile: vi.fn(),
 }))
+
+import { fetchMemberProfile } from '../api/client'
 
 const seed: MemberProfileSeed = {
   bioguide_id: 'F000466',
@@ -42,6 +44,24 @@ describe('MemberProfileTrigger', () => {
   })
 
   it('opens the member profile for a real bioguide', () => {
+    vi.mocked(fetchMemberProfile).mockResolvedValue({
+      ...seed,
+      chamber: 'House',
+      district: 1,
+      photo_url: '',
+      congress_gov_url: null,
+      congress: 119,
+      session: 2,
+      votes_cast: 10,
+      yea_count: 6,
+      nay_count: 4,
+      cross_vote_count: 1,
+      cross_vote_label: 'rare',
+      recent_cross_votes: [],
+      member_votes_available: true,
+      as_of: '2026-07-20T00:00:00.000Z',
+    })
+
     renderWithMemberProfile(
       <MemberProfileTrigger seed={seed}>Brian Fitzpatrick</MemberProfileTrigger>,
     )
