@@ -141,7 +141,8 @@ that do not yet have one (capped by `DIGEST_MAX_NEW_REWRITES`). When OpenRouter 
 parseable digest for a bill that has a title or CRS text, every digest writer (feed refresh,
 executive hydrate, admin `digest-refresh`) stores a deterministic title fallback built in
 `synthesis/title-fallback-digest.ts` (worker-only `source: "title_fallback"` marker in
-`digest_json`, stripped from the public feed) instead of a NULL tombstone; the feed refresh
+`digest_json`, stripped from the public feed) instead of a NULL tombstone (admin `digest-refresh`
+only when no LLM digest exists); the feed refresh
 records a `digest_warnings` entry and retries the LLM for stored fallbacks on the next run.
 Because Congress.gov lists House
 votes oldest-first, daily runs scan list pages until the lookback window is reached (~5 list

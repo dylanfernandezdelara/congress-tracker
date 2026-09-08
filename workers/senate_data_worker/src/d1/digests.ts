@@ -104,7 +104,7 @@ export async function upsertDigest(
     title: string | null;
     policyArea: string | null;
     rawSummaryText: string | null;
-    digest: BillDigestContent | null;
+    digest: StoredBillDigest | null;
     /** When digest is null, keep this JSON instead of tombstoning the row. */
     preserveDigestJson?: string | null;
   }

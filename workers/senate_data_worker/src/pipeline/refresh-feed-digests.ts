@@ -42,6 +42,16 @@ interface DigestLookup {
   untrustedKeys: Set<string>;
 }
 
+/** Processing order; the type-level check fails if a `DigestPhase` is missing. */
+const DIGEST_PHASE_ORDER = [
+  "incomplete",
+  "fallback_upgrade",
+  "crs_upgrade",
+  "complete",
+] as const satisfies readonly DigestPhase[];
+type MissingPhase = Exclude<DigestPhase, (typeof DIGEST_PHASE_ORDER)[number]>;
+const _everyPhaseOrdered: MissingPhase extends never ? true : never = true;
+
 interface DigestWorkItem {
   row: LifecycleBillRow;
   phase: DigestPhase;
@@ -360,8 +370,10 @@ export async function refreshFeedDigests(
     (priorityKeys.has(key) ? queue.priority : queue.rest).push({ row, phase });
   }
 
-  const ordered: DigestPhase[] = ["incomplete", "fallback_upgrade", "crs_upgrade", "complete"];
-  for (const item of ordered.flatMap((phase) => [...queues[phase].priority, ...queues[phase].rest])) {
+  for (const item of DIGEST_PHASE_ORDER.flatMap((phase) => [
+    ...queues[phase].priority,
+    ...queues[phase].rest,
+  ])) {
     await processBill(env, model, item, existingFor(digestByKey, item.row), counters, warnings);
   }
 
