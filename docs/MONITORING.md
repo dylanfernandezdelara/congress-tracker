@@ -53,6 +53,20 @@ with no `bill_digests` row. Older session-backfill rows and bills ranked past
 that window are expected to lack rewrites. A count above 0 marks ingest
 **`degraded`** (it no longer stays `ok` with only an annotation).
 
+An OpenRouter miss (non-2xx, empty, or unparseable JSON in both prompt modes)
+for a feed bill that has a title or CRS text no longer leaves `digest_json`
+NULL. The daily ingest writes a deterministic **title fallback** digest
+(`digest.source = "title_fallback"`: headline = title, lead = CRS opening
+sentence or a sentence restating the title; never invented CRS content) and
+records `…OpenRouter rewrite returned no digest; wrote deterministic title
+fallback digest` in `last_success.digest_warnings` (also the
+`feed_pipeline_partial_digest_refresh` log event). The next run retries the LLM
+for every stored fallback (after new incompletes, before CRS upgrades) and
+warns again if it still misses. Bills over the per-run rewrite budget also get
+a fallback, summarized in one `rewrite budget (N) spent…` warning. Only a bill
+with neither title nor CRS text stays empty, and that is warned per bill.
+Digest warnings never change `status`; `missing_digest_count` does.
+
 House ingest that hits the per-run detail cap records `House ingest truncated:…`
 and is **`degraded`** (newest-first fetch still lands the current week's rolls).
 
@@ -125,7 +139,7 @@ Severity split (important while Senate.gov 403 persists):
 | Severity | Status | Action |
 |----------|--------|--------|
 | Page / notify | `failed`, `stale`, `unknown` | True blocker — cron broken, no scheduled success, hard chamber skip, **or** menu cache nearing expiry / expired |
-| Tracked / known | `degraded` (Senate **cache fallback**, menu cache stale >48h, intro list soft-fail, and/or feed bills missing digests) | Confirm `senate_fetch_browser_rendering_fallback` / menu cache write, or `feed_pipeline_intro_list_failed` + `last_success.intro_warnings`, in Workers Logs; page only if Browser Rendering **and** D1 cache both fail, cache nears 7d, or intro list stays failed across runs. Break-glass: `npm run refresh:senate-menu`. Missing-digest degrade: run `POST /__pipeline/run/feed` (or `digest-refresh` for named bills) on workers.dev; title-only rewrite covers intros/resolutions without CRS. Do **not** page forever on expected 403→BR/cache. |
+| Tracked / known | `degraded` (Senate **cache fallback**, menu cache stale >48h, intro list soft-fail, and/or feed bills missing digests) | Confirm `senate_fetch_browser_rendering_fallback` / menu cache write, or `feed_pipeline_intro_list_failed` + `last_success.intro_warnings`, in Workers Logs; page only if Browser Rendering **and** D1 cache both fail, cache nears 7d, or intro list stays failed across runs. Break-glass: `npm run refresh:senate-menu`. Missing-digest degrade: run `POST /__pipeline/run/feed` (or `digest-refresh` for named bills) on workers.dev; title-only rewrite covers intros/resolutions without CRS, and a deterministic title fallback covers LLM misses (check `last_success.digest_warnings` for repeated `OpenRouter rewrite … no digest` lines — that is an OpenRouter/model problem, not a data gap). Do **not** page forever on expected 403→BR/cache. |
 | Clear | `ok` | No action |
 
 `degraded` covers expected Worker→Senate.gov 403 → Browser Rendering (or D1

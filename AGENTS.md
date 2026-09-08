@@ -137,7 +137,12 @@ never shares a minute with the daily feed cron (both share one write lease).
 `wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
 `workers/senate_data_worker` only after `wrangler versions upload` previews. The feed pipeline
 only upserts **new** passage votes (skips known roll-call keys) and writes digests for bills
-that do not yet have one (capped by `DIGEST_MAX_NEW_REWRITES`). Because Congress.gov lists House
+that do not yet have one (capped by `DIGEST_MAX_NEW_REWRITES`). When OpenRouter returns no
+parseable digest for a bill that has a title or CRS text, the run writes a deterministic
+title fallback (`digest.source = "title_fallback"`, built in
+`synthesis/title-fallback-digest.ts`), records a `digest_warnings` entry, and retries the LLM
+on the next run; feed-visible bills never sit at `digest_json = NULL` after a rewrite miss.
+Because Congress.gov lists House
 votes oldest-first, daily runs scan list pages until the lookback window is reached (~5 list
 requests per run for the current session). Ingest success/failure is persisted in D1
 (`pipeline_state`) and surfaced on `GET /health` (`data.ingest`) and `GET /debug/ingest.json`;
