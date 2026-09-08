@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 
 import {
@@ -6,7 +9,22 @@ import {
   isValidPreviewAlias,
   resolvePreviewAlias,
   sanitizePreviewAlias,
+  webDistBuildProblem,
 } from './preview-upload.mjs'
+
+test('webDistBuildProblem rejects missing and placeholder web/dist, accepts a Vite build', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preview-upload-dist-'))
+  try {
+    assert.match(webDistBuildProblem(dir), /missing/)
+    fs.mkdirSync(path.join(dir, 'web', 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'web', 'dist', 'index.html'), '<!DOCTYPE html>\n', 'utf8')
+    assert.match(webDistBuildProblem(dir), /placeholder shell/)
+    fs.mkdirSync(path.join(dir, 'web', 'dist', 'assets'))
+    assert.equal(webDistBuildProblem(dir), '')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 test('preview alias max length fits preview worker DNS label budget', () => {
   assert.equal(MAX_PREVIEW_ALIAS_LEN, 34)

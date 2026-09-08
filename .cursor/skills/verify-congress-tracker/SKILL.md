@@ -31,8 +31,9 @@ Launch will:
 
 1. Fail if verification ports `:5174` or `:8788` (or `:9223`) are already listening.
 2. Run `npm run seed` with `SEED_PERSIST_TO` pointed at `artifacts/verify/.run/d1` (writes `(local sample)` bills, members, laws, and confirmations into that isolated store only).
-3. Start the Worker with `wrangler dev --local --persist-to artifacts/verify/.run/d1 --port 8788` (resolved to an absolute path). Then start `npm run dev:web -- --mode verify-congress-tracker` with `VITE_DEV_PORT=5174` and `VITE_WORKER_ORIGIN=http://127.0.0.1:8788`; the mode is only an ownership marker for cleanup and does not change app behavior.
-4. Wait until `GET http://127.0.0.1:8788/health` and `GET http://127.0.0.1:5174` return HTTP 200.
+3. Create a placeholder `web/dist` by copying `web/index.html` if the directory is missing, because wrangler refuses to start without its `[assets]` directory; the verification UI is still served by Vite.
+4. Start the Worker with `wrangler dev --local --persist-to artifacts/verify/.run/d1 --port 8788` (resolved to an absolute path). Then start `npm run dev:web -- --mode verify-congress-tracker` with `VITE_DEV_PORT=5174` and `VITE_WORKER_ORIGIN=http://127.0.0.1:8788`; the mode is only an ownership marker for cleanup and does not change app behavior.
+5. Wait until `GET http://127.0.0.1:8788/health` and `GET http://127.0.0.1:5174` return HTTP 200.
 
 Ready when stdout includes `ready. Run doctor` and doctor (below) exits 0. Worker `/health` may be `degraded` locally because ingest cron does not run — that is still driveable. Feed JSON must be sample-only (`(local sample)` on every item). `--local` means Senate.gov Browser Rendering is unavailable; do not use this instance to prove live ingest.
 

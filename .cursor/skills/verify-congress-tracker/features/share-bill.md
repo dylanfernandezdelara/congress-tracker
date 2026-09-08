@@ -33,5 +33,5 @@ Preconditions:
 - Desktop Chrome in the helper often has no `navigator.share`. The icon still opens the preview sheet; **Copy link** inside the sheet is the paste path.
 - There is no second Copy link control in the expanded detail or footer.
 - UI strips `(local sample)` from the bill headline. The preview body still uses the digest `what_it_does` text.
-- OG rewrite is Worker HTML, not Vite. Prove rewritten `og:title` with curl against the helper worker (`127.0.0.1:8788/?bill=119-hr-1`) after `web/dist` exists, not against the Vite origin.
+- OG rewrite is Worker HTML, not Vite. The verify stack serves the UI from Vite on 5174; a placeholder `web/dist` is only enough for wrangler to start. Prove rewritten `og:title` by curling the Worker on `127.0.0.1:8788/?bill=119-hr-1` after a real build (`npm run build:web`), not against the Vite origin.
 - `.feed-row-detail-panel` keeps a CSS transform from its enter animation. The sheet **must** portal to `document.body` so `position: fixed` is viewport-relative.
