@@ -1,4 +1,7 @@
-import type { BillDigestContent } from "../../../../shared/digest-api-types";
+import {
+  DIGEST_SOURCE_TITLE_FALLBACK,
+  type BillDigestContent,
+} from "../../../../shared/digest-api-types";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
 
@@ -21,6 +24,15 @@ export function hasDigestRewriteSource(params: {
   rawSummary?: string | null;
 }): boolean {
   return Boolean(params.title?.trim() || params.rawSummary?.trim());
+}
+
+/**
+ * Deterministic metadata-only digest (see `buildTitleFallbackDigest`). Parses
+ * as complete so the feed and `/health` treat it as present, but the daily
+ * ingest still retries the LLM rewrite for it.
+ */
+export function isTitleFallbackDigest(json: string | null): boolean {
+  return parseStoredDigest(json)?.source === DIGEST_SOURCE_TITLE_FALLBACK;
 }
 
 /** Complete title-only digest that should rewrite when CRS text later appears. */

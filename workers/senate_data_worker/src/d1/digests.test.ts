@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { hasDigestRewriteSource, needsCrsUpgrade, parseStoredDigest } from "./digests";
+import { DIGEST_SOURCE_TITLE_FALLBACK } from "../../../../shared/digest-api-types";
+import {
+  hasDigestRewriteSource,
+  isTitleFallbackDigest,
+  needsCrsUpgrade,
+  parseStoredDigest,
+} from "./digests";
+
+describe("isTitleFallbackDigest", () => {
+  it("is true only for parseable digests carrying the fallback source marker", () => {
+    expect(
+      isTitleFallbackDigest(
+        JSON.stringify({
+          headline: "Done",
+          what_it_does: "Works",
+          source: DIGEST_SOURCE_TITLE_FALLBACK,
+        })
+      )
+    ).toBe(true);
+    expect(
+      isTitleFallbackDigest(JSON.stringify({ headline: "Done", what_it_does: "Works" }))
+    ).toBe(false);
+    expect(
+      isTitleFallbackDigest(JSON.stringify({ headline: "Done", source: DIGEST_SOURCE_TITLE_FALLBACK }))
+    ).toBe(false);
+    expect(isTitleFallbackDigest(null)).toBe(false);
+  });
+});
 
 describe("hasDigestRewriteSource", () => {
   it("accepts a title when CRS text is missing", () => {
