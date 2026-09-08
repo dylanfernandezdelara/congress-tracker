@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DIGEST_SOURCE_TITLE_FALLBACK } from "../../../../shared/digest-api-types";
 import type { Env } from "../config";
 import { DIGEST_MAX_NEW_REWRITES } from "../constants";
-import { digestMapKey, parseStoredDigest, type DigestRow } from "../d1/digests";
+import {
+  DIGEST_SOURCE_TITLE_FALLBACK,
+  digestMapKey,
+  parseStoredDigest,
+  type DigestRow,
+} from "../d1/digests";
 import type { LifecycleBillRow } from "../d1/lifecycle";
 import type { BillSummaryBundle } from "../sources/congress-client";
 
@@ -94,20 +98,22 @@ function storedFallbackRow(overrides: Partial<DigestRow> = {}): DigestRow {
   };
 }
 
+function resetDigestMocks(digests: Map<string, DigestRow>): void {
+  vi.clearAllMocks();
+  mockGetDigestsForBills.mockResolvedValue(digests);
+  mockUpsertDigest.mockResolvedValue(undefined);
+  mockBillHasSponsors.mockResolvedValue(true);
+  mockReplaceBillSponsors.mockResolvedValue(undefined);
+  mockFetchBillSummaryBundle.mockResolvedValue(hr10239Bundle);
+  mockRewriteSummary.mockResolvedValue(llmDigest);
+}
+
 function upsertedDigest(call = 0): unknown {
   return (mockUpsertDigest.mock.calls[call]?.[1] as { digest: unknown } | undefined)?.digest;
 }
 
 describe("refreshFeedDigests incomplete bills", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetDigestsForBills.mockResolvedValue(new Map());
-    mockUpsertDigest.mockResolvedValue(undefined);
-    mockBillHasSponsors.mockResolvedValue(true);
-    mockReplaceBillSponsors.mockResolvedValue(undefined);
-    mockFetchBillSummaryBundle.mockResolvedValue(hr10239Bundle);
-    mockRewriteSummary.mockResolvedValue(llmDigest);
-  });
+  beforeEach(() => resetDigestMocks(new Map()));
 
   it("stores the LLM digest when OpenRouter succeeds (primary path)", async () => {
     const result = await refreshFeedDigests(createEnv(), [bill(10239)], MODEL);
@@ -178,7 +184,7 @@ describe("refreshFeedDigests incomplete bills", () => {
     expect(upsertedDigest()).toEqual({
       headline: "Equal Pay for Equal Work Act",
       what_it_does: "This bill prohibits pay discrimination.",
-      key_points: ["Policy area: Labor and Employment"],
+      key_points: [],
       terms_explained: [],
       source: DIGEST_SOURCE_TITLE_FALLBACK,
     });
@@ -249,15 +255,7 @@ describe("refreshFeedDigests incomplete bills", () => {
 });
 
 describe("refreshFeedDigests stored title fallbacks", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetDigestsForBills.mockResolvedValue(digestRows([storedFallbackRow()]));
-    mockUpsertDigest.mockResolvedValue(undefined);
-    mockBillHasSponsors.mockResolvedValue(true);
-    mockReplaceBillSponsors.mockResolvedValue(undefined);
-    mockFetchBillSummaryBundle.mockResolvedValue(hr10239Bundle);
-    mockRewriteSummary.mockResolvedValue(llmDigest);
-  });
+  beforeEach(() => resetDigestMocks(digestRows([storedFallbackRow()])));
 
   it("retries the LLM next run and replaces the fallback on success", async () => {
     const result = await refreshFeedDigests(createEnv(), [bill(10239)], MODEL);
@@ -355,8 +353,7 @@ describe("refreshFeedDigests stored title fallbacks", () => {
 
 describe("refreshFeedDigests CRS upgrades", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetDigestsForBills.mockResolvedValue(
+    resetDigestMocks(
       digestRows([
         {
           congress: 119,
@@ -369,9 +366,6 @@ describe("refreshFeedDigests CRS upgrades", () => {
         },
       ])
     );
-    mockUpsertDigest.mockResolvedValue(undefined);
-    mockBillHasSponsors.mockResolvedValue(true);
-    mockReplaceBillSponsors.mockResolvedValue(undefined);
     mockFetchBillSummaryBundle.mockResolvedValue({
       ...hr10239Bundle,
       rawSummaryText: "This bill bans wage discrimination based on sex.",

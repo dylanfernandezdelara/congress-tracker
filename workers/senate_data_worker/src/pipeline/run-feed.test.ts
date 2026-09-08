@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
-import { digestMapKey, type DigestRow } from "../d1/digests";
+import { DIGEST_SOURCE_TITLE_FALLBACK, digestMapKey, type DigestRow } from "../d1/digests";
 
 const mockGetDigest = vi.fn<
   (db: D1Database, congress: number, billType: string, number: number) => Promise<DigestRow | null>
@@ -356,7 +356,7 @@ describe("runFeedPipeline digest retry", () => {
     expect(mockUpsertDigest).toHaveBeenCalledTimes(25);
     expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
     const overBudget = mockUpsertDigest.mock.calls.filter(
-      (call) => (call[1] as { digest: { source?: string } | null }).digest?.source === "title_fallback"
+      (call) => (call[1] as { digest: { source?: string } | null }).digest?.source === DIGEST_SOURCE_TITLE_FALLBACK
     );
     expect(overBudget).toHaveLength(5);
     expect(result.digestWarnings).toEqual([
@@ -395,7 +395,7 @@ describe("runFeedPipeline digest retry", () => {
         number: 10239,
         digest: expect.objectContaining({
           headline: "Equal Pay for Equal Work Act",
-          source: "title_fallback",
+          source: DIGEST_SOURCE_TITLE_FALLBACK,
         }),
       })
     );

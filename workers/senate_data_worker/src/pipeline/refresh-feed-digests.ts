@@ -1,15 +1,15 @@
 import { DIGEST_MAX_NEW_REWRITES } from "../constants";
 import type { Env } from "../config";
 import {
+  classifyDigestPhase,
   digestMapKey,
   getDigest,
   getDigestsForBills,
   hasDigestRewriteSource,
-  isTitleFallbackDigest,
-  needsCrsUpgrade,
-  parseStoredDigest,
   upsertDigest,
+  type DigestPhase,
   type DigestRow,
+  type StoredBillDigest,
 } from "../d1/digests";
 import type { LifecycleBillRow } from "../d1/lifecycle";
 import { billHasSponsors, replaceBillSponsors } from "../d1/sponsors";
@@ -41,14 +41,6 @@ interface DigestLookup {
   /** Bills whose digest row could not be read; never treat as incomplete. */
   untrustedKeys: Set<string>;
 }
-
-/**
- * - `incomplete`: no parseable digest; rewrite, else write a title fallback.
- * - `fallback_upgrade`: deterministic title fallback stored; retry the LLM.
- * - `crs_upgrade`: LLM title-only digest; rewrite only once CRS text exists.
- * - `complete`: CRS-backed digest; sponsor backfill only.
- */
-type DigestPhase = "incomplete" | "fallback_upgrade" | "crs_upgrade" | "complete";
 
 interface DigestWorkItem {
   row: LifecycleBillRow;
@@ -121,34 +113,9 @@ async function writeRewrite(ctx: BillDigestContext, digest: BillDigestContent): 
   ctx.counters.newRewrites += 1;
 }
 
-/**
- * Deterministic digest so the bill leaves `missing_digest_count`. An LLM miss
- * warns per bill; budget exhaustion is summarized once per run instead.
- */
-async function writeTitleFallback(
-  ctx: BillDigestContext,
-  cause: { kind: "rewrite_miss"; detail: string } | { kind: "budget_spent" }
-): Promise<boolean> {
-  const fallback = buildTitleFallbackDigest({
-    title: ctx.bundle.title,
-    policyArea: ctx.bundle.policyArea,
-    rawSummary: ctx.bundle.rawSummaryText,
-  });
-  if (!fallback) return false;
-  await writeDigest(ctx, fallback);
-  switch (cause.kind) {
-    case "rewrite_miss":
-      ctx.warnings.push(`${ctx.label}: ${cause.detail}; wrote deterministic title fallback digest`);
-      break;
-    case "budget_spent":
-      ctx.counters.budgetFallbacks += 1;
-      break;
-    default: {
-      const unreachable: never = cause;
-      throw new Error(`unknown fallback cause: ${String(unreachable)}`);
-    }
-  }
-  return true;
+/** Deterministic digest so the bill leaves `missing_digest_count`. */
+function titleFallbackFor(bundle: BillSummaryBundle): StoredBillDigest | null {
+  return buildTitleFallbackDigest({ title: bundle.title, rawSummary: bundle.rawSummaryText });
 }
 
 async function writeEmptyDigestRow(ctx: BillDigestContext, detail: string): Promise<void> {
@@ -167,21 +134,27 @@ async function processIncomplete(ctx: BillDigestContext): Promise<void> {
     return;
   }
 
-  if (counters.newRewrites >= DIGEST_MAX_NEW_REWRITES) {
-    if (!(await writeTitleFallback(ctx, { kind: "budget_spent" }))) {
-      await writeEmptyDigestRow(ctx, "title fallback digest unavailable");
+  const budgetSpent = counters.newRewrites >= DIGEST_MAX_NEW_REWRITES;
+  if (!budgetSpent) {
+    const digest = await rewriteFromBundle(ctx);
+    if (digest) {
+      await writeRewrite(ctx, digest);
+      return;
     }
-    return;
   }
 
-  const digest = await rewriteFromBundle(ctx);
-  if (digest) {
-    await writeRewrite(ctx, digest);
+  const fallback = titleFallbackFor(bundle);
+  if (!fallback) {
+    await writeEmptyDigestRow(ctx, "title fallback digest unavailable");
     return;
   }
-  const miss = { kind: "rewrite_miss", detail: "OpenRouter rewrite returned no digest" } as const;
-  if (!(await writeTitleFallback(ctx, miss))) {
-    await writeEmptyDigestRow(ctx, `${miss.detail}; title fallback digest unavailable`);
+  await writeDigest(ctx, fallback);
+  if (budgetSpent) {
+    counters.budgetFallbacks += 1;
+  } else {
+    ctx.warnings.push(
+      `${ctx.label}: OpenRouter rewrite returned no digest; wrote deterministic title fallback digest`
+    );
   }
 }
 
@@ -199,10 +172,10 @@ async function processFallbackUpgrade(ctx: BillDigestContext): Promise<void> {
   }
 
   const detail = "OpenRouter rewrite still returned no digest";
-  if (
-    bundleMetadataChanged(existing, bundle) &&
-    (await writeTitleFallback(ctx, { kind: "rewrite_miss", detail }))
-  ) {
+  const refreshed = bundleMetadataChanged(existing, bundle) ? titleFallbackFor(bundle) : null;
+  if (refreshed) {
+    await writeDigest(ctx, refreshed);
+    ctx.warnings.push(`${ctx.label}: ${detail}; wrote deterministic title fallback digest`);
     return;
   }
   counters.skipped += 1;
@@ -338,22 +311,14 @@ async function processBill(
   }
 }
 
-function classifyPhase(existing: DigestRow | null): DigestPhase {
-  const json = existing?.digest_json ?? null;
-  if (!parseStoredDigest(json)) return "incomplete";
-  if (isTitleFallbackDigest(json)) return "fallback_upgrade";
-  if (needsCrsUpgrade(existing)) return "crs_upgrade";
-  return "complete";
-}
-
 /**
  * Fill missing feed digests first (CRS when present, otherwise title; a
  * deterministic title fallback when the LLM returns nothing), then retry the
  * LLM for stored title fallbacks, then upgrade LLM title-only rows when CRS
  * arrives, then sponsor-backfill complete CRS-backed rows. Incomplete work
  * consumes DIGEST_MAX_NEW_REWRITES before fallback retries and CRS upgrades.
- * Feed-window incompletes (see `prioritize`) spend that budget before
- * non-visible voted bills.
+ * Within each phase, feed-window rows (see `prioritize`) spend that budget
+ * before non-visible voted bills.
  */
 export async function refreshFeedDigests(
   env: Env,
@@ -377,46 +342,26 @@ export async function refreshFeedDigests(
 
   const { map: digestByKey, untrustedKeys } = await loadDigestMap(env, bills, warnings);
 
-  const incompletePriority: DigestWorkItem[] = [];
-  const incompleteRest: DigestWorkItem[] = [];
-  const fallbackUpgrade: DigestWorkItem[] = [];
-  const crsUpgrade: DigestWorkItem[] = [];
-  const complete: DigestWorkItem[] = [];
+  // Feed-window rows (see `prioritize`) lead each rewrite-consuming phase.
+  const queues: Record<DigestPhase, { priority: DigestWorkItem[]; rest: DigestWorkItem[] }> = {
+    incomplete: { priority: [], rest: [] },
+    fallback_upgrade: { priority: [], rest: [] },
+    crs_upgrade: { priority: [], rest: [] },
+    complete: { priority: [], rest: [] },
+  };
   for (const row of bills) {
     const key = digestMapKey(row.bill_congress, row.bill_type, row.bill_number);
     if (untrustedKeys.has(key)) {
       counters.skipped += 1;
       continue;
     }
-    const phase = classifyPhase(existingFor(digestByKey, row));
-    const item: DigestWorkItem = { row, phase };
-    switch (phase) {
-      case "incomplete":
-        (priorityKeys.has(key) ? incompletePriority : incompleteRest).push(item);
-        break;
-      case "fallback_upgrade":
-        fallbackUpgrade.push(item);
-        break;
-      case "crs_upgrade":
-        crsUpgrade.push(item);
-        break;
-      case "complete":
-        complete.push(item);
-        break;
-      default: {
-        const unreachable: never = phase;
-        throw new Error(`unknown digest phase: ${String(unreachable)}`);
-      }
-    }
+    const phase = classifyDigestPhase(existingFor(digestByKey, row));
+    const queue = queues[phase];
+    (priorityKeys.has(key) ? queue.priority : queue.rest).push({ row, phase });
   }
 
-  for (const item of [
-    ...incompletePriority,
-    ...incompleteRest,
-    ...fallbackUpgrade,
-    ...crsUpgrade,
-    ...complete,
-  ]) {
+  const ordered: DigestPhase[] = ["incomplete", "fallback_upgrade", "crs_upgrade", "complete"];
+  for (const item of ordered.flatMap((phase) => [...queues[phase].priority, ...queues[phase].rest])) {
     await processBill(env, model, item, existingFor(digestByKey, item.row), counters, warnings);
   }
 
