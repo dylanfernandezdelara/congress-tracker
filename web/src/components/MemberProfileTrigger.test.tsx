@@ -58,6 +58,8 @@ describe('MemberProfileTrigger', () => {
       cross_vote_count: 1,
       cross_vote_label: 'rare',
       recent_cross_votes: [],
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
       member_votes_available: true,
       as_of: '2026-07-20T00:00:00.000Z',
     })

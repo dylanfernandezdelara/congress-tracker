@@ -41,12 +41,31 @@ const profile: MemberProfileResponse = {
       bill_type: 'S',
       bill_number: 2,
       bill_congress: 119,
+      bill_id: '119-s-2',
+      title: 'Public Lands and Waters Protection Act',
+      headline: 'Senate passes a public lands conservation and access bill',
+      question: 'On Passage of the Bill',
+      result: 'Passed',
       vote_date: '2026-06-09',
       position: 'yea',
       party_line: 'nay',
       margin: 2,
     },
   ],
+  sponsored_bills: [
+    {
+      bill_id: '119-hr-22',
+      congress: 119,
+      bill_type: 'HR',
+      bill_number: 22,
+      title: 'Government Accountability and Savings Act',
+      headline: 'House passes a federal spending oversight bill',
+      introduced_date: '2026-06-01',
+      policy_area: 'Government Operations and Politics',
+      status: 'Presented to President.',
+    },
+  ],
+  sponsored_bills_total: 1,
   member_votes_available: true,
   as_of: '2026-07-20T00:00:00.000Z',
 }
@@ -102,9 +121,18 @@ describe('MemberProfile', () => {
     expect(screen.getByText('House')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('30 / 12')).toBeInTheDocument()
-    expect(screen.getByText(/S\. 2/)).toBeInTheDocument()
+    expect(screen.getByText('Senate passes a public lands conservation and access bill')).toBeInTheDocument()
+    expect(screen.getByText(/S\. 2 · /)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Recent party-line breaks' })).toBeInTheDocument()
-    expect(screen.getByText(/voted Yea \(party Nay\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Voted yea against party · margin 2/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Senate passes a public lands conservation and access bill/ }),
+    ).toHaveAttribute('href', '/?bill=119-s-2')
+    expect(screen.getByRole('region', { name: 'Sponsored bills' })).toBeInTheDocument()
+    expect(screen.getByText('House passes a federal spending oversight bill')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+    ).toHaveAttribute('href', '/?bill=119-hr-22')
     expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toHaveAttribute(
       'href',
       'https://www.congress.gov/member/brian-fitzpatrick/F000466',
@@ -382,5 +410,100 @@ describe('MemberProfile', () => {
     })
     expect(screen.getByText('Other')).toBeInTheDocument()
     expect(screen.queryByText('Republican')).not.toBeInTheDocument()
+  })
+
+  it('falls back from headline to title to the short bill id on cross-vote rows', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      recent_cross_votes: [
+        {
+          ...profile.recent_cross_votes[0]!,
+          headline: null,
+          title: 'Public Lands and Waters Protection Act',
+        },
+        {
+          ...profile.recent_cross_votes[0]!,
+          roll_number: 215,
+          bill_type: 'HR',
+          bill_number: 1234,
+          bill_id: '119-hr-1234',
+          headline: null,
+          title: '',
+        },
+      ],
+    })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Public Lands and Waters Protection Act')).toBeInTheDocument()
+    })
+    expect(screen.getByText('H.R. 1234')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /H\.R\. 1234/ })).toHaveAttribute(
+      'href',
+      '/?bill=119-hr-1234',
+    )
+  })
+
+  it('hides the sponsored section when there are no bills and votes are unavailable', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      member_votes_available: false,
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
+    })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Per-member vote history is not available for this session yet.'),
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('region', { name: 'Sponsored bills' })).not.toBeInTheDocument()
+    expect(screen.queryByText('No sponsored bills in this Congress')).not.toBeInTheDocument()
+  })
+
+  it('shows a muted empty line when votes exist but there are no sponsored bills', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
+    })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('No sponsored bills in this Congress')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('5 of 23')).not.toBeInTheDocument()
+  })
+
+  it('shows N of M when more sponsored bills exist than the sheet lists', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      sponsored_bills: [
+        profile.sponsored_bills[0]!,
+        {
+          ...profile.sponsored_bills[0]!,
+          bill_id: '119-hr-1',
+          bill_number: 1,
+          headline: 'House passes a broad energy permitting and production package',
+          title: 'Lower Energy Costs Act',
+          policy_area: 'Energy',
+        },
+      ],
+      sponsored_bills_total: 23,
+    })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('2 of 23')).toBeInTheDocument()
+    })
+    expect(
+      screen.getByRole('link', { name: /House passes a broad energy permitting and production package/ }),
+    ).toHaveAttribute('href', '/?bill=119-hr-1')
+    expect(screen.getByText('Energy')).toBeInTheDocument()
   })
 })
