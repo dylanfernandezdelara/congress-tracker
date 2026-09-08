@@ -42,5 +42,15 @@ describe("member photo helpers", () => {
     expect(memberInitials("Nancy Pelosi")).toBe("NP");
     expect(memberInitials("Madonna")).toBe("M");
     expect(memberInitials("  ")).toBe("?");
+    expect(memberInitials("Rep. Sample Crossover (local)")).toBe("SC");
+    expect(memberInitials("Foxx, Virginia")).toBe("VF");
+    expect(memberInitials("Ocasio-Cortez, Alexandria")).toBe("AO");
+    expect(memberInitials("Brian Fitzpatrick")).toBe("BF");
+    expect(memberInitials("Sen. Bernard Sanders (local)")).toBe("BS");
+    expect(memberInitials("Rep. Foxx, Virginia [R-NC-5]")).toBe("VF");
+    expect(memberInitials("Cher")).toBe("C");
+    expect(memberInitials("")).toBe("?");
+    expect(memberInitials("Del Toro, Benicio")).toBe("BD");
+    expect(memberInitials("Del. Jane Doe")).toBe("JD");
   });
 });

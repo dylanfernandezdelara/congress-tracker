@@ -1,12 +1,17 @@
 import { useId } from 'react'
+import { ExternalLink } from 'lucide-react'
 
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
-import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
+import { partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
-import { formatBillDocket, formatVoteDate } from '../utils/billLabels'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { congressOrdinal, formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { AnimatedSheet } from './AnimatedSheet'
 import { MemberAvatar } from './MemberAvatar'
+import { PartyBadge } from './PartyBadge'
 
 export type MemberProfileSeed = Pick<
   NotableVoteEntry['defectors'][number],
@@ -31,10 +36,20 @@ type StatsPhase =
   | { kind: 'unavailable' }
   | { kind: 'ready'; profile: MemberProfileResponse }
 
-function seatLabel(profile: Pick<MemberProfileResponse, 'chamber' | 'state' | 'district'>): string {
-  if (profile.chamber === 'Senate') return `Senator from ${profile.state}`
-  if (profile.district != null) return `${profile.state}-${profile.district}`
+function seatBadge(profile: MemberProfileResponse | null, seed: MemberProfileSeed): string {
+  if (!profile) return `${partyShortLabel(seed.party)}-${seed.state}`
+  if (profile.chamber === 'Senate') return `Senator · ${profile.state}`
+  // Congress.gov uses district 0 for at-large House seats; null means unknown.
+  if (profile.district === 0) return `${profile.state} at-large`
+  if (profile.district != null && profile.district > 0) {
+    return `${profile.state}-${profile.district}`
+  }
   return `Representative from ${profile.state}`
+}
+
+function votingRecordTitle(profile: MemberProfileResponse | null): string {
+  if (!profile) return 'Voting record'
+  return `Voting record · ${congressOrdinal(profile.congress)} Congress, session ${profile.session}`
 }
 
 function positionWord(position: 'yea' | 'nay'): string {
@@ -65,7 +80,6 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
 
   const name = profile?.name ?? seed.name
   const party = profile?.party ?? seed.party
-  const state = profile?.state ?? seed.state
   const photoUrl = profile?.photo_url || seed.photo_url
   const hint = crossVoteHint(profile?.cross_vote_label ?? seed.cross_vote_label)
   const phase = statsPhase(profile, isPending, error)
@@ -78,37 +92,44 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       titleId={titleId}
       closeAriaLabel="Close profile"
     >
-      <div className="member-profile-header">
+      <div className="flex items-center gap-3.5">
         <MemberAvatar key={seed.bioguide_id} name={name} photoUrl={photoUrl} variant="profile" />
-        <div className="member-profile-identity">
-          <h2 id={titleId} className="member-profile-name">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h2 id={titleId} className="m-0 text-lg font-bold leading-tight tracking-tight">
             {name}
           </h2>
-          <p className={`member-profile-party ${partyCssClass(party)}`}>
-            {partyDisplayName(party)} · {partyShortLabel(party)}-{state}
-          </p>
-          {profile ? <p className="member-profile-seat">{seatLabel(profile)}</p> : null}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <PartyBadge party={party} />
+            <Badge variant="outline">{seatBadge(profile, seed)}</Badge>
+            {profile ? <Badge variant="outline">{profile.chamber}</Badge> : null}
+          </div>
         </div>
       </div>
 
-      <section className="sheet-section" aria-label="Voting behavior">
-        <h3 className="sheet-section-title">Voting behavior</h3>
-        <p className="member-profile-behavior">{hint}</p>
+      <Separator />
+
+      <section className="sheet-section" aria-label="Voting record">
+        <h3 className="sheet-section-title">{votingRecordTitle(profile)}</h3>
+        <p className="sheet-muted">{hint}</p>
         {phase.kind === 'ready' ? (
-          <dl className="member-profile-stats">
-            <div>
-              <dt>Passage votes</dt>
-              <dd>{phase.profile.votes_cast}</dd>
+          <dl className="mt-1.5 grid grid-cols-3 gap-2">
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[0.6875rem] text-faint">Passage votes</dt>
+              <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
+                {phase.profile.votes_cast}
+              </dd>
             </div>
-            <div>
-              <dt>Yea / Nay</dt>
-              <dd>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[0.6875rem] text-faint">Yea · Nay</dt>
+              <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
                 {phase.profile.yea_count} / {phase.profile.nay_count}
               </dd>
             </div>
-            <div>
-              <dt>Party-line breaks</dt>
-              <dd>{phase.profile.cross_vote_count}</dd>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[0.6875rem] text-faint">Party-line breaks</dt>
+              <dd className="m-0 text-[0.9375rem] font-semibold tabular-nums">
+                {phase.profile.cross_vote_count}
+              </dd>
             </div>
           </dl>
         ) : null}
@@ -128,16 +149,16 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       {phase.kind === 'ready' && phase.profile.recent_cross_votes.length > 0 ? (
         <section className="sheet-section" aria-label="Recent party-line breaks">
           <h3 className="sheet-section-title">Recent party-line breaks</h3>
-          <ul className="member-profile-recent">
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {phase.profile.recent_cross_votes.map((vote) => (
               <li
                 key={`${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`}
-                className="member-profile-recent-item"
+                className="flex flex-col gap-0.5"
               >
-                <span className="member-profile-recent-bill">
+                <span className="text-[0.8125rem] font-semibold">
                   {formatBillDocket(vote.bill_type, vote.bill_number, vote.bill_congress)}
                 </span>
-                <span className="member-profile-recent-meta">
+                <span className="text-xs text-secondary">
                   {vote.chamber} · {formatVoteDate(vote.vote_date)} · voted{' '}
                   {positionWord(vote.position)} (party {positionWord(vote.party_line)})
                 </span>
@@ -148,14 +169,12 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       ) : null}
 
       {profile?.congress_gov_url ? (
-        <a
-          className="sheet-link congress-link"
-          href={profile.congress_gov_url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          View on Congress.gov
-        </a>
+        <Button asChild variant="outline" size="sm" className="self-start">
+          <a href={profile.congress_gov_url} target="_blank" rel="noopener noreferrer">
+            View on Congress.gov
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          </a>
+        </Button>
       ) : null}
     </AnimatedSheet>
   )

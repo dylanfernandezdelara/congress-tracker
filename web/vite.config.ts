@@ -24,6 +24,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@congress-tracker/shared': path.join(repoRoot, 'shared'),
+      '@': path.join(path.dirname(fileURLToPath(import.meta.url)), 'src'),
     },
   },
   server: {
