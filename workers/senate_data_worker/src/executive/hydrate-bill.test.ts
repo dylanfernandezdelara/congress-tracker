@@ -188,6 +188,40 @@ describe("hydrateBillFromCongress CRS upgrade", () => {
     expect(mockIngestPassageVotesForBill).toHaveBeenCalledOnce();
   });
 
+  it("rebuilds the stored fallback when CRS arrives but the retry misses", async () => {
+    mockGetDigest.mockResolvedValue({
+      ...titleOnly,
+      digest_json: JSON.stringify({
+        headline: "To designate a post office",
+        what_it_does: "Restated title.",
+        key_points: [],
+        terms_explained: [],
+        source: DIGEST_SOURCE_TITLE_FALLBACK,
+      }),
+    });
+    mockRewriteSummary.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "To designate a post office",
+      policyArea: "Government Operations and Politics",
+      rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
+      introducedDate: "2026-09-01",
+      sponsors: [],
+    });
+
+    await expect(hydrateBillFromCongress(createEnv(), bill)).resolves.toBe(true);
+
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
+        digest: expect.objectContaining({
+          what_it_does: "This bill designates the Springfield facility as the Example Post Office.",
+          source: DIGEST_SOURCE_TITLE_FALLBACK,
+        }),
+      })
+    );
+  });
+
   it("does not overwrite a title-only digest when CRS is still missing", async () => {
     mockGetDigest.mockResolvedValue(titleOnly);
     mockFetchBillSummaryBundle.mockResolvedValue({
