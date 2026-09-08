@@ -48,14 +48,10 @@ Use [`.cursor/skills/verify-congress-tracker/SKILL.md`](.cursor/skills/verify-co
 Viewport QA and thermonuclear review run in **Cursor / Cursor Cloud**, not GitHub Actions. Every agent session should follow this before opening or updating a PR:
 
 1. `npm test`
-2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`. For behavior changes in `web/`, prove the feature with the verify skill (`features/<feature>.md`): evidence under `artifacts/verify/<feature>/`, and copy desktop (1280px) + mobile (390px) screenshots to `/opt/cursor/artifacts/` for PR bodies / chat.
+2. For `web/` changes: `npm run dev:web` (separate terminal) then `npm run qa:web`. For behavior changes, prove the feature with the verify skill (`features/<feature>.md`): evidence under `artifacts/verify/<feature>/` including desktop + mobile (390px) screenshots — see `.cursor/skills/verify-congress-tracker/SKILL.md`.
 3. Run thermonuclear review per `.cursor/rules/pr-thermonuclear-review.mdc` (two Grok 4.6 thermos passes in one background launch, then synthesize); fix CRITICAL and WARNING findings; repeat until CLEAR. Never launch thermos on Grok 4.5 (`cursor-grok-4.5-high-fast`).
 4. `npm run preview` — paste the Cloudflare Preview URL into **chat for the user** and the PR (do not wait for the user to ask). If that URL’s feed lags production, run `npm run sync:preview-db` once (it exports production D1 and briefly makes live queries unavailable; do not run it on every preview upload).
 5. Include QA results, thermonuclear review outcome, and preview URL in the PR description
-
-**Running beside another stack.** `VITE_DEV_PORT=<port> npm run dev:web` then `QA_WEB_URL=http://127.0.0.1:<port> npm run qa:web`. The verify helper uses `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT` (defaults 5174/8788/9223). See `.cursor/skills/verify-congress-tracker/SKILL.md` (Mobile proof).
-
-**Merging (when the user asks to merge).** `gh` and the GitHub MCP token in Cursor Cloud are read-only for merges. From a clean `origin/main` worktree: `git worktree add /tmp/wt-main origin/main && cd /tmp/wt-main && git checkout -B main origin/main && git merge --no-ff origin/<branch> -m "Merge pull request #N from <owner>/<branch>" && git push origin main`. GitHub records that as the PR merge; then delete the remote branch.
 
 Whenever you change the UI (`web/`), always share the preview URL in your reply so the user can click through and review the visual changes. Each `npm run preview` run prints a new version-specific URL; do not reuse an older link unless you confirm it matches the current build.
 

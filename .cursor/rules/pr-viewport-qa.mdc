@@ -15,8 +15,6 @@ For every PR that changes `web/`:
 3. Confirm 8/8 checks pass (home × 4 viewports × light/dark)
 4. Include the QA summary in the PR description before opening or updating the PR
 
-If another stack already holds 5173, use `VITE_DEV_PORT=<port> npm run dev:web` and `QA_WEB_URL=http://127.0.0.1:<port> npm run qa:web`.
-
-For `web/` **behavior** changes, also capture a mobile proof (390px) plus desktop (1280px) via the verify skill — see `.cursor/skills/verify-congress-tracker/SKILL.md` (Mobile proof). `qa:web` clip checks are not a substitute.
+For behavior-change mobile proof (390px), see `.cursor/skills/verify-congress-tracker/SKILL.md`.
 
 Do not skip this for UI bugfixes or small CSS tweaks.
