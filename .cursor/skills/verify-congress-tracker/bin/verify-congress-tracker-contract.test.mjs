@@ -8,13 +8,16 @@ import { fileURLToPath } from 'node:url'
 
 import { parseArgs } from '../lib/args.mjs'
 import {
+  ACCESSIBLE_NAME_MAX,
+  clipAccessibleName,
   describeLocator,
   formatInteractiveLine,
+  getLocator,
+  INTERACTIVE_ROLES,
   isAllowedCdpMethod,
   jsLooksLikeNavigation,
   normalizeRef,
   parseName,
-  parseViewportFlags,
 } from '../lib/browser.mjs'
 import {
   endpointsFromState,
@@ -33,6 +36,14 @@ import {
   portOwnershipProblem,
   teardownPids,
 } from '../lib/process.mjs'
+import {
+  applyViewport,
+  deviceMetricsFromState,
+  parseViewportFlags,
+  shouldClearDeviceMetrics,
+  viewportFromCdpFlags,
+  viewportFromState,
+} from '../lib/viewport.mjs'
 import { FALLBACK_WEB_DIST_HTML, ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 import { TEST_ONLY } from './verify-congress-tracker.mjs'
 
@@ -59,8 +70,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const helper = path.join(here, 'verify-congress-tracker')
 const rootDir = path.resolve(here, '../../../..')
 const seedScript = path.join(rootDir, 'scripts', 'seed-local-feed.sh')
-const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, viewportFromState, deviceMetricsFromState } =
-  TEST_ONLY
+const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, persistViewportFromCdp } = TEST_ONLY
 
 test('helper wrapper is executable', () => {
   const stat = fs.statSync(helper)
@@ -89,8 +99,10 @@ test('usage documents selector, nth, GET-only api, and DevTools commands', () =>
     assert.match(text, /start Chromium/)
     assert.match(text, /--name <label>/)
     assert.match(text, /--ref/)
-    assert.match(text, /fill .*\[--nth N\]/)
+    assert.match(text, /fill \(--role/)
     assert.match(text, /select .*\[--nth N\]/)
+    assert.match(text, /searchbox/)
+    assert.doesNotMatch(text, /--ref <ref>\) \[--exact\]/)
   }
 })
 
@@ -142,9 +154,21 @@ test('interactive snapshot lines are compact and include set state', () => {
     '[e2] radio "All" (checked)',
   )
   assert.equal(
-    formatInteractiveLine({ ref: 'e3', role: 'textbox', name: 'Search bills', disabled: true }),
-    '[e3] textbox "Search bills" (disabled)',
+    formatInteractiveLine({ ref: 'e3', role: 'searchbox', name: 'Search bills', disabled: true }),
+    '[e3] searchbox "Search bills" (disabled)',
   )
+})
+
+test('interactive role set includes searchbox and option', () => {
+  assert.ok(INTERACTIVE_ROLES.includes('searchbox'))
+  assert.ok(INTERACTIVE_ROLES.includes('option'))
+  assert.equal(ACCESSIBLE_NAME_MAX, 120)
+  assert.equal(clipAccessibleName('  Search   bills  '), 'Search bills')
+})
+
+test('getLocator rejects a stale --ref', async () => {
+  const page = { locator: () => ({ count: async () => 0 }) }
+  await assert.rejects(() => getLocator(page, { ref: 'e3' }), /ref e3 is stale or missing/)
 })
 
 test('parseArgs accepts --interactive and --mobile booleans', () => {
@@ -155,12 +179,18 @@ test('parseArgs accepts --interactive and --mobile booleans', () => {
   assert.equal(flags.height, '844')
 })
 
-test('parseViewportFlags requires positive width and height', () => {
+test('parseViewportFlags writes a complete metrics object', () => {
   assert.deepEqual(parseViewportFlags({ width: '390', height: '844', mobile: true, 'device-scale-factor': '2' }), {
     width: 390,
     height: 844,
     deviceScaleFactor: 2,
     mobile: true,
+  })
+  assert.deepEqual(parseViewportFlags({ width: '1280', height: '800' }), {
+    width: 1280,
+    height: 800,
+    deviceScaleFactor: 1,
+    mobile: false,
   })
   assert.throws(() => parseViewportFlags({ width: '0', height: '844' }), /--width/)
   assert.throws(() => parseViewportFlags({ width: '390' }), /--height/)
@@ -177,14 +207,16 @@ test('api paths are read-only public JSON', () => {
   assert.equal(isAllowedApiPath('https://example.com/feed'), false)
 })
 
-test('documented mobile CDP params map onto the persisted viewport', () => {
-  const params = JSON.parse('{"width":390,"height":844,"deviceScaleFactor":2,"mobile":true}')
-  assert.deepEqual(deviceMetricsFromState({ viewport: params }), {
-    width: 390,
-    height: 844,
-    deviceScaleFactor: 2,
-    mobile: true,
-  })
+test('persistViewportFromCdp records dsf and mobile from CDP params', () => {
+  assert.deepEqual(
+    viewportFromCdpFlags({
+      method: 'Emulation.setDeviceMetricsOverride',
+      params: '{"width":390,"height":844,"deviceScaleFactor":2,"mobile":true}',
+    }),
+    { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  )
+  assert.equal(viewportFromCdpFlags({ method: 'Runtime.evaluate', params: '{}' }), null)
+  assert.equal(typeof persistViewportFromCdp, 'function')
 })
 
 test('browser commands reuse a persisted CDP viewport instead of resetting to 1280', () => {
@@ -197,12 +229,36 @@ test('browser commands reuse a persisted CDP viewport instead of resetting to 12
     height: 568,
   })
   assert.deepEqual(viewportFromState({}), { width: 1280, height: 800 })
-  assert.deepEqual(deviceMetricsFromState({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true } }), {
-    width: 390,
-    height: 844,
-    deviceScaleFactor: 2,
-    mobile: true,
-  })
+  assert.deepEqual(
+    deviceMetricsFromState({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true } }),
+    { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  )
+  assert.equal(
+    shouldClearDeviceMetrics(deviceMetricsFromState({ viewport: { width: 1280, height: 800 } })),
+    true,
+  )
+})
+
+test('applyViewport clears device metrics when restoring desktop', async () => {
+  const sent = []
+  const page = {
+    setViewportSize: async (size) => {
+      sent.push(['setViewportSize', size])
+    },
+    context: () => ({
+      newCDPSession: async () => ({
+        send: async (method, params) => {
+          sent.push([method, params])
+        },
+      }),
+    }),
+  }
+  await applyViewport(page, { viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true } })
+  assert.equal(sent[1][0], 'Emulation.setDeviceMetricsOverride')
+  sent.length = 0
+  await applyViewport(page, { viewport: { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false } })
+  assert.deepEqual(sent[0], ['setViewportSize', { width: 1280, height: 800 }])
+  assert.equal(sent[1][0], 'Emulation.clearDeviceMetricsOverride')
 })
 
 test('evidence paths cannot escape artifacts/verify', () => {

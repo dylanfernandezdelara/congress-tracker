@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { isAllowedAppUrl } from './endpoints.mjs'
+import { parseViewportFlags } from './viewport.mjs'
 
 const CDP_PREFIXES = [
   'Runtime.',
@@ -22,6 +23,38 @@ const CDP_PREFIXES = [
 const CDP_EXACT = ['Page.captureScreenshot', 'Page.getLayoutMetrics', 'Page.getNavigationHistory']
 
 const CDP_DENIED = ['Runtime.compileScript', 'Runtime.runScript']
+
+export const ACCESSIBLE_NAME_MAX = 120
+
+export const INTERACTIVE_ROLES = [
+  'button',
+  'link',
+  'textbox',
+  'combobox',
+  'radio',
+  'checkbox',
+  'tab',
+  'searchbox',
+  'option',
+]
+
+const INTERACTIVE_CANDIDATE_SELECTOR = [
+  'button',
+  'input',
+  'textarea',
+  'select',
+  'option',
+  'a[href]',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="textbox"]',
+  '[role="searchbox"]',
+  '[role="combobox"]',
+  '[role="radio"]',
+  '[role="checkbox"]',
+  '[role="tab"]',
+  '[role="option"]',
+].join(',')
 
 export function isAllowedCdpMethod(method) {
   if (typeof method !== 'string' || method.length === 0) return false
@@ -43,7 +76,12 @@ export function jsLooksLikeNavigation(js) {
   )
 }
 
-export const INTERACTIVE_ROLES = ['button', 'link', 'textbox', 'combobox', 'radio', 'checkbox', 'tab']
+export function clipAccessibleName(raw, max = ACCESSIBLE_NAME_MAX) {
+  return String(raw ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, max)
+}
 
 export function normalizeRef(raw) {
   if (raw === undefined || raw === null || String(raw).trim() === '') {
@@ -64,28 +102,6 @@ export function formatInteractiveLine(entry) {
   const state = states.length > 0 ? ` (${states.join(', ')})` : ''
   const name = String(entry.name ?? '').replace(/"/g, '\\"')
   return `[${entry.ref}] ${entry.role} "${name}"${state}`
-}
-
-export function parseViewportFlags(flags) {
-  const width = Number(flags.width)
-  const height = Number(flags.height)
-  if (!Number.isFinite(width) || width <= 0) {
-    throw new Error('viewport requires --width > 0')
-  }
-  if (!Number.isFinite(height) || height <= 0) {
-    throw new Error('viewport requires --height > 0')
-  }
-  const dsfRaw = flags['device-scale-factor']
-  const dsf = dsfRaw === undefined ? undefined : Number(dsfRaw)
-  if (dsfRaw !== undefined && (!Number.isFinite(dsf) || dsf <= 0)) {
-    throw new Error('--device-scale-factor must be > 0')
-  }
-  return {
-    width: Math.round(width),
-    height: Math.round(height),
-    ...(dsf !== undefined ? { deviceScaleFactor: dsf } : {}),
-    ...(flags.mobile ? { mobile: true } : {}),
-  }
 }
 
 export function describeLocator(flags, { all = false } = {}) {
@@ -110,12 +126,23 @@ export function describeLocator(flags, { all = false } = {}) {
   return { kind: 'label', name: flags.name, nth }
 }
 
-export function getLocator(page, flags, { all = false } = {}) {
+function staleRefError(ref) {
+  return new Error(
+    `ref ${ref} is stale or missing; run browser snapshot --interactive again (refs are invalidated by re-render)`,
+  )
+}
+
+export async function getLocator(page, flags, { all = false } = {}) {
   const described = describeLocator(flags, { all })
   let locator
   if (described.kind === 'ref') {
     locator = page.locator(`[data-verify-ref="${described.ref}"]`)
-  } else if (described.kind === 'selector') {
+    if ((await locator.count()) === 0) {
+      throw staleRefError(described.ref)
+    }
+    return locator
+  }
+  if (described.kind === 'selector') {
     locator = page.locator(described.selector)
   } else if (described.kind === 'role') {
     const options = {}
@@ -147,46 +174,63 @@ function printJsonlOrEmpty(filePath) {
 }
 
 async function summarizeMatch(locator) {
-  return locator.evaluate((node) => {
-    const tag = node.tagName.toLowerCase()
-    const name = (node.getAttribute('aria-label') || node.innerText || node.textContent || '')
-      .trim()
-      .replace(/\s+/g, ' ')
-      .slice(0, 120)
-    const expanded = node.getAttribute('aria-expanded')
-    return { tag, name, expanded }
-  })
-}
-
-function staleRefError(ref) {
-  return new Error(
-    `ref ${ref} is stale or missing; run browser snapshot --interactive again (refs are invalidated by re-render)`,
+  return locator.evaluate(
+    (node, maxName) => {
+      const tag = node.tagName.toLowerCase()
+      const name = (node.getAttribute('aria-label') || node.innerText || node.textContent || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .slice(0, maxName)
+      const expanded = node.getAttribute('aria-expanded')
+      return { tag, name, expanded }
+    },
+    ACCESSIBLE_NAME_MAX,
   )
 }
 
-async function requireRefLocator(page, flags) {
-  const locator = getLocator(page, flags)
-  if ((await locator.count()) === 0) {
-    throw staleRefError(normalizeRef(flags.ref))
-  }
-  return locator
-}
-
 export async function collectInteractiveElements(page) {
-  await page.evaluate(() => {
-    document.querySelectorAll('[data-verify-ref]').forEach((node) => node.removeAttribute('data-verify-ref'))
-  })
-  const entries = []
-  let next = 1
-  for (const role of INTERACTIVE_ROLES) {
-    const locator = page.getByRole(role)
-    const count = await locator.count()
-    for (let i = 0; i < count; i += 1) {
-      const ref = `e${next}`
-      next += 1
-      const loc = locator.nth(i)
-      const info = await loc.evaluate((node, payload) => {
-        node.setAttribute('data-verify-ref', payload.ref)
+  const entries = await page.evaluate(
+    ({ roles, maxName, selector }) => {
+      const roleSet = new Set(roles)
+
+      function implicitRole(el) {
+        const explicit = el.getAttribute('role')
+        if (explicit) return explicit
+        const tag = el.tagName.toLowerCase()
+        const type = (el.getAttribute('type') || '').toLowerCase()
+        if (tag === 'button') return 'button'
+        if (tag === 'a' && el.hasAttribute('href')) return 'link'
+        if (tag === 'textarea') return 'textbox'
+        if (tag === 'select') return 'combobox'
+        if (tag === 'option') return 'option'
+        if (tag === 'input') {
+          if (type === 'search') return 'searchbox'
+          if (type === 'checkbox') return 'checkbox'
+          if (type === 'radio') return 'radio'
+          if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') {
+            return 'button'
+          }
+          if (type === 'hidden' || type === 'file' || type === 'range' || type === 'color') return null
+          return 'textbox'
+        }
+        return null
+      }
+
+      document.querySelectorAll('[data-verify-ref]').forEach((node) => node.removeAttribute('data-verify-ref'))
+
+      const seen = new Set()
+      const collected = []
+      for (const node of document.querySelectorAll(selector)) {
+        if (seen.has(node)) continue
+        const role = implicitRole(node)
+        if (!role || !roleSet.has(role)) continue
+        seen.add(node)
+        collected.push({ node, role })
+      }
+
+      return collected.map(({ node, role }, index) => {
+        const ref = `e${index + 1}`
+        node.setAttribute('data-verify-ref', ref)
         const expanded = node.getAttribute('aria-expanded')
         const ariaChecked = node.getAttribute('aria-checked')
         const isCheckable =
@@ -195,23 +239,19 @@ export async function collectInteractiveElements(page) {
         const disabled =
           (node instanceof HTMLElement && 'disabled' in node && Boolean(node.disabled)) ||
           node.getAttribute('aria-disabled') === 'true'
-        let name = node.getAttribute('aria-label') || ''
-        if (!name && 'labels' in node && node.labels && node.labels[0]) {
-          name = (node.labels[0].innerText || node.labels[0].textContent || '').trim()
-        }
-        if (!name) name = (node.innerText || node.textContent || '').trim()
-        name = name.replace(/\s+/g, ' ').slice(0, 160)
-        return {
-          role: payload.role,
-          name,
-          expanded,
-          checked,
-          disabled,
-        }
-      }, { role, ref })
-      entries.push({ ref, ...info })
-    }
-  }
+        const name = (node.getAttribute('aria-label') || node.innerText || node.textContent || '')
+          .trim()
+          .replace(/\s+/g, ' ')
+          .slice(0, maxName)
+        return { ref, role, name, expanded, checked, disabled }
+      })
+    },
+    {
+      roles: INTERACTIVE_ROLES,
+      maxName: ACCESSIBLE_NAME_MAX,
+      selector: INTERACTIVE_CANDIDATE_SELECTOR,
+    },
+  )
   return entries
 }
 
@@ -236,15 +276,7 @@ function parseCdpParams(raw) {
 }
 
 export async function runBrowserCommand(command, flags, ctx) {
-  const {
-    withPage,
-    resolveEvidencePath,
-    WEB_URL,
-    CDP_PORT,
-    consoleLogPath,
-    networkLogPath,
-    persistInteractiveRefs,
-  } = ctx
+  const { withPage, resolveEvidencePath, WEB_URL, CDP_PORT, consoleLogPath, networkLogPath } = ctx
 
   if (command === 'start') {
     await withPage(async (page) => {
@@ -278,7 +310,7 @@ export async function runBrowserCommand(command, flags, ctx) {
 
   if (command === 'find') {
     await withPage(async (page) => {
-      const locator = getLocator(page, flags, { all: true })
+      const locator = await getLocator(page, flags, { all: true })
       const count = await locator.count()
       const cap = Math.min(count, 20)
       console.log(`${count} match(es)`)
@@ -296,15 +328,19 @@ export async function runBrowserCommand(command, flags, ctx) {
 
   if (command === 'scroll') {
     await withPage(async (page) => {
-      await getLocator(page, flags).scrollIntoViewIfNeeded()
-      console.log(`scrolled ${flags.role || flags.selector} ${flags.name || ''}`.trim())
+      const locator = await getLocator(page, flags)
+      await locator.scrollIntoViewIfNeeded()
+      const target = flags.ref
+        ? `--ref ${normalizeRef(flags.ref)}`
+        : `${flags.role || flags.selector} ${flags.name || ''}`.trim()
+      console.log(`scrolled ${target}`)
     })
     return
   }
 
   if (command === 'click') {
     await withPage(async (page) => {
-      const locator = flags.ref ? await requireRefLocator(page, flags) : getLocator(page, flags)
+      const locator = await getLocator(page, flags)
       await locator.click()
       const target = flags.ref
         ? `--ref ${normalizeRef(flags.ref)}`
@@ -317,7 +353,7 @@ export async function runBrowserCommand(command, flags, ctx) {
   if (command === 'fill') {
     if (flags.value === undefined) throw new Error('fill requires --value')
     await withPage(async (page) => {
-      const locator = flags.ref ? await requireRefLocator(page, flags) : getLocator(page, flags)
+      const locator = await getLocator(page, flags)
       await locator.fill(flags.value)
       const target = flags.ref ? `--ref ${normalizeRef(flags.ref)}` : flags.name || flags.selector
       console.log(`filled ${target}`)
@@ -327,20 +363,10 @@ export async function runBrowserCommand(command, flags, ctx) {
 
   if (command === 'viewport') {
     const viewport = parseViewportFlags(flags)
-    await withPage(async (page) => {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height })
-      if (viewport.mobile || viewport.deviceScaleFactor) {
-        const session = await page.context().newCDPSession(page)
-        await session.send('Emulation.setDeviceMetricsOverride', {
-          width: viewport.width,
-          height: viewport.height,
-          deviceScaleFactor: viewport.deviceScaleFactor || 1,
-          mobile: Boolean(viewport.mobile),
-        })
-      }
+    await withPage(async () => {
       console.log(
         `viewport ${viewport.width}x${viewport.height}${viewport.mobile ? ' mobile' : ''}${
-          viewport.deviceScaleFactor ? ` dsf=${viewport.deviceScaleFactor}` : ''
+          viewport.deviceScaleFactor !== 1 ? ` dsf=${viewport.deviceScaleFactor}` : ''
         }`,
       )
     })
@@ -350,8 +376,10 @@ export async function runBrowserCommand(command, flags, ctx) {
   if (command === 'select') {
     if (flags.value === undefined) throw new Error('select requires --value')
     await withPage(async (page) => {
-      await getLocator(page, flags).selectOption(flags.value)
-      console.log(`selected ${flags.name || flags.selector}=${flags.value}`)
+      const locator = await getLocator(page, flags)
+      await locator.selectOption(flags.value)
+      const target = flags.ref ? `--ref ${normalizeRef(flags.ref)}` : flags.name || flags.selector
+      console.log(`selected ${target}=${flags.value}`)
     })
     return
   }
@@ -368,8 +396,12 @@ export async function runBrowserCommand(command, flags, ctx) {
   if (command === 'wait') {
     const timeout = Number(flags['timeout-ms'] || 15_000)
     await withPage(async (page) => {
-      await getLocator(page, flags).waitFor({ timeout })
-      console.log(`waited for ${flags.role || flags.selector} ${flags.name || ''}`.trim())
+      const locator = await getLocator(page, flags)
+      await locator.waitFor({ timeout })
+      const target = flags.ref
+        ? `--ref ${normalizeRef(flags.ref)}`
+        : `${flags.role || flags.selector} ${flags.name || ''}`.trim()
+      console.log(`waited for ${target}`)
     })
     return
   }
@@ -432,7 +464,6 @@ export async function runBrowserCommand(command, flags, ctx) {
       let text
       if (flags.interactive) {
         const entries = await collectInteractiveElements(page)
-        persistInteractiveRefs?.(entries)
         text = `${entries.map(formatInteractiveLine).join('\n')}\n`
       } else {
         const snapshot = await page.locator('body').ariaSnapshot()

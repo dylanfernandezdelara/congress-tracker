@@ -9,7 +9,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { parseArgs, UsageError } from '../lib/args.mjs'
-import { parseViewportFlags, runBrowserCommand } from '../lib/browser.mjs'
+import { runBrowserCommand } from '../lib/browser.mjs'
 import {
   DEFAULT_CDP_PORT,
   DEFAULT_WEB_PORT,
@@ -41,6 +41,12 @@ import {
 } from '../lib/process.mjs'
 import { createStateStore, salvageEndpointsFromText, salvagePidsFromText } from '../lib/run-state.mjs'
 import { tailFile } from '../lib/tail-file.mjs'
+import {
+  applyViewport,
+  DEFAULT_VIEWPORT,
+  parseViewportFlags,
+  viewportFromCdpFlags,
+} from '../lib/viewport.mjs'
 import { ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -52,7 +58,6 @@ const PERSIST_TO = path.join(RUN_DIR, 'd1')
 const CONSOLE_JSONL = path.join(RUN_DIR, 'console.jsonl')
 const NETWORK_JSONL = path.join(RUN_DIR, 'network.jsonl')
 const TAP_SCRIPT = path.join(here, '../lib/devtools-tap.mjs')
-const VIEWPORT = { width: 1280, height: 800 }
 const { readState, writeState, updateState, readStateOrCorrupt } = createStateStore(STATE_PATH)
 
 function usage() {
@@ -66,8 +71,8 @@ function usage() {
   verify-congress-tracker browser url
   verify-congress-tracker browser find (--role <role> --name <name> | --selector <sel>) [--exact]
   verify-congress-tracker browser scroll (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N]
-  verify-congress-tracker browser click (--role <role> --name <name> | --selector <sel> | --ref <ref>) [--exact] [--nth N]
-  verify-congress-tracker browser fill (--role <role> --name <name> | --selector <sel> | --ref <ref>) --value <value> [--exact] [--nth N]
+  verify-congress-tracker browser click (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>)
+  verify-congress-tracker browser fill (--role <role> --name <name> [--exact] [--nth N] | --selector <sel> [--nth N] | --ref <ref>) --value <value>
   verify-congress-tracker browser select (--role <role> --name <name> | --name <label> | --selector <sel>) --value <value> [--exact] [--nth N]
   verify-congress-tracker browser press --key <key>
   verify-congress-tracker browser wait (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N] [--timeout-ms 15000]
@@ -81,8 +86,9 @@ function usage() {
 
   api GET is read-only and limited to /feed, /stats, /health, and /debug/*.json.
   --name /regex/ is a JavaScript regex. Snapshot writes an ARIA tree (--aria) or one interactive line per
-  [ref] (--interactive) to stdout or --path. --ref targets data-verify-ref from the last --interactive snapshot
-  (stale after re-render). browser viewport persists width/height for later commands.
+  [ref] (--interactive: button, link, textbox, combobox, radio, checkbox, tab, searchbox, option) to stdout
+  or --path. --ref targets data-verify-ref from the last --interactive snapshot (unique; not combined with
+  --nth/--exact; stale after re-render). browser viewport persists a complete metrics object; withPage applies it.
   browser console and browser network start Chromium + the DevTools tap if needed.
 `)
   throw new UsageError()
@@ -234,7 +240,7 @@ async function cmdLaunch() {
     runId: new Date().toISOString().replace(/[:.]/g, '-'),
     repoRoot: REPO_ROOT,
     ...endpoints,
-    viewport: VIEWPORT,
+    viewport: { ...DEFAULT_VIEWPORT, deviceScaleFactor: 1, mobile: false },
     persistTo: PERSIST_TO,
     seeded: false,
     pids: {},
@@ -469,78 +475,14 @@ async function withPage(fn) {
   return await fn(page)
 }
 
-function viewportFromState(state) {
-  const width = Number(state?.viewport?.width)
-  const height = Number(state?.viewport?.height)
-  return {
-    width: Number.isFinite(width) && width > 0 ? Math.round(width) : VIEWPORT.width,
-    height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
-  }
-}
-
-function deviceMetricsFromState(state) {
-  const viewport = viewportFromState(state)
-  const dsf = Number(state?.viewport?.deviceScaleFactor)
-  return {
-    width: viewport.width,
-    height: viewport.height,
-    deviceScaleFactor: Number.isFinite(dsf) && dsf > 0 ? dsf : 1,
-    mobile: Boolean(state?.viewport?.mobile),
-  }
-}
-
-async function applyViewport(page, state) {
-  const metrics = deviceMetricsFromState(state)
-  await page.setViewportSize({ width: metrics.width, height: metrics.height })
-  if (metrics.mobile || metrics.deviceScaleFactor !== 1) {
-    const session = await page.context().newCDPSession(page)
-    await session.send('Emulation.setDeviceMetricsOverride', {
-      width: metrics.width,
-      height: metrics.height,
-      deviceScaleFactor: metrics.deviceScaleFactor,
-      mobile: metrics.mobile,
-    })
-  }
-}
-
 function persistViewportFromCdp(flags) {
-  if (flags.method !== 'Emulation.setDeviceMetricsOverride') return
-  let params = {}
-  if (typeof flags.params === 'string' && flags.params.trim()) {
-    try {
-      params = JSON.parse(flags.params)
-    } catch {
-      return
-    }
-  } else if (flags.params && typeof flags.params === 'object') {
-    params = flags.params
-  }
-  const width = Number(params.width)
-  const height = Number(params.height)
-  if (!Number.isFinite(width) || width <= 0) return
-  const dsf = Number(params.deviceScaleFactor)
-  updateState({
-    viewport: {
-      width: Math.round(width),
-      height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
-      ...(Number.isFinite(dsf) && dsf > 0 ? { deviceScaleFactor: dsf } : {}),
-      ...(params.mobile ? { mobile: true } : {}),
-    },
-  })
+  const viewport = viewportFromCdpFlags(flags)
+  if (!viewport) return
+  updateState({ viewport })
 }
 
 function persistViewportFromFlags(flags) {
   updateState({ viewport: parseViewportFlags(flags) })
-}
-
-function persistInteractiveRefs(entries) {
-  updateState({
-    interactiveRefs: entries.map((entry) => ({
-      ref: entry.ref,
-      role: entry.role,
-      name: entry.name,
-    })),
-  })
 }
 
 async function cmdBrowser(command, flags) {
@@ -554,7 +496,6 @@ async function cmdBrowser(command, flags) {
     CDP_PORT: endpoints.cdpPort,
     consoleLogPath: CONSOLE_JSONL,
     networkLogPath: NETWORK_JSONL,
-    persistInteractiveRefs,
   })
 }
 
@@ -622,10 +563,7 @@ export const TEST_ONLY = {
   resolveEvidencePath,
   EVIDENCE_ROOT,
   PERSIST_TO,
-  viewportFromState,
   persistViewportFromCdp,
-  persistViewportFromFlags,
-  deviceMetricsFromState,
 }
 
 async function main(argv) {
