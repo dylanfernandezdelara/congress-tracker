@@ -17,7 +17,8 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Start every recipe from `/` with chamber `All` and no search/filters unless the feature says otherwise.
 - Prefer ARIA roles and accessible names. Use `[data-feed-row-key]` / `[data-feed-topic]` only when a name is generated.
 - Treat every command as literal. Keep quoted names unchanged.
-- Run browser actions through `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser` (`click` / `fill` / `select` / `press` / `wait` plus `eval` / `cdp` / `console` / `network` for DevTools inspection).
+- Run browser actions through `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser` (`click` / `fill` / `select` / `press` / `wait` plus `eval` / `cdp` / `console` / `network` for DevTools inspection). `snapshot --interactive` plus `click --ref` / `fill --ref` are for exploration; recipes should keep `--role --name`.
+- Mobile proofs: follow SKILL.md **Mobile proof** (390×844 viewport). Below 1024px rails unmount and sheets close; re-open controls after resizing.
 - Run API reads through `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker api GET`.
 - Cleanup must not remove `artifacts/verify/<feature>/` proof files.
 

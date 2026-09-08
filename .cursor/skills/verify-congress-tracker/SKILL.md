@@ -89,9 +89,14 @@ Inspect the page the way Chrome DevTools would (CDP on `http://127.0.0.1:9223`; 
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser console
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser network
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --aria
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --interactive
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --ref e12
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser fill --ref e8 --value "energy"
 ```
 
 `--name /regex/` is a JavaScript regex. `--exact` requires a full accessible-name match.
+
+`snapshot --interactive` prints one line per button/link/textbox/combobox/radio/checkbox/tab (`[e1] button "…" (expanded)`) and stamps `data-verify-ref` on those nodes. `click --ref` / `fill --ref` use that attribute (or `@e1`). Refs are invalidated by re-render — snapshot again before the next `--ref`. Prefer `--role --name` for recipes that must survive a re-render. Why this exists (and why we did not switch to agent-browser): `docs/BROWSER_VERIFICATION.md`.
 
 Do **not** intercept `/feed` or `/stats` (that is `qa:web`). Do **not** POST `/__pipeline/*` as a stand-in for a UI action. Side-effect reads of the same data the UI shows are allowed:
 
@@ -117,6 +122,24 @@ Standards:
 
 `npm run qa:web` output in `artifacts/qa-viewports/` is viewport QA, not a substitute for these proofs.
 
+## Mobile proof
+
+Default drive viewport is **1280×800** (desktop rails mount at `min-width: 1024px`). For a phone proof, resize then re-open any control the resize closed:
+
+```bash
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser viewport --width 390 --height 844 --device-scale-factor 2 --mobile
+```
+
+Equivalent CDP (also persisted via `persistViewportFromCdp`):
+
+```bash
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser cdp --method Emulation.setDeviceMetricsOverride --params '{"width":390,"height":844,"deviceScaleFactor":2,"mobile":true}'
+```
+
+Later `browser` commands reuse the recorded width/height (and mobile/dsf when set). Resizing **below 1024px unmounts the desktop rails and closes any open sheet** — re-open the row, Filters, or member profile after resizing. `qa:web` already checks 390px; AGENTS.md still wants desktop (1280px) + mobile (390px) screenshots under `artifacts/verify/<feature>/` for `web/` behavior changes.
+
+Run beside another worktree’s stack with `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT` (this skill’s defaults 5174/8788/9223 are often busy). Example: `VERIFY_WEB_PORT=5197 VERIFY_WORKER_PORT=8811 VERIFY_CDP_PORT=9246` on every helper command in that shell.
+
 ## Cleanup
 
 ```bash
@@ -127,6 +150,6 @@ Sends SIGTERM (then SIGKILL) to the **worker, web, browser, and tap PIDs this la
 
 ## Helpers
 
-All commands above are `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker <subcommand>`. Implementation: `bin/verify-congress-tracker.mjs` (browser/CDP in `lib/browser.mjs`; console/network tap in `lib/devtools-tap.mjs`). Run with no args for usage.
+All commands above are `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker <subcommand>`. Implementation: `bin/verify-congress-tracker.mjs` (browser/CDP in `lib/browser.mjs`; console/network tap in `lib/devtools-tap.mjs`). Run with no args for usage. Interactive refs live on `data-verify-ref` for the current DOM only.
 
 If launch fails because verification ports are busy, stop. If seed or health fails, read `artifacts/verify/.run/seed.log`, `worker.log`, and `web.log` before retrying — run cleanup after every failed launch so ports are not left occupied.
