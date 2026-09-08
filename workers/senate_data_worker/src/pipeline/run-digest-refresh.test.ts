@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DIGEST_SOURCE_TITLE_FALLBACK } from "../d1/digests";
 import { parseDigestRefreshRequest, runDigestRefreshPipeline } from "./run-digest-refresh";
 
 const mockFetchBillSummaryBundle = vi.fn();
 const mockRewriteSummary = vi.fn();
 const mockUpsertDigest = vi.fn();
+const mockGetDigest = vi.fn();
 const mockReplaceBillSponsors = vi.fn();
 const mockResolveOpenRouterModel = vi.fn();
 
@@ -19,6 +21,7 @@ vi.mock("../d1/digests", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/digests")>();
   return {
     ...actual,
+    getDigest: (...args: unknown[]) => mockGetDigest(...args),
     upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
   };
 });
@@ -80,6 +83,61 @@ describe("runDigestRefreshPipeline", () => {
       terms_explained: [],
     });
     mockUpsertDigest.mockResolvedValue(undefined);
+    mockGetDigest.mockResolvedValue(null);
+  });
+
+  it("stores a title fallback when the rewrite misses and no LLM digest exists", async () => {
+    mockRewriteSummary.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "Equal Pay for Equal Work Act",
+      policyArea: null,
+      rawSummaryText: null,
+      introducedDate: null,
+      sponsors: [],
+    });
+
+    const result = await runDigestRefreshPipeline(createEnv(), [
+      { congress: 119, type: "HR", number: 10239 },
+    ]);
+
+    expect(result).toMatchObject({
+      refreshed: 0,
+      skipped: 1,
+      fallbacksWritten: 1,
+      failures: [{ bill: "HR10239", reason: "openrouter_rewrite_failed_title_fallback_written" }],
+    });
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        number: 10239,
+        digest: expect.objectContaining({ source: DIGEST_SOURCE_TITLE_FALLBACK }),
+      })
+    );
+  });
+
+  it("never overwrites a stored LLM digest with a fallback when the rewrite misses", async () => {
+    mockRewriteSummary.mockResolvedValue(null);
+    mockGetDigest.mockResolvedValue({
+      congress: 119,
+      bill_type: "HR",
+      number: 1234,
+      title: "Sample Act",
+      policy_area: "Education",
+      raw_summary_text: "Official CRS summary text.",
+      digest_json: JSON.stringify({ headline: "Existing", what_it_does: "Already good." }),
+    });
+
+    const result = await runDigestRefreshPipeline(createEnv(), [
+      { congress: 119, type: "HR", number: 1234 },
+    ]);
+
+    expect(result).toMatchObject({
+      refreshed: 0,
+      skipped: 1,
+      fallbacksWritten: 0,
+      failures: [{ bill: "HR1234", reason: "openrouter_rewrite_failed" }],
+    });
+    expect(mockUpsertDigest).not.toHaveBeenCalled();
   });
 
   it("rewrites and upserts digests even when a digest already exists", async () => {
