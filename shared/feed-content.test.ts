@@ -94,7 +94,7 @@ The resolution recommends levels and amounts for FY2027-FY2036 for federal reven
     ).toBe("Amends Title 18 U.S.C. Section 401 to add penalties.");
   });
 
-  it("does not cut the first sentence on place, suffix, or company abbreviations", () => {
+  it("does not cut the first sentence on place or name-suffix abbreviations", () => {
     expect(
       formatCollapsedDigestLead(
         'This measure is titled "St. Croix National Heritage Area Act" and does not yet have an official summary.'
