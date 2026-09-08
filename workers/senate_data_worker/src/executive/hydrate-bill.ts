@@ -51,7 +51,17 @@ export async function hydrateBillFromCongress(env: Env, bill: BillRef): Promise<
       return true;
     }
     case "fallback_upgrade": {
-      const digest = await rewriteFromBundle(env, bill, bundle);
+      // Same as the feed refresh: replace with the LLM digest, else refresh the
+      // fallback only when Congress.gov metadata (title / policy / CRS) moved.
+      const metadataChanged =
+        existing?.title !== bundle.title ||
+        existing?.policy_area !== bundle.policyArea ||
+        (existing?.raw_summary_text ?? null) !== (bundle.rawSummaryText ?? null);
+      const digest =
+        (await rewriteFromBundle(env, bill, bundle)) ??
+        (metadataChanged
+          ? buildTitleFallbackDigest({ title: bundle.title, rawSummary: bundle.rawSummaryText })
+          : null);
       if (digest) {
         await upsertDigest(env.DB, { ...billDigestKey(bill), ...bundleFields(bundle), digest });
       }

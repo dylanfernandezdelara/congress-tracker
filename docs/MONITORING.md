@@ -66,9 +66,11 @@ the `feed_pipeline_partial_digest_refresh` log event); executive hydrate logs
 `executive_bill_digest_title_fallback`; `digest-refresh` reports
 `openrouter_rewrite_failed_title_fallback_written` (it never replaces a stored
 LLM digest with a fallback). The next daily run retries the LLM for every
-stored fallback (after new incompletes, before CRS upgrades) and warns again if
-it still misses. Bills over the per-run rewrite budget also get a fallback,
-summarized in one `rewrite budget (N) spent…` warning. Only a bill with
+stored fallback (after new incompletes, before CRS upgrades, and only while
+`DIGEST_MAX_NEW_REWRITES` remains — over-budget fallbacks wait silently for a
+later run) and warns again if it still misses. Bills over the per-run rewrite
+budget also get a fallback, summarized in one `rewrite budget (N) spent…`
+warning. Only a bill with
 neither title nor CRS text stays empty, and that is warned per bill. Digest
 warnings never change `status`; `missing_digest_count` does.
 

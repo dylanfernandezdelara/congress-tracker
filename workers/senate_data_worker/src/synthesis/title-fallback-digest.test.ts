@@ -43,8 +43,8 @@ describe("buildTitleFallbackDigest", () => {
     for (const title of [
       "St. Croix National Heritage Area Act",
       "Martin Luther King, Jr. Memorial Post Office Act",
-      "Acme Inc. Relief Act",
       "Mt. Hood Cooperative Recreation Enhancement Act",
+      "Ft. Worth Veterans Clinic Act",
     ]) {
       const digest = buildTitleFallbackDigest({ title, rawSummary: null });
       const expected = `This measure is titled "${title}" and does not yet have an official summary.`;
