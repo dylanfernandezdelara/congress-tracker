@@ -1,5 +1,6 @@
 @import './styles/base.css';
 @import './styles/primitives.css';
+@import './styles/member-profile-trigger.css';
 @import './styles/feed-row.css';
 @import './styles/bill-pipeline.css';
 @import './styles/chrome.css';

@@ -4,6 +4,7 @@ import type { Mock } from 'vitest'
 
 import { AppLayout } from '../layouts/AppLayout'
 import Home from '../routes/Home'
+/* Home mounts MemberProfileProvider so isolated rail/feed tests share one sheet. */
 import { makeFeedItem } from './feedItemFixtures'
 import { makeTightnessStats } from './tightnessFixtures'
 

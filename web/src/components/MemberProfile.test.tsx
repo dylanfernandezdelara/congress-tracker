@@ -55,6 +55,7 @@ vi.mock('../api/client', () => ({
   fetchMemberProfile: vi.fn(),
 }))
 
+import { ApiError } from '../api/fetchJson'
 import { fetchMemberProfile } from '../api/client'
 
 const fetchMemberProfileMock = vi.mocked(fetchMemberProfile)
@@ -139,6 +140,44 @@ describe('MemberProfile', () => {
     await waitFor(() => {
       expect(screen.getByText('member profile unavailable')).toBeInTheDocument()
     })
+  })
+
+  it('shows a member-specific message when the profile is 404', async () => {
+    fetchMemberProfileMock.mockRejectedValue(
+      new ApiError('No data found. Data may not be available yet.', 404, 'Not Found'),
+    )
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Profile not available for this member')).toBeInTheDocument()
+    })
+  })
+
+  it('omits the cross-vote hint and derives a photo when the seed lacks those fields', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, photo_url: '', cross_vote_label: 'rare' })
+
+    render(
+      <MemberProfile
+        open
+        seed={{
+          bioguide_id: seed.bioguide_id,
+          name: seed.name,
+          party: seed.party,
+          state: seed.state,
+        }}
+        selectionKey={1}
+        onClose={() => undefined}
+      />,
+    )
+
+    expect(screen.queryByText('Frequent cross-voter')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rare party-line break')).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('Rare party-line break')).toBeInTheDocument()
+    })
+    expect(screen.getByText('PA-1')).toBeInTheDocument()
   })
 
   it('shows the unavailable message when member votes are missing', async () => {

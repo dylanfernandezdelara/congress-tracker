@@ -1,6 +1,6 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
-import type { FeedItem } from '../api/types'
+import type { FeedItem, FeedPrimarySponsor } from '../api/types'
 import {
   buildBillSharePayload,
   copyTextToClipboard,
@@ -10,7 +10,7 @@ import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
-import { formatPrimarySponsorLine } from '../utils/sponsorLabels'
+import { primarySponsorDisplay } from '../utils/sponsorLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
@@ -18,12 +18,45 @@ import { BillTextChangesSection } from './BillTextChangesSection'
 import { ShareIcon } from './ShareIcon'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 import { FeedSummarySections } from './FeedSummarySections'
+import { MemberProfileTrigger } from './MemberProfileTrigger'
 import { PassageVoteDetails } from './PassageVoteDetails'
 
 type FeedRowDetailProps = {
   item: FeedItem
   /** Override for the share URL; defaults to the timeline deep link. */
   shareUrl?: string
+}
+
+function SponsorLine({ sponsor }: { sponsor: FeedPrimarySponsor }) {
+  const display = primarySponsorDisplay(sponsor)
+  if (!display) return null
+
+  const nameEl: ReactNode = display.name ? (
+    <MemberProfileTrigger
+      seed={{
+        bioguide_id: sponsor.bioguide_id,
+        name: display.name,
+        party: sponsor.party ?? '',
+        state: sponsor.state,
+      }}
+      className="feed-row-sponsor-name"
+    >
+      {display.name}
+    </MemberProfileTrigger>
+  ) : null
+  const metaEl = display.meta ? (
+    <>
+      {nameEl ? ' · ' : null}
+      {display.meta}
+    </>
+  ) : null
+
+  return (
+    <>
+      {nameEl}
+      {metaEl}
+    </>
+  )
 }
 
 function ExecutiveContextSection({ item }: { item: FeedItem }) {
@@ -66,9 +99,8 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   const [copied, setCopied] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [shareKey, setShareKey] = useState(0)
-  const sponsorHeadingId = useId()
   const sharePayload = buildBillSharePayload(item, shareUrl)
-  const sponsorLine = formatPrimarySponsorLine(item.primary_sponsor)
+  const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
   useEffect(() => {
     if (!copied) return
@@ -96,12 +128,10 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   return (
     <div className="feed-row-detail">
       <div className="feed-row-detail-topbar">
-        {sponsorLine ? (
-          <p className="feed-row-sponsor" aria-labelledby={sponsorHeadingId}>
-            <span id={sponsorHeadingId} className="feed-row-sponsor-label">
-              Sponsored by
-            </span>{' '}
-            {sponsorLine}
+        {sponsorDisplay && item.primary_sponsor ? (
+          <p className="feed-row-sponsor">
+            <span className="feed-row-sponsor-label">Sponsored by</span>{' '}
+            <SponsorLine sponsor={item.primary_sponsor} />
           </p>
         ) : null}
         <button
