@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatPrimarySponsorLine } from './sponsorLabels'
+import { formatPrimarySponsorLine, primarySponsorDisplay } from './sponsorLabels'
 
 describe('formatPrimarySponsorLine', () => {
   it('joins name with party-state', () => {
@@ -35,5 +35,16 @@ describe('formatPrimarySponsorLine', () => {
       }),
     ).toBeNull()
     expect(formatPrimarySponsorLine(null)).toBeNull()
+  })
+
+  it('splits name and party-state meta for interactive rendering', () => {
+    expect(
+      primarySponsorDisplay({
+        bioguide_id: 'LOCAL:H002',
+        name: 'Rep. Sample Loyal (local)',
+        party: 'D',
+        state: 'NY',
+      }),
+    ).toEqual({ name: 'Rep. Sample Loyal (local)', meta: 'D-NY' })
   })
 })

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
+import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
@@ -9,9 +10,11 @@ import { FeedRowDetail } from './FeedRowDetail'
 
 vi.mock('../api/client', () => ({
   fetchVoteDefectors: vi.fn(),
+  fetchMemberProfile: vi.fn(),
 }))
 
-import { fetchVoteDefectors } from '../api/client'
+import { fetchMemberProfile, fetchVoteDefectors } from '../api/client'
+import { renderWithMemberProfile } from '../test/memberProfileHarness'
 
 beforeEach(() => {
   // Tests that are not about defectors still render the vote section.
@@ -30,6 +33,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks()
   vi.unstubAllGlobals()
+  clearMemberProfileCache()
   clearRollDefectorsCache()
   resetSheetLayerForTests()
 })
@@ -382,7 +386,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('shows the primary sponsor above the fold when the payload has one', async () => {
-    render(
+    renderWithMemberProfile(
       <FeedRowDetail
         item={makeFeedItem({
           primary_sponsor: {
@@ -396,11 +400,85 @@ describe('FeedRowDetail', () => {
     )
 
     expect(screen.getByText(/Sponsored by/)).toBeInTheDocument()
-    expect(screen.getByText(/Rep\. Sample Loyal \(local\) · D-NY/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open profile for Rep. Sample Loyal (local)' })).toBeInTheDocument()
+    expect(document.querySelector('.feed-row-sponsor')).toHaveTextContent(
+      'Sponsored by Rep. Sample Loyal (local) · D-NY',
+    )
     const shareButton = screen.getByRole('button', { name: 'Share' })
     const sponsor = document.querySelector('.feed-row-sponsor')
     expect(shareButton.parentElement).toBe(sponsor?.parentElement)
     expect(shareButton.parentElement).toHaveClass('feed-row-detail-topbar')
+    await waitFor(() => {
+      expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
+    })
+  })
+
+  it('opens the member profile when the sponsor name is clicked', async () => {
+    vi.mocked(fetchMemberProfile).mockResolvedValue({
+      bioguide_id: 'LOCAL:H002',
+      name: 'Rep. Sample Loyal (local)',
+      chamber: 'House',
+      party: 'D',
+      state: 'NY',
+      district: 10,
+      photo_url: '',
+      congress_gov_url: null,
+      congress: 119,
+      session: 2,
+      votes_cast: 8,
+      yea_count: 6,
+      nay_count: 2,
+      cross_vote_count: 0,
+      cross_vote_label: 'rare',
+      recent_cross_votes: [],
+      member_votes_available: true,
+      as_of: '2026-07-20T00:00:00.000Z',
+    })
+
+    renderWithMemberProfile(
+      <FeedRowDetail
+        item={makeFeedItem({
+          primary_sponsor: {
+            bioguide_id: 'LOCAL:H002',
+            name: 'Rep. Sample Loyal (local)',
+            party: 'D',
+            state: 'NY',
+          },
+        })}
+      />,
+    )
+
+    const nameButton = screen.getByRole('button', {
+      name: 'Open profile for Rep. Sample Loyal (local)',
+    })
+    fireEvent.mouseEnter(nameButton)
+    fireEvent.click(nameButton)
+
+    expect(screen.getByRole('dialog', { name: 'Rep. Sample Loyal (local)' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(fetchMemberProfile).toHaveBeenCalledWith('LOCAL:H002')
+      expect(screen.getByText('NY-10')).toBeInTheDocument()
+    })
+  })
+
+  it('does not make LIS: placeholder sponsor names interactive', async () => {
+    renderWithMemberProfile(
+      <FeedRowDetail
+        item={makeFeedItem({
+          primary_sponsor: {
+            bioguide_id: 'LIS:S123',
+            name: 'Sen. Placeholder',
+            party: 'R',
+            state: 'TX',
+          },
+        })}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: /Open profile/ })).not.toBeInTheDocument()
+    expect(document.querySelector('.feed-row-sponsor')).toHaveTextContent(
+      'Sponsored by Sen. Placeholder · R-TX',
+    )
     await waitFor(() => {
       expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
     })
