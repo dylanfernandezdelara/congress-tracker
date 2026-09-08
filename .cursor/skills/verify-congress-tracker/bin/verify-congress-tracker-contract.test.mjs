@@ -9,9 +9,12 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from '../lib/args.mjs'
 import {
   describeLocator,
+  formatInteractiveLine,
   isAllowedCdpMethod,
   jsLooksLikeNavigation,
+  normalizeRef,
   parseName,
+  parseViewportFlags,
 } from '../lib/browser.mjs'
 import {
   endpointsFromState,
@@ -56,7 +59,8 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const helper = path.join(here, 'verify-congress-tracker')
 const rootDir = path.resolve(here, '../../../..')
 const seedScript = path.join(rootDir, 'scripts', 'seed-local-feed.sh')
-const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, viewportFromState } = TEST_ONLY
+const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, viewportFromState, deviceMetricsFromState } =
+  TEST_ONLY
 
 test('helper wrapper is executable', () => {
   const stat = fs.statSync(helper)
@@ -73,9 +77,10 @@ test('usage documents selector, nth, GET-only api, and DevTools commands', () =>
     assert.match(text, /--selector/)
     assert.match(text, /--nth N/)
     assert.match(text, /api GET/)
-    assert.match(text, /snapshot --aria/)
+    assert.match(text, /snapshot \(--aria \| --interactive\)/)
     assert.match(text, /browser eval/)
     assert.match(text, /browser cdp/)
+    assert.match(text, /browser viewport/)
     assert.match(text, /browser console/)
     assert.match(text, /browser network/)
     assert.match(text, /browser url/)
@@ -83,6 +88,7 @@ test('usage documents selector, nth, GET-only api, and DevTools commands', () =>
     assert.match(text, /browser scroll/)
     assert.match(text, /start Chromium/)
     assert.match(text, /--name <label>/)
+    assert.match(text, /--ref/)
     assert.match(text, /fill .*\[--nth N\]/)
     assert.match(text, /select .*\[--nth N\]/)
   }
@@ -109,6 +115,57 @@ test('describeLocator applies nth to selector and rejects a bad nth', () => {
   assert.throws(() => describeLocator({ name: 'House', nth: 'x' }), /non-negative integer/)
 })
 
+test('describeLocator and normalizeRef accept @eN snapshot refs', () => {
+  assert.deepEqual(describeLocator({ ref: '@e12' }), { kind: 'ref', ref: 'e12' })
+  assert.deepEqual(describeLocator({ ref: 'e3', role: 'button', name: 'House' }), {
+    kind: 'ref',
+    ref: 'e3',
+  })
+  assert.equal(normalizeRef('@e1'), 'e1')
+  assert.equal(normalizeRef('e9'), 'e9')
+  assert.throws(() => normalizeRef('12'), /invalid ref/)
+  assert.throws(() => normalizeRef(''), /ref is required/)
+})
+
+test('interactive snapshot lines are compact and include set state', () => {
+  assert.equal(
+    formatInteractiveLine({
+      ref: 'e1',
+      role: 'button',
+      name: 'Open profile for Rep. Sample Crossover (local)',
+      expanded: 'false',
+    }),
+    '[e1] button "Open profile for Rep. Sample Crossover (local)" (collapsed)',
+  )
+  assert.equal(
+    formatInteractiveLine({ ref: 'e2', role: 'radio', name: 'All', checked: 'true' }),
+    '[e2] radio "All" (checked)',
+  )
+  assert.equal(
+    formatInteractiveLine({ ref: 'e3', role: 'textbox', name: 'Search bills', disabled: true }),
+    '[e3] textbox "Search bills" (disabled)',
+  )
+})
+
+test('parseArgs accepts --interactive and --mobile booleans', () => {
+  const flags = parseArgs(['--interactive', '--mobile', '--width', '390', '--height', '844'])
+  assert.equal(flags.interactive, true)
+  assert.equal(flags.mobile, true)
+  assert.equal(flags.width, '390')
+  assert.equal(flags.height, '844')
+})
+
+test('parseViewportFlags requires positive width and height', () => {
+  assert.deepEqual(parseViewportFlags({ width: '390', height: '844', mobile: true, 'device-scale-factor': '2' }), {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 2,
+    mobile: true,
+  })
+  assert.throws(() => parseViewportFlags({ width: '0', height: '844' }), /--width/)
+  assert.throws(() => parseViewportFlags({ width: '390' }), /--height/)
+})
+
 test('api paths are read-only public JSON', () => {
   assert.equal(isAllowedApiPath('/feed/latest.json?limit=50&offset=0'), true)
   assert.equal(isAllowedApiPath('/stats/session.json'), true)
@@ -118,6 +175,16 @@ test('api paths are read-only public JSON', () => {
   assert.equal(isAllowedApiPath('/@fs/workers/senate_data_worker/.dev.vars'), false)
   assert.equal(isAllowedApiPath('/feed/../@fs/workers/senate_data_worker/.dev.vars'), false)
   assert.equal(isAllowedApiPath('https://example.com/feed'), false)
+})
+
+test('documented mobile CDP params map onto the persisted viewport', () => {
+  const params = JSON.parse('{"width":390,"height":844,"deviceScaleFactor":2,"mobile":true}')
+  assert.deepEqual(deviceMetricsFromState({ viewport: params }), {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 2,
+    mobile: true,
+  })
 })
 
 test('browser commands reuse a persisted CDP viewport instead of resetting to 1280', () => {
@@ -130,6 +197,12 @@ test('browser commands reuse a persisted CDP viewport instead of resetting to 12
     height: 568,
   })
   assert.deepEqual(viewportFromState({}), { width: 1280, height: 800 })
+  assert.deepEqual(deviceMetricsFromState({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true } }), {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 2,
+    mobile: true,
+  })
 })
 
 test('evidence paths cannot escape artifacts/verify', () => {

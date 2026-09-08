@@ -9,7 +9,13 @@ export function parseArgs(argv) {
   const flags = { _: [] }
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i]
-    if (token === '--exact' || token === '--full-page' || token === '--aria') {
+    if (
+      token === '--exact' ||
+      token === '--full-page' ||
+      token === '--aria' ||
+      token === '--interactive' ||
+      token === '--mobile'
+    ) {
       flags[token.slice(2)] = true
       continue
     }

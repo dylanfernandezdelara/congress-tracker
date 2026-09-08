@@ -9,7 +9,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { parseArgs, UsageError } from '../lib/args.mjs'
-import { runBrowserCommand } from '../lib/browser.mjs'
+import { parseViewportFlags, runBrowserCommand } from '../lib/browser.mjs'
 import {
   DEFAULT_CDP_PORT,
   DEFAULT_WEB_PORT,
@@ -66,20 +66,23 @@ function usage() {
   verify-congress-tracker browser url
   verify-congress-tracker browser find (--role <role> --name <name> | --selector <sel>) [--exact]
   verify-congress-tracker browser scroll (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N]
-  verify-congress-tracker browser click (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N]
-  verify-congress-tracker browser fill (--role <role> --name <name> | --selector <sel>) --value <value> [--exact] [--nth N]
+  verify-congress-tracker browser click (--role <role> --name <name> | --selector <sel> | --ref <ref>) [--exact] [--nth N]
+  verify-congress-tracker browser fill (--role <role> --name <name> | --selector <sel> | --ref <ref>) --value <value> [--exact] [--nth N]
   verify-congress-tracker browser select (--role <role> --name <name> | --name <label> | --selector <sel>) --value <value> [--exact] [--nth N]
   verify-congress-tracker browser press --key <key>
   verify-congress-tracker browser wait (--role <role> --name <name> | --selector <sel>) [--exact] [--nth N] [--timeout-ms 15000]
   verify-congress-tracker browser eval --js <expression>
   verify-congress-tracker browser cdp --method <CDP.Method> [--params <json-object>]
+  verify-congress-tracker browser viewport --width <n> --height <n> [--device-scale-factor <n>] [--mobile]
   verify-congress-tracker browser console
   verify-congress-tracker browser network
-  verify-congress-tracker browser snapshot --aria [--path <file-under-artifacts/verify>]
+  verify-congress-tracker browser snapshot (--aria | --interactive) [--path <file-under-artifacts/verify>]
   verify-congress-tracker browser screenshot --path <file-under-artifacts/verify> [--full-page]
 
   api GET is read-only and limited to /feed, /stats, /health, and /debug/*.json.
-  --name /regex/ is a JavaScript regex. Snapshot writes an ARIA snapshot to stdout or --path (--aria is required).
+  --name /regex/ is a JavaScript regex. Snapshot writes an ARIA tree (--aria) or one interactive line per
+  [ref] (--interactive) to stdout or --path. --ref targets data-verify-ref from the last --interactive snapshot
+  (stale after re-render). browser viewport persists width/height for later commands.
   browser console and browser network start Chromium + the DevTools tap if needed.
 `)
   throw new UsageError()
@@ -456,13 +459,13 @@ async function withPage(fn) {
     })
     if (disallowed) {
       await disallowed.goto(webUrl, { waitUntil: 'domcontentloaded' })
-      await disallowed.setViewportSize(viewportFromState(ready))
+      await applyViewport(disallowed, ready)
       throw new Error('page was on a disallowed URL; restored to home')
     }
     page = await context.newPage()
     await page.goto(webUrl, { waitUntil: 'domcontentloaded' })
   }
-  await page.setViewportSize(viewportFromState(ready))
+  await applyViewport(page, ready)
   return await fn(page)
 }
 
@@ -472,6 +475,31 @@ function viewportFromState(state) {
   return {
     width: Number.isFinite(width) && width > 0 ? Math.round(width) : VIEWPORT.width,
     height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
+  }
+}
+
+function deviceMetricsFromState(state) {
+  const viewport = viewportFromState(state)
+  const dsf = Number(state?.viewport?.deviceScaleFactor)
+  return {
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor: Number.isFinite(dsf) && dsf > 0 ? dsf : 1,
+    mobile: Boolean(state?.viewport?.mobile),
+  }
+}
+
+async function applyViewport(page, state) {
+  const metrics = deviceMetricsFromState(state)
+  await page.setViewportSize({ width: metrics.width, height: metrics.height })
+  if (metrics.mobile || metrics.deviceScaleFactor !== 1) {
+    const session = await page.context().newCDPSession(page)
+    await session.send('Emulation.setDeviceMetricsOverride', {
+      width: metrics.width,
+      height: metrics.height,
+      deviceScaleFactor: metrics.deviceScaleFactor,
+      mobile: metrics.mobile,
+    })
   }
 }
 
@@ -490,16 +518,34 @@ function persistViewportFromCdp(flags) {
   const width = Number(params.width)
   const height = Number(params.height)
   if (!Number.isFinite(width) || width <= 0) return
+  const dsf = Number(params.deviceScaleFactor)
   updateState({
     viewport: {
       width: Math.round(width),
       height: Number.isFinite(height) && height > 0 ? Math.round(height) : VIEWPORT.height,
+      ...(Number.isFinite(dsf) && dsf > 0 ? { deviceScaleFactor: dsf } : {}),
+      ...(params.mobile ? { mobile: true } : {}),
     },
+  })
+}
+
+function persistViewportFromFlags(flags) {
+  updateState({ viewport: parseViewportFlags(flags) })
+}
+
+function persistInteractiveRefs(entries) {
+  updateState({
+    interactiveRefs: entries.map((entry) => ({
+      ref: entry.ref,
+      role: entry.role,
+      name: entry.name,
+    })),
   })
 }
 
 async function cmdBrowser(command, flags) {
   if (command === 'cdp') persistViewportFromCdp(flags)
+  if (command === 'viewport') persistViewportFromFlags(flags)
   const endpoints = endpointsFromState(requireOwnState())
   await runBrowserCommand(command, flags, {
     withPage,
@@ -508,6 +554,7 @@ async function cmdBrowser(command, flags) {
     CDP_PORT: endpoints.cdpPort,
     consoleLogPath: CONSOLE_JSONL,
     networkLogPath: NETWORK_JSONL,
+    persistInteractiveRefs,
   })
 }
 
@@ -577,6 +624,8 @@ export const TEST_ONLY = {
   PERSIST_TO,
   viewportFromState,
   persistViewportFromCdp,
+  persistViewportFromFlags,
+  deviceMetricsFromState,
 }
 
 async function main(argv) {
