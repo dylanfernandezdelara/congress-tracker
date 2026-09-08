@@ -1,9 +1,6 @@
-import type { ReactNode } from 'react'
-
-import { bioguidePhotoUrl, congressGovMemberUrl } from '@congress-tracker/shared/member-photo'
+import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
 import { crossVoteLabel } from '@congress-tracker/shared/notable-votes'
 
-import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type {
   DefectorEntry,
   PortfolioEntry,
@@ -13,9 +10,8 @@ import type {
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
 import { formatBillDocket, formatCoverageDate } from '../utils/billLabels'
-import { canOpenMemberProfile } from '../utils/memberProfileOpen'
 import type { MemberProfileSeed } from './MemberProfile'
-import { useOpenMemberProfile } from './MemberProfileProvider'
+import { MemberProfileTrigger } from './MemberProfileTrigger'
 
 type LeftSidebarProps = {
   session: UseAsyncDataResult<SessionStatsResponse>
@@ -30,7 +26,6 @@ type MemberSpotlight = {
   party: string
   state: string
   hook: string
-  href: string | null
   tone?: 'neutral' | 'gain' | 'loss'
   cross_vote_count: number
 }
@@ -88,7 +83,6 @@ function buildSpotlights(
       party: defector.party,
       state: defector.state,
       hook: defectorHook(defector),
-      href: defector.congress_gov_url,
       tone: 'neutral',
       cross_vote_count: defector.cross_vote_count,
     })
@@ -109,7 +103,6 @@ function buildSpotlights(
       party: entry.party ?? '',
       state: entry.state ?? '',
       hook: portfolioHook(entry, direction),
-      href: congressGovMemberUrl(entry.bioguide_id, entry.name),
       tone: direction === 'gain' ? 'gain' : 'loss',
       cross_vote_count: 0,
     })
@@ -130,50 +123,15 @@ function spotlightToSeed(member: MemberSpotlight): MemberProfileSeed {
   }
 }
 
-function MemberSpotlightCard({
-  member,
-  onOpenProfile,
-}: {
-  member: MemberSpotlight
-  onOpenProfile: (seed: MemberProfileSeed) => void
-}) {
+function MemberSpotlightCard({ member }: { member: MemberSpotlight }) {
   const meta = formatPartyState(member.party || null, member.state || null)
-  const canOpenProfile = canOpenMemberProfile(member.bioguide_id)
-
-  let nameEl: ReactNode
-  if (canOpenProfile) {
-    const seed = spotlightToSeed(member)
-    nameEl = (
-      <button
-        type="button"
-        className="member-spotlight-name"
-        onClick={() => onOpenProfile(seed)}
-        onMouseEnter={() => prefetchMemberProfile(member.bioguide_id)}
-        onFocus={() => prefetchMemberProfile(member.bioguide_id)}
-        aria-label={`Open profile for ${member.name}`}
-      >
-        {member.name}
-      </button>
-    )
-  } else if (member.href) {
-    nameEl = (
-      <a
-        href={member.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="member-spotlight-name congress-link"
-      >
-        {member.name}
-      </a>
-    )
-  } else {
-    nameEl = <p className="member-spotlight-name">{member.name}</p>
-  }
 
   return (
     <article className="member-spotlight">
       <div className="member-spotlight-header">
-        {nameEl}
+        <MemberProfileTrigger seed={spotlightToSeed(member)} className="member-spotlight-name">
+          {member.name}
+        </MemberProfileTrigger>
         {meta ? <span className="member-spotlight-party">{meta}</span> : null}
       </div>
       <p
@@ -199,7 +157,6 @@ function ChamberSection({
   portfoliosLoading,
   defectorsError,
   portfoliosError,
-  onOpenProfile,
 }: {
   title: 'House' | 'Senate'
   defectors: DefectorEntry[]
@@ -208,7 +165,6 @@ function ChamberSection({
   portfoliosLoading: boolean
   defectorsError: string | null
   portfoliosError: string | null
-  onOpenProfile: (seed: MemberProfileSeed) => void
 }) {
   const spotlights = buildSpotlights(
     defectorsError ? [] : defectors,
@@ -237,11 +193,7 @@ function ChamberSection({
       {spotlights.length > 0 ? (
         <div className="member-spotlight-list">
           {spotlights.map((member) => (
-            <MemberSpotlightCard
-              key={member.bioguide_id}
-              member={member}
-              onOpenProfile={onOpenProfile}
-            />
+            <MemberSpotlightCard key={member.bioguide_id} member={member} />
           ))}
         </div>
       ) : null}
@@ -250,8 +202,6 @@ function ChamberSection({
 }
 
 export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSidebarProps) {
-  const openProfile = useOpenMemberProfile()
-
   const coverage =
     session.data && session.data.house.date_range.last
       ? `${session.data.congress}th Congress, ${session.data.session}${ordinal(session.data.session)} session · through ${formatCoverageDate(session.data.house.date_range.last)}`
@@ -290,7 +240,6 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         portfoliosLoading={portfolios.isLoading}
         defectorsError={defectors.error ?? defectors.data?.houseError ?? null}
         portfoliosError={portfolios.error ?? portfolios.data?.houseError ?? null}
-        onOpenProfile={openProfile}
       />
       <div className="border-t border-border" />
       <ChamberSection
@@ -301,7 +250,6 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         portfoliosLoading={portfolios.isLoading}
         defectorsError={defectors.error ?? defectors.data?.senateError ?? null}
         portfoliosError={portfolios.error ?? portfolios.data?.senateError ?? null}
-        onOpenProfile={openProfile}
       />
       {disclaimer ? <p className="sidebar-disclaimer">{disclaimer}</p> : null}
     </div>

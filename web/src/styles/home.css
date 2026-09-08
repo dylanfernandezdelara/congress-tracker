@@ -629,13 +629,9 @@
   .notable-compact-member {
     align-self: flex-start;
     margin-top: 0.15rem;
-    padding: 0;
-    border: none;
-    background: transparent;
     font-size: 12px;
     font-weight: 500;
     color: hsl(var(--twc-secondary));
-    cursor: pointer;
     text-decoration: underline;
     text-decoration-color: hsl(var(--twc-link-decoration));
   }

@@ -4,8 +4,7 @@ import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { notableVoteTitle } from '../utils/notableVoteLabels'
-import type { MemberProfileSeed } from './MemberProfile'
-import { useOpenMemberProfile } from './MemberProfileProvider'
+import { MemberProfileTrigger } from './MemberProfileTrigger'
 import { NotableBillSheet } from './NotableBillSheet'
 import { NotableVoteDefectors } from './NotableVoteDefectors'
 
@@ -68,11 +67,9 @@ function NotableVoteMeta({
 
 function NotableVoteCard({
   entry,
-  onOpenProfile,
   onOpenBill,
 }: {
   entry: NotableVoteEntry
-  onOpenProfile: (seed: MemberProfileSeed) => void
   onOpenBill: (entry: NotableVoteEntry) => void
 }) {
   const title = notableVoteTitle(entry)
@@ -86,18 +83,16 @@ function NotableVoteCard({
       />
       <p className="notable-vote-why">{entry.why_it_matters}</p>
       <NotableVoteMeta entry={entry} className="notable-vote-meta" />
-      <NotableVoteDefectors entry={entry} onOpenProfile={onOpenProfile} />
+      <NotableVoteDefectors entry={entry} />
     </article>
   )
 }
 
 function NotableVoteCompactItem({
   entry,
-  onOpenProfile,
   onOpenBill,
 }: {
   entry: NotableVoteEntry
-  onOpenProfile: (seed: MemberProfileSeed) => void
   onOpenBill: (entry: NotableVoteEntry) => void
 }) {
   const title = notableVoteTitle(entry)
@@ -117,17 +112,10 @@ function NotableVoteCompactItem({
         trailing={entry.why_it_matters ? ` · ${entry.why_it_matters}` : null}
       />
       {firstDefector ? (
-        <button
-          type="button"
-          className="notable-compact-member"
-          onClick={() => onOpenProfile(firstDefector)}
-          onMouseEnter={() => prefetchMemberProfile(firstDefector.bioguide_id)}
-          onFocus={() => prefetchMemberProfile(firstDefector.bioguide_id)}
-          aria-label={`Open profile for ${firstDefector.name}`}
-        >
+        <MemberProfileTrigger seed={firstDefector} className="notable-compact-member">
           {firstDefector.name}
           {entry.defectors.length > 1 ? ` +${entry.defectors.length - 1}` : ''}
-        </button>
+        </MemberProfileTrigger>
       ) : null}
     </li>
   )
@@ -141,7 +129,6 @@ export function NotableVotesSection({
   variant = 'cards',
 }: NotableVotesSectionProps) {
   const [bill, setBill] = useState<BillOverlay | null>(null)
-  const openProfile = useOpenMemberProfile()
 
   useEffect(() => {
     if (!notable) return
@@ -167,7 +154,6 @@ export function NotableVotesSection({
       entry={bill.entry}
       selectionKey={bill.key}
       onClose={closeBill}
-      onOpenProfile={openProfile}
     />
   ) : null
 
@@ -234,7 +220,6 @@ export function NotableVotesSection({
             <NotableVoteCompactItem
               key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
               entry={entry}
-              onOpenProfile={openProfile}
               onOpenBill={openBill}
             />
           ))}
@@ -251,12 +236,11 @@ export function NotableVotesSection({
       </div>
       <div className="notable-votes-list">
         {notable.map((entry) => (
-          <NotableVoteCard
-            key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
-            entry={entry}
-            onOpenProfile={openProfile}
-            onOpenBill={openBill}
-          />
+            <NotableVoteCard
+              key={`${entry.chamber}-${entry.congress}-${entry.session}-${entry.roll_number}`}
+              entry={entry}
+              onOpenBill={openBill}
+            />
         ))}
       </div>
       {overlayNodes}

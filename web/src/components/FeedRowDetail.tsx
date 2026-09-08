@@ -1,6 +1,5 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
-import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { FeedItem, FeedPrimarySponsor } from '../api/types'
 import {
   buildBillSharePayload,
@@ -11,16 +10,15 @@ import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
-import { canOpenMemberProfile } from '../utils/memberProfileOpen'
 import { primarySponsorDisplay } from '../utils/sponsorLabels'
 import { useRollDefectors } from '../hooks/useRollDefectors'
-import { useOpenMemberProfile } from './MemberProfileProvider'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
 import { ShareIcon } from './ShareIcon'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 import { FeedSummarySections } from './FeedSummarySections'
+import { MemberProfileTrigger } from './MemberProfileTrigger'
 import { PassageVoteDetails } from './PassageVoteDetails'
 
 type FeedRowDetailProps = {
@@ -29,42 +27,23 @@ type FeedRowDetailProps = {
   shareUrl?: string
 }
 
-function SponsorName({ sponsor }: { sponsor: FeedPrimarySponsor }) {
-  const openProfile = useOpenMemberProfile()
-  const display = primarySponsorDisplay(sponsor)
-  const name = display?.name
-  if (!name) return null
-
-  if (!canOpenMemberProfile(sponsor.bioguide_id)) {
-    return <>{name}</>
-  }
-
-  return (
-    <button
-      type="button"
-      className="feed-row-sponsor-name"
-      onClick={() =>
-        openProfile({
-          bioguide_id: sponsor.bioguide_id,
-          name,
-          party: sponsor.party ?? '',
-          state: sponsor.state,
-        })
-      }
-      onMouseEnter={() => prefetchMemberProfile(sponsor.bioguide_id)}
-      onFocus={() => prefetchMemberProfile(sponsor.bioguide_id)}
-      aria-label={`Open profile for ${name}`}
-    >
-      {name}
-    </button>
-  )
-}
-
 function SponsorLine({ sponsor }: { sponsor: FeedPrimarySponsor }) {
   const display = primarySponsorDisplay(sponsor)
   if (!display) return null
 
-  const nameEl: ReactNode = display.name ? <SponsorName sponsor={sponsor} /> : null
+  const nameEl: ReactNode = display.name ? (
+    <MemberProfileTrigger
+      seed={{
+        bioguide_id: sponsor.bioguide_id,
+        name: display.name,
+        party: sponsor.party ?? '',
+        state: sponsor.state,
+      }}
+      className="feed-row-sponsor-name"
+    >
+      {display.name}
+    </MemberProfileTrigger>
+  ) : null
   const metaEl = display.meta ? (
     <>
       {nameEl ? ' · ' : null}
@@ -120,7 +99,6 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   const [copied, setCopied] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [shareKey, setShareKey] = useState(0)
-  const sponsorHeadingId = useId()
   const sharePayload = buildBillSharePayload(item, shareUrl)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
@@ -151,10 +129,8 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
     <div className="feed-row-detail">
       <div className="feed-row-detail-topbar">
         {sponsorDisplay && item.primary_sponsor ? (
-          <p className="feed-row-sponsor" aria-labelledby={sponsorHeadingId}>
-            <span id={sponsorHeadingId} className="feed-row-sponsor-label">
-              Sponsored by
-            </span>{' '}
+          <p className="feed-row-sponsor">
+            <span className="feed-row-sponsor-label">Sponsored by</span>{' '}
             <SponsorLine sponsor={item.primary_sponsor} />
           </p>
         ) : null}

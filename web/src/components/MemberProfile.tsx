@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { ExternalLink } from 'lucide-react'
 
-import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
+import type { MemberProfileResponse } from '../api/types'
 import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
 import { partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
@@ -14,16 +14,18 @@ import { AnimatedSheet } from './AnimatedSheet'
 import { MemberAvatar } from './MemberAvatar'
 import { PartyBadge } from './PartyBadge'
 
-export type MemberProfileSeed = Pick<
-  NotableVoteEntry['defectors'][number],
-  'bioguide_id' | 'name' | 'party' | 'state'
-> &
-  Partial<
-    Pick<
-      NotableVoteEntry['defectors'][number],
-      'photo_url' | 'cross_vote_count' | 'cross_vote_label'
-    >
-  >
+export type MemberProfileCrossVoteLabel = 'rare' | 'occasional' | 'frequent'
+
+/** Fields the profile sheet can render before `/stats/member.json` returns. */
+export type MemberProfileSeed = {
+  bioguide_id: string
+  name: string
+  party: string
+  state: string
+  photo_url?: string | null
+  cross_vote_count?: number
+  cross_vote_label?: MemberProfileCrossVoteLabel
+}
 
 type MemberProfileProps = {
   open: boolean

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
@@ -139,7 +139,7 @@ describe('LeftSidebar', () => {
     expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toBeInTheDocument()
   })
 
-  it('falls back to an external link when bioguide id is missing', () => {
+  it('renders missing and LIS: bioguide names as plain text', () => {
     const defectors = asyncResult(
       chamberPair(
         [
@@ -154,15 +154,10 @@ describe('LeftSidebar', () => {
     )
     const portfolios = asyncResult(chamberPair(emptyPortfolios, emptyPortfolios))
 
-    renderWithMemberProfile(
-      <LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />,
-    )
+    render(<LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />)
 
-    const link = screen.getByRole('link', { name: 'No Id Member' })
-    expect(link).toHaveAttribute(
-      'href',
-      'https://www.congress.gov/member/brian-fitzpatrick/F000466',
-    )
+    expect(screen.getByText('No Id Member')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'No Id Member' })).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Open profile for No Id Member' }),
     ).not.toBeInTheDocument()

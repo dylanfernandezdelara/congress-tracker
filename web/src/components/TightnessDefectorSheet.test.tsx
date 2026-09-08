@@ -1,6 +1,12 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+function endAnimation(element: HTMLElement, animationName: string) {
+  const event = new Event('animationend', { bubbles: true })
+  Object.defineProperty(event, 'animationName', { value: animationName })
+  fireEvent(element, event)
+}
+
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { makeTightnessDot } from '../test/tightnessFixtures'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
@@ -127,14 +133,29 @@ describe('TightnessDefectorSheet', () => {
       />,
     )
 
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Open profile for Rep. Sample Crossover (local)' }),
-    )
+    const trigger = await screen.findByRole('button', {
+      name: 'Open profile for Rep. Sample Crossover (local)',
+    })
+    fireEvent.click(trigger)
 
-    expect(screen.getByRole('dialog', { name: 'Rep. Sample Crossover (local)' })).toBeInTheDocument()
+    const profile = screen.getByRole('dialog', { name: 'Rep. Sample Crossover (local)' })
+    expect(profile).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'H.R. 88', hidden: true })).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('CA-12')).toBeInTheDocument()
+    })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    endAnimation(profile, 'sheet-sink')
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Rep. Sample Crossover (local)' }),
+      ).not.toBeInTheDocument()
+    })
+    expect(screen.getByRole('dialog', { name: 'H.R. 88' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(trigger).toHaveFocus()
     })
   })
 })

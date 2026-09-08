@@ -64,7 +64,7 @@ describe('FeedRowDetail', () => {
       ],
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithMemberProfile(<FeedRowDetail item={makeFeedItem()} />)
 
     await waitFor(() => {
       expect(screen.getByText('Sen. Sample Crossover (local)')).toBeInTheDocument()
@@ -213,7 +213,7 @@ describe('FeedRowDetail', () => {
       ],
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithMemberProfile(<FeedRowDetail item={makeFeedItem()} />)
 
     const toggle = await screen.findByRole('button', { name: 'Show all 13' })
     expect(screen.getAllByText(/Rep. Crossover/)).toHaveLength(6)

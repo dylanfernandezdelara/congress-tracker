@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
@@ -275,6 +275,34 @@ describe('NotableVotesSection', () => {
     await waitFor(() => {
       expect(screen.getByText('CA-12')).toBeInTheDocument()
     })
+  })
+
+  it('does not make LIS: defector names interactive', () => {
+    render(
+      <NotableVotesSection
+        notable={[
+          sampleEntry({
+            member_votes_available: true,
+            defectors: [
+              {
+                bioguide_id: 'LIS:S123',
+                name: 'Sen. Placeholder',
+                party: 'R',
+                state: 'TX',
+                photo_url: '',
+                cross_vote_count: 0,
+                cross_vote_label: 'rare',
+              },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('Sen. Placeholder')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Open profile for Sen. Placeholder' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows an empty state when there are no notable votes', () => {

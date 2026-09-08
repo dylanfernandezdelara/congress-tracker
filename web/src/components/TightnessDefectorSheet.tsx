@@ -2,7 +2,6 @@ import { useEffect, useId, useState } from 'react'
 
 import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
 
-import { prefetchMemberProfile } from '../api/memberProfileCache'
 import { loadRollDefectors } from '../api/rollDefectorsCache'
 import type { RollPartySplit, TightnessDot, VoteDefectorEntry } from '../api/types'
 import {
@@ -11,13 +10,12 @@ import {
   noPartyDefectorsMessage,
 } from '../constants/memberVotesCopy'
 import { formatVoteDate } from '../utils/billLabels'
-import { canOpenMemberProfile } from '../utils/memberProfileOpen'
 import { formatPartySplits, groupDefectorsByParty } from '../utils/partySplit'
 import { cohesionLabel, tightnessDotLabel } from '../utils/tightnessLabels'
 import { AnimatedSheet } from './AnimatedSheet'
 import { MemberAvatar } from './MemberAvatar'
 import type { MemberProfileSeed } from './MemberProfile'
-import { useOpenMemberProfile } from './MemberProfileProvider'
+import { MemberProfileTrigger } from './MemberProfileTrigger'
 
 type LoadState =
   | { status: 'idle' }
@@ -138,8 +136,6 @@ function TightnessDefectorBody({
   chamber: string
   state: LoadState
 }) {
-  const openProfile = useOpenMemberProfile()
-
   if (state.status === 'idle' || state.status === 'loading') {
     return <p className="sheet-muted">Loading party defectors…</p>
   }
@@ -161,35 +157,19 @@ function TightnessDefectorBody({
           <ul className="tightness-sheet-names">
             {group.members.map((member) => (
               <li key={member.bioguide_id}>
-                {canOpenMemberProfile(member.bioguide_id) ? (
-                  <button
-                    type="button"
-                    className="notable-vote-defector-button"
-                    onClick={() => openProfile(voteDefectorToSeed(member))}
-                    onMouseEnter={() => prefetchMemberProfile(member.bioguide_id)}
-                    onFocus={() => prefetchMemberProfile(member.bioguide_id)}
-                    aria-label={`Open profile for ${member.name}`}
-                  >
-                    <MemberAvatar
-                      name={member.name}
-                      photoUrl={bioguidePhotoUrl(member.bioguide_id) ?? ''}
-                      variant="defector"
-                    />
-                    <span className="notable-vote-defector-copy">
-                      <span className="notable-vote-defector-name">{member.name}</span>
-                      <span className="tightness-sheet-member-meta">
-                        {member.party}-{member.state}
-                      </span>
-                    </span>
-                  </button>
-                ) : (
-                  <>
-                    <span className="tightness-sheet-name">{member.name}</span>
+                <MemberProfileTrigger seed={voteDefectorToSeed(member)} variant="row">
+                  <MemberAvatar
+                    name={member.name}
+                    photoUrl={bioguidePhotoUrl(member.bioguide_id) ?? ''}
+                    variant="defector"
+                  />
+                  <span className="member-profile-trigger-copy">
+                    <span className="member-profile-trigger-name">{member.name}</span>
                     <span className="tightness-sheet-member-meta">
                       {member.party}-{member.state}
                     </span>
-                  </>
-                )}
+                  </span>
+                </MemberProfileTrigger>
               </li>
             ))}
           </ul>
