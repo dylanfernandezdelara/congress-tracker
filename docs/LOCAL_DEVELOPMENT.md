@@ -151,3 +151,34 @@ Follow the ship checklist in [`AGENTS.md`](../AGENTS.md): `npm test`, then for
 `web/` changes `npm run qa:web` (with `npm run dev:web` running), a
 thermonuclear review of the branch diff with Grok 4.6 (`cursor-grok-4.6-high-fast`; never Grok 4.5),
 and `npm run preview` for a shareable URL.
+
+## Working several PRs at once
+
+Keep one fix per PR. When more than one is in flight, give each its own
+`git worktree` so tests, `npm run preview`, and the verify helper never see
+another branch's files:
+
+```bash
+git fetch origin main
+# <suffix> is the session id Cursor appends to every branch, e.g. 6eb0
+git worktree add /tmp/wt-<name> -b cursor/<name>-<suffix> origin/main
+cd /tmp/wt-<name> && npm run setup   # each worktree needs its own node_modules + web/dist
+```
+
+Run the ship checklist inside that worktree. Paste the **version** URL that
+`npm run preview` prints; it is unique per upload. The branch alias it also
+requests is truncated (`scripts/preview-upload.mjs`), so two long branch
+names can share one alias. Files are isolated but ports are not: if two worktrees run the
+checklist at once, give the second `VITE_DEV_PORT` (with a matching
+`QA_WEB_URL` for `qa:web`) and different `VERIFY_*_PORT` values (Launch
+section of
+[`.cursor/skills/verify-congress-tracker/SKILL.md`](../.cursor/skills/verify-congress-tracker/SKILL.md)).
+
+Merge order matters: after each squash-merge, `git fetch origin main` and
+merge (or rebase) it into the remaining worktrees before their next
+thermonuclear review round, so review sees the diff against the real base. Once a PR is merged,
+remove its worktree from the primary checkout (the clone you added it from):
+
+```bash
+git worktree remove --force /tmp/wt-<name> && git branch -D cursor/<name>-<suffix>
+```
