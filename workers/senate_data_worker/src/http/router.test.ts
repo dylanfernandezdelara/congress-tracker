@@ -715,6 +715,14 @@ describe("HTTP API", () => {
     expect(response.status).toBe(400);
   });
 
+  it("accepts bioguide as an alias for bioguide_id", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://worker.example.com/stats/member.json?bioguide=Z999999"),
+      createMockEnv() as any
+    );
+    expect(response.status).toBe(404);
+  });
+
   it("returns 404 for unknown member profile", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/stats/member.json?bioguide_id=Z999999"),

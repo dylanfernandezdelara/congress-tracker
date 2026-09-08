@@ -120,6 +120,8 @@ describe('TightnessDefectorSheet', () => {
       cross_vote_count: 3,
       cross_vote_label: 'occasional',
       recent_cross_votes: [],
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
       member_votes_available: true,
       as_of: '2026-07-20T00:00:00.000Z',
     })

@@ -28,7 +28,7 @@ describe('useMemberProfile', () => {
 
     const { result } = renderHook(() => useMemberProfile('F000466'))
 
-    expect(result.current.profile).toBe(profile)
+    expect(result.current.profile).toEqual(expect.objectContaining({ bioguide_id: 'F000466' }))
     expect(result.current.isPending).toBe(false)
     expect(result.current.error).toBeNull()
   })
@@ -42,7 +42,7 @@ describe('useMemberProfile', () => {
     expect(result.current.isPending).toBe(true)
 
     await waitFor(() => {
-      expect(result.current.profile).toBe(profile)
+      expect(result.current.profile).toEqual(expect.objectContaining({ bioguide_id: 'F000466' }))
     })
     expect(result.current.isPending).toBe(false)
   })
@@ -79,6 +79,58 @@ describe('useMemberProfile', () => {
       expect(result.current.error).toBe('Profile not available for this member')
     })
     expect(result.current.isPending).toBe(false)
+  })
+
+  it('normalizes a stale pre-enrichment body so the sheet can render', async () => {
+    const legacy = {
+      bioguide_id: 'F000466',
+      name: 'Brian Fitzpatrick',
+      chamber: 'House',
+      party: 'R',
+      state: 'PA',
+      district: 1,
+      photo_url: '',
+      congress_gov_url: null,
+      congress: 119,
+      session: 2,
+      votes_cast: 1,
+      yea_count: 0,
+      nay_count: 1,
+      cross_vote_count: 1,
+      cross_vote_label: 'rare',
+      recent_cross_votes: [
+        {
+          chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 10,
+          bill_type: 'HR',
+          bill_number: 1,
+          bill_congress: 119,
+          vote_date: '2026-09-07',
+          position: 'nay',
+          party_line: 'yea',
+          margin: 7,
+        },
+      ],
+      member_votes_available: true,
+      as_of: '2026-09-07T00:00:00.000Z',
+    } as unknown as MemberProfileResponse
+    fetchMemberProfileMock.mockResolvedValue(legacy)
+
+    const { result } = renderHook(() => useMemberProfile('F000466'))
+
+    await waitFor(() => {
+      expect(result.current.profile).not.toBeNull()
+    })
+    expect(result.current.profile?.sponsored_bills).toEqual([])
+    expect(result.current.profile?.sponsored_bills_total).toBe(0)
+    expect(result.current.profile?.recent_cross_votes[0]).toMatchObject({
+      bill_id: '119-hr-1',
+      title: '',
+      headline: null,
+      in_feed: false,
+    })
   })
 
   it('returns idle state for a null id', () => {

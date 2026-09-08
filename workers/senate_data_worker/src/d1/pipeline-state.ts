@@ -1,13 +1,7 @@
 import { ensureSchema } from "./schema";
 import { congressNumber, type Env } from "../config";
-import {
-  EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
-  FEED_MAX_BILLS,
-  INTRO_LOOKBACK_DAYS,
-  VOTE_LOOKBACK_DAYS,
-} from "../constants";
-import { daysAgoLookbackStartIso, inclusiveLookbackStartIso } from "../../../../shared/lookback";
-import { feedMembershipBinds, feedMembershipCteSql } from "./feed-membership";
+import { FEED_MAX_BILLS } from "../constants";
+import { feedMembershipCteSql, feedMembershipWindowBinds } from "./feed-membership";
 import type {
   ExecutivePipelineRunRecord,
   FeedPipelineFailureRecord,
@@ -283,9 +277,6 @@ export async function getMissingDigestCount(
   asOf: Date = new Date()
 ): Promise<number> {
   await ensureSchema(env.DB);
-  const voteLookback = daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf);
-  const executiveSince = daysAgoLookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS, asOf);
-  const introLookback = inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS, asOf);
   const row = await env.DB
     .prepare(
       `${feedMembershipCteSql(true)}
@@ -322,7 +313,7 @@ export async function getMissingDigestCount(
                ''
              ) = ''`
     )
-    .bind(...feedMembershipBinds(voteLookback, executiveSince, introLookback, true), FEED_MAX_BILLS)
+    .bind(...feedMembershipWindowBinds(asOf, true), FEED_MAX_BILLS)
     .first<{ missing_count: number }>();
   return row?.missing_count ?? 0;
 }

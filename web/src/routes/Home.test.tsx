@@ -1,8 +1,11 @@
 import { maxIsoDay } from '@congress-tracker/shared/iso-day'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
+import { AppLayout } from '../layouts/AppLayout'
+import Home from './Home'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   mockViewport,
@@ -613,6 +616,140 @@ describe('Home', () => {
       expect(scrollIntoView).toHaveBeenCalled()
     })
     expect(fetchFeed).toHaveBeenCalledTimes(2)
+  })
+
+  it('replaces a filtered page before expanding a bill that drops filters', async () => {
+    const houseOnly = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 88, title: 'House Only Act' },
+      digest: {
+        headline: 'House-only headline',
+        what_it_does: 'House only',
+        key_points: ['House'],
+        terms_explained: [],
+      },
+      passage_votes: [
+        {
+          chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 88,
+          question: 'On Passage',
+          result: 'Passed',
+          yeas: 220,
+          nays: 200,
+          date: '2026-06-04',
+        },
+      ],
+    })
+    const senateBill = makeFeedItem({
+      bill: { congress: 119, type: 'S', number: 2, title: 'Senate Target' },
+      digest: {
+        headline: 'Senate origin bill',
+        what_it_does: 'Senate target',
+        key_points: ['Senate'],
+        terms_explained: [],
+      },
+    })
+
+    let releaseUnfiltered: ((value: ReturnType<typeof pageResponse>) => void) | undefined
+    fetchFeed.mockImplementation((options: { chamber?: 'House' | 'Senate'; q?: string; offset?: number }) => {
+      if (options.chamber === 'House') {
+        return Promise.resolve(pageResponse([houseOnly], { total: 1, has_more: false }))
+      }
+      return new Promise((resolve) => {
+        releaseUnfiltered = resolve
+      })
+    })
+
+    function JumpToBillWithoutFilters() {
+      const navigate = useNavigate()
+      return (
+        <button type="button" onClick={() => navigate('/?bill=119-s-2')}>
+          Open senate bill
+        </button>
+      )
+    }
+
+    render(
+      <MemoryRouter
+        initialEntries={['/?chamber=House']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route
+              path="/"
+              element={
+                <>
+                  <JumpToBillWithoutFilters />
+                  <Home />
+                </>
+              }
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('House-only headline')).toBeInTheDocument()
+    expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0, chamber: 'House' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open senate bill' }))
+
+    await waitFor(() => {
+      expect(releaseUnfiltered).toBeDefined()
+    })
+    const callsAfterNavigate = fetchFeed.mock.calls.slice(1)
+    expect(callsAfterNavigate).toEqual([[{ limit: 15, offset: 0 }]])
+
+    await act(async () => {
+      releaseUnfiltered?.(pageResponse([senateBill], { total: 1, has_more: false }))
+    })
+
+    const toggle = await screen.findByRole('button', { name: /Senate origin bill/i })
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
+    expect(screen.queryByText('House-only headline')).not.toBeInTheDocument()
+    expect(fetchFeed.mock.calls.slice(1)).toEqual([[{ limit: 15, offset: 0 }]])
+  })
+
+  it('expands a bill when ?bill= is set after the feed already loaded', async () => {
+    function JumpToBill() {
+      const navigate = useNavigate()
+      return (
+        <button type="button" onClick={() => navigate('/?bill=119-s-2')}>
+          Open deep link
+        </button>
+      )
+    }
+    render(
+      <MemoryRouter
+        initialEntries={['/']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route
+              path="/"
+              element={
+                <>
+                  <JumpToBill />
+                  <Home />
+                </>
+              }
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const toggle = await screen.findByRole('button', { name: /Plain headline for readers/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Open deep link' }))
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
   })
 
   it('shows a dismissible notice when a deep-linked bill is missing', async () => {

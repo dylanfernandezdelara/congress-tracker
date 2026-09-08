@@ -1,10 +1,42 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { MemberProfileResponse } from '../api/types'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
+
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const
+
+function SearchParamsProbe() {
+  const [params] = useSearchParams()
+  return <div data-testid="search-params">{params.toString()}</div>
+}
+
+function renderProfile(ui: ReactElement, initialEntry = '/') {
+  const view = render(
+    <MemoryRouter initialEntries={[initialEntry]} future={routerFuture}>
+      <SearchParamsProbe />
+      {ui}
+    </MemoryRouter>,
+  )
+  return {
+    ...view,
+    rerender(next: ReactElement) {
+      view.rerender(
+        <MemoryRouter initialEntries={[initialEntry]} future={routerFuture}>
+          <SearchParamsProbe />
+          {next}
+        </MemoryRouter>,
+      )
+    },
+  }
+}
 
 const seed: MemberProfileSeed = {
   bioguide_id: 'F000466',
@@ -41,12 +73,31 @@ const profile: MemberProfileResponse = {
       bill_type: 'S',
       bill_number: 2,
       bill_congress: 119,
+      bill_id: '119-s-2',
+      title: 'Public Lands and Waters Protection Act',
+      headline: 'Senate passes a public lands conservation and access bill',
+      in_feed: true,
       vote_date: '2026-06-09',
       position: 'yea',
       party_line: 'nay',
       margin: 2,
     },
   ],
+  sponsored_bills: [
+    {
+      bill_id: '119-hr-22',
+      congress: 119,
+      bill_type: 'HR',
+      bill_number: 22,
+      title: 'Government Accountability and Savings Act',
+      headline: 'House passes a federal spending oversight bill',
+      introduced_date: '2026-06-01',
+      policy_area: 'Government Operations and Politics',
+      latest_action_text: 'Presented to President.',
+      in_feed: true,
+    },
+  ],
+  sponsored_bills_total: 1,
   member_votes_available: true,
   as_of: '2026-07-20T00:00:00.000Z',
 }
@@ -77,16 +128,16 @@ afterEach(() => {
 
 describe('MemberProfile', () => {
   it('renders nothing when closed', () => {
-    const { container } = render(
+    const { container } = renderProfile(
       <MemberProfile open={false} seed={seed} selectionKey={1} onClose={() => undefined} />,
     )
-    expect(container).toBeEmptyDOMElement()
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 
   it('shows seed identity immediately and loads session stats', async () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Voting record' })).toBeInTheDocument()
@@ -102,9 +153,19 @@ describe('MemberProfile', () => {
     expect(screen.getByText('House')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('30 / 12')).toBeInTheDocument()
-    expect(screen.getByText(/S\. 2/)).toBeInTheDocument()
+    expect(screen.getByText('Senate passes a public lands conservation and access bill')).toBeInTheDocument()
+    expect(screen.getByText(/S\. 2 · /)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Recent party-line breaks' })).toBeInTheDocument()
-    expect(screen.getByText(/voted Yea \(party Nay\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Voted yea against party · margin 2/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Senate passes a public lands conservation and access bill/ }),
+    ).toHaveAttribute('href', '/?bill=119-s-2')
+    expect(screen.getByRole('region', { name: 'Sponsored bills' })).toBeInTheDocument()
+    expect(screen.getByText('House passes a federal spending oversight bill')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+    ).toHaveAttribute('href', '/?bill=119-hr-22')
+    expect(screen.getByText('Presented to President.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toHaveAttribute(
       'href',
       'https://www.congress.gov/member/brian-fitzpatrick/F000466',
@@ -115,7 +176,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     await loadMemberProfile(seed.bioguide_id)
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
     expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -126,7 +187,7 @@ describe('MemberProfile', () => {
   it('shows a loading message while session stats are in flight', () => {
     fetchMemberProfileMock.mockReturnValue(new Promise(() => undefined))
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.getByText('Loading session voting stats…')).toBeInTheDocument()
     expect(screen.getByText('R-PA')).toBeInTheDocument()
@@ -135,7 +196,7 @@ describe('MemberProfile', () => {
   it('shows the fetch error when the profile request fails', async () => {
     fetchMemberProfileMock.mockRejectedValue(new Error('member profile unavailable'))
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     await waitFor(() => {
       expect(screen.getByText('member profile unavailable')).toBeInTheDocument()
@@ -147,7 +208,7 @@ describe('MemberProfile', () => {
       new ApiError('No data found. Data may not be available yet.', 404, 'Not Found'),
     )
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     await waitFor(() => {
       expect(screen.getByText('Profile not available for this member')).toBeInTheDocument()
@@ -157,7 +218,7 @@ describe('MemberProfile', () => {
   it('omits the cross-vote hint and derives a photo when the seed lacks those fields', async () => {
     fetchMemberProfileMock.mockResolvedValue({ ...profile, photo_url: '', cross_vote_label: 'rare' })
 
-    render(
+    renderProfile(
       <MemberProfile
         open
         seed={{
@@ -183,7 +244,7 @@ describe('MemberProfile', () => {
   it('shows the unavailable message when member votes are missing', async () => {
     fetchMemberProfileMock.mockResolvedValue({ ...profile, member_votes_available: false })
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     await waitFor(() => {
       expect(
@@ -197,7 +258,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -223,7 +284,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -242,7 +303,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    const { rerender } = render(
+    const { rerender } = renderProfile(
       <MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />,
     )
 
@@ -270,7 +331,7 @@ describe('MemberProfile', () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    const { rerender } = render(
+    const { rerender } = renderProfile(
       <MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />,
     )
 
@@ -301,7 +362,7 @@ describe('MemberProfile', () => {
       state: 'TX',
     })
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     await waitFor(() => {
       expect(screen.getByText('Senator · TX')).toBeInTheDocument()
@@ -312,7 +373,7 @@ describe('MemberProfile', () => {
   it('labels a House at-large seat when district is 0', async () => {
     fetchMemberProfileMock.mockResolvedValue({ ...profile, district: 0, state: 'AK' })
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     await waitFor(() => {
       expect(screen.getByText('AK at-large')).toBeInTheDocument()
@@ -324,7 +385,7 @@ describe('MemberProfile', () => {
   it('does not treat a null House district as at-large', async () => {
     fetchMemberProfileMock.mockResolvedValue({ ...profile, district: null, state: 'SC' })
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     await waitFor(() => {
       expect(screen.getByText('Representative from SC')).toBeInTheDocument()
@@ -335,7 +396,7 @@ describe('MemberProfile', () => {
   it('labels a numbered House district as state-district', async () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
 
-    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -347,7 +408,7 @@ describe('MemberProfile', () => {
   it('falls back to initials when photo_url is empty and does not render an img', async () => {
     fetchMemberProfileMock.mockResolvedValue({ ...profile, photo_url: '' })
 
-    render(
+    renderProfile(
       <MemberProfile
         open
         seed={{ ...seed, photo_url: '' }}
@@ -367,7 +428,7 @@ describe('MemberProfile', () => {
   it('renders Other for an unrecognized party code', async () => {
     fetchMemberProfileMock.mockResolvedValue({ ...profile, party: '?' })
 
-    render(
+    renderProfile(
       <MemberProfile
         open
         seed={{ ...seed, party: '?' }}
@@ -382,5 +443,243 @@ describe('MemberProfile', () => {
     })
     expect(screen.getByText('Other')).toBeInTheDocument()
     expect(screen.queryByText('Republican')).not.toBeInTheDocument()
+  })
+
+  it('falls back from headline to title to the short bill id on cross-vote rows', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      recent_cross_votes: [
+        {
+          ...profile.recent_cross_votes[0]!,
+          headline: null,
+          title: 'Public Lands and Waters Protection Act',
+        },
+        {
+          ...profile.recent_cross_votes[0]!,
+          roll_number: 215,
+          bill_type: 'HR',
+          bill_number: 1234,
+          bill_id: '119-hr-1234',
+          headline: null,
+          title: '',
+        },
+      ],
+    })
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Public Lands and Waters Protection Act')).toBeInTheDocument()
+    })
+    expect(screen.getByText('H.R. 1234')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /H\.R\. 1234/ })).toHaveAttribute(
+      'href',
+      '/?bill=119-hr-1234',
+    )
+  })
+
+  it('hides the sponsored section when there are no bills and votes are unavailable', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      member_votes_available: false,
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
+    })
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Per-member vote history is not available for this session yet.'),
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('region', { name: 'Sponsored bills' })).not.toBeInTheDocument()
+    expect(screen.queryByText('No sponsored bills in this Congress')).not.toBeInTheDocument()
+  })
+
+  it('shows a muted empty line when votes exist but there are no sponsored bills', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
+    })
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('No sponsored bills in this Congress')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('5 of 23')).not.toBeInTheDocument()
+  })
+
+  it('shows N of M when more sponsored bills exist than the sheet lists', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      sponsored_bills: [
+        profile.sponsored_bills[0]!,
+        {
+          ...profile.sponsored_bills[0]!,
+          bill_id: '119-hr-1',
+          bill_number: 1,
+          headline: 'House passes a broad energy permitting and production package',
+          title: 'Lower Energy Costs Act',
+          policy_area: 'Energy',
+        },
+      ],
+      sponsored_bills_total: 23,
+    })
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('2 of 23')).toBeInTheDocument()
+    })
+    expect(
+      screen.getByRole('link', { name: /House passes a broad energy permitting and production package/ }),
+    ).toHaveAttribute('href', '/?bill=119-hr-1')
+    expect(screen.getByText('Energy')).toBeInTheDocument()
+  })
+
+  it('links out-of-window bills to Congress.gov and in-feed bills to the timeline', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      recent_cross_votes: [{ ...profile.recent_cross_votes[0]!, in_feed: false }],
+      sponsored_bills: [
+        { ...profile.sponsored_bills[0]!, in_feed: true },
+        {
+          ...profile.sponsored_bills[0]!,
+          bill_id: '119-hr-99',
+          bill_number: 99,
+          headline: 'House bill would publish member portfolio snapshots',
+          title: 'Member Portfolio Transparency Act',
+          latest_action_text: 'Referred to the House Committee on Oversight.',
+          in_feed: false,
+        },
+      ],
+      sponsored_bills_total: 2,
+    })
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Referred to the House Committee on Oversight.')).toBeInTheDocument()
+    })
+    const congressGovCross = screen.getByRole('link', {
+      name: /Senate passes a public lands conservation and access bill.*opens Congress\.gov/,
+    })
+    expect(congressGovCross).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/bill/119th-congress/senate-bill/2',
+    )
+    expect(congressGovCross).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+    ).toHaveAttribute('href', '/?bill=119-hr-22')
+    const congressGovSponsored = screen.getByRole('link', {
+      name: /House bill would publish member portfolio snapshots.*opens Congress\.gov/,
+    })
+    expect(congressGovSponsored).toHaveAttribute(
+      'href',
+      'https://www.congress.gov/bill/119th-congress/house-bill/99',
+    )
+    expect(congressGovSponsored).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('keeps current filters when an in-feed row sets bill', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+
+    renderProfile(
+      <MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />,
+      '/?chamber=House&q=energy',
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+      ).toBeInTheDocument()
+    })
+    fireEvent.click(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+    )
+    await waitFor(() => {
+      const search = screen.getByTestId('search-params').textContent ?? ''
+      expect(search).toContain('chamber=House')
+      expect(search).toContain('q=energy')
+      expect(search).toContain('bill=119-hr-22')
+    })
+  })
+
+  it('closes the sheet after an in-feed bill link navigates', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+      ).toBeInTheDocument()
+    })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    fireEvent.click(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+    )
+    await waitFor(() => {
+      expect(dialog.closest('.sheet-root')).toHaveAttribute('inert')
+    })
+    endAnimation(dialog, 'sheet-sink')
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('keeps the sheet open when an in-feed bill link is opened in a new tab', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+      ).toBeInTheDocument()
+    })
+    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    fireEvent.click(
+      screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
+      { metaKey: true },
+    )
+    await Promise.resolve()
+    expect(dialog.closest('.sheet-root')).not.toHaveAttribute('inert')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('renders a stale pre-enrichment payload without throwing', async () => {
+    fetchMemberProfileMock.mockResolvedValue({
+      ...profile,
+      recent_cross_votes: [
+        {
+          chamber: 'House',
+          congress: 119,
+          session: 2,
+          roll_number: 214,
+          bill_type: 'S',
+          bill_number: 2,
+          bill_congress: 119,
+          vote_date: '2026-06-09',
+          position: 'yea',
+          party_line: 'nay',
+          margin: 2,
+        },
+      ],
+      sponsored_bills: undefined,
+      sponsored_bills_total: undefined,
+    } as unknown as MemberProfileResponse)
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    })
+    expect(screen.getByText('S. 2')).toBeInTheDocument()
+    expect(screen.getByText('No sponsored bills in this Congress')).toBeInTheDocument()
   })
 })

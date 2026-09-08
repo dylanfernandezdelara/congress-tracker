@@ -61,6 +61,7 @@ describe("ensureSchema versioning", () => {
     await ensureSchema(db);
 
     expect(ranSql.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS votes"))).toBe(true);
+    expect(ranSql.some((sql) => sql.includes("idx_bill_sponsors_member"))).toBe(true);
     expect(ranSql.some((sql) => sql.includes("DELETE FROM financial_transactions"))).toBe(true);
     expect(store.get("schema_version")?.value_json).toBe(
       JSON.stringify({ version: SCHEMA_VERSION })

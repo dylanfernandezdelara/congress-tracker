@@ -126,6 +126,8 @@ describe('Home advanced filters', () => {
       cross_vote_count: 0,
       cross_vote_label: 'cross-party votes',
       recent_cross_votes: [],
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
       member_votes_available: true,
       as_of: '2026-08-07T00:00:00.000Z',
     })
@@ -258,6 +260,8 @@ describe('Home advanced filters', () => {
       cross_vote_count: 0,
       cross_vote_label: 'cross-party votes',
       recent_cross_votes: [],
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
       member_votes_available: true,
       as_of: '2026-08-07T00:00:00.000Z',
     })

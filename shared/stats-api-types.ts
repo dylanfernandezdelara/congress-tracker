@@ -292,10 +292,35 @@ export interface MemberProfileRecentCrossVote {
   bill_type: string
   bill_number: number
   bill_congress: number
+  /** Canonical `?bill=` key (`119-hr-1`). */
+  bill_id: string
+  /** Official bill title when a digest row exists. */
+  title: string
+  /** Digest plain-English headline, when present. */
+  headline: string | null
+  /** True when the bill is still in `/feed/latest` membership. */
+  in_feed: boolean
   vote_date: string
   position: 'yea' | 'nay'
   party_line: 'yea' | 'nay'
   margin: number
+}
+
+/** Primary-sponsored bill on the member profile sheet. */
+export interface MemberProfileSponsoredBill {
+  /** Canonical `?bill=` key (`119-hr-1`). */
+  bill_id: string
+  congress: number
+  bill_type: string
+  bill_number: number
+  title: string
+  headline: string | null
+  introduced_date: string | null
+  policy_area: string | null
+  /** Latest official action from `bill_lifecycle`, when present. */
+  latest_action_text: string | null
+  /** True when the bill is still in `/feed/latest` membership. */
+  in_feed: boolean
 }
 
 export interface MemberProfileResponse {
@@ -316,6 +341,10 @@ export interface MemberProfileResponse {
   cross_vote_count: number
   cross_vote_label: NotableVoteCrossVoteLabel
   recent_cross_votes: MemberProfileRecentCrossVote[]
+  /** Up to 5 most recent primary-sponsored bills in this Congress. */
+  sponsored_bills: MemberProfileSponsoredBill[]
+  /** Total primary-sponsored bills in this Congress (may exceed `sponsored_bills.length`). */
+  sponsored_bills_total: number
   member_votes_available: boolean
   as_of: string
 }

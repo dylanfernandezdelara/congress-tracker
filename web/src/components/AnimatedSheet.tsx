@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 import { useAnimatedDismiss } from '../hooks/useAnimatedDismiss'
@@ -26,6 +26,8 @@ type AnimatedSheetProps = {
    */
   footerDismiss?: boolean
   panelClassName?: string
+  /** Latest `requestClose` so callers can animate-dismiss after in-app navigation. */
+  requestCloseRef?: MutableRefObject<(() => void) | null>
   children: ReactNode
 }
 
@@ -45,6 +47,7 @@ export function AnimatedSheet({
   closeLabel = 'Close',
   footerDismiss = false,
   panelClassName,
+  requestCloseRef,
   children,
 }: AnimatedSheetProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -67,6 +70,14 @@ export function AnimatedSheet({
   controllerRef.current.requestClose = requestClose
   controllerRef.current.getIsClosing = getIsClosing
   controllerRef.current.panel = panelRef.current
+
+  useEffect(() => {
+    if (!requestCloseRef) return
+    requestCloseRef.current = requestClose
+    return () => {
+      requestCloseRef.current = null
+    }
+  }, [requestClose, requestCloseRef])
 
   useEffect(() => {
     if (!open) return

@@ -739,10 +739,13 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
   "/stats/member.json": async ({ env, url, json }) => {
     const congress = congressNumber(env);
     const session = sessionNumber(env);
-    const bioguideId = url.searchParams.get("bioguide_id")?.trim() ?? "";
+    const bioguideId =
+      url.searchParams.get("bioguide_id")?.trim() ||
+      url.searchParams.get("bioguide")?.trim() ||
+      "";
     if (!bioguideId) {
       return json(
-        { error: "bad_request", message: "bioguide_id is required" },
+        { error: "bad_request", message: "bioguide or bioguide_id is required" },
         { status: 400 }
       );
     }

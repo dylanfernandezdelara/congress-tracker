@@ -42,9 +42,9 @@ describe('memberProfileCache', () => {
     ])
 
     expect(fetchMemberProfileMock).toHaveBeenCalledTimes(1)
-    expect(first).toBe(profile)
-    expect(second).toBe(profile)
-    expect(getCachedMemberProfile('F000466')).toBe(profile)
+    expect(first).toEqual(expect.objectContaining({ bioguide_id: 'F000466' }))
+    expect(second).toBe(first)
+    expect(getCachedMemberProfile('F000466')).toBe(first)
   })
 
   it('does not cache failures, so the next load retries', async () => {
@@ -54,7 +54,9 @@ describe('memberProfileCache', () => {
     await expect(loadMemberProfile('F000466')).rejects.toThrow('down')
     expect(getCachedMemberProfile('F000466')).toBeNull()
 
-    await expect(loadMemberProfile('F000466')).resolves.toBe(profile)
+    await expect(loadMemberProfile('F000466')).resolves.toEqual(
+      expect.objectContaining({ bioguide_id: 'F000466' }),
+    )
     expect(fetchMemberProfileMock).toHaveBeenCalledTimes(2)
   })
 

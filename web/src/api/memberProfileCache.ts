@@ -1,4 +1,5 @@
 import { fetchMemberProfile } from './client'
+import { normalizeMemberProfile } from './normalizeMemberProfile'
 import type { MemberProfileResponse } from './types'
 
 /* Session-lived cache so the member profile sheet opens with data already in
@@ -28,8 +29,9 @@ export function loadMemberProfile(bioguideId: string): Promise<MemberProfileResp
   const generation = cacheGeneration
   const request = fetchMemberProfile(bioguideId)
     .then((profile) => {
-      if (generation === cacheGeneration) resolvedProfiles.set(bioguideId, profile)
-      return profile
+      const normalized = normalizeMemberProfile(profile)
+      if (generation === cacheGeneration) resolvedProfiles.set(bioguideId, normalized)
+      return normalized
     })
     .finally(() => {
       /* Only remove our own entry: a clear plus a newer request for the same

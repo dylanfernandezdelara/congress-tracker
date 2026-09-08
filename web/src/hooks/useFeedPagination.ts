@@ -100,6 +100,11 @@ export function useFeedPagination() {
   const requestIdRef = useRef(0)
   const appendLockRef = useRef(false)
   const lastFeedModeRef = useRef<'replace' | 'append'>('replace')
+  /** True while a filter `replace` fetch is in flight. The deep-link effect can
+   *  run in the same commit as a filter change (still seeing the previous
+   *  `isInitialLoading === false`) and must not append/lookup until replace
+   *  settles — otherwise the replace fails its requestId check. */
+  const replaceInFlightRef = useRef(false)
   const deepLinkBillRef = useRef<string | null>(null)
   const deepLinkPhaseRef = useRef<DeepLinkPhase>('done')
   /** Filters+bill tuple currently being searched or already resolved for deep link. */
@@ -146,6 +151,7 @@ export function useFeedPagination() {
         // A replace supersedes any in-flight append; release the append lock so
         // Load more is not stuck after the replace settles first.
         appendLockRef.current = false
+        replaceInFlightRef.current = true
       }
 
       const requestId = ++requestIdRef.current
@@ -193,6 +199,11 @@ export function useFeedPagination() {
       } finally {
         if (mode === 'append' && requestId === requestIdRef.current) {
           appendLockRef.current = false
+        }
+        if (mode === 'replace') {
+          if (requestId === requestIdRef.current || lastFeedModeRef.current !== 'replace') {
+            replaceInFlightRef.current = false
+          }
         }
         if (requestId === requestIdRef.current) {
           setIsInitialLoading(false)
@@ -403,6 +414,7 @@ export function useFeedPagination() {
   // Deep-link: after pages load, find the bill or keep appending until exhausted.
   useEffect(() => {
     const phase = deepLinkPhaseRef.current
+    if (replaceInFlightRef.current) return
     if (phase !== 'searching' && phase !== 'lookup') return
     if (isInitialLoading || isLoadingMore) return
     // Don't treat a failed fetch as "bill missing".
@@ -447,6 +459,7 @@ export function useFeedPagination() {
     deepLinkPhaseRef.current = 'done'
     setBillMissingNotice(true)
   }, [
+    billParam,
     items,
     hasMore,
     isInitialLoading,
