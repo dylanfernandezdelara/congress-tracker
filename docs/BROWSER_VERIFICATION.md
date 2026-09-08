@@ -43,5 +43,6 @@ reject (c): `-i` was ~43% of our home ARIA dump and ~47% after the profile sheet
 
 Implemented here: `browser snapshot --interactive` prints `[ref] role "name" (state)` and
 sets `data-verify-ref`; `browser click --ref e1` / `fill --ref e2 --value …` target those
-nodes. Refs are invalidated by re-render — snapshot again. `browser viewport` persists
-width/height (and optional mobile/dsf) so later commands keep the size.
+nodes. Home `--interactive` is **2202 B** vs `--aria` **8700 B** (same page). Refs are
+invalidated by re-render — snapshot again. `browser viewport` persists width/height
+(and optional mobile/dsf) so later commands keep the size.
