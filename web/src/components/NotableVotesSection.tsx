@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
 import { formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import { canOpenMemberProfile } from '../utils/memberProfileOpen'
 import { notableVoteTitle } from '../utils/notableVoteLabels'
 import { MemberProfileTrigger } from './MemberProfileTrigger'
 import { NotableBillSheet } from './NotableBillSheet'
@@ -134,7 +135,9 @@ export function NotableVotesSection({
     if (!notable) return
     for (const entry of notable) {
       for (const defector of entry.defectors) {
-        prefetchMemberProfile(defector.bioguide_id)
+        if (canOpenMemberProfile(defector.bioguide_id)) {
+          prefetchMemberProfile(defector.bioguide_id)
+        }
       }
     }
   }, [notable])

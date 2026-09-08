@@ -149,17 +149,26 @@ describe('LeftSidebar', () => {
             name: 'No Id Member',
           },
         ],
-        [] as DefectorEntry[],
+        [
+          {
+            ...houseDefector,
+            bioguide_id: 'LIS:S123',
+            name: 'Placeholder Senator',
+            state: 'VT',
+          },
+        ],
       ),
     )
     const portfolios = asyncResult(chamberPair(emptyPortfolios, emptyPortfolios))
 
     render(<LeftSidebar session={session} defectors={defectors} portfolios={portfolios} />)
 
-    expect(screen.getByText('No Id Member')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'No Id Member' })).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'Open profile for No Id Member' }),
-    ).not.toBeInTheDocument()
+    for (const name of ['No Id Member', 'Placeholder Senator']) {
+      expect(screen.getByText(name)).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: `Open profile for ${name}` }),
+      ).not.toBeInTheDocument()
+    }
   })
 })

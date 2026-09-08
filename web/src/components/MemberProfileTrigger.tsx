@@ -25,12 +25,17 @@ export function MemberProfileTrigger({
   variant = 'inline',
 }: MemberProfileTriggerProps) {
   if (!canOpenMemberProfile(seed.bioguide_id)) {
-    const staticClass = cn(
-      variant === 'row' && 'member-profile-trigger-static member-profile-trigger-static--row',
-      className,
+    return (
+      <span
+        className={cn(
+          'member-profile-trigger-static',
+          variant === 'row' && 'member-profile-trigger-static--row',
+          className,
+        )}
+      >
+        {children}
+      </span>
     )
-    if (!staticClass) return children
-    return <span className={staticClass}>{children}</span>
   }
 
   return (

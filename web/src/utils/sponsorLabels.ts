@@ -18,12 +18,3 @@ export function primarySponsorDisplay(
   if (!name && !meta) return null
   return { name, meta }
 }
-
-/** Compact expanded-row line: `Rep. Jane Doe · D-NY`. Null when nothing useful is stored. */
-export function formatPrimarySponsorLine(sponsor: FeedPrimarySponsor | null | undefined): string | null {
-  const parts = primarySponsorDisplay(sponsor)
-  if (!parts) return null
-  if (parts.name && parts.meta) return `${parts.name} · ${parts.meta}`
-  if (parts.name) return parts.name
-  return parts.meta || null
-}

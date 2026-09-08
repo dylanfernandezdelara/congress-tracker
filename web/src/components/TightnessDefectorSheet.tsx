@@ -125,7 +125,6 @@ function voteDefectorToSeed(member: VoteDefectorEntry): MemberProfileSeed {
     name: member.name,
     party: member.party,
     state: member.state,
-    photo_url: bioguidePhotoUrl(member.bioguide_id) ?? undefined,
   }
 }
 
