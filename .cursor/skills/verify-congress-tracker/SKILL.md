@@ -17,7 +17,7 @@ Read `features/README.md` before driving. Prove the mapped entry points, not a c
 
 ## Launch
 
-Verification uses its own ports (default Vite **5174**, worker **8788**, CDP **9223**) and its own D1, so it can run beside `npm run dev:*`. The user's 5173/8787 stack is never touched. If a **verification** port is already listening, **refuse** — do not kill by process name, and do not attach to a server this run did not start. Override with `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT`.
+Verification uses its own ports (default Vite **5174**, worker **8788**, CDP **9223**) and its own D1, so it can run beside `npm run dev:*`. The user's 5173/8787 stack is never touched. If a **verification** port is already listening, **refuse** — do not kill by process name, and do not attach to a server this run did not start. `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT` are read at **launch** (defaults 5174/8788/9223). Later commands use `state.json` — you do not need to re-export them after a successful launch.
 
 Verification D1 is a disposable `--persist-to` store at `artifacts/verify/.run/d1` (absolute path; spawn cwd is the repo root). Launch **never** reads or writes `workers/senate_data_worker/.wrangler/state` (the human `npm run seed` / `dev:worker` store). Seed data is synthetic `(local sample)` / `LOCAL:*` — **not** a production dump. Never run `npm run sync:preview-db`, pipeline POSTs, or `d1 execute --remote` for this skill.
 
@@ -89,9 +89,14 @@ Inspect the page the way Chrome DevTools would (CDP on `http://127.0.0.1:9223`; 
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser console
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser network
 ./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --aria
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --interactive
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --ref e12
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser fill --ref e8 --value "energy"
 ```
 
 `--name /regex/` is a JavaScript regex. `--exact` requires a full accessible-name match.
+
+`snapshot --interactive` prints one line per button/link/textbox/combobox/radio/checkbox/tab/searchbox/option (`[e1] searchbox "Search bills"`) and stamps `data-verify-ref` on those nodes. `click --ref` / `fill --ref` (and find/scroll/wait/select `--ref`) use that attribute (or `@e1`). `--ref` cannot be combined with `--role`/`--name`/`--selector`/`--nth`/`--exact`. Refs are invalidated by re-render — snapshot again before the next `--ref`. Prefer `--role --name` for recipes that must survive a re-render.
 
 Do **not** intercept `/feed` or `/stats` (that is `qa:web`). Do **not** POST `/__pipeline/*` as a stand-in for a UI action. Side-effect reads of the same data the UI shows are allowed:
 
@@ -114,8 +119,25 @@ Standards:
 - Pair an ARIA snapshot with a screenshot that shows `Track Congress` and the changed control/result.
 - For search/filter, also read `/feed/latest.json?...` (or the page URL query) and confirm the visible rows match.
 - Record the feature file and entry point used.
+- For `web/` behavior changes, keep desktop (1280×800) and mobile (390×844) screenshots of the affected flow under `artifacts/verify/<feature>/`.
 
 `npm run qa:web` output in `artifacts/qa-viewports/` is viewport QA, not a substitute for these proofs.
+
+## Mobile proof
+
+Default drive viewport is **1280×800** (desktop rails mount at `min-width: 1024px`). For a phone proof, resize then re-open any control the resize closed:
+
+```bash
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser viewport --width 390 --height 844 --device-scale-factor 2 --mobile
+```
+
+Equivalent CDP escape hatch (`Emulation.setDeviceMetricsOverride` also writes `state.viewport`):
+
+```bash
+./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser cdp --method Emulation.setDeviceMetricsOverride --params '{"width":390,"height":844,"deviceScaleFactor":2,"mobile":true}'
+```
+
+Later `browser` commands reuse `state.viewport`. Restoring `browser viewport --width 1280 --height 800` replaces the mobile override with a complete desktop metrics object (`deviceScaleFactor` 1, `mobile` false). Resizing **below 1024px unmounts the desktop rails and closes any open sheet** — re-open the row, Filters, or member profile after resizing.
 
 ## Cleanup
 
@@ -125,8 +147,12 @@ Standards:
 
 Sends SIGTERM (then SIGKILL) to the **worker, web, browser, and tap PIDs this launch recorded**. Deletes `artifacts/verify/.run/` only after those PIDs are gone and the recorded verification ports are free (default 5174/8788/9223, or `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT` if launch used overrides); otherwise it keeps state and exits non-zero. Feature evidence directories stay. Never `pkill -f wrangler` / `vite` / `chrome`. `.run/` includes the isolated D1, Chrome profile, and console/network JSONL. If `state.json` is corrupt, cleanup recovers ports from the file (falling back to env/defaults per missing field) and only claims processes whose command line names this run.
 
+## Why this helper, not agent-browser
+
+Keep this helper as the driver: it owns ports, doctor, evidence paths, and an isolated D1. The useful idea from agent-browser is the compact interactive snapshot with refs — we borrowed that. Do not attach a generic browser CLI to another worktree’s Chrome.
+
 ## Helpers
 
-All commands above are `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker <subcommand>`. Implementation: `bin/verify-congress-tracker.mjs` (browser/CDP in `lib/browser.mjs`; console/network tap in `lib/devtools-tap.mjs`). Run with no args for usage.
+All commands above are `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker <subcommand>`. Implementation: `bin/verify-congress-tracker.mjs` (browser/CDP in `lib/browser.mjs`; viewport in `lib/viewport.mjs`; console/network tap in `lib/devtools-tap.mjs`). Run with no args for usage.
 
 If launch fails because verification ports are busy, stop. If seed or health fails, read `artifacts/verify/.run/seed.log`, `worker.log`, and `web.log` before retrying — run cleanup after every failed launch so ports are not left occupied.

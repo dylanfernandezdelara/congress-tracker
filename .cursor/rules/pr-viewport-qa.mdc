@@ -15,4 +15,6 @@ For every PR that changes `web/`:
 3. Confirm 8/8 checks pass (home × 4 viewports × light/dark)
 4. Include the QA summary in the PR description before opening or updating the PR
 
+For behavior-change mobile proof (390px), see `.cursor/skills/verify-congress-tracker/SKILL.md`.
+
 Do not skip this for UI bugfixes or small CSS tweaks.
