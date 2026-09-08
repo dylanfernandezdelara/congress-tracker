@@ -151,3 +151,29 @@ Follow the ship checklist in [`AGENTS.md`](../AGENTS.md): `npm test`, then for
 `web/` changes `npm run qa:web` (with `npm run dev:web` running), a
 thermonuclear review of the branch diff with Grok 4.6 (`cursor-grok-4.6-high-fast`; never Grok 4.5),
 and `npm run preview` for a shareable URL.
+
+## Working several PRs at once
+
+Keep one fix per PR. When more than one is in flight, give each its own
+`git worktree` so tests, `npm run preview`, and the verify helper never see
+another branch's files:
+
+```bash
+git fetch origin main
+git worktree add /tmp/wt-<name> -b cursor/<name>-<suffix> origin/main
+cd /tmp/wt-<name> && npm run setup   # each worktree needs its own node_modules + web/dist
+```
+
+Run the ship checklist inside that worktree. `npm run preview` prints a
+per-branch alias URL, so parallel previews do not collide. If two worktrees
+need the verify helper at the same time, give the second one different
+`VERIFY_*_PORT` values (see the skill's Launch section).
+
+Merge order matters: after each squash-merge, `git fetch origin main` and
+merge (or rebase) it into the remaining worktrees before their next thermos
+round, so review sees the diff against the real base. When a PR is merged:
+
+```bash
+gh pr merge <n> --squash --delete-branch   # prints a worktree warning; that is expected
+cd /workspace && git worktree remove --force /tmp/wt-<name> && git branch -D cursor/<name>-<suffix>
+```

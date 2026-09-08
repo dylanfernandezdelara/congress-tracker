@@ -178,5 +178,6 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 - Never commit secrets from `.dev.vars`.
 - `FEED_MAX_BILLS` and `DIGEST_MAX_NEW_REWRITES` are module constants in `workers/senate_data_worker/src/constants.ts`. `VOTE_LOOKBACK_DAYS` lives in `shared/feed-constants.ts` (worker re-exports; web imports for empty-state copy).
 - Always `git fetch origin` before starting work on a fresh session.
+- One fix per PR. When several PRs are in flight, use one `git worktree` per branch (recipe: `docs/LOCAL_DEVELOPMENT.md` → "Working several PRs at once").
 - After `web/` work, follow the ship checklist above (tests → `qa:web` → thermonuclear review → preview URL). Never publish a preview URL without attempting QA and review first.
 - After any UI change, always give the user the latest preview URL in chat so they can view the result in a browser.
