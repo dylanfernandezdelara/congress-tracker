@@ -95,24 +95,27 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
 
   return (
     <div className="feed-row-detail">
-      <button
-        type="button"
-        className="feed-row-share"
-        onClick={openShareSheet}
-        aria-label="Share"
-        title="Share"
-      >
-        <ShareIcon />
-      </button>
-
-      {sponsorLine ? (
-        <p className="feed-row-sponsor" aria-labelledby={sponsorHeadingId}>
-          <span id={sponsorHeadingId} className="feed-row-sponsor-label">
-            Sponsored by
-          </span>{' '}
-          {sponsorLine}
-        </p>
-      ) : null}
+      <div className="feed-row-detail-topbar">
+        {sponsorLine ? (
+          <p className="feed-row-sponsor" aria-labelledby={sponsorHeadingId}>
+            <span id={sponsorHeadingId} className="feed-row-sponsor-label">
+              Sponsored by
+            </span>{' '}
+            {sponsorLine}
+          </p>
+        ) : (
+          <span className="feed-row-detail-topbar-spacer" aria-hidden="true" />
+        )}
+        <button
+          type="button"
+          className="feed-row-share"
+          onClick={openShareSheet}
+          aria-label="Share"
+          title="Share"
+        >
+          <ShareIcon />
+        </button>
+      </div>
 
       <FeedSummarySections content={summary} />
 

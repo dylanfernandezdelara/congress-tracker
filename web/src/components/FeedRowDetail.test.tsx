@@ -396,6 +396,10 @@ describe('FeedRowDetail', () => {
 
     expect(screen.getByText(/Sponsored by/)).toBeInTheDocument()
     expect(screen.getByText(/Rep\. Sample Loyal \(local\) · D-NY/)).toBeInTheDocument()
+    const shareButton = screen.getByRole('button', { name: 'Share' })
+    const sponsor = document.querySelector('.feed-row-sponsor')
+    expect(shareButton.parentElement).toBe(sponsor?.parentElement)
+    expect(shareButton.parentElement).toHaveClass('feed-row-detail-topbar')
     await waitFor(() => {
       expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
     })
