@@ -50,5 +50,7 @@ describe("member photo helpers", () => {
     expect(memberInitials("Rep. Foxx, Virginia [R-NC-5]")).toBe("VF");
     expect(memberInitials("Cher")).toBe("C");
     expect(memberInitials("")).toBe("?");
+    expect(memberInitials("Del Toro, Benicio")).toBe("BD");
+    expect(memberInitials("Del. Jane Doe")).toBe("JD");
   });
 });

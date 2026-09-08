@@ -158,11 +158,13 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI
 - `web/src/components/FeedRowDetail.tsx` — expanded feed row detail panel
 - `web/src/utils/feedRowLabels.ts` — topic, event line, procedural detection, teaser helpers
+- `web/src/components/ui/` — vendored shadcn/ui primitives (added via `components.json`; add new primitives with `npx shadcn@latest add <name>` from `web/`)
 - `.cursor/skills/verify-congress-tracker/` — isolated UI verification helper (ports 5174/8788)
 
 ## Key rules
 
 - Prefer commands in this file over guessing root-level npm scripts.
+- Prefer existing shadcn/ui primitives in `web/src/components/ui/` over hand-rolled components.
 - Default to `npm test` for verification.
 - Never commit secrets from `.dev.vars`.
 - `FEED_MAX_BILLS` and `DIGEST_MAX_NEW_REWRITES` are module constants in `workers/senate_data_worker/src/constants.ts`. `VOTE_LOOKBACK_DAYS` lives in `shared/feed-constants.ts` (worker re-exports; web imports for empty-state copy).

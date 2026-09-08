@@ -33,32 +33,3 @@
     outline-offset: 2px;
   }
 }
-
-/* Unlayered so party colors beat Badge utility classes (bg-primary). */
-.member-profile-badge.party-d,
-.member-profile-badge.party-d:hover {
-  background: hsl(var(--twc-party-d) / 0.12);
-  color: hsl(var(--twc-party-d));
-  border-color: transparent;
-}
-
-.member-profile-badge.party-r,
-.member-profile-badge.party-r:hover {
-  background: hsl(var(--twc-party-r) / 0.12);
-  color: hsl(var(--twc-party-r));
-  border-color: transparent;
-}
-
-.member-profile-badge.party-i,
-.member-profile-badge.party-i:hover {
-  background: hsl(var(--twc-party-i) / 0.12);
-  color: hsl(var(--twc-party-i));
-  border-color: transparent;
-}
-
-.member-profile-badge.party-other,
-.member-profile-badge.party-other:hover {
-  background: hsl(var(--twc-party-other) / 0.12);
-  color: hsl(var(--twc-party-other));
-  border-color: transparent;
-}

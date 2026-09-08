@@ -2,17 +2,17 @@ import { useId } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import type { MemberProfileResponse, NotableVoteEntry } from '../api/types'
-import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-tracker/shared/party'
-import { memberInitials } from '@congress-tracker/shared/member-photo'
+import { partyShortLabel } from '@congress-tracker/shared/party'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { congressOrdinal, formatBillDocket, formatVoteDate } from '../utils/billLabels'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { AnimatedSheet } from './AnimatedSheet'
+import { MemberAvatar } from './MemberAvatar'
+import { PartyBadge } from './PartyBadge'
 
 export type MemberProfileSeed = Pick<
   NotableVoteEntry['defectors'][number],
@@ -40,10 +40,12 @@ type StatsPhase =
 function seatBadge(profile: MemberProfileResponse | null, seed: MemberProfileSeed): string {
   if (!profile) return `${partyShortLabel(seed.party)}-${seed.state}`
   if (profile.chamber === 'Senate') return `Senator · ${profile.state}`
-  if (profile.district != null && profile.district !== 0) {
+  // Congress.gov uses district 0 for at-large House seats; null means unknown.
+  if (profile.district === 0) return `${profile.state} at-large`
+  if (profile.district != null && profile.district > 0) {
     return `${profile.state}-${profile.district}`
   }
-  return `${profile.state} at-large`
+  return `Representative from ${profile.state}`
 }
 
 function votingRecordTitle(profile: MemberProfileResponse | null): string {
@@ -92,18 +94,13 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       closeAriaLabel="Close profile"
     >
       <div className="flex items-center gap-3.5">
-        <Avatar key={seed.bioguide_id} className="h-16 w-16">
-          {photoUrl ? <AvatarImage src={photoUrl} alt="" /> : null}
-          <AvatarFallback>{memberInitials(name)}</AvatarFallback>
-        </Avatar>
+        <MemberAvatar key={seed.bioguide_id} name={name} photoUrl={photoUrl} variant="profile" />
         <div className="flex min-w-0 flex-col gap-1.5">
           <h2 id={titleId} className="member-profile-name">
             {name}
           </h2>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge className={`member-profile-badge ${partyCssClass(party)}`}>
-              {partyDisplayName(party)}
-            </Badge>
+            <PartyBadge party={party} />
             <Badge variant="outline">{seatBadge(profile, seed)}</Badge>
             {profile ? <Badge variant="outline">{profile.chamber}</Badge> : null}
           </div>
@@ -115,7 +112,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       <section aria-label="Voting behavior">
         <Card>
           <CardHeader>
-            <CardTitle>{votingRecordTitle(profile)}</CardTitle>
+            <h3 className="font-semibold leading-none tracking-tight">{votingRecordTitle(profile)}</h3>
             <CardDescription>{hint}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -160,7 +157,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
         <section aria-label="Recent party-line breaks">
           <Card>
             <CardHeader>
-              <CardTitle>Recent party-line breaks</CardTitle>
+              <h3 className="font-semibold leading-none tracking-tight">Recent party-line breaks</h3>
             </CardHeader>
             <CardContent>
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">

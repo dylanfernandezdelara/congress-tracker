@@ -36,7 +36,7 @@ export function congressGovMemberUrl(bioguideId: string, name: string): string |
   return `https://www.congress.gov/member/${memberNameSlug(name)}/${bioguideId.toUpperCase()}`
 }
 
-const LEADING_HONORIFIC = /^(?:res\.?\s*comm\.?|rep\.?|sen\.?|del\.?|mrs\.?|ms\.?|mr\.?|dr\.?)\s+/i
+const LEADING_HONORIFIC = /^(?:res\.?\s*comm\.?|rep\.?|sen\.?|del\.|mrs\.?|ms\.?|mr\.?|dr\.?)\s+/i
 const BRACKETED_SUFFIX = /\s*[\[(][^\]\)]*[)\]]/g
 const GENERATIONAL_SUFFIX = /^(?:jr\.?|sr\.?|ii|iii|iv)$/i
 
