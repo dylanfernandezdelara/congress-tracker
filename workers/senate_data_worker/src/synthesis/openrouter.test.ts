@@ -21,6 +21,24 @@ describe("parseDigestJson", () => {
     expect(parsed?.key_points).toHaveLength(2);
   });
 
+  it("drops unknown keys so a model cannot echo storage markers into digest_json", () => {
+    const parsed = parseDigestJson(
+      JSON.stringify({
+        headline: "Test headline here",
+        what_it_does: "Does a thing.",
+        key_points: [],
+        terms_explained: [],
+        source: "title_fallback",
+      })
+    );
+    expect(parsed).toEqual({
+      headline: "Test headline here",
+      what_it_does: "Does a thing.",
+      key_points: [],
+      terms_explained: [],
+    });
+  });
+
   it("reduces what_it_does to its first sentence", () => {
     const parsed = parseDigestJson(
       JSON.stringify({

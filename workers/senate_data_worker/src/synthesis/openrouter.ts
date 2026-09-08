@@ -21,16 +21,19 @@ const COMPACT_MAX_TOKENS = 512;
 export function parseDigestJson(text: string): BillDigestContent | null {
   const raw = stripMarkdownFence(text);
   try {
-    const parsed = JSON.parse(raw) as BillDigestContent;
+    const parsed = JSON.parse(raw) as Partial<BillDigestContent>;
     if (!parsed.headline || !parsed.what_it_does) return null;
-    parsed.what_it_does = normalizeDigestLead(parsed.what_it_does);
-    parsed.key_points = normalizeDigestBullets(
-      Array.isArray(parsed.key_points) ? parsed.key_points : [],
-    );
-    parsed.terms_explained = Array.isArray(parsed.terms_explained)
-      ? parsed.terms_explained.slice(0, 8)
-      : [];
-    return parsed;
+    // Only known keys: a model echoing storage markers must not survive into digest_json.
+    return {
+      headline: parsed.headline,
+      what_it_does: normalizeDigestLead(parsed.what_it_does),
+      key_points: normalizeDigestBullets(
+        Array.isArray(parsed.key_points) ? parsed.key_points : [],
+      ),
+      terms_explained: Array.isArray(parsed.terms_explained)
+        ? parsed.terms_explained.slice(0, 8)
+        : [],
+    };
   } catch {
     return null;
   }
