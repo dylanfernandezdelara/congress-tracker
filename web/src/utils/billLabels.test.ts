@@ -9,12 +9,36 @@ import {
   formatSenateWaitingSince,
   formatVoteDate,
   formatWeekdayVoteDate,
+  getBillColloquialName,
 } from './billLabels'
 
 describe('formatBillDocket', () => {
   it('re-exports shared bill docket formatting', () => {
     expect(formatBillDocket('hconres', 84, 119)).toBe('H.Con.Res. 84 · 119th Congress')
     expect(formatBillDocket('HJRES', 12, 119)).toBe('H.J.Res. 12 · 119th Congress')
+  })
+})
+
+describe('getBillColloquialName', () => {
+  it('prefers headline, then title, then the short bill id', () => {
+    expect(
+      getBillColloquialName({
+        congress: 119,
+        type: 'HR',
+        number: 1,
+        title: 'Lower Energy Costs Act',
+        headline: 'House passes a broad energy package',
+      }),
+    ).toBe('House passes a broad energy package')
+    expect(
+      getBillColloquialName({
+        congress: 119,
+        type: 'S',
+        number: 2,
+        title: 'Public Lands Act',
+      }),
+    ).toBe('Public Lands Act')
+    expect(getBillColloquialName({ congress: 119, type: 'HR', number: 99 })).toBe('H.R. 99')
   })
 })
 

@@ -1,20 +1,26 @@
 import { useId } from 'react'
 import { ExternalLink } from 'lucide-react'
 
-import { trimDisplayTitle } from '@congress-tracker/shared/bill-id'
 import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
 import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
 import { partyShortLabel } from '@congress-tracker/shared/party'
 
-import type { MemberProfileResponse } from '../api/types'
+import type { MemberProfileResponse, MemberProfileSponsoredBill } from '../api/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { congressOrdinal, formatShortBillId, formatVoteDate } from '../utils/billLabels'
+import {
+  congressGovBillUrl,
+  congressOrdinal,
+  formatShortBillId,
+  formatVoteDate,
+  getBillColloquialName,
+} from '../utils/billLabels'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { AnimatedSheet } from './AnimatedSheet'
 import { MemberAvatar } from './MemberAvatar'
 import { PartyBadge } from './PartyBadge'
+import { ProfileBillRow } from './ProfileBillRow'
 
 export type MemberProfileCrossVoteLabel = 'rare' | 'occasional' | 'frequent'
 
@@ -63,21 +69,13 @@ function votingRecordTitle(profile: MemberProfileResponse | null): string {
   return `Voting record · ${congressOrdinal(profile.congress)} Congress, session ${profile.session}`
 }
 
-function billCardTitle(
-  headline: string | null | undefined,
-  title: string | null | undefined,
-  billType: string,
-  billNumber: number,
-): string {
-  const headlineText = headline?.trim()
-  if (headlineText) return trimDisplayTitle(headlineText)
-  const titleText = title?.trim()
-  if (titleText) return trimDisplayTitle(titleText)
-  return formatShortBillId(billType, billNumber)
-}
-
 function againstPartyLabel(position: 'yea' | 'nay'): string {
   return position === 'yea' ? 'Voted yea against party' : 'Voted nay against party'
+}
+
+function billHref(inFeed: boolean, billId: string, congress: number, type: string, number: number): string {
+  if (inFeed) return `/?bill=${billId}`
+  return congressGovBillUrl(congress, type, number)
 }
 
 function statsPhase(
@@ -89,6 +87,81 @@ function statsPhase(
   if (isLoading && !profile) return { kind: 'loading' }
   if (error && !profile) return { kind: 'error', message: error }
   return { kind: 'unavailable' }
+}
+
+function SponsoredBillsSection({
+  profile,
+  onClose,
+}: {
+  profile: MemberProfileResponse
+  onClose: () => void
+}) {
+  const bills = profile.sponsored_bills
+  if (bills.length === 0 && !profile.member_votes_available) return null
+
+  return (
+    <section className="sheet-section" aria-label="Sponsored bills">
+      <div className="flex min-w-0 items-baseline justify-between gap-2">
+        <h3 className="sheet-section-title">Sponsored bills</h3>
+        {bills.length > 0 && profile.sponsored_bills_total > bills.length ? (
+          <p className="m-0 text-[0.6875rem] text-faint">
+            {bills.length} of {profile.sponsored_bills_total}
+          </p>
+        ) : null}
+      </div>
+      {bills.length > 0 ? (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {bills.map((bill) => (
+            <SponsoredBillItem key={bill.bill_id} bill={bill} onClose={onClose} />
+          ))}
+        </ul>
+      ) : (
+        <p className="sheet-muted">No sponsored bills in this Congress</p>
+      )}
+    </section>
+  )
+}
+
+function SponsoredBillItem({
+  bill,
+  onClose,
+}: {
+  bill: MemberProfileSponsoredBill
+  onClose: () => void
+}) {
+  const title = getBillColloquialName({
+    congress: bill.congress,
+    type: bill.bill_type,
+    number: bill.bill_number,
+    title: bill.title,
+    headline: bill.headline,
+  })
+  const shortId = formatShortBillId(bill.bill_type, bill.bill_number)
+  return (
+    <li className="min-w-0">
+      <ProfileBillRow
+        title={title}
+        href={billHref(bill.in_feed, bill.bill_id, bill.congress, bill.bill_type, bill.bill_number)}
+        inFeed={bill.in_feed}
+        onAfterNavigate={onClose}
+      >
+        <span className="text-xs text-secondary">
+          {shortId}
+          {bill.introduced_date ? ` · ${formatVoteDate(bill.introduced_date)}` : null}
+        </span>
+      </ProfileBillRow>
+      {bill.latest_action_text ? (
+        <p className="m-0 truncate text-xs text-faint" title={bill.latest_action_text}>
+          {bill.latest_action_text}
+        </p>
+      ) : null}
+      {bill.policy_area ? (
+        <Badge variant="outline" className="mt-1 max-w-full truncate font-medium" title={bill.policy_area}>
+          {bill.policy_area}
+        </Badge>
+      ) : null}
+    </li>
+  )
 }
 
 export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfileProps) {
@@ -177,31 +250,36 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
           <h3 className="sheet-section-title">Recent party-line breaks</h3>
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {phase.profile.recent_cross_votes.map((vote) => {
-              const title = billCardTitle(
-                vote.headline,
-                vote.title,
-                vote.bill_type,
-                vote.bill_number,
-              )
+              const title = getBillColloquialName({
+                congress: vote.bill_congress,
+                type: vote.bill_type,
+                number: vote.bill_number,
+                title: vote.title,
+                headline: vote.headline,
+              })
               const shortId = formatShortBillId(vote.bill_type, vote.bill_number)
               return (
                 <li
                   key={`${vote.chamber}-${vote.congress}-${vote.session}-${vote.roll_number}`}
                   className="min-w-0"
                 >
-                  <a
-                    href={`/?bill=${vote.bill_id}`}
-                    className="flex min-w-0 flex-col gap-0.5 no-underline"
-                    onClick={onClose}
+                  <ProfileBillRow
+                    title={title}
+                    href={billHref(
+                      vote.in_feed,
+                      vote.bill_id,
+                      vote.bill_congress,
+                      vote.bill_type,
+                      vote.bill_number,
+                    )}
+                    inFeed={vote.in_feed}
+                    onAfterNavigate={onClose}
                   >
-                    <span className="line-clamp-2 text-[0.8125rem] font-semibold text-foreground">
-                      {title}
-                    </span>
                     <span className="text-xs text-secondary">
                       {shortId} · {formatVoteDate(vote.vote_date)} · {againstPartyLabel(vote.position)}{' '}
                       · margin {vote.margin}
                     </span>
-                  </a>
+                  </ProfileBillRow>
                 </li>
               )
             })}
@@ -209,55 +287,7 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
         </section>
       ) : null}
 
-      {profile && profile.sponsored_bills.length > 0 ? (
-        <section className="sheet-section" aria-label="Sponsored bills">
-          <div className="flex min-w-0 items-baseline justify-between gap-2">
-            <h3 className="sheet-section-title">Sponsored bills</h3>
-            {profile.sponsored_bills_total > profile.sponsored_bills.length ? (
-              <p className="m-0 text-[0.6875rem] text-faint">
-                {profile.sponsored_bills.length} of {profile.sponsored_bills_total}
-              </p>
-            ) : null}
-          </div>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {profile.sponsored_bills.map((bill) => {
-              const title = billCardTitle(bill.headline, bill.title, bill.bill_type, bill.bill_number)
-              const shortId = formatShortBillId(bill.bill_type, bill.bill_number)
-              return (
-                <li key={bill.bill_id} className="min-w-0">
-                  <a
-                    href={`/?bill=${bill.bill_id}`}
-                    className="flex min-w-0 flex-col gap-0.5 no-underline"
-                    onClick={onClose}
-                  >
-                    <span className="line-clamp-2 text-[0.8125rem] font-semibold text-foreground">
-                      {title}
-                    </span>
-                    <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-secondary">
-                      <span>
-                        {shortId}
-                        {bill.introduced_date ? ` · ${formatVoteDate(bill.introduced_date)}` : null}
-                      </span>
-                      {bill.policy_area ? (
-                        <Badge variant="outline" className="max-w-full truncate font-medium">
-                          {bill.policy_area}
-                        </Badge>
-                      ) : null}
-                    </span>
-                  </a>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ) : null}
-
-      {profile?.member_votes_available && profile.sponsored_bills.length === 0 ? (
-        <section className="sheet-section" aria-label="Sponsored bills">
-          <h3 className="sheet-section-title">Sponsored bills</h3>
-          <p className="sheet-muted">No sponsored bills in this Congress</p>
-        </section>
-      ) : null}
+      {profile ? <SponsoredBillsSection profile={profile} onClose={onClose} /> : null}
 
       {profile?.congress_gov_url ? (
         <Button asChild variant="outline" size="sm" className="self-start">

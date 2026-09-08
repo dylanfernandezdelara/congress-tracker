@@ -1,3 +1,5 @@
+import { formatShortBillId, trimDisplayTitle } from '@congress-tracker/shared/feed-content'
+
 export {
   congressGovBillUrl,
   congressOrdinal,
@@ -5,6 +7,21 @@ export {
   formatBillIdParts,
   formatShortBillId,
 } from '@congress-tracker/shared/feed-content'
+
+export type BillDisplayRef = {
+  congress: number
+  type: string
+  number: number
+  title?: string | null
+  headline?: string | null
+}
+
+/** Plain-language bill label (headline → short title → bill id). */
+export function getBillColloquialName(bill: BillDisplayRef): string {
+  if (bill.headline?.trim()) return trimDisplayTitle(bill.headline)
+  if (bill.title?.trim()) return trimDisplayTitle(bill.title)
+  return formatShortBillId(bill.type, bill.number)
+}
 
 export function formatVoteDate(iso: string): string {
   const d = new Date(iso + 'T12:00:00')
