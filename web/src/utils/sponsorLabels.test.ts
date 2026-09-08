@@ -1,39 +1,39 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatPrimarySponsorLine } from './sponsorLabels'
+import { primarySponsorDisplay } from './sponsorLabels'
 
-describe('formatPrimarySponsorLine', () => {
-  it('joins name with party-state', () => {
+describe('primarySponsorDisplay', () => {
+  it('splits name and party-state meta for interactive rendering', () => {
     expect(
-      formatPrimarySponsorLine({
+      primarySponsorDisplay({
         bioguide_id: 'LOCAL:H002',
         name: 'Rep. Sample Loyal (local)',
         party: 'D',
         state: 'NY',
       }),
-    ).toBe('Rep. Sample Loyal (local) · D-NY')
+    ).toEqual({ name: 'Rep. Sample Loyal (local)', meta: 'D-NY' })
   })
 
   it('returns name only when party and state are missing', () => {
     expect(
-      formatPrimarySponsorLine({
+      primarySponsorDisplay({
         bioguide_id: 'LOCAL:H002',
         name: 'Rep. Sample Loyal (local)',
         party: null,
         state: '',
       }),
-    ).toBe('Rep. Sample Loyal (local)')
+    ).toEqual({ name: 'Rep. Sample Loyal (local)', meta: '' })
   })
 
   it('returns null when the sponsor row is empty', () => {
     expect(
-      formatPrimarySponsorLine({
+      primarySponsorDisplay({
         bioguide_id: 'LOCAL:H002',
         name: null,
         party: null,
         state: '',
       }),
     ).toBeNull()
-    expect(formatPrimarySponsorLine(null)).toBeNull()
+    expect(primarySponsorDisplay(null)).toBeNull()
   })
 })

@@ -16,6 +16,7 @@ import { FeedRow } from '../components/FeedRow'
 import { FeedSearchInput } from '../components/FeedSearchInput'
 import { FloorStatusChip } from '../components/FloorStatusChip'
 import { LeftSidebar } from '../components/LeftSidebar'
+import { MemberProfileProvider } from '../components/MemberProfileProvider'
 import { RecentConfirmationsSection } from '../components/RecentConfirmationsSection'
 import { RecentLawsSection } from '../components/RecentLawsSection'
 import { RightRail } from '../components/RightRail'
@@ -236,7 +237,8 @@ export default function Home() {
   })
 
   return (
-    <div className="home-shell">
+    <MemberProfileProvider>
+      <div className="home-shell">
       {isDesktop ? (
         <aside className="home-rail home-rail--left" aria-label="Session context">
           <div className="home-rail-stack">
@@ -428,6 +430,7 @@ export default function Home() {
         selectionKey={defectorSheetKey}
         onClose={closeTightnessDot}
       />
-    </div>
+      </div>
+    </MemberProfileProvider>
   )
 }
