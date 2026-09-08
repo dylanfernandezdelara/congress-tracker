@@ -88,14 +88,22 @@ describe('MemberProfile', () => {
     render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
     expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Voting behavior' })).toBeInTheDocument()
     expect(screen.getByText('Frequent cross-voter')).toBeInTheDocument()
+    expect(screen.getByText('BF')).toBeInTheDocument()
+    expect(screen.getByText('Republican')).toBeInTheDocument()
+    expect(screen.getByText('R-PA')).toBeInTheDocument()
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
+    expect(screen.getByText('Republican')).toBeInTheDocument()
+    expect(screen.getByText('House')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('30 / 12')).toBeInTheDocument()
     expect(screen.getByText(/S\. 2/)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Recent party-line breaks' })).toBeInTheDocument()
+    expect(screen.getByText(/voted Yea \(party Nay\)/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toHaveAttribute(
       'href',
       'https://www.congress.gov/member/brian-fitzpatrick/F000466',
@@ -110,7 +118,40 @@ describe('MemberProfile', () => {
 
     expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
     expect(screen.getByText('PA-1')).toBeInTheDocument()
+    expect(screen.getByText('Republican')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
+  })
+
+  it('shows a loading message while session stats are in flight', () => {
+    fetchMemberProfileMock.mockReturnValue(new Promise(() => undefined))
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    expect(screen.getByText('Loading session voting stats…')).toBeInTheDocument()
+    expect(screen.getByText('R-PA')).toBeInTheDocument()
+  })
+
+  it('shows the fetch error when the profile request fails', async () => {
+    fetchMemberProfileMock.mockRejectedValue(new Error('member profile unavailable'))
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('member profile unavailable')).toBeInTheDocument()
+    })
+  })
+
+  it('shows the unavailable message when member votes are missing', async () => {
+    fetchMemberProfileMock.mockResolvedValue({ ...profile, member_votes_available: false })
+
+    render(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Per-member vote history is not available for this session yet.'),
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('region', { name: 'Recent party-line breaks' })).not.toBeInTheDocument()
   })
 
   it('closes on Escape and backdrop click after the exit animation', async () => {

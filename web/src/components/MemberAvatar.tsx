@@ -3,10 +3,6 @@ import { useState } from 'react'
 import { memberInitials } from '../utils/memberPhoto'
 
 const VARIANT_CLASSES = {
-  profile: {
-    root: 'member-profile-avatar',
-    fallback: 'member-profile-avatar-fallback',
-  },
   defector: {
     root: 'notable-defector-avatar',
     fallback: 'notable-defector-avatar-fallback',
@@ -16,7 +12,7 @@ const VARIANT_CLASSES = {
 type MemberAvatarProps = {
   name: string
   photoUrl: string
-  /** `profile` = large sheet avatar; `defector` = compact notable-vote avatar. */
+  /** Compact notable-vote avatar. */
   variant: keyof typeof VARIANT_CLASSES
 }
 
