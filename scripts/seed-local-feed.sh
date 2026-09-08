@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS bill_sponsors (
 );
 CREATE INDEX IF NOT EXISTS idx_bill_sponsors_state ON bill_sponsors (state, congress, bill_type, bill_number);
 CREATE INDEX IF NOT EXISTS idx_bill_sponsors_bill ON bill_sponsors (congress, bill_type, bill_number);
+CREATE INDEX IF NOT EXISTS idx_bill_sponsors_member ON bill_sponsors (bioguide_id, congress, is_primary);
 CREATE TABLE IF NOT EXISTS members (
   bioguide_id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -317,6 +318,10 @@ VALUES
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"House bill would publish member portfolio snapshots (local sample)","what_it_does":"Would require more frequent public reporting of members stock trades and year-end holdings.","key_points":["Adds quarterly portfolio snapshots","Puts trade reports on a public dashboard","Applies to members and senior staff"],"terms_explained":[{"term":"Portfolio snapshot","plain":"A dated list of what someone owns so the public can see changes over time."}]}',
    '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z'),
+  (119, 'hr', 99, 'Out-of-window Transparency Act (local sample)', 'Government Operations and Politics',
+   'Sample CRS-style summary seeded for local development. No live data was fetched.',
+   '{"headline":"House bill sits outside the recent feed window (local sample)","what_it_does":"Would require older disclosure reports that no longer appear in the 45-day feed.","key_points":["Introduced outside the 7-day intro window","Has no recent passage vote","Used to prove Congress.gov profile links"],"terms_explained":[{"term":"Feed window","plain":"The recent stretch of votes and introductions the homepage still lists."}]}',
+   '${D_OLDER}T00:00:00.000Z', '${D_OLDER}T00:00:00.000Z'),
   (119, 's', 55, 'Senate Ethics Disclosure Companion Act (local sample)', 'Government Operations and Politics',
    'Sample CRS-style summary seeded for local development. No live data was fetched.',
    '{"headline":"Senate companion tightens ethics disclosure rules (local sample)","what_it_does":"Would align Senate disclosure deadlines with the House portfolio-reporting bill.","key_points":["Matches House reporting deadlines","Covers Senate staff as well as senators","Keeps existing penalties for late filings"],"terms_explained":[{"term":"Companion bill","plain":"A similar bill introduced in the other chamber so both houses can work on the same idea."}]}',
@@ -328,6 +333,7 @@ VALUES
   (119, 'hr', 1, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_RECENT}T00:00:00.000Z'),
   (119, 's', 47, 'LOCAL:S001', 'TX', 'Sen. Sample Crossover (local)', 'R', 1, '${D_MID}T00:00:00.000Z'),
   (119, 'hr', 22, 'LOCAL:H001', 'CA', 'Rep. Sample Crossover (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z'),
+  (119, 'hr', 99, 'LOCAL:H001', 'CA', 'Rep. Sample Crossover (local)', 'D', 1, '${D_OLDER}T00:00:00.000Z'),
   (119, 'hr', 88, 'LOCAL:H004', 'SC', 'Rep. Portfolio Loser (local)', 'R', 1, '${D_RECENT}T00:00:00.000Z'),
   (119, 'hr', 33, 'LOCAL:H002', 'NY', 'Rep. Sample Loyal (local)', 'D', 1, '${D_MID}T00:00:00.000Z'),
   (119, 's', 9901, 'LOCAL:S9901', 'VT', 'Sen. Bernard Sanders (local)', 'I', 1, '${D_TODAY}T00:00:00.000Z'),
@@ -349,6 +355,8 @@ VALUES
    '${D_RECENT}', 'Passed the House. (local sample)', '${D_RECENT}T00:00:00.000Z'),
   (119, 'hr', 55, '${D_OLDER}', NULL, NULL, NULL, NULL, NULL, NULL,
    '${D_OLDER}', 'Introduced in House. (local sample)', '${D_OLDER}T00:00:00.000Z'),
+  (119, 'hr', 99, '${D_OLDER}', NULL, NULL, NULL, NULL, NULL, NULL,
+   '${D_OLDER}', 'Referred to the House Committee on Oversight. (local sample)', '${D_OLDER}T00:00:00.000Z'),
   (119, 's', 55, '${D_OLDER}', NULL, NULL, NULL, NULL, NULL, NULL,
    '${D_OLDER}', 'Introduced in Senate. (local sample)', '${D_OLDER}T00:00:00.000Z'),
   (119, 's', 9901, '${D_TODAY}', NULL, NULL, NULL, NULL, NULL, NULL,
