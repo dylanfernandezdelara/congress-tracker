@@ -1,10 +1,15 @@
 import { bioguidePhotoUrl, congressGovMemberUrl } from "../../../../shared/member-photo";
 import { crossVoteLabel } from "../../../../shared/notable-votes";
-import type { MemberProfileRecentCrossVote, MemberProfileResponse } from "../../../../shared/stats-api-types";
+import type {
+  MemberProfileRecentCrossVote,
+  MemberProfileResponse,
+  MemberProfileSponsoredBill,
+} from "../../../../shared/stats-api-types";
 import { normalizeVotePosition } from "../../../../shared/vote-positions";
 import { getMember, getMembersByIds } from "../d1/members";
 import {
   enrichRecentCrossVotes,
+  selectInFeedBillIds,
   selectSponsoredBillsForMember,
 } from "../d1/member-profile-bills";
 import {
@@ -15,10 +20,37 @@ import {
 import {
   getMemberSessionStats,
   selectRecentMemberCrossVotes,
+  type MemberCrossVoteCore,
 } from "../d1/member-session-stats";
 import { rollCrossVotes } from "./cross-votes";
 
 const RECENT_CROSS_VOTE_LIMIT = 5;
+
+async function withFeedMembership(
+  db: D1Database,
+  crossVotes: MemberProfileRecentCrossVote[],
+  sponsored: MemberProfileSponsoredBill[]
+): Promise<{
+  crossVotes: MemberProfileRecentCrossVote[];
+  sponsored: MemberProfileSponsoredBill[];
+}> {
+  const inFeed = await selectInFeedBillIds(db, [
+    ...crossVotes.map((vote) => ({
+      congress: vote.bill_congress,
+      billType: vote.bill_type,
+      billNumber: vote.bill_number,
+    })),
+    ...sponsored.map((bill) => ({
+      congress: bill.congress,
+      billType: bill.bill_type,
+      billNumber: bill.bill_number,
+    })),
+  ]);
+  return {
+    crossVotes: crossVotes.map((vote) => ({ ...vote, in_feed: inFeed.has(vote.bill_id) })),
+    sponsored: sponsored.map((bill) => ({ ...bill, in_feed: inFeed.has(bill.bill_id) })),
+  };
+}
 
 /**
  * Build a member profile for the current session: roster identity plus
@@ -49,6 +81,7 @@ export async function buildMemberProfile(
       ).then((votes) => enrichRecentCrossVotes(db, votes)),
       selectSponsoredBillsForMember(db, congress, bioguideId),
     ]);
+    const flagged = await withFeedMembership(db, recent_cross_votes, sponsored.bills);
     return {
       bioguide_id: member.bioguideId,
       name: member.name,
@@ -65,8 +98,8 @@ export async function buildMemberProfile(
       nay_count: stats.nay_count,
       cross_vote_count: stats.cross_vote_count,
       cross_vote_label: crossVoteLabel(stats.cross_vote_count),
-      recent_cross_votes,
-      sponsored_bills: sponsored.bills,
+      recent_cross_votes: flagged.crossVotes,
+      sponsored_bills: flagged.sponsored,
       sponsored_bills_total: sponsored.total,
       member_votes_available: stats.votes_cast > 0,
       as_of: stats.updated_at,
@@ -103,6 +136,7 @@ async function buildMemberProfileLive(
     computeMemberCrossVotes(db, member, memberVotes),
     selectSponsoredBillsForMember(db, congress, member.bioguideId),
   ]);
+  const flagged = await withFeedMembership(db, recent_cross_votes, sponsored.bills);
 
   return {
     bioguide_id: member.bioguideId,
@@ -120,8 +154,8 @@ async function buildMemberProfileLive(
     nay_count,
     cross_vote_count,
     cross_vote_label: crossVoteLabel(cross_vote_count),
-    recent_cross_votes,
-    sponsored_bills: sponsored.bills,
+    recent_cross_votes: flagged.crossVotes,
+    sponsored_bills: flagged.sponsored,
     sponsored_bills_total: sponsored.total,
     member_votes_available: memberVotes.length > 0,
     as_of: new Date().toISOString(),
@@ -165,9 +199,7 @@ async function computeMemberCrossVotes(
 
   const memberVoteByRoll = new Map(memberVotes.map((row) => [row.roll_number, row]));
   let cross_vote_count = 0;
-  const recent_cross_votes: Array<
-    Omit<MemberProfileRecentCrossVote, "bill_id" | "title" | "headline" | "question" | "result">
-  > = [];
+  const recent_cross_votes: MemberCrossVoteCore[] = [];
 
   // memberVotes arrive newest-first; walk in that order for recent examples.
   for (const vote of memberVotes) {

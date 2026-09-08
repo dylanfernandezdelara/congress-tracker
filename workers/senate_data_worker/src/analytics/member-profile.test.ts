@@ -14,6 +14,7 @@ function createDb(options: {
   rollBillInfo?: MockRow[];
   sponsoredBills?: MockRow[];
   sponsoredTotal?: number;
+  inFeedBills?: MockRow[];
 }): D1Database {
   const {
     member = null,
@@ -25,6 +26,7 @@ function createDb(options: {
     rollBillInfo = [],
     sponsoredBills = [],
     sponsoredTotal = sponsoredBills.length,
+    inFeedBills = [],
   } = options;
 
   return {
@@ -34,6 +36,9 @@ function createDb(options: {
         all: vi.fn(async () => {
           if (sql.includes("FROM member_cross_votes") && sql.includes("ORDER BY vote_date DESC")) {
             return { results: recentCrossVotes };
+          }
+          if (sql.includes("WITH combined AS")) {
+            return { results: inFeedBills };
           }
           if (sql.includes("FROM votes v") && sql.includes("LEFT JOIN bill_digests")) {
             return { results: rollBillInfo };
@@ -194,8 +199,6 @@ describe("buildMemberProfile", () => {
             congress: 119,
             session: 2,
             roll_number: 10,
-            question: "On Passage",
-            result: "Passed",
             title: "Lower Energy Costs Act",
             headline: "House passes a broad energy package",
           },
@@ -209,10 +212,14 @@ describe("buildMemberProfile", () => {
             headline: "House passes a federal spending oversight bill",
             policy_area: "Government Operations",
             introduced_date: "2026-06-01",
-            status: "Presented to President.",
+            latest_action_text: "Presented to President.",
           },
         ],
         sponsoredTotal: 3,
+        inFeedBills: [
+          { bill_congress: 119, bill_type: "HR", bill_number: 1 },
+          { bill_congress: 119, bill_type: "HR", bill_number: 22 },
+        ],
       }),
       119,
       2,
@@ -237,8 +244,7 @@ describe("buildMemberProfile", () => {
         bill_id: "119-hr-1",
         title: "Lower Energy Costs Act",
         headline: "House passes a broad energy package",
-        question: "On Passage",
-        result: "Passed",
+        in_feed: true,
       }),
     ]);
     expect(profile?.sponsored_bills).toEqual([
@@ -248,7 +254,8 @@ describe("buildMemberProfile", () => {
         headline: "House passes a federal spending oversight bill",
         introduced_date: "2026-06-01",
         policy_area: "Government Operations",
-        status: "Presented to President.",
+        latest_action_text: "Presented to President.",
+        in_feed: true,
       }),
     ]);
     expect(profile?.sponsored_bills_total).toBe(3);
@@ -326,14 +333,13 @@ describe("buildMemberProfile", () => {
             congress: 119,
             session: 2,
             roll_number: 10,
-            question: "On Passage",
-            result: "Passed",
             title: "Lower Energy Costs Act",
             headline: "House passes a broad energy package",
           },
         ],
         sponsoredBills: [],
         sponsoredTotal: 0,
+        inFeedBills: [{ bill_congress: 119, bill_type: "HR", bill_number: 1 }],
       }),
       119,
       2,
@@ -358,8 +364,7 @@ describe("buildMemberProfile", () => {
         bill_id: "119-hr-1",
         title: "Lower Energy Costs Act",
         headline: "House passes a broad energy package",
-        question: "On Passage",
-        result: "Passed",
+        in_feed: true,
         position: "yea",
         party_line: "nay",
         margin: 10,
@@ -409,12 +414,11 @@ describe("buildMemberProfile", () => {
             congress: 119,
             session: 2,
             roll_number: 11,
-            question: "On Passage of the Bill",
-            result: "Passed",
             title: null,
             headline: null,
           },
         ],
+        inFeedBills: [],
       }),
       119,
       2,
@@ -426,8 +430,7 @@ describe("buildMemberProfile", () => {
         bill_id: "119-s-47",
         title: "",
         headline: null,
-        question: "On Passage of the Bill",
-        result: "Passed",
+        in_feed: false,
       }),
     ]);
     expect(profile?.sponsored_bills).toEqual([]);

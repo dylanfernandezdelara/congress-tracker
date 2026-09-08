@@ -106,7 +106,7 @@ export async function getMemberSessionStats(
 
 export type MemberCrossVoteCore = Omit<
   MemberProfileRecentCrossVote,
-  "bill_id" | "title" | "headline" | "question" | "result"
+  "bill_id" | "title" | "headline" | "in_feed"
 >;
 
 export async function selectRecentMemberCrossVotes(

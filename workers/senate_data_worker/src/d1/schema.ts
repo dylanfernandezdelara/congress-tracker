@@ -1,9 +1,9 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
-const SCHEMA_DDL = [
+export const SCHEMA_DDL = [
   `CREATE TABLE IF NOT EXISTS votes (
   chamber TEXT NOT NULL,
   congress INTEGER NOT NULL,
@@ -223,6 +223,7 @@ const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_bill_sponsors_state ON bill_sponsors (state, congress, bill_type, bill_number)`,
   `CREATE INDEX IF NOT EXISTS idx_bill_sponsors_bill ON bill_sponsors (congress, bill_type, bill_number)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_sponsors_member ON bill_sponsors (bioguide_id, congress, is_primary)`,
   `CREATE TABLE IF NOT EXISTS bill_committee_events (
   congress INTEGER NOT NULL,
   bill_type TEXT NOT NULL,

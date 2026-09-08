@@ -298,10 +298,8 @@ export interface MemberProfileRecentCrossVote {
   title: string
   /** Digest plain-English headline, when present. */
   headline: string | null
-  /** Roll-call question when the votes row has one. */
-  question: string | null
-  /** Official roll result (`Passed`, `Failed`) when present. */
-  result: string | null
+  /** True when the bill is still in `/feed/latest` membership. */
+  in_feed: boolean
   vote_date: string
   position: 'yea' | 'nay'
   party_line: 'yea' | 'nay'
@@ -319,8 +317,10 @@ export interface MemberProfileSponsoredBill {
   headline: string | null
   introduced_date: string | null
   policy_area: string | null
-  /** Latest known official action text from `bill_lifecycle`, when present. */
-  status: string | null
+  /** Latest official action from `bill_lifecycle`, when present. */
+  latest_action_text: string | null
+  /** True when the bill is still in `/feed/latest` membership. */
+  in_feed: boolean
 }
 
 export interface MemberProfileResponse {
