@@ -160,14 +160,18 @@ another branch's files:
 
 ```bash
 git fetch origin main
+# <suffix> is the session id Cursor appends to every branch, e.g. 6eb0
 git worktree add /tmp/wt-<name> -b cursor/<name>-<suffix> origin/main
 cd /tmp/wt-<name> && npm run setup   # each worktree needs its own node_modules + web/dist
 ```
 
-Run the ship checklist inside that worktree. `npm run preview` prints a
-per-branch alias URL, so parallel previews do not collide. If two worktrees
-need the verify helper at the same time, give the second one different
-`VERIFY_*_PORT` values (Launch section of
+Run the ship checklist inside that worktree. Paste the **version** URL that
+`npm run preview` prints; it is unique per upload. The branch alias it also
+requests is truncated to 34 characters, so two long branch names can share
+one alias. Files are isolated but ports are not: if two worktrees run the
+checklist at once, give the second `VITE_DEV_PORT` (with a matching
+`QA_WEB_URL` for `qa:web`) and different `VERIFY_*_PORT` values (Launch
+section of
 [`.cursor/skills/verify-congress-tracker/SKILL.md`](../.cursor/skills/verify-congress-tracker/SKILL.md)).
 
 Merge order matters: after each squash-merge, `git fetch origin main` and
