@@ -355,6 +355,58 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsWritten).toBe(25);
     expect(mockUpsertDigest).toHaveBeenCalledTimes(25);
     expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
+    const overBudget = mockUpsertDigest.mock.calls.filter(
+      (call) => (call[1] as { digest: { source?: string } | null }).digest?.source === "title_fallback"
+    );
+    expect(overBudget).toHaveLength(5);
+    expect(result.digestWarnings).toEqual([
+      expect.stringContaining("rewrite budget (20) spent: wrote deterministic title fallback digest for 5 bill(s)"),
+    ]);
+  });
+
+  it("writes a title fallback and records a digest warning when OpenRouter returns null for an intro", async () => {
+    mockSelectRecentVotedBills.mockResolvedValue([]);
+    mockPersistRecentIntroductions.mockResolvedValue({
+      bills: [{ bill_congress: 119, bill_type: "HR", bill_number: 10239 }],
+      discovered: 1,
+      persisted: 1,
+      warnings: [],
+    });
+    mockGetDigest.mockResolvedValue(null);
+    mockFetchBillSummaryBundle.mockResolvedValue({
+      title: "Equal Pay for Equal Work Act",
+      policyArea: null,
+      rawSummaryText: null,
+      introducedDate: "2026-09-03",
+      sponsors: [],
+    });
+    mockRewriteSummary.mockResolvedValue(null);
+
+    const result = await runFeedPipeline(createEnv());
+
+    expect(result.digestsWritten).toBe(1);
+    expect(result.digestsRewritten).toBe(0);
+    expect(result.digestWarnings).toEqual([
+      "H.R. 10239 · 119th Congress: OpenRouter rewrite returned no digest; wrote deterministic title fallback digest",
+    ]);
+    expect(mockUpsertDigest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        number: 10239,
+        digest: expect.objectContaining({
+          headline: "Equal Pay for Equal Work Act",
+          source: "title_fallback",
+        }),
+      })
+    );
+    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalledWith(
+      expect.anything(),
+      "admin",
+      expect.objectContaining({
+        digestsWritten: 1,
+        digest_warnings: result.digestWarnings,
+      })
+    );
   });
 
   it("refreshes lifecycle for feed bills and skips terminal rows", async () => {
