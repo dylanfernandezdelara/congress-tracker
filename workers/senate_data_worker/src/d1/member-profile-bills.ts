@@ -1,19 +1,10 @@
 import { formatBillQueryParam } from "../../../../shared/bill-id";
-import {
-  daysAgoLookbackStartIso,
-  inclusiveLookbackStartIso,
-} from "../../../../shared/lookback";
 import type {
   MemberProfileRecentCrossVote,
   MemberProfileSponsoredBill,
 } from "../../../../shared/stats-api-types";
-import {
-  EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
-  INTRO_LOOKBACK_DAYS,
-  VOTE_LOOKBACK_DAYS,
-} from "../constants";
 import { normalizeBillType } from "../sources/bill-type";
-import { feedMembershipBinds, feedMembershipCteSql } from "./feed-membership";
+import { feedMembershipCteSql, feedMembershipWindowBinds } from "./feed-membership";
 import type { MemberCrossVoteCore } from "./member-session-stats";
 import { ensureSchema } from "./schema";
 
@@ -253,11 +244,8 @@ export async function selectInFeedBillIds(
   if (unique.length === 0) return new Set();
 
   await ensureSchema(db);
-  const lookback = daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf);
-  const executiveSince = daysAgoLookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS, asOf);
-  const introLookback = inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS, asOf);
   const binds: Array<string | number> = [
-    ...feedMembershipBinds(lookback, executiveSince, introLookback, true),
+    ...feedMembershipWindowBinds(asOf, true),
     ...unique.flatMap((bill) => [bill.congress, bill.billType, bill.billNumber]),
   ];
 

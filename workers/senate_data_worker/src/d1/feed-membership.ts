@@ -1,4 +1,13 @@
-import { INTRO_FEED_MAX_NEW } from "../constants";
+import {
+  daysAgoLookbackStartIso,
+  inclusiveLookbackStartIso,
+} from "../../../../shared/lookback";
+import {
+  EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
+  INTRO_FEED_MAX_NEW,
+  INTRO_LOOKBACK_DAYS,
+  VOTE_LOOKBACK_DAYS,
+} from "../constants";
 import { introRelevanceScoreSql } from "../sources/intro-relevance";
 
 const INTRO_SCORE_SQL = introRelevanceScoreSql("d.title", "d.policy_area", "s.bioguide_id");
@@ -69,4 +78,17 @@ export function feedMembershipBinds(
 ): Array<string | number> {
   if (!includeIntros) return [voteLookbackDate, executiveSinceIso];
   return [voteLookbackDate, executiveSinceIso, introLookbackDate, INTRO_FEED_MAX_NEW];
+}
+
+/** Vote / executive / intro lookback trio for {@link feedMembershipBinds}. */
+export function feedMembershipWindowBinds(
+  asOf: Date = new Date(),
+  includeIntros = true
+): Array<string | number> {
+  return feedMembershipBinds(
+    daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf),
+    daysAgoLookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS, asOf),
+    inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS, asOf),
+    includeIntros
+  );
 }

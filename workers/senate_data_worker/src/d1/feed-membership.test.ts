@@ -3,13 +3,24 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { INTRO_FEED_MAX_NEW } from "../constants";
+import { daysAgoLookbackStartIso, inclusiveLookbackStartIso } from "../../../../shared/lookback";
+import {
+  EXECUTIVE_SIGNAL_LOOKBACK_DAYS,
+  INTRO_FEED_MAX_NEW,
+  INTRO_LOOKBACK_DAYS,
+  VOTE_LOOKBACK_DAYS,
+} from "../constants";
 import {
   introRelevanceScoreSql,
   scoreIntroRelevance,
   type IntroRelevanceFields,
 } from "../sources/intro-relevance";
-import { feedMembershipCteSql, introOnlyMembershipSql } from "./feed-membership";
+import {
+  feedMembershipBinds,
+  feedMembershipCteSql,
+  feedMembershipWindowBinds,
+  introOnlyMembershipSql,
+} from "./feed-membership";
 
 /** CI is Node 20 (`node:sqlite` is 22.5+). Drive the real SQL with the sqlite3 CLI. */
 function bindSql(sql: string, values: Array<string | number>): string {
@@ -153,6 +164,20 @@ INSERT INTO bill_digests (congress, bill_type, number, title, policy_area) VALUE
     for (const [i, fields] of fixtures.entries()) {
       expect(Number(rows[i]?.score), fields.title ?? "null title").toBe(scoreIntroRelevance(fields));
     }
+  });
+});
+
+describe("feedMembershipWindowBinds", () => {
+  it("owns the vote/executive/intro lookback trio", () => {
+    const asOf = new Date("2026-09-08T12:00:00.000Z");
+    expect(feedMembershipWindowBinds(asOf, true)).toEqual(
+      feedMembershipBinds(
+        daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf),
+        daysAgoLookbackStartIso(EXECUTIVE_SIGNAL_LOOKBACK_DAYS, asOf),
+        inclusiveLookbackStartIso(INTRO_LOOKBACK_DAYS, asOf),
+        true
+      )
+    );
   });
 });
 
