@@ -8,9 +8,16 @@ import { fileURLToPath } from 'node:url'
 
 import { parseArgs } from '../lib/args.mjs'
 import {
+  ACCESSIBLE_NAME_MAX,
+  collectInteractiveInPage,
   describeLocator,
+  formatActionTarget,
+  formatInteractiveLine,
+  getLocator,
+  INTERACTIVE_ROLES,
   isAllowedCdpMethod,
   jsLooksLikeNavigation,
+  normalizeRef,
   parseName,
 } from '../lib/browser.mjs'
 import {
@@ -30,6 +37,14 @@ import {
   portOwnershipProblem,
   teardownPids,
 } from '../lib/process.mjs'
+import {
+  applyViewport,
+  DEFAULT_METRICS,
+  deviceMetricsFromState,
+  normalizeMetrics,
+  parseViewportFlags,
+  viewportFromCdpFlags,
+} from '../lib/viewport.mjs'
 import { FALLBACK_WEB_DIST_HTML, ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 import { TEST_ONLY } from './verify-congress-tracker.mjs'
 
@@ -56,7 +71,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const helper = path.join(here, 'verify-congress-tracker')
 const rootDir = path.resolve(here, '../../../..')
 const seedScript = path.join(rootDir, 'scripts', 'seed-local-feed.sh')
-const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO, viewportFromState } = TEST_ONLY
+const { resolveEvidencePath, EVIDENCE_ROOT, PERSIST_TO } = TEST_ONLY
 
 test('helper wrapper is executable', () => {
   const stat = fs.statSync(helper)
@@ -73,9 +88,10 @@ test('usage documents selector, nth, GET-only api, and DevTools commands', () =>
     assert.match(text, /--selector/)
     assert.match(text, /--nth N/)
     assert.match(text, /api GET/)
-    assert.match(text, /snapshot --aria/)
+    assert.match(text, /snapshot \(--aria \| --interactive\)/)
     assert.match(text, /browser eval/)
     assert.match(text, /browser cdp/)
+    assert.match(text, /browser viewport/)
     assert.match(text, /browser console/)
     assert.match(text, /browser network/)
     assert.match(text, /browser url/)
@@ -83,8 +99,15 @@ test('usage documents selector, nth, GET-only api, and DevTools commands', () =>
     assert.match(text, /browser scroll/)
     assert.match(text, /start Chromium/)
     assert.match(text, /--name <label>/)
-    assert.match(text, /fill .*\[--nth N\]/)
-    assert.match(text, /select .*\[--nth N\]/)
+    assert.match(text, /--ref/)
+    assert.match(text, /fill \(--role/)
+    assert.match(text, /browser find.*--ref/)
+    assert.match(text, /browser scroll.*--ref/)
+    assert.match(text, /browser wait.*--ref/)
+    assert.match(text, /browser select.*--ref/)
+    assert.match(text, /select .*--value/)
+    assert.match(text, /searchbox/)
+    assert.doesNotMatch(text, /--ref <ref>\) \[--exact\]/)
   }
 })
 
@@ -109,6 +132,183 @@ test('describeLocator applies nth to selector and rejects a bad nth', () => {
   assert.throws(() => describeLocator({ name: 'House', nth: 'x' }), /non-negative integer/)
 })
 
+test('describeLocator and normalizeRef accept @eN snapshot refs', () => {
+  assert.deepEqual(describeLocator({ ref: '@e12' }), { kind: 'ref', ref: 'e12' })
+  assert.throws(
+    () => describeLocator({ ref: 'e3', role: 'button', name: 'House' }),
+    /--ref cannot be combined with --role\/--name\/--selector\/--nth\/--exact/,
+  )
+  assert.throws(
+    () => describeLocator({ ref: 'e3', selector: '.feed-row' }),
+    /--ref cannot be combined/,
+  )
+  assert.throws(() => describeLocator({ ref: 'e3', nth: '0' }), /--ref cannot be combined/)
+  assert.throws(() => describeLocator({ ref: 'e3', exact: true }), /--ref cannot be combined/)
+  assert.equal(normalizeRef('@e1'), 'e1')
+  assert.equal(normalizeRef('e9'), 'e9')
+  assert.throws(() => normalizeRef('12'), /invalid ref/)
+  assert.throws(() => normalizeRef(''), /ref is required/)
+  assert.equal(formatActionTarget({ ref: '@e12' }), '--ref e12')
+  assert.equal(formatActionTarget({ role: 'button', name: 'House' }), 'button House')
+  assert.equal(formatActionTarget({ selector: '.feed-row' }), '.feed-row')
+})
+
+test('interactive snapshot lines are compact and include set state', () => {
+  assert.equal(
+    formatInteractiveLine({
+      ref: 'e1',
+      role: 'button',
+      name: 'Open profile for Rep. Sample Crossover (local)',
+      expanded: 'false',
+    }),
+    '[e1] button "Open profile for Rep. Sample Crossover (local)" (collapsed)',
+  )
+  assert.equal(
+    formatInteractiveLine({ ref: 'e2', role: 'radio', name: 'All', checked: 'true' }),
+    '[e2] radio "All" (checked)',
+  )
+  assert.equal(
+    formatInteractiveLine({ ref: 'e3', role: 'searchbox', name: 'Search bills', disabled: true }),
+    '[e3] searchbox "Search bills" (disabled)',
+  )
+})
+
+test('collectInteractiveInPage stamps visible searchboxes and skips hidden or inert nodes', () => {
+  function fakeNode(init) {
+    const store = { ...(init.attrs || {}) }
+    const node = {
+      tagName: init.tagName,
+      type: init.type,
+      hidden: Boolean(init.hidden),
+      labels: init.labels || [],
+      placeholder: init.placeholder || '',
+      innerText: init.innerText || '',
+      textContent: init.textContent || '',
+      disabled: init.disabled,
+      checked: init.checked,
+      ownerDocument: init.ownerDocument,
+      getAttribute: (key) => store[key] ?? '',
+      setAttribute: (key, value) => {
+        store[key] = value
+      },
+      removeAttribute: (key) => {
+        delete store[key]
+      },
+      hasAttribute: (key) => Object.hasOwn(store, key),
+      getClientRects: () => init.rects ?? [{ width: 10, height: 10 }],
+    }
+    return node
+  }
+
+  const search = fakeNode({
+    tagName: 'INPUT',
+    type: 'search',
+    attrs: { type: 'search' },
+    labels: [{ innerText: 'Search bills', textContent: 'Search bills' }],
+  })
+  const hidden = fakeNode({
+    tagName: 'BUTTON',
+    attrs: { 'aria-hidden': 'true' },
+    innerText: 'Hidden',
+  })
+  const option = fakeNode({
+    tagName: 'DIV',
+    attrs: { role: 'option' },
+    innerText: 'Choice',
+  })
+  const bareLink = fakeNode({
+    tagName: 'A',
+    innerText: 'No href',
+  })
+  // Stale ref from an earlier snapshot; list mode must clear it before restamping.
+  const stale = fakeNode({
+    tagName: 'BUTTON',
+    attrs: { 'data-verify-ref': 'e9' },
+    innerText: 'Gone',
+    rects: [],
+  })
+  const nodes = [search, hidden, option, bareLink, stale]
+  const previous = globalThis.document
+  globalThis.document = {
+    querySelectorAll: (selector) => {
+      if (selector === '[data-verify-ref]') {
+        return nodes.filter((node) => node.hasAttribute('data-verify-ref'))
+      }
+      return nodes
+    },
+  }
+  try {
+    const arg = { roles: INTERACTIVE_ROLES, maxName: ACCESSIBLE_NAME_MAX, selector: 'input, button, a, [role]' }
+
+    // Single mode (locator.evaluate shape) describes without touching refs.
+    const fresh = collectInteractiveInPage(search, arg)
+    assert.equal(fresh.role, 'searchbox')
+    assert.equal(fresh.name, 'Search bills')
+    assert.equal(fresh.tag, 'input')
+    assert.equal(search.hasAttribute('data-verify-ref'), false)
+    assert.equal(stale.getAttribute('data-verify-ref'), 'e9')
+
+    const entries = collectInteractiveInPage(arg)
+    assert.deepEqual(
+      entries.map((entry) => ({ ref: entry.ref, role: entry.role, name: entry.name })),
+      [
+        { ref: 'e1', role: 'searchbox', name: 'Search bills' },
+        { ref: 'e2', role: 'option', name: 'Choice' },
+      ],
+    )
+    assert.equal(search.getAttribute('data-verify-ref'), 'e1')
+    assert.equal(option.getAttribute('data-verify-ref'), 'e2')
+    assert.equal(hidden.hasAttribute('data-verify-ref'), false)
+    assert.equal(bareLink.hasAttribute('data-verify-ref'), false)
+    assert.equal(stale.hasAttribute('data-verify-ref'), false)
+
+    // Single mode after a snapshot reports the live ref and leaves it in place.
+    const single = collectInteractiveInPage(search, arg)
+    assert.equal(single.ref, 'e1')
+    assert.equal(search.getAttribute('data-verify-ref'), 'e1')
+    assert.equal(option.getAttribute('data-verify-ref'), 'e2')
+  } finally {
+    globalThis.document = previous
+  }
+})
+
+test('getLocator rejects a stale --ref', async () => {
+  const page = { locator: () => ({ count: async () => 0 }) }
+  await assert.rejects(() => getLocator(page, { ref: 'e3' }), /ref e3 is stale or missing/)
+})
+
+test('parseArgs accepts --interactive and --mobile booleans', () => {
+  const flags = parseArgs(['--interactive', '--mobile', '--width', '390', '--height', '844'])
+  assert.equal(flags.interactive, true)
+  assert.equal(flags.mobile, true)
+  assert.equal(flags.width, '390')
+  assert.equal(flags.height, '844')
+})
+
+test('parseViewportFlags writes a complete metrics object', () => {
+  assert.deepEqual(parseViewportFlags({ width: '390', height: '844', mobile: true, 'device-scale-factor': '2' }), {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 2,
+    mobile: true,
+  })
+  assert.deepEqual(parseViewportFlags({ width: '1280', height: '800' }), {
+    width: 1280,
+    height: 800,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
+  assert.throws(() => parseViewportFlags({ width: '0', height: '844' }), /--width/)
+  assert.throws(() => parseViewportFlags({ width: '390' }), /--height/)
+  assert.deepEqual(normalizeMetrics({}), { ...DEFAULT_METRICS })
+  assert.deepEqual(normalizeMetrics({ width: 390, height: 844 }), {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
+})
+
 test('api paths are read-only public JSON', () => {
   assert.equal(isAllowedApiPath('/feed/latest.json?limit=50&offset=0'), true)
   assert.equal(isAllowedApiPath('/stats/session.json'), true)
@@ -120,16 +320,68 @@ test('api paths are read-only public JSON', () => {
   assert.equal(isAllowedApiPath('https://example.com/feed'), false)
 })
 
+test('persistViewportFromCdp records dsf and mobile from CDP params', () => {
+  assert.deepEqual(
+    viewportFromCdpFlags({
+      method: 'Emulation.setDeviceMetricsOverride',
+      params: '{"width":390,"height":844,"deviceScaleFactor":2,"mobile":true}',
+    }),
+    { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  )
+  assert.equal(viewportFromCdpFlags({ method: 'Runtime.evaluate', params: '{}' }), null)
+})
+
 test('browser commands reuse a persisted CDP viewport instead of resetting to 1280', () => {
-  assert.deepEqual(viewportFromState({ viewport: { width: 390, height: 844 } }), {
+  assert.deepEqual(deviceMetricsFromState({ viewport: { width: 390, height: 844 } }), {
     width: 390,
     height: 844,
+    deviceScaleFactor: 1,
+    mobile: false,
   })
-  assert.deepEqual(viewportFromState({ viewport: { width: 320, height: 568 } }), {
+  assert.deepEqual(deviceMetricsFromState({ viewport: { width: 320, height: 568 } }), {
     width: 320,
     height: 568,
+    deviceScaleFactor: 1,
+    mobile: false,
   })
-  assert.deepEqual(viewportFromState({}), { width: 1280, height: 800 })
+  assert.deepEqual(deviceMetricsFromState({}), { ...DEFAULT_METRICS })
+  assert.deepEqual(
+    deviceMetricsFromState({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true } }),
+    { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  )
+})
+
+test('applyViewport always sends a complete device-metrics override', async () => {
+  const sent = []
+  const page = {
+    setViewportSize: async (size) => {
+      sent.push(['setViewportSize', size])
+    },
+    context: () => ({
+      newCDPSession: async () => ({
+        send: async (method, params) => {
+          sent.push([method, params])
+        },
+      }),
+    }),
+  }
+  await applyViewport(page, { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
+  assert.deepEqual(sent[1], [
+    'Emulation.setDeviceMetricsOverride',
+    { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
+  ])
+  sent.length = 0
+  const restored = await applyViewport(page, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+  assert.deepEqual(sent[0], ['setViewportSize', { width: 1280, height: 800 }])
+  assert.deepEqual(sent[1], [
+    'Emulation.setDeviceMetricsOverride',
+    { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false },
+  ])
+  assert.equal(
+    sent.some(([method]) => method === 'Emulation.clearDeviceMetricsOverride'),
+    false,
+  )
+  assert.deepEqual(restored, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
 })
 
 test('evidence paths cannot escape artifacts/verify', () => {

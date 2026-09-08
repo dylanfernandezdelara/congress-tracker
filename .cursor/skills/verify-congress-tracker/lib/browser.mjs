@@ -23,6 +23,26 @@ const CDP_EXACT = ['Page.captureScreenshot', 'Page.getLayoutMetrics', 'Page.getN
 
 const CDP_DENIED = ['Runtime.compileScript', 'Runtime.runScript']
 
+export const ACCESSIBLE_NAME_MAX = 120
+
+export const INTERACTIVE_ROLES = [
+  'button',
+  'link',
+  'textbox',
+  'combobox',
+  'radio',
+  'checkbox',
+  'tab',
+  'searchbox',
+  'option',
+]
+
+const INTERACTIVE_NATIVE_TAGS = 'button, input, textarea, select, option, a[href]'
+const INTERACTIVE_CANDIDATE_SELECTOR = [
+  INTERACTIVE_NATIVE_TAGS,
+  ...INTERACTIVE_ROLES.map((role) => `[role="${role}"]`),
+].join(', ')
+
 export function isAllowedCdpMethod(method) {
   if (typeof method !== 'string' || method.length === 0) return false
   if (CDP_DENIED.includes(method)) return false
@@ -43,9 +63,145 @@ export function jsLooksLikeNavigation(js) {
   )
 }
 
+/**
+ * Closure-free in-page collector. Playwright serializes the whole function
+ * (`page.evaluate` / `locator.evaluate`); nested helpers travel with it.
+ * `page.evaluate(fn, arg)` calls `fn(arg)`. `locator.evaluate(fn, arg)` calls `fn(element, arg)`.
+ */
+export function collectInteractiveInPage(nodeOrArg, maybeArg) {
+  function nameFromNode(node, maxName) {
+    if (!node) return ''
+    const clip = (value) => {
+      const text = String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (!text) return ''
+      return text.length > maxName ? text.slice(0, maxName) : text
+    }
+    const labelledBy = node.getAttribute?.('aria-labelledby') || ''
+    let labelledByText = ''
+    if (labelledBy && node.ownerDocument) {
+      labelledByText = labelledBy
+        .split(/\s+/)
+        .map((id) => node.ownerDocument.getElementById(id)?.innerText || '')
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    }
+    const fromLabel =
+      node.labels && node.labels.length
+        ? Array.from(node.labels)
+            .map((label) => label.innerText || label.textContent || '')
+            .join(' ')
+        : ''
+    return clip(
+      node.getAttribute?.('aria-label') ||
+        labelledByText ||
+        fromLabel ||
+        node.placeholder ||
+        node.getAttribute?.('placeholder') ||
+        node.getAttribute?.('title') ||
+        node.innerText ||
+        node.textContent,
+    )
+  }
+
+  function implicitRole(node) {
+    if (!node) return 'generic'
+    const explicit = (node.getAttribute?.('role') || '').trim()
+    if (explicit) return explicit
+    const tag = String(node.tagName || '').toLowerCase()
+    const type = String(node.type || node.getAttribute?.('type') || '').toLowerCase()
+    if (tag === 'a' && (node.getAttribute?.('href') || node.hasAttribute?.('href'))) return 'link'
+    if (tag === 'button') return 'button'
+    if (tag === 'textarea') return 'textbox'
+    if (tag === 'select') return 'combobox'
+    if (tag === 'option') return 'option'
+    if (tag === 'input') {
+      if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') return 'button'
+      if (type === 'checkbox') return 'checkbox'
+      if (type === 'radio') return 'radio'
+      if (type === 'search') return 'searchbox'
+      if (type === 'hidden' || type === 'file' || type === 'range' || type === 'color') return 'generic'
+      return 'textbox'
+    }
+    return 'generic'
+  }
+
+  function describe(node, index, stamp) {
+    const role = implicitRole(node)
+    const ref = `e${index + 1}`
+    if (stamp) node.setAttribute('data-verify-ref', ref)
+    const tag = String(node.tagName || '').toLowerCase()
+    const type = String(node.type || node.getAttribute?.('type') || '').toLowerCase()
+    const expanded = node.getAttribute?.('aria-expanded')
+    const isCheckable = tag === 'input' && (type === 'checkbox' || type === 'radio')
+    const checked = isCheckable ? (node.checked ? 'true' : 'false') : node.getAttribute?.('aria-checked')
+    const disabled = Boolean(node.disabled) || node.getAttribute?.('aria-disabled') === 'true'
+    return {
+      ref,
+      role,
+      name: nameFromNode(node, arg.maxName),
+      tag,
+      expanded,
+      checked,
+      disabled,
+    }
+  }
+
+  const single = maybeArg != null
+  const arg = single ? maybeArg : nodeOrArg
+  if (single) {
+    return describe(nodeOrArg, 0, false)
+  }
+
+  const roleSet = new Set(arg.roles)
+  document.querySelectorAll('[data-verify-ref]').forEach((node) => node.removeAttribute('data-verify-ref'))
+  const seen = new Set()
+  const collected = []
+  for (const node of document.querySelectorAll(arg.selector)) {
+    if (seen.has(node)) continue
+    if (node.hidden || node.getAttribute('aria-hidden') === 'true' || node.getClientRects().length === 0) {
+      continue
+    }
+    const role = implicitRole(node)
+    if (!role || !roleSet.has(role)) continue
+    seen.add(node)
+    collected.push(node)
+  }
+  return collected.map((node, index) => describe(node, index, true))
+}
+
+export function normalizeRef(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    throw new Error('ref is required')
+  }
+  const match = String(raw).trim().match(/^@?(e\d+)$/)
+  if (!match) throw new Error(`invalid ref: ${raw} (expected e1 or @e1)`)
+  return match[1]
+}
+
+export function formatInteractiveLine(entry) {
+  const states = []
+  if (entry.expanded === 'true') states.push('expanded')
+  if (entry.expanded === 'false') states.push('collapsed')
+  if (entry.checked === 'true') states.push('checked')
+  if (entry.checked === 'false') states.push('unchecked')
+  if (entry.disabled) states.push('disabled')
+  const state = states.length > 0 ? ` (${states.join(', ')})` : ''
+  const name = String(entry.name ?? '').replace(/"/g, '\\"')
+  return `[${entry.ref}] ${entry.role} "${name}"${state}`
+}
+
 export function describeLocator(flags, { all = false } = {}) {
+  if (flags.ref) {
+    if (flags.role || flags.name || flags.selector || flags.nth != null || flags.exact === true) {
+      throw new Error('--ref cannot be combined with --role/--name/--selector/--nth/--exact')
+    }
+    return { kind: 'ref', ref: normalizeRef(flags.ref) }
+  }
   if (!flags.selector && !flags.role && !flags.name) {
-    throw new Error('browser action needs --role --name, --name <label>, or --selector')
+    throw new Error('browser action needs --role --name, --name <label>, --selector, or --ref')
   }
   let nth
   if (!all && flags.nth !== undefined) {
@@ -62,9 +218,28 @@ export function describeLocator(flags, { all = false } = {}) {
   return { kind: 'label', name: flags.name, nth }
 }
 
-export function getLocator(page, flags, { all = false } = {}) {
+export function formatActionTarget(flags) {
+  if (flags.ref) return `--ref ${normalizeRef(flags.ref)}`
+  if (flags.selector) return String(flags.selector)
+  return `${flags.role || ''} ${flags.name || ''}`.trim()
+}
+
+function staleRefError(ref) {
+  return new Error(
+    `ref ${ref} is stale or missing; run browser snapshot --interactive again (refs are invalidated by re-render)`,
+  )
+}
+
+export async function getLocator(page, flags, { all = false } = {}) {
   const described = describeLocator(flags, { all })
   let locator
+  if (described.kind === 'ref') {
+    locator = page.locator(`[data-verify-ref="${described.ref}"]`)
+    if ((await locator.count()) === 0) {
+      throw staleRefError(described.ref)
+    }
+    return locator
+  }
   if (described.kind === 'selector') {
     locator = page.locator(described.selector)
   } else if (described.kind === 'role') {
@@ -96,16 +271,18 @@ function printJsonlOrEmpty(filePath) {
   process.stdout.write(text.endsWith('\n') ? text : `${text}\n`)
 }
 
+const INTERACTIVE_EVAL_ARG = {
+  roles: INTERACTIVE_ROLES,
+  maxName: ACCESSIBLE_NAME_MAX,
+  selector: INTERACTIVE_CANDIDATE_SELECTOR,
+}
+
 async function summarizeMatch(locator) {
-  return locator.evaluate((node) => {
-    const tag = node.tagName.toLowerCase()
-    const name = (node.getAttribute('aria-label') || node.innerText || node.textContent || '')
-      .trim()
-      .replace(/\s+/g, ' ')
-      .slice(0, 120)
-    const expanded = node.getAttribute('aria-expanded')
-    return { tag, name, expanded }
-  })
+  return locator.evaluate(collectInteractiveInPage, INTERACTIVE_EVAL_ARG)
+}
+
+export async function collectInteractiveElements(page) {
+  return page.evaluate(collectInteractiveInPage, INTERACTIVE_EVAL_ARG)
 }
 
 async function assertStayedOnApp(page, webUrl) {
@@ -129,14 +306,7 @@ function parseCdpParams(raw) {
 }
 
 export async function runBrowserCommand(command, flags, ctx) {
-  const {
-    withPage,
-    resolveEvidencePath,
-    WEB_URL,
-    CDP_PORT,
-    consoleLogPath,
-    networkLogPath,
-  } = ctx
+  const { withPage, resolveEvidencePath, WEB_URL, CDP_PORT, consoleLogPath, networkLogPath } = ctx
 
   if (command === 'start') {
     await withPage(async (page) => {
@@ -170,7 +340,7 @@ export async function runBrowserCommand(command, flags, ctx) {
 
   if (command === 'find') {
     await withPage(async (page) => {
-      const locator = getLocator(page, flags, { all: true })
+      const locator = await getLocator(page, flags, { all: true })
       const count = await locator.count()
       const cap = Math.min(count, 20)
       console.log(`${count} match(es)`)
@@ -188,16 +358,18 @@ export async function runBrowserCommand(command, flags, ctx) {
 
   if (command === 'scroll') {
     await withPage(async (page) => {
-      await getLocator(page, flags).scrollIntoViewIfNeeded()
-      console.log(`scrolled ${flags.role || flags.selector} ${flags.name || ''}`.trim())
+      const locator = await getLocator(page, flags)
+      await locator.scrollIntoViewIfNeeded()
+      console.log(`scrolled ${formatActionTarget(flags)}`)
     })
     return
   }
 
   if (command === 'click') {
     await withPage(async (page) => {
-      await getLocator(page, flags).click()
-      console.log(`clicked ${flags.role || flags.selector} ${flags.name || ''}`.trim())
+      const locator = await getLocator(page, flags)
+      await locator.click()
+      console.log(`clicked ${formatActionTarget(flags)}`)
     })
     return
   }
@@ -205,8 +377,18 @@ export async function runBrowserCommand(command, flags, ctx) {
   if (command === 'fill') {
     if (flags.value === undefined) throw new Error('fill requires --value')
     await withPage(async (page) => {
-      await getLocator(page, flags).fill(flags.value)
-      console.log(`filled ${flags.name || flags.selector}`)
+      const locator = await getLocator(page, flags)
+      await locator.fill(flags.value)
+      console.log(`filled ${formatActionTarget(flags)}`)
+    })
+    return
+  }
+
+  if (command === 'viewport') {
+    await withPage(async (_page, metrics) => {
+      console.log(
+        `viewport ${metrics.width}x${metrics.height} dsf=${metrics.deviceScaleFactor} mobile=${metrics.mobile}`,
+      )
     })
     return
   }
@@ -214,8 +396,9 @@ export async function runBrowserCommand(command, flags, ctx) {
   if (command === 'select') {
     if (flags.value === undefined) throw new Error('select requires --value')
     await withPage(async (page) => {
-      await getLocator(page, flags).selectOption(flags.value)
-      console.log(`selected ${flags.name || flags.selector}=${flags.value}`)
+      const locator = await getLocator(page, flags)
+      await locator.selectOption(flags.value)
+      console.log(`selected ${formatActionTarget(flags)}=${flags.value}`)
     })
     return
   }
@@ -232,8 +415,9 @@ export async function runBrowserCommand(command, flags, ctx) {
   if (command === 'wait') {
     const timeout = Number(flags['timeout-ms'] || 15_000)
     await withPage(async (page) => {
-      await getLocator(page, flags).waitFor({ timeout })
-      console.log(`waited for ${flags.role || flags.selector} ${flags.name || ''}`.trim())
+      const locator = await getLocator(page, flags)
+      await locator.waitFor({ timeout })
+      console.log(`waited for ${formatActionTarget(flags)}`)
     })
     return
   }
@@ -286,10 +470,21 @@ export async function runBrowserCommand(command, flags, ctx) {
   }
 
   if (command === 'snapshot') {
-    if (!flags.aria) throw new Error('snapshot requires --aria (optional --path under artifacts/verify)')
+    if (!flags.aria && !flags.interactive) {
+      throw new Error('snapshot requires --aria or --interactive (optional --path under artifacts/verify)')
+    }
+    if (flags.aria && flags.interactive) {
+      throw new Error('snapshot accepts only one of --aria or --interactive')
+    }
     await withPage(async (page) => {
-      const snapshot = await page.locator('body').ariaSnapshot()
-      const text = snapshot.endsWith('\n') ? snapshot : `${snapshot}\n`
+      let text
+      if (flags.interactive) {
+        const entries = await collectInteractiveElements(page)
+        text = `${entries.map(formatInteractiveLine).join('\n')}\n`
+      } else {
+        const snapshot = await page.locator('body').ariaSnapshot()
+        text = snapshot.endsWith('\n') ? snapshot : `${snapshot}\n`
+      }
       if (!flags.path) {
         process.stdout.write(text)
         return
