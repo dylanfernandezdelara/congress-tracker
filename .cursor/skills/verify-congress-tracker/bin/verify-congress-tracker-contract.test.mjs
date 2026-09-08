@@ -30,6 +30,7 @@ import {
   portOwnershipProblem,
   teardownPids,
 } from '../lib/process.mjs'
+import { FALLBACK_WEB_DIST_HTML, ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 import { TEST_ONLY } from './verify-congress-tracker.mjs'
 
 test('corrupt-state cleanup only claims listeners that visibly belong to a verification run', () => {
@@ -245,6 +246,60 @@ test('dead recorded Chrome is not an ownership problem when CDP is free', () => 
     }),
     null,
   )
+})
+
+test('ensureWebDistPlaceholder copies web/index.html and does not clobber a real build', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-web-dist-'))
+  try {
+    const source = '<!DOCTYPE html><html><head><meta property="og:title" content="Track Congress" /></head><body></body></html>\n'
+    fs.mkdirSync(path.join(dir, 'web'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'web', 'index.html'), source, 'utf8')
+
+    assert.equal(fs.existsSync(path.join(dir, 'web', 'dist')), false)
+    assert.equal(ensureWebDistPlaceholder(dir), true)
+    const indexPath = path.join(dir, 'web', 'dist', 'index.html')
+    assert.equal(fs.readFileSync(indexPath, 'utf8'), source)
+    assert.match(fs.readFileSync(indexPath, 'utf8'), /og:title/)
+
+    const markerPath = path.join(dir, 'web', 'dist', 'marker.txt')
+    fs.writeFileSync(markerPath, 'survives', 'utf8')
+    assert.equal(ensureWebDistPlaceholder(dir), false)
+    assert.equal(fs.readFileSync(markerPath, 'utf8'), 'survives')
+    assert.equal(fs.readFileSync(indexPath, 'utf8'), source)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('ensureWebDistPlaceholder repairs an empty web/dist directory', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-web-dist-empty-'))
+  try {
+    const source = '<!DOCTYPE html><html><head><title>shell</title></head><body></body></html>\n'
+    fs.mkdirSync(path.join(dir, 'web', 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'web', 'index.html'), source, 'utf8')
+    assert.equal(ensureWebDistPlaceholder(dir), true)
+    assert.equal(fs.readFileSync(path.join(dir, 'web', 'dist', 'index.html'), 'utf8'), source)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('ensureWebDistPlaceholder writes a minimal shell when web/index.html is missing', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-web-dist-fallback-'))
+  try {
+    fs.mkdirSync(path.join(dir, 'web'), { recursive: true })
+    assert.equal(ensureWebDistPlaceholder(dir), true)
+    assert.equal(fs.readFileSync(path.join(dir, 'web', 'dist', 'index.html'), 'utf8'), FALLBACK_WEB_DIST_HTML)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('launch appends worker.log or web.log tails on any startup failure', () => {
+  const source = fs.readFileSync(path.join(here, 'verify-congress-tracker.mjs'), 'utf8')
+  assert.doesNotMatch(source, /startsWith\('worker not ready'\)/)
+  assert.match(source, /errorWithLogTail\(err, path\.join\(RUN_DIR, 'worker\.log'\)\)/)
+  assert.match(source, /errorWithLogTail\(err, path\.join\(RUN_DIR, 'web\.log'\)\)/)
 })
 
 test('launch seeds and serves isolated persist-to D1', () => {

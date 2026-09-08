@@ -35,9 +35,28 @@ export function resolvePreviewAlias(branch, envAlias = process.env.PREVIEW_ALIAS
   return sanitizePreviewAlias(branch)
 }
 
+/**
+ * `npm run setup` seeds web/dist with the Vite source shell so wrangler can start.
+ * That shell references /src/main.tsx and renders blank if uploaded; a real
+ * build always emits web/dist/assets.
+ */
+export function webDistBuildProblem(repoRoot) {
+  const distDir = path.join(repoRoot, 'web', 'dist')
+  if (!existsSync(path.join(distDir, 'index.html'))) {
+    return 'web/dist is missing — run npm run build:web (or npm run preview) first'
+  }
+  if (!existsSync(path.join(distDir, 'assets'))) {
+    return 'web/dist is a placeholder shell, not a Vite build — run npm run build:web (or npm run preview) first'
+  }
+  return ''
+}
+
 function runPreviewUpload() {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const workerDir = path.join(repoRoot, 'workers', 'senate_data_worker')
+
+  const distProblem = webDistBuildProblem(repoRoot)
+  if (distProblem) throw new Error(distProblem)
 
   const branch = execSync('git branch --show-current', {
     cwd: repoRoot,

@@ -40,6 +40,8 @@ import {
   waitForPort,
 } from '../lib/process.mjs'
 import { createStateStore, salvageEndpointsFromText, salvagePidsFromText } from '../lib/run-state.mjs'
+import { tailFile } from '../lib/tail-file.mjs'
+import { ensureWebDistPlaceholder } from '../lib/web-dist-placeholder.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(here, '../../../..')
@@ -176,6 +178,12 @@ async function waitHttpOk(url, timeoutMs, label) {
   throw new Error(`${label} not ready at ${url} (${last})`)
 }
 
+function errorWithLogTail(err, logPath) {
+  const message = err instanceof Error ? err.message : String(err)
+  const tail = tailFile(logPath, 15)
+  return new Error(tail ? `${message}\n${tail}` : message)
+}
+
 function seedLocal(persistTo) {
   console.log(
     'Seeding isolated verification D1 (SEED_PERSIST_TO artifacts/verify/.run/d1; never touches .wrangler/state or production/preview D1).',
@@ -233,6 +241,12 @@ async function cmdLaunch() {
   seedLocal(PERSIST_TO)
   updateState({ seeded: true, persistTo: PERSIST_TO, ...endpoints })
 
+  if (ensureWebDistPlaceholder(REPO_ROOT)) {
+    console.log(
+      'created placeholder web/dist from web/index.html (wrangler [assets] needs the directory; Vite serves the UI)',
+    )
+  }
+
   const workerPid = spawnLogged(
     'npm',
     workerArgsFor(endpoints, PERSIST_TO),
@@ -248,10 +262,16 @@ async function cmdLaunch() {
 
   try {
     await waitHttpOk(`${endpoints.workerUrl}/health`, 90_000, 'worker')
+  } catch (err) {
+    teardownPids(recordedPids(readState()))
+    throw errorWithLogTail(err, path.join(RUN_DIR, 'worker.log'))
+  }
+
+  try {
     await waitHttpOk(endpoints.webUrl, 60_000, 'web')
   } catch (err) {
     teardownPids(recordedPids(readState()))
-    throw err
+    throw errorWithLogTail(err, path.join(RUN_DIR, 'web.log'))
   }
 
   const health = await fetchJson(`${endpoints.workerUrl}/health`)

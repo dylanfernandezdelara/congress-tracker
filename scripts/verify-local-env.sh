@@ -60,6 +60,16 @@ check_deps "root" "${ROOT_DIR}"
 check_deps "worker" "${WORKER_DIR}"
 check_deps "web" "${WEB_DIR}"
 
+if [[ -d "${WEB_DIR}/dist/assets" ]]; then
+  status "${PASS}" "web/dist: built"
+elif [[ -f "${WEB_DIR}/dist/index.html" ]]; then
+  status "${PASS}" "web/dist: placeholder (run npm run build:web for real assets)"
+elif [[ -d "${WEB_DIR}/dist" ]]; then
+  status "${WARN}" "web/dist present but incomplete — run 'npm run setup' or 'npm run build:web' before 'npm run dev:worker'"
+else
+  status "${WARN}" "web/dist missing — run 'npm run setup' or 'npm run build:web' before 'npm run dev:worker'"
+fi
+
 # --- Local secrets --------------------------------------------------------
 if [[ -f "${DEV_VARS}" ]]; then
   status "${PASS}" ".dev.vars present"

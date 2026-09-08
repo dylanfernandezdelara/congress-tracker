@@ -12,7 +12,7 @@ const devVarsExample = path.join(rootDir, 'workers', 'senate_data_worker', '.dev
 
 const read = (file) => fs.readFileSync(file, 'utf8')
 
-function runSetupFixture({ existingDevVars } = {}) {
+function runSetupFixture({ existingDevVars, webIndexHtml, existingDistHtml, emptyDist } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cursor-cloud-setup-'))
   const scriptsDir = path.join(dir, 'scripts')
   const workerDir = path.join(dir, 'workers', 'senate_data_worker')
@@ -30,6 +30,16 @@ function runSetupFixture({ existingDevVars } = {}) {
   if (existingDevVars !== undefined) {
     fs.writeFileSync(fixtureDevVars, existingDevVars, 'utf8')
   }
+  if (webIndexHtml !== undefined) {
+    fs.writeFileSync(path.join(webDir, 'index.html'), webIndexHtml, 'utf8')
+  }
+  if (existingDistHtml !== undefined) {
+    fs.mkdirSync(path.join(webDir, 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(webDir, 'dist', 'index.html'), existingDistHtml, 'utf8')
+  }
+  if (emptyDist) {
+    fs.mkdirSync(path.join(webDir, 'dist'), { recursive: true })
+  }
 
   const fakeNpm = path.join(binDir, 'npm')
   fs.writeFileSync(fakeNpm, '#!/usr/bin/env bash\nexit 0\n', 'utf8')
@@ -44,7 +54,12 @@ function runSetupFixture({ existingDevVars } = {}) {
     },
   })
 
-  return { output, devVars: read(fixtureDevVars) }
+  return {
+    output,
+    dir,
+    devVars: read(fixtureDevVars),
+    distIndex: path.join(webDir, 'dist', 'index.html'),
+  }
 }
 
 test('cursor-cloud setup creates .dev.vars from example when missing', () => {
@@ -59,6 +74,38 @@ test('cursor-cloud setup does not overwrite an existing .dev.vars', () => {
   })
 
   assert.match(devVars, /^ALLOWED_ORIGIN=https:\/\/example\.com$/m)
+})
+
+test('cursor-cloud setup writes a placeholder web/dist without running vite build', () => {
+  const script = read(setupScript)
+  assert.doesNotMatch(script, /npm --prefix "\$\{WEB_DIR\}" run build/)
+  assert.match(script, /Creating placeholder web\/dist from web\/index\.html/)
+  const playwrightIdx = script.indexOf('playwright install chromium')
+  const placeholderIdx = script.indexOf('Creating placeholder web/dist from web/index.html')
+  const devVarsIdx = script.indexOf('if [[ ! -f "${DEV_VARS}" ]]')
+  assert.ok(playwrightIdx !== -1 && placeholderIdx > playwrightIdx)
+  assert.ok(devVarsIdx > placeholderIdx, '.dev.vars copy must stay after the placeholder step')
+
+  const source = '<!DOCTYPE html><html><head><meta property="og:title" content="Track Congress" /></head></html>\n'
+  const created = runSetupFixture({ webIndexHtml: source })
+  assert.match(created.output, /Creating placeholder web\/dist from web\/index\.html/)
+  assert.equal(read(created.distIndex), source)
+  assert.match(read(created.distIndex), /og:title/)
+
+  const fallback = runSetupFixture()
+  assert.match(fallback.output, /Creating placeholder web\/dist from web\/index\.html/)
+  assert.match(read(fallback.distIndex), /<!DOCTYPE html>/)
+
+  const existing = runSetupFixture({
+    webIndexHtml: source,
+    existingDistHtml: 'REAL BUILD\n',
+  })
+  assert.doesNotMatch(existing.output, /Creating placeholder web\/dist/)
+  assert.equal(read(existing.distIndex), 'REAL BUILD\n')
+
+  const empty = runSetupFixture({ webIndexHtml: source, emptyDist: true })
+  assert.match(empty.output, /Creating placeholder web\/dist from web\/index\.html/)
+  assert.equal(read(empty.distIndex), source)
 })
 
 test('.dev.vars.example documents local CORS without secrets', () => {

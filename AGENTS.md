@@ -17,7 +17,7 @@ npm run setup # same as ./scripts/cursor-cloud-setup.sh (Cursor Cloud runs this 
 
 Copy `workers/senate_data_worker/.dev.vars.example` to `.dev.vars` and set `CONGRESS_API_KEY`, `OPENROUTER_API_KEY`, and optionally `OPENROUTER_MODEL`.
 
-`npm run setup` also installs root Playwright tooling used by `npm run qa:web`.
+`npm run setup` also installs root Playwright tooling used by `npm run qa:web`, and creates a placeholder `web/dist` from `web/index.html` so wrangler `[assets]` can start (`npm run build:web` produces real assets).
 
 Local ↔ Cursor Cloud parity: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md). Quick check: `npm run verify:local`.
 
@@ -28,7 +28,7 @@ re-run after `members-roster` / `member-votes` if those rails go empty.
 ### Local development
 
 - **Seed sample data (required for local UI):** `npm run seed`
-- Worker: `npm run dev:worker` (`http://127.0.0.1:8787`)
+- Worker: `npm run dev:worker` (`http://127.0.0.1:8787`; needs `web/dist` — `npm run setup` creates a placeholder, `npm run build:web` makes real assets)
 - Web: `npm run dev:web` (`http://127.0.0.1:5173`)
 - Trigger live ingestion (needs API keys): `curl -fsS -X POST http://127.0.0.1:8787/__pipeline/run/feed`
 - Feed JSON: `http://127.0.0.1:8787/feed/latest.json?limit=50&offset=0` (paginated object; read `items`)
