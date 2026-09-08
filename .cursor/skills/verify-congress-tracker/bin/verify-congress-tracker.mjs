@@ -577,7 +577,6 @@ export const TEST_ONLY = {
   PERSIST_TO,
   viewportFromState,
   persistViewportFromCdp,
-  ensureWebDistPlaceholder,
 }
 
 async function main(argv) {

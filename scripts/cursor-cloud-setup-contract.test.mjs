@@ -12,7 +12,7 @@ const devVarsExample = path.join(rootDir, 'workers', 'senate_data_worker', '.dev
 
 const read = (file) => fs.readFileSync(file, 'utf8')
 
-function runSetupFixture({ existingDevVars, webIndexHtml, existingDistHtml } = {}) {
+function runSetupFixture({ existingDevVars, webIndexHtml, existingDistHtml, emptyDist } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cursor-cloud-setup-'))
   const scriptsDir = path.join(dir, 'scripts')
   const workerDir = path.join(dir, 'workers', 'senate_data_worker')
@@ -36,6 +36,9 @@ function runSetupFixture({ existingDevVars, webIndexHtml, existingDistHtml } = {
   if (existingDistHtml !== undefined) {
     fs.mkdirSync(path.join(webDir, 'dist'), { recursive: true })
     fs.writeFileSync(path.join(webDir, 'dist', 'index.html'), existingDistHtml, 'utf8')
+  }
+  if (emptyDist) {
+    fs.mkdirSync(path.join(webDir, 'dist'), { recursive: true })
   }
 
   const fakeNpm = path.join(binDir, 'npm')
@@ -99,6 +102,10 @@ test('cursor-cloud setup writes a placeholder web/dist without running vite buil
   })
   assert.doesNotMatch(existing.output, /Creating placeholder web\/dist/)
   assert.equal(read(existing.distIndex), 'REAL BUILD\n')
+
+  const empty = runSetupFixture({ webIndexHtml: source, emptyDist: true })
+  assert.match(empty.output, /Creating placeholder web\/dist from web\/index\.html/)
+  assert.equal(read(empty.distIndex), source)
 })
 
 test('.dev.vars.example documents local CORS without secrets', () => {

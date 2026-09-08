@@ -271,6 +271,19 @@ test('ensureWebDistPlaceholder copies web/index.html and does not clobber a real
   }
 })
 
+test('ensureWebDistPlaceholder repairs an empty web/dist directory', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-web-dist-empty-'))
+  try {
+    const source = '<!DOCTYPE html><html><head><title>shell</title></head><body></body></html>\n'
+    fs.mkdirSync(path.join(dir, 'web', 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'web', 'index.html'), source, 'utf8')
+    assert.equal(ensureWebDistPlaceholder(dir), true)
+    assert.equal(fs.readFileSync(path.join(dir, 'web', 'dist', 'index.html'), 'utf8'), source)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('ensureWebDistPlaceholder writes a minimal shell when web/index.html is missing', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-web-dist-fallback-'))
   try {

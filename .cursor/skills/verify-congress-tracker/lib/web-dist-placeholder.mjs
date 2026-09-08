@@ -18,9 +18,11 @@ export function ensureWebDistPlaceholder(repoRoot) {
     throw new Error('repoRoot is required')
   }
   const distDir = path.join(repoRoot, 'web', 'dist')
-  if (fs.existsSync(distDir)) return false
-  fs.mkdirSync(distDir, { recursive: true })
   const dest = path.join(distDir, 'index.html')
+  // Key on index.html, not the directory: an empty web/dist lets wrangler start
+  // but serves nothing, so it is repaired the same way as a missing one.
+  if (fs.existsSync(dest)) return false
+  fs.mkdirSync(distDir, { recursive: true })
   const source = path.join(repoRoot, 'web', 'index.html')
   if (fs.existsSync(source)) {
     fs.copyFileSync(source, dest)

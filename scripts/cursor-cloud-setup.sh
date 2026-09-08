@@ -22,8 +22,9 @@ npx --prefix "${ROOT_DIR}" playwright install chromium
 
 # wrangler [assets] needs web/dist to exist. Do not run tsc/vite here — setup
 # must stay cheap and must not fail closed on a web typecheck. A real bundle
-# comes from `npm run build:web`. Do not clobber an existing dist.
-if [[ ! -d "${WEB_DIR}/dist" ]]; then
+# comes from `npm run build:web`. Do not clobber an existing dist; key on
+# index.html so an empty directory is repaired too.
+if [[ ! -f "${WEB_DIR}/dist/index.html" ]]; then
   echo "Creating placeholder web/dist from web/index.html (wrangler [assets] needs the directory; Vite serves the UI)..."
   mkdir -p "${WEB_DIR}/dist"
   if [[ -f "${WEB_DIR}/index.html" ]]; then

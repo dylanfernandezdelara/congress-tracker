@@ -87,4 +87,8 @@ test('distinguishes missing, placeholder, and built web/dist', () => {
   const built = runVerify({ withDeps: true, withDevVars: true, webDist: 'built' })
   assert.equal(built.code, 0)
   assert.match(built.stdout, /\[ok\] web\/dist: built/)
+
+  const empty = runVerify({ withDeps: true, withDevVars: true, webDist: 'empty' })
+  assert.equal(empty.code, 0)
+  assert.match(empty.stdout, /web\/dist present but incomplete/)
 })
