@@ -17,7 +17,7 @@ Read `features/README.md` before driving. Prove the mapped entry points, not a c
 
 ## Launch
 
-Verification uses its own ports (default Vite **5174**, worker **8788**, CDP **9223**) and its own D1, so it can run beside `npm run dev:*`. The user's 5173/8787 stack is never touched. If a **verification** port is already listening, **refuse** — do not kill by process name, and do not attach to a server this run did not start. Override with `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT`.
+Verification uses its own ports (default Vite **5174**, worker **8788**, CDP **9223**) and its own D1, so it can run beside `npm run dev:*`. The user's 5173/8787 stack is never touched. If a **verification** port is already listening, **refuse** — do not kill by process name, and do not attach to a server this run did not start. `VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT` are read at **launch** (defaults 5174/8788/9223). Later commands use `state.json` — you do not need to re-export them after a successful launch.
 
 Verification D1 is a disposable `--persist-to` store at `artifacts/verify/.run/d1` (absolute path; spawn cwd is the repo root). Launch **never** reads or writes `workers/senate_data_worker/.wrangler/state` (the human `npm run seed` / `dev:worker` store). Seed data is synthetic `(local sample)` / `LOCAL:*` — **not** a production dump. Never run `npm run sync:preview-db`, pipeline POSTs, or `d1 execute --remote` for this skill.
 
@@ -138,8 +138,6 @@ Equivalent CDP escape hatch (`Emulation.setDeviceMetricsOverride` also writes `s
 ```
 
 Later `browser` commands reuse `state.viewport`. Restoring `browser viewport --width 1280 --height 800` replaces the mobile override with a complete desktop metrics object (`deviceScaleFactor` 1, `mobile` false). Resizing **below 1024px unmounts the desktop rails and closes any open sheet** — re-open the row, Filters, or member profile after resizing.
-
-`VERIFY_WEB_PORT` / `VERIFY_WORKER_PORT` / `VERIFY_CDP_PORT` are read at **launch** (defaults 5174/8788/9223). Later commands use `state.json` — you do not need to re-export them after a successful launch.
 
 ## Cleanup
 
