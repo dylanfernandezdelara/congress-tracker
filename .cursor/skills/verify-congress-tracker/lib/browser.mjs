@@ -278,7 +278,7 @@ const INTERACTIVE_EVAL_ARG = {
 }
 
 async function summarizeMatch(locator) {
-  return locator.evaluate(collectInteractiveInPage, { ...INTERACTIVE_EVAL_ARG, single: true })
+  return locator.evaluate(collectInteractiveInPage, INTERACTIVE_EVAL_ARG)
 }
 
 export async function collectInteractiveElements(page) {

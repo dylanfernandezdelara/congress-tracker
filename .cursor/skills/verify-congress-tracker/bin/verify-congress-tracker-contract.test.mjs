@@ -220,7 +220,14 @@ test('collectInteractiveInPage stamps visible searchboxes and skips hidden or in
     tagName: 'A',
     innerText: 'No href',
   })
-  const nodes = [search, hidden, option, bareLink]
+  // Stale ref from an earlier snapshot; list mode must clear it before restamping.
+  const stale = fakeNode({
+    tagName: 'BUTTON',
+    attrs: { 'data-verify-ref': 'e9' },
+    innerText: 'Gone',
+    rects: [],
+  })
+  const nodes = [search, hidden, option, bareLink, stale]
   const previous = globalThis.document
   globalThis.document = {
     querySelectorAll: (selector) => {
@@ -232,6 +239,15 @@ test('collectInteractiveInPage stamps visible searchboxes and skips hidden or in
   }
   try {
     const arg = { roles: INTERACTIVE_ROLES, maxName: ACCESSIBLE_NAME_MAX, selector: 'input, button, a, [role]' }
+
+    // Single mode (locator.evaluate shape) describes without touching refs.
+    const fresh = collectInteractiveInPage(search, arg)
+    assert.equal(fresh.role, 'searchbox')
+    assert.equal(fresh.name, 'Search bills')
+    assert.equal(fresh.tag, 'input')
+    assert.equal(search.hasAttribute('data-verify-ref'), false)
+    assert.equal(stale.getAttribute('data-verify-ref'), 'e9')
+
     const entries = collectInteractiveInPage(arg)
     assert.deepEqual(
       entries.map((entry) => ({ ref: entry.ref, role: entry.role, name: entry.name })),
@@ -244,12 +260,13 @@ test('collectInteractiveInPage stamps visible searchboxes and skips hidden or in
     assert.equal(option.getAttribute('data-verify-ref'), 'e2')
     assert.equal(hidden.hasAttribute('data-verify-ref'), false)
     assert.equal(bareLink.hasAttribute('data-verify-ref'), false)
+    assert.equal(stale.hasAttribute('data-verify-ref'), false)
 
-    const single = collectInteractiveInPage(search, { ...arg, single: true })
-    assert.equal(single.role, 'searchbox')
-    assert.equal(single.name, 'Search bills')
+    // Single mode after a snapshot reports the live ref and leaves it in place.
+    const single = collectInteractiveInPage(search, arg)
     assert.equal(single.ref, 'e1')
-    assert.equal(single.tag, 'input')
+    assert.equal(search.getAttribute('data-verify-ref'), 'e1')
+    assert.equal(option.getAttribute('data-verify-ref'), 'e2')
   } finally {
     globalThis.document = previous
   }
