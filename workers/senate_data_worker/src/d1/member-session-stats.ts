@@ -104,13 +104,18 @@ export async function getMemberSessionStats(
     .first<MemberSessionStatsRow>();
 }
 
+export type MemberCrossVoteCore = Omit<
+  MemberProfileRecentCrossVote,
+  "bill_id" | "title" | "headline" | "question" | "result"
+>;
+
 export async function selectRecentMemberCrossVotes(
   db: D1Database,
   congress: number,
   session: number,
   bioguideId: string,
   limit: number
-): Promise<MemberProfileRecentCrossVote[]> {
+): Promise<MemberCrossVoteCore[]> {
   await ensureSchema(db);
   const { results } = await db
     .prepare(
@@ -155,7 +160,7 @@ export async function selectRecentMemberCrossVotes(
         position,
         party_line: partyLine,
         margin: row.margin,
-      } satisfies MemberProfileRecentCrossVote,
+      } satisfies MemberCrossVoteCore,
     ];
   });
 }

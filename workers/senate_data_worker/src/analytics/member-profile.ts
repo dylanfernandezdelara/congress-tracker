@@ -4,6 +4,10 @@ import type { MemberProfileRecentCrossVote, MemberProfileResponse } from "../../
 import { normalizeVotePosition } from "../../../../shared/vote-positions";
 import { getMember, getMembersByIds } from "../d1/members";
 import {
+  enrichRecentCrossVotes,
+  selectSponsoredBillsForMember,
+} from "../d1/member-profile-bills";
+import {
   selectMemberVotesForBioguide,
   selectMemberVotesForRollNumbers,
   type MemberVoteWithRoll,
@@ -18,7 +22,8 @@ const RECENT_CROSS_VOTE_LIMIT = 5;
 
 /**
  * Build a member profile for the current session: roster identity plus
- * passage-vote tallies and recent party-line breaks.
+ * passage-vote tallies, recent party-line breaks (with bill titles/headlines),
+ * and primary-sponsored bills.
  *
  * Prefers denormalized member_session_stats (maintained when member votes are
  * ingested). Falls back to a live scan when stats have not been backfilled yet.
@@ -34,13 +39,16 @@ export async function buildMemberProfile(
 
   const stats = await getMemberSessionStats(db, congress, session, bioguideId);
   if (stats) {
-    const recent_cross_votes = await selectRecentMemberCrossVotes(
-      db,
-      congress,
-      session,
-      bioguideId,
-      RECENT_CROSS_VOTE_LIMIT
-    );
+    const [recent_cross_votes, sponsored] = await Promise.all([
+      selectRecentMemberCrossVotes(
+        db,
+        congress,
+        session,
+        bioguideId,
+        RECENT_CROSS_VOTE_LIMIT
+      ).then((votes) => enrichRecentCrossVotes(db, votes)),
+      selectSponsoredBillsForMember(db, congress, bioguideId),
+    ]);
     return {
       bioguide_id: member.bioguideId,
       name: member.name,
@@ -58,6 +66,8 @@ export async function buildMemberProfile(
       cross_vote_count: stats.cross_vote_count,
       cross_vote_label: crossVoteLabel(stats.cross_vote_count),
       recent_cross_votes,
+      sponsored_bills: sponsored.bills,
+      sponsored_bills_total: sponsored.total,
       member_votes_available: stats.votes_cast > 0,
       as_of: stats.updated_at,
     };
@@ -89,11 +99,10 @@ async function buildMemberProfileLive(
     else if (side === "nay") nay_count += 1;
   }
 
-  const { cross_vote_count, recent_cross_votes } = await computeMemberCrossVotes(
-    db,
-    member,
-    memberVotes
-  );
+  const [{ cross_vote_count, recent_cross_votes }, sponsored] = await Promise.all([
+    computeMemberCrossVotes(db, member, memberVotes),
+    selectSponsoredBillsForMember(db, congress, member.bioguideId),
+  ]);
 
   return {
     bioguide_id: member.bioguideId,
@@ -112,6 +121,8 @@ async function buildMemberProfileLive(
     cross_vote_count,
     cross_vote_label: crossVoteLabel(cross_vote_count),
     recent_cross_votes,
+    sponsored_bills: sponsored.bills,
+    sponsored_bills_total: sponsored.total,
     member_votes_available: memberVotes.length > 0,
     as_of: new Date().toISOString(),
   };
@@ -154,7 +165,9 @@ async function computeMemberCrossVotes(
 
   const memberVoteByRoll = new Map(memberVotes.map((row) => [row.roll_number, row]));
   let cross_vote_count = 0;
-  const recent_cross_votes: MemberProfileRecentCrossVote[] = [];
+  const recent_cross_votes: Array<
+    Omit<MemberProfileRecentCrossVote, "bill_id" | "title" | "headline" | "question" | "result">
+  > = [];
 
   // memberVotes arrive newest-first; walk in that order for recent examples.
   for (const vote of memberVotes) {
@@ -188,5 +201,8 @@ async function computeMemberCrossVotes(
     }
   }
 
-  return { cross_vote_count, recent_cross_votes };
+  return {
+    cross_vote_count,
+    recent_cross_votes: await enrichRecentCrossVotes(db, recent_cross_votes),
+  };
 }

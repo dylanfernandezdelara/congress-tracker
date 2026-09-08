@@ -124,6 +124,7 @@ export type {
   NotableVoteEntry,
   NotableVotesResponse,
   MemberProfileRecentCrossVote,
+  MemberProfileSponsoredBill,
   MemberProfileResponse,
   PartySeatCount,
   ChamberComposition,

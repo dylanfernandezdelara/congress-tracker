@@ -35,6 +35,7 @@ export type {
   DefectorEntry,
   DefectorsResponse,
   MemberProfileRecentCrossVote,
+  MemberProfileSponsoredBill,
   MemberProfileResponse,
   MemberSearchItem,
   MembersSearchResponse,

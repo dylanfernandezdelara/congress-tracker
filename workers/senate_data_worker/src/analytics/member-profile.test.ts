@@ -11,6 +11,9 @@ function createDb(options: {
   memberVotes?: MockRow[];
   peerVotes?: MockRow[];
   roster?: MockRow[];
+  rollBillInfo?: MockRow[];
+  sponsoredBills?: MockRow[];
+  sponsoredTotal?: number;
 }): D1Database {
   const {
     member = null,
@@ -19,6 +22,9 @@ function createDb(options: {
     memberVotes = [],
     peerVotes = [],
     roster = [],
+    rollBillInfo = [],
+    sponsoredBills = [],
+    sponsoredTotal = sponsoredBills.length,
   } = options;
 
   return {
@@ -28,6 +34,12 @@ function createDb(options: {
         all: vi.fn(async () => {
           if (sql.includes("FROM member_cross_votes") && sql.includes("ORDER BY vote_date DESC")) {
             return { results: recentCrossVotes };
+          }
+          if (sql.includes("FROM votes v") && sql.includes("LEFT JOIN bill_digests")) {
+            return { results: rollBillInfo };
+          }
+          if (sql.includes("FROM bill_sponsors s") && sql.includes("LEFT JOIN bill_digests")) {
+            return { results: sponsoredBills };
           }
           if (
             sql.includes("FROM member_votes mv") &&
@@ -57,6 +69,9 @@ function createDb(options: {
         first: vi.fn(async () => {
           if (sql.includes("FROM member_session_stats")) {
             return stats;
+          }
+          if (sql.includes("FROM bill_sponsors") && sql.includes("COUNT(*)")) {
+            return { total: sponsoredTotal };
           }
           return null;
         }),
@@ -128,6 +143,8 @@ describe("buildMemberProfile", () => {
       cross_vote_label: "rare",
       member_votes_available: false,
       recent_cross_votes: [],
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
     });
     expect(profile?.photo_url).toContain("F000466");
     expect(profile?.congress_gov_url).toBe(
@@ -171,6 +188,31 @@ describe("buildMemberProfile", () => {
             margin: 10,
           },
         ],
+        rollBillInfo: [
+          {
+            chamber: "House",
+            congress: 119,
+            session: 2,
+            roll_number: 10,
+            question: "On Passage",
+            result: "Passed",
+            title: "Lower Energy Costs Act",
+            headline: "House passes a broad energy package",
+          },
+        ],
+        sponsoredBills: [
+          {
+            congress: 119,
+            bill_type: "HR",
+            bill_number: 22,
+            title: "Government Accountability Act",
+            headline: "House passes a federal spending oversight bill",
+            policy_area: "Government Operations",
+            introduced_date: "2026-06-01",
+            status: "Presented to President.",
+          },
+        ],
+        sponsoredTotal: 3,
       }),
       119,
       2,
@@ -192,8 +234,24 @@ describe("buildMemberProfile", () => {
         position: "yea",
         party_line: "nay",
         margin: 10,
+        bill_id: "119-hr-1",
+        title: "Lower Energy Costs Act",
+        headline: "House passes a broad energy package",
+        question: "On Passage",
+        result: "Passed",
       }),
     ]);
+    expect(profile?.sponsored_bills).toEqual([
+      expect.objectContaining({
+        bill_id: "119-hr-22",
+        title: "Government Accountability Act",
+        headline: "House passes a federal spending oversight bill",
+        introduced_date: "2026-06-01",
+        policy_area: "Government Operations",
+        status: "Presented to President.",
+      }),
+    ]);
+    expect(profile?.sponsored_bills_total).toBe(3);
   });
 
   it("falls back to a live scan when session stats are missing", async () => {
@@ -262,6 +320,20 @@ describe("buildMemberProfile", () => {
         memberVotes,
         peerVotes,
         roster,
+        rollBillInfo: [
+          {
+            chamber: "House",
+            congress: 119,
+            session: 2,
+            roll_number: 10,
+            question: "On Passage",
+            result: "Passed",
+            title: "Lower Energy Costs Act",
+            headline: "House passes a broad energy package",
+          },
+        ],
+        sponsoredBills: [],
+        sponsoredTotal: 0,
       }),
       119,
       2,
@@ -275,16 +347,123 @@ describe("buildMemberProfile", () => {
       cross_vote_count: 1,
       cross_vote_label: "rare",
       member_votes_available: true,
+      sponsored_bills: [],
+      sponsored_bills_total: 0,
     });
     expect(profile?.recent_cross_votes).toEqual([
       expect.objectContaining({
         roll_number: 10,
         bill_type: "HR",
         bill_number: 1,
+        bill_id: "119-hr-1",
+        title: "Lower Energy Costs Act",
+        headline: "House passes a broad energy package",
+        question: "On Passage",
+        result: "Passed",
         position: "yea",
         party_line: "nay",
         margin: 10,
       }),
     ]);
+  });
+
+  it("keeps enriched cross-vote bill_id when the digest is missing", async () => {
+    const profile = await buildMemberProfile(
+      createDb({
+        member: {
+          bioguide_id: "F000466",
+          name: "Brian Fitzpatrick",
+          chamber: "House",
+          party: "R",
+          state: "PA",
+          district: 1,
+        },
+        stats: {
+          bioguide_id: "F000466",
+          congress: 119,
+          session: 2,
+          votes_cast: 2,
+          yea_count: 1,
+          nay_count: 1,
+          cross_vote_count: 1,
+          updated_at: "2026-07-01T12:00:00.000Z",
+        },
+        recentCrossVotes: [
+          {
+            chamber: "House",
+            congress: 119,
+            session: 2,
+            roll_number: 11,
+            bill_type: "S",
+            bill_number: 47,
+            bill_congress: 119,
+            vote_date: "2026-06-20",
+            position: "nay",
+            party_line: "yea",
+            margin: 4,
+          },
+        ],
+        rollBillInfo: [
+          {
+            chamber: "House",
+            congress: 119,
+            session: 2,
+            roll_number: 11,
+            question: "On Passage of the Bill",
+            result: "Passed",
+            title: null,
+            headline: null,
+          },
+        ],
+      }),
+      119,
+      2,
+      "F000466"
+    );
+
+    expect(profile?.recent_cross_votes).toEqual([
+      expect.objectContaining({
+        bill_id: "119-s-47",
+        title: "",
+        headline: null,
+        question: "On Passage of the Bill",
+        result: "Passed",
+      }),
+    ]);
+    expect(profile?.sponsored_bills).toEqual([]);
+    expect(profile?.sponsored_bills_total).toBe(0);
+  });
+
+  it("returns an empty sponsored list when the member has no primary bills", async () => {
+    const profile = await buildMemberProfile(
+      createDb({
+        member: {
+          bioguide_id: "F000466",
+          name: "Brian Fitzpatrick",
+          chamber: "House",
+          party: "R",
+          state: "PA",
+          district: 1,
+        },
+        stats: {
+          bioguide_id: "F000466",
+          congress: 119,
+          session: 2,
+          votes_cast: 1,
+          yea_count: 1,
+          nay_count: 0,
+          cross_vote_count: 0,
+          updated_at: "2026-07-01T12:00:00.000Z",
+        },
+        sponsoredBills: [],
+        sponsoredTotal: 0,
+      }),
+      119,
+      2,
+      "F000466"
+    );
+
+    expect(profile?.sponsored_bills).toEqual([]);
+    expect(profile?.sponsored_bills_total).toBe(0);
   });
 });
