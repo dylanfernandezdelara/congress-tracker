@@ -94,6 +94,21 @@ The resolution recommends levels and amounts for FY2027-FY2036 for federal reven
     ).toBe("Amends Title 18 U.S.C. Section 401 to add penalties.");
   });
 
+  it("does not cut the first sentence on place, suffix, or company abbreviations", () => {
+    expect(
+      formatCollapsedDigestLead(
+        'This measure is titled "St. Croix National Heritage Area Act" and does not yet have an official summary.'
+      )
+    ).toBe(
+      'This measure is titled "St. Croix National Heritage Area Act" and does not yet have an official summary.'
+    );
+    expect(
+      normalizeDigestLead(
+        "Names the Martin Luther King, Jr. Memorial Post Office. Signage follows."
+      )
+    ).toBe("Names the Martin Luther King, Jr. Memorial Post Office.");
+  });
+
   it("does not cut the first sentence on a name initial", () => {
     expect(
       formatCollapsedDigestLead(

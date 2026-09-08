@@ -1,13 +1,13 @@
 import {
+  DIGEST_LEAD_MAX_WORDS,
   normalizeDigestLead,
   trimDisplayTitle,
+  truncateWords,
 } from "../../../../shared/feed-content";
-import { DIGEST_SOURCE_TITLE_FALLBACK } from "../../../../shared/digest-api-types";
-import type { BillDigestContent } from "../types";
+import { DIGEST_SOURCE_TITLE_FALLBACK, type StoredBillDigest } from "../d1/digests";
 
 export interface TitleFallbackSource {
   title: string | null;
-  policyArea: string | null;
   rawSummary: string | null;
 }
 
@@ -26,23 +26,25 @@ function cleanTitle(title: string | null): string | null {
  * sentence that restates the title and says no official summary exists yet.
  * Returns null when there is neither a title nor CRS text to restate.
  */
-export function buildTitleFallbackDigest(source: TitleFallbackSource): BillDigestContent | null {
+export function buildTitleFallbackDigest(source: TitleFallbackSource): StoredBillDigest | null {
   const title = cleanTitle(source.title);
   const crs = source.rawSummary?.trim() || null;
   if (!title && !crs) return null;
 
   const headline = title ?? normalizeDigestLead(crs ?? "");
+  // The templated lead is already one sentence; a first-sentence cut would
+  // split on abbreviations inside the title ("St. Croix", "Jr.").
   const whatItDoes = crs
     ? normalizeDigestLead(crs)
-    : normalizeDigestLead(
-        `This measure is titled "${title}" and does not yet have an official summary.`
+    : truncateWords(
+        `This measure is titled "${title}" and does not yet have an official summary.`,
+        DIGEST_LEAD_MAX_WORDS
       );
-  const policyArea = source.policyArea?.trim();
 
   return {
     headline,
     what_it_does: whatItDoes,
-    key_points: policyArea ? [`Policy area: ${policyArea}`] : [],
+    key_points: [],
     terms_explained: [],
     source: DIGEST_SOURCE_TITLE_FALLBACK,
   };

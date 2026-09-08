@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DIGEST_SOURCE_TITLE_FALLBACK } from "../../../../shared/digest-api-types";
-import { parseStoredDigest } from "../d1/digests";
+import { formatCollapsedDigestLead } from "../../../../shared/feed-content";
+import {
+  DIGEST_SOURCE_TITLE_FALLBACK,
+  isTitleFallbackDigest,
+  parseStoredDigest,
+} from "../d1/digests";
 import { buildTitleFallbackDigest } from "./title-fallback-digest";
 
 describe("buildTitleFallbackDigest", () => {
   it("restates a title-only bill without inventing CRS content", () => {
     const digest = buildTitleFallbackDigest({
       title: "Equal Pay for Equal Work Act",
-      policyArea: null,
       rawSummary: null,
     });
 
@@ -19,13 +22,14 @@ describe("buildTitleFallbackDigest", () => {
       terms_explained: [],
       source: DIGEST_SOURCE_TITLE_FALLBACK,
     });
-    expect(parseStoredDigest(JSON.stringify(digest))).not.toBeNull();
+    const json = JSON.stringify(digest);
+    expect(parseStoredDigest(json)).not.toBeNull();
+    expect(isTitleFallbackDigest(json)).toBe(true);
   });
 
-  it("keeps the lead to one sentence and lists the policy area as a key point", () => {
+  it("strips boilerplate and trailing punctuation from the title", () => {
     const digest = buildTitleFallbackDigest({
       title: "To amend title 38, United States Code, to improve care, and for other purposes.",
-      policyArea: "Armed Forces and National Security",
       rawSummary: null,
     });
 
@@ -33,14 +37,25 @@ describe("buildTitleFallbackDigest", () => {
     expect(digest?.what_it_does).toBe(
       'This measure is titled "To amend title 38, United States Code, to improve care" and does not yet have an official summary.'
     );
-    expect(digest?.what_it_does.match(/[.!?](\s|$)/g)).toHaveLength(1);
-    expect(digest?.key_points).toEqual(["Policy area: Armed Forces and National Security"]);
+  });
+
+  it("keeps the whole templated lead when the title contains abbreviations", () => {
+    for (const title of [
+      "St. Croix National Heritage Area Act",
+      "Martin Luther King, Jr. Memorial Post Office Act",
+      "Acme Inc. Relief Act",
+      "Mt. Hood Cooperative Recreation Enhancement Act",
+    ]) {
+      const digest = buildTitleFallbackDigest({ title, rawSummary: null });
+      const expected = `This measure is titled "${title}" and does not yet have an official summary.`;
+      expect(digest?.what_it_does).toBe(expected);
+      expect(formatCollapsedDigestLead(digest?.what_it_does ?? "")).toBe(expected);
+    }
   });
 
   it("uses the CRS opening sentence when official text exists", () => {
     const digest = buildTitleFallbackDigest({
       title: "Springfield Post Office Act",
-      policyArea: "Government Operations and Politics",
       rawSummary:
         "This bill designates the facility in Springfield as the Example Post Office. It also directs signage changes.",
     });
@@ -53,14 +68,13 @@ describe("buildTitleFallbackDigest", () => {
   });
 
   it("returns null when neither title nor CRS text exists", () => {
-    expect(buildTitleFallbackDigest({ title: "  ", policyArea: "Health", rawSummary: null })).toBeNull();
-    expect(buildTitleFallbackDigest({ title: null, policyArea: null, rawSummary: "" })).toBeNull();
+    expect(buildTitleFallbackDigest({ title: "  ", rawSummary: null })).toBeNull();
+    expect(buildTitleFallbackDigest({ title: null, rawSummary: "" })).toBeNull();
   });
 
   it("falls back to the CRS lead as headline when the title is missing", () => {
     const digest = buildTitleFallbackDigest({
       title: null,
-      policyArea: null,
       rawSummary: "This resolution honors the 2026 champions. It commends the coaching staff.",
     });
 
