@@ -2,6 +2,8 @@ import { trimDisplayTitle } from "../../../../shared/bill-id";
 import {
   OG_CARD_HEADLINE_MAX_CHARS,
   OG_CARD_QUOTE_MAX_CHARS,
+  buildStatusLine,
+  formatCardDate,
   ogCardDocket,
   truncateForCard,
   type OgCardModel,
@@ -15,44 +17,11 @@ import type { BillQuote } from "../../../../shared/share-api-types";
 import { getBillQuote } from "../d1/bill-quotes";
 import { getDigest, type DigestRow } from "../d1/digests";
 import { getLifecycle } from "../d1/lifecycle";
-import { getPassageVotesForBill, type VoteRow } from "../d1/votes";
+import { getPassageVotesForBill } from "../d1/votes";
 
 export type OgCardBillRef = { congress: number; type: string; number: number };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-export function formatCardDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (!match) return null;
-  const month = MONTHS[Number.parseInt(match[2]!, 10) - 1];
-  if (!month) return null;
-  return `${month} ${Number.parseInt(match[3]!, 10)}, ${match[1]}`;
-}
-
-function passedVerb(result: string): "Passed" | "Failed" {
-  return /fail|reject|not/i.test(result) ? "Failed" : "Passed";
-}
-
-/** Status copy: enactment wins, then the newest passage vote, then intro state. */
-export function buildStatusLine(params: {
-  latestVote: VoteRow | null;
-  becameLawDate: string | null;
-  vetoedDate: string | null;
-}): string {
-  const law = formatCardDate(params.becameLawDate);
-  if (law) return `Became law · ${law}`;
-  const vetoed = formatCardDate(params.vetoedDate);
-  if (vetoed) return `Vetoed · ${vetoed}`;
-  const vote = params.latestVote;
-  if (vote) {
-    const chamber = vote.chamber === "Senate" ? "Senate" : "House";
-    const date = formatCardDate(vote.vote_date);
-    const tally = `${vote.yeas}–${vote.nays}`;
-    return `${passedVerb(vote.result)} ${chamber} ${tally}${date ? ` · ${date}` : ""}`;
-  }
-  return "Introduced · In committee";
-}
+export { buildStatusLine, formatCardDate };
 
 export type LoadOgCardModelResult =
   | { ok: true; model: OgCardModel }

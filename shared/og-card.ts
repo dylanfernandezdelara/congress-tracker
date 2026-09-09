@@ -85,6 +85,34 @@ function normalizeBarParty(party: string): OgCardBarSegment['party'] {
   return 'Other'
 }
 
+const YEA_PARTY_ORDER: ReadonlyArray<OgCardBarSegment['party']> = ['D', 'I', 'Other', 'R']
+const NAY_PARTY_ORDER: ReadonlyArray<OgCardBarSegment['party']> = ['R', 'Other', 'I', 'D']
+
+function partyCountPrefix(splits: RollPartySplit[], side: 'yea' | 'nay'): string {
+  if (splits.length === 0) return ''
+  const order = side === 'yea' ? YEA_PARTY_ORDER : NAY_PARTY_ORDER
+  const parts: string[] = []
+  for (const party of order) {
+    let count = 0
+    for (const split of splits) {
+      if (normalizeBarParty(split.party) !== party) continue
+      count += side === 'yea' ? split.yeas : split.nays
+    }
+    if (count > 0) parts.push(`${party} ${count}`)
+  }
+  return parts.join(' · ')
+}
+
+/** Legend labels under the tally bar. Party prefixes only when splits exist. */
+export function ogCardLegend(tally: OgCardTally): { yea: string; nay: string } {
+  const yeaPrefix = partyCountPrefix(tally.party_splits, 'yea')
+  const nayPrefix = partyCountPrefix(tally.party_splits, 'nay')
+  return {
+    yea: yeaPrefix ? `${yeaPrefix} Yea ${tally.yeas}` : `Yea ${tally.yeas}`,
+    nay: nayPrefix ? `${nayPrefix} Nay ${tally.nays}` : `Nay ${tally.nays}`,
+  }
+}
+
 export function truncateForCard(text: string, max: number): string {
   const cleaned = text.replace(/\s+/g, ' ').trim()
   if (cleaned.length <= max) return cleaned
@@ -95,6 +123,57 @@ export function truncateForCard(text: string, max: number): string {
 
 export function formatTallyLabel(tally: Pick<OgCardTally, 'yeas' | 'nays'>): string {
   return `${tally.yeas}–${tally.nays}`
+}
+
+const CARD_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** `2026-09-03…` → `Sep 3, 2026`; null for missing or non-ISO input. */
+export function formatCardDate(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (!match) return null
+  const month = CARD_MONTHS[Number.parseInt(match[2]!, 10) - 1]
+  if (!month) return null
+  return `${month} ${Number.parseInt(match[3]!, 10)}, ${match[1]}`
+}
+
+export type OgCardStatusVote = {
+  chamber: string
+  yeas: number
+  nays: number
+  result: string
+  vote_date: string | null
+}
+
+function passedVerb(result: string): 'Passed' | 'Failed' {
+  return /fail|reject|not/i.test(result) ? 'Failed' : 'Passed'
+}
+
+/** Status copy: enactment wins, then the newest passage vote, then intro state. */
+export function buildStatusLine(params: {
+  latestVote: OgCardStatusVote | null
+  becameLawDate: string | null
+  vetoedDate: string | null
+}): string {
+  const law = formatCardDate(params.becameLawDate)
+  if (law) return `Became law · ${law}`
+  const vetoed = formatCardDate(params.vetoedDate)
+  if (vetoed) return `Vetoed · ${vetoed}`
+  const vote = params.latestVote
+  if (vote) {
+    const chamber = vote.chamber === 'Senate' ? 'Senate' : 'House'
+    const date = formatCardDate(vote.vote_date)
+    return `${passedVerb(vote.result)} ${chamber} ${formatTallyLabel(vote)}${date ? ` · ${date}` : ''}`
+  }
+  return 'Introduced · In committee'
+}
+
+/** Chip label used when a bill has no passage vote: the part after `Introduced · `. */
+export function ogCardStatusChipLabel(statusLine: string): string {
+  const sep = ' · '
+  const idx = statusLine.indexOf(sep)
+  if (idx === -1) return 'In committee'
+  return statusLine.slice(idx + sep.length).trim() || 'In committee'
 }
 
 export function ogCardDocket(bill: { congress: number; type: string; number: number }): string {

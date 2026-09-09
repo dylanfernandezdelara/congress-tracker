@@ -28,7 +28,7 @@ import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { useStatsData } from '../hooks/useStatsData'
-import { feedRowKey } from '../utils/billDeepLink'
+import { feedRowKey, itemMatchesBillParam } from '../utils/billDeepLink'
 import { tightnessDotKey } from '../utils/tightnessLabels'
 import {
   advancedFilterCount,
@@ -84,6 +84,8 @@ export default function Home() {
     expandedRowKey,
     feedSettled,
     billMissingNotice,
+    billParam,
+    quoteParam,
     lastFeedModeRef,
     reloadFeed,
     loadMore,
@@ -348,6 +350,11 @@ export default function Home() {
                     item={item}
                     isExpanded={expandedRowKey === rowKey}
                     onToggle={toggleRow}
+                    quoteId={
+                      quoteParam && billParam && itemMatchesBillParam(item, billParam)
+                        ? quoteParam
+                        : null
+                    }
                   />
                 )
               })}

@@ -3,6 +3,8 @@ import {
   OG_CARD_SITE_LABEL,
   OG_CARD_WIDTH,
   ogCardBarSegments,
+  ogCardLegend,
+  ogCardStatusChipLabel,
   type OgCardBarSegment,
   type OgCardModel,
   type OgCardTally,
@@ -32,8 +34,7 @@ const NAY_COLORS: Record<OgCardBarSegment["party"], string> = {
   Other: "#d1d5db",
 };
 
-const YEA_PARTY_ORDER: ReadonlyArray<OgCardBarSegment["party"]> = ["D", "I", "Other", "R"];
-const NAY_PARTY_ORDER: ReadonlyArray<OgCardBarSegment["party"]> = ["R", "Other", "I", "D"];
+export { ogCardLegend };
 
 function escapeOgText(value: string): string {
   return value
@@ -41,42 +42,6 @@ function escapeOgText(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function partyCountPrefix(
-  splits: OgCardTally["party_splits"],
-  side: "yea" | "nay"
-): string {
-  if (splits.length === 0) return "";
-  const order = side === "yea" ? YEA_PARTY_ORDER : NAY_PARTY_ORDER;
-  const parts: string[] = [];
-  for (const party of order) {
-    let count = 0;
-    for (const split of splits) {
-      if (split.party !== party) continue;
-      count += side === "yea" ? split.yeas : split.nays;
-    }
-    if (count > 0) parts.push(`${party} ${count}`);
-  }
-  return parts.join(" · ");
-}
-
-/** Legend labels under the tally bar. Party prefixes only when splits exist. */
-export function ogCardLegend(tally: OgCardTally): { yea: string; nay: string } {
-  const yeaPrefix = partyCountPrefix(tally.party_splits, "yea");
-  const nayPrefix = partyCountPrefix(tally.party_splits, "nay");
-  return {
-    yea: yeaPrefix ? `${yeaPrefix} Yea ${tally.yeas}` : `Yea ${tally.yeas}`,
-    nay: nayPrefix ? `${nayPrefix} Nay ${tally.nays}` : `Nay ${tally.nays}`,
-  };
-}
-
-function statusChipLabel(statusLine: string): string {
-  const sep = " · ";
-  const idx = statusLine.indexOf(sep);
-  if (idx === -1) return "In committee";
-  const rest = statusLine.slice(idx + sep.length).trim();
-  return rest || "In committee";
 }
 
 function segmentColor(segment: OgCardBarSegment): string {
@@ -103,7 +68,7 @@ function tallyBarHtml(tally: OgCardTally): string {
 }
 
 function statusChipHtml(statusLine: string): string {
-  const label = escapeOgText(statusChipLabel(statusLine));
+  const label = escapeOgText(ogCardStatusChipLabel(statusLine));
   return [
     `<div style="display:flex;margin-top:14px;">`,
     `<div style="border:2px solid ${CHIP_BORDER};border-radius:999px;padding:10px 18px;font-family:${SANS};font-size:22px;color:${INK};">${label}</div>`,

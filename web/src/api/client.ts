@@ -1,7 +1,12 @@
 import type { IngestMonitorPayload } from '@congress-tracker/shared/ingest-api-types'
+import type {
+  CreateBillQuoteRequest,
+  CreateBillQuoteResponse,
+  GetBillQuoteResponse,
+} from '@congress-tracker/shared/share-api-types'
 
 import { applyAdvancedFeedParams, type AdvancedFeedFilters } from '../utils/feedAdvancedFilters'
-import { fetchJson } from './fetchJson'
+import { fetchJson, postJson } from './fetchJson'
 import type {
   CommitteesLeaderboardResponse,
   DefectorsResponse,
@@ -158,4 +163,14 @@ export async function fetchVoteDefectors(params: {
 export async function fetchMemberProfile(bioguideId: string): Promise<MemberProfileResponse> {
   const params = new URLSearchParams({ bioguide_id: bioguideId })
   return fetchJson<MemberProfileResponse>(`/stats/member.json?${params}`)
+}
+
+/** Verify + store a reader-selected quote; the worker rejects text not found in the bill. */
+export async function createBillQuote(request: CreateBillQuoteRequest): Promise<CreateBillQuoteResponse> {
+  return postJson<CreateBillQuoteResponse>('/share/quote', request)
+}
+
+export async function fetchBillQuote(id: string): Promise<GetBillQuoteResponse> {
+  const params = new URLSearchParams({ id })
+  return fetchJson<GetBillQuoteResponse>(`/share/quote.json?${params}`)
 }

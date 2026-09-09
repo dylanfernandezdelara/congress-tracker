@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildStatusLine,
+  formatCardDate,
   ogCardBarSegments,
   ogCardImagePath,
+  ogCardLegend,
+  ogCardStatusChipLabel,
   ogCardVersion,
   truncateForCard,
   type OgCardModel,
@@ -65,5 +69,46 @@ describe('og card model helpers', () => {
     expect(ogCardImagePath({ congress: 119, type: 'S', number: 2 }, { version })).toBe(
       `/og/bill/119-s-2.png?v=${version}`,
     )
+  })
+
+  it('formats status lines: enactment, veto, newest vote, then intro', () => {
+    const vote = { chamber: 'House', yeas: 219, nays: 213, result: 'Passed', vote_date: '2026-09-03' }
+    expect(formatCardDate('2026-09-03T00:00:00Z')).toBe('Sep 3, 2026')
+    expect(formatCardDate('nonsense')).toBeNull()
+    expect(buildStatusLine({ latestVote: vote, becameLawDate: null, vetoedDate: null })).toBe(
+      'Passed House 219–213 · Sep 3, 2026',
+    )
+    expect(
+      buildStatusLine({ latestVote: { ...vote, result: 'Failed' }, becameLawDate: null, vetoedDate: null }),
+    ).toBe('Failed House 219–213 · Sep 3, 2026')
+    expect(buildStatusLine({ latestVote: vote, becameLawDate: '2026-09-10', vetoedDate: null })).toBe(
+      'Became law · Sep 10, 2026',
+    )
+    expect(buildStatusLine({ latestVote: vote, becameLawDate: null, vetoedDate: '2026-09-11' })).toBe(
+      'Vetoed · Sep 11, 2026',
+    )
+    expect(buildStatusLine({ latestVote: null, becameLawDate: null, vetoedDate: null })).toBe(
+      'Introduced · In committee',
+    )
+    expect(ogCardStatusChipLabel('Introduced · In committee')).toBe('In committee')
+    expect(ogCardStatusChipLabel('Introduced')).toBe('In committee')
+  })
+
+  it('labels the legend with party prefixes only when splits exist', () => {
+    expect(ogCardLegend({ chamber: 'House', yeas: 5, nays: 3, party_splits: [] })).toEqual({
+      yea: 'Yea 5',
+      nay: 'Nay 3',
+    })
+    expect(
+      ogCardLegend({
+        chamber: 'House',
+        yeas: 5,
+        nays: 3,
+        party_splits: [
+          { party: 'R', yeas: 4, nays: 1, party_line: 'yea' },
+          { party: 'D', yeas: 1, nays: 2, party_line: 'nay' },
+        ],
+      }),
+    ).toEqual({ yea: 'D 1 · R 4 Yea 5', nay: 'R 1 · D 2 Nay 3' })
   })
 })
