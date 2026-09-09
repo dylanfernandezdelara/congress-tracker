@@ -63,6 +63,7 @@ describe("buildEvidenceChunks", () => {
   it("formats stored enums as Sec. N. Heading", () => {
     expect(formatSectionLabel("3.", "Definitions")).toBe("Sec. 3. Definitions");
     expect(formatSectionLabel("Sec. 3", "Definitions")).toBe("Sec. 3. Definitions");
+    expect(formatSectionLabel("Sec. 3.", "Definitions")).toBe("Sec. 3. Definitions");
   });
 });
 

@@ -89,7 +89,7 @@ export function formatSectionLabel(label: string, heading: string): string {
   const head = heading.trim();
   const enumPart = raw.replace(/\.$/, "");
   const looksLikeEnum = /^[0-9A-Za-z]+$/.test(enumPart);
-  const title = looksLikeEnum ? `Sec. ${enumPart}` : raw || "Bill text";
+  const title = looksLikeEnum ? `Sec. ${enumPart}` : enumPart || "Bill text";
   return head ? `${title}. ${head}` : title;
 }
 
