@@ -109,6 +109,23 @@ describe('og card model helpers', () => {
           { party: 'D', yeas: 1, nays: 2, party_line: 'nay' },
         ],
       }),
-    ).toEqual({ yea: 'D 1 · R 4 Yea 5', nay: 'R 1 · D 2 Nay 3' })
+    ).toEqual({ yea: 'Yea 5 · D 1 · R 4', nay: 'Nay 3 · R 1 · D 2' })
+  })
+
+  it('drops party detail when member splits do not reconcile with the roll tally', () => {
+    const tally = {
+      chamber: 'House' as const,
+      yeas: 220,
+      nays: 213,
+      party_splits: [
+        { party: 'R', yeas: 219, nays: 0, party_line: 'yea' as const },
+        { party: 'D', yeas: 211, nays: 1, party_line: 'yea' as const },
+      ],
+    }
+    expect(ogCardBarSegments(tally)).toEqual([
+      { party: 'Other', side: 'yea', count: 220 },
+      { party: 'Other', side: 'nay', count: 213 },
+    ])
+    expect(ogCardLegend(tally)).toEqual({ yea: 'Yea 220', nay: 'Nay 213' })
   })
 })

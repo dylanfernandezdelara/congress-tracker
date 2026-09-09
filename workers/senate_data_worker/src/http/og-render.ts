@@ -30,10 +30,15 @@ function loadFonts(): Promise<FontSet> {
   return fontsPromise;
 }
 
-/** Render share-card HTML to a PNG Response via workers-og (satori + resvg). */
+/**
+ * Render share-card HTML to a PNG Response via workers-og (satori + resvg).
+ * `ImageResponse` renders lazily into its body stream, which would surface a
+ * satori error only after a 200 has been sent; buffering the bytes here lets
+ * the route fall back to the static card instead of serving an empty body.
+ */
 export async function renderOgCardPng(html: string): Promise<Response> {
   const fonts = await loadFonts();
-  return new ImageResponse(html, {
+  const streamed = new ImageResponse(html, {
     width: OG_CARD_WIDTH,
     height: OG_CARD_HEIGHT,
     fonts: [
@@ -42,4 +47,7 @@ export async function renderOgCardPng(html: string): Promise<Response> {
       { name: "Source Serif 4", data: fonts.serif500, weight: 500, style: "normal" },
     ],
   });
+  const png = await streamed.arrayBuffer();
+  if (png.byteLength === 0) throw new Error("og_card_render_empty");
+  return new Response(png, { status: 200, headers: { "content-type": "image/png" } });
 }

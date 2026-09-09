@@ -48,17 +48,34 @@ const PARTY_ORDER: Array<OgCardBarSegment['party']> = ['D', 'I', 'Other', 'R']
  * R→Other→I→D nays so the two "outer" colors meet their own party's nays.
  * Without splits: a single yea segment and a single nay segment.
  */
+/**
+ * Party splits come from per-member roll rows, the tally from the roll header.
+ * Only trust the split when both agree, otherwise a partially ingested roll
+ * would draw a bar that contradicts the printed total.
+ */
+export function reconciledPartySplits(tally: OgCardTally): RollPartySplit[] {
+  if (tally.party_splits.length === 0) return []
+  let yeas = 0
+  let nays = 0
+  for (const split of tally.party_splits) {
+    yeas += split.yeas
+    nays += split.nays
+  }
+  return yeas === tally.yeas && nays === tally.nays ? tally.party_splits : []
+}
+
 export function ogCardBarSegments(tally: OgCardTally): OgCardBarSegment[] {
   const total = tally.yeas + tally.nays
   if (total <= 0) return []
-  if (tally.party_splits.length === 0) {
+  const splits = reconciledPartySplits(tally)
+  if (splits.length === 0) {
     return [
       { party: 'Other', side: 'yea', count: tally.yeas },
       { party: 'Other', side: 'nay', count: tally.nays },
     ]
   }
   const byParty = new Map<OgCardBarSegment['party'], RollPartySplit>()
-  for (const split of tally.party_splits) {
+  for (const split of splits) {
     const key = normalizeBarParty(split.party)
     const existing = byParty.get(key)
     byParty.set(
@@ -103,13 +120,14 @@ function partyCountPrefix(splits: RollPartySplit[], side: 'yea' | 'nay'): string
   return parts.join(' · ')
 }
 
-/** Legend labels under the tally bar. Party prefixes only when splits exist. */
+/** Legend labels under the tally bar: total first, party detail only when splits reconcile. */
 export function ogCardLegend(tally: OgCardTally): { yea: string; nay: string } {
-  const yeaPrefix = partyCountPrefix(tally.party_splits, 'yea')
-  const nayPrefix = partyCountPrefix(tally.party_splits, 'nay')
+  const splits = reconciledPartySplits(tally)
+  const yeaDetail = partyCountPrefix(splits, 'yea')
+  const nayDetail = partyCountPrefix(splits, 'nay')
   return {
-    yea: yeaPrefix ? `${yeaPrefix} Yea ${tally.yeas}` : `Yea ${tally.yeas}`,
-    nay: nayPrefix ? `${nayPrefix} Nay ${tally.nays}` : `Nay ${tally.nays}`,
+    yea: yeaDetail ? `Yea ${tally.yeas} · ${yeaDetail}` : `Yea ${tally.yeas}`,
+    nay: nayDetail ? `Nay ${tally.nays} · ${nayDetail}` : `Nay ${tally.nays}`,
   }
 }
 
