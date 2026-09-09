@@ -5,6 +5,7 @@
  */
 import { formatBillDocket, formatBillQueryParam } from './bill-id'
 import type { RollPartySplit } from './stats-api-types'
+import { BILL_QUOTE_QUERY_PARAM } from './share-api-types'
 
 export const OG_CARD_WIDTH = 1200
 export const OG_CARD_HEIGHT = 630
@@ -207,7 +208,7 @@ export function ogCardImagePath(
   options: { quoteId?: string | null; version: string },
 ): string {
   const params = new URLSearchParams()
-  if (options.quoteId) params.set('q', options.quoteId)
+  if (options.quoteId) params.set(BILL_QUOTE_QUERY_PARAM, options.quoteId)
   params.set('v', options.version)
   return `/og/bill/${formatBillQueryParam(bill)}.png?${params.toString()}`
 }

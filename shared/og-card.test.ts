@@ -65,7 +65,7 @@ describe('og card model helpers', () => {
     expect(ogCardVersion({ ...model, headline: 'Other' })).not.toBe(version)
     expect(
       ogCardImagePath({ congress: 119, type: 'HR', number: 1 }, { quoteId: 'abc123ff', version }),
-    ).toBe(`/og/bill/119-hr-1.png?q=abc123ff&v=${version}`)
+    ).toBe(`/og/bill/119-hr-1.png?quote=abc123ff&v=${version}`)
     expect(ogCardImagePath({ congress: 119, type: 'S', number: 2 }, { version })).toBe(
       `/og/bill/119-s-2.png?v=${version}`,
     )

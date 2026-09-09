@@ -8,7 +8,7 @@ Selecting text inside an expanded bill's summary opens a small floating menu. **
 - `quote-share-sheet` opens dialog `Share this quote` with an HTML twin of the OG card (quote as main text, headline muted below, status line, tally bar or status chip) and the `&quote=` URL.
 - `quote-landing` opens `/?bill=119-hr-1&quote=<id>`, expands the bill, highlights the passage (`mark[data-quote-highlight]`), scrolls it into view, and toasts `Shared quote`.
 - `quote-landing-callout` falls back to an aside `Shared quote` above the summary when the stored text no longer matches the digest.
-- `quote-og` (Worker HTML, not Vite) rewrites `og:description` / `twitter:description` to the quote, points `og:image` / `twitter:image` at `/og/bill/<id>.png?q=<quoteId>&v=…`, and sets `og:image:alt`.
+- `quote-og` (Worker HTML, not Vite) rewrites `og:description` / `twitter:description` to the quote, points `og:image` / `twitter:image` at `/og/bill/<id>.png?quote=<quoteId>&v=…`, and sets `og:image:alt`.
 
 ## How to get to it (user POV)
 
@@ -30,7 +30,7 @@ Preconditions:
 - **Landing.** `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser goto --path "/?bill=119-hr-1&quote=<id>"` then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role region --name "/Details for House passes a broad energy/"`. Within ~1 s, `mark[data-quote-highlight]` exists with the quote text, its rect is inside the viewport, and `.app-toast` reads `Shared quote`.
 - **Proof (landing).** `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --aria --path artifacts/verify/share-quote/landing.aria.txt` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/share-quote/landing-highlight-desktop.png`.
 - **Mobile.** Override to 390×844 (SKILL.md **Mobile proof**), repeat landing, select, and share; save `landing-highlight-390.png`, `selection-menu-390.png`, `share-sheet-quote-390.png`.
-- **Crawler (Worker, not Vite).** `curl -s -A "Twitterbot/1.0" -H "Accept: text/html" "http://127.0.0.1:8788/?bill=119-hr-1&quote=<id>"` must show `og:description` = the quote and `og:image` ending in `/og/bill/119-hr-1.png?q=<id>&v=…`. `curl -D - -o /tmp/og.png "http://127.0.0.1:8788/og/bill/119-hr-1.png?q=<id>"` returns `image/png` with `x-og-card: rendered` (a `static` value means satori failed and the fallback PNG was served).
+- **Crawler (Worker, not Vite).** `curl -s -A "Twitterbot/1.0" -H "Accept: text/html" "http://127.0.0.1:8788/?bill=119-hr-1&quote=<id>"` must show `og:description` = the quote and `og:image` ending in `/og/bill/119-hr-1.png?quote=<id>&v=…`. `curl -D - -o /tmp/og.png "http://127.0.0.1:8788/og/bill/119-hr-1.png?quote=<id>"` returns `image/png` with `x-og-card: rendered` (a `static` value means satori failed and the fallback PNG was served).
 
 ## Gotchas
 
