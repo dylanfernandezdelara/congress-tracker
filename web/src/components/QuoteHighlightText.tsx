@@ -1,4 +1,4 @@
-import { findQuoteInText } from '../utils/quoteHighlight'
+import { findQuoteInText } from '@congress-tracker/shared/quote-verification'
 
 type QuoteHighlightTextProps = {
   text: string

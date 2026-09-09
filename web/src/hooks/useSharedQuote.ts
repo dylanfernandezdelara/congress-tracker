@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import { formatBillQueryParam } from '@congress-tracker/shared/bill-id'
+import { formatBillQueryParam, parseBillQueryParam } from '@congress-tracker/shared/bill-id'
+import { quoteBelongsToBill } from '@congress-tracker/shared/quote-verification'
 import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 
 import { fetchBillQuote } from '../api/client'
@@ -20,6 +21,7 @@ export function useSharedQuote(
   item: Pick<FeedItem, 'bill'>,
   quoteId: string | null | undefined,
 ): SharedQuoteState {
+  // Primitive dependency so a fresh `item` object does not refetch the quote.
   const billParam = formatBillQueryParam(item.bill)
   const [state, setState] = useState<SharedQuoteState>({ status: 'idle' })
 
@@ -33,7 +35,8 @@ export function useSharedQuote(
     fetchBillQuote(quoteId)
       .then(({ quote }) => {
         if (cancelled) return
-        const belongs = formatBillQueryParam(quote.bill) === billParam
+        const bill = parseBillQueryParam(billParam)
+        const belongs = bill !== null && quoteBelongsToBill(quote, bill)
         setState(belongs ? { status: 'ready', quote } : { status: 'missing' })
       })
       .catch(() => {
