@@ -86,7 +86,7 @@ afterEach(() => {
 
 describe('BillChatSection', () => {
   it('renders the heading and starter chips including key-point questions', () => {
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
     expect(screen.getByText('Answers quote the bill’s text.')).toBeInTheDocument()
@@ -101,7 +101,7 @@ describe('BillChatSection', () => {
   })
 
   it('sends a starter chip as the user message', () => {
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'What does this bill do?' }))
 
@@ -118,7 +118,7 @@ describe('BillChatSection', () => {
       ]),
     ]
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByText('The bill raises the spending cap.')).toBeInTheDocument()
     expect(screen.getByText('The Secretary shall raise the cap.')).toBeInTheDocument()
@@ -135,7 +135,7 @@ describe('BillChatSection', () => {
       ]),
     ]
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const notice = screen.getByText("The bill text doesn't address this.")
     expect(notice.closest('.bill-chat-bubble--refused')).toBeTruthy()
@@ -145,7 +145,7 @@ describe('BillChatSection', () => {
   it('shows the parsed error message and retries', () => {
     chatMock.error = new Error(JSON.stringify({ message: 'Too many questions today.' }))
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Too many questions today.')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -155,7 +155,7 @@ describe('BillChatSection', () => {
   it('shows a generic error when the transport message is not JSON', () => {
     chatMock.error = new Error('Failed to fetch')
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Chat is unavailable right now.')
   })
@@ -165,7 +165,7 @@ describe('BillChatSection', () => {
     // message is the worker's errorText, not a JSON body.
     chatMock.error = new Error(BILL_CHAT_STREAM_ERROR_TEXT)
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('The chat service failed. Try again shortly.')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
@@ -179,6 +179,7 @@ describe('BillChatSection', () => {
         pendingSelection="the selected text about rural clinics"
         onClearSelection={onClearSelection}
         onSharePassage={vi.fn()}
+        onQuoteCreated={vi.fn()}
       />,
     )
 
@@ -198,7 +199,7 @@ describe('BillChatSection', () => {
     chatMock.status = 'streaming'
     chatMock.messages = [assistantMessage([{ type: 'text', text: 'Working' }])]
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()

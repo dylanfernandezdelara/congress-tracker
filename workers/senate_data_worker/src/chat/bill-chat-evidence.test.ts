@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { BillDigestContent } from "../../../../shared/digest-api-types";
+import { cleanQuoteText, findQuoteSource } from "../../../../shared/quote-verification";
 import type { DigestRow } from "../d1/digests";
 import type { BillTextSectionRow } from "../d1/bill-text-sections";
 import {
@@ -128,10 +129,19 @@ describe("findChunkForQuote", () => {
     expect(found?.displayText).toBe("Speeds energy permits");
   });
 
-  it("tolerates curly quotes via normalized match and falls back to cleaned text", () => {
+  it("tolerates curly quotes and returns the chunk's own typography as the display text", () => {
     const found = findChunkForQuote(chunks, 'a "widget" is a device');
     expect(found?.chunk.source).toBe("bill_text");
-    expect(found?.displayText.toLowerCase()).toContain("widget");
+    expect(found?.displayText).toBe("A “widget” is a device");
+  });
+
+  it("accepts exactly the passages POST /share/quote accepts (lockstep with findQuoteSource)", () => {
+    const passages = ['a "widget" is a device.', "Caps environmental review at two years", "SPEEDS ENERGY   permits"];
+    for (const passage of passages) {
+      const shared = findQuoteSource(cleanQuoteText(passage), chunks);
+      const chat = findChunkForQuote(chunks, passage);
+      expect(chat?.chunk.id, passage).toBe(shared?.id);
+    }
   });
 
   it("returns null when the quote is not in any chunk", () => {

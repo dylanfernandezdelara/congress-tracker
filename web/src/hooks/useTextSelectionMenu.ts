@@ -25,8 +25,21 @@ function closestQuotable(node: Node | null): HTMLElement | null {
   return element?.closest<HTMLElement>(`[${QUOTABLE_ATTR}]`) ?? null
 }
 
+export type TextSelectionOptions = {
+  enabled?: boolean
+  /**
+   * Only report selections whose `data-quotable` value is listed. Lets two
+   * menus share one DOM subtree (the detail panel handles bill text, the chat
+   * section handles its own answers) without both claiming a selection.
+   */
+  sources?: readonly string[]
+}
+
 /** Current selection when it lies within one quotable region inside `container`. */
-export function readQuotableSelection(container: HTMLElement | null): TextSelection | null {
+export function readQuotableSelection(
+  container: HTMLElement | null,
+  sources?: readonly string[],
+): TextSelection | null {
   if (!container || typeof window === 'undefined') return null
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null
@@ -35,13 +48,15 @@ export function readQuotableSelection(container: HTMLElement | null): TextSelect
   const start = closestQuotable(range.startContainer)
   const end = closestQuotable(range.endContainer)
   if (!start || start !== end) return null
+  const source = start.getAttribute(QUOTABLE_ATTR) || 'digest'
+  if (sources && !sources.includes(source)) return null
   const text = cleanQuoteText(selection.toString())
   if (!text) return null
   const rect = range.getBoundingClientRect()
   if (rect.width === 0 && rect.height === 0) return null
   return {
     text,
-    source: start.getAttribute(QUOTABLE_ATTR) || 'digest',
+    source,
     sourceId: start.getAttribute(QUOTABLE_ID_ATTR),
     rect,
   }
@@ -54,9 +69,10 @@ export function readQuotableSelection(container: HTMLElement | null): TextSelect
  */
 export function useTextSelectionMenu(
   containerRef: RefObject<HTMLElement | null>,
-  options: { enabled?: boolean } = {},
+  options: TextSelectionOptions = {},
 ): { selection: TextSelection | null; clear: () => void } {
   const enabled = options.enabled ?? true
+  const sources = options.sources
   const [selection, setSelection] = useState<TextSelection | null>(null)
 
   const clear = useCallback(() => {
@@ -72,7 +88,7 @@ export function useTextSelectionMenu(
     }
     let timer: number | null = null
     const refresh = () => {
-      setSelection(readQuotableSelection(containerRef.current))
+      setSelection(readQuotableSelection(containerRef.current, sources))
     }
     const scheduleRefresh = () => {
       if (timer !== null) window.clearTimeout(timer)
@@ -82,7 +98,9 @@ export function useTextSelectionMenu(
       }, SETTLE_MS)
     }
     const onScroll = () => {
-      setSelection((current) => (current ? readQuotableSelection(containerRef.current) : current))
+      setSelection((current) =>
+        current ? readQuotableSelection(containerRef.current, sources) : current,
+      )
     }
     document.addEventListener('selectionchange', scheduleRefresh)
     document.addEventListener('pointerup', scheduleRefresh)
@@ -97,7 +115,7 @@ export function useTextSelectionMenu(
       window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onScroll)
     }
-  }, [containerRef, enabled])
+  }, [containerRef, enabled, sources])
 
   return { selection, clear }
 }

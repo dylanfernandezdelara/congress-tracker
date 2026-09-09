@@ -224,12 +224,6 @@ export async function writeBillChatStream(params: {
       section_label: found.chunk.section_label,
       source: found.chunk.source,
     };
-    writer.write({
-      type: "source-document",
-      sourceId,
-      mediaType: "text/plain",
-      title: found.chunk.section_label,
-    });
     writer.write({ type: "data-quote", id: sourceId, data });
   });
 

@@ -7,23 +7,12 @@ import {
 } from "../../../../shared/chat-api-types";
 import { verifyAnswerSignature } from "../chat/answer-signature";
 import type { EvidenceChunk } from "../chat/bill-chat-evidence";
-import type { DigestRow } from "../d1/digests";
 import { CHAT_FALLBACK_MODELS, CHAT_REASONING, chatModelRoute, handleBillChat } from "./bill-chat";
 import { buildJsonResponse } from "./responses";
 import { createMockEnv } from "./test-fixtures";
 
 const json = (body: unknown, init?: ResponseInit) => buildJsonResponse(body, {}, init);
 const corsHeaders = { "Access-Control-Allow-Origin": "*" };
-
-const DIGEST_ROW: DigestRow = {
-  congress: 119,
-  bill_type: "HR",
-  number: 1,
-  title: "Widget Act",
-  policy_area: null,
-  raw_summary_text: null,
-  digest_json: null,
-};
 
 const SECTION: EvidenceChunk = {
   id: "bill_text-0",
@@ -182,7 +171,7 @@ describe("POST /chat/bill", () => {
       json,
       corsHeaders,
       deps: {
-        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        loadEvidence: async () => ({ title: "Widget Act", chunks: [SECTION] }),
         reserveUsage: async () => "client_capped",
       },
     });
@@ -210,7 +199,7 @@ describe("POST /chat/bill", () => {
       json,
       corsHeaders,
       deps: {
-        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        loadEvidence: async () => ({ title: "Widget Act", chunks: [SECTION] }),
         reserveUsage: okUsage(),
         resolveModel,
         streamText: async () => ({ textStream: tokens() }),
@@ -220,7 +209,6 @@ describe("POST /chat/bill", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("x-vercel-ai-ui-message-stream")).toBe("v1");
     const chunks = await readSse(response);
-    expect(chunks.some((c) => c.type === "source-document")).toBe(true);
     const quote = chunks.find((c) => c.type === "data-quote");
     expect(quote).toMatchObject({
       type: "data-quote",
@@ -265,7 +253,7 @@ describe("POST /chat/bill", () => {
       json,
       corsHeaders,
       deps: {
-        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        loadEvidence: async () => ({ title: "Widget Act", chunks: [SECTION] }),
         reserveUsage: okUsage(),
         resolveModel,
         streamText: async () => {
@@ -285,7 +273,7 @@ describe("POST /chat/bill", () => {
       json,
       corsHeaders,
       deps: {
-        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        loadEvidence: async () => ({ title: "Widget Act", chunks: [SECTION] }),
         reserveUsage: okUsage(),
         resolveModel,
         streamText: async ({ onError }) => {
@@ -309,7 +297,7 @@ describe("POST /chat/bill", () => {
       json,
       corsHeaders,
       deps: {
-        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        loadEvidence: async () => ({ title: "Widget Act", chunks: [SECTION] }),
         reserveUsage: okUsage(),
         resolveModel,
         streamText: async () => {
@@ -339,7 +327,7 @@ describe("POST /chat/bill", () => {
       json,
       corsHeaders,
       deps: {
-        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        loadEvidence: async () => ({ title: "Widget Act", chunks: [SECTION] }),
         reserveUsage: okUsage(),
         resolveModel: async () => "vendor/model:free",
         streamText,
@@ -364,7 +352,7 @@ describe("POST /chat/bill", () => {
       json,
       corsHeaders,
       deps: {
-        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        loadEvidence: async () => ({ title: "Widget Act", chunks: [SECTION] }),
         reserveUsage: okUsage(),
         resolveModel,
         streamText: async () => {

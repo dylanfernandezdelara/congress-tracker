@@ -1,366 +1,255 @@
 import { formatBillQueryParam } from '@congress-tracker/shared/bill-id'
-import {
-  BILL_CHAT_MAX_QUESTION_CHARS,
-  BILL_CHAT_UNVERIFIED_PLACEHOLDER,
-  type BillChatAnswerData,
-  type BillChatQuoteData,
-} from '@congress-tracker/shared/chat-api-types'
+import { BILL_CHAT_MAX_QUESTION_CHARS } from '@congress-tracker/shared/chat-api-types'
+import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport, type UIMessage } from 'ai'
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
+import { DefaultChatTransport } from 'ai'
+import { FileTextIcon, XIcon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 
+import { createBillQuote } from '../api/client'
 import { buildApiUrl } from '../api/fetchJson'
 import type { FeedItem } from '../api/types'
-import { assertNever } from '../utils/assertNever'
+import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
 import {
   capSelection,
-  evidenceSourceLabel,
   parseChatErrorMessage,
   selectionChipLabel,
-  splitProseParagraphs,
   starterChipsFromKeyPoints,
 } from '../utils/billChat'
-import {
-  Attachment,
-  AttachmentInfo,
-  AttachmentPreview,
-  AttachmentRemove,
-  Attachments,
-} from './ai-elements/attachments'
-import { Conversation, ConversationContent } from './ai-elements/conversation'
-import { Message, MessageContent } from './ai-elements/message'
-import {
-  PromptInput,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-} from './ai-elements/prompt-input'
-import { Suggestion, Suggestions } from './ai-elements/suggestion'
+import { copyTextToClipboard } from '../utils/billDeepLink'
+import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
+import { BillChatTranscript, messageAnswer, type BillChatMessage } from './BillChatTranscript'
+import { SelectionMenu } from './SelectionMenu'
 import { Button } from './ui/button'
 
-export type BillChatMessage = UIMessage<
-  unknown,
-  { quote: BillChatQuoteData; answer: BillChatAnswerData }
->
+export type { BillChatMessage } from './BillChatTranscript'
 
-type RenderablePart =
-  | { type: 'text'; text: string }
-  | { type: 'data-quote'; data: BillChatQuoteData }
-  | { type: 'data-answer'; data: BillChatAnswerData }
-  | { type: 'source-document' }
-
-export type BillChatSectionHandle = {
-  getAnswer(messageId: string): BillChatAnswerData | undefined
-}
+/** Selections inside answer bubbles are shared here, signed; the detail panel handles bill text. */
+const ANSWER_SELECTION_SOURCES = ['answer'] as const
+const SELECTION_STATUS_MS = 1800
 
 export type BillChatSectionProps = {
   item: FeedItem
+  /** Text the reader picked with "Ask about this"; shown as a chip and sent with the next question. */
   pendingSelection?: string | null
   onClearSelection?: () => void
+  /** Reader tapped "Share this passage" under a verified quote (bill text, unsigned). */
   onSharePassage: (text: string) => void
+  /** A signed answer selection was minted as a quote; the caller opens the share sheet. */
+  onQuoteCreated: (quote: BillQuote) => void
 }
 
-type QuotedPassageProps = {
-  quote: BillChatQuoteData
-  onSharePassage: (text: string) => void
-}
-
-export function QuotedPassage({ quote, onSharePassage }: QuotedPassageProps) {
-  const sourceName = evidenceSourceLabel(quote.source)
-  const meta =
-    quote.section_label && quote.section_label !== sourceName
-      ? `${quote.section_label} · ${sourceName}`
-      : quote.section_label || sourceName
-
-  return (
-    <figure className="bill-chat-quote">
-      <blockquote className="bill-chat-quote-text">{quote.text}</blockquote>
-      <figcaption className="bill-chat-quote-meta">{meta}</figcaption>
-      <button
-        type="button"
-        className="bill-chat-quote-share"
-        onClick={() => onSharePassage(quote.text)}
-      >
-        Share this passage
-      </button>
-    </figure>
-  )
-}
-
-function asRenderablePart(part: BillChatMessage['parts'][number]): RenderablePart | null {
-  switch (part.type) {
-    case 'text':
-      return { type: 'text', text: part.text }
-    case 'data-quote':
-      return { type: 'data-quote', data: part.data }
-    case 'data-answer':
-      return { type: 'data-answer', data: part.data }
-    case 'source-document':
-      return { type: 'source-document' }
-    default:
-      return null
-  }
-}
-
-function renderUnverifiedProse(text: string): ReactNode {
-  const pieces = text.split(BILL_CHAT_UNVERIFIED_PLACEHOLDER)
-  return pieces.map((chunk, index) => (
-    <span key={`prose-${index}`}>
-      {chunk}
-      {index < pieces.length - 1 ? (
-        <span className="bill-chat-unverified">{BILL_CHAT_UNVERIFIED_PLACEHOLDER}</span>
-      ) : null}
-    </span>
-  ))
-}
-
-function userMessageText(message: BillChatMessage): string {
-  return message.parts
-    .filter((part): part is Extract<BillChatMessage['parts'][number], { type: 'text' }> => {
-      return part.type === 'text'
-    })
-    .map((part) => part.text)
-    .join('')
-}
-
-function messageAnswer(message: BillChatMessage): BillChatAnswerData | undefined {
-  for (const part of message.parts) {
-    if (part.type === 'data-answer') return part.data
-  }
-  return undefined
-}
-
-function AssistantParts({
-  message,
-  streaming,
+export function BillChatSection({
+  item,
+  pendingSelection = null,
+  onClearSelection,
   onSharePassage,
-}: {
-  message: BillChatMessage
-  streaming: boolean
-  onSharePassage: (text: string) => void
-}) {
-  const answer = messageAnswer(message)
-  const refused = answer?.refused === true
+  onQuoteCreated,
+}: BillChatSectionProps) {
+  const billId = formatBillQueryParam(item.bill)
+  const sectionRef = useRef<HTMLElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [input, setInput] = useState('')
+  const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
+  const [sharingAnswer, setSharingAnswer] = useState(false)
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: buildApiUrl('/chat/bill'),
+        body: { bill: billId },
+      }),
+    [billId],
+  )
+  const { messages, sendMessage, status, stop, error, regenerate } = useChat<BillChatMessage>({
+    id: `bill-chat-${billId}`,
+    transport,
+  })
+  const { selection, clear: clearSelection } = useTextSelectionMenu(sectionRef, {
+    sources: ANSWER_SELECTION_SOURCES,
+  })
+
+  useEffect(() => {
+    if (!pendingSelection) return
+    sectionRef.current?.scrollIntoView?.({ block: 'nearest' })
+    textareaRef.current?.focus()
+  }, [pendingSelection])
+
+  useEffect(() => {
+    if (!selectionStatus) return
+    const timer = window.setTimeout(() => setSelectionStatus(null), SELECTION_STATUS_MS)
+    return () => window.clearTimeout(timer)
+  }, [selectionStatus])
+
+  const streaming = status === 'submitted' || status === 'streaming'
+  const starters = useMemo(
+    () => starterChipsFromKeyPoints(item.digest?.key_points),
+    [item.digest?.key_points],
+  )
+  const errorText = parseChatErrorMessage(error)
+  const attachedSelection = pendingSelection ? capSelection(pendingSelection) : null
+
+  const submitQuestion = useCallback(
+    (raw: string) => {
+      const text = raw.trim().slice(0, BILL_CHAT_MAX_QUESTION_CHARS)
+      if (!text || streaming) return
+      if (attachedSelection) {
+        void sendMessage({ text }, { body: { selection: attachedSelection } })
+        onClearSelection?.()
+      } else {
+        void sendMessage({ text })
+      }
+      setInput('')
+    },
+    [attachedSelection, onClearSelection, sendMessage, streaming],
+  )
+
+  const onTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      submitQuestion(input)
+    }
+  }
+
+  /** Answer prose is only shareable with the worker's bill-bound signature. */
+  const shareAnswerSelection = async (current: TextSelection) => {
+    const message = messages.find((entry) => entry.id === current.sourceId)
+    const answer = message ? messageAnswer(message) : undefined
+    if (!answer?.sig) {
+      setSelectionStatus('Sharing chat answers is unavailable')
+      return
+    }
+    setSharingAnswer(true)
+    try {
+      const { quote } = await createBillQuote({
+        bill: billId,
+        text: current.text,
+        answer: { text: answer.text, sig: answer.sig },
+      })
+      clearSelection()
+      onQuoteCreated(quote)
+    } catch (err) {
+      setSelectionStatus(shareQuoteErrorCopy(err))
+    } finally {
+      setSharingAnswer(false)
+    }
+  }
 
   return (
-    <MessageContent
-      className={
-        refused ? 'bill-chat-bubble bill-chat-bubble--refused' : 'bill-chat-bubble bill-chat-bubble--assistant'
-      }
-    >
-      {message.parts.map((raw, index) => {
-        const part = asRenderablePart(raw)
-        if (!part) return null
-        switch (part.type) {
-          case 'text':
-            return (
-              <div
-                key={`${message.id}-text-${index}`}
-                className="bill-chat-prose"
-                data-quotable="answer"
-                data-quotable-id={message.id}
-              >
-                {splitProseParagraphs(part.text).map((paragraph, paragraphIndex) => (
-                  <p key={`${message.id}-p-${paragraphIndex}`}>{renderUnverifiedProse(paragraph)}</p>
-                ))}
-              </div>
-            )
-          case 'data-quote':
-            return refused ? null : (
-              <QuotedPassage
-                key={`${message.id}-quote-${part.data.sourceId}`}
-                quote={part.data}
-                onSharePassage={onSharePassage}
-              />
-            )
-          case 'data-answer':
-          case 'source-document':
-            return null
-          default:
-            return assertNever(part)
-        }
-      })}
-      {streaming ? (
-        <p className="bill-chat-streaming" aria-live="polite">
-          <span className="bill-chat-streaming-dot" />
-          Answering…
-        </p>
+    <section ref={sectionRef} className="feed-row-detail-section bill-chat" aria-labelledby="bill-chat-heading">
+      <h3 id="bill-chat-heading" className="feed-row-detail-heading">
+        Ask about this bill
+      </h3>
+      <p className="bill-chat-note">Answers quote the bill’s text.</p>
+
+      {messages.length === 0 ? (
+        <div className="bill-chat-suggestions">
+          {starters.map((chip) => (
+            <Button
+              key={chip}
+              type="button"
+              size="sm"
+              variant="outline"
+              className="bill-chat-suggestion"
+              disabled={streaming}
+              onClick={() => submitQuestion(chip)}
+            >
+              {chip}
+            </Button>
+          ))}
+        </div>
       ) : null}
-    </MessageContent>
+
+      <BillChatTranscript messages={messages} status={status} onSharePassage={onSharePassage} />
+
+      {errorText ? (
+        <div className="bill-chat-error" role="alert">
+          <span>{errorText}</span>
+          <button type="button" className="bill-chat-error-retry" onClick={() => void regenerate()}>
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {attachedSelection ? (
+        <div className="bill-chat-attachments">
+          <div className="bill-chat-attachment" title={attachedSelection}>
+            <span className="bill-chat-attachment-icon" aria-hidden>
+              <FileTextIcon />
+            </span>
+            <span className="bill-chat-attachment-label" title={attachedSelection}>
+              {selectionChipLabel(attachedSelection)}
+            </span>
+            {onClearSelection ? (
+              <button
+                type="button"
+                className="bill-chat-attachment-remove"
+                aria-label="Remove"
+                onClick={onClearSelection}
+              >
+                <XIcon />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <form
+        className="bill-chat-prompt"
+        onSubmit={(event) => {
+          event.preventDefault()
+          submitQuestion(input)
+        }}
+      >
+        <textarea
+          ref={textareaRef}
+          className="bill-chat-prompt-textarea"
+          rows={2}
+          value={input}
+          disabled={streaming}
+          onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
+          onKeyDown={onTextareaKeyDown}
+          maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
+          aria-label="Ask about this bill"
+          placeholder="Ask a question about this bill"
+        />
+        <div className="bill-chat-prompt-footer">
+          {streaming ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="bill-chat-prompt-stop"
+              onClick={() => stop()}
+            >
+              Stop
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              size="sm"
+              variant="default"
+              className="bill-chat-prompt-submit"
+              disabled={input.trim().length === 0}
+            >
+              Send
+            </Button>
+          )}
+        </div>
+      </form>
+
+      <SelectionMenu
+        selection={selection}
+        status={selectionStatus}
+        busy={sharingAnswer}
+        onShareQuote={(current) => {
+          void shareAnswerSelection(current)
+        }}
+        onCopy={(current) => {
+          void copyTextToClipboard(current.text).then((ok) =>
+            setSelectionStatus(ok ? 'Copied' : "Couldn't copy"),
+          )
+        }}
+      />
+    </section>
   )
 }
-
-export const BillChatSection = forwardRef<BillChatSectionHandle, BillChatSectionProps>(
-  function BillChatSection(
-    { item, pendingSelection = null, onClearSelection, onSharePassage },
-    ref,
-  ) {
-    const billId = formatBillQueryParam(item.bill)
-    const sectionRef = useRef<HTMLElement>(null)
-    const textareaRef = useRef<HTMLTextAreaElement>(null)
-    const [input, setInput] = useState('')
-    const transport = useMemo(
-      () =>
-        new DefaultChatTransport({
-          api: buildApiUrl('/chat/bill'),
-          body: { bill: billId },
-        }),
-      [billId],
-    )
-    const { messages, sendMessage, status, stop, error, regenerate } = useChat<BillChatMessage>({
-      id: `bill-chat-${billId}`,
-      transport,
-    })
-
-    useImperativeHandle(
-      ref,
-      () => ({
-        getAnswer(messageId: string) {
-          const message = messages.find((entry) => entry.id === messageId)
-          return message ? messageAnswer(message) : undefined
-        },
-      }),
-      [messages],
-    )
-
-    useEffect(() => {
-      if (!pendingSelection) return
-      sectionRef.current?.scrollIntoView?.({ block: 'nearest' })
-      textareaRef.current?.focus()
-    }, [pendingSelection])
-
-    const streaming = status === 'submitted' || status === 'streaming'
-    const starters = useMemo(
-      () => starterChipsFromKeyPoints(item.digest?.key_points),
-      [item.digest?.key_points],
-    )
-    const errorText = parseChatErrorMessage(error)
-    const attachedSelection = pendingSelection ? capSelection(pendingSelection) : null
-
-    const submitQuestion = useCallback(
-      (raw: string) => {
-        const text = raw.trim().slice(0, BILL_CHAT_MAX_QUESTION_CHARS)
-        if (!text || streaming) return
-        if (attachedSelection) {
-          void sendMessage({ text }, { body: { selection: attachedSelection } })
-          onClearSelection?.()
-        } else {
-          void sendMessage({ text })
-        }
-        setInput('')
-      },
-      [attachedSelection, onClearSelection, sendMessage, streaming],
-    )
-
-    return (
-      <section ref={sectionRef} className="feed-row-detail-section bill-chat" aria-labelledby="bill-chat-heading">
-        <h3 id="bill-chat-heading" className="feed-row-detail-heading">
-          Ask about this bill
-        </h3>
-        <p className="bill-chat-note">Answers quote the bill’s text.</p>
-
-        {messages.length === 0 ? (
-          <Suggestions>
-            {starters.map((chip) => (
-              <Suggestion
-                key={chip}
-                suggestion={chip}
-                disabled={streaming}
-                onClick={(value) => submitQuestion(value)}
-              />
-            ))}
-          </Suggestions>
-        ) : null}
-
-        {messages.length > 0 ? (
-          <Conversation>
-            <ConversationContent>
-              {messages.map((message, index) => {
-                if (message.role === 'user') {
-                  return (
-                    <Message key={message.id} from="user">
-                      <MessageContent className="bill-chat-bubble bill-chat-bubble--user">
-                        {userMessageText(message)}
-                      </MessageContent>
-                    </Message>
-                  )
-                }
-                if (message.role === 'assistant') {
-                  const isLast = index === messages.length - 1
-                  return (
-                    <Message key={message.id} from="assistant">
-                      <AssistantParts
-                        message={message}
-                        streaming={isLast && status === 'streaming'}
-                        onSharePassage={onSharePassage}
-                      />
-                    </Message>
-                  )
-                }
-                return null
-              })}
-            </ConversationContent>
-          </Conversation>
-        ) : null}
-
-        {errorText ? (
-          <div className="bill-chat-error" role="alert">
-            <span>{errorText}</span>
-            <button type="button" className="bill-chat-error-retry" onClick={() => void regenerate()}>
-              Retry
-            </button>
-          </div>
-        ) : null}
-
-        {attachedSelection ? (
-          <Attachments>
-            <Attachment
-              label={selectionChipLabel(attachedSelection)}
-              title={attachedSelection}
-              onRemove={onClearSelection}
-            >
-              <AttachmentPreview />
-              <AttachmentInfo />
-              <AttachmentRemove />
-            </Attachment>
-          </Attachments>
-        ) : null}
-
-        <PromptInput disabled={streaming} onSubmit={() => submitQuestion(input)}>
-          <PromptInputTextarea
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
-            maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
-            aria-label="Ask about this bill"
-            placeholder="Ask a question about this bill"
-          />
-          <PromptInputFooter>
-            {streaming ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="bill-chat-prompt-stop"
-                onClick={() => stop()}
-              >
-                Stop
-              </Button>
-            ) : (
-              <PromptInputSubmit disabled={input.trim().length === 0} />
-            )}
-          </PromptInputFooter>
-        </PromptInput>
-      </section>
-    )
-  },
-)

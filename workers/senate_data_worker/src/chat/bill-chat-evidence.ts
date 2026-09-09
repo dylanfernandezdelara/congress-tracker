@@ -1,15 +1,18 @@
 import type { BillDigestContent } from "../../../../shared/digest-api-types";
+import type { BillChatEvidenceSource } from "../../../../shared/chat-api-types";
 import {
   cleanQuoteText,
   digestQuoteSourceText,
+  findQuoteInText,
+  findQuoteSource,
   normalizeForQuoteMatch,
 } from "../../../../shared/quote-verification";
 import type { Env } from "../config";
 import { BILL_CHAT_EVIDENCE_MAX_CHARS } from "../constants";
-import { getDigest, parseStoredDigest, type DigestRow } from "../d1/digests";
+import { getDigest, parseStoredDigest } from "../d1/digests";
 import { getBillText, type BillTextSectionRow } from "../d1/bill-text-sections";
 
-export type EvidenceSource = "digest" | "crs" | "bill_text";
+export type EvidenceSource = BillChatEvidenceSource;
 
 export type EvidenceChunk = {
   id: string;
@@ -203,7 +206,7 @@ export function selectEvidence(
 export async function loadBillEvidence(
   env: Pick<Env, "DB">,
   bill: { congress: number; type: string; number: number }
-): Promise<{ title: string; digestRow: DigestRow; chunks: EvidenceChunk[] } | null> {
+): Promise<{ title: string; chunks: EvidenceChunk[] } | null> {
   const digestRow = await getDigest(env.DB, bill.congress, bill.type, bill.number);
   if (!digestRow) return null;
   const digest = parseStoredDigest(digestRow.digest_json);
@@ -213,21 +216,19 @@ export async function loadBillEvidence(
     crsSummary: digestRow.raw_summary_text,
     sections: stored?.sections ?? [],
   });
-  return { title: digestRow.title?.trim() || "", digestRow, chunks };
-}
-
-function sliceDisplayQuote(chunkText: string, cleanedQuote: string): string | null {
-  const idx = chunkText.toLowerCase().indexOf(cleanedQuote.toLowerCase());
-  if (idx === -1) return null;
-  return chunkText.slice(idx, idx + cleanedQuote.length);
+  return { title: digestRow.title?.trim() || "", chunks };
 }
 
 /**
- * Locate the evidence chunk a quoted passage was copied from. The model's
+ * Locate the evidence chunk a quoted passage was copied from, using the same
+ * matcher `POST /share/quote` uses (`findQuoteSource`), so a passage the chat
+ * cites is by construction one the share endpoint accepts. The model's
  * `section` attribute is a hint, not a gate: the chunk with that label is tried
  * first so a passage that appears in several blocks (digest and bill text often
  * overlap) is attributed to the block the model cited, and the remaining chunks
- * are still searched when the label is missing or mistyped.
+ * are still searched when the label is missing or mistyped. `displayText` is
+ * the chunk's own spelling of the passage (`findQuoteInText`), falling back to
+ * the cleaned model text.
  */
 export function findChunkForQuote(
   chunks: EvidenceChunk[],
@@ -235,8 +236,7 @@ export function findChunkForQuote(
   section: string | null = null
 ): { chunk: EvidenceChunk; displayText: string } | null {
   const cleaned = cleanQuoteText(quoteText);
-  const needle = normalizeForQuoteMatch(cleaned);
-  if (!needle) return null;
+  if (!cleaned) return null;
   const hinted = section ? normalizeForQuoteMatch(section) : "";
   const ordered = hinted
     ? [
@@ -244,9 +244,8 @@ export function findChunkForQuote(
         ...chunks.filter((chunk) => normalizeForQuoteMatch(chunk.section_label) !== hinted),
       ]
     : chunks;
-  for (const chunk of ordered) {
-    if (!normalizeForQuoteMatch(chunk.text).includes(needle)) continue;
-    return { chunk, displayText: sliceDisplayQuote(chunk.text, cleaned) ?? cleaned };
-  }
-  return null;
+  const chunk = findQuoteSource(cleaned, ordered);
+  if (!chunk) return null;
+  const range = findQuoteInText(chunk.text, cleaned);
+  return { chunk, displayText: range ? chunk.text.slice(range.start, range.end) : cleaned };
 }

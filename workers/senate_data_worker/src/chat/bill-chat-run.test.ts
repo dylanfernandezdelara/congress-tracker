@@ -155,7 +155,7 @@ describe("buildBillChatSystemPrompt", () => {
 });
 
 describe("writeBillChatStream", () => {
-  it("emits prose as text parts, verified quotes as source-document + data-quote, and a bill-bound signed answer", async () => {
+  it("emits prose as text parts, verified quotes as data-quote, and a bill-bound signed answer", async () => {
     const { writer, chunks } = recordingWriter();
     await writeBillChatStream({
       writer,
@@ -175,12 +175,10 @@ describe("writeBillChatStream", () => {
       "text-start",
       "text-delta",
       "text-end",
-      "source-document",
       "data-quote",
       "text-start",
       "text-delta",
       "text-end",
-      "source-document",
       "data-quote",
       "data-answer",
     ]);

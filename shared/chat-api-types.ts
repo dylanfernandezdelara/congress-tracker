@@ -3,9 +3,9 @@
  * producer) and the web client (`@ai-sdk/react` `useChat` consumer).
  *
  * Transport is the AI SDK UI Message Stream (SSE). Prose streams as ordinary
- * `text-*` parts. Every verified verbatim passage is emitted as a native
- * `source-document` part (so AI Elements `Sources` can list it) plus a
- * `data-quote` part carrying the text itself and the section label.
+ * `text-*` parts; every verified verbatim passage is a `data-quote` part
+ * carrying the text and its section label, rendered inline (B2) where the
+ * model cited it. A final `data-answer` part carries the signed prose.
  */
 
 /** Extra JSON body fields the web client sends alongside `messages`. */
@@ -19,8 +19,9 @@ export interface BillChatRequestBody {
 /** Where a verified passage was found. Mirrors `BillQuoteSource` minus `answer`. */
 export type BillChatEvidenceSource = 'digest' | 'crs' | 'bill_text'
 
-/** Payload of a `data-quote` part. `sourceId` matches the sibling `source-document`. */
+/** Payload of a `data-quote` part. */
 export interface BillChatQuoteData {
+  /** Stable per-turn id (`<chunk id>-<n>`), also the part id, so React keys survive re-streams. */
   sourceId: string
   /** Verbatim passage as stored in the evidence (display casing, collapsed whitespace). */
   text: string
@@ -78,7 +79,3 @@ export const BILL_CHAT_STREAM_ERROR_TEXT = 'The chat service failed. Try again s
 
 /** Shown when the transport failed before the worker could say anything (network, non-JSON body). */
 export const BILL_CHAT_GENERIC_ERROR_TEXT = 'Chat is unavailable right now.'
-
-/** Names of custom data parts; the web narrows `part.type === \`data-${name}\``. */
-export const BILL_CHAT_DATA_PART_QUOTE = 'quote'
-export const BILL_CHAT_DATA_PART_ANSWER = 'answer'
