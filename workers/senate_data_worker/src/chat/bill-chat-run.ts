@@ -31,9 +31,18 @@ export type BillChatStreamText = (options: {
   messages: Awaited<ReturnType<typeof convertToModelMessages>>;
   temperature: number;
   maxOutputTokens: number;
+  /**
+   * `textStream` never surfaces provider errors (the SDK only reports them
+   * here), so the caller records the error and `writeBillChatStream` turns it
+   * into an `error` part instead of signing an empty answer.
+   */
+  onError: (event: { error: unknown }) => void;
+  providerOptions?: { openrouter: { models: string[] } };
 }) =>
   | { textStream: AsyncIterable<string> }
   | Promise<{ textStream: AsyncIterable<string> }>;
+
+export const BILL_CHAT_ERROR_TEXT = "The chat service failed. Try again shortly.";
 
 export type BillChatStreamWriter = UIMessageStreamWriter<BillChatUIMessage>;
 
@@ -144,6 +153,8 @@ export async function writeBillChatStream(params: {
   textStream: AsyncIterable<string>;
   chunks: EvidenceChunk[];
   hmacSecret?: string;
+  /** Provider error captured via `streamText`'s `onError`; read after the text stream ends. */
+  streamError?: () => unknown;
 }): Promise<void> {
   const { writer, chunks, hmacSecret } = params;
   let textOpen = false;
@@ -212,15 +223,23 @@ export async function writeBillChatStream(params: {
   } catch (err: unknown) {
     console.error("bill_chat_llm_error", err);
     endText();
-    writer.write({
-      type: "error",
-      errorText: "The chat service failed. Try again shortly.",
-    });
+    writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });
     return;
   }
 
   endText();
   const text = prose.trim();
+  const providerError = params.streamError?.();
+  if (providerError !== undefined && providerError !== null) {
+    console.error("bill_chat_provider_error", providerError);
+    writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });
+    return;
+  }
+  if (text.length === 0 && quoteIndex === 0) {
+    console.error("bill_chat_empty_answer");
+    writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });
+    return;
+  }
   const sig = hmacSecret ? await signAnswer(hmacSecret, text) : null;
   const answer: BillChatAnswerData = {
     text,

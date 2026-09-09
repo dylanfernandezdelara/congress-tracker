@@ -8,7 +8,7 @@ import {
 import { verifyAnswerSignature } from "../chat/answer-signature";
 import type { EvidenceChunk } from "../chat/bill-chat-evidence";
 import type { DigestRow } from "../d1/digests";
-import { handleBillChat } from "./bill-chat";
+import { chatModelRoute, handleBillChat } from "./bill-chat";
 import { buildJsonResponse } from "./responses";
 import { createMockEnv } from "./test-fixtures";
 
@@ -60,6 +60,8 @@ async function readSse(response: Response): Promise<Array<Record<string, unknown
 function okUsage() {
   return vi.fn(async () => "ok" as const);
 }
+
+const resolveModel = async () => "test-model";
 
 describe("POST /chat/bill", () => {
   it("validates method, body, bill, question, and selection", async () => {
@@ -210,6 +212,7 @@ describe("POST /chat/bill", () => {
       deps: {
         loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
         reserveUsage: okUsage(),
+        resolveModel,
         streamText: async () => ({ textStream: tokens() }),
       },
     });
@@ -257,6 +260,7 @@ describe("POST /chat/bill", () => {
       deps: {
         loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
         reserveUsage: okUsage(),
+        resolveModel,
         streamText: async () => {
           throw new Error("provider down");
         },
@@ -264,5 +268,80 @@ describe("POST /chat/bill", () => {
     });
     const chunks = await readSse(response);
     expect(chunks.some((c) => c.type === "error")).toBe(true);
+  });
+
+  it("turns a provider error reported via onError into an error chunk instead of signing an empty answer", async () => {
+    const env = createMockEnv({ CHAT_HMAC_SECRET: "unit-test-hmac" });
+    const response = await handleBillChat({
+      request: post({ bill: "119-hr-1", messages: [userMessage("What is a widget?")] }),
+      env: env as never,
+      json,
+      corsHeaders,
+      deps: {
+        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        reserveUsage: okUsage(),
+        resolveModel,
+        streamText: async ({ onError }) => {
+          // The SDK's textStream ends silently on provider failure; only onError fires.
+          onError({ error: new Error("Upstream error from Nvidia: Service temporarily overloaded") });
+          async function* empty() {}
+          return { textStream: empty() };
+        },
+      },
+    });
+    const chunks = await readSse(response);
+    expect(chunks.some((c) => c.type === "error")).toBe(true);
+    expect(chunks.some((c) => c.type === "data-answer")).toBe(false);
+  });
+
+  it("treats an empty model answer as an error rather than a signed blank bubble", async () => {
+    const env = createMockEnv({ CHAT_HMAC_SECRET: "unit-test-hmac" });
+    const response = await handleBillChat({
+      request: post({ bill: "119-hr-1", messages: [userMessage("What is a widget?")] }),
+      env: env as never,
+      json,
+      corsHeaders,
+      deps: {
+        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        reserveUsage: okUsage(),
+        resolveModel,
+        streamText: async () => {
+          async function* blank() {
+            yield "   ";
+          }
+          return { textStream: blank() };
+        },
+      },
+    });
+    const chunks = await readSse(response);
+    expect(chunks.some((c) => c.type === "error")).toBe(true);
+    expect(chunks.some((c) => c.type === "data-answer")).toBe(false);
+  });
+
+  it("routes the resolved model with the free router as an OpenRouter fallback", async () => {
+    const env = createMockEnv();
+    const streamText = vi.fn(async () => {
+      async function* one() {
+        yield "Answer.";
+      }
+      return { textStream: one() };
+    });
+    await handleBillChat({
+      request: post({ bill: "119-hr-1", messages: [userMessage("What is a widget?")] }),
+      env: env as never,
+      json,
+      corsHeaders,
+      deps: {
+        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        reserveUsage: okUsage(),
+        resolveModel: async () => "vendor/model:free",
+        streamText,
+      },
+    });
+    const call = (streamText.mock.calls as unknown[][])[0]?.[0] as {
+      providerOptions: { openrouter: { models: string[] } };
+    };
+    expect(call.providerOptions.openrouter.models).toEqual(["vendor/model:free", "openrouter/free"]);
+    expect(chatModelRoute("openrouter/free")).toEqual(["openrouter/free"]);
   });
 });

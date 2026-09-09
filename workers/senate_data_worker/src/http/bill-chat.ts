@@ -19,7 +19,7 @@ import {
   CHAT_DAILY_PER_CLIENT_CAP,
 } from "../constants";
 import { reserveChatUsage, utcChatDay } from "../d1/chat-usage";
-import { FALLBACK_FREE_OPENROUTER_MODEL } from "../synthesis/model";
+import { resolveOpenRouterModel } from "../synthesis/model";
 import { loadBillEvidence, selectEvidence } from "../chat/bill-chat-evidence";
 import {
   applySelection,
@@ -27,6 +27,7 @@ import {
   filterChatHistory,
   latestUserQuestion,
   writeBillChatStream,
+  BILL_CHAT_ERROR_TEXT,
   type BillChatStreamText,
   type BillChatUIMessage,
 } from "../chat/bill-chat-run";
@@ -42,8 +43,20 @@ export type BillChatDeps = {
   streamText?: BillChatStreamText;
   loadEvidence?: typeof loadBillEvidence;
   reserveUsage?: typeof reserveChatUsage;
+  resolveModel?: (env: Env) => Promise<string>;
   now?: () => Date;
 };
+
+/** Free-tier router OpenRouter falls back to when the primary free model is overloaded. */
+const OPENROUTER_FREE_ROUTER = "openrouter/free";
+
+/**
+ * OpenRouter `models` fallback list: free providers 503 under load, so route
+ * to the free router when the resolved model fails before producing output.
+ */
+export function chatModelRoute(modelId: string): string[] {
+  return modelId === OPENROUTER_FREE_ROUTER ? [modelId] : [modelId, OPENROUTER_FREE_ROUTER];
+}
 
 function errorResponse(
   json: JsonFn,
@@ -200,12 +213,13 @@ export async function handleBillChat(params: {
     chunks: selected.chunks,
   });
   const modelMessages = await convertToModelMessages(history);
-  const modelId = env.OPENROUTER_MODEL?.trim() || FALLBACK_FREE_OPENROUTER_MODEL;
+  const modelId = await (deps.resolveModel ?? resolveOpenRouterModel)(env);
   const runStream = deps.streamText ?? streamText;
   const openrouter = createOpenRouter({ apiKey: env.OPENROUTER_API_KEY });
 
   const stream = createUIMessageStream<BillChatUIMessage>({
     execute: async ({ writer }) => {
+      let streamError: unknown = null;
       try {
         const result = await Promise.resolve(
           runStream({
@@ -214,6 +228,10 @@ export async function handleBillChat(params: {
             messages: modelMessages,
             temperature: 0.2,
             maxOutputTokens: 700,
+            onError: ({ error }: { error: unknown }) => {
+              streamError = error;
+            },
+            providerOptions: { openrouter: { models: chatModelRoute(modelId) } },
           })
         );
         await writeBillChatStream({
@@ -221,13 +239,11 @@ export async function handleBillChat(params: {
           textStream: result.textStream,
           chunks: selected.chunks,
           hmacSecret: env.CHAT_HMAC_SECRET,
+          streamError: () => streamError,
         });
       } catch (err: unknown) {
         console.error("bill_chat_llm_error", err);
-        writer.write({
-          type: "error",
-          errorText: "The chat service failed. Try again shortly.",
-        });
+        writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });
       }
     },
   });
