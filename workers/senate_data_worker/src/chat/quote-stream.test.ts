@@ -60,11 +60,12 @@ describe("createQuoteTagParser", () => {
     ]);
   });
 
-  it("treats an unterminated quote as plain text on flush", () => {
+  it("emits an unterminated quote as a quote candidate on flush so a truncated citation is still verified", () => {
     expect(collect(['Before <quote section="Sec. 1">orphaned body'])).toEqual([
       { type: "text", text: "Before " },
-      { type: "text", text: "orphaned body" },
+      { type: "quote", section: "Sec. 1", text: "orphaned body" },
     ]);
+    expect(collect(['Before <quote section="Sec. 1">   '])).toEqual([{ type: "text", text: "Before " }]);
   });
 
   it("keeps a lone < in prose", () => {

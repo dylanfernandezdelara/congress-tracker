@@ -118,19 +118,28 @@ export function createQuoteTagParser(onEvent: (event: QuoteStreamEvent) => void)
         return;
       }
       if (endOfInput) {
-        emitText(quoteBody + buf);
-        buf = "";
-        resetQuote();
+        emitTruncatedQuote();
       }
       return;
     }
   }
 
+  /**
+   * The stream ended inside an open tag (usually the output-token cap). The
+   * body so far is still a candidate passage: the consumer verifies it against
+   * the evidence, so a verbatim prefix renders as a quote instead of leaking
+   * half a citation into the prose.
+   */
+  function emitTruncatedQuote(): void {
+    const body = (quoteBody + buf).trim();
+    buf = "";
+    if (body) onEvent({ type: "quote", section: quoteSection, text: body });
+    resetQuote();
+  }
+
   function flushHeld(): void {
     if (mode === "quote") {
-      emitText(quoteBody + buf);
-      buf = "";
-      resetQuote();
+      emitTruncatedQuote();
       return;
     }
     if (buf) {

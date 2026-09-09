@@ -69,8 +69,11 @@ export function chatModelRoute(modelId: string): string[] {
  */
 export const CHAT_REASONING = { effort: "low", exclude: true } as const;
 
-/** Room for a 180-word answer plus two or three verbatim passages after low-effort reasoning. */
-export const CHAT_MAX_OUTPUT_TOKENS = 1200;
+/**
+ * Room for a 180-word answer plus two or three verbatim passages after
+ * low-effort reasoning (reasoning tokens count against this cap on OpenRouter).
+ */
+export const CHAT_MAX_OUTPUT_TOKENS = 1600;
 
 function errorResponse(
   json: JsonFn,
@@ -257,6 +260,12 @@ export async function handleBillChat(params: {
           hmacSecret: env.CHAT_HMAC_SECRET,
           streamError: () => streamError,
         });
+        const finishReason = result.finishReason
+          ? await Promise.resolve(result.finishReason).catch(() => undefined)
+          : undefined;
+        if (finishReason === "length") {
+          console.warn(JSON.stringify({ event: "bill_chat_truncated", model: modelId, maxOutputTokens: CHAT_MAX_OUTPUT_TOKENS }));
+        }
       } catch (err: unknown) {
         console.error("bill_chat_llm_error", err);
         writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });

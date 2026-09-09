@@ -40,9 +40,13 @@ export type BillChatStreamText = (options: {
   providerOptions?: {
     openrouter: { models: string[]; reasoning?: { effort: "low"; exclude: boolean } };
   };
-}) =>
-  | { textStream: AsyncIterable<string> }
-  | Promise<{ textStream: AsyncIterable<string> }>;
+}) => BillChatStreamResult | Promise<BillChatStreamResult>;
+
+export type BillChatStreamResult = {
+  textStream: AsyncIterable<string>;
+  /** `streamText` resolves this after the stream ends; `"length"` means the output cap truncated the answer. */
+  finishReason?: PromiseLike<string>;
+};
 
 export const BILL_CHAT_ERROR_TEXT = "The chat service failed. Try again shortly.";
 
