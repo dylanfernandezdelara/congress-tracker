@@ -289,7 +289,7 @@ describe("bill OG rewrite", () => {
       `${PRODUCTION_ORIGIN}/?bill=119-hr-4795&amp;quote=abcdefabcdefabcd`
     );
     expect(metaContent(html, "property", "og:image")).toMatch(
-      /^https:\/\/trackcongress\.org\/og\/bill\/119-hr-4795\.png\?q=abcdefabcdefabcd&amp;v=[0-9a-f]{8}$/
+      /^https:\/\/trackcongress\.org\/og\/bill\/119-hr-4795\.png\?quote=abcdefabcdefabcd&amp;v=[0-9a-f]{8}$/
     );
     expect(metaContent(html, "property", "og:image:alt")).toContain("“Speeds energy permits and production.”");
 

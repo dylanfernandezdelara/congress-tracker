@@ -51,8 +51,8 @@ describe("ogCardLegend", () => {
       ],
     };
     expect(ogCardLegend(tally)).toEqual({
-      yea: "D 212 · R 7 Yea 219",
-      nay: "R 205 · I 6 · D 2 Nay 213",
+      yea: "Yea 219 · D 212 · R 7",
+      nay: "Nay 213 · R 205 · I 6 · D 2",
     });
   });
 });
@@ -66,7 +66,7 @@ describe("buildOgCardHtml", () => {
     expect(html).toContain("font-size:58px");
     expect(html).toContain("font-weight:700");
     expect(html).toContain("font-family:Inter");
-    expect(html).not.toContain("&#8220;");
+    expect(html).not.toContain("\u201c");
     expect(html).toContain(OG_CARD_SITE_LABEL);
     expect(html).toContain("Passed House 219–213 · Sep 3, 2026");
   });
@@ -78,7 +78,7 @@ describe("buildOgCardHtml", () => {
         headline: "House passes a permitting package",
       })
     );
-    expect(html).toContain("&#8220;");
+    expect(html).toContain("\u201c");
     expect(html).toContain("This bill speeds energy permits.");
     expect(html).toContain("font-size:46px");
     expect(html).toContain("font-family:'Source Serif 4'");
@@ -89,7 +89,7 @@ describe("buildOgCardHtml", () => {
     expect(html).not.toContain("font-size:58px");
   });
 
-  it("escapes model text for HTML", () => {
+  it("neutralizes angle brackets without entity-encoding text (satori prints entities literally)", () => {
     const html = buildOgCardHtml(
       model({
         docket: `H.R. 1 <x> & "y"`,
@@ -103,10 +103,12 @@ describe("buildOgCardHtml", () => {
     expect(html).not.toContain("<b>");
     expect(html).not.toContain("<yes>");
     expect(html).not.toContain("<House>");
-    expect(html).toContain("H.R. 1 &lt;x&gt; &amp; &quot;y&quot;");
-    expect(html).toContain("Say &lt;b&gt;no&lt;/b&gt; &amp; &quot;maybe&quot;");
-    expect(html).toContain("He said &lt;yes&gt; &amp; &quot;go&quot;");
-    expect(html).toContain("Passed &lt;House&gt; &amp; &quot;219&quot;");
+    expect(html).not.toContain("&amp;");
+    expect(html).not.toContain("&quot;");
+    expect(html).toContain(`H.R. 1 \u2039x\u203a & "y"`);
+    expect(html).toContain(`Say \u2039b\u203ano\u2039/b\u203a & "maybe"`);
+    expect(html).toContain(`He said \u2039yes\u203a & "go"`);
+    expect(html).toContain(`Passed \u2039House\u203a & "219"`);
   });
 
   it("draws party-split bar segments in locked order and colors", () => {
@@ -122,8 +124,8 @@ describe("buildOgCardHtml", () => {
       ["#2563eb", "#dc2626", "#fecaca", "#ddd6fe", "#bfdbfe"].includes(c)
     );
     expect(barColors).toEqual(["#2563eb", "#dc2626", "#fecaca", "#ddd6fe", "#bfdbfe"]);
-    expect(html).toContain("D 212 · R 7 Yea 219");
-    expect(html).toContain("R 205 · I 6 · D 2 Nay 213");
+    expect(html).toContain("Yea 219 · D 212 · R 7");
+    expect(html).toContain("Nay 213 · R 205 · I 6 · D 2");
     expect(html).toContain("height:14px");
     expect(html).toContain("margin-right:2px");
     expect(html).not.toContain("In committee");

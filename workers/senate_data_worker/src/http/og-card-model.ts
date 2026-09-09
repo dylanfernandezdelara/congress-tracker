@@ -61,7 +61,7 @@ export async function loadOgCardModel(
   const parsed = parseShareDigestJson(digestRow.digest_json);
   const officialTitle = digestRow.title?.trim() || null;
   const headlineSource =
-    parsed.headline ||
+    (parsed.headline ? trimDisplayTitle(parsed.headline) : null) ||
     (officialTitle ? proceduralHeadline(officialTitle) || trimDisplayTitle(officialTitle) : null) ||
     ogCardDocket(bill);
 

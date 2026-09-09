@@ -171,7 +171,7 @@ describe("handleOgImageRoute", () => {
       return pngResponse("rendered-png");
     });
 
-    const res = await route("/og/bill/119-hr-1.png?q=deadbeefdeadbeef&v=ver1", {
+    const res = await route("/og/bill/119-hr-1.png?quote=deadbeefdeadbeef&v=ver1", {
       cache,
       ctx: { waitUntil },
       loadModel,
@@ -187,7 +187,7 @@ describe("handleOgImageRoute", () => {
     await waitUntil.mock.calls[0]![0];
     expect(cache.put).toHaveBeenCalledTimes(1);
     const putReq = cache.put.mock.calls[0]![0] as Request;
-    expect(putReq.url).toContain("q=deadbeefdeadbeef");
+    expect(putReq.url).toContain("quote=deadbeefdeadbeef");
     expect(putReq.url).toContain("v=ver1");
   });
 
@@ -202,7 +202,7 @@ describe("handleOgImageRoute", () => {
         return { ok: true, model: CARD };
       }
     );
-    await route("/og/bill/119-hr-1.png?q=NOT-HEX", {
+    await route("/og/bill/119-hr-1.png?quote=NOT-HEX", {
       cache: mockCache(),
       loadModel,
     });

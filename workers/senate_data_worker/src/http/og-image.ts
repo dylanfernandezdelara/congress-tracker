@@ -1,4 +1,5 @@
 import { parseBillQueryParam } from "../../../../shared/bill-id";
+import { BILL_QUOTE_QUERY_PARAM } from "../../../../shared/share-api-types";
 import type { Env } from "../config";
 import { buildOgCardHtml } from "./og-card-html";
 import { loadOgCardModel } from "./og-card-model";
@@ -111,7 +112,7 @@ export async function handleOgImageRoute(params: {
     return plainText(404, "Not Found");
   }
 
-  const quoteId = parseQuoteId(url.searchParams.get("q"));
+  const quoteId = parseQuoteId(url.searchParams.get(BILL_QUOTE_QUERY_PARAM));
   const cache = deps?.cache ?? edgeCache();
   const cacheKey = new Request(url.toString(), { method: "GET" });
   const cached = cache ? await cache.match(cacheKey) : undefined;

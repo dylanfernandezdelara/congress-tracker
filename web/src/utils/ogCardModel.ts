@@ -32,8 +32,9 @@ export function buildOgCardModelFromFeedItem(
   options: { quote?: string | null; partySplits?: RollPartySplit[] } = {},
 ): OgCardModel {
   const officialTitle = item.bill.title?.trim() || null
+  const digestHeadline = item.digest?.headline?.trim()
   const headlineSource =
-    item.digest?.headline?.trim() ||
+    (digestHeadline ? trimDisplayTitle(digestHeadline) : null) ||
     (officialTitle ? proceduralHeadline(officialTitle) || trimDisplayTitle(officialTitle) : null) ||
     ogCardDocket(item.bill)
   const vote = latestPassageVote(item.passage_votes)
