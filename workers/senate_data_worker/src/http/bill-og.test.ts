@@ -276,7 +276,7 @@ describe("bill OG rewrite", () => {
       DB: db,
     });
     const response = await tryRewriteBillOg(
-      new Request("https://trackcongress.org/?bill=119-hr-4795&q=ABCDEFABCDEFABCD", {
+      new Request("https://trackcongress.org/?bill=119-hr-4795&quote=ABCDEFABCDEFABCD", {
         headers: { Accept: "text/html" },
       }),
       env as never
@@ -286,7 +286,7 @@ describe("bill OG rewrite", () => {
       "“Speeds energy permits and production.”"
     );
     expect(metaContent(html, "property", "og:url")).toBe(
-      `${PRODUCTION_ORIGIN}/?bill=119-hr-4795&amp;q=abcdefabcdefabcd`
+      `${PRODUCTION_ORIGIN}/?bill=119-hr-4795&amp;quote=abcdefabcdefabcd`
     );
     expect(metaContent(html, "property", "og:image")).toMatch(
       /^https:\/\/trackcongress\.org\/og\/bill\/119-hr-4795\.png\?q=abcdefabcdefabcd&amp;v=[0-9a-f]{8}$/
@@ -308,7 +308,7 @@ describe("bill OG rewrite", () => {
       })),
     } as unknown as D1Database;
     const ignored = await tryRewriteBillOg(
-      new Request("https://trackcongress.org/?bill=119-hr-4795&q=abcdefabcdefabcd", {
+      new Request("https://trackcongress.org/?bill=119-hr-4795&quote=abcdefabcdefabcd", {
         headers: { Accept: "text/html" },
       }),
       createMockEnv({ ASSETS, DB: otherQuoteDb }) as never

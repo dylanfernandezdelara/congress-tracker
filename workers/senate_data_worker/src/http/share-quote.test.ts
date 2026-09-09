@@ -91,7 +91,7 @@ describe("POST /share/quote", () => {
     expect(body.quote.id).toBe(expectedId);
     expect(body.quote.source).toBe("digest");
     expect(body.quote.text).toBe(text);
-    expect(body.url).toBe(`https://trackcongress.org/?bill=119-hr-4795&q=${expectedId}`);
+    expect(body.url).toBe(`https://trackcongress.org/?bill=119-hr-4795&quote=${expectedId}`);
     expect(quotes.size).toBe(1);
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
@@ -223,7 +223,7 @@ describe("POST /share/quote", () => {
     expect(quoteSourcesForBill(DIGEST).map((s) => s.source)).toEqual(["digest", "crs"]);
     expect(quoteSourcesForBill({ digest_json: null, raw_summary_text: null })).toEqual([]);
     expect(buildBillQuoteShareUrl({ congress: 119, type: "S", number: 2 }, "abcd1234abcd1234")).toBe(
-      "https://trackcongress.org/?bill=119-s-2&q=abcd1234abcd1234"
+      "https://trackcongress.org/?bill=119-s-2&quote=abcd1234abcd1234"
     );
   });
 });

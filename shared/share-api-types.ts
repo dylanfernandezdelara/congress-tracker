@@ -32,7 +32,7 @@ export interface CreateBillQuoteRequest {
 
 export interface CreateBillQuoteResponse {
   quote: BillQuote
-  /** Canonical production share URL: `https://trackcongress.org/?bill=…&q=…`. */
+  /** Canonical production share URL: `https://trackcongress.org/?bill=…&quote=…`. */
   url: string
 }
 
@@ -51,5 +51,5 @@ export type CreateBillQuoteError =
 
 export const BILL_QUOTE_MIN_CHARS = 12
 export const BILL_QUOTE_MAX_CHARS = 280
-/** Query parameter carrying a shared quote id on `/?bill=…&q=…`. */
-export const BILL_QUOTE_QUERY_PARAM = 'q'
+/** Query parameter carrying a shared quote id on `/?bill=…&quote=…`. */
+export const BILL_QUOTE_QUERY_PARAM = 'quote'
