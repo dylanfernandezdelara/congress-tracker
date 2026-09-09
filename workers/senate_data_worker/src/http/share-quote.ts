@@ -15,16 +15,28 @@ import {
   type CreateBillQuoteResponse,
   type GetBillQuoteResponse,
 } from "../../../../shared/share-api-types";
-import { PRODUCTION_ORIGIN } from "../../../../shared/share-copy";
 import type { Env } from "../config";
-import { buildBillQuoteId, getBillQuote, insertBillQuote, isBillQuoteId } from "../d1/bill-quotes";
+import {
+  buildBillQuoteId,
+  countBillQuotes,
+  getBillQuote,
+  insertBillQuote,
+  isBillQuoteId,
+} from "../d1/bill-quotes";
 import { getDigest, parseStoredDigest } from "../d1/digests";
+import { publicShareOrigin } from "./bill-og";
 import { cacheLatest, cacheNoStore } from "./responses";
 
 type JsonFn = (body: unknown, init?: ResponseInit) => Response;
 
 /** Request bodies are tiny; anything larger is not a quote. */
 const MAX_BODY_BYTES = 8 * 1024;
+
+/**
+ * Hard bound on stored quotes per bill. Real readers share a handful of
+ * passages; this caps table growth even if the burst limiter is bypassed.
+ */
+export const BILL_QUOTES_PER_BILL_CAP = 500;
 
 const NO_STORE = { "Cache-Control": cacheNoStore };
 
@@ -37,11 +49,16 @@ function errorResponse(
   return json({ error, message }, { status, headers: NO_STORE });
 }
 
+/**
+ * Share URL on the origin that will actually resolve it: the canonical domain
+ * for production hosts, the request's own origin for preview / local.
+ */
 export function buildBillQuoteShareUrl(
   bill: { congress: number; type: string; number: number },
-  quoteId: string
+  quoteId: string,
+  origin: string
 ): string {
-  return `${PRODUCTION_ORIGIN}/?bill=${formatBillQueryParam(bill)}&${BILL_QUOTE_QUERY_PARAM}=${quoteId}`;
+  return `${origin}/?bill=${formatBillQueryParam(bill)}&${BILL_QUOTE_QUERY_PARAM}=${quoteId}`;
 }
 
 /** Client key for the burst limiter: Cloudflare's connecting IP, else a shared bucket. */
@@ -106,19 +123,27 @@ export async function handleCreateBillQuote(params: {
   }
 
   if (env.SHARE_RATE_LIMITER) {
+    let allowed: boolean;
     try {
-      const outcome = await env.SHARE_RATE_LIMITER.limit({ key: rateLimitKey(request) });
-      if (!outcome.success) {
-        return errorResponse(
-          json,
-          429,
-          "rate_limited",
-          "Too many share links created. Wait a minute and try again."
-        );
-      }
+      allowed = (await env.SHARE_RATE_LIMITER.limit({ key: rateLimitKey(request) })).success;
     } catch (err: unknown) {
-      // The limiter is a guard rail, not a dependency: fail open with a log line.
+      // This is the only per-client bound on a public write path, so a limiter
+      // outage pauses quote creation rather than opening it up.
       console.warn("share_rate_limiter_unavailable", err);
+      return errorResponse(
+        json,
+        503,
+        "rate_limited",
+        "Sharing quotes is temporarily unavailable. Try again shortly."
+      );
+    }
+    if (!allowed) {
+      return errorResponse(
+        json,
+        429,
+        "rate_limited",
+        "Too many share links created. Wait a minute and try again."
+      );
     }
   }
 
@@ -162,8 +187,8 @@ export async function handleCreateBillQuote(params: {
   if (!row) {
     return errorResponse(json, 404, "bill_not_found", "That bill is not in the feed yet.");
   }
-  const source = findQuoteSource(text, quoteSourcesForBill(row));
-  if (!source) {
+  const matched = findQuoteSource(text, quoteSourcesForBill(row));
+  if (!matched) {
     return errorResponse(
       json,
       422,
@@ -173,10 +198,19 @@ export async function handleCreateBillQuote(params: {
   }
 
   const id = await buildBillQuoteId(bill, text);
-  const quote = await insertBillQuote(env.DB, { id, bill, text, source });
+  const existing = await getBillQuote(env.DB, id);
+  if (!existing && (await countBillQuotes(env.DB, bill)) >= BILL_QUOTES_PER_BILL_CAP) {
+    return errorResponse(
+      json,
+      429,
+      "rate_limited",
+      "This bill already has the maximum number of shared quotes."
+    );
+  }
+  const quote = existing ?? (await insertBillQuote(env.DB, { id, bill, text, source: matched.source }));
   const response: CreateBillQuoteResponse = {
     quote,
-    url: buildBillQuoteShareUrl(quote.bill, quote.id),
+    url: buildBillQuoteShareUrl(quote.bill, quote.id, publicShareOrigin(new URL(request.url))),
   };
   return json(response, { status: 200, headers: NO_STORE });
 }
