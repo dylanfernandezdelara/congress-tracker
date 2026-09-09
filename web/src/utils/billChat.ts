@@ -2,6 +2,7 @@ import {
   BILL_CHAT_MAX_SELECTION_CHARS,
   type BillChatEvidenceSource,
 } from '@congress-tracker/shared/chat-api-types'
+import { BILL_QUOTE_MAX_CHARS } from '@congress-tracker/shared/share-api-types'
 
 import { assertNever } from './assertNever'
 
@@ -72,4 +73,26 @@ export function splitProseParagraphs(text: string): string[] {
     .split(/\n\s*\n/)
     .map((paragraph) => paragraph.trim())
     .filter((paragraph) => paragraph.length > 0)
+}
+
+/**
+ * Fit a quoted passage into the share-quote length cap: keep whole sentences
+ * while they fit, otherwise cut the first sentence at a word boundary. The
+ * result is always a prefix of the passage, so it still verifies as a
+ * substring of the bill text on the server.
+ */
+export function fitPassageForQuote(text: string, maxChars = BILL_QUOTE_MAX_CHARS): string {
+  const trimmed = text.replace(/\s+/g, ' ').trim()
+  if (trimmed.length <= maxChars) return trimmed
+  const sentences = trimmed.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) ?? [trimmed]
+  let kept = ''
+  for (const sentence of sentences) {
+    const candidate = kept ? `${kept} ${sentence.trim()}` : sentence.trim()
+    if (candidate.length > maxChars) break
+    kept = candidate
+  }
+  if (kept) return kept
+  const slice = trimmed.slice(0, maxChars)
+  const lastSpace = slice.lastIndexOf(' ')
+  return (lastSpace > 12 ? slice.slice(0, lastSpace) : slice).replace(/[.,;:]+$/, '')
 }

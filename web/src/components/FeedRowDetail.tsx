@@ -12,6 +12,7 @@ import {
   formatBillQueryParam,
   shareBillViaNavigator,
 } from '../utils/billDeepLink'
+import { fitPassageForQuote } from '../utils/billChat'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
@@ -255,7 +256,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
     try {
       const { quote } = await createBillQuote({
         bill: formatBillQueryParam(item.bill),
-        text,
+        text: fitPassageForQuote(text),
       })
       openShareSheet(quote)
     } catch (error) {
