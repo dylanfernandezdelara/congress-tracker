@@ -52,6 +52,7 @@ import { searchMembers } from "../d1/members";
 import { listPolicyAreas } from "../d1/policy-areas";
 import { tryRewriteBillOg } from "./bill-og";
 import { handleOgImageRoute, parseOgImagePath } from "./og-image";
+import { handleBillChat } from "./bill-chat";
 import { handleCreateBillQuote, handleGetBillQuote } from "./share-quote";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
@@ -62,6 +63,7 @@ import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
 import { buildCommitteesLeaderboard } from "../storage/committee-leaderboard";
 import { runProcessBackfillPipeline } from "../pipeline/run-process-backfill";
+import { runBillTextBackfillPipeline } from "../pipeline/run-bill-text-backfill";
 import { refreshBillProcessQueue } from "../pipeline/refresh-bill-process";
 import type {
   CommitteesLeaderboardResponse,
@@ -470,6 +472,7 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
     runExecutivePostsPipeline(env, { trigger: "admin" }),
   "/__pipeline/run/process-backfill": ({ env }) => runProcessBackfillPipeline(env),
   "/__pipeline/run/process-refresh": ({ env }) => refreshBillProcessQueue(env),
+  "/__pipeline/run/bill-text-backfill": ({ env }) => runBillTextBackfillPipeline(env),
 };
 
 const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
@@ -877,6 +880,11 @@ export async function handlePublicFetch(
     return handleCreateBillQuote({ request, env, json });
   }
 
+  // Public write: grounded bill chat (UI message stream). Not a pipeline write.
+  if (pathname === "/chat/bill") {
+    return handleBillChat({ request, env, json, corsHeaders });
+  }
+
   if (request.method !== "GET") {
     return json({ error: "method_not_allowed", message: "Only GET requests are allowed" }, { status: 405 });
   }
@@ -906,6 +914,7 @@ const API_PATH_PREFIXES = [
   "/stats/",
   "/executive/",
   "/share/",
+  "/chat/",
   "/og/",
   "/__pipeline/",
 ];

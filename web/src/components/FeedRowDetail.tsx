@@ -2,20 +2,22 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 
-import { ApiError } from '../api/fetchJson'
 import { createBillQuote } from '../api/client'
 import type { FeedItem, FeedPrimarySponsor } from '../api/types'
 import { copyTextToClipboard, formatBillQueryParam } from '../utils/billDeepLink'
+import { fitPassageForQuote } from '../utils/billChat'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
 import { latestPassageVote } from '../utils/ogCardModel'
+import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
 import { primarySponsorDisplay } from '../utils/sponsorLabels'
 import { useBillShare } from '../hooks/useBillShare'
 import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
 import { useSharedQuoteLanding } from '../hooks/useSharedQuoteLanding'
 import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
+import { BillChatSection } from './BillChatSection'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
@@ -36,21 +38,8 @@ type FeedRowDetailProps = {
 }
 
 const SELECTION_STATUS_MS = 1800
-
-function shareQuoteErrorCopy(error: unknown): string {
-  if (error instanceof ApiError) {
-    switch (error.code) {
-      case 'quote_too_short':
-      case 'quote_too_long':
-      case 'quote_not_in_bill':
-      case 'rate_limited':
-        return error.message
-      default:
-        break
-    }
-  }
-  return "Couldn't create a quote link. Try again."
-}
+/** Bill-text regions this panel's selection menu handles; answer bubbles are the chat section's. */
+const BILL_TEXT_SELECTION_SOURCES = ['digest', 'crs'] as const
 
 function SharedQuoteCallout({ quote }: { quote: BillQuote }) {
   return (
@@ -136,6 +125,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [sharingQuote, setSharingQuote] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [chatSelection, setChatSelection] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
@@ -148,6 +138,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
   })
   const { selection, clear: clearSelection } = useTextSelectionMenu(detailRef, {
     enabled: !share.open,
+    sources: BILL_TEXT_SELECTION_SOURCES,
   })
   const landing = useSharedQuoteLanding({
     item,
@@ -178,6 +169,18 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
       setSelectionStatus(shareQuoteErrorCopy(error))
     } finally {
       setSharingQuote(false)
+    }
+  }
+
+  const handleSharePassage = async (text: string) => {
+    try {
+      const { quote } = await createBillQuote({
+        bill: formatBillQueryParam(item.bill),
+        text: fitPassageForQuote(text),
+      })
+      share.openSheet(quote)
+    } catch (error) {
+      setToast(shareQuoteErrorCopy(error))
     }
   }
 
@@ -238,6 +241,16 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         />
       </section>
 
+      <BillChatSection
+        item={item}
+        pendingSelection={chatSelection}
+        onClearSelection={() => setChatSelection(null)}
+        onSharePassage={(text) => {
+          void handleSharePassage(text)
+        }}
+        onQuoteCreated={share.openSheet}
+      />
+
       <footer className="feed-row-detail-footer">
         <a
           href={sourceUrl}
@@ -270,6 +283,10 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         busy={sharingQuote}
         onShareQuote={(current) => {
           void handleShareQuote(current)
+        }}
+        onAsk={(sel) => {
+          setChatSelection(sel.text)
+          clearSelection()
         }}
         onCopy={(current) => {
           void handleCopySelection(current)

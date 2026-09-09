@@ -8,6 +8,7 @@ function makeSelection(): TextSelection {
   return {
     text: 'raises the cap',
     source: 'digest',
+    sourceId: null,
     rect: new DOMRect(200, 300, 120, 18),
   }
 }

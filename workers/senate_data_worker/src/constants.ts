@@ -56,6 +56,26 @@ export const CONFIRMATION_VOTE_CONTEXT_PER_RUN = 10;
 export const TEXT_CHANGES_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 /** Skip text diffing above this document size to bound cron memory and time. */
 export const BILL_TEXT_MAX_BYTES = 8 * 1024 * 1024;
+/**
+ * Full bill-text section ingest (chat grounding). Each bill costs one text
+ * metadata probe per day and one XML download when its newest version changed.
+ */
+export const BILL_TEXT_SECTIONS_MAX_FETCHES_PER_RUN = 15;
+/** Admin backfill cap per invocation (re-invoke until `bills_remaining` is 0). */
+export const BILL_TEXT_SECTIONS_BACKFILL_MAX_FETCHES = 40;
+/** Sections kept per bill; omnibus prints beyond this lose their tail. */
+export const BILL_TEXT_SECTIONS_MAX_PER_BILL = 400;
+/** Plain-text characters stored per section body (truncated with an ellipsis). */
+export const BILL_TEXT_SECTION_MAX_CHARS = 12_000;
+/**
+ * Max characters of evidence packed into one `POST /chat/bill` system prompt
+ * (digest + CRS + ranked sections).
+ */
+export const BILL_CHAT_EVIDENCE_MAX_CHARS = 24_000;
+/** Per-IP daily chat turns (UTC day) stored in `chat_usage`. */
+export const CHAT_DAILY_PER_CLIENT_CAP = 40;
+/** Site-wide daily chat turns (UTC day), keyed as `*` in `chat_usage`. */
+export const CHAT_DAILY_GLOBAL_CAP = 2000;
 /** Newest companion (non-passage) rolls carried per bill in the feed payload. */
 export const COMPANION_VOTES_PER_BILL = 6;
 

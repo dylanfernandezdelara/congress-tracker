@@ -131,6 +131,15 @@ vi.mock("./refresh-bill-text-changes", () => ({
   refreshBillTextChanges: (...args: unknown[]) => mockRefreshBillTextChanges(...args),
 }));
 
+vi.mock("./refresh-bill-text-sections", () => ({
+  refreshBillTextSections: vi.fn(async () => ({
+    fetched: 0,
+    skipped: 0,
+    remaining: 0,
+    warnings: [],
+  })),
+}));
+
 vi.mock("./refresh-confirmations", () => ({
   persistConfirmationVotes: vi.fn(async (_db: D1Database, votes: unknown[]) => votes.length),
   refreshConfirmationEnrichment: vi.fn(async () => ({

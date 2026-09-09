@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { signAnswer } from "../chat/answer-signature";
 import { buildBillQuoteId } from "../d1/bill-quotes";
 import type { DigestRow } from "../d1/digests";
 import { buildJsonResponse } from "./responses";
@@ -31,7 +32,10 @@ const DIGEST: DigestRow = {
 };
 
 /** D1 stub: one digest row plus an in-memory bill_quotes table. */
-function shareDb(digest: DigestRow | null = DIGEST) {
+function shareDb(
+  digest: DigestRow | null = DIGEST,
+  sections: Array<{ ordinal: number; label: string; heading: string; body: string }> = []
+) {
   const quotes = new Map<string, Record<string, unknown>>();
   const db = {
     exec: vi.fn(async () => {}),
@@ -53,9 +57,15 @@ function shareDb(digest: DigestRow | null = DIGEST) {
             return { total };
           }
           if (sql.includes("FROM bill_quotes")) return quotes.get(String(state.args[0])) ?? null;
+          if (sql.includes("FROM bill_text_documents")) {
+            return sections.length > 0 ? { fetched_at: "2026-09-01T00:00:00.000Z" } : null;
+          }
           return null;
         },
-        all: async () => ({ results: [] }),
+        all: async () => {
+          if (sql.includes("FROM bill_text_sections")) return { results: sections };
+          return { results: [] };
+        },
         run: async () => {
           if (sql.includes("INSERT INTO bill_quotes")) {
             const [id, congress, billType, number, text, source, createdAt] = state.args;
@@ -189,7 +199,7 @@ describe("POST /share/quote", () => {
     expect(await response.json()).toMatchObject({ error: "bill_not_found" });
   });
 
-  it("refuses chat-answer quotes until signing ships", async () => {
+  it("refuses chat-answer quotes when the HMAC secret is unset", async () => {
     const env = createMockEnv({ DB: shareDb().db });
     const response = await handleCreateBillQuote({
       request: post({ bill: "119-hr-4795", text: "Speeds energy permits", answer: { text: "x", sig: "y" } }),
@@ -198,6 +208,76 @@ describe("POST /share/quote", () => {
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: "unsupported_source" });
+  });
+
+  it("stores a signed chat-answer quote, rejects a bad signature, and refuses cross-bill replay", async () => {
+    const secret = "share-test-hmac";
+    const answerText = "The bill speeds energy permits across states in this package.";
+    const sig = await signAnswer(secret, { bill: "119-hr-4795", text: answerText });
+    const env = createMockEnv({ DB: shareDb().db, CHAT_HMAC_SECRET: secret });
+    const ok = await handleCreateBillQuote({
+      request: post({
+        bill: "119-hr-4795",
+        text: "speeds energy permits",
+        answer: { text: answerText, sig },
+      }),
+      env: env as never,
+      json,
+    });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({ quote: { source: "answer" } });
+
+    const bad = await handleCreateBillQuote({
+      request: post({
+        bill: "119-hr-4795",
+        text: "speeds energy permits",
+        answer: { text: answerText, sig: "0".repeat(64) },
+      }),
+      env: env as never,
+      json,
+    });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ error: "bad_request" });
+
+    const missing = await handleCreateBillQuote({
+      request: post({
+        bill: "119-hr-4795",
+        text: "something the answer never said",
+        answer: { text: answerText, sig },
+      }),
+      env: env as never,
+      json,
+    });
+    expect(missing.status).toBe(422);
+    expect(await missing.json()).toMatchObject({ error: "quote_not_in_bill" });
+
+    // The MAC binds the bill: a signature minted while chatting about H.R. 4795
+    // cannot store the same prose as a quote on another bill.
+    const otherBill = await handleCreateBillQuote({
+      request: post({
+        bill: "119-s-2",
+        text: "speeds energy permits",
+        answer: { text: answerText, sig },
+      }),
+      env: env as never,
+      json,
+    });
+    expect(otherBill.status).toBe(400);
+    expect(await otherBill.json()).toMatchObject({ error: "bad_request" });
+  });
+
+  it("verifies against stored bill-text sections after digest and CRS", async () => {
+    const { db } = shareDb(DIGEST, [
+      { ordinal: 0, label: "3.", heading: "Definitions", body: "A widget means a safety device under this Act." },
+    ]);
+    const env = createMockEnv({ DB: db });
+    const response = await handleCreateBillQuote({
+      request: post({ bill: "119-hr-4795", text: "a widget means a safety device" }),
+      env: env as never,
+      json,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ quote: { source: "bill_text" } });
   });
 
   it("returns the canonical production URL on production hosts", async () => {
@@ -263,8 +343,13 @@ describe("POST /share/quote", () => {
     expect(rateLimitKey(post({}))).toBe("anonymous");
   });
 
-  it("builds sources in digest-then-CRS precedence", () => {
+  it("builds sources in digest-then-CRS-then-bill-text precedence", () => {
     expect(quoteSourcesForBill(DIGEST).map((s) => s.source)).toEqual(["digest", "crs"]);
+    expect(
+      quoteSourcesForBill(DIGEST, [
+        { ordinal: 0, label: "Sec. 1.", heading: "Short title", body: "Section body for verification." },
+      ]).map((s) => s.source)
+    ).toEqual(["digest", "crs", "bill_text"]);
     expect(quoteSourcesForBill({ digest_json: null, raw_summary_text: null })).toEqual([]);
     expect(
       buildBillQuoteShareUrl({ congress: 119, type: "S", number: 2 }, "abcd1234abcd1234", "https://trackcongress.org")

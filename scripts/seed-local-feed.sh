@@ -253,6 +253,33 @@ CREATE TABLE IF NOT EXISTS bill_text_changes (
   checked_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, bill_number)
 );
+CREATE TABLE IF NOT EXISTS bill_text_documents (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  text_version TEXT,
+  text_version_date TEXT,
+  section_count INTEGER NOT NULL DEFAULT 0,
+  checked_at TEXT NOT NULL,
+  fetched_at TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number)
+);
+CREATE TABLE IF NOT EXISTS bill_text_sections (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  ordinal INTEGER NOT NULL,
+  label TEXT NOT NULL,
+  heading TEXT NOT NULL,
+  body TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number, ordinal)
+);
+CREATE TABLE IF NOT EXISTS chat_usage (
+  day TEXT NOT NULL,
+  client_key TEXT NOT NULL,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (day, client_key)
+);
 
 -- Offline sample mode: wipe live-ingested feed rows so seed replaces rather
 -- than merging production-shaped local ingest.
@@ -263,6 +290,11 @@ DELETE FROM bill_lifecycle;
 DELETE FROM nominations;
 DELETE FROM confirmation_votes;
 DELETE FROM bill_text_changes;
+DELETE FROM bill_text_documents;
+DELETE FROM bill_text_sections;
+-- Local chat runs share one `anonymous` client key; a re-seed starts the
+-- per-day chat caps over so UI work is never blocked by yesterday's questions.
+DELETE FROM chat_usage;
 
 -- Offline sample mode: drop real-roster rows so hasRealMemberRoster stays false
 -- and LOCAL:* defectors/portfolios remain visible in /stats/defectors.json and
@@ -410,6 +442,25 @@ INSERT OR REPLACE INTO bill_text_changes
 VALUES
   (119, 'HR', 22, 'Introduced in House', '${D_OLDER}', 'Engrossed in House', '${D_OLDER}',
    '[{"label":"Sec. 4.","heading":"Public spending dashboard details"}]', 0, '${D_OLDER}T00:00:00.000Z');
+
+-- Sample bill text so the grounded chat (POST /chat/bill) has verbatim
+-- evidence offline. Uses the stored-section shape the daily refresh writes.
+INSERT OR REPLACE INTO bill_text_documents
+  (congress, bill_type, bill_number, text_version, text_version_date, section_count, checked_at, fetched_at)
+VALUES
+  (119, 'HR', 1, 'Engrossed in House', '${D_RECENT}', 4, '${D_RECENT}T00:00:00.000Z', '${D_RECENT}T00:00:00.000Z');
+
+INSERT OR REPLACE INTO bill_text_sections
+  (congress, bill_type, bill_number, ordinal, label, heading, body)
+VALUES
+  (119, 'HR', 1, 1, 'Sec. 1.', 'Short title',
+   'This Act may be cited as the Lower Energy Costs Act (local sample).'),
+  (119, 'HR', 1, 2, 'Sec. 2.', 'Permitting deadlines',
+   'Not later than 1 year after the date of enactment of this Act, the Secretary shall complete an environmental review for any covered energy or mineral project. The Secretary may extend the deadline by not more than 90 days if the applicant agrees in writing. A permit not acted on by the deadline shall be deemed approved.'),
+  (119, 'HR', 1, 3, 'Sec. 3.', 'Domestic leasing',
+   'The Secretary of the Interior shall hold not fewer than 4 onshore oil and gas lease sales each year in each State with available acreage, and shall offer for lease not less than 50 percent of the nominated acreage. Mineral leasing on Federal land shall follow the same annual schedule.'),
+  (119, 'HR', 1, 4, 'Sec. 4.', 'Pipeline and transmission approvals',
+   'The Federal Energy Regulatory Commission shall act on an application for an interstate pipeline or transmission line within 180 days of receiving a complete application. A State may not withhold water quality certification for more than 1 year after a request is filed.');
 
 INSERT OR REPLACE INTO nominations
   (congress, nomination_number, part_number, citation, description, organization, position_title,

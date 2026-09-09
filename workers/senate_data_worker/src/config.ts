@@ -20,6 +20,17 @@ export interface Env {
    * cap). Optional: unit tests and older local wrangler runs omit it.
    */
   SHARE_RATE_LIMITER?: RateLimit;
+  /**
+   * Workers Rate Limiting binding for public `POST /chat/bill` (per-IP burst
+   * cap). Optional: unit tests and older local wrangler runs omit it.
+   */
+  CHAT_RATE_LIMITER?: RateLimit;
+  /**
+   * HMAC-SHA256 secret used to sign bill-chat answers so `POST /share/quote`
+   * can verify `source: "answer"` quotes. Optional: when unset, answers stream
+   * with `sig: null` and sharing chat answers is rejected.
+   */
+  CHAT_HMAC_SECRET?: string;
   CONGRESS: string;
   SESSION: string;
   ALLOWED_ORIGIN?: string;

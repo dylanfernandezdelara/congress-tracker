@@ -7,6 +7,7 @@ import {
 import {
   compareBillText,
   diffAddedSections,
+  parseBillSectionBodies,
   parseBillSections,
   selectLatestSummary,
   selectSummaryBasisVersion,
@@ -64,6 +65,51 @@ describe("parseBillSections", () => {
 
   it("returns nothing for documents without sections (simple resolutions)", () => {
     expect(parseBillSections("<resolution><resolution-body>Resolved.</resolution-body></resolution>")).toEqual([]);
+  });
+});
+
+describe("parseBillSectionBodies", () => {
+  it("returns one plain-text body per top-level section, keeping quoted insertions inline", () => {
+    const sections = parseBillSectionBodies(ENGROSSED_XML);
+    expect(sections.map((s) => [s.label, s.heading])).toEqual([
+      ["1.", "Short title"],
+      ["2.", "Prohibition on certain transactions"],
+      ["3.", "Requiring voters to provide photo identification"],
+    ]);
+    expect(sections[0]!.body).toBe("This Act may be cited as the Stop Insider Trading Act.");
+    expect(sections[2]!.body).toBe(
+      "303A. Photo identification requirements Each State shall require photo identification."
+    );
+  });
+
+  it("decodes entities, keeps header markup text, and separates adjacent blocks", () => {
+    const xml = `<section><enum>4.</enum><header>Has <term>markup</term> &amp; entities</header>
+      <subsection><enum>(a)</enum><header>In general</header><text>Rate &lt; 5&#37;.</text></subsection>
+      <subsection><enum>(b)</enum><text>Second&#x2014;part.</text></subsection>
+    </section>`;
+    expect(parseBillSectionBodies(xml)).toEqual([
+      {
+        label: "4.",
+        heading: "Has markup & entities",
+        body: "(a) In general Rate < 5%. (b) Second—part.",
+      },
+    ]);
+  });
+
+  it("caps section count and body length", () => {
+    const xml = Array.from(
+      { length: 5 },
+      (_, i) => `<section><enum>${i + 1}.</enum><header>H${i}</header><text>${"word ".repeat(40)}</text></section>`
+    ).join("");
+    const sections = parseBillSectionBodies(xml, { maxSections: 3, maxBodyChars: 30 });
+    expect(sections).toHaveLength(3);
+    expect(sections[0]!.body.length).toBeLessThanOrEqual(30);
+    expect(sections[0]!.body.endsWith("…")).toBe(true);
+  });
+
+  it("returns nothing for documents without sections", () => {
+    expect(parseBillSectionBodies("<resolution><resolution-body>Resolved.</resolution-body></resolution>")).toEqual([]);
+    expect(parseBillSectionBodies("<section></section>")).toEqual([]);
   });
 });
 

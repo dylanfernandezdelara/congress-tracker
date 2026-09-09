@@ -2,19 +2,22 @@ import { formatBillQueryParam, parseBillQueryParam } from "../../../../shared/bi
 import {
   checkQuoteLength,
   cleanQuoteText,
-  digestQuoteSourceText,
   findQuoteSource,
+  normalizeForQuoteMatch,
   type QuoteSourceText,
 } from "../../../../shared/quote-verification";
 import {
   BILL_QUOTE_MAX_CHARS,
   BILL_QUOTE_MIN_CHARS,
   BILL_QUOTE_QUERY_PARAM,
+  type BillQuoteSource,
   type CreateBillQuoteError,
   type CreateBillQuoteRequest,
   type CreateBillQuoteResponse,
   type GetBillQuoteResponse,
 } from "../../../../shared/share-api-types";
+import { verifyAnswerSignature } from "../chat/answer-signature";
+import { buildEvidenceChunks } from "../chat/bill-chat-evidence";
 import type { Env } from "../config";
 import {
   buildBillQuoteId,
@@ -23,11 +26,19 @@ import {
   insertBillQuote,
   isBillQuoteId,
 } from "../d1/bill-quotes";
+import { getBillText, type BillTextSectionRow } from "../d1/bill-text-sections";
 import { getDigest, parseStoredDigest } from "../d1/digests";
 import { publicShareOrigin } from "./bill-og";
-import { cacheLatest, cacheNoStore } from "./responses";
+import {
+  NO_STORE_HEADERS,
+  publicErrorResponse,
+  rateLimitKey,
+  readJsonBody,
+  type JsonFn,
+} from "./public-json";
+import { cacheLatest } from "./responses";
 
-type JsonFn = (body: unknown, init?: ResponseInit) => Response;
+export { rateLimitKey };
 
 /** Request bodies are tiny; anything larger is not a quote. */
 const MAX_BODY_BYTES = 8 * 1024;
@@ -38,16 +49,9 @@ const MAX_BODY_BYTES = 8 * 1024;
  */
 export const BILL_QUOTES_PER_BILL_CAP = 500;
 
-const NO_STORE = { "Cache-Control": cacheNoStore };
+const NO_STORE = NO_STORE_HEADERS;
 
-function errorResponse(
-  json: JsonFn,
-  status: number,
-  error: CreateBillQuoteError,
-  message: string
-): Response {
-  return json({ error, message }, { status, headers: NO_STORE });
-}
+const errorResponse = publicErrorResponse<CreateBillQuoteError>;
 
 /**
  * Share URL on the origin that will actually resolve it: the canonical domain
@@ -61,22 +65,6 @@ export function buildBillQuoteShareUrl(
   return `${origin}/?bill=${formatBillQueryParam(bill)}&${BILL_QUOTE_QUERY_PARAM}=${quoteId}`;
 }
 
-/** Client key for the burst limiter: Cloudflare's connecting IP, else a shared bucket. */
-export function rateLimitKey(request: Request): string {
-  return request.headers.get("CF-Connecting-IP")?.trim() || "anonymous";
-}
-
-async function readJsonBody(request: Request): Promise<unknown | null> {
-  const declared = Number.parseInt(request.headers.get("content-length") ?? "", 10);
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
-  try {
-    const text = await request.text();
-    if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return null;
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-}
 
 function parseCreateRequest(body: unknown): CreateBillQuoteRequest | null {
   if (!body || typeof body !== "object") return null;
@@ -93,19 +81,22 @@ function parseCreateRequest(body: unknown): CreateBillQuoteRequest | null {
 }
 
 /**
- * Verification sources a reader could have selected from, in precedence order.
- * Full bill text and signed chat answers are added by later PRs.
+ * Verification sources a reader could have selected from, in precedence order
+ * (digest → CRS → bill-text sections). Built from the same evidence chunks the
+ * chat grounds on, so "shareable" and "citable" are one definition.
  */
-export function quoteSourcesForBill(row: {
-  digest_json: string | null;
-  raw_summary_text: string | null;
-}): QuoteSourceText[] {
-  const sources: QuoteSourceText[] = [];
-  const digest = parseStoredDigest(row.digest_json);
-  const digestText = digestQuoteSourceText(digest);
-  if (digestText) sources.push({ source: "digest", text: digestText });
-  if (row.raw_summary_text?.trim()) sources.push({ source: "crs", text: row.raw_summary_text });
-  return sources;
+export function quoteSourcesForBill(
+  row: {
+    digest_json: string | null;
+    raw_summary_text: string | null;
+  },
+  sections: BillTextSectionRow[] = []
+): QuoteSourceText[] {
+  return buildEvidenceChunks({
+    digest: parseStoredDigest(row.digest_json),
+    crsSummary: row.raw_summary_text,
+    sections,
+  }).map((chunk) => ({ source: chunk.source, text: chunk.text }));
 }
 
 /**
@@ -147,7 +138,7 @@ export async function handleCreateBillQuote(params: {
     }
   }
 
-  const body = parseCreateRequest(await readJsonBody(request));
+  const body = parseCreateRequest(await readJsonBody(request, MAX_BODY_BYTES));
   if (!body) {
     return errorResponse(json, 400, "bad_request", "Body must be JSON with `bill` and `text`.");
   }
@@ -156,12 +147,23 @@ export async function handleCreateBillQuote(params: {
     return errorResponse(json, 400, "bad_request", "`bill` must look like 119-hr-1.");
   }
   if (body.answer) {
-    return errorResponse(
-      json,
-      400,
-      "unsupported_source",
-      "Sharing chat answers is not available yet."
+    const secret = env.CHAT_HMAC_SECRET;
+    if (!secret) {
+      return errorResponse(
+        json,
+        400,
+        "unsupported_source",
+        "Sharing chat answers is not available"
+      );
+    }
+    const valid = await verifyAnswerSignature(
+      secret,
+      { bill: formatBillQueryParam(bill), text: body.answer.text },
+      body.answer.sig
     );
+    if (!valid) {
+      return errorResponse(json, 400, "bad_request", "answer signature is invalid for this bill");
+    }
   }
 
   const text = cleanQuoteText(body.text);
@@ -187,14 +189,33 @@ export async function handleCreateBillQuote(params: {
   if (!row) {
     return errorResponse(json, 404, "bill_not_found", "That bill is not in the feed yet.");
   }
-  const matched = findQuoteSource(text, quoteSourcesForBill(row));
-  if (!matched) {
-    return errorResponse(
-      json,
-      422,
-      "quote_not_in_bill",
-      "That text is not part of this bill's summary, so it cannot be shared as a quote."
-    );
+
+  let source: BillQuoteSource;
+  if (body.answer) {
+    // A signed answer is model prose about this bill, not bill text: the quote
+    // only has to be part of the answer the worker actually produced.
+    const needle = normalizeForQuoteMatch(text);
+    if (!needle || !normalizeForQuoteMatch(body.answer.text).includes(needle)) {
+      return errorResponse(
+        json,
+        422,
+        "quote_not_in_bill",
+        "That text is not part of this chat answer, so it cannot be shared as a quote."
+      );
+    }
+    source = "answer";
+  } else {
+    const stored = await getBillText(env.DB, bill);
+    const matched = findQuoteSource(text, quoteSourcesForBill(row, stored?.sections ?? []));
+    if (!matched) {
+      return errorResponse(
+        json,
+        422,
+        "quote_not_in_bill",
+        "That text is not part of this bill's summary, so it cannot be shared as a quote."
+      );
+    }
+    source = matched.source;
   }
 
   const id = await buildBillQuoteId(bill, text);
@@ -207,7 +228,7 @@ export async function handleCreateBillQuote(params: {
       "This bill already has the maximum number of shared quotes."
     );
   }
-  const quote = existing ?? (await insertBillQuote(env.DB, { id, bill, text, source: matched.source }));
+  const quote = existing ?? (await insertBillQuote(env.DB, { id, bill, text, source }));
   const response: CreateBillQuoteResponse = {
     quote,
     url: buildBillQuoteShareUrl(quote.bill, quote.id, publicShareOrigin(new URL(request.url))),

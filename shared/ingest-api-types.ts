@@ -23,6 +23,9 @@ export interface FeedPipelineRunRecord {
   textChangesRefreshed?: number;
   textChangesWithAddedProvisions?: number;
   text_changes_warnings?: string[];
+  textSectionsFetched?: number;
+  textSectionsRemaining?: number;
+  text_sections_warnings?: string[];
   confirmationVotesUpserted?: number;
   confirmationNominationsFetched?: number;
   confirmationBackgroundsRewritten?: number;

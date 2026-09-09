@@ -33,6 +33,7 @@ import { persistRecentIntroductions } from "./refresh-introductions";
 import { refreshFeedDigests } from "./refresh-feed-digests";
 import { mergeLifecycleRefreshCandidates, refreshBillLifecycles } from "./refresh-lifecycles";
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
+import { refreshBillTextSections } from "./refresh-bill-text-sections";
 import { enqueueProcessBills } from "../d1/bill-process";
 import { hydrateProcessBills } from "./refresh-bill-process";
 import { resolveOpenRouterModel } from "../synthesis/model";
@@ -52,6 +53,9 @@ export interface RunFeedResult {
   textChangesRefreshed: number;
   textChangesWithAddedProvisions: number;
   textChangesWarnings: string[];
+  textSectionsFetched: number;
+  textSectionsRemaining: number;
+  textSectionsWarnings: string[];
   confirmationVotesUpserted: number;
   confirmationNominationsFetched: number;
   confirmationBackgroundsRewritten: number;
@@ -255,6 +259,18 @@ export async function runFeedPipeline(
       );
     }
 
+    // Full-text sections for grounded chat (capped; full crawl is admin bill-text-backfill).
+    const textSections = await refreshBillTextSections(env, bills, trigger);
+    if (textSections.warnings.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: "feed_pipeline_partial_text_sections_refresh",
+          trigger,
+          warnings: textSections.warnings,
+        })
+      );
+    }
+
     // Light committee-process refresh for feed bills (capped; full crawl is admin backfill).
     // Enqueue first so park/rehydrate timestamps stick; hydrate directly so a
     // discovery backlog cannot starve feed bills.
@@ -300,6 +316,9 @@ export async function runFeedPipeline(
       textChangesRefreshed: textChanges.refreshed,
       textChangesWithAddedProvisions: textChanges.withAddedProvisions,
       textChangesWarnings: textChanges.warnings,
+      textSectionsFetched: textSections.fetched,
+      textSectionsRemaining: textSections.remaining,
+      textSectionsWarnings: textSections.warnings,
       confirmationVotesUpserted,
       confirmationNominationsFetched: confirmationEnrichment.nominationsFetched,
       confirmationBackgroundsRewritten: confirmationEnrichment.backgroundsRewritten,
@@ -335,6 +354,11 @@ export async function runFeedPipeline(
         textChangesWithAddedProvisions: result.textChangesWithAddedProvisions,
         ...(textChanges.warnings.length > 0
           ? { text_changes_warnings: textChanges.warnings }
+          : {}),
+        textSectionsFetched: result.textSectionsFetched,
+        textSectionsRemaining: result.textSectionsRemaining,
+        ...(textSections.warnings.length > 0
+          ? { text_sections_warnings: textSections.warnings }
           : {}),
         confirmationVotesUpserted: result.confirmationVotesUpserted,
         confirmationNominationsFetched: result.confirmationNominationsFetched,

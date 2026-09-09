@@ -47,6 +47,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Feed timeline](./feed-timeline.md) covers home load, expand-in-place bill detail, confirmations, and new laws.
 - [Share a bill](./share-bill.md) covers the expanded-row share sheet, copy blurb, and `/?bill=` landing.
 - [Share a quote](./share-quote.md) covers select-text → `Share quote`, the card preview, `/?bill=…&quote=` landing highlight, and the Worker OG rewrite + PNG.
+- [Ask about this bill](./bill-chat.md) covers the grounded chat at the bottom of the detail panel: starter chips, streamed answers with verbatim quoted passages, `Ask about this` selection attachments, and `Share this passage`.
 - [Introduced bills](./introduced-bills.md) covers intro-only rows (Introduced chip, search, `?bill=`).
 - [Search bills](./search-bills.md) covers searchbox submit, matches, empty state, and clear.
 - [Filter feed](./filter-feed.md) covers chamber radios and the Filters panel (state, sponsor chamber, party, member, topic).

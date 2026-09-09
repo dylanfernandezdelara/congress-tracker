@@ -68,6 +68,12 @@ name = "SHARE_RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 20, period = 60 }
 
+# Per-IP burst cap for public POST /chat/bill. Daily caps live in D1 (`chat_usage`).
+[[ratelimits]]
+name = "CHAT_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 10, period = 60 }
+
 # Deployed preview URLs (`wrangler versions upload --env preview`) bind the isolated
 # preview D1 below. `preview_database_id` applies to local `wrangler dev` only.
 # Clear routes so preview never inherits production custom domains.
@@ -94,3 +100,8 @@ database_id = "da5dbbc1-8111-4aa9-a49e-5e03022e44cc"
 name = "SHARE_RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 20, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "CHAT_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 10, period = 60 }
