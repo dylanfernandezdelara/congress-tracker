@@ -130,6 +130,43 @@ test('cron triggers keep daily feed and hourly executive on distinct minutes', (
   )
 })
 
+function parseRateLimitBindings(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8')
+  const bindings = []
+  for (const match of content.matchAll(
+    /^\[\[(ratelimits|env\.preview\.ratelimits)\]\]\s*\nname\s*=\s*"([^"]+)"\s*\nnamespace_id\s*=\s*"([^"]+)"\s*\nsimple\s*=\s*\{\s*limit\s*=\s*(\d+),\s*period\s*=\s*(\d+)\s*\}/gm,
+  )) {
+    bindings.push({
+      env: match[1] === 'ratelimits' ? 'production' : 'preview',
+      name: match[2],
+      namespace_id: match[3],
+      limit: Number(match[4]),
+      period: Number(match[5]),
+    })
+  }
+  return bindings
+}
+
+test('public share rate limiter is bound identically in production and preview on both configs', () => {
+  for (const configPath of [rootConfigPath, workerConfigPath]) {
+    const bindings = parseRateLimitBindings(configPath)
+    const share = bindings.filter((binding) => binding.name === 'SHARE_RATE_LIMITER')
+    assert.deepEqual(
+      share.map((binding) => binding.env).sort(),
+      ['preview', 'production'],
+      `${configPath} must bind SHARE_RATE_LIMITER for production and env.preview`,
+    )
+    const [first, ...rest] = share
+    for (const binding of rest) {
+      assert.equal(binding.namespace_id, first.namespace_id)
+      assert.equal(binding.limit, first.limit)
+      assert.equal(binding.period, first.period)
+    }
+    assert.equal(first.period, 60, 'Workers rate limiting supports 10s or 60s periods')
+  }
+  assert.deepEqual(parseRateLimitBindings(rootConfigPath), parseRateLimitBindings(workerConfigPath))
+})
+
 test('Workers Logs observability is enabled at full sampling on both configs', () => {
   const root = parseWranglerConfig(rootConfigPath)
   const worker = parseWranglerConfig(workerConfigPath)
