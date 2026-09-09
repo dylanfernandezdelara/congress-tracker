@@ -34,6 +34,23 @@ describe('readQuotableSelection', () => {
     expect(readQuotableSelection(container)).toMatchObject({
       text: 'Official summary',
       source: 'crs',
+      sourceId: null,
+    })
+  })
+
+  it('reads data-quotable-id from the enclosing quotable region', () => {
+    document.body.innerHTML =
+      '<div id="c"><p data-quotable="answer" data-quotable-id="asst-1">Chat answer text here.</p></div>'
+    const container = document.getElementById('c')!
+    const paragraph = container.querySelector('p')!
+    const range = document.createRange()
+    range.selectNodeContents(paragraph)
+    stubSelection(range, 'Chat answer text here.')
+
+    expect(readQuotableSelection(container)).toMatchObject({
+      text: 'Chat answer text here.',
+      source: 'answer',
+      sourceId: 'asst-1',
     })
   })
 

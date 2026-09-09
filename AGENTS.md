@@ -169,6 +169,8 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 - `wrangler.toml` (repo root) — mirrors `workers/senate_data_worker/wrangler.toml` for Cloudflare Workers Builds
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI
 - `web/src/components/FeedRowDetail.tsx` — expanded feed row detail panel (quotable regions carry `data-quotable`; selecting text opens `SelectionMenu` → `POST /share/quote`; `?bill=&quote=` landing highlights the quote in place)
+- `web/src/components/BillChatSection.tsx` — grounded “Ask about this bill” chat (`useChat` → `POST /chat/bill`)
+- `web/src/components/ai-elements/` — lightweight conversation/message/prompt primitives (hand-written; official AI Elements pull streamdown)
 - `workers/senate_data_worker/src/http/share-quote.ts`, `og-card-model.ts`, `og-card-html.ts`, `og-image.ts` — quote sharing + dynamic OG card; `shared/og-card.ts` is the card model shared with the web preview twin (`web/src/components/OgCardPreview.tsx`)
 - `web/src/utils/feedRowLabels.ts` — topic, event line, procedural detection, teaser helpers
 - `web/src/components/ui/` — vendored shadcn/ui primitives (added via `components.json`; add new primitives with `npx shadcn@latest add <name>` from `web/`)

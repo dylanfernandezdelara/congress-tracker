@@ -1,0 +1,337 @@
+@layer components {
+  .bill-chat {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .bill-chat-note {
+    margin: 0 0 0.75rem;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 0.75rem;
+    min-width: 0;
+  }
+
+  .bill-chat-suggestion {
+    max-width: 100%;
+    height: auto;
+    min-height: 1.75rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: normal;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .bill-chat-conversation {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .bill-chat-conversation-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin: 0 0 0.75rem;
+    min-width: 0;
+  }
+
+  .bill-chat-message {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .bill-chat-message--user {
+    justify-content: flex-end;
+  }
+
+  .bill-chat-message--assistant {
+    justify-content: flex-start;
+  }
+
+  .bill-chat-message-content {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .bill-chat-bubble {
+    min-width: 0;
+    max-width: min(100%, 36rem);
+    padding: 0.55rem 0.75rem;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .bill-chat-bubble--user {
+    border-radius: 16px 16px 4px 16px;
+    background: hsl(var(--twc-foreground));
+    color: hsl(var(--twc-background));
+  }
+
+  .bill-chat-bubble--assistant {
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 16px 16px 16px 4px;
+    background: hsl(var(--twc-card));
+    color: hsl(var(--twc-foreground));
+  }
+
+  .bill-chat-bubble--refused {
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 12px;
+    background: hsl(var(--twc-surface-subtle));
+    color: hsl(var(--twc-secondary));
+  }
+
+  .bill-chat-prose {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  .bill-chat-prose p {
+    margin: 0;
+  }
+
+  .bill-chat-unverified {
+    color: hsl(var(--twc-faint));
+    font-style: italic;
+  }
+
+  .bill-chat-quote {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0.55rem 0 0;
+    padding: 0.45rem 0 0.15rem 0.7rem;
+    border-left: 3px solid hsl(var(--twc-law));
+    min-width: 0;
+  }
+
+  .bill-chat-quote-text {
+    margin: 0;
+    font-size: 13px;
+    font-style: italic;
+    line-height: 1.45;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .bill-chat-quote-meta {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-chat-quote-share {
+    align-self: flex-start;
+    margin: 0;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 999px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--twc-secondary));
+    cursor: pointer;
+  }
+
+  .bill-chat-quote-share:hover {
+    background: hsl(var(--twc-row-hover));
+    color: hsl(var(--twc-foreground));
+  }
+
+  .bill-chat-quote-share:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+  }
+
+  .bill-chat-streaming {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+    font-size: 11px;
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-chat-streaming-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: hsl(var(--twc-faint));
+    animation: bill-chat-pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes bill-chat-pulse {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .bill-chat-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.7rem;
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 10px;
+    background: hsl(var(--twc-surface-subtle));
+    font-size: 12px;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .bill-chat-error-retry {
+    margin: 0;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 999px;
+    background: hsl(var(--twc-card));
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--twc-foreground));
+    cursor: pointer;
+  }
+
+  .bill-chat-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 0.45rem;
+    min-width: 0;
+  }
+
+  .bill-chat-attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.25rem 0.45rem 0.25rem 0.4rem;
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 999px;
+    background: hsl(var(--twc-card));
+    font-size: 12px;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .bill-chat-attachment-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-chat-attachment-icon svg {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+
+  .bill-chat-attachment-label {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bill-chat-attachment-remove {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: hsl(var(--twc-faint));
+    cursor: pointer;
+  }
+
+  .bill-chat-attachment-remove svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .bill-chat-attachment-remove:hover,
+  .bill-chat-attachment-remove:focus-visible {
+    color: hsl(var(--twc-foreground));
+  }
+
+  .bill-chat-prompt {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .bill-chat-prompt-textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 2.6rem;
+    margin: 0;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 12px;
+    background: hsl(var(--twc-card));
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    color: hsl(var(--twc-foreground));
+    resize: vertical;
+  }
+
+  .bill-chat-prompt-textarea:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 1px;
+  }
+
+  .bill-chat-prompt-textarea:disabled {
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-chat-prompt-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .bill-chat-prompt-submit,
+  .bill-chat-prompt-stop {
+    height: auto;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bill-chat-streaming-dot {
+      animation: none;
+    }
+  }
+}

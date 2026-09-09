@@ -4,12 +4,16 @@ import { cleanQuoteText } from '@congress-tracker/shared/quote-verification'
 
 /** Attribute marking text a reader may quote. Value is the source kind (`digest`, `crs`, `answer`). */
 export const QUOTABLE_ATTR = 'data-quotable'
+/** Optional id on a quotable region (chat message id for `answer` selections). */
+export const QUOTABLE_ID_ATTR = 'data-quotable-id'
 
 export type TextSelection = {
   /** Whitespace-collapsed selected text. */
   text: string
   /** Which quotable region the selection sits in (`data-quotable` value). */
   source: string
+  /** Optional id on the quotable region (`data-quotable-id`), e.g. a chat message id. */
+  sourceId: string | null
   /** Viewport rectangle of the selection, refreshed on scroll. */
   rect: DOMRect
 }
@@ -35,7 +39,12 @@ export function readQuotableSelection(container: HTMLElement | null): TextSelect
   if (!text) return null
   const rect = range.getBoundingClientRect()
   if (rect.width === 0 && rect.height === 0) return null
-  return { text, source: start.getAttribute(QUOTABLE_ATTR) || 'digest', rect }
+  return {
+    text,
+    source: start.getAttribute(QUOTABLE_ATTR) || 'digest',
+    sourceId: start.getAttribute(QUOTABLE_ID_ATTR),
+    rect,
+  }
 }
 
 /**

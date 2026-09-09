@@ -21,6 +21,7 @@ import { primarySponsorDisplay } from '../utils/sponsorLabels'
 import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
 import { useSharedQuote } from '../hooks/useSharedQuote'
 import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
+import { BillChatSection, type BillChatSectionHandle } from './BillChatSection'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
@@ -147,7 +148,9 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
   const [sharingQuote, setSharingQuote] = useState(false)
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [chatSelection, setChatSelection] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
+  const chatRef = useRef<BillChatSectionHandle>(null)
   const { selection, clear: clearSelection } = useTextSelectionMenu(detailRef, {
     enabled: !shareOpen,
   })
@@ -219,8 +222,24 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
   const handleShareQuote = async (current: TextSelection) => {
     setSharingQuote(true)
     try {
+      const bill = formatBillQueryParam(item.bill)
+      if (current.source === 'answer') {
+        const answer = current.sourceId ? chatRef.current?.getAnswer(current.sourceId) : undefined
+        if (!answer?.sig) {
+          setSelectionStatus('Sharing chat answers is unavailable')
+          return
+        }
+        const { quote } = await createBillQuote({
+          bill,
+          text: current.text,
+          answer: { text: answer.text, sig: answer.sig },
+        })
+        clearSelection()
+        openShareSheet(quote)
+        return
+      }
       const { quote } = await createBillQuote({
-        bill: formatBillQueryParam(item.bill),
+        bill,
         text: current.text,
       })
       clearSelection()
@@ -229,6 +248,18 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
       setSelectionStatus(shareQuoteErrorCopy(error))
     } finally {
       setSharingQuote(false)
+    }
+  }
+
+  const handleSharePassage = async (text: string) => {
+    try {
+      const { quote } = await createBillQuote({
+        bill: formatBillQueryParam(item.bill),
+        text,
+      })
+      openShareSheet(quote)
+    } catch (error) {
+      setToast(error instanceof ApiError ? error.message : shareQuoteErrorCopy(error))
     }
   }
 
@@ -289,6 +320,16 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         />
       </section>
 
+      <BillChatSection
+        ref={chatRef}
+        item={item}
+        pendingSelection={chatSelection}
+        onClearSelection={() => setChatSelection(null)}
+        onSharePassage={(text) => {
+          void handleSharePassage(text)
+        }}
+      />
+
       <footer className="feed-row-detail-footer">
         <a
           href={sourceUrl}
@@ -321,6 +362,10 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         busy={sharingQuote}
         onShareQuote={(current) => {
           void handleShareQuote(current)
+        }}
+        onAsk={(sel) => {
+          setChatSelection(sel.text)
+          clearSelection()
         }}
         onCopy={(current) => {
           void handleCopySelection(current)
