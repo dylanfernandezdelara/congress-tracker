@@ -1,6 +1,8 @@
 import type { Env } from "../config";
 import {
   BILL_TEXT_MAX_BYTES,
+  BILL_TEXT_SECTION_MAX_CHARS,
+  BILL_TEXT_SECTIONS_MAX_PER_BILL,
   TEXT_CHANGES_MAX_STORED_PROVISIONS,
   USER_AGENT,
 } from "../constants";
@@ -64,6 +66,115 @@ export function parseBillSections(xml: string): BillSection[] {
     out.push({ label, heading });
   }
   return out;
+}
+
+/** One top-level section with its full plain-text body (chat grounding evidence). */
+export interface BillSectionBody {
+  /** `1.`, `303A.` — empty when the print omits `<enum>`. */
+  label: string;
+  /** Plain-text heading — empty when the print omits `<header>`. */
+  heading: string;
+  /** Section text without markup, whitespace collapsed; excludes enum/header. */
+  body: string;
+}
+
+const XML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: "\u00a0",
+};
+
+function decodeXmlEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, entity: string) => {
+    if (entity[0] === "#") {
+      const code =
+        entity[1]?.toLowerCase() === "x"
+          ? Number.parseInt(entity.slice(2), 16)
+          : Number.parseInt(entity.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : whole;
+    }
+    return XML_ENTITIES[entity.toLowerCase()] ?? whole;
+  });
+}
+
+/** Markup → readable text: tags become spaces so adjacent blocks never fuse. */
+export function xmlToPlainText(fragment: string): string {
+  return decodeXmlEntities(
+    fragment
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<[^>]*>/g, " ")
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Top-level `<section>` elements with their full text, in document order.
+ *
+ * Unlike `parseBillSections` this keeps sections without a header and includes
+ * everything inside the section (subsections, quoted blocks, tables) as one
+ * plain-text body. Sections nested inside a `<quoted-block>` are *not* split
+ * out — they are part of the enclosing section's text, which is what a reader
+ * quoting "Sec. 3" expects. Bodies longer than `maxBodyChars` are truncated
+ * with an ellipsis; more than `maxSections` sections are dropped from the tail.
+ */
+export function parseBillSectionBodies(
+  xml: string,
+  options: { maxSections?: number; maxBodyChars?: number } = {}
+): BillSectionBody[] {
+  const maxSections = options.maxSections ?? BILL_TEXT_SECTIONS_MAX_PER_BILL;
+  const maxBodyChars = options.maxBodyChars ?? BILL_TEXT_SECTION_MAX_CHARS;
+  const out: BillSectionBody[] = [];
+  const tagPattern = /<(\/?)section\b[^>]*>/g;
+  let depth = 0;
+  let openIndex = -1;
+
+  for (const match of xml.matchAll(tagPattern)) {
+    const isClose = match[1] === "/";
+    if (!isClose) {
+      if (depth === 0) openIndex = match.index + match[0].length;
+      depth += 1;
+      continue;
+    }
+    if (depth === 0) continue;
+    depth -= 1;
+    if (depth !== 0 || openIndex < 0) continue;
+
+    const inner = xml.slice(openIndex, match.index);
+    openIndex = -1;
+    const section = sectionBodyFromInner(inner, maxBodyChars);
+    if (!section) continue;
+    out.push(section);
+    if (out.length >= maxSections) break;
+  }
+  return out;
+}
+
+function sectionBodyFromInner(inner: string, maxBodyChars: number): BillSectionBody | null {
+  const enumMatch = /^\s*<enum>([\s\S]*?)<\/enum>/.exec(inner);
+  let rest = inner;
+  let label = "";
+  if (enumMatch) {
+    label = xmlToPlainText(enumMatch[1]!);
+    rest = rest.slice(enumMatch[0].length);
+  }
+  const headerMatch = /^\s*<header>([\s\S]*?)<\/header>/.exec(rest);
+  let heading = "";
+  if (headerMatch) {
+    heading = xmlToPlainText(headerMatch[1]!);
+    rest = rest.slice(headerMatch[0].length);
+  }
+  let body = xmlToPlainText(rest);
+  if (!body && !heading) return null;
+  if (body.length > maxBodyChars) {
+    body = `${body.slice(0, maxBodyChars - 1).replace(/\s+\S*$/, "")}…`;
+  }
+  return { label, heading, body };
 }
 
 /** Normalized section number — trailing punctuation and case vary between prints. */
@@ -237,6 +348,29 @@ export async function fetchBillTextChangesSource(
     summaryVersion: selectSummaryBasisVersion(versions, summaryDate),
     latestVersion: versions.length > 0 ? versions[versions.length - 1]! : null,
   };
+}
+
+/** Newest published XML text version for a bill, or null when none exists yet. */
+export async function fetchLatestBillTextVersion(
+  env: Env,
+  bill: BillRef
+): Promise<BillTextVersion | null> {
+  const base = `https://api.congress.gov/v3/bill/${bill.congress}/${billPathSegment(bill.type)}/${bill.number}`;
+  const textRes = await fetchJson<BillTextResponse>(
+    `${base}/text?format=json&limit=250&api_key=${env.CONGRESS_API_KEY}`
+  );
+  const versions = usableTextVersions(textRes.textVersions ?? []);
+  return versions.length > 0 ? versions[versions.length - 1]! : null;
+}
+
+/**
+ * Download one print and return its section bodies. Null when the document is
+ * over `BILL_TEXT_MAX_BYTES` (same guard as the text-changes diff).
+ */
+export async function fetchBillSectionBodies(url: string): Promise<BillSectionBody[] | null> {
+  const xml = await fetchBillTextXml(url);
+  if (xml === null) return null;
+  return parseBillSectionBodies(xml);
 }
 
 /**

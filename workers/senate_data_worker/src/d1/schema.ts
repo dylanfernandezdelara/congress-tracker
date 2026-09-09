@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -294,6 +294,29 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_bill_quotes_bill
     ON bill_quotes (congress, bill_type, number)`,
+  // Full bill text for grounded chat: one document row per bill (which print
+  // is stored, when it was probed) and its top-level sections as plain text.
+  `CREATE TABLE IF NOT EXISTS bill_text_documents (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  text_version TEXT,
+  text_version_date TEXT,
+  section_count INTEGER NOT NULL DEFAULT 0,
+  checked_at TEXT NOT NULL,
+  fetched_at TEXT,
+  PRIMARY KEY (congress, bill_type, bill_number)
+)`,
+  `CREATE TABLE IF NOT EXISTS bill_text_sections (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  bill_number INTEGER NOT NULL,
+  ordinal INTEGER NOT NULL,
+  label TEXT NOT NULL,
+  heading TEXT NOT NULL,
+  body TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, bill_number, ordinal)
+)`,
 ];
 
 /**

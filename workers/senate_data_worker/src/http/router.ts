@@ -62,6 +62,7 @@ import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
 import { buildCommitteesLeaderboard } from "../storage/committee-leaderboard";
 import { runProcessBackfillPipeline } from "../pipeline/run-process-backfill";
+import { runBillTextBackfillPipeline } from "../pipeline/run-bill-text-backfill";
 import { refreshBillProcessQueue } from "../pipeline/refresh-bill-process";
 import type {
   CommitteesLeaderboardResponse,
@@ -470,6 +471,7 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
     runExecutivePostsPipeline(env, { trigger: "admin" }),
   "/__pipeline/run/process-backfill": ({ env }) => runProcessBackfillPipeline(env),
   "/__pipeline/run/process-refresh": ({ env }) => refreshBillProcessQueue(env),
+  "/__pipeline/run/bill-text-backfill": ({ env }) => runBillTextBackfillPipeline(env),
 };
 
 const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
