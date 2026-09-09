@@ -43,6 +43,8 @@ export default defineConfig({
       '/feed': { target: workerOrigin, changeOrigin: true },
       '/stats': { target: workerOrigin, changeOrigin: true },
       '/health': { target: workerOrigin, changeOrigin: true },
+      '/share': { target: workerOrigin, changeOrigin: true },
+      '/og': { target: workerOrigin, changeOrigin: true },
       '/debug': {
         target: workerOrigin,
         changeOrigin: true,
