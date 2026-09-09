@@ -8,7 +8,7 @@ import {
 import { verifyAnswerSignature } from "../chat/answer-signature";
 import type { EvidenceChunk } from "../chat/bill-chat-evidence";
 import type { DigestRow } from "../d1/digests";
-import { chatModelRoute, handleBillChat } from "./bill-chat";
+import { CHAT_FALLBACK_MODELS, CHAT_REASONING, chatModelRoute, handleBillChat } from "./bill-chat";
 import { buildJsonResponse } from "./responses";
 import { createMockEnv } from "./test-fixtures";
 
@@ -318,7 +318,7 @@ describe("POST /chat/bill", () => {
     expect(chunks.some((c) => c.type === "data-answer")).toBe(false);
   });
 
-  it("routes the resolved model with the free router as an OpenRouter fallback", async () => {
+  it("routes the resolved model ahead of the curated free fallbacks with low-effort excluded reasoning", async () => {
     const env = createMockEnv();
     const streamText = vi.fn(async () => {
       async function* one() {
@@ -339,9 +339,10 @@ describe("POST /chat/bill", () => {
       },
     });
     const call = (streamText.mock.calls as unknown[][])[0]?.[0] as {
-      providerOptions: { openrouter: { models: string[] } };
+      providerOptions: { openrouter: { models: string[]; reasoning: unknown } };
     };
-    expect(call.providerOptions.openrouter.models).toEqual(["vendor/model:free", "openrouter/free"]);
-    expect(chatModelRoute("openrouter/free")).toEqual(["openrouter/free"]);
+    expect(call.providerOptions.openrouter.models).toEqual(["vendor/model:free", ...CHAT_FALLBACK_MODELS]);
+    expect(call.providerOptions.openrouter.reasoning).toEqual(CHAT_REASONING);
+    expect(chatModelRoute(CHAT_FALLBACK_MODELS[0]!)).toEqual([...CHAT_FALLBACK_MODELS]);
   });
 });

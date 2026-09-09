@@ -19,7 +19,7 @@ import {
   CHAT_DAILY_PER_CLIENT_CAP,
 } from "../constants";
 import { reserveChatUsage, utcChatDay } from "../d1/chat-usage";
-import { resolveOpenRouterModel } from "../synthesis/model";
+import { FALLBACK_FREE_OPENROUTER_MODEL, resolveOpenRouterModel } from "../synthesis/model";
 import { loadBillEvidence, selectEvidence } from "../chat/bill-chat-evidence";
 import {
   applySelection,
@@ -47,16 +47,30 @@ export type BillChatDeps = {
   now?: () => Date;
 };
 
-/** Free-tier router OpenRouter falls back to when the primary free model is overloaded. */
-const OPENROUTER_FREE_ROUTER = "openrouter/free";
+/**
+ * Curated free fallbacks for the OpenRouter `models` list. The intelligence-index
+ * pick can be gated (403 "agentic harnesses only") or overloaded, and the generic
+ * `openrouter/free` router is a lottery (content-safety classifiers, models that
+ * spend the whole budget on reasoning), so fall back to models that answer this
+ * prompt shape reliably with reasoning turned down.
+ */
+export const CHAT_FALLBACK_MODELS: readonly string[] = [
+  FALLBACK_FREE_OPENROUTER_MODEL,
+  "nvidia/nemotron-3-super-120b-a12b:free",
+];
+
+export function chatModelRoute(modelId: string): string[] {
+  return [...new Set([modelId, ...CHAT_FALLBACK_MODELS])];
+}
 
 /**
- * OpenRouter `models` fallback list: free providers 503 under load, so route
- * to the free router when the resolved model fails before producing output.
+ * Low-effort, excluded reasoning: reasoning tokens count against
+ * `maxOutputTokens`, and some free endpoints refuse `enabled: false`.
  */
-export function chatModelRoute(modelId: string): string[] {
-  return modelId === OPENROUTER_FREE_ROUTER ? [modelId] : [modelId, OPENROUTER_FREE_ROUTER];
-}
+export const CHAT_REASONING = { effort: "low", exclude: true } as const;
+
+/** Room for a 180-word answer plus two or three verbatim passages after low-effort reasoning. */
+export const CHAT_MAX_OUTPUT_TOKENS = 1200;
 
 function errorResponse(
   json: JsonFn,
@@ -227,11 +241,13 @@ export async function handleBillChat(params: {
             system,
             messages: modelMessages,
             temperature: 0.2,
-            maxOutputTokens: 700,
+            maxOutputTokens: CHAT_MAX_OUTPUT_TOKENS,
             onError: ({ error }: { error: unknown }) => {
               streamError = error;
             },
-            providerOptions: { openrouter: { models: chatModelRoute(modelId) } },
+            providerOptions: {
+              openrouter: { models: chatModelRoute(modelId), reasoning: CHAT_REASONING },
+            },
           })
         );
         await writeBillChatStream({

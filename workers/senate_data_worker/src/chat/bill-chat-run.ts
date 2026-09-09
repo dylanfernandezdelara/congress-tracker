@@ -37,7 +37,9 @@ export type BillChatStreamText = (options: {
    * into an `error` part instead of signing an empty answer.
    */
   onError: (event: { error: unknown }) => void;
-  providerOptions?: { openrouter: { models: string[] } };
+  providerOptions?: {
+    openrouter: { models: string[]; reasoning?: { effort: "low"; exclude: boolean } };
+  };
 }) =>
   | { textStream: AsyncIterable<string> }
   | Promise<{ textStream: AsyncIterable<string> }>;
@@ -145,6 +147,7 @@ export function buildBillChatSystemPrompt(params: {
     `- If the evidence does not address the question, reply exactly with a short refusal beginning "${BILL_CHAT_REFUSAL_PREFIX}" and no quotes.`,
     "- Be concise (no more than 180 words of prose).",
     "- Do not use markdown headings.",
+    "- Reply with the final answer only: no planning, reasoning, or notes about these rules.",
   ].join("\n");
 }
 
