@@ -2,8 +2,8 @@ import {
   OG_CARD_SITE_LABEL,
   ogCardBarSegments,
   ogCardLegend,
+  ogCardSegmentColor,
   ogCardStatusChipLabel,
-  type OgCardBarSegment,
   type OgCardModel,
 } from '@congress-tracker/shared/og-card'
 
@@ -11,14 +11,10 @@ type OgCardPreviewProps = {
   model: OgCardModel
 }
 
-function segmentClass(segment: OgCardBarSegment): string {
-  return `og-card-bar-seg og-card-bar-seg--${segment.side} og-card-bar-seg--${segment.party.toLowerCase()}`
-}
-
 /**
  * HTML twin of the worker's 1200×630 share PNG (`/og/bill/:id.png`). Sized with
  * container-query units so it scales with the sheet while keeping the PNG's
- * proportions; colors are fixed (the card is always light, like the image).
+ * proportions; colors come from `OG_CARD_COLORS`, the same palette the PNG uses.
  */
 export function OgCardPreview({ model }: OgCardPreviewProps) {
   const segments = model.tally ? ogCardBarSegments(model.tally) : []
@@ -54,8 +50,10 @@ export function OgCardPreview({ model }: OgCardPreviewProps) {
                   {segments.map((segment, index) => (
                     <span
                       key={`${segment.side}-${segment.party}-${index}`}
-                      className={segmentClass(segment)}
-                      style={{ flexGrow: segment.count }}
+                      className="og-card-bar-seg"
+                      data-side={segment.side}
+                      data-party={segment.party}
+                      style={{ flexGrow: segment.count, background: ogCardSegmentColor(segment) }}
                     />
                   ))}
                 </div>

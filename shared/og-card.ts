@@ -3,7 +3,8 @@
  * The worker renders it to PNG (`/og/bill/:id.png`); the web share sheet renders
  * an HTML twin so the preview matches what crawlers fetch.
  */
-import { formatBillDocket, formatBillQueryParam } from './bill-id'
+import { formatBillDocket, formatBillQueryParam, trimDisplayTitle } from './bill-id'
+import { proceduralHeadline } from './procedural-titles'
 import type { RollPartySplit } from './stats-api-types'
 import { BILL_QUOTE_QUERY_PARAM } from './share-api-types'
 
@@ -197,6 +198,86 @@ export function ogCardStatusChipLabel(statusLine: string): string {
 
 export function ogCardDocket(bill: { congress: number; type: string; number: number }): string {
   return formatBillDocket(bill.type, bill.number, bill.congress)
+}
+
+/**
+ * Colors shared by the PNG renderer and the HTML preview so the two cards stay
+ * pixel-comparable. Fixed light palette: link cards ignore the site theme.
+ */
+type OgCardPartyPalette = Record<OgCardBarSegment['party'], string>
+
+export const OG_CARD_COLORS: {
+  ink: string
+  muted: string
+  faint: string
+  quoteMark: string
+  chipBorder: string
+  background: string
+  yea: OgCardPartyPalette
+  nay: OgCardPartyPalette
+} = {
+  ink: '#111827',
+  muted: '#6b7280',
+  faint: '#9ca3af',
+  quoteMark: '#d1d5db',
+  chipBorder: '#e5e7eb',
+  background: '#ffffff',
+  yea: { D: '#2563eb', R: '#dc2626', I: '#7c3aed', Other: '#374151' },
+  nay: { D: '#bfdbfe', R: '#fecaca', I: '#ddd6fe', Other: '#d1d5db' },
+}
+
+export function ogCardSegmentColor(segment: OgCardBarSegment): string {
+  return segment.side === 'yea' ? OG_CARD_COLORS.yea[segment.party] : OG_CARD_COLORS.nay[segment.party]
+}
+
+export type OgCardAssembleInput = {
+  bill: { congress: number; type: string; number: number }
+  /** Digest headline when the bill has one. */
+  digestHeadline: string | null | undefined
+  /** Official bill title; fallback headline source. */
+  officialTitle: string | null | undefined
+  /** Verbatim shared quote; becomes the main text when present. */
+  quote: string | null | undefined
+  /** Newest passage vote on the bill, if any. */
+  latestVote: OgCardStatusVote | null
+  /** Per-party splits for `latestVote`; empty when not ingested. */
+  partySplits: RollPartySplit[]
+  becameLawDate: string | null | undefined
+  vetoedDate: string | null | undefined
+}
+
+/**
+ * Single card-assembly contract: the worker feeds it D1 rows, the web feeds it
+ * feed items, and both produce the identical model (headline fallback order,
+ * truncation, status copy, tally shape).
+ */
+export function assembleOgCardModel(input: OgCardAssembleInput): OgCardModel {
+  const digestHeadline = input.digestHeadline?.trim() || null
+  const officialTitle = input.officialTitle?.trim() || null
+  const headlineSource =
+    (digestHeadline ? trimDisplayTitle(digestHeadline) : null) ||
+    (officialTitle ? proceduralHeadline(officialTitle) || trimDisplayTitle(officialTitle) : null) ||
+    ogCardDocket(input.bill)
+  const vote = input.latestVote
+  const tally: OgCardTally | null = vote
+    ? {
+        chamber: vote.chamber === 'Senate' ? 'Senate' : 'House',
+        yeas: vote.yeas,
+        nays: vote.nays,
+        party_splits: input.partySplits,
+      }
+    : null
+  return {
+    docket: ogCardDocket(input.bill),
+    headline: truncateForCard(headlineSource, OG_CARD_HEADLINE_MAX_CHARS),
+    quote: input.quote ? truncateForCard(input.quote, OG_CARD_QUOTE_MAX_CHARS) : null,
+    status_line: buildStatusLine({
+      latestVote: vote,
+      becameLawDate: input.becameLawDate ?? null,
+      vetoedDate: input.vetoedDate ?? null,
+    }),
+    tally,
+  }
 }
 
 /**
