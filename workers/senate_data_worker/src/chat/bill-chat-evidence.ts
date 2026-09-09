@@ -144,29 +144,38 @@ function sectionOrdinal(chunk: EvidenceChunk): number {
   return match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
 }
 
+function termFrequencies(text: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const token of tokens(text)) counts.set(token, (counts.get(token) ?? 0) + 1);
+  return counts;
+}
+
+/**
+ * Pick the evidence blocks that go into the system prompt: the digest and CRS
+ * summary always, then bill-text sections ranked by a small tf/df score against
+ * the question (and selected passage) until `maxChars` is spent. Sections are
+ * tokenized once each; a bill can have hundreds on a public endpoint.
+ */
 export function selectEvidence(
   chunks: EvidenceChunk[],
   query: string,
   options: { maxChars: number } = { maxChars: BILL_CHAT_EVIDENCE_MAX_CHARS }
-): { chunks: EvidenceChunk[]; truncated: boolean; hasBillText: boolean } {
+): EvidenceChunk[] {
   const always = chunks.filter((chunk) => chunk.source === "digest" || chunk.source === "crs");
   const sections = chunks.filter((chunk) => chunk.source === "bill_text");
-  const queryTokens = tokens(query);
+  const queryTokens = [...new Set(tokens(query))];
 
+  const bags = sections.map((chunk) => termFrequencies(`${chunk.section_label} ${chunk.text}`));
   const df = new Map<string, number>();
-  for (const token of new Set(queryTokens)) {
-    let count = 0;
-    for (const chunk of sections) {
-      if (tokens(chunk.text).includes(token)) count += 1;
-    }
-    df.set(token, count);
+  for (const token of queryTokens) {
+    df.set(token, bags.reduce((n, bag) => n + (bag.has(token) ? 1 : 0), 0));
   }
 
-  const scored = sections.map((chunk) => {
-    const bag = tokens(`${chunk.section_label} ${chunk.text}`);
+  const scored = sections.map((chunk, index) => {
+    const bag = bags[index]!;
     let score = 0;
     for (const token of queryTokens) {
-      const tf = bag.reduce((n, t) => n + (t === token ? 1 : 0), 0);
+      const tf = bag.get(token) ?? 0;
       if (tf === 0) continue;
       score += tf / (1 + (df.get(token) ?? 0));
     }
@@ -181,26 +190,14 @@ export function selectEvidence(
         .map((row) => row.chunk)
     : [...sections].sort((a, b) => sectionOrdinal(a) - sectionOrdinal(b));
 
-  const selected: EvidenceChunk[] = [];
-  let used = 0;
-  for (const chunk of always) {
-    selected.push(chunk);
-    used += chunk.text.length;
-  }
-  let truncated = false;
+  const selected: EvidenceChunk[] = [...always];
+  let used = always.reduce((n, chunk) => n + chunk.text.length, 0);
   for (const chunk of ranked) {
-    if (used + chunk.text.length > options.maxChars) {
-      truncated = true;
-      break;
-    }
+    if (used + chunk.text.length > options.maxChars) break;
     selected.push(chunk);
     used += chunk.text.length;
   }
-  return {
-    chunks: selected,
-    truncated,
-    hasBillText: selected.some((chunk) => chunk.source === "bill_text"),
-  };
+  return selected;
 }
 
 export async function loadBillEvidence(
@@ -225,14 +222,29 @@ function sliceDisplayQuote(chunkText: string, cleanedQuote: string): string | nu
   return chunkText.slice(idx, idx + cleanedQuote.length);
 }
 
+/**
+ * Locate the evidence chunk a quoted passage was copied from. The model's
+ * `section` attribute is a hint, not a gate: the chunk with that label is tried
+ * first so a passage that appears in several blocks (digest and bill text often
+ * overlap) is attributed to the block the model cited, and the remaining chunks
+ * are still searched when the label is missing or mistyped.
+ */
 export function findChunkForQuote(
   chunks: EvidenceChunk[],
-  quoteText: string
+  quoteText: string,
+  section: string | null = null
 ): { chunk: EvidenceChunk; displayText: string } | null {
   const cleaned = cleanQuoteText(quoteText);
   const needle = normalizeForQuoteMatch(cleaned);
   if (!needle) return null;
-  for (const chunk of chunks) {
+  const hinted = section ? normalizeForQuoteMatch(section) : "";
+  const ordered = hinted
+    ? [
+        ...chunks.filter((chunk) => normalizeForQuoteMatch(chunk.section_label) === hinted),
+        ...chunks.filter((chunk) => normalizeForQuoteMatch(chunk.section_label) !== hinted),
+      ]
+    : chunks;
+  for (const chunk of ordered) {
     if (!normalizeForQuoteMatch(chunk.text).includes(needle)) continue;
     return { chunk, displayText: sliceDisplayQuote(chunk.text, cleaned) ?? cleaned };
   }

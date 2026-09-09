@@ -1,5 +1,7 @@
 import {
+  BILL_CHAT_GENERIC_ERROR_TEXT,
   BILL_CHAT_MAX_SELECTION_CHARS,
+  BILL_CHAT_STREAM_ERROR_TEXT,
   type BillChatEvidenceSource,
 } from '@congress-tracker/shared/chat-api-types'
 import { BILL_QUOTE_MAX_CHARS } from '@congress-tracker/shared/share-api-types'
@@ -37,8 +39,14 @@ export function selectionChipLabel(text: string): string {
   return truncateAtWordBoundary(text, SELECTION_CHIP_CHARS)
 }
 
+/**
+ * Copy for the chat error alert. `useChat` reports three shapes: a mid-stream
+ * `error` part (its `errorText` becomes `error.message` verbatim), a non-2xx
+ * JSON body (`{ error, message }` from the worker), or a raw transport failure.
+ */
 export function parseChatErrorMessage(error: Error | undefined): string | null {
   if (!error) return null
+  if (error.message === BILL_CHAT_STREAM_ERROR_TEXT) return BILL_CHAT_STREAM_ERROR_TEXT
   try {
     const parsed: unknown = JSON.parse(error.message)
     if (
@@ -52,7 +60,7 @@ export function parseChatErrorMessage(error: Error | undefined): string | null {
   } catch {
     // Non-JSON transport errors use the generic copy.
   }
-  return 'Chat is unavailable right now.'
+  return BILL_CHAT_GENERIC_ERROR_TEXT
 }
 
 export function evidenceSourceLabel(source: BillChatEvidenceSource): string {

@@ -5,6 +5,7 @@ import { buildBillQuoteId } from "../d1/bill-quotes";
 import type { DigestRow } from "../d1/digests";
 import { buildJsonResponse } from "./responses";
 import {
+  BILL_QUOTES_PER_BILL_CAP,
   buildBillQuoteShareUrl,
   handleCreateBillQuote,
   handleGetBillQuote,
@@ -47,6 +48,14 @@ function shareDb(
         },
         first: async () => {
           if (sql.includes("FROM bill_digests")) return digest;
+          if (sql.includes("COUNT(*)") && sql.includes("bill_quotes")) {
+            const [congress, billType, number] = state.args;
+            let total = 0;
+            for (const row of quotes.values()) {
+              if (row.congress === congress && row.bill_type === billType && row.number === number) total += 1;
+            }
+            return { total };
+          }
           if (sql.includes("FROM bill_quotes")) return quotes.get(String(state.args[0])) ?? null;
           if (sql.includes("FROM bill_text_documents")) {
             return sections.length > 0 ? { fetched_at: "2026-09-01T00:00:00.000Z" } : null;
@@ -101,7 +110,7 @@ describe("POST /share/quote", () => {
     expect(body.quote.id).toBe(expectedId);
     expect(body.quote.source).toBe("digest");
     expect(body.quote.text).toBe(text);
-    expect(body.url).toBe(`https://trackcongress.org/?bill=119-hr-4795&quote=${expectedId}`);
+    expect(body.url).toBe(`https://worker.example.com/?bill=119-hr-4795&quote=${expectedId}`);
     expect(quotes.size).toBe(1);
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
@@ -201,10 +210,10 @@ describe("POST /share/quote", () => {
     expect(await response.json()).toMatchObject({ error: "unsupported_source" });
   });
 
-  it("stores a signed chat-answer quote and rejects a bad signature", async () => {
+  it("stores a signed chat-answer quote, rejects a bad signature, and refuses cross-bill replay", async () => {
     const secret = "share-test-hmac";
     const answerText = "The bill speeds energy permits across states in this package.";
-    const sig = await signAnswer(secret, answerText);
+    const sig = await signAnswer(secret, { bill: "119-hr-4795", text: answerText });
     const env = createMockEnv({ DB: shareDb().db, CHAT_HMAC_SECRET: secret });
     const ok = await handleCreateBillQuote({
       request: post({
@@ -241,6 +250,20 @@ describe("POST /share/quote", () => {
     });
     expect(missing.status).toBe(422);
     expect(await missing.json()).toMatchObject({ error: "quote_not_in_bill" });
+
+    // The MAC binds the bill: a signature minted while chatting about H.R. 4795
+    // cannot store the same prose as a quote on another bill.
+    const otherBill = await handleCreateBillQuote({
+      request: post({
+        bill: "119-s-2",
+        text: "speeds energy permits",
+        answer: { text: answerText, sig },
+      }),
+      env: env as never,
+      json,
+    });
+    expect(otherBill.status).toBe(400);
+    expect(await otherBill.json()).toMatchObject({ error: "bad_request" });
   });
 
   it("verifies against stored bill-text sections after digest and CRS", async () => {
@@ -257,7 +280,39 @@ describe("POST /share/quote", () => {
     expect(await response.json()).toMatchObject({ quote: { source: "bill_text" } });
   });
 
-  it("returns 429 when the rate limiter denies and fails open when it throws", async () => {
+  it("returns the canonical production URL on production hosts", async () => {
+    const env = createMockEnv({ DB: shareDb().db });
+    const request = new Request("https://trackcongress.org/share/quote", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bill: "119-hr-4795", text: "Caps environmental review at two years" }),
+    });
+    const response = await handleCreateBillQuote({ request, env: env as never, json });
+    const body = (await response.json()) as { url: string };
+    expect(body.url).toMatch(/^https:\/\/trackcongress\.org\/\?bill=119-hr-4795&quote=[0-9a-f]{16}$/);
+  });
+
+  it("caps distinct quotes per bill but still returns an existing quote at the cap", async () => {
+    const { db, quotes } = shareDb();
+    const env = createMockEnv({ DB: db });
+    const text = "Caps environmental review at two years";
+    const first = await handleCreateBillQuote({ request: post({ bill: "119-hr-4795", text }), env: env as never, json });
+    expect(first.status).toBe(200);
+    for (let i = 0; i < BILL_QUOTES_PER_BILL_CAP; i += 1) {
+      quotes.set(`fill${i}`, { id: `fill${i}`, congress: 119, bill_type: "HR", number: 4795, text: `q${i}`, source: "digest", created_at: "" });
+    }
+    const capped = await handleCreateBillQuote({
+      request: post({ bill: "119-hr-4795", text: "accelerate transmission siting" }),
+      env: env as never,
+      json,
+    });
+    expect(capped.status).toBe(429);
+    expect(await capped.json()).toMatchObject({ error: "rate_limited" });
+    const again = await handleCreateBillQuote({ request: post({ bill: "119-hr-4795", text }), env: env as never, json });
+    expect(again.status).toBe(200);
+  });
+
+  it("returns 429 when the rate limiter denies and 503 (fail closed) when it throws", async () => {
     const denied = { limit: vi.fn(async () => ({ success: false })) };
     const env = createMockEnv({ DB: shareDb().db, SHARE_RATE_LIMITER: denied });
     const response = await handleCreateBillQuote({
@@ -270,14 +325,17 @@ describe("POST /share/quote", () => {
     expect(response.status).toBe(429);
     expect(denied.limit).toHaveBeenCalledWith({ key: "203.0.113.9" });
 
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const broken = { limit: vi.fn(async () => { throw new Error("binding down"); }) };
-    const openEnv = createMockEnv({ DB: shareDb().db, SHARE_RATE_LIMITER: broken });
-    const ok = await handleCreateBillQuote({
+    const closedEnv = createMockEnv({ DB: shareDb().db, SHARE_RATE_LIMITER: broken });
+    const closed = await handleCreateBillQuote({
       request: post({ bill: "119-hr-4795", text: "Speeds energy permits and “smart” grid" }),
-      env: openEnv as never,
+      env: closedEnv as never,
       json,
     });
-    expect(ok.status).toBe(200);
+    expect(closed.status).toBe(503);
+    expect(await closed.json()).toMatchObject({ error: "rate_limited" });
+    warnSpy.mockRestore();
   });
 
   it("keys the limiter by connecting IP with an anonymous fallback", () => {
@@ -288,12 +346,14 @@ describe("POST /share/quote", () => {
   it("builds sources in digest-then-CRS-then-bill-text precedence", () => {
     expect(quoteSourcesForBill(DIGEST).map((s) => s.source)).toEqual(["digest", "crs"]);
     expect(
-      quoteSourcesForBill(DIGEST, [{ body: "Section body for verification." }]).map((s) => s.source)
+      quoteSourcesForBill(DIGEST, [
+        { ordinal: 0, label: "Sec. 1.", heading: "Short title", body: "Section body for verification." },
+      ]).map((s) => s.source)
     ).toEqual(["digest", "crs", "bill_text"]);
     expect(quoteSourcesForBill({ digest_json: null, raw_summary_text: null })).toEqual([]);
-    expect(buildBillQuoteShareUrl({ congress: 119, type: "S", number: 2 }, "abcd1234abcd1234")).toBe(
-      "https://trackcongress.org/?bill=119-s-2&quote=abcd1234abcd1234"
-    );
+    expect(
+      buildBillQuoteShareUrl({ congress: 119, type: "S", number: 2 }, "abcd1234abcd1234", "https://trackcongress.org")
+    ).toBe("https://trackcongress.org/?bill=119-s-2&quote=abcd1234abcd1234");
   });
 });
 

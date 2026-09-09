@@ -32,7 +32,10 @@ export interface CreateBillQuoteRequest {
 
 export interface CreateBillQuoteResponse {
   quote: BillQuote
-  /** Canonical production share URL: `https://trackcongress.org/?bill=…&quote=…`. */
+  /**
+   * Share URL on the origin that serves it: `https://trackcongress.org/?bill=…&quote=…`
+   * in production, the request's own origin on preview / local hosts.
+   */
   url: string
 }
 

@@ -294,35 +294,11 @@
     overflow: hidden;
   }
 
+  /* Segment colors come inline from OG_CARD_COLORS (shared/og-card.ts). */
   .og-card-bar-seg {
     flex-basis: 0;
     flex-shrink: 1;
     height: 100%;
-  }
-
-  .og-card-bar-seg--yea.og-card-bar-seg--d {
-    background: #2563eb;
-  }
-  .og-card-bar-seg--yea.og-card-bar-seg--r {
-    background: #dc2626;
-  }
-  .og-card-bar-seg--yea.og-card-bar-seg--i {
-    background: #7c3aed;
-  }
-  .og-card-bar-seg--yea.og-card-bar-seg--other {
-    background: #374151;
-  }
-  .og-card-bar-seg--nay.og-card-bar-seg--d {
-    background: #bfdbfe;
-  }
-  .og-card-bar-seg--nay.og-card-bar-seg--r {
-    background: #fecaca;
-  }
-  .og-card-bar-seg--nay.og-card-bar-seg--i {
-    background: #ddd6fe;
-  }
-  .og-card-bar-seg--nay.og-card-bar-seg--other {
-    background: #d1d5db;
   }
 
   .og-card-legend {

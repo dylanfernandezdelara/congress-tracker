@@ -9,7 +9,6 @@ import {
   BILL_CHAT_MAX_QUESTION_CHARS,
   BILL_CHAT_MAX_SELECTION_CHARS,
   type BillChatError,
-  type BillChatErrorResponse,
 } from "../../../../shared/chat-api-types";
 import { parseBillQueryParam } from "../../../../shared/bill-id";
 import type { Env } from "../config";
@@ -28,16 +27,22 @@ import {
   latestUserQuestion,
   writeBillChatStream,
   BILL_CHAT_ERROR_TEXT,
+  isAbortError,
   type BillChatStreamText,
   type BillChatUIMessage,
 } from "../chat/bill-chat-run";
-import { rateLimitKey } from "./share-quote";
+import {
+  NO_STORE_HEADERS,
+  publicErrorResponse,
+  rateLimitKey,
+  readJsonBody,
+  type JsonFn,
+} from "./public-json";
 import { cacheNoStore } from "./responses";
 
-type JsonFn = (body: unknown, init?: ResponseInit) => Response;
-
+/** Message history plus selection; generous, but a chat turn is never 64KB. */
 const MAX_BODY_BYTES = 64 * 1024;
-const NO_STORE = { "Cache-Control": cacheNoStore };
+const NO_STORE = NO_STORE_HEADERS;
 
 export type BillChatDeps = {
   streamText?: BillChatStreamText;
@@ -75,27 +80,7 @@ export const CHAT_REASONING = { effort: "low", exclude: true } as const;
  */
 export const CHAT_MAX_OUTPUT_TOKENS = 1600;
 
-function errorResponse(
-  json: JsonFn,
-  status: number,
-  error: BillChatError,
-  message: string
-): Response {
-  const body: BillChatErrorResponse = { error, message };
-  return json(body, { status, headers: NO_STORE });
-}
-
-async function readJsonBody(request: Request): Promise<unknown | null> {
-  const declared = Number.parseInt(request.headers.get("content-length") ?? "", 10);
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
-  try {
-    const text = await request.text();
-    if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return null;
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-}
+const errorResponse = publicErrorResponse<BillChatError>;
 
 function parseChatRequest(body: unknown): {
   messages: unknown[];
@@ -148,7 +133,7 @@ export async function handleBillChat(params: {
     }
   }
 
-  const parsed = parseChatRequest(await readJsonBody(request));
+  const parsed = parseChatRequest(await readJsonBody(request, MAX_BODY_BYTES));
   if (!parsed) {
     return errorResponse(
       json,
@@ -220,14 +205,14 @@ export async function handleBillChat(params: {
   }
 
   const query = [parsed.selection, question].filter(Boolean).join(" ");
-  const selected = selectEvidence(loaded.chunks, query, {
+  const evidence = selectEvidence(loaded.chunks, query, {
     maxChars: BILL_CHAT_EVIDENCE_MAX_CHARS,
   });
   const history = applySelection(filterChatHistory(parsed.messages), parsed.selection);
   const system = buildBillChatSystemPrompt({
     title: loaded.title,
     bill,
-    chunks: selected.chunks,
+    chunks: evidence,
   });
   const modelMessages = await convertToModelMessages(history);
   const modelId = await (deps.resolveModel ?? resolveOpenRouterModel)(env);
@@ -248,6 +233,9 @@ export async function handleBillChat(params: {
             onError: ({ error }: { error: unknown }) => {
               streamError = error;
             },
+            // Stop in the UI aborts the fetch; without this the OpenRouter run
+            // would keep generating (and billing) for a reader who left.
+            abortSignal: request.signal,
             providerOptions: {
               openrouter: { models: chatModelRoute(modelId), reasoning: CHAT_REASONING },
             },
@@ -256,7 +244,8 @@ export async function handleBillChat(params: {
         await writeBillChatStream({
           writer,
           textStream: result.textStream,
-          chunks: selected.chunks,
+          bill,
+          chunks: evidence,
           hmacSecret: env.CHAT_HMAC_SECRET,
           streamError: () => streamError,
         });
@@ -267,6 +256,7 @@ export async function handleBillChat(params: {
           console.warn(JSON.stringify({ event: "bill_chat_truncated", model: modelId, maxOutputTokens: CHAT_MAX_OUTPUT_TOKENS }));
         }
       } catch (err: unknown) {
+        if (isAbortError(err)) return;
         console.error("bill_chat_llm_error", err);
         writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });
       }

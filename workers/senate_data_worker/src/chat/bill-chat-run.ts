@@ -6,6 +6,7 @@ import {
 } from "ai";
 import {
   BILL_CHAT_MAX_HISTORY_TURNS,
+  BILL_CHAT_STREAM_ERROR_TEXT,
   BILL_CHAT_UNVERIFIED_PLACEHOLDER,
   type BillChatAnswerData,
   type BillChatQuoteData,
@@ -37,6 +38,8 @@ export type BillChatStreamText = (options: {
    * into an `error` part instead of signing an empty answer.
    */
   onError: (event: { error: unknown }) => void;
+  /** The request's signal: when the reader hits Stop, the model call stops too. */
+  abortSignal?: AbortSignal;
   providerOptions?: {
     openrouter: { models: string[]; reasoning?: { effort: "low"; exclude: boolean } };
   };
@@ -48,7 +51,7 @@ export type BillChatStreamResult = {
   finishReason?: PromiseLike<string>;
 };
 
-export const BILL_CHAT_ERROR_TEXT = "The chat service failed. Try again shortly.";
+export const BILL_CHAT_ERROR_TEXT = BILL_CHAT_STREAM_ERROR_TEXT;
 
 export type BillChatStreamWriter = UIMessageStreamWriter<BillChatUIMessage>;
 
@@ -56,6 +59,11 @@ type TextPart = { type: "text"; text: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/** The reader pressed Stop (request aborted): nothing to report, nobody listening. */
+export function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
 }
 
 export function extractTextParts(parts: unknown): TextPart[] {
@@ -158,12 +166,15 @@ export function buildBillChatSystemPrompt(params: {
 export async function writeBillChatStream(params: {
   writer: BillChatStreamWriter;
   textStream: AsyncIterable<string>;
+  /** Bill the answer is about; bound into the answer signature. */
+  bill: { congress: number; type: string; number: number };
   chunks: EvidenceChunk[];
   hmacSecret?: string;
   /** Provider error captured via `streamText`'s `onError`; read after the text stream ends. */
   streamError?: () => unknown;
 }): Promise<void> {
   const { writer, chunks, hmacSecret } = params;
+  const billParam = formatBillQueryParam(params.bill);
   let textOpen = false;
   let textSeq = 0;
   let textId = "text-0";
@@ -192,7 +203,7 @@ export async function writeBillChatStream(params: {
       prose += event.text;
       return;
     }
-    const found = findChunkForQuote(chunks, event.text);
+    const found = findChunkForQuote(chunks, event.text, event.section);
     if (!found) {
       unverified += 1;
       ensureText();
@@ -228,8 +239,9 @@ export async function writeBillChatStream(params: {
     }
     parser.flush();
   } catch (err: unknown) {
-    console.error("bill_chat_llm_error", err);
     endText();
+    if (isAbortError(err)) return;
+    console.error("bill_chat_llm_error", err);
     writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });
     return;
   }
@@ -247,7 +259,7 @@ export async function writeBillChatStream(params: {
     writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });
     return;
   }
-  const sig = hmacSecret ? await signAnswer(hmacSecret, text) : null;
+  const sig = hmacSecret ? await signAnswer(hmacSecret, { bill: billParam, text }) : null;
   const answer: BillChatAnswerData = {
     text,
     sig,

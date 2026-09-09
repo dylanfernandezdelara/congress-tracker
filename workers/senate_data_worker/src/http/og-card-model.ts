@@ -1,19 +1,15 @@
-import { trimDisplayTitle } from "../../../../shared/bill-id";
 import {
-  OG_CARD_HEADLINE_MAX_CHARS,
-  OG_CARD_QUOTE_MAX_CHARS,
+  assembleOgCardModel,
   buildStatusLine,
   formatCardDate,
-  ogCardDocket,
-  truncateForCard,
   type OgCardModel,
   type OgCardTally,
 } from "../../../../shared/og-card";
+import { quoteBelongsToBill } from "../../../../shared/quote-verification";
 import { parseShareDigestJson } from "../../../../shared/share-copy";
-import { proceduralHeadline } from "../../../../shared/procedural-titles";
+import type { BillQuote } from "../../../../shared/share-api-types";
 import { computeRollDefectors } from "../analytics/defectors";
 import type { Env } from "../config";
-import type { BillQuote } from "../../../../shared/share-api-types";
 import { getBillQuote } from "../d1/bill-quotes";
 import { getDigest, type DigestRow } from "../d1/digests";
 import { getLifecycle } from "../d1/lifecycle";
@@ -47,23 +43,11 @@ export async function loadOgCardModel(
   if (quoteId) {
     const stored =
       preloaded.quote !== undefined ? preloaded.quote : await getBillQuote(env.DB, quoteId);
-    if (
-      !stored ||
-      stored.bill.congress !== bill.congress ||
-      stored.bill.type !== bill.type.toUpperCase() ||
-      stored.bill.number !== bill.number
-    ) {
+    if (!stored || !quoteBelongsToBill(stored, bill)) {
       return { ok: false, reason: "quote_not_found" };
     }
-    quote = truncateForCard(stored.text, OG_CARD_QUOTE_MAX_CHARS);
+    quote = stored.text;
   }
-
-  const parsed = parseShareDigestJson(digestRow.digest_json);
-  const officialTitle = digestRow.title?.trim() || null;
-  const headlineSource =
-    (parsed.headline ? trimDisplayTitle(parsed.headline) : null) ||
-    (officialTitle ? proceduralHeadline(officialTitle) || trimDisplayTitle(officialTitle) : null) ||
-    ogCardDocket(bill);
 
   const [votes, lifecycle] = await Promise.all([
     getPassageVotesForBill(env.DB, bill.congress, bill.type, bill.number),
@@ -71,13 +55,11 @@ export async function loadOgCardModel(
   ]);
   const latestVote = votes[0] ?? null;
 
-  let tally: OgCardTally | null = null;
+  let partySplits: OgCardTally["party_splits"] = [];
   if (latestVote) {
-    const chamber = latestVote.chamber === "Senate" ? "Senate" : "House";
-    let partySplits: OgCardTally["party_splits"] = [];
     try {
       const defectors = await computeRollDefectors(env.DB, {
-        chamber,
+        chamber: latestVote.chamber === "Senate" ? "Senate" : "House",
         congress: latestVote.congress,
         session: latestVote.session,
         roll_number: latestVote.roll_number,
@@ -86,21 +68,19 @@ export async function loadOgCardModel(
     } catch (err: unknown) {
       console.warn("og_card_party_splits_unavailable", err);
     }
-    tally = { chamber, yeas: latestVote.yeas, nays: latestVote.nays, party_splits: partySplits };
   }
 
   return {
     ok: true,
-    model: {
-      docket: ogCardDocket(bill),
-      headline: truncateForCard(headlineSource, OG_CARD_HEADLINE_MAX_CHARS),
+    model: assembleOgCardModel({
+      bill,
+      digestHeadline: parseShareDigestJson(digestRow.digest_json).headline,
+      officialTitle: digestRow.title,
       quote,
-      status_line: buildStatusLine({
-        latestVote,
-        becameLawDate: lifecycle?.became_law_date ?? null,
-        vetoedDate: lifecycle?.vetoed_date ?? null,
-      }),
-      tally,
-    },
+      latestVote,
+      partySplits,
+      becameLawDate: lifecycle?.became_law_date,
+      vetoedDate: lifecycle?.vetoed_date,
+    }),
   };
 }

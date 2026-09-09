@@ -1,10 +1,11 @@
+import { textContainsQuote } from '@congress-tracker/shared/quote-verification'
+
 import {
   FEED_SUMMARY_PENDING,
   getFeedSummarySectionsModel,
   type FeedSummaryContent,
   type FeedSummaryPrimary,
 } from '../utils/feedRowLabels'
-import { textContainsQuote } from '../utils/quoteHighlight'
 import { QuoteHighlightText } from './QuoteHighlightText'
 
 export type SummaryHighlight = {

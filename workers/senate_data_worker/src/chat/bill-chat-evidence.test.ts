@@ -40,8 +40,11 @@ describe("buildEvidenceChunks", () => {
       { id: "bill_text-0", source: "bill_text", label: "Sec. 3. Definitions" },
     ]);
     expect(chunks[2]!.text).toBe("A widget is a device.");
-    expect(chunks[0]!.text).toContain("House passes a permitting package");
-    expect(chunks[0]!.text).toContain("NEPA");
+    // Digest evidence is the selectable summary text (what it does + key
+    // points), the same fields `POST /share/quote` verifies against.
+    expect(chunks[0]!.text).toContain("Speeds energy permits across states.");
+    expect(chunks[0]!.text).toContain("Caps environmental review at two years");
+    expect(chunks[0]!.text).not.toContain("House passes a permitting package");
   });
 
   it("skips empty sources and formats labels without a heading", () => {
@@ -81,11 +84,14 @@ describe("selectEvidence", () => {
 
   it("always includes digest and CRS first, then ranks matching sections", () => {
     const selected = selectEvidence(all, "the term widget means", { maxChars: 24_000 });
-    expect(selected.chunks[0]!.source).toBe("digest");
-    expect(selected.chunks[1]!.source).toBe("crs");
-    expect(selected.hasBillText).toBe(true);
-    expect(selected.truncated).toBe(false);
-    const labels = selected.chunks.filter((c) => c.source === "bill_text").map((c) => c.section_label);
+    expect(selected[0]!.source).toBe("digest");
+    expect(selected[1]!.source).toBe("crs");
+    // "widgets" in the findings section does not match the query token "widget".
+    expect(selected.filter((c) => c.source === "bill_text").map((c) => c.id)).toEqual([
+      "bill_text-2",
+      "bill_text-0",
+    ]);
+    const labels = selected.filter((c) => c.source === "bill_text").map((c) => c.section_label);
     expect(labels[0]).toBe("Sec. 3. Definitions");
   });
 
@@ -95,14 +101,13 @@ describe("selectEvidence", () => {
     const selected = selectEvidence(all, "the term widget means", {
       maxChars: used + all.find((c) => c.id === "bill_text-2")!.text.length,
     });
-    expect(selected.truncated).toBe(true);
-    expect(selected.chunks.filter((c) => c.source === "bill_text")).toHaveLength(1);
-    expect(selected.chunks.at(-1)!.section_label).toBe("Sec. 3. Definitions");
+    expect(selected.filter((c) => c.source === "bill_text")).toHaveLength(1);
+    expect(selected.at(-1)!.section_label).toBe("Sec. 3. Definitions");
   });
 
   it("falls back to ordinal order when no section matches", () => {
     const selected = selectEvidence(all, "zzzz unrelated query", { maxChars: 24_000 });
-    expect(selected.chunks.filter((c) => c.source === "bill_text").map((c) => c.id)).toEqual([
+    expect(selected.filter((c) => c.source === "bill_text").map((c) => c.id)).toEqual([
       "bill_text-0",
       "bill_text-1",
       "bill_text-2",
@@ -131,6 +136,25 @@ describe("findChunkForQuote", () => {
 
   it("returns null when the quote is not in any chunk", () => {
     expect(findChunkForQuote(chunks, "this sentence is not in the bill")).toBeNull();
+  });
+
+  it("prefers the chunk named by the section hint when the passage appears in several", () => {
+    const shared = "The Secretary shall publish an annual report.";
+    const overlapping = buildEvidenceChunks({
+      digest: { ...digest, what_it_does: shared },
+      crsSummary: shared,
+      sections: [section(4, "5.", "Reporting", shared)],
+    });
+    expect(findChunkForQuote(overlapping, shared)?.chunk.id).toBe("digest");
+    expect(findChunkForQuote(overlapping, shared, "Sec. 5. Reporting")?.chunk.id).toBe("bill_text-4");
+    expect(findChunkForQuote(overlapping, shared, "sec. 5. reporting")?.chunk.id).toBe("bill_text-4");
+    expect(findChunkForQuote(overlapping, shared, "CRS summary")?.chunk.id).toBe("crs");
+  });
+
+  it("still searches every chunk when the section hint names a block the passage is not in", () => {
+    const found = findChunkForQuote(chunks, "speeds energy permits", "Sec. 3. Definitions");
+    expect(found?.chunk.source).toBe("digest");
+    expect(findChunkForQuote(chunks, "speeds energy permits", "Sec. 99. Nonexistent")?.chunk.id).toBe("digest");
   });
 });
 

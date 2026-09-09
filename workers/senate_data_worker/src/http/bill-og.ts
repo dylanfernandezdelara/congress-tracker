@@ -8,6 +8,7 @@ import {
   parseShareDigestJson,
 } from "../../../../shared/share-copy";
 import { ogCardImagePath, ogCardVersion, type OgCardModel } from "../../../../shared/og-card";
+import { quoteBelongsToBill } from "../../../../shared/quote-verification";
 import { BILL_QUOTE_QUERY_PARAM, type BillQuote } from "../../../../shared/share-api-types";
 import type { Env } from "../config";
 import { getBillQuote, isBillQuoteId } from "../d1/bill-quotes";
@@ -28,11 +29,11 @@ export type ShareMetaFields = {
 };
 
 /**
- * Origin that serves the dynamic card PNG. Production custom domains use the
- * canonical origin; preview / workers.dev / local keep their own host so a
- * crawler hitting a preview URL fetches the preview's image.
+ * Origin for share URLs and the dynamic card PNG. Production custom domains use
+ * the canonical origin; preview / workers.dev / local keep their own host so a
+ * preview share link resolves and a crawler fetches the preview's image.
  */
-export function shareImageOrigin(url: URL): string {
+export function publicShareOrigin(url: URL): string {
   return isProductionPipelineHost(url.hostname) ? PRODUCTION_ORIGIN : url.origin;
 }
 
@@ -230,12 +231,7 @@ export async function resolveSharedQuote(
   const raw = url.searchParams.get(BILL_QUOTE_QUERY_PARAM)?.trim().toLowerCase();
   if (!isBillQuoteId(raw)) return null;
   const quote = await getBillQuote(env.DB, raw);
-  if (!quote) return null;
-  const matches =
-    quote.bill.congress === bill.congress &&
-    quote.bill.type === bill.type.toUpperCase() &&
-    quote.bill.number === bill.number;
-  return matches ? quote : null;
+  return quote && quoteBelongsToBill(quote, bill) ? quote : null;
 }
 
 function billOgHeaders(shell: Response): Headers {
@@ -289,7 +285,7 @@ export async function tryRewriteBillOg(
       quote,
     });
     if (card.ok) {
-      fields = { ...fields, ...ogImageFields(parsed, card.model, quote, shareImageOrigin(url)) };
+      fields = { ...fields, ...ogImageFields(parsed, card.model, quote, publicShareOrigin(url)) };
     }
   } catch (err: unknown) {
     console.warn("bill_og_card_model_failed", err);

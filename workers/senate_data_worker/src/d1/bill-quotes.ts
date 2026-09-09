@@ -102,6 +102,22 @@ export async function insertBillQuote(
   );
 }
 
+/** Distinct stored quotes for one bill; bounds table growth per bill. */
+export async function countBillQuotes(
+  db: D1Database,
+  bill: { congress: number; type: string; number: number }
+): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS total FROM bill_quotes
+       WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
+    )
+    .bind(bill.congress, normalizeBillType(bill.type), bill.number)
+    .first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
 export async function getBillQuote(db: D1Database, id: string): Promise<BillQuote | null> {
   await ensureSchema(db);
   const row = await db

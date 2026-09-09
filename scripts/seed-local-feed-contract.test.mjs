@@ -51,6 +51,8 @@ test('SEED_PRINT_SQL emits schema and idempotent inserts without running wrangle
   assert.match(sql, /INSERT OR REPLACE INTO bill_text_documents/)
   assert.match(sql, /INSERT OR REPLACE INTO bill_text_sections/)
   assert.match(sql, /'Sec\. 2\.', 'Permitting deadlines'/)
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS chat_usage/)
+  assert.match(sql, /DELETE FROM chat_usage;/)
   assert.match(sql, /INSERT INTO bill_committee_events/)
   assert.match(sql, /INSERT INTO bill_floor_events/)
   assert.match(sql, /INSERT OR REPLACE INTO committee_roster/)

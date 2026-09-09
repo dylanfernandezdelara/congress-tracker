@@ -31,9 +31,11 @@ export interface BillChatQuoteData {
 
 /**
  * Payload of the trailing `data-answer` part. `sig` is HMAC-SHA256 (hex) over
- * `text` using `CHAT_HMAC_SECRET`; `POST /share/quote` verifies it before
- * accepting a quote with `source: "answer"`. `sig` is null when the secret is
- * not configured, in which case answers cannot be shared as quotes.
+ * the bill param plus `text` using `CHAT_HMAC_SECRET` (see
+ * `workers/.../chat/answer-signature.ts`); `POST /share/quote` verifies it for
+ * the bill in the request before accepting a quote with `source: "answer"`, so
+ * a signature cannot be replayed onto another bill. `sig` is null when the
+ * secret is not configured, in which case answers cannot be shared as quotes.
  */
 export interface BillChatAnswerData {
   /** Final prose of the assistant turn (verified passages excluded). */
@@ -65,6 +67,17 @@ export const BILL_CHAT_MAX_SELECTION_CHARS = 600
 
 /** Placeholder rendered in place of a passage the model quoted but the evidence does not contain. */
 export const BILL_CHAT_UNVERIFIED_PLACEHOLDER = '(could not verify this passage)'
+
+/**
+ * `errorText` of the UI-message-stream `error` part the worker writes when the
+ * model call fails mid-stream (provider error, thrown stream, blank answer).
+ * `useChat` surfaces it verbatim as `error.message`, so the web recognizes
+ * this exact string and shows it instead of the generic transport copy.
+ */
+export const BILL_CHAT_STREAM_ERROR_TEXT = 'The chat service failed. Try again shortly.'
+
+/** Shown when the transport failed before the worker could say anything (network, non-JSON body). */
+export const BILL_CHAT_GENERIC_ERROR_TEXT = 'Chat is unavailable right now.'
 
 /** Names of custom data parts; the web narrows `part.type === \`data-${name}\``. */
 export const BILL_CHAT_DATA_PART_QUOTE = 'quote'

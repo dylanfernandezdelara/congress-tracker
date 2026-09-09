@@ -245,7 +245,14 @@ describe("POST /chat/bill", () => {
     expect(data.text).toContain("The Act says");
     expect(data.text).toContain(BILL_CHAT_UNVERIFIED_PLACEHOLDER);
     expect(data.text).not.toContain("A widget is a device.");
-    await expect(verifyAnswerSignature(secret, data.text, data.sig)).resolves.toBe(true);
+    await expect(
+      verifyAnswerSignature(secret, { bill: "119-hr-1", text: data.text }, data.sig)
+    ).resolves.toBe(true);
+    // The signature is bound to the bill the reader asked about, so it cannot
+    // mint an `answer` quote on a different bill via POST /share/quote.
+    await expect(
+      verifyAnswerSignature(secret, { bill: "119-s-2", text: data.text }, data.sig)
+    ).resolves.toBe(false);
     expect(chunks.some((c) => c.type === "text-start")).toBe(true);
     expect(chunks.some((c) => c.type === "text-end")).toBe(true);
   });
@@ -340,9 +347,37 @@ describe("POST /chat/bill", () => {
     });
     const call = (streamText.mock.calls as unknown[][])[0]?.[0] as {
       providerOptions: { openrouter: { models: string[]; reasoning: unknown } };
+      abortSignal?: AbortSignal;
     };
     expect(call.providerOptions.openrouter.models).toEqual(["vendor/model:free", ...CHAT_FALLBACK_MODELS]);
     expect(call.providerOptions.openrouter.reasoning).toEqual(CHAT_REASONING);
     expect(chatModelRoute(CHAT_FALLBACK_MODELS[0]!)).toEqual([...CHAT_FALLBACK_MODELS]);
+    // Stop in the UI aborts the request; the model call must observe that signal.
+    expect(call.abortSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("ends the stream quietly when the reader aborts instead of writing an error part", async () => {
+    const env = createMockEnv({ CHAT_HMAC_SECRET: "unit-test-hmac" });
+    const response = await handleBillChat({
+      request: post({ bill: "119-hr-1", messages: [userMessage("What is a widget?")] }),
+      env: env as never,
+      json,
+      corsHeaders,
+      deps: {
+        loadEvidence: async () => ({ title: "Widget Act", digestRow: DIGEST_ROW, chunks: [SECTION] }),
+        reserveUsage: okUsage(),
+        resolveModel,
+        streamText: async () => {
+          async function* aborted() {
+            yield "Partial ";
+            throw new DOMException("The operation was aborted.", "AbortError");
+          }
+          return { textStream: aborted() };
+        },
+      },
+    });
+    const chunks = await readSse(response);
+    expect(chunks.some((c) => c.type === "error")).toBe(false);
+    expect(chunks.some((c) => c.type === "data-answer")).toBe(false);
   });
 });

@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { BillChatAnswerData, BillChatQuoteData } from '@congress-tracker/shared/chat-api-types'
+import {
+  BILL_CHAT_STREAM_ERROR_TEXT,
+  type BillChatAnswerData,
+  type BillChatQuoteData,
+} from '@congress-tracker/shared/chat-api-types'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import type { BillChatMessage } from './BillChatSection'
@@ -154,6 +158,17 @@ describe('BillChatSection', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Chat is unavailable right now.')
+  })
+
+  it("shows the worker's stream error copy when the model call fails mid-stream", () => {
+    // The UI-message-stream `error` part surfaces as a plain Error whose
+    // message is the worker's errorText, not a JSON body.
+    chatMock.error = new Error(BILL_CHAT_STREAM_ERROR_TEXT)
+
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('The chat service failed. Try again shortly.')
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
   it('renders a pending selection chip and sends it on submit, then clears it', () => {
