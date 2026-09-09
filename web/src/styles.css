@@ -8,6 +8,7 @@
 @import './styles/home.css';
 @import './styles/feed-filters.css';
 @import './styles/sheet.css';
+@import './styles/quote-share.css';
 
 @tailwind base;
 @tailwind components;

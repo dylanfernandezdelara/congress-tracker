@@ -3,11 +3,18 @@ import {
   formatShortBillId,
   parseBillQueryParam,
 } from '@congress-tracker/shared/bill-id'
+import { BILL_QUOTE_QUERY_PARAM, type BillQuote } from '@congress-tracker/shared/share-api-types'
 import { PRODUCTION_ORIGIN, buildShareCopy } from '@congress-tracker/shared/share-copy'
 
 import type { FeedItem } from '../api/types'
 
-export { formatBillQueryParam, parseBillQueryParam, PRODUCTION_ORIGIN }
+export { BILL_QUOTE_QUERY_PARAM, formatBillQueryParam, parseBillQueryParam, PRODUCTION_ORIGIN }
+
+/** Drop the bill deep-link params together; a quote id is meaningless without its bill. */
+export function clearBillDeepLinkParams(params: URLSearchParams): void {
+  params.delete('bill')
+  params.delete(BILL_QUOTE_QUERY_PARAM)
+}
 
 export function feedRowKey(item: FeedItem): string {
   return `${item.bill.congress}-${item.bill.type}-${item.bill.number}`
@@ -28,8 +35,13 @@ export function billShareOrigin(href = window.location.href): string {
   return url.origin
 }
 
-export function buildBillShareUrl(item: Pick<FeedItem, 'bill'>, href = window.location.href): string {
-  return `${billShareOrigin(href)}/?bill=${formatBillQueryParam(item.bill)}`
+export function buildBillShareUrl(
+  item: Pick<FeedItem, 'bill'>,
+  href = window.location.href,
+  quoteId?: string | null,
+): string {
+  const base = `${billShareOrigin(href)}/?bill=${formatBillQueryParam(item.bill)}`
+  return quoteId ? `${base}&${BILL_QUOTE_QUERY_PARAM}=${encodeURIComponent(quoteId)}` : base
 }
 
 /** `q=` value that matches feed bill-id search (`119-hr-1` → `H.R. 1`). */
@@ -65,6 +77,29 @@ export function buildBillSharePayload(
     text,
     url,
     clipboardText: `${title}\n\n${text}\n\n${url}`,
+  }
+}
+
+/** Share payload for a stored quote: the quote is the body, the link carries its id. */
+export function buildBillQuoteSharePayload(
+  item: Pick<FeedItem, 'bill' | 'digest' | 'raw_summary_text'>,
+  quote: Pick<BillQuote, 'id' | 'text'>,
+  href = window.location.href,
+): BillSharePayload {
+  const { title } = buildShareCopy({
+    headline: item.digest?.headline,
+    whatItDoes: item.digest?.what_it_does,
+    crsSummary: item.raw_summary_text,
+    title: item.bill.title,
+    bill: item.bill,
+  })
+  const url = buildBillShareUrl(item, href, quote.id)
+  const text = `“${quote.text}”`
+  return {
+    title,
+    text,
+    url,
+    clipboardText: `${text}\n\n${title}\n\n${url}`,
   }
 }
 

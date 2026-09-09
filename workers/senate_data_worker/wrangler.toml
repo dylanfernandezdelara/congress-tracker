@@ -67,6 +67,13 @@ database_name = "congress-tracker"
 database_id = "e21fa2df-1c7d-4a83-8044-f28803c80a26"
 preview_database_id = "da5dbbc1-8111-4aa9-a49e-5e03022e44cc"
 
+# Per-IP burst cap for public POST /share/quote (Workers Rate Limiting binding).
+# Daily caps are not needed here: quotes are idempotent (content-derived ids).
+[[ratelimits]]
+name = "SHARE_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
 # Deployed preview URLs (`wrangler versions upload --env preview`) bind the isolated
 # preview D1 below. `preview_database_id` applies to local `wrangler dev` only.
 # Clear routes so preview never inherits production custom domains.
@@ -88,6 +95,11 @@ CF_ZONE_ID = ""
 binding = "DB"
 database_name = "congress-tracker-preview"
 database_id = "da5dbbc1-8111-4aa9-a49e-5e03022e44cc"
+
+[[env.preview.ratelimits]]
+name = "SHARE_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
 
 # Note: previews are served via per-version "preview URLs" (see preview_urls
 # above). Upload with `--env preview` so bindings use congress-tracker-preview.

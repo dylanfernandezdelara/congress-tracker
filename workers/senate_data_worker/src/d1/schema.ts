@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -280,6 +280,20 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_process_refresh_queue_pending
     ON process_refresh_queue (last_hydrated_at, queued_at)`,
+  // Reader-shared quotes: id is content-derived (see d1/bill-quotes.ts) so the
+  // same selection on the same bill is idempotent; `source` records which bill
+  // text the quote was verified against.
+  `CREATE TABLE IF NOT EXISTS bill_quotes (
+  id TEXT PRIMARY KEY,
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  source TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_bill_quotes_bill
+    ON bill_quotes (congress, bill_type, number)`,
 ];
 
 /**

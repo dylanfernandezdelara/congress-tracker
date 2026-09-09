@@ -51,6 +51,8 @@ import { normalizeFeedSearchQuery } from "../d1/feed-search";
 import { searchMembers } from "../d1/members";
 import { listPolicyAreas } from "../d1/policy-areas";
 import { tryRewriteBillOg } from "./bill-og";
+import { handleOgImageRoute, parseOgImagePath } from "./og-image";
+import { handleCreateBillQuote, handleGetBillQuote } from "./share-quote";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
@@ -727,6 +729,7 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       "member search unavailable"
     );
   },
+  "/share/quote.json": ({ env, url, json }) => handleGetBillQuote({ env, url, json }),
   "/stats/policy-areas.json": ({ env, json }) =>
     handleStatsJson(
       json,
@@ -869,6 +872,11 @@ export async function handlePublicFetch(
     return handlePipelineRoute(request, env, json, () => pipeline(routeCtx), ctx);
   }
 
+  // Public write: reader-shared quotes (verified verbatim; idempotent ids).
+  if (pathname === "/share/quote") {
+    return handleCreateBillQuote({ request, env, json });
+  }
+
   if (request.method !== "GET") {
     return json({ error: "method_not_allowed", message: "Only GET requests are allowed" }, { status: 405 });
   }
@@ -876,6 +884,10 @@ export async function handlePublicFetch(
   const getRoute = GET_ROUTES[pathname];
   if (getRoute) {
     return getRoute(routeCtx);
+  }
+
+  if (parseOgImagePath(pathname)) {
+    return handleOgImageRoute({ request, env, url, ctx });
   }
 
   if (env.ASSETS && !isApiPath(pathname)) {
@@ -887,7 +899,16 @@ export async function handlePublicFetch(
   return notFound(pathname);
 }
 
-const API_PATH_PREFIXES = ["/health", "/debug/", "/feed/", "/stats/", "/executive/", "/__pipeline/"];
+const API_PATH_PREFIXES = [
+  "/health",
+  "/debug/",
+  "/feed/",
+  "/stats/",
+  "/executive/",
+  "/share/",
+  "/og/",
+  "/__pipeline/",
+];
 
 function isApiPath(pathname: string): boolean {
   return API_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));

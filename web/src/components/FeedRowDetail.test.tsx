@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
@@ -11,9 +11,12 @@ import { FeedRowDetail } from './FeedRowDetail'
 vi.mock('../api/client', () => ({
   fetchVoteDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
+  fetchBillQuote: vi.fn(),
+  createBillQuote: vi.fn(),
 }))
 
-import { fetchMemberProfile, fetchVoteDefectors } from '../api/client'
+import { createBillQuote, fetchBillQuote, fetchMemberProfile, fetchVoteDefectors } from '../api/client'
+import { ApiError } from '../api/fetchJson'
 import { renderWithMemberProfile } from '../test/memberProfileHarness'
 
 beforeEach(() => {
@@ -484,5 +487,182 @@ describe('FeedRowDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
     })
+  })
+
+  it('renders the share-card preview for the whole bill', async () => {
+    render(<FeedRowDetail item={makeFeedItem()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
+    const card = within(dialog).getByTestId('og-card-preview')
+    expect(card).toHaveTextContent('S. 2 · 119th Congress')
+    expect(card).toHaveTextContent('Plain headline for readers')
+    expect(card).toHaveTextContent('Passed Senate 52–47 · Jun 5, 2026')
+    expect(card).toHaveTextContent('Yea 52')
+  })
+
+  it('marks summary text as quotable regions', () => {
+    render(<FeedRowDetail item={makeFeedItem()} />)
+    const quotable = document.querySelectorAll('[data-quotable]')
+    expect(quotable.length).toBeGreaterThanOrEqual(3)
+    expect(screen.getByText('It does something important in plain language.')).toHaveAttribute(
+      'data-quotable',
+      'digest',
+    )
+  })
+
+  it('highlights a shared quote in place, scrolls to it, and toasts', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    vi.mocked(fetchBillQuote).mockResolvedValue({
+      quote: {
+        id: 'abc123abc123abc1',
+        bill: { congress: 119, type: 'S', number: 2 },
+        text: 'something important',
+        source: 'digest',
+        created_at: '2026-09-01T00:00:00.000Z',
+      },
+    })
+
+    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc1" />)
+
+    const mark = await screen.findByText('something important', { selector: 'mark' })
+    expect(mark).toHaveClass('quote-highlight', 'quote-highlight--landing')
+    expect(await screen.findByRole('status')).toHaveTextContent('Shared quote')
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalled()
+    })
+    expect(screen.queryByLabelText('Shared quote')).not.toBeInTheDocument()
+  })
+
+  it('opens the CRS disclosure when the shared quote lives there', async () => {
+    vi.mocked(fetchBillQuote).mockResolvedValue({
+      quote: {
+        id: 'abc123abc123abc2',
+        bill: { congress: 119, type: 'S', number: 2 },
+        text: 'Official CRS summary text.',
+        source: 'crs',
+        created_at: '2026-09-01T00:00:00.000Z',
+      },
+    })
+
+    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc2" />)
+
+    await screen.findByText('Official CRS summary text.', { selector: 'mark' })
+    expect(document.querySelector('details.feed-row-crs-details')).toHaveAttribute('open')
+  })
+
+  it('falls back to a callout when the shared quote no longer matches the summary', async () => {
+    vi.mocked(fetchBillQuote).mockResolvedValue({
+      quote: {
+        id: 'abc123abc123abc3',
+        bill: { congress: 119, type: 'S', number: 2 },
+        text: 'Text that was rewritten since sharing.',
+        source: 'digest',
+        created_at: '2026-09-01T00:00:00.000Z',
+      },
+    })
+
+    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc3" />)
+
+    const callout = await screen.findByLabelText('Shared quote')
+    expect(callout).toHaveTextContent('“Text that was rewritten since sharing.”')
+    expect(document.querySelector('mark[data-quote-highlight]')).toBeNull()
+  })
+
+  it('ignores a shared quote stored for a different bill', async () => {
+    vi.mocked(fetchBillQuote).mockResolvedValue({
+      quote: {
+        id: 'abc123abc123abc4',
+        bill: { congress: 119, type: 'HR', number: 1 },
+        text: 'something important',
+        source: 'digest',
+        created_at: '2026-09-01T00:00:00.000Z',
+      },
+    })
+
+    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc4" />)
+
+    await waitFor(() => {
+      expect(fetchBillQuote).toHaveBeenCalledWith('abc123abc123abc4')
+    })
+    expect(document.querySelector('mark[data-quote-highlight]')).toBeNull()
+    expect(screen.queryByLabelText('Shared quote')).not.toBeInTheDocument()
+  })
+
+  function selectQuotableText(text: string) {
+    const paragraph = screen.getByText(text)
+    const range = document.createRange()
+    range.selectNodeContents(paragraph)
+    ;(range as unknown as { getBoundingClientRect: () => DOMRect }).getBoundingClientRect = () =>
+      new DOMRect(100, 200, 160, 18)
+    vi.spyOn(window, 'getSelection').mockReturnValue({
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => range,
+      toString: () => text,
+      removeAllRanges: vi.fn(),
+    } as unknown as Selection)
+    fireEvent(document, new Event('selectionchange'))
+  }
+
+  it('shares a selected passage: verifies it, then opens the sheet with the quote card', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.mocked(createBillQuote).mockResolvedValue({
+      quote: {
+        id: 'feedfacefeedface',
+        bill: { congress: 119, type: 'S', number: 2 },
+        text: 'It does something important in plain language.',
+        source: 'digest',
+        created_at: '2026-09-01T00:00:00.000Z',
+      },
+      url: 'https://trackcongress.org/?bill=119-s-2&quote=feedfacefeedface',
+    })
+    render(<FeedRowDetail item={makeFeedItem()} />)
+
+    selectQuotableText('It does something important in plain language.')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+    const toolbar = await screen.findByRole('toolbar', { name: 'Selected text actions' })
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Share quote' }))
+
+    await waitFor(() => {
+      expect(createBillQuote).toHaveBeenCalledWith({
+        bill: '119-s-2',
+        text: 'It does something important in plain language.',
+      })
+    })
+    const dialog = await screen.findByRole('dialog', { name: 'Share this quote' })
+    const card = within(dialog).getByTestId('og-card-preview')
+    expect(card).toHaveTextContent('It does something important in plain language.')
+    expect(within(dialog).getByText(/quote=feedfacefeedface/)).toBeInTheDocument()
+    expect(within(dialog).getByText('“It does something important in plain language.”')).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('surfaces the API validation message when a selection cannot be shared', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.mocked(createBillQuote).mockRejectedValue(
+      new ApiError(
+        "That text is not part of this bill's summary, so it cannot be shared as a quote.",
+        422,
+        'Unprocessable Entity',
+        'quote_not_in_bill',
+      ),
+    )
+    render(<FeedRowDetail item={makeFeedItem()} />)
+
+    selectQuotableText('Point one')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+    const toolbar = await screen.findByRole('toolbar', { name: 'Selected text actions' })
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Share quote' }))
+
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent(
+      'not part of this bill\'s summary',
+    )
+    expect(screen.queryByRole('dialog', { name: 'Share this quote' })).not.toBeInTheDocument()
+    vi.useRealTimers()
   })
 })

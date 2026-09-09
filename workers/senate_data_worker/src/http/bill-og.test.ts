@@ -205,6 +205,121 @@ describe("bill OG rewrite", () => {
     expect(html).toContain('property="og:title" content="Track Congress"');
   });
 
+  it("points og:image at the dynamic card and keeps the static image when the model fails", async () => {
+    const shellFor = () =>
+      new Response(SITE_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
+    const env = createMockEnv({ ASSETS: { fetch: vi.fn(async () => shellFor()) }, DB: digestDb(digestRow()) });
+    const response = await tryRewriteBillOg(
+      new Request("https://preview-congress-tracker-api.acct.workers.dev/?bill=119-hr-4795", {
+        headers: { Accept: "text/html" },
+      }),
+      env as never
+    );
+    const html = await response!.text();
+    const image = metaContent(html, "property", "og:image")!;
+    expect(image).toMatch(
+      /^https:\/\/preview-congress-tracker-api\.acct\.workers\.dev\/og\/bill\/119-hr-4795\.png\?v=[0-9a-f]{8}$/
+    );
+    expect(metaContent(html, "name", "twitter:image")).toBe(image);
+    expect(metaContent(html, "property", "og:image:alt")).toContain("House passes a permitting package");
+
+    const failingDb = {
+      exec: vi.fn(async () => {}),
+      prepare: vi.fn((sql: string) => ({
+        bind: vi.fn().mockReturnThis(),
+        first: vi.fn(async () => (sql.includes("FROM bill_digests") ? digestRow() : null)),
+        all: vi.fn(async () => {
+          throw new Error("votes unavailable");
+        }),
+        run: vi.fn(async () => ({ success: true, meta: { duration: 0, changes: 0 } })),
+      })),
+    } as unknown as D1Database;
+    const fallback = await tryRewriteBillOg(
+      new Request("https://trackcongress.org/?bill=119-hr-4795", { headers: { Accept: "text/html" } }),
+      createMockEnv({ ASSETS: { fetch: vi.fn(async () => shellFor()) }, DB: failingDb }) as never
+    );
+    const fallbackHtml = await fallback!.text();
+    expect(metaContent(fallbackHtml, "property", "og:title")).toBe("House passes a permitting package");
+    expect(metaContent(fallbackHtml, "property", "og:image")).toBe("https://trackcongress.org/og-image.png");
+  });
+
+  it("uses the shared quote as the description and image when q= matches the bill", async () => {
+    const quote = {
+      id: "abcdefabcdefabcd",
+      congress: 119,
+      bill_type: "HR",
+      number: 4795,
+      text: "Speeds energy permits and production.",
+      source: "digest",
+      created_at: "2026-09-01T00:00:00Z",
+    };
+    const db = {
+      exec: vi.fn(async () => {}),
+      prepare: vi.fn((sql: string) => ({
+        bind: vi.fn().mockReturnThis(),
+        first: vi.fn(async () => {
+          if (sql.includes("FROM bill_digests")) return digestRow();
+          if (sql.includes("FROM bill_quotes")) return quote;
+          return null;
+        }),
+        all: vi.fn(async () => ({ results: [] })),
+        run: vi.fn(async () => ({ success: true, meta: { duration: 0, changes: 0 } })),
+      })),
+    } as unknown as D1Database;
+    const ASSETS = {
+      fetch: vi.fn(
+        async () => new Response(SITE_HTML, { headers: { "content-type": "text/html; charset=utf-8" } })
+      ),
+    };
+    const env = createMockEnv({
+      ASSETS,
+      DB: db,
+    });
+    const response = await tryRewriteBillOg(
+      new Request("https://trackcongress.org/?bill=119-hr-4795&quote=ABCDEFABCDEFABCD", {
+        headers: { Accept: "text/html" },
+      }),
+      env as never
+    );
+    const html = await response!.text();
+    expect(metaContent(html, "property", "og:description")).toBe(
+      "“Speeds energy permits and production.”"
+    );
+    expect(metaContent(html, "property", "og:url")).toBe(
+      `${PRODUCTION_ORIGIN}/?bill=119-hr-4795&amp;quote=abcdefabcdefabcd`
+    );
+    expect(metaContent(html, "property", "og:image")).toMatch(
+      /^https:\/\/trackcongress\.org\/og\/bill\/119-hr-4795\.png\?quote=abcdefabcdefabcd&amp;v=[0-9a-f]{8}$/
+    );
+    expect(metaContent(html, "property", "og:image:alt")).toContain("“Speeds energy permits and production.”");
+
+    // A quote for another bill is ignored: whole-bill meta, no q= in og:url.
+    const otherQuoteDb = {
+      ...db,
+      prepare: vi.fn((sql: string) => ({
+        bind: vi.fn().mockReturnThis(),
+        first: vi.fn(async () => {
+          if (sql.includes("FROM bill_digests")) return digestRow();
+          if (sql.includes("FROM bill_quotes")) return { ...quote, number: 1 };
+          return null;
+        }),
+        all: vi.fn(async () => ({ results: [] })),
+        run: vi.fn(async () => ({ success: true, meta: { duration: 0, changes: 0 } })),
+      })),
+    } as unknown as D1Database;
+    const ignored = await tryRewriteBillOg(
+      new Request("https://trackcongress.org/?bill=119-hr-4795&quote=abcdefabcdefabcd", {
+        headers: { Accept: "text/html" },
+      }),
+      createMockEnv({ ASSETS, DB: otherQuoteDb }) as never
+    );
+    const ignoredHtml = await ignored!.text();
+    expect(metaContent(ignoredHtml, "property", "og:description")).toBe(
+      "Speeds energy permits and production."
+    );
+    expect(metaContent(ignoredHtml, "property", "og:url")).toBe(`${PRODUCTION_ORIGIN}/?bill=119-hr-4795`);
+  });
+
   it("does not intercept non-document or non-bill requests", async () => {
     const env = createMockEnv({ ASSETS: { fetch: vi.fn() } });
     await expect(
