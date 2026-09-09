@@ -221,7 +221,7 @@ export function ogFieldsFromDigest(
   };
 }
 
-/** Stored quote for `?q=` when it exists and belongs to this bill; else null. */
+/** Stored quote for `?quote=` when it exists and belongs to this bill; else null. */
 export async function resolveSharedQuote(
   env: Env,
   url: URL,
