@@ -4,8 +4,11 @@ import {
   cleanQuoteText,
   digestQuoteSourceText,
   findQuoteSource,
+  normalizeForQuoteMatch,
   type QuoteSourceText,
 } from "../../../../shared/quote-verification";
+import { verifyAnswerSignature } from "../chat/answer-signature";
+import { getBillText } from "../d1/bill-text-sections";
 import {
   BILL_QUOTE_MAX_CHARS,
   BILL_QUOTE_MIN_CHARS,
@@ -77,17 +80,22 @@ function parseCreateRequest(body: unknown): CreateBillQuoteRequest | null {
 
 /**
  * Verification sources a reader could have selected from, in precedence order.
- * Full bill text and signed chat answers are added by later PRs.
  */
-export function quoteSourcesForBill(row: {
-  digest_json: string | null;
-  raw_summary_text: string | null;
-}): QuoteSourceText[] {
+export function quoteSourcesForBill(
+  row: {
+    digest_json: string | null;
+    raw_summary_text: string | null;
+  },
+  sections?: ReadonlyArray<{ body: string }>
+): QuoteSourceText[] {
   const sources: QuoteSourceText[] = [];
   const digest = parseStoredDigest(row.digest_json);
   const digestText = digestQuoteSourceText(digest);
   if (digestText) sources.push({ source: "digest", text: digestText });
   if (row.raw_summary_text?.trim()) sources.push({ source: "crs", text: row.raw_summary_text });
+  for (const section of sections ?? []) {
+    if (section.body.trim()) sources.push({ source: "bill_text", text: section.body });
+  }
   return sources;
 }
 
@@ -131,12 +139,19 @@ export async function handleCreateBillQuote(params: {
     return errorResponse(json, 400, "bad_request", "`bill` must look like 119-hr-1.");
   }
   if (body.answer) {
-    return errorResponse(
-      json,
-      400,
-      "unsupported_source",
-      "Sharing chat answers is not available yet."
-    );
+    const secret = env.CHAT_HMAC_SECRET;
+    if (!secret) {
+      return errorResponse(
+        json,
+        400,
+        "unsupported_source",
+        "Sharing chat answers is not available"
+      );
+    }
+    const valid = await verifyAnswerSignature(secret, body.answer.text, body.answer.sig);
+    if (!valid) {
+      return errorResponse(json, 400, "bad_request", "answer signature is invalid");
+    }
   }
 
   const text = cleanQuoteText(body.text);
@@ -162,14 +177,31 @@ export async function handleCreateBillQuote(params: {
   if (!row) {
     return errorResponse(json, 404, "bill_not_found", "That bill is not in the feed yet.");
   }
-  const source = findQuoteSource(text, quoteSourcesForBill(row));
-  if (!source) {
-    return errorResponse(
-      json,
-      422,
-      "quote_not_in_bill",
-      "That text is not part of this bill's summary, so it cannot be shared as a quote."
-    );
+
+  let source: "digest" | "crs" | "bill_text" | "answer";
+  if (body.answer) {
+    const needle = normalizeForQuoteMatch(text);
+    if (!needle || !normalizeForQuoteMatch(body.answer.text).includes(needle)) {
+      return errorResponse(
+        json,
+        422,
+        "quote_not_in_bill",
+        "That text is not part of this bill's summary, so it cannot be shared as a quote."
+      );
+    }
+    source = "answer";
+  } else {
+    const stored = await getBillText(env.DB, bill);
+    const found = findQuoteSource(text, quoteSourcesForBill(row, stored?.sections));
+    if (!found) {
+      return errorResponse(
+        json,
+        422,
+        "quote_not_in_bill",
+        "That text is not part of this bill's summary, so it cannot be shared as a quote."
+      );
+    }
+    source = found;
   }
 
   const id = await buildBillQuoteId(bill, text);

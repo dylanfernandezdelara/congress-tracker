@@ -1083,6 +1083,28 @@ describe("HTTP API", () => {
     expect(ASSETS.fetch).not.toHaveBeenCalled();
   });
 
+  it("dispatches POST /chat/bill and treats /chat/ as an API prefix", async () => {
+    const response = await handlePublicFetch(
+      new Request("https://abc-congress-tracker-api.acct.workers.dev/chat/bill", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bill: "not-a-bill", messages: [] }),
+      }),
+      createMockEnv({ DEV_OPEN_PIPELINE: undefined }) as any
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "bad_request" });
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+
+    const ASSETS = { fetch: vi.fn(async () => new Response("html")) };
+    const unknown = await handlePublicFetch(
+      new Request("https://worker.example.com/chat/nope"),
+      createMockEnv({ ASSETS }) as any
+    );
+    expect(unknown.status).toBe(404);
+    expect(ASSETS.fetch).not.toHaveBeenCalled();
+  });
+
   it("accepts public quote shares on preview hosts without admin auth", async () => {
     // No digest row in the mock DB → the handler ran (past auth) and 404s on the bill.
     const response = await handlePublicFetch(

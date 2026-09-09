@@ -16,6 +16,9 @@ ENABLE_SAMPLE_DISCLOSURES=1
 # Optional override — must be a free OpenRouter model (e.g. google/gemma-4-31b-it:free).
 # When unset, the worker picks the highest Artificial Analysis intelligence_index free model.
 # OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+# HMAC-SHA256 secret for signing bill-chat answers so POST /share/quote can
+# accept source:"answer" quotes. Leave unset locally if you do not need sharing.
+# CHAT_HMAC_SECRET=
 # PIPELINE_ADMIN_TOKEN=  # when set, POST with Authorization: Bearer <token>
 # Optional: purge trackcongress.org edge cache after local pipeline runs that
 # somehow target prod (normally unset locally; production uses wrangler secret).

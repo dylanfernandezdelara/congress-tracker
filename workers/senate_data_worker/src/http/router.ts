@@ -52,6 +52,7 @@ import { searchMembers } from "../d1/members";
 import { listPolicyAreas } from "../d1/policy-areas";
 import { tryRewriteBillOg } from "./bill-og";
 import { handleOgImageRoute, parseOgImagePath } from "./og-image";
+import { handleBillChat } from "./bill-chat";
 import { handleCreateBillQuote, handleGetBillQuote } from "./share-quote";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
@@ -879,6 +880,11 @@ export async function handlePublicFetch(
     return handleCreateBillQuote({ request, env, json });
   }
 
+  // Public write: grounded bill chat (UI message stream). Not a pipeline write.
+  if (pathname === "/chat/bill") {
+    return handleBillChat({ request, env, json, corsHeaders });
+  }
+
   if (request.method !== "GET") {
     return json({ error: "method_not_allowed", message: "Only GET requests are allowed" }, { status: 405 });
   }
@@ -908,6 +914,7 @@ const API_PATH_PREFIXES = [
   "/stats/",
   "/executive/",
   "/share/",
+  "/chat/",
   "/og/",
   "/__pipeline/",
 ];

@@ -19,6 +19,9 @@
     "wrangler": "^4.54.0"
   },
   "dependencies": {
-    "workers-og": "^0.0.27"
+    "@openrouter/ai-sdk-provider": "^3.0.0",
+    "ai": "^7.0.94",
+    "workers-og": "^0.0.27",
+    "zod": "^4.5.4"
   }
 }

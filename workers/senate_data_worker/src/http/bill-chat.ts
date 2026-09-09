@@ -1,0 +1,243 @@
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  streamText,
+} from "ai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import {
+  BILL_CHAT_MAX_QUESTION_CHARS,
+  BILL_CHAT_MAX_SELECTION_CHARS,
+  type BillChatError,
+  type BillChatErrorResponse,
+} from "../../../../shared/chat-api-types";
+import { parseBillQueryParam } from "../../../../shared/bill-id";
+import type { Env } from "../config";
+import {
+  BILL_CHAT_EVIDENCE_MAX_CHARS,
+  CHAT_DAILY_GLOBAL_CAP,
+  CHAT_DAILY_PER_CLIENT_CAP,
+} from "../constants";
+import { reserveChatUsage, utcChatDay } from "../d1/chat-usage";
+import { FALLBACK_FREE_OPENROUTER_MODEL } from "../synthesis/model";
+import { loadBillEvidence, selectEvidence } from "../chat/bill-chat-evidence";
+import {
+  applySelection,
+  buildBillChatSystemPrompt,
+  filterChatHistory,
+  latestUserQuestion,
+  writeBillChatStream,
+  type BillChatStreamText,
+  type BillChatUIMessage,
+} from "../chat/bill-chat-run";
+import { rateLimitKey } from "./share-quote";
+import { cacheNoStore } from "./responses";
+
+type JsonFn = (body: unknown, init?: ResponseInit) => Response;
+
+const MAX_BODY_BYTES = 64 * 1024;
+const NO_STORE = { "Cache-Control": cacheNoStore };
+
+export type BillChatDeps = {
+  streamText?: BillChatStreamText;
+  loadEvidence?: typeof loadBillEvidence;
+  reserveUsage?: typeof reserveChatUsage;
+  now?: () => Date;
+};
+
+function errorResponse(
+  json: JsonFn,
+  status: number,
+  error: BillChatError,
+  message: string
+): Response {
+  const body: BillChatErrorResponse = { error, message };
+  return json(body, { status, headers: NO_STORE });
+}
+
+async function readJsonBody(request: Request): Promise<unknown | null> {
+  const declared = Number.parseInt(request.headers.get("content-length") ?? "", 10);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+  try {
+    const text = await request.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return null;
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function parseChatRequest(body: unknown): {
+  messages: unknown[];
+  bill: string;
+  selection?: string;
+} | null {
+  if (!body || typeof body !== "object") return null;
+  const record = body as Record<string, unknown>;
+  if (typeof record.bill !== "string" || !Array.isArray(record.messages)) return null;
+  const parsed: { messages: unknown[]; bill: string; selection?: string } = {
+    messages: record.messages,
+    bill: record.bill,
+  };
+  if (record.selection !== undefined) {
+    if (typeof record.selection !== "string") return null;
+    parsed.selection = record.selection;
+  }
+  return parsed;
+}
+
+/**
+ * `POST /chat/bill` — public UI-message stream. Grounded answers with verified
+ * quote parts; allowed on preview hosts (not a pipeline write).
+ */
+export async function handleBillChat(params: {
+  request: Request;
+  env: Env;
+  json: JsonFn;
+  corsHeaders: HeadersInit;
+  deps?: BillChatDeps;
+}): Promise<Response> {
+  const { request, env, json, corsHeaders, deps = {} } = params;
+  if (request.method !== "POST") {
+    return json({ error: "method_not_allowed" }, { status: 405, headers: NO_STORE });
+  }
+
+  if (env.CHAT_RATE_LIMITER) {
+    try {
+      const outcome = await env.CHAT_RATE_LIMITER.limit({ key: rateLimitKey(request) });
+      if (!outcome.success) {
+        return errorResponse(
+          json,
+          429,
+          "rate_limited",
+          "Too many chat questions. Wait a minute and try again."
+        );
+      }
+    } catch (err: unknown) {
+      console.warn("chat_rate_limiter_unavailable", err);
+    }
+  }
+
+  const parsed = parseChatRequest(await readJsonBody(request));
+  if (!parsed) {
+    return errorResponse(
+      json,
+      400,
+      "bad_request",
+      "Body must be JSON with `bill` and `messages`."
+    );
+  }
+  const bill = parseBillQueryParam(parsed.bill);
+  if (!bill) {
+    return errorResponse(json, 400, "bad_request", "`bill` must look like 119-hr-1.");
+  }
+  const question = latestUserQuestion(parsed.messages);
+  if (!question) {
+    return errorResponse(
+      json,
+      400,
+      "bad_request",
+      "Send at least one user message with a non-empty text part."
+    );
+  }
+  if (question.length > BILL_CHAT_MAX_QUESTION_CHARS) {
+    return errorResponse(
+      json,
+      400,
+      "bad_request",
+      `Questions are limited to ${BILL_CHAT_MAX_QUESTION_CHARS} characters.`
+    );
+  }
+  if (parsed.selection !== undefined && parsed.selection.length > BILL_CHAT_MAX_SELECTION_CHARS) {
+    return errorResponse(
+      json,
+      400,
+      "bad_request",
+      `Selected passages are limited to ${BILL_CHAT_MAX_SELECTION_CHARS} characters.`
+    );
+  }
+  if (!env.OPENROUTER_API_KEY?.trim()) {
+    return errorResponse(
+      json,
+      503,
+      "chat_unavailable",
+      "Chat is not configured on this worker."
+    );
+  }
+
+  const loadEvidence = deps.loadEvidence ?? loadBillEvidence;
+  const loaded = await loadEvidence(env, bill);
+  if (!loaded) {
+    return errorResponse(json, 404, "bill_not_found", "That bill is not in the feed yet.");
+  }
+
+  const reserve = deps.reserveUsage ?? reserveChatUsage;
+  const usage = await reserve(env.DB, {
+    day: utcChatDay(deps.now?.() ?? new Date()),
+    clientKey: rateLimitKey(request),
+    perClientCap: CHAT_DAILY_PER_CLIENT_CAP,
+    globalCap: CHAT_DAILY_GLOBAL_CAP,
+  });
+  if (usage !== "ok") {
+    return errorResponse(
+      json,
+      429,
+      "daily_limit",
+      usage === "client_capped"
+        ? "This address has reached today's chat limit."
+        : "The site-wide chat limit for today has been reached."
+    );
+  }
+
+  const query = [parsed.selection, question].filter(Boolean).join(" ");
+  const selected = selectEvidence(loaded.chunks, query, {
+    maxChars: BILL_CHAT_EVIDENCE_MAX_CHARS,
+  });
+  const history = applySelection(filterChatHistory(parsed.messages), parsed.selection);
+  const system = buildBillChatSystemPrompt({
+    title: loaded.title,
+    bill,
+    chunks: selected.chunks,
+  });
+  const modelMessages = await convertToModelMessages(history);
+  const modelId = env.OPENROUTER_MODEL?.trim() || FALLBACK_FREE_OPENROUTER_MODEL;
+  const runStream = deps.streamText ?? streamText;
+  const openrouter = createOpenRouter({ apiKey: env.OPENROUTER_API_KEY });
+
+  const stream = createUIMessageStream<BillChatUIMessage>({
+    execute: async ({ writer }) => {
+      try {
+        const result = await Promise.resolve(
+          runStream({
+            model: openrouter(modelId),
+            system,
+            messages: modelMessages,
+            temperature: 0.2,
+            maxOutputTokens: 700,
+          })
+        );
+        await writeBillChatStream({
+          writer,
+          textStream: result.textStream,
+          chunks: selected.chunks,
+          hmacSecret: env.CHAT_HMAC_SECRET,
+        });
+      } catch (err: unknown) {
+        console.error("bill_chat_llm_error", err);
+        writer.write({
+          type: "error",
+          errorText: "The chat service failed. Try again shortly.",
+        });
+      }
+    },
+  });
+
+  return createUIMessageStreamResponse({
+    stream,
+    headers: {
+      ...corsHeaders,
+      "Cache-Control": cacheNoStore,
+      "x-vercel-ai-ui-message-stream": "v1",
+    },
+  });
+}

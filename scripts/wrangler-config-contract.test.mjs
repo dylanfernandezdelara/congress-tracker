@@ -167,6 +167,29 @@ test('public share rate limiter is bound identically in production and preview o
   assert.deepEqual(parseRateLimitBindings(rootConfigPath), parseRateLimitBindings(workerConfigPath))
 })
 
+test('public chat rate limiter is bound identically in production and preview on both configs', () => {
+  for (const configPath of [rootConfigPath, workerConfigPath]) {
+    const bindings = parseRateLimitBindings(configPath)
+    const chat = bindings.filter((binding) => binding.name === 'CHAT_RATE_LIMITER')
+    assert.deepEqual(
+      chat.map((binding) => binding.env).sort(),
+      ['preview', 'production'],
+      `${configPath} must bind CHAT_RATE_LIMITER for production and env.preview`,
+    )
+    const [first, ...rest] = chat
+    for (const binding of rest) {
+      assert.equal(binding.namespace_id, first.namespace_id)
+      assert.equal(binding.limit, first.limit)
+      assert.equal(binding.period, first.period)
+    }
+    assert.equal(first.name, 'CHAT_RATE_LIMITER')
+    assert.equal(first.namespace_id, '1002')
+    assert.equal(first.limit, 10)
+    assert.equal(first.period, 60, 'Workers rate limiting supports 10s or 60s periods')
+  }
+  assert.deepEqual(parseRateLimitBindings(rootConfigPath), parseRateLimitBindings(workerConfigPath))
+})
+
 test('Workers Logs observability is enabled at full sampling on both configs', () => {
   const root = parseWranglerConfig(rootConfigPath)
   const worker = parseWranglerConfig(workerConfigPath)

@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -316,6 +316,14 @@ export const SCHEMA_DDL = [
   heading TEXT NOT NULL,
   body TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, bill_number, ordinal)
+)`,
+  // Daily chat-turn counters: one row per UTC day + client (IP or `anonymous`),
+  // plus `client_key = '*'` for the site-wide cap.
+  `CREATE TABLE IF NOT EXISTS chat_usage (
+  day TEXT NOT NULL,
+  client_key TEXT NOT NULL,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (day, client_key)
 )`,
 ];
 
