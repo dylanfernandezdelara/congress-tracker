@@ -1,6 +1,8 @@
 import { parseBillQueryParam } from "../../../../shared/bill-id";
+import { ogCardImagePath, ogCardVersion } from "../../../../shared/og-card";
 import { BILL_QUOTE_QUERY_PARAM } from "../../../../shared/share-api-types";
 import type { Env } from "../config";
+import { isBillQuoteId } from "../d1/bill-quotes";
 import { buildOgCardHtml } from "./og-card-html";
 import { loadOgCardModel } from "./og-card-model";
 import type { OgRenderer } from "./og-render";
@@ -8,7 +10,6 @@ import type { OgRenderer } from "./og-render";
 export const OG_IMAGE_CACHE_CONTROL = "public, max-age=86400, s-maxage=604800, immutable";
 export const OG_IMAGE_FALLBACK_CACHE_CONTROL = "public, max-age=300";
 
-const QUOTE_ID_RE = /^[0-9a-f]{8,32}$/;
 const OG_PATH_RE = /^\/og\/bill\/([^/]+)\.png$/;
 
 /** 1×1 transparent PNG so crawlers never receive HTML when assets are missing. */
@@ -87,12 +88,29 @@ export function parseOgImagePath(pathname: string): string | null {
 }
 
 function parseQuoteId(raw: string | null): string | null {
-  if (!raw || !QUOTE_ID_RE.test(raw)) return null;
-  return raw;
+  const id = raw?.trim().toLowerCase() ?? "";
+  return isBillQuoteId(id) ? id : null;
+}
+
+/**
+ * Cache key built from what the card actually depends on — bill, quote id, and
+ * the server-computed content version — never from the request's own query
+ * string. Junk or attacker-varied params therefore collapse onto one cached
+ * render instead of forcing a fresh satori pass each time.
+ */
+export function ogImageCacheKey(
+  origin: string,
+  bill: { congress: number; type: string; number: number },
+  quoteId: string | null,
+  version: string
+): Request {
+  return new Request(new URL(ogCardImagePath(bill, { quoteId, version }), origin), { method: "GET" });
 }
 
 /**
  * GET `/og/bill/:bill.png` — rendered tally card, Cache API, static PNG fallback.
+ * The model (a few D1 reads) is loaded before the cache lookup so the key can
+ * carry the real content version; only the WASM render is behind the cache.
  */
 export async function handleOgImageRoute(params: {
   request: Request;
@@ -113,11 +131,6 @@ export async function handleOgImageRoute(params: {
   }
 
   const quoteId = parseQuoteId(url.searchParams.get(BILL_QUOTE_QUERY_PARAM));
-  const cache = deps?.cache ?? edgeCache();
-  const cacheKey = new Request(url.toString(), { method: "GET" });
-  const cached = cache ? await cache.match(cacheKey) : undefined;
-  if (cached) return cached;
-
   const loadModel = deps?.loadModel ?? loadOgCardModel;
   const render = deps?.render ?? defaultRender;
 
@@ -126,6 +139,11 @@ export async function handleOgImageRoute(params: {
     if (!loaded.ok) {
       return staticFallbackResponse(env, url);
     }
+
+    const cache = deps?.cache ?? edgeCache();
+    const cacheKey = ogImageCacheKey(url.origin, bill, quoteId, ogCardVersion(loaded.model));
+    const cached = cache ? await cache.match(cacheKey) : undefined;
+    if (cached) return cached;
 
     const rendered = await render(buildOgCardHtml(loaded.model));
     const response = new Response(rendered.body, {

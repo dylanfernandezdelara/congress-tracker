@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Env } from "../config";
-import type { OgCardModel } from "../../../../shared/og-card";
+import { ogCardVersion, type OgCardModel } from "../../../../shared/og-card";
 import type { LoadOgCardModelResult } from "./og-card-model";
 import {
   handleOgImageRoute,
@@ -103,19 +103,26 @@ describe("handleOgImageRoute", () => {
     expect(invalid.status).toBe(404);
   });
 
-  it("returns a cache hit without loading or rendering", async () => {
+  it("returns a cache hit without rendering, keyed by the server-side content version", async () => {
     const cached = pngResponse("from-cache");
     cached.headers.set("x-og-card", "rendered");
     const cache = mockCache(cached);
-    const loadModel = vi.fn(async (): Promise<LoadOgCardModelResult> => {
-      throw new Error("should not load");
-    });
     const render = vi.fn(async () => pngResponse());
-    const res = await route("/og/bill/119-hr-1.png?v=abc", { cache, loadModel, render });
+    const res = await route("/og/bill/119-hr-1.png?v=abc&junk=1&other=2", { cache, render });
     expect(await res.text()).toBe("from-cache");
-    expect(loadModel).not.toHaveBeenCalled();
     expect(render).not.toHaveBeenCalled();
     expect(cache.put).not.toHaveBeenCalled();
+    const key = cache.match.mock.calls[0]![0];
+    expect(key.url).toBe(`https://worker.example.com/og/bill/119-hr-1.png?v=${ogCardVersion(CARD)}`);
+  });
+
+  it("collapses junk query strings onto one cache key so unknown params cannot force re-renders", async () => {
+    const cache = mockCache();
+    await route("/og/bill/119-hr-1.png?v=attacker-1&x=1", { cache });
+    await route("/og/bill/119-hr-1.png?v=attacker-2&y=2", { cache });
+    const [first, second] = cache.match.mock.calls.map(([req]) => req.url);
+    expect(first).toBe(second);
+    expect(first).not.toContain("attacker");
   });
 
   it("returns the static fallback when the model is missing and does not cache it", async () => {
@@ -188,7 +195,8 @@ describe("handleOgImageRoute", () => {
     expect(cache.put).toHaveBeenCalledTimes(1);
     const putReq = cache.put.mock.calls[0]![0] as Request;
     expect(putReq.url).toContain("quote=deadbeefdeadbeef");
-    expect(putReq.url).toContain("v=ver1");
+    expect(putReq.url).toContain(`v=${ogCardVersion(CARD)}`);
+    expect(putReq.url).not.toContain("ver1");
   });
 
   it("treats an invalid q as absent", async () => {
