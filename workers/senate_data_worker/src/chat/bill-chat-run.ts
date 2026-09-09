@@ -243,6 +243,7 @@ export async function writeBillChatStream(params: {
   endText();
   const text = prose.trim();
   const providerError = params.streamError?.();
+  if (isAbortError(providerError)) return;
   if (providerError !== undefined && providerError !== null) {
     console.error("bill_chat_provider_error", providerError);
     writer.write({ type: "error", errorText: BILL_CHAT_ERROR_TEXT });

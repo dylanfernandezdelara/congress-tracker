@@ -25,7 +25,8 @@ export interface CreateBillQuoteRequest {
   text: string
   /**
    * Required when the quote comes from a chat answer (PR B). The worker
-   * verifies `sig` (HMAC over `text`) before accepting the quote.
+   * verifies `sig` (HMAC over `bill-chat-answer\n<bill>\n<text>`, so it is
+   * bound to `bill`) before accepting the quote.
    */
   answer?: { text: string; sig: string }
 }

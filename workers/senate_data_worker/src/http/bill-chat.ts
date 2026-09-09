@@ -180,12 +180,9 @@ export async function handleBillChat(params: {
     );
   }
 
-  const loadEvidence = deps.loadEvidence ?? loadBillEvidence;
-  const loaded = await loadEvidence(env, bill);
-  if (!loaded) {
-    return errorResponse(json, 404, "bill_not_found", "That bill is not in the feed yet.");
-  }
-
+  // Claim the daily slot before the evidence read so a capped client costs one
+  // single-row upsert per 429, not a full digest + bill-text load. A 404 below
+  // therefore spends a slot; the UI only offers chat for bills already in the feed.
   const reserve = deps.reserveUsage ?? reserveChatUsage;
   const usage = await reserve(env.DB, {
     day: utcChatDay(deps.now?.() ?? new Date()),
@@ -202,6 +199,12 @@ export async function handleBillChat(params: {
         ? "This address has reached today's chat limit."
         : "The site-wide chat limit for today has been reached."
     );
+  }
+
+  const loadEvidence = deps.loadEvidence ?? loadBillEvidence;
+  const loaded = await loadEvidence(env, bill);
+  if (!loaded) {
+    return errorResponse(json, 404, "bill_not_found", "That bill is not in the feed yet.");
   }
 
   const query = [parsed.selection, question].filter(Boolean).join(" ");

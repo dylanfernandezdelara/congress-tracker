@@ -296,6 +296,18 @@ describe("writeBillChatStream", () => {
     expect(isAbortError("AbortError")).toBe(false);
   });
 
+  it("stays silent when the SDK reports the abort through onError and the stream simply ends", async () => {
+    const { writer, chunks } = recordingWriter();
+    await writeBillChatStream({
+      writer,
+      bill: BILL,
+      chunks: [SECTION],
+      textStream: stream(),
+      streamError: () => new DOMException("The operation was aborted.", "AbortError"),
+    });
+    expect(chunks).toEqual([]);
+  });
+
   it("verifies a quote cut off by the output cap as a passage when its prefix is verbatim", async () => {
     const { writer, chunks } = recordingWriter();
     await writeBillChatStream({
