@@ -5,7 +5,9 @@ import { fetchFeed } from '../api/client'
 import type { FeedItem, FeedPageResponse } from '../api/types'
 import { FEED_PAGE_SIZE } from '../constants/feed'
 import {
+  BILL_QUOTE_QUERY_PARAM,
   billSearchQueryFromParam,
+  clearBillDeepLinkParams,
   feedRowKey,
   formatBillQueryParam,
   itemMatchesBillParam,
@@ -83,6 +85,7 @@ export function useFeedPagination() {
     ...advanced,
   }
   const billParam = searchParams.get('bill')
+  const quoteParam = searchParams.get(BILL_QUOTE_QUERY_PARAM)?.trim() || null
 
   const [retryKey, setRetryKey] = useState(0)
   const [draftQuery, setDraftQuery] = useState(filters.q)
@@ -256,7 +259,7 @@ export function useFeedPagination() {
     setBillMissingNotice(false)
     clearDeepLinkState()
     replaceSearchParams((params) => {
-      params.delete('bill')
+      clearBillDeepLinkParams(params)
     })
     setRetryKey((k) => k + 1)
   }, [clearDeepLinkState, replaceSearchParams, setExpandedKey])
@@ -318,7 +321,7 @@ export function useFeedPagination() {
       replaceSearchParams((params) => {
         const current = parseAdvancedFeedFilters(params)
         applyAdvancedFeedParams(params, { ...current, ...patch })
-        params.delete('bill')
+        clearBillDeepLinkParams(params)
       })
     },
     [clearDeepLinkState, replaceSearchParams, setExpandedKey],
@@ -332,7 +335,7 @@ export function useFeedPagination() {
       replaceSearchParams((params) => {
         if (next) params.set('chamber', next)
         else params.delete('chamber')
-        params.delete('bill')
+        clearBillDeepLinkParams(params)
       })
     },
     [clearDeepLinkState, replaceSearchParams, setExpandedKey],
@@ -372,13 +375,15 @@ export function useFeedPagination() {
       if (collapsing) {
         clearDeepLinkState()
         replaceSearchParams((params) => {
-          params.delete('bill')
+          clearBillDeepLinkParams(params)
         })
       } else {
         deepLinkPhaseRef.current = 'done'
         deepLinkBillRef.current = bill
         deepLinkQueryRef.current = deepLinkQueryKey(filtersRef.current, bill)
         replaceSearchParams((params) => {
+          // A stale quote id must not follow the reader to a different bill.
+          if (params.get('bill') !== bill) params.delete(BILL_QUOTE_QUERY_PARAM)
           params.set('bill', bill)
         })
       }
@@ -391,7 +396,7 @@ export function useFeedPagination() {
     setBillMissingNotice(false)
     clearDeepLinkState()
     replaceSearchParams((params) => {
-      params.delete('bill')
+      clearBillDeepLinkParams(params)
     })
   }, [clearDeepLinkState, replaceSearchParams])
 
@@ -494,6 +499,10 @@ export function useFeedPagination() {
     expandedRowKey,
     feedSettled,
     billMissingNotice,
+    /** Bill the URL deep-links to (also set when a reader expands a row). */
+    billParam,
+    /** `?quote=` id, only meaningful for `billParam`'s row. */
+    quoteParam,
     lastFeedModeRef,
     reloadFeed,
     loadMore,

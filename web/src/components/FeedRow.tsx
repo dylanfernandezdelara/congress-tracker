@@ -26,9 +26,16 @@ type FeedRowProps = {
   item: FeedItem
   isExpanded: boolean
   onToggle: (item: FeedItem) => void
+  /** Shared quote id from the URL when this row is the deep-linked bill. */
+  quoteId?: string | null
 }
 
-export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: FeedRowProps) {
+export const FeedRow = memo(function FeedRow({
+  item,
+  isExpanded,
+  onToggle,
+  quoteId = null,
+}: FeedRowProps) {
   const badgeId = useId()
   const topicId = useId()
   const policyAreaId = useId()
@@ -169,7 +176,7 @@ export const FeedRow = memo(function FeedRow({ item, isExpanded, onToggle }: Fee
           aria-label={`Details for ${topic}`}
           hidden={!isExpanded}
         >
-          {isExpanded ? <FeedRowDetail item={item} /> : null}
+          {isExpanded ? <FeedRowDetail item={item} quoteId={quoteId} /> : null}
         </div>
       </article>
     </li>

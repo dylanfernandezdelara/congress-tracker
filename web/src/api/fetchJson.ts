@@ -3,12 +3,15 @@ import { getApiBaseUrl } from './config'
 export class ApiError extends Error {
   readonly status: number
   readonly statusText: string
+  /** Machine-readable `error` code from a JSON error body, when the API sent one. */
+  readonly code: string | null
 
-  constructor(message: string, status: number, statusText: string) {
+  constructor(message: string, status: number, statusText: string, code: string | null = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.statusText = statusText
+    this.code = code
   }
 }
 
@@ -52,6 +55,55 @@ export async function fetchJson<T>(path: string): Promise<T> {
 
   if (!response.ok) {
     throw new ApiError(getErrorMessage(response.status), response.status, response.statusText)
+  }
+
+  try {
+    return (await response.json()) as T
+  } catch {
+    throw new Error(INVALID_JSON_MESSAGE)
+  }
+}
+
+async function readErrorBody(response: Response): Promise<{ code: string | null; message: string | null }> {
+  try {
+    const body: unknown = await response.json()
+    if (!body || typeof body !== 'object') return { code: null, message: null }
+    const record = body as Record<string, unknown>
+    return {
+      code: typeof record.error === 'string' ? record.error : null,
+      message: typeof record.message === 'string' ? record.message : null,
+    }
+  } catch {
+    return { code: null, message: null }
+  }
+}
+
+/**
+ * JSON POST. Unlike `fetchJson`, error responses surface the API's own
+ * `message` (these endpoints return reader-facing validation copy).
+ */
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const url = buildApiUrl(path)
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error(NETWORK_ERROR_MESSAGE)
+  }
+
+  if (!response.ok) {
+    const { code, message } = await readErrorBody(response)
+    throw new ApiError(
+      message ?? getErrorMessage(response.status),
+      response.status,
+      response.statusText,
+      code,
+    )
   }
 
   try {

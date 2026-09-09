@@ -1,13 +1,18 @@
 import { useId } from 'react'
 
+import type { OgCardModel } from '@congress-tracker/shared/og-card'
+
 import type { BillSharePayload } from '../utils/billDeepLink'
 import { canUseWebShare } from '../utils/billDeepLink'
 import { AnimatedSheet } from './AnimatedSheet'
+import { OgCardPreview } from './OgCardPreview'
 
 type BillShareSheetProps = {
   open: boolean
   selectionKey: number
   payload: BillSharePayload
+  /** Preview of the link card; carries the quote when one is being shared. */
+  card: OgCardModel
   copied: boolean
   onClose: () => void
   onShare: () => void
@@ -18,12 +23,14 @@ export function BillShareSheet({
   open,
   selectionKey,
   payload,
+  card,
   copied,
   onClose,
   onShare,
   onCopy,
 }: BillShareSheetProps) {
   const titleId = useId()
+  const isQuote = card.quote !== null
 
   return (
     <AnimatedSheet
@@ -36,10 +43,16 @@ export function BillShareSheet({
     >
       <header className="bill-share-sheet-header">
         <h2 id={titleId} className="bill-share-sheet-title">
-          Share this bill
+          {isQuote ? 'Share this quote' : 'Share this bill'}
         </h2>
-        <p className="bill-share-sheet-kicker">Preview what friends will see, then share or copy.</p>
+        <p className="bill-share-sheet-kicker">
+          {isQuote
+            ? 'The link opens on this passage. Preview the card, then share or copy.'
+            : 'Preview what friends will see, then share or copy.'}
+        </p>
       </header>
+
+      <OgCardPreview model={card} />
 
       <div className="bill-share-preview">
         <p className="bill-share-preview-title">{payload.title}</p>

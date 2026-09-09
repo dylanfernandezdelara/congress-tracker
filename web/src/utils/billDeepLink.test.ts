@@ -4,8 +4,10 @@ import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   billSearchQueryFromParam,
   billShareOrigin,
+  buildBillQuoteSharePayload,
   buildBillSharePayload,
   buildBillShareUrl,
+  clearBillDeepLinkParams,
   canUseWebShare,
   copyTextToClipboard,
   feedRowKey,
@@ -38,6 +40,29 @@ describe('billDeepLink', () => {
     expect(buildBillShareUrl(item, 'https://example.test/?chamber=House&other=1')).toBe(
       'https://example.test/?bill=119-hr-1',
     )
+  })
+
+  it('appends the quote id to the share URL when given', () => {
+    const item = makeFeedItem({ bill: { congress: 119, type: 'HR', number: 1, title: null } })
+    expect(buildBillShareUrl(item, 'https://example.test/', 'abc123abc123abc1')).toBe(
+      'https://example.test/?bill=119-hr-1&quote=abc123abc123abc1',
+    )
+    const params = new URLSearchParams('bill=119-hr-1&quote=abc&chamber=House')
+    clearBillDeepLinkParams(params)
+    expect(params.toString()).toBe('chamber=House')
+  })
+
+  it('builds a quote share payload with the quote as the body', () => {
+    const payload = buildBillQuoteSharePayload(
+      makeFeedItem(),
+      { id: 'abc123abc123abc1', text: 'It does something important' },
+      'https://preview.test/',
+    )
+    expect(payload.title).toBe('Plain headline for readers')
+    expect(payload.text).toBe('“It does something important”')
+    expect(payload.url).toBe('https://preview.test/?bill=119-s-2&quote=abc123abc123abc1')
+    expect(payload.clipboardText.startsWith('“It does something important”')).toBe(true)
+    expect(payload.clipboardText).toContain(payload.url)
   })
 
   it('rewrites production hosts to the apex origin', () => {
