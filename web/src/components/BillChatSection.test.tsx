@@ -195,6 +195,23 @@ describe('BillChatSection', () => {
     expect(onClearSelection).toHaveBeenCalled()
   })
 
+  it('hides the composer when collapsed', () => {
+    render(
+      <BillChatSection
+        item={twoPointItem}
+        collapsed
+        onSharePassage={vi.fn()}
+        onQuoteCreated={vi.fn()}
+        headerActions={<button type="button">Open</button>}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Answers quote the bill’s text.')).not.toBeInTheDocument()
+  })
+
   it('opens ChatGPT and Claude with a bill briefing', async () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 

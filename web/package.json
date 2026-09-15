@@ -27,7 +27,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
     "tailwind-merge": "^2.6.0",
-    "vaul": "^1.1.2"
+    "vaul": "1.1.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

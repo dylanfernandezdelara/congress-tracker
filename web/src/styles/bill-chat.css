@@ -28,7 +28,8 @@
   }
 
   .bill-chat-export-trigger,
-  .bill-chat-open-peek {
+  .bill-chat-open-peek,
+  .bill-chat-minimize {
     height: auto;
     padding: 0.3rem 0.7rem;
     border-radius: 999px;
@@ -108,16 +109,7 @@
     overscroll-behavior: contain;
   }
 
-  .bill-chat-drawer-inner[data-snap='peek'] .bill-chat-note,
-  .bill-chat-drawer-inner[data-snap='peek'] .bill-chat-suggestions,
-  .bill-chat-drawer-inner[data-snap='peek'] .bill-chat-conversation,
-  .bill-chat-drawer-inner[data-snap='peek'] .bill-chat-prompt,
-  .bill-chat-drawer-inner[data-snap='peek'] .bill-chat-attachments,
-  .bill-chat-drawer-inner[data-snap='peek'] .bill-chat-error {
-    display: none;
-  }
-
-  .bill-chat-drawer-inner[data-snap='peek'] .bill-chat-header {
+  .bill-chat--collapsed .bill-chat-header {
     margin-bottom: 0;
     align-items: center;
   }

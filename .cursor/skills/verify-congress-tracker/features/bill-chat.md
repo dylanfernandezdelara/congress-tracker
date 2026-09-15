@@ -6,7 +6,7 @@ An expanded bill opens a persistent **Ask about this bill** chat so the reader c
 
 - `chat-section` renders region `Ask about this bill` (heading + note `Answers quote the bill’s text.`) next to the bill on desktop (`#bill-chat-rail` / complementary `Ask about this bill`) or in the mobile drawer, with starter chips and a textbox `Ask about this bill` plus a `Send` button.
 - `chat-desktop-rail` — at `min-width: 1024px`, expanding a timeline bill moves the chat into the right rail (`home-shell--reading`); Vote tightness hides until the row collapses.
-- `chat-mobile-drawer` — at `max-width: 1023px` the chat is a non-modal bottom drawer (`dialog` `Ask about this bill`) with peek / half / full snaps. Peek shows the title plus **Open** / **Open in chat**. **Ask about this** (selection) opens the drawer to half.
+- `chat-mobile-drawer` — at `max-width: 1023px` the chat is a non-modal bottom drawer (`dialog` `Ask about this bill`) with peek / half / full snaps. Peek shows the title plus **Open** / **Open in chat**. **Open** lifts to half; **Minimize** returns to peek. **Ask about this** (selection) opens the drawer to half.
 - `chat-open-in` — `Open in chat` is a menu with `Open in ChatGPT`, `Open in Claude`, and `Copy briefing`. Each link carries a briefing (bill id, congress.gov + Track Congress URLs, summary, thread).
 - `chat-answer` streams an assistant bubble (`Answering…` while streaming) whose verified quotes render as `figure.bill-chat-quote` blockquotes with a section caption (for example `Sec. 2. Permitting deadlines · Bill text`) and a `Share this passage` button.
 - `chat-ask-about-this` — the selection toolbar `Selected text actions` gains `Ask about this`; the selection becomes an inline attachment chip on the composer (with `Remove`) and focuses the textbox.
@@ -46,6 +46,6 @@ Preconditions:
 - The answer comes from a free OpenRouter model, so wording varies between runs; assert on the presence of `.bill-chat-quote` and that every blockquote is verbatim from the seeded sections, not on the prose.
 - The chat is `POST /chat/bill` on the Worker. Vite proxies `/chat` to 8788 in the verify stack; the helper's `api` subcommand is GET-only and cannot exercise it — drive the UI.
 - Daily caps (`chat_usage`) are per client per UTC day; the verify D1 is disposable, so a fresh launch resets them, and `npm run seed` also clears `chat_usage` on the shared local D1. A `429` shows `chat-error` with the cap message.
-- Each expanded bill has its own conversation (`useChat` id `bill-chat-<bill>`). Collapsing and re-expanding a row keeps the thread for the session.
-- Desktop chat lives in `#bill-chat-rail`, not at the bottom of `Details for <topic>`. Isolated component tests without `BillChatLayoutProvider` still render the chat inline.
+- Each expanded bill has its own conversation (`useChat` id `bill-chat-<bill>`). Home owns one dock; `FeedRowDetail` only presents a session. Last attach wins; detaching reclaims the previous source.
+- Desktop chat lives in `#bill-chat-rail`, not at the bottom of `Details for <topic>`. Isolated component tests wrap `FeedRowDetail` with `BillChatLayoutProvider` and `<BillChatDock placement="inline" />`.
 - `Open in ChatGPT` / `Open in Claude` navigate off-site; do not click through in headed proof — assert `href` only.

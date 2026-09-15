@@ -1,5 +1,5 @@
 import { CopyIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { copyTextToClipboard } from '../utils/billDeepLink'
 import {
@@ -20,6 +20,13 @@ type BillChatExportMenuProps = {
 
 export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
   const [copied, setCopied] = useState(false)
+  const copiedTimer = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
+    }
+  }, [])
 
   return (
     <OpenIn query={query}>
@@ -37,7 +44,8 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
           onSelect={() => {
             void copyTextToClipboard(query).then((ok) => {
               setCopied(ok)
-              window.setTimeout(() => setCopied(false), 1600)
+              if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
+              copiedTimer.current = window.setTimeout(() => setCopied(false), 1600)
             })
           }}
         >

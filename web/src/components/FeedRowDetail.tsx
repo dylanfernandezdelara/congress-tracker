@@ -17,7 +17,7 @@ import { useBillShare } from '../hooks/useBillShare'
 import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
 import { useSharedQuoteLanding } from '../hooks/useSharedQuoteLanding'
 import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
-import { BillChatDock } from './BillChatDock'
+import { usePresentBillChat } from './BillChatLayout'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
@@ -172,7 +172,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
     }
   }
 
-  const handleSharePassage = async (text: string) => {
+  const handleSharePassage = useCallback(async (text: string) => {
     try {
       const { quote } = await createBillQuote({
         bill: formatBillQueryParam(item.bill),
@@ -182,7 +182,17 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
     } catch (error) {
       setToast(shareQuoteErrorCopy(error))
     }
-  }
+  }, [item.bill, share])
+
+  const onClearChatSelection = useCallback(() => setChatSelection(null), [])
+
+  usePresentBillChat({
+    item,
+    pendingSelection: chatSelection,
+    onClearSelection: onClearChatSelection,
+    onSharePassage: handleSharePassage,
+    onQuoteCreated: share.openSheet,
+  })
 
   const handleCopySelection = async (current: TextSelection) => {
     const ok = await copyTextToClipboard(current.text)
@@ -240,16 +250,6 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
           companionVotes={item.companion_votes ?? []}
         />
       </section>
-
-      <BillChatDock
-        item={item}
-        pendingSelection={chatSelection}
-        onClearSelection={() => setChatSelection(null)}
-        onSharePassage={(text) => {
-          void handleSharePassage(text)
-        }}
-        onQuoteCreated={share.openSheet}
-      />
 
       <footer className="feed-row-detail-footer">
         <a

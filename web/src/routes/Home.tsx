@@ -9,7 +9,12 @@ import type {
   RecentLawsResponse,
   TightnessDot,
 } from '../api/types'
-import { BILL_CHAT_RAIL_ID, BillChatLayoutProvider, useBillChatLayout } from '../components/BillChatLayout'
+import { BillChatDock } from '../components/BillChatDock'
+import {
+  BILL_CHAT_DESKTOP_QUERY,
+  BillChatLayoutProvider,
+  useBillChatSession,
+} from '../components/BillChatLayout'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
@@ -38,8 +43,6 @@ import {
 } from '../utils/feedAdvancedFilters'
 import { timelineFloorChrome } from '../utils/feedQuiet'
 
-const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
-
 function HomeChrome({
   isDesktop,
   left,
@@ -51,8 +54,8 @@ function HomeChrome({
   right: ReactNode
   children: ReactNode
 }) {
-  const layout = useBillChatLayout()
-  const occupied = Boolean(isDesktop && layout?.railOccupied)
+  const session = useBillChatSession()
+  const occupied = Boolean(isDesktop && session)
   return (
     <div className={`home-shell${occupied ? ' home-shell--reading' : ''}`}>
       {isDesktop ? (
@@ -66,13 +69,11 @@ function HomeChrome({
           className={`home-rail home-rail--right${occupied ? ' home-rail--chat' : ''}`}
           aria-label={occupied ? 'Ask about this bill' : 'Legislative context'}
         >
-          <div
-            id={BILL_CHAT_RAIL_ID}
-            className={occupied ? 'bill-chat-rail' : 'bill-chat-rail bill-chat-rail--empty'}
-          />
-          {occupied ? null : right}
+          {occupied ? <BillChatDock isDesktop /> : right}
         </aside>
-      ) : null}
+      ) : (
+        <BillChatDock isDesktop={false} />
+      )}
     </div>
   )
 }
@@ -107,7 +108,7 @@ function emptyFeedCopy(
 }
 
 export default function Home() {
-  const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
+  const isDesktop = useMediaQuery(BILL_CHAT_DESKTOP_QUERY)
   const {
     chamber,
     advancedFilters,
