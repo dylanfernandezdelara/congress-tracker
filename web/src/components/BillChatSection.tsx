@@ -205,10 +205,7 @@ export function BillChatSection({
             </div>
           ) : null}
 
-          <PromptInput
-            className="bill-chat-prompt"
-            onSubmit={({ text }) => submitQuestion(text)}
-          >
+          <PromptInput className="bill-chat-prompt" onSubmit={() => submitQuestion(input)}>
             {attachedSelection ? (
               <PromptInputHeader className="bill-chat-attachments">
                 <div className="bill-chat-attachment" title={attachedSelection}>

@@ -6,6 +6,7 @@ import type { FeedPassageVote } from '../api/types'
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { TooltipTestProvider } from '../test/tooltipHarness'
 import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { BillChatPane } from './BillChatPane'
@@ -80,10 +81,12 @@ afterEach(() => {
 
 function renderDetailWithChat(ui: ReactElement) {
   return render(
-    <BillChatLayoutProvider>
-      <BillChatPane />
-      {ui}
-    </BillChatLayoutProvider>,
+    <TooltipTestProvider>
+      <BillChatLayoutProvider>
+        <BillChatPane />
+        {ui}
+      </BillChatLayoutProvider>
+    </TooltipTestProvider>,
   )
 }
 

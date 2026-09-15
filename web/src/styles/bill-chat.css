@@ -94,6 +94,10 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
+  }
+
+  /* StickToBottom scrolls an inner wrapper; contain must sit on that node. */
+  .bill-chat-conversation-scroll {
     overscroll-behavior: contain;
   }
 

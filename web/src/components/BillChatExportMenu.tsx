@@ -13,7 +13,7 @@ import {
   OpenInTrigger,
 } from './ai-elements/open-in-chat'
 import { Button } from './ui/button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 /** Visible label — must not collide with the drawer “Open chat” peek control. */
 export const BILL_CHAT_EXPORT_TRIGGER = 'Continue in…'
@@ -38,28 +38,26 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
 
   return (
     <OpenIn query={query}>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <OpenInTrigger>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="bill-chat-export-trigger"
-                  aria-label={BILL_CHAT_EXPORT_NAME}
-                >
-                  {BILL_CHAT_EXPORT_TRIGGER}
-                </Button>
-              </OpenInTrigger>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-56">
-            {BILL_CHAT_EXPORT_HINT}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <OpenInTrigger>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="bill-chat-export-trigger"
+                aria-label={BILL_CHAT_EXPORT_NAME}
+              >
+                {BILL_CHAT_EXPORT_TRIGGER}
+              </Button>
+            </OpenInTrigger>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-56">
+          {BILL_CHAT_EXPORT_HINT}
+        </TooltipContent>
+      </Tooltip>
       <OpenInContent align="end">
         <OpenInLabel>Continue this bill in</OpenInLabel>
         <OpenInChatGPT />

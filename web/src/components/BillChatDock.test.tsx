@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FeedItem } from '../api/types'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { mockViewport } from '../test/homeRouteHarness'
+import { TooltipTestProvider } from '../test/tooltipHarness'
 import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 
 const sendMessage = vi.fn()
@@ -53,10 +54,12 @@ function Presenter({
 
 function renderHost(ui: ReactNode, placement: BillChatDockPlacement = 'rail') {
   return render(
-    <BillChatLayoutProvider>
-      <BillChatDock placement={placement} />
-      {ui}
-    </BillChatLayoutProvider>,
+    <TooltipTestProvider>
+      <BillChatLayoutProvider>
+        <BillChatDock placement={placement} />
+        {ui}
+      </BillChatLayoutProvider>
+    </TooltipTestProvider>,
   )
 }
 
@@ -72,9 +75,11 @@ describe('BillChatDock', () => {
 
   it('renders nothing until a bill presents a session', () => {
     render(
-      <BillChatLayoutProvider>
-        <BillChatDock placement="rail" />
-      </BillChatLayoutProvider>,
+      <TooltipTestProvider>
+        <BillChatLayoutProvider>
+          <BillChatDock placement="rail" />
+        </BillChatLayoutProvider>
+      </TooltipTestProvider>,
     )
 
     expect(screen.queryByRole('heading', { name: 'Ask about this bill' })).not.toBeInTheDocument()
@@ -94,10 +99,12 @@ describe('BillChatDock', () => {
 
   it('renders the chat pane without a rail or drawer shell', () => {
     render(
-      <BillChatLayoutProvider>
-        <BillChatPane />
-        <Presenter item={makeFeedItem()} />
-      </BillChatLayoutProvider>,
+      <TooltipTestProvider>
+        <BillChatLayoutProvider>
+          <BillChatPane />
+          <Presenter item={makeFeedItem()} />
+        </BillChatLayoutProvider>
+      </TooltipTestProvider>,
     )
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
@@ -146,14 +153,22 @@ describe('BillChatDock', () => {
       )
     }
 
-    const { rerender } = render(<App showSecond />)
+    const { rerender } = render(
+      <TooltipTestProvider>
+        <App showSecond />
+      </TooltipTestProvider>,
+    )
 
     await waitFor(() => {
       expect(document.getElementById(BILL_CHAT_RAIL_ID)).toHaveAttribute('data-bill', '119-hr-1')
     })
     expect(document.querySelectorAll('.bill-chat')).toHaveLength(1)
 
-    rerender(<App showSecond={false} />)
+    rerender(
+      <TooltipTestProvider>
+        <App showSecond={false} />
+      </TooltipTestProvider>,
+    )
 
     await waitFor(() => {
       expect(document.getElementById(BILL_CHAT_RAIL_ID)).toHaveAttribute('data-bill', '119-s-2')
@@ -175,12 +190,20 @@ describe('BillChatDock', () => {
       )
     }
 
-    const { rerender } = render(<App number={2} />)
+    const { rerender } = render(
+      <TooltipTestProvider>
+        <App number={2} />
+      </TooltipTestProvider>,
+    )
     const box = await screen.findByRole('textbox', { name: 'Ask about this bill' })
     fireEvent.change(box, { target: { value: 'draft for S.2' } })
     expect(box).toHaveValue('draft for S.2')
 
-    rerender(<App number={3} />)
+    rerender(
+      <TooltipTestProvider>
+        <App number={3} />
+      </TooltipTestProvider>,
+    )
     expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('')
   })
 
@@ -196,12 +219,20 @@ describe('BillChatDock', () => {
       )
     }
 
-    const { rerender } = render(<App askNonce={1} />)
+    const { rerender } = render(
+      <TooltipTestProvider>
+        <App askNonce={1} />
+      </TooltipTestProvider>,
+    )
     expect(await screen.findByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Minimize' }))
     expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
 
-    rerender(<App askNonce={2} />)
+    rerender(
+      <TooltipTestProvider>
+        <App askNonce={2} />
+      </TooltipTestProvider>,
+    )
     expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
   })
 
@@ -217,9 +248,17 @@ describe('BillChatDock', () => {
       )
     }
 
-    const { rerender } = render(<App askNonce={1} />)
+    const { rerender } = render(
+      <TooltipTestProvider>
+        <App askNonce={1} />
+      </TooltipTestProvider>,
+    )
     expect(await screen.findByRole('button', { name: 'Minimize' })).toBeInTheDocument()
-    rerender(<App askNonce={2} />)
+    rerender(
+      <TooltipTestProvider>
+        <App askNonce={2} />
+      </TooltipTestProvider>,
+    )
     expect(screen.getByRole('button', { name: 'Minimize' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open chat' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()

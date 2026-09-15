@@ -152,7 +152,10 @@ export function BillChatTranscript({ messages, status, onSharePassage }: BillCha
   if (messages.length === 0) return null
   return (
     <Conversation className="bill-chat-conversation">
-      <ConversationContent className="bill-chat-conversation-content gap-2 p-0">
+      <ConversationContent
+        className="bill-chat-conversation-content"
+        scrollClassName="bill-chat-conversation-scroll"
+      >
         {messages.map((message, index) => {
           if (message.role === 'user') {
             return (

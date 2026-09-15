@@ -47,6 +47,10 @@ describe('billChatDrawerSnap', () => {
     expect(billChatCss).toContain('.bill-chat-suggestion:nth-child(n + 3)')
     expect(billChatCss).toContain('gap: var(--space-2)')
     expect(billChatCss).toContain('.bill-chat-prompt-group')
+    expect(billChatCss).toContain('.bill-chat-conversation-scroll')
+    expect(billChatCss).toMatch(
+      /\.bill-chat-conversation-scroll\s*\{[^}]*overscroll-behavior: contain/,
+    )
     expect(billChatCss).not.toContain('bill-chat-prompt-footer')
     expect(billChatCss).toContain(
       'padding: var(--space-3) var(--space-2) var(--space-2)',

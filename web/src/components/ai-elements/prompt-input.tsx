@@ -1,5 +1,3 @@
-"use client"
-
 import {
   InputGroup,
   InputGroupAddon,
@@ -19,22 +17,17 @@ import type {
 } from "react"
 
 /**
- * Text-only subset of Vercel AI Elements PromptInput (no file drop, screenshot,
- * or model picker). Same names and submit shape as the registry component.
+ * Text-only subset of Vercel AI Elements PromptInput (no file drop).
+ * Submit is a form event; the parent already owns the controlled value.
  */
-export type PromptInputMessage = {
-  text: string
-}
-
 export type PromptInputProps = Omit<HTMLAttributes<HTMLFormElement>, "onSubmit"> & {
-  onSubmit: (message: PromptInputMessage, event: FormEvent<HTMLFormElement>) => void | Promise<void>
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>
 }
 
 export function PromptInput({ className, onSubmit, children, ...props }: PromptInputProps) {
   const handleSubmit: FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault()
-    const text = String(new FormData(event.currentTarget).get("message") ?? "")
-    void onSubmit({ text }, event)
+    void onSubmit(event)
   }
 
   return (
