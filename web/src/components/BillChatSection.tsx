@@ -43,7 +43,7 @@ export type BillChatSectionProps = {
   onQuoteCreated: (quote: BillQuote) => void
   /** Peek bar: hide the transcript and composer so the handle stays a title row. */
   collapsed?: boolean
-  /** Drawer Open / Minimize (or other chrome) next to Open in chat. */
+  /** Drawer Open chat / Minimize (or other chrome) next to Open in chat. */
   headerActions?: ReactNode
 }
 

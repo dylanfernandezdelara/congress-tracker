@@ -66,6 +66,7 @@ export function BillChatDrawer({ billId }: { billId: string }) {
       handleOnly
       noBodyStyles
       shouldScaleBackground={false}
+      repositionInputs={false}
       snapPoints={[...BILL_CHAT_DRAWER_SNAP_POINTS]}
       activeSnapPoint={snapPoint}
       setActiveSnapPoint={setSnapPoint}

@@ -116,7 +116,9 @@
     --snap-point-height (containerHeight - snapHeight). Size the used column
     to the visible slice so Send stays in the half / full window after the
     transcript grows. Do not set Content height to the snap — that double-
-    offsets against the translate.
+    offsets against the translate. The companion Drawer also sets
+    repositionInputs={false}: default true rewrites Content height when the
+    keyboard opens, and 100% minus the window-based offset then collapses.
   */
   .bill-chat-drawer-snap {
     display: flex;

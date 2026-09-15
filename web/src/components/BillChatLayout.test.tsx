@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import billChatCss from '../styles/bill-chat.css?raw'
+import billChatDrawerSource from './BillChatDrawer.tsx?raw'
 import {
   BILL_CHAT_DRAWER_FULL,
   BILL_CHAT_DRAWER_HALF,
@@ -37,6 +38,10 @@ describe('billChatDrawerSnap', () => {
   it('sizes the drawer column to the visible vaul slice, not the untranslated sheet', () => {
     expect(billChatCss).toContain('.bill-chat-drawer-snap')
     expect(billChatCss).toContain('height: calc(100% - var(--snap-point-height, 0px))')
+  })
+
+  it('keeps vaul from rewriting Content height when the keyboard opens', () => {
+    expect(billChatDrawerSource).toContain('repositionInputs={false}')
   })
 })
 

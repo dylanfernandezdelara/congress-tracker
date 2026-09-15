@@ -203,4 +203,24 @@ describe('BillChatDock', () => {
     rerender(<App askNonce={2} />)
     expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
   })
+
+  it('leaves a half-open drawer in place when Ask repeats', async () => {
+    mockViewport(false)
+
+    function App({ askNonce }: { askNonce: number }) {
+      return (
+        <BillChatLayoutProvider>
+          <BillChatDock placement="drawer" />
+          <Presenter item={makeFeedItem()} pendingSelection="same passage" askNonce={askNonce} />
+        </BillChatLayoutProvider>
+      )
+    }
+
+    const { rerender } = render(<App askNonce={1} />)
+    expect(await screen.findByRole('button', { name: 'Minimize' })).toBeInTheDocument()
+    rerender(<App askNonce={2} />)
+    expect(screen.getByRole('button', { name: 'Minimize' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open chat' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
+  })
 })
