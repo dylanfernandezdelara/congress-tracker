@@ -128,10 +128,13 @@ describe('align-grid.css', () => {
 
   it('keeps page chrome and the reading rail on space tokens', () => {
     expect(chromeCss).toContain('margin-top: var(--space-2)')
-    expect(chromeCss).toContain('height: var(--space-6)')
+    expect(chromeCss).toContain('height: var(--site-header-height)')
+    expect(chromeCss).toContain('box-shadow: inset 0 -1px 0 hsl(var(--twc-border))')
     expect(homeCss).toContain('minmax(336px, 26vw)')
-    expect(homeCss).toContain('top: var(--space-8)')
-    expect(homeCss).toContain('height: calc(100vh - var(--space-8))')
+    expect(homeCss).toContain('top: var(--site-rail-top)')
+    expect(homeCss).toContain('height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom))')
     expect(billChatCss).toContain('--bill-chat-peek: 180px')
+    expect(billChatCss).not.toContain('bill-chat-prompt-footer')
+    expect(baseCss).toContain('--site-header-height: 48px')
   })
 })

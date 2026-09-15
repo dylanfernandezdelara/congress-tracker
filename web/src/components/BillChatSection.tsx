@@ -250,29 +250,27 @@ export function BillChatSection({
               aria-label="Ask about this bill"
               placeholder="Ask a question about this bill"
             />
-            <div className="bill-chat-prompt-footer">
-              {streaming ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="bill-chat-prompt-stop"
-                  onClick={() => stop()}
-                >
-                  Stop
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="default"
-                  className="bill-chat-prompt-submit"
-                  disabled={input.trim().length === 0}
-                >
-                  Send
-                </Button>
-              )}
-            </div>
+            {streaming ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="bill-chat-prompt-stop"
+                onClick={() => stop()}
+              >
+                Stop
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="sm"
+                variant="default"
+                className="bill-chat-prompt-submit"
+                disabled={input.trim().length === 0}
+              >
+                Send
+              </Button>
+            )}
           </form>
         </div>
       )}

@@ -1,8 +1,10 @@
 @layer components {
   /*
     Viewport overlay for layout work. Off unless `html[data-align-grid]` is set
-    (`?align=1` / `?align=grid` via useAlignGrid). pointer-events none so it
-    never intercepts clicks. qa:web and production leave the attribute unset.
+    (`?align=1` / `?align=grid` via useAlignGrid). Origin is (0,0) because
+    `--site-header-height` (48) plus `--space-2` lands on the 64px major line
+    (`--site-rail-top`). pointer-events none so it never intercepts clicks.
+    qa:web and production leave the attribute unset.
   */
   html[data-align-grid]::before {
     content: '';

@@ -334,7 +334,7 @@ export default function Home() {
         {showSkeleton ? <FeedSkeleton /> : null}
 
         {feedError && items.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-card border border-border bg-card px-6 py-8 text-center">
+          <div className="flex flex-col items-center gap-4 rounded-card border border-border bg-card px-6 py-8 text-center">
             <p className="text-[13px] text-secondary">{feedError}</p>
             <button type="button" className="ghost-button" onClick={reloadAll}>
               Retry

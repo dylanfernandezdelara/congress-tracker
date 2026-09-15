@@ -47,6 +47,7 @@ describe('billChatDrawerSnap', () => {
     expect(billChatCss).toContain('.bill-chat-suggestion:nth-child(n + 3)')
     expect(billChatCss).toContain('gap: var(--space-2)')
     expect(billChatCss).toContain('align-items: end')
+    expect(billChatCss).not.toContain('bill-chat-prompt-footer')
   })
 
   it('sizes the drawer column to the visible vaul slice, not the untranslated sheet', () => {

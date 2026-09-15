@@ -25,7 +25,7 @@
   .feed-search {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: var(--space-1);
     min-width: 0;
     width: 100%;
   }
@@ -874,8 +874,8 @@
     .home-rail {
       display: block;
       position: sticky;
-      top: var(--space-8);
-      max-height: calc(100vh - var(--space-8));
+      top: var(--site-rail-top);
+      max-height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom));
       overflow-x: hidden;
       overflow-y: auto;
       overscroll-behavior: contain;
@@ -894,8 +894,8 @@
     .home-rail--chat {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - var(--space-8));
-      max-height: calc(100vh - var(--space-8));
+      height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom));
+      max-height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom));
       overflow: hidden;
     }
   }

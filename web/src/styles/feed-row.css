@@ -133,9 +133,9 @@
   .feed-row-date {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0;
     margin: 0;
-    padding-top: 0.1rem;
+    padding-top: 0;
     min-width: 0;
     font-size: 12px;
     line-height: 1.3;
@@ -155,7 +155,7 @@
 
   .feed-row-header .feed-row-chevron {
     margin-left: auto;
-    margin-top: 0.1rem;
+    margin-top: 0;
   }
 
   .feed-row-meta-row {
@@ -163,9 +163,9 @@
     flex-wrap: wrap;
     align-items: center;
     /* Separator width (middot + gutters); the ::before below centers in it. */
-    --feed-meta-sep: 1rem;
+    --feed-meta-sep: var(--space-2);
     column-gap: var(--feed-meta-sep);
-    row-gap: 0.35rem;
+    row-gap: var(--space-1);
     min-width: 0;
     /* Clips the leading ::before of a chip that wrapped to a new line, so
        lines never start or end with a middot. Do not remove or split into

@@ -44,6 +44,12 @@
     --space-5: calc(var(--grid) * 5);
     --space-6: calc(var(--grid) * 6);
     --space-8: calc(var(--grid) * 8);
+    /* Border-box header (hairline is a box-shadow, not extra height). */
+    --site-header-height: 48px;
+    --site-rail-top: calc(
+      var(--site-header-height) + var(--space-2) + env(safe-area-inset-top, 0px)
+    );
+    --site-rail-bottom: var(--space-2);
   }
 
   [data-theme='dark'] {
