@@ -5,6 +5,7 @@ import { makeFeedItem } from '../test/feedItemFixtures'
 import billChatCss from '../styles/bill-chat.css?raw'
 import billChatDrawerSource from './BillChatDrawer.tsx?raw'
 import {
+  BILL_CHAT_DRAWER_TRANSITION_MS,
   billChatVisibleSlicePx,
   syncBillChatDrawerSnapHeight,
 } from './BillChatDrawer'
@@ -46,6 +47,12 @@ describe('billChatDrawerSnap', () => {
 
   it('keeps vaul from rewriting Content height when the keyboard opens', () => {
     expect(billChatDrawerSource).toContain('repositionInputs={false}')
+  })
+
+  it('keeps measuring the snap column through vaul transform transitions', () => {
+    expect(BILL_CHAT_DRAWER_TRANSITION_MS).toBe(500)
+    expect(billChatDrawerSource).toContain('transitionend')
+    expect(billChatDrawerSource).toContain('BILL_CHAT_DRAWER_TRANSITION_MS')
   })
 
   it('sizes the snap column from the live sheet top, including mid-drag', () => {

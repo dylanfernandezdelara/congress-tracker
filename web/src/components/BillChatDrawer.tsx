@@ -25,31 +25,59 @@ export function syncBillChatDrawerSnapHeight(drawer: HTMLElement): void {
   snap.style.height = `${billChatVisibleSlicePx(drawer.getBoundingClientRect().top, window.innerHeight)}px`
 }
 
-function useBillChatDrawerSnapHeight() {
+/** Vaul's `[data-vaul-drawer]` transform transition. Measure until it ends. */
+export const BILL_CHAT_DRAWER_TRANSITION_MS = 500
+
+function useBillChatDrawerSnapHeight(snapPoint: number | string | null) {
+  const nodeRef = useRef<HTMLDivElement | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
-  return useCallback((node: HTMLDivElement | null) => {
+
+  const bind = useCallback((node: HTMLDivElement | null) => {
     cleanupRef.current?.()
     cleanupRef.current = null
+    nodeRef.current = node
     if (!node) return
     const sync = () => syncBillChatDrawerSnapHeight(node)
     sync()
     const mo = new MutationObserver(sync)
     mo.observe(node, { attributes: true, attributeFilter: ['style'] })
+    const onTransition = (event: TransitionEvent) => {
+      if (event.target !== node) return
+      if (event.propertyName && event.propertyName !== 'transform') return
+      sync()
+    }
+    node.addEventListener('transitionrun', onTransition)
+    node.addEventListener('transitionend', onTransition)
     window.addEventListener('resize', sync)
-    const raf = requestAnimationFrame(sync)
     cleanupRef.current = () => {
       mo.disconnect()
+      node.removeEventListener('transitionrun', onTransition)
+      node.removeEventListener('transitionend', onTransition)
       window.removeEventListener('resize', sync)
-      cancelAnimationFrame(raf)
     }
   }, [])
+
+  useEffect(() => {
+    const node = nodeRef.current
+    if (!node) return
+    let raf = 0
+    const deadline = performance.now() + BILL_CHAT_DRAWER_TRANSITION_MS
+    const tick = (now: number) => {
+      syncBillChatDrawerSnapHeight(node)
+      if (now < deadline) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [snapPoint])
+
+  return bind
 }
 
 /** Non-modal vaul companion: no overlay, no body lock, handle-only drag. */
 export function BillChatDrawer({ billId }: { billId: string }) {
   const session = useBillChatSession()
-  const drawerRef = useBillChatDrawerSnapHeight()
   const [snapPoint, setSnapPoint] = useState<number | string | null>(BILL_CHAT_DRAWER_PEEK)
+  const drawerRef = useBillChatDrawerSnapHeight(snapPoint)
   const snap = billChatDrawerSnap(snapPoint)
   const collapsed = snap === 'peek'
 
