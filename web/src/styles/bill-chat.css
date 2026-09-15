@@ -74,7 +74,29 @@
     height: 100%;
   }
 
-  .bill-chat-dock--rail .bill-chat-conversation {
+  .bill-chat-dock--rail .bill-chat-body,
+  .bill-chat-drawer-inner .bill-chat-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .bill-chat-dock--rail .bill-chat-header,
+  .bill-chat-drawer-inner .bill-chat-header,
+  .bill-chat-dock--rail .bill-chat-suggestions,
+  .bill-chat-drawer-inner .bill-chat-suggestions,
+  .bill-chat-dock--rail .bill-chat-attachments,
+  .bill-chat-drawer-inner .bill-chat-attachments,
+  .bill-chat-dock--rail .bill-chat-error,
+  .bill-chat-drawer-inner .bill-chat-error,
+  .bill-chat-dock--rail .bill-chat-prompt,
+  .bill-chat-drawer-inner .bill-chat-prompt {
+    flex-shrink: 0;
+  }
+
+  .bill-chat-dock--rail .bill-chat-conversation,
+  .bill-chat-drawer-inner .bill-chat-conversation {
     flex: 1 1 auto;
     min-height: 0;
     overflow-x: hidden;
@@ -117,14 +139,6 @@
     min-height: 0;
     border-top: none;
     padding-top: 0;
-  }
-
-  .bill-chat-drawer-inner .bill-chat-conversation {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
   }
 
   .bill-chat--collapsed .bill-chat-header {

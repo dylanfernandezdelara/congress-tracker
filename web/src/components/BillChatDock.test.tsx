@@ -33,13 +33,16 @@ import {
 function Presenter({
   item,
   pendingSelection = null,
+  askNonce = 0,
 }: {
   item: FeedItem
   pendingSelection?: string | null
+  askNonce?: number
 }) {
   const payload: BillChatSessionPayload = {
     item,
     pendingSelection,
+    askNonce,
     onClearSelection: () => {},
     onSharePassage: () => {},
     onQuoteCreated: () => {},
@@ -152,5 +155,49 @@ describe('BillChatDock', () => {
       expect(document.getElementById(BILL_CHAT_RAIL_ID)).toHaveAttribute('data-bill', '119-s-2')
     })
     expect(document.querySelectorAll('.bill-chat')).toHaveLength(1)
+  })
+
+  it('clears the composer draft when the occupant bill changes', async () => {
+    function App({ number }: { number: number }) {
+      return (
+        <BillChatLayoutProvider>
+          <BillChatPane />
+          <Presenter
+            item={makeFeedItem({
+              bill: { congress: 119, type: 'S', number, title: `Bill ${number}` },
+            })}
+          />
+        </BillChatLayoutProvider>
+      )
+    }
+
+    const { rerender } = render(<App number={2} />)
+    const box = await screen.findByRole('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(box, { target: { value: 'draft for S.2' } })
+    expect(box).toHaveValue('draft for S.2')
+
+    rerender(<App number={3} />)
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('')
+  })
+
+  it('lifts the peeked drawer when Ask repeats the same passage', async () => {
+    mockViewport(false)
+
+    function App({ askNonce }: { askNonce: number }) {
+      return (
+        <BillChatLayoutProvider>
+          <BillChatDock placement="drawer" />
+          <Presenter item={makeFeedItem()} pendingSelection="same passage" askNonce={askNonce} />
+        </BillChatLayoutProvider>
+      )
+    }
+
+    const { rerender } = render(<App askNonce={1} />)
+    expect(await screen.findByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize' }))
+    expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
+
+    rerender(<App askNonce={2} />)
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
   })
 })

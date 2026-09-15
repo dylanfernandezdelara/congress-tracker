@@ -27,7 +27,7 @@ export function BillChatDrawer({ billId }: { billId: string }) {
   useEffect(() => {
     if (!session?.pendingSelection) return
     setSnapPoint(BILL_CHAT_DRAWER_HALF)
-  }, [session?.pendingSelection])
+  }, [session?.askNonce, session?.pendingSelection, session?.sourceId])
 
   const headerActions =
     snap === 'peek' ? (
@@ -36,6 +36,7 @@ export function BillChatDrawer({ billId }: { billId: string }) {
         size="sm"
         variant="outline"
         className="bill-chat-open-peek"
+        aria-expanded={false}
         onClick={() => setSnapPoint(BILL_CHAT_DRAWER_HALF)}
       >
         Open
@@ -47,6 +48,7 @@ export function BillChatDrawer({ billId }: { billId: string }) {
         size="sm"
         variant="outline"
         className="bill-chat-minimize"
+        aria-expanded={true}
         onClick={() => setSnapPoint(BILL_CHAT_DRAWER_PEEK)}
       >
         Minimize

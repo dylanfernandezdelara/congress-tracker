@@ -27,6 +27,12 @@ describe('billChatDrawerSnap', () => {
   it('keeps the JS peek string lockstep with --bill-chat-peek', () => {
     expect(billChatCss).toContain(`--bill-chat-peek: ${BILL_CHAT_DRAWER_PEEK}`)
   })
+
+  it('makes the chat body a flex child so the transcript can scroll', () => {
+    expect(billChatCss).toContain('.bill-chat-dock--rail .bill-chat-body')
+    expect(billChatCss).toContain('.bill-chat-drawer-inner .bill-chat-body')
+    expect(billChatCss).toMatch(/\.bill-chat-body[^{]*\{[^}]*min-height: 0/)
+  })
 })
 
 function SessionLabel() {

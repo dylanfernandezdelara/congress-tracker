@@ -133,6 +133,7 @@ export function FeedRowDetail({
   const [sharingQuote, setSharingQuote] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [chatSelection, setChatSelection] = useState<string | null>(null)
+  const [askNonce, setAskNonce] = useState(0)
   const detailRef = useRef<HTMLDivElement>(null)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
@@ -198,6 +199,7 @@ export function FeedRowDetail({
       ? {
           item,
           pendingSelection: chatSelection,
+          askNonce,
           onClearSelection: onClearChatSelection,
           onSharePassage: handleSharePassage,
           onQuoteCreated: share.openSheet,
@@ -297,6 +299,7 @@ export function FeedRowDetail({
         }}
         onAsk={(sel) => {
           setChatSelection(sel.text)
+          setAskNonce((n) => n + 1)
           clearSelection()
         }}
         onCopy={(current) => {

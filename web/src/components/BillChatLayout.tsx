@@ -54,19 +54,23 @@ export function billChatDrawerSnap(point: number | string | null): BillChatDrawe
 export type BillChatSessionPayload = {
   item: FeedItem
   pendingSelection: string | null
+  /** Increments on each Ask so a repeated passage still lifts the drawer. */
+  askNonce?: number
   onClearSelection: () => void
   onSharePassage: (text: string) => void
   onQuoteCreated: (quote: BillQuote) => void
 }
 
-export type BillChatSession = BillChatSessionPayload & {
+export type BillChatSession = Omit<BillChatSessionPayload, 'askNonce'> & {
   sourceId: string
+  askNonce: number
 }
 
 type SourceRecord = {
   sourceId: string
   item: FeedItem
   pendingSelection: string | null
+  askNonce: number
 }
 
 type SessionHandlers = Pick<
@@ -77,6 +81,7 @@ type SessionHandlers = Pick<
 type OccupancyRecord = {
   item: FeedItem
   pendingSelection: string | null
+  askNonce: number
 }
 
 type BillChatActions = {
@@ -97,6 +102,7 @@ export function BillChatLayoutProvider({ children }: { children: ReactNode }) {
       sourceId,
       item: record.item,
       pendingSelection: record.pendingSelection,
+      askNonce: record.askNonce,
     }
     setStack((current) => {
       const exists = current.some((entry) => entry.sourceId === sourceId)
@@ -125,6 +131,7 @@ export function BillChatLayoutProvider({ children }: { children: ReactNode }) {
       sourceId: active.sourceId,
       item: active.item,
       pendingSelection: active.pendingSelection,
+      askNonce: active.askNonce,
       onClearSelection: () => {
         handlersRef.current[active.sourceId]?.onClearSelection()
       },
@@ -160,6 +167,7 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
   const hasPayload = payload != null
   const item = payload?.item
   const pendingSelection = payload?.pendingSelection ?? null
+  const askNonce = payload?.askNonce ?? 0
 
   useLayoutEffect(() => {
     if (!actions || !hasPayload) return
@@ -173,10 +181,14 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
     if (!actions || !current) return
     actions.present(
       sourceId,
-      { item: current.item, pendingSelection: current.pendingSelection },
+      {
+        item: current.item,
+        pendingSelection: current.pendingSelection,
+        askNonce: current.askNonce ?? 0,
+      },
       Boolean(current.pendingSelection),
     )
-  }, [actions, item, pendingSelection, sourceId])
+  }, [actions, item, pendingSelection, askNonce, sourceId])
 
   // Handlers can change without an occupancy change; keep the ref current every commit.
   useLayoutEffect(() => {

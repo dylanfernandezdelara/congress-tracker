@@ -1,3 +1,4 @@
+import { formatBillQueryParam } from '@congress-tracker/shared/bill-id'
 import type { ReactNode } from 'react'
 
 import { useBillChatSession } from './BillChatLayout'
@@ -13,8 +14,10 @@ export function BillChatPane({
   const session = useBillChatSession()
   if (!session) return null
 
+  const billId = formatBillQueryParam(session.item.bill)
   return (
     <BillChatSection
+      key={billId}
       item={session.item}
       pendingSelection={session.pendingSelection}
       onClearSelection={session.onClearSelection}
