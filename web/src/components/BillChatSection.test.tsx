@@ -217,7 +217,9 @@ describe('BillChatSection', () => {
   it('opens ChatGPT and Claude with a bill briefing', async () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
-    const trigger = screen.getByRole('button', { name: 'Open in chat' })
+    const trigger = screen.getByRole('button', { name: 'Continue this bill in ChatGPT or Claude' })
+    expect(trigger).toHaveTextContent('Continue in…')
+    expect(trigger).not.toHaveTextContent('Open in chat')
     fireEvent.pointerDown(trigger)
     fireEvent.pointerUp(trigger)
     fireEvent.click(trigger)

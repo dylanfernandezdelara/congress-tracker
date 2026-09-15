@@ -89,7 +89,7 @@ describe('BillChatDock', () => {
       )
     })
     expect(document.getElementById(BILL_CHAT_RAIL_ID)).toHaveAttribute('data-bill', '119-s-2')
-    expect(screen.getByRole('button', { name: 'Open in chat' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue this bill in ChatGPT or Claude' })).toBeInTheDocument()
   })
 
   it('renders the chat pane without a rail or drawer shell', () => {
@@ -111,7 +111,7 @@ describe('BillChatDock', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open chat' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open in chat' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue this bill in ChatGPT or Claude' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
   })
 
