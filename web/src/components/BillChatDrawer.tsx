@@ -1,5 +1,5 @@
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 
 import { BillChatPane } from './BillChatPane'
@@ -25,30 +25,33 @@ export function syncBillChatDrawerSnapHeight(drawer: HTMLElement): void {
   snap.style.height = `${billChatVisibleSlicePx(drawer.getBoundingClientRect().top, window.innerHeight)}px`
 }
 
-function useBillChatDrawerSnapHeight(drawerRef: RefObject<HTMLDivElement | null>) {
-  useLayoutEffect(() => {
-    const drawer = drawerRef.current
-    if (!drawer) return
-    const sync = () => syncBillChatDrawerSnapHeight(drawer)
+function useBillChatDrawerSnapHeight() {
+  const cleanupRef = useRef<(() => void) | null>(null)
+  return useCallback((node: HTMLDivElement | null) => {
+    cleanupRef.current?.()
+    cleanupRef.current = null
+    if (!node) return
+    const sync = () => syncBillChatDrawerSnapHeight(node)
     sync()
     const mo = new MutationObserver(sync)
-    mo.observe(drawer, { attributes: true, attributeFilter: ['style'] })
+    mo.observe(node, { attributes: true, attributeFilter: ['style'] })
     window.addEventListener('resize', sync)
-    return () => {
+    const raf = requestAnimationFrame(sync)
+    cleanupRef.current = () => {
       mo.disconnect()
       window.removeEventListener('resize', sync)
+      cancelAnimationFrame(raf)
     }
-  }, [drawerRef])
+  }, [])
 }
 
 /** Non-modal vaul companion: no overlay, no body lock, handle-only drag. */
 export function BillChatDrawer({ billId }: { billId: string }) {
   const session = useBillChatSession()
-  const drawerRef = useRef<HTMLDivElement>(null)
+  const drawerRef = useBillChatDrawerSnapHeight()
   const [snapPoint, setSnapPoint] = useState<number | string | null>(BILL_CHAT_DRAWER_PEEK)
   const snap = billChatDrawerSnap(snapPoint)
   const collapsed = snap === 'peek'
-  useBillChatDrawerSnapHeight(drawerRef)
 
   useEffect(() => {
     setSnapPoint(BILL_CHAT_DRAWER_PEEK)
