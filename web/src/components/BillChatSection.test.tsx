@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -193,6 +193,28 @@ describe('BillChatSection', () => {
       { body: { selection: 'the selected text about rural clinics' } },
     )
     expect(onClearSelection).toHaveBeenCalled()
+  })
+
+  it('opens ChatGPT and Claude with a bill briefing', async () => {
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Open in chat' })
+    fireEvent.pointerDown(trigger)
+    fireEvent.pointerUp(trigger)
+    fireEvent.click(trigger)
+
+    const chatgpt = await screen.findByRole('menuitem', { name: /Open in ChatGPT/ })
+    const claude = screen.getByRole('menuitem', { name: /Open in Claude/ })
+    const chatgptHref = chatgpt.getAttribute('href') ?? ''
+    const claudeHref = claude.getAttribute('href') ?? ''
+    expect(chatgptHref).toContain('https://chatgpt.com/?')
+    expect(new URL(chatgptHref).searchParams.get('prompt')).toContain('S. 2')
+    expect(claudeHref).toContain('https://claude.ai/new?')
+    expect(new URL(claudeHref).searchParams.get('q')).toContain('S. 2')
+    expect(screen.getByRole('menuitem', { name: 'Copy briefing' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    })
   })
 
   it('shows Stop while streaming and disables send', () => {

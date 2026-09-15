@@ -30,6 +30,18 @@ function userMessageText(message: BillChatMessage): string {
     .join('')
 }
 
+/** Plain text of a turn for export / Open in ChatGPT or Claude. */
+export function messagePlainText(message: BillChatMessage): string {
+  if (message.role === 'user') return userMessageText(message)
+  const answer = messageAnswer(message)
+  if (answer?.text.trim()) return answer.text.trim()
+  return message.parts
+    .filter((part): part is Extract<BillChatPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n\n')
+    .trim()
+}
+
 function renderUnverifiedProse(text: string): ReactNode {
   const pieces = text.split(BILL_CHAT_UNVERIFIED_PLACEHOLDER)
   return pieces.map((chunk, index) => (

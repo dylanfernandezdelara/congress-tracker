@@ -17,7 +17,7 @@ import { useBillShare } from '../hooks/useBillShare'
 import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
 import { useSharedQuoteLanding } from '../hooks/useSharedQuoteLanding'
 import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
-import { BillChatSection } from './BillChatSection'
+import { BillChatDock } from './BillChatDock'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
@@ -241,7 +241,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         />
       </section>
 
-      <BillChatSection
+      <BillChatDock
         item={item}
         pendingSelection={chatSelection}
         onClearSelection={() => setChatSelection(null)}

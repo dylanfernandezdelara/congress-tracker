@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
@@ -9,6 +9,7 @@ import type {
   RecentLawsResponse,
   TightnessDot,
 } from '../api/types'
+import { BILL_CHAT_RAIL_ID, BillChatLayoutProvider, useBillChatLayout } from '../components/BillChatLayout'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
@@ -38,6 +39,43 @@ import {
 import { timelineFloorChrome } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
+
+function HomeChrome({
+  isDesktop,
+  left,
+  right,
+  children,
+}: {
+  isDesktop: boolean
+  left: ReactNode
+  right: ReactNode
+  children: ReactNode
+}) {
+  const layout = useBillChatLayout()
+  const occupied = Boolean(isDesktop && layout?.railOccupied)
+  return (
+    <div className={`home-shell${occupied ? ' home-shell--reading' : ''}`}>
+      {isDesktop ? (
+        <aside className="home-rail home-rail--left" aria-label="Session context">
+          {left}
+        </aside>
+      ) : null}
+      {children}
+      {isDesktop ? (
+        <aside
+          className={`home-rail home-rail--right${occupied ? ' home-rail--chat' : ''}`}
+          aria-label={occupied ? 'Ask about this bill' : 'Legislative context'}
+        >
+          <div
+            id={BILL_CHAT_RAIL_ID}
+            className={occupied ? 'bill-chat-rail' : 'bill-chat-rail bill-chat-rail--empty'}
+          />
+          {occupied ? null : right}
+        </aside>
+      ) : null}
+    </div>
+  )
+}
 
 function FeedSkeleton() {
   return (
@@ -240,16 +278,17 @@ export default function Home() {
 
   return (
     <MemberProfileProvider>
-      <div className="home-shell">
-      {isDesktop ? (
-        <aside className="home-rail home-rail--left" aria-label="Session context">
-          <div className="home-rail-stack">
-            {federalControl}
-            <section aria-label="Members in Congress">{memberSpotlights}</section>
-          </div>
-        </aside>
-      ) : null}
-
+      <BillChatLayoutProvider>
+        <HomeChrome
+          isDesktop={isDesktop}
+          left={
+            <div className="home-rail-stack">
+              {federalControl}
+              <section aria-label="Members in Congress">{memberSpotlights}</section>
+            </div>
+          }
+          right={<div className="home-rail-stack">{legislativeContext}</div>}
+        >
       <main id="content" className="home-feed-column feed-main">
         <div className="home-feed-toolbar">
           <FeedAdvancedFilters
@@ -424,20 +463,14 @@ export default function Home() {
           </div>
         ) : null}
       </main>
-
-      {isDesktop ? (
-        <aside className="home-rail home-rail--right" aria-label="Legislative context">
-          <div className="home-rail-stack">{legislativeContext}</div>
-        </aside>
-      ) : null}
-
+        </HomeChrome>
+      </BillChatLayoutProvider>
       <TightnessDefectorSheet
         open={selectedDot != null}
         dot={selectedDot}
         selectionKey={defectorSheetKey}
         onClose={closeTightnessDot}
       />
-      </div>
     </MemberProfileProvider>
   )
 }

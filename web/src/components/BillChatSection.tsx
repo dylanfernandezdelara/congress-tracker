@@ -3,7 +3,7 @@ import { BILL_CHAT_MAX_QUESTION_CHARS } from '@congress-tracker/shared/chat-api-
 import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { FileTextIcon, XIcon } from 'lucide-react'
+import { ChevronUpIcon, FileTextIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 
 import { createBillQuote } from '../api/client'
@@ -16,9 +16,12 @@ import {
   selectionChipLabel,
   starterChipsFromKeyPoints,
 } from '../utils/billChat'
-import { copyTextToClipboard } from '../utils/billDeepLink'
+import { buildBillChatExportPrompt } from '../utils/billChatExport'
+import { congressGovBillUrl, formatShortBillId, getBillColloquialName } from '../utils/billLabels'
+import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
-import { BillChatTranscript, messageAnswer, type BillChatMessage } from './BillChatTranscript'
+import { BillChatExportMenu } from './BillChatExportMenu'
+import { BillChatTranscript, messageAnswer, messagePlainText, type BillChatMessage } from './BillChatTranscript'
 import { SelectionMenu } from './SelectionMenu'
 import { Button } from './ui/button'
 
@@ -37,6 +40,8 @@ export type BillChatSectionProps = {
   onSharePassage: (text: string) => void
   /** A signed answer selection was minted as a quote; the caller opens the share sheet. */
   onQuoteCreated: (quote: BillQuote) => void
+  /** Mobile peek bar: open the drawer to half height. */
+  onOpenFromPeek?: () => void
 }
 
 export function BillChatSection({
@@ -45,6 +50,7 @@ export function BillChatSection({
   onClearSelection,
   onSharePassage,
   onQuoteCreated,
+  onOpenFromPeek,
 }: BillChatSectionProps) {
   const billId = formatBillQueryParam(item.bill)
   const sectionRef = useRef<HTMLElement>(null)
@@ -87,6 +93,24 @@ export function BillChatSection({
   )
   const errorText = parseChatErrorMessage(error)
   const attachedSelection = pendingSelection ? capSelection(pendingSelection) : null
+  const exportPrompt = useMemo(() => {
+    const turns = messages.flatMap((message) => {
+      if (message.role !== 'user' && message.role !== 'assistant') return []
+      const text = messagePlainText(message)
+      return text ? [{ role: message.role, text }] : []
+    })
+    return buildBillChatExportPrompt({
+      billLabel: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
+      billId: formatShortBillId(item.bill.type, item.bill.number),
+      sourceUrl: congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number),
+      pageUrl: buildBillShareUrl(item),
+      headline: item.digest?.headline,
+      whatItDoes: item.digest?.what_it_does,
+      keyPoints: item.digest?.key_points,
+      crsSummary: item.raw_summary_text,
+      messages: turns,
+    })
+  }, [item, messages])
 
   const submitQuestion = useCallback(
     (raw: string) => {
@@ -136,10 +160,29 @@ export function BillChatSection({
 
   return (
     <section ref={sectionRef} className="feed-row-detail-section bill-chat" aria-labelledby="bill-chat-heading">
-      <h3 id="bill-chat-heading" className="feed-row-detail-heading">
-        Ask about this bill
-      </h3>
-      <p className="bill-chat-note">Answers quote the bill’s text.</p>
+      <header className="bill-chat-header">
+        <div className="bill-chat-header-copy">
+          <h3 id="bill-chat-heading" className="feed-row-detail-heading">
+            Ask about this bill
+          </h3>
+          <p className="bill-chat-note">Answers quote the bill’s text.</p>
+        </div>
+        <div className="bill-chat-header-actions">
+          {onOpenFromPeek ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="bill-chat-open-peek"
+              onClick={onOpenFromPeek}
+            >
+              Open
+              <ChevronUpIcon />
+            </Button>
+          ) : null}
+          <BillChatExportMenu query={exportPrompt} />
+        </div>
+      </header>
 
       {messages.length === 0 ? (
         <div className="bill-chat-suggestions">
