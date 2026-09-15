@@ -80,7 +80,6 @@ export function BillChatSection({
 
   useEffect(() => {
     if (!pendingSelection || collapsed) return
-    sectionRef.current?.scrollIntoView?.({ block: 'nearest' })
     textareaRef.current?.focus()
   }, [collapsed, pendingSelection])
 
@@ -165,7 +164,7 @@ export function BillChatSection({
   return (
     <section
       ref={sectionRef}
-      className={`feed-row-detail-section bill-chat${collapsed ? ' bill-chat--collapsed' : ''}`}
+      className={`bill-chat${collapsed ? ' bill-chat--collapsed' : ''}`}
       aria-labelledby="bill-chat-heading"
     >
       <header className="bill-chat-header">

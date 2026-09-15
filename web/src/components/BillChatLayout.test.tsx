@@ -27,7 +27,7 @@ describe('billChatDrawerSnap', () => {
     expect(billChatDrawerSnap(BILL_CHAT_DRAWER_HALF)).toBe('half')
     expect(billChatDrawerSnap(BILL_CHAT_DRAWER_FULL)).toBe('full')
     expect(billChatDrawerSnap(null)).toBe('peek')
-    expect(billChatDrawerSnap(0.61)).toBe('peek')
+    expect(billChatDrawerSnap(0.61)).toBe('peek') // unknown values stay peek
   })
 
   it('keeps the JS peek string lockstep with --bill-chat-peek', () => {

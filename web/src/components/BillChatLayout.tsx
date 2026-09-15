@@ -46,7 +46,7 @@ export function billChatDrawerSnap(point: number | string | null): BillChatDrawe
     case null:
       return 'peek'
     default:
-      // Vaul emits intermediate values while dragging; do not throw.
+      // Unknown values stay peek so a bad snap never throws.
       return 'peek'
   }
 }
@@ -61,9 +61,8 @@ export type BillChatSessionPayload = {
   onQuoteCreated: (quote: BillQuote) => void
 }
 
-export type BillChatSession = Omit<BillChatSessionPayload, 'askNonce'> & {
+export type BillChatSession = BillChatSessionPayload & {
   sourceId: string
-  askNonce: number
 }
 
 type SourceRecord = {
@@ -78,11 +77,7 @@ type SessionHandlers = Pick<
   'onClearSelection' | 'onSharePassage' | 'onQuoteCreated'
 >
 
-type OccupancyRecord = {
-  item: FeedItem
-  pendingSelection: string | null
-  askNonce: number
-}
+type OccupancyRecord = Omit<SourceRecord, 'sourceId'>
 
 type BillChatActions = {
   present: (sourceId: string, record: OccupancyRecord, activate: boolean) => void
@@ -98,12 +93,7 @@ export function BillChatLayoutProvider({ children }: { children: ReactNode }) {
   const handlersRef = useRef<Record<string, SessionHandlers>>({})
 
   const present = useCallback((sourceId: string, record: OccupancyRecord, activate: boolean) => {
-    const next: SourceRecord = {
-      sourceId,
-      item: record.item,
-      pendingSelection: record.pendingSelection,
-      askNonce: record.askNonce,
-    }
+    const next: SourceRecord = { sourceId, ...record }
     setStack((current) => {
       const exists = current.some((entry) => entry.sourceId === sourceId)
       if (!exists) return [...current, next]
@@ -196,7 +186,7 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
     )
   }, [actions, item, pendingSelection, askNonce, sourceId])
 
-  // Handlers can change without an occupancy change; keep the ref current every commit.
+  // Handlers can change without a stack write; keep the ref current every commit.
   useLayoutEffect(() => {
     const current = payloadRef.current
     if (!actions || !current) return

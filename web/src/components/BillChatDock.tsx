@@ -21,7 +21,7 @@ export function BillChatDock({ placement }: BillChatDockProps) {
       return (
         <div
           id={BILL_CHAT_RAIL_ID}
-          className="bill-chat-dock bill-chat-dock--rail bill-chat-rail"
+          className="bill-chat-dock--rail"
           data-bill={billId}
         >
           <BillChatPane />
