@@ -23,7 +23,7 @@
   }
 
   .bill-chat-header .feed-row-detail-heading {
-    margin-bottom: 0.2rem;
+    margin-bottom: 0;
   }
 
   .bill-chat-header-copy {
@@ -45,17 +45,6 @@
     border-radius: 999px;
     font-size: 12px;
     font-weight: 500;
-  }
-
-  .bill-chat-note {
-    margin: 0 0 0.75rem;
-    font-size: 12px;
-    line-height: 1.4;
-    color: hsl(var(--twc-faint));
-  }
-
-  .bill-chat-header .bill-chat-note {
-    margin-bottom: 0;
   }
 
   .bill-chat-dock--rail {

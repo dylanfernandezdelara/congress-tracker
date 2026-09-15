@@ -92,7 +92,7 @@ describe('BillChatSection', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
-    expect(screen.getByText('Answers quote the bill’s text.')).toBeInTheDocument()
+    expect(screen.queryByText('Answers quote the bill’s text.')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'What does this bill do?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Who is affected?' })).toBeInTheDocument()
     expect(
@@ -212,7 +212,6 @@ describe('BillChatSection', () => {
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Answers quote the bill’s text.')).not.toBeInTheDocument()
   })
 
   it('opens ChatGPT and Claude with a bill briefing', async () => {

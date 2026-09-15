@@ -172,7 +172,6 @@ export function BillChatSection({
           <h3 id="bill-chat-heading" className="feed-row-detail-heading">
             Ask about this bill
           </h3>
-          {collapsed ? null : <p className="bill-chat-note">Answers quote the bill’s text.</p>}
         </div>
         <div className="bill-chat-header-actions">
           {headerActions}
