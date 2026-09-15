@@ -790,7 +790,7 @@ describe('Home', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Plain headline for readers/i }))
 
     expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open chat' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Vote tightness' })).toBeInTheDocument()
   })
 

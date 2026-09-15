@@ -157,13 +157,15 @@ export function useBillChatSession(): BillChatSession | null {
 
 /**
  * An expanded bill detail registers as a chat source.
- * First present / Ask-about-this (`pendingSelection`) activates; detach reclaims.
+ * First present appends. Ask (`askNonce` bump) steals. A leftover chip does not.
+ * Detach reclaims.
  */
 export function usePresentBillChat(payload: BillChatSessionPayload | null): void {
   const actions = useContext(BillChatActionsContext)
   const sourceId = useId()
   const payloadRef = useRef(payload)
   payloadRef.current = payload
+  const seenAskNonce = useRef<number | null>(null)
   const hasPayload = payload != null
   const item = payload?.item
   const pendingSelection = payload?.pendingSelection ?? null
@@ -172,6 +174,7 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
   useLayoutEffect(() => {
     if (!actions || !hasPayload) return
     return () => {
+      seenAskNonce.current = null
       actions.reclaim(sourceId)
     }
   }, [actions, hasPayload, sourceId])
@@ -179,14 +182,17 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
   useLayoutEffect(() => {
     const current = payloadRef.current
     if (!actions || !current) return
+    const nonce = current.askNonce ?? 0
+    const activate = seenAskNonce.current !== null && nonce !== seenAskNonce.current
+    seenAskNonce.current = nonce
     actions.present(
       sourceId,
       {
         item: current.item,
         pendingSelection: current.pendingSelection,
-        askNonce: current.askNonce ?? 0,
+        askNonce: nonce,
       },
-      Boolean(current.pendingSelection),
+      activate,
     )
   }, [actions, item, pendingSelection, askNonce, sourceId])
 

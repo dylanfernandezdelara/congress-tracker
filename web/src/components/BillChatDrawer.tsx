@@ -39,7 +39,7 @@ export function BillChatDrawer({ billId }: { billId: string }) {
         aria-expanded={false}
         onClick={() => setSnapPoint(BILL_CHAT_DRAWER_HALF)}
       >
-        Open
+        Open chat
         <ChevronUpIcon />
       </Button>
     ) : (

@@ -110,7 +110,7 @@ describe('BillChatDock', () => {
     renderHost(<Presenter item={makeFeedItem()} />, 'drawer')
 
     expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open chat' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open in chat' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
   })
@@ -119,10 +119,10 @@ describe('BillChatDock', () => {
     mockViewport(false)
     renderHost(<Presenter item={makeFeedItem()} />, 'drawer')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open chat' }))
     expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Minimize' }))
-    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open chat' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
   })
 

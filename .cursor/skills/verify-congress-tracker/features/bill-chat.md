@@ -6,7 +6,7 @@ An expanded bill opens a persistent **Ask about this bill** chat so the reader c
 
 - `chat-section` renders region `Ask about this bill` (heading + note `Answers quote the bill’s text.`) next to the bill on desktop (`#bill-chat-rail` / complementary `Ask about this bill`) or in the mobile drawer, with starter chips and a textbox `Ask about this bill` plus a `Send` button.
 - `chat-desktop-rail` — at `min-width: 1024px`, expanding a timeline bill moves the chat into the right rail (`home-shell--reading`); Vote tightness hides until the row collapses.
-- `chat-mobile-drawer` — at `max-width: 1023px` the chat is a non-modal bottom drawer (`dialog` `Ask about this bill`) with peek / half / full snaps. Peek shows the title plus **Open** / **Open in chat**. **Open** lifts to half; **Minimize** returns to peek. **Ask about this** (selection) opens the drawer to half, including a second Ask of the same passage.
+- `chat-mobile-drawer` — at `max-width: 1023px` the chat is a non-modal bottom drawer (`dialog` `Ask about this bill`) with peek / half / full snaps. Peek shows the title plus **Open chat** / **Open in chat**. **Open chat** lifts to half; **Minimize** returns to peek. **Ask about this** (selection) opens the drawer to half, including a second Ask of the same passage.
 - `chat-open-in` — `Open in chat` is a menu with `Open in ChatGPT`, `Open in Claude`, and `Copy briefing`. Each link carries a briefing (bill id, congress.gov + Track Congress URLs, summary, thread).
 - `chat-answer` streams an assistant bubble (`Answering…` while streaming) whose verified quotes render as `figure.bill-chat-quote` blockquotes with a section caption (for example `Sec. 2. Permitting deadlines · Bill text`) and a `Share this passage` button.
 - `chat-ask-about-this` — the selection toolbar `Selected text actions` gains `Ask about this`; the selection becomes an inline attachment chip on the composer (with `Remove`) and focuses the textbox.
@@ -16,7 +16,7 @@ An expanded bill opens a persistent **Ask about this bill** chat so the reader c
 
 ## How to get to it (user POV)
 
-- Expand a timeline bill. On desktop the chat is already on the right. On a phone, pull the bottom bar up (or tap **Open**).
+- Expand a timeline bill. On desktop the chat is already on the right. On a phone, pull the bottom bar up (or tap **Open chat**).
 - Tap a starter chip or type a question and press Enter / **Send**.
 - Select text in **What it does** / **Key points** / CRS summary and tap **Ask about this**.
 - Tap **Open in chat** → **Open in ChatGPT** or **Open in Claude** to continue in those apps.
@@ -39,13 +39,13 @@ Preconditions:
 - **Ask about this (selection).** Build a selection inside What it does as in `share-quote.md`, wait ~150 ms, then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "Ask about this"`. The composer shows an attachment chip (`.bill-chat-attachment`) whose `title` is the selected text, and the textbox has focus (`document.activeElement.getAttribute('aria-label') === 'Ask about this bill'`).
 - **Proof (attachment).** `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/bill-chat/chat-attachment-desktop.png`.
 - **Share a passage.** `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "Share this passage" --nth 0` then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role dialog --name "Share this quote"`. The URL in the sheet contains `&quote=`.
-- **Mobile.** Override to 390×844 (SKILL.md **Mobile proof**), re-expand the bill, and confirm a `dialog` `Ask about this bill` (peek). Tap **Open** with `--exact` (otherwise it matches `Open profile for…`) so the composer is visible, then **Minimize** to return to peek. Save `chat-answer-390.png` after an answer lands.
+- **Mobile.** Override to 390×844 (SKILL.md **Mobile proof**), re-expand the bill, and confirm a `dialog` `Ask about this bill` (peek). Tap **Open chat** so the composer is visible, then **Minimize** to return to peek. Save `chat-answer-390.png` after an answer lands.
 
 ## Gotchas
 
 - The answer comes from a free OpenRouter model, so wording varies between runs; assert on the presence of `.bill-chat-quote` and that every blockquote is verbatim from the seeded sections, not on the prose.
 - The chat is `POST /chat/bill` on the Worker. Vite proxies `/chat` to 8788 in the verify stack; the helper's `api` subcommand is GET-only and cannot exercise it — drive the UI.
 - Daily caps (`chat_usage`) are per client per UTC day; the verify D1 is disposable, so a fresh launch resets them, and `npm run seed` also clears `chat_usage` on the shared local D1. A `429` shows `chat-error` with the cap message.
-- Each expanded bill has its own conversation (`useChat` id `bill-chat-<bill>`, cached so rail ↔ drawer remounts keep the thread). Home owns one dock; timeline / New laws pass `presentChat` so a detail presents a session. Last present wins; **Ask about this** on a background bill steals the dock; detaching reclaims.
+- Each expanded bill has its own conversation (`useChat` id `bill-chat-<bill>`, cached so rail ↔ drawer remounts keep the thread). Home owns one dock; timeline / New laws pass `presentChat` so a detail presents a session. Last present wins; **Ask about this** (`askNonce`) on a background bill steals the dock; a leftover chip does not. Detaching reclaims.
 - Desktop chat lives in `#bill-chat-rail`, not at the bottom of `Details for <topic>`. Isolated component tests wrap `FeedRowDetail` with `BillChatLayoutProvider` and `<BillChatPane />`.
 - `Open in ChatGPT` / `Open in Claude` navigate off-site; do not click through in headed proof — assert `href` only.

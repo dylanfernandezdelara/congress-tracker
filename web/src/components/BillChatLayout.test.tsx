@@ -50,14 +50,17 @@ function Present({
   type,
   number,
   pendingSelection = null,
+  askNonce = 0,
 }: {
   type: 'S' | 'HR'
   number: number
   pendingSelection?: string | null
+  askNonce?: number
 }) {
   usePresentBillChat({
     item: makeFeedItem({ bill: { congress: 119, type, number, title: `${type} ${number}` } }),
     pendingSelection,
+    askNonce,
     onClearSelection: () => {},
     onSharePassage: () => {},
     onQuoteCreated: () => {},
@@ -84,11 +87,16 @@ describe('usePresentBillChat', () => {
     expect(screen.getByTestId('session')).toHaveTextContent('S-2:')
   })
 
-  it('steals the dock when a background source gets a pending selection', () => {
+  it('steals the dock when a background source asks', () => {
     function App({ askFirst }: { askFirst: boolean }) {
       return (
         <BillChatLayoutProvider>
-          <Present type="S" number={2} pendingSelection={askFirst ? 'from the first bill' : null} />
+          <Present
+            type="S"
+            number={2}
+            pendingSelection={askFirst ? 'from the first bill' : null}
+            askNonce={askFirst ? 1 : 0}
+          />
           <Present type="HR" number={1} />
           <SessionLabel />
         </BillChatLayoutProvider>
@@ -100,6 +108,35 @@ describe('usePresentBillChat', () => {
 
     rerender(<App askFirst />)
     expect(screen.getByTestId('session')).toHaveTextContent('S-2:from the first bill')
+  })
+
+  it('does not steal when an inactive source still has a leftover Ask chip', () => {
+    function First({ title }: { title: string }) {
+      usePresentBillChat({
+        item: makeFeedItem({ bill: { congress: 119, type: 'S', number: 2, title } }),
+        pendingSelection: 'leftover chip',
+        askNonce: 1,
+        onClearSelection: () => {},
+        onSharePassage: () => {},
+        onQuoteCreated: () => {},
+      })
+      return null
+    }
+
+    function App({ firstTitle }: { firstTitle: string }) {
+      return (
+        <BillChatLayoutProvider>
+          <First title={firstTitle} />
+          <Present type="HR" number={1} />
+          <SessionLabel />
+        </BillChatLayoutProvider>
+      )
+    }
+
+    const { rerender } = render(<App firstTitle="Original" />)
+    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
+    rerender(<App firstTitle="Updated title" />)
+    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
   })
 
   it('does not steal when only the inactive item identity is patched', () => {
