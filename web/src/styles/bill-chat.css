@@ -76,6 +76,7 @@
   }
 
   .bill-chat-drawer {
+    overflow: hidden;
     background: hsl(var(--twc-card));
     border-color: hsl(var(--twc-border));
     padding-bottom: env(safe-area-inset-bottom, 0px);

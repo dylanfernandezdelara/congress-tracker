@@ -4,8 +4,11 @@ export const BILL_CHAT_RAIL_ID = 'bill-chat-rail'
 export const BILL_CHAT_DESKTOP_QUERY = '(min-width: 1024px)'
 export const BILL_CHAT_MOBILE_QUERY = '(max-width: 1023px)'
 
-/** Vaul treats numbers > 1 as pixels; 0–1 are viewport fractions. */
-export const BILL_CHAT_DRAWER_PEEK = 88
+/**
+ * Vaul 1.1.2: numbers are viewport fractions (`0.5` = half the window).
+ * Pixel snaps must be strings (`"140px"`). A bare `88` is 88× the viewport.
+ */
+export const BILL_CHAT_DRAWER_PEEK = '140px'
 export const BILL_CHAT_DRAWER_HALF = 0.5
 export const BILL_CHAT_DRAWER_FULL = 0.92
 
