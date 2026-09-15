@@ -1,3 +1,13 @@
+:root {
+  --bill-chat-peek: 180px;
+}
+
+@media (max-width: 1023px) {
+  body:has(.bill-chat-drawer) {
+    padding-bottom: calc(var(--bill-chat-peek) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @layer components {
   .bill-chat {
     min-width: 0;
@@ -132,10 +142,6 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-  }
-
-  .bill-chat-rail--empty {
-    display: none;
   }
 
   .bill-chat-suggestions {

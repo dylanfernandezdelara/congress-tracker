@@ -16,6 +16,7 @@ import {
   selectionChipLabel,
   starterChipsFromKeyPoints,
 } from '../utils/billChat'
+import { billChatInstance } from '../utils/billChatInstance'
 import { buildBillChatExportPrompt } from '../utils/billChatExport'
 import { congressGovBillUrl, formatShortBillId, getBillColloquialName } from '../utils/billLabels'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
@@ -69,9 +70,9 @@ export function BillChatSection({
       }),
     [billId],
   )
+  const chat = useMemo(() => billChatInstance(billId, transport), [billId, transport])
   const { messages, sendMessage, status, stop, error, regenerate } = useChat<BillChatMessage>({
-    id: `bill-chat-${billId}`,
-    transport,
+    chat,
   })
   const { selection, clear: clearSelection } = useTextSelectionMenu(sectionRef, {
     sources: ANSWER_SELECTION_SOURCES,

@@ -8,6 +8,7 @@ import {
 } from '@congress-tracker/shared/chat-api-types'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import type { BillChatMessage } from './BillChatSection'
 
 const sendMessage = vi.fn()
@@ -31,6 +32,7 @@ const chatMock: {
 }
 
 vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
   useChat: () => chatMock,
 }))
 
@@ -81,6 +83,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  resetBillChatInstancesForTests()
   vi.restoreAllMocks()
 })
 

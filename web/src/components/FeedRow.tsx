@@ -176,7 +176,7 @@ export const FeedRow = memo(function FeedRow({
           aria-label={`Details for ${topic}`}
           hidden={!isExpanded}
         >
-          {isExpanded ? <FeedRowDetail item={item} quoteId={quoteId} /> : null}
+          {isExpanded ? <FeedRowDetail item={item} quoteId={quoteId} presentChat /> : null}
         </div>
       </article>
     </li>

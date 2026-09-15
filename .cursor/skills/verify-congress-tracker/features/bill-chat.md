@@ -46,6 +46,6 @@ Preconditions:
 - The answer comes from a free OpenRouter model, so wording varies between runs; assert on the presence of `.bill-chat-quote` and that every blockquote is verbatim from the seeded sections, not on the prose.
 - The chat is `POST /chat/bill` on the Worker. Vite proxies `/chat` to 8788 in the verify stack; the helper's `api` subcommand is GET-only and cannot exercise it — drive the UI.
 - Daily caps (`chat_usage`) are per client per UTC day; the verify D1 is disposable, so a fresh launch resets them, and `npm run seed` also clears `chat_usage` on the shared local D1. A `429` shows `chat-error` with the cap message.
-- Each expanded bill has its own conversation (`useChat` id `bill-chat-<bill>`). Home owns one dock; `FeedRowDetail` only presents a session. Last attach wins; detaching reclaims the previous source.
+- Each expanded bill has its own conversation (`useChat` id `bill-chat-<bill>`, cached so rail ↔ drawer remounts keep the thread). Home owns one dock; timeline / New laws pass `presentChat` so a detail presents a session. Last present wins; **Ask about this** on a background bill steals the dock; detaching reclaims.
 - Desktop chat lives in `#bill-chat-rail`, not at the bottom of `Details for <topic>`. Isolated component tests wrap `FeedRowDetail` with `BillChatLayoutProvider` and `<BillChatDock placement="inline" />`.
 - `Open in ChatGPT` / `Open in Claude` navigate off-site; do not click through in headed proof — assert `href` only.

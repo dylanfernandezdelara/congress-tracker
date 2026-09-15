@@ -69,10 +69,10 @@ function HomeChrome({
           className={`home-rail home-rail--right${occupied ? ' home-rail--chat' : ''}`}
           aria-label={occupied ? 'Ask about this bill' : 'Legislative context'}
         >
-          {occupied ? <BillChatDock isDesktop /> : right}
+          {occupied ? <BillChatDock placement="rail" /> : right}
         </aside>
       ) : (
-        <BillChatDock isDesktop={false} />
+        <BillChatDock placement="drawer" />
       )}
     </div>
   )

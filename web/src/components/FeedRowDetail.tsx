@@ -35,6 +35,8 @@ type FeedRowDetailProps = {
   shareUrl?: string
   /** `?quote=` id from a shared link that targets this bill. */
   quoteId?: string | null
+  /** Home hosts present an expanded row so the dock can attach. */
+  presentChat?: boolean
 }
 
 const SELECTION_STATUS_MS = 1800
@@ -112,7 +114,12 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
   )
 }
 
-export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailProps) {
+export function FeedRowDetail({
+  item,
+  shareUrl,
+  quoteId = null,
+  presentChat = false,
+}: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
   const summary = getFeedSummaryContent(item)
@@ -186,13 +193,17 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
 
   const onClearChatSelection = useCallback(() => setChatSelection(null), [])
 
-  usePresentBillChat({
-    item,
-    pendingSelection: chatSelection,
-    onClearSelection: onClearChatSelection,
-    onSharePassage: handleSharePassage,
-    onQuoteCreated: share.openSheet,
-  })
+  usePresentBillChat(
+    presentChat
+      ? {
+          item,
+          pendingSelection: chatSelection,
+          onClearSelection: onClearChatSelection,
+          onSharePassage: handleSharePassage,
+          onQuoteCreated: share.openSheet,
+        }
+      : null,
+  )
 
   const handleCopySelection = async (current: TextSelection) => {
     const ok = await copyTextToClipboard(current.text)

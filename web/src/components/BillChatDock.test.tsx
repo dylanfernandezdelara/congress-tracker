@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FeedItem } from '../api/types'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { mockViewport } from '../test/homeRouteHarness'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 
 const sendMessage = vi.fn()
 
 vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
   useChat: () => ({
     messages: [],
     status: 'ready',
@@ -19,7 +21,7 @@ vi.mock('@ai-sdk/react', () => ({
   }),
 }))
 
-import { BillChatDock } from './BillChatDock'
+import { BillChatDock, type BillChatDockPlacement } from './BillChatDock'
 import {
   BILL_CHAT_RAIL_ID,
   BillChatLayoutProvider,
@@ -45,14 +47,10 @@ function Presenter({
   return null
 }
 
-function renderHost(
-  ui: ReactNode,
-  options: { isDesktop?: boolean; placement?: 'rail' | 'drawer' | 'inline' } = {},
-) {
-  const { isDesktop = true, placement } = options
+function renderHost(ui: ReactNode, placement: BillChatDockPlacement = 'rail') {
   return render(
     <BillChatLayoutProvider>
-      <BillChatDock isDesktop={isDesktop} placement={placement} />
+      <BillChatDock placement={placement} />
       {ui}
     </BillChatLayoutProvider>,
   )
@@ -64,13 +62,14 @@ describe('BillChatDock', () => {
   })
 
   afterEach(() => {
+    resetBillChatInstancesForTests()
     vi.restoreAllMocks()
   })
 
   it('renders nothing until a bill presents a session', () => {
     render(
       <BillChatLayoutProvider>
-        <BillChatDock isDesktop />
+        <BillChatDock placement="rail" />
       </BillChatLayoutProvider>,
     )
 
@@ -90,7 +89,7 @@ describe('BillChatDock', () => {
   })
 
   it('keeps the chat inline when tests opt out of the rail and drawer', () => {
-    renderHost(<Presenter item={makeFeedItem()} />, { isDesktop: false, placement: 'inline' })
+    renderHost(<Presenter item={makeFeedItem()} />, 'inline')
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' }).closest('.bill-chat-dock--inline')).toBeTruthy()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -98,7 +97,7 @@ describe('BillChatDock', () => {
 
   it('mounts a companion drawer on mobile when a bill is presented', async () => {
     mockViewport(false)
-    renderHost(<Presenter item={makeFeedItem()} />, { isDesktop: false })
+    renderHost(<Presenter item={makeFeedItem()} />, 'drawer')
 
     expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
@@ -108,7 +107,7 @@ describe('BillChatDock', () => {
 
   it('opens and minimizes the mobile drawer from the header actions', async () => {
     mockViewport(false)
-    renderHost(<Presenter item={makeFeedItem()} />, { isDesktop: false })
+    renderHost(<Presenter item={makeFeedItem()} />, 'drawer')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open' }))
     expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
@@ -126,7 +125,7 @@ describe('BillChatDock', () => {
     function App({ showSecond }: { showSecond: boolean }) {
       return (
         <BillChatLayoutProvider>
-          <BillChatDock isDesktop />
+          <BillChatDock placement="rail" />
           <Presenter item={first} />
           {showSecond ? <Presenter item={second} /> : null}
         </BillChatLayoutProvider>

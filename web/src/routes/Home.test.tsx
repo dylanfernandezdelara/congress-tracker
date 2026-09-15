@@ -16,6 +16,7 @@ import {
 import { formatVoteDate } from '../utils/billLabels'
 import { chamberFloorDetail } from '../utils/feedQuiet'
 import { floorChipLabel } from '../utils/floorStatusCopy'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
@@ -85,6 +86,7 @@ describe('Home', () => {
     vi.clearAllMocks()
     clearMemberProfileCache()
     resetSheetLayerForTests()
+    resetBillChatInstancesForTests()
     document.body.style.overflow = ''
   })
 

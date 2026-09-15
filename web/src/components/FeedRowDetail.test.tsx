@@ -6,6 +6,7 @@ import type { FeedPassageVote } from '../api/types'
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { BillChatDock } from './BillChatDock'
 import { BillChatLayoutProvider } from './BillChatLayout'
@@ -45,6 +46,7 @@ const chatMock: {
 }
 
 vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
   useChat: () => chatMock,
 }))
 
@@ -73,6 +75,7 @@ afterEach(() => {
   clearMemberProfileCache()
   clearRollDefectorsCache()
   resetSheetLayerForTests()
+  resetBillChatInstancesForTests()
 })
 
 function renderDetailWithChat(ui: ReactElement) {
@@ -709,9 +712,14 @@ describe('FeedRowDetail', () => {
     vi.useRealTimers()
   })
 
+  it('does not present a chat session unless the host asks', () => {
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
+    expect(screen.queryByRole('heading', { name: 'Ask about this bill' })).not.toBeInTheDocument()
+  })
+
   it('sends a selection to the bill chat when Ask about this is used', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} presentChat />)
 
     selectQuotableText('It does something important in plain language.')
     await act(async () => {
@@ -761,7 +769,7 @@ describe('FeedRowDetail', () => {
       },
       url: 'https://trackcongress.org/?bill=119-s-2&quote=cafecafecafecafe',
     })
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} presentChat />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {
@@ -804,7 +812,7 @@ describe('FeedRowDetail', () => {
         ],
       },
     ]
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} presentChat />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {

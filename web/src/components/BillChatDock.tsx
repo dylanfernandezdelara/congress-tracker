@@ -2,29 +2,25 @@ import { formatBillQueryParam } from '@congress-tracker/shared/bill-id'
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { BillChatDrawer } from './BillChatDrawer'
 import { BillChatSection } from './BillChatSection'
 import {
   BILL_CHAT_DRAWER_HALF,
   BILL_CHAT_DRAWER_PEEK,
-  BILL_CHAT_DRAWER_SNAP_POINTS,
   BILL_CHAT_RAIL_ID,
   billChatDrawerSnap,
   useBillChatSession,
 } from './BillChatLayout'
 import { Button } from './ui/button'
-import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from './ui/drawer'
 
 export type BillChatDockPlacement = 'rail' | 'drawer' | 'inline'
 
 type BillChatDockProps = {
-  isDesktop?: boolean
-  /** Isolated tests render in place so they do not mount a vaul dialog. */
-  placement?: BillChatDockPlacement
+  placement: BillChatDockPlacement
 }
 
-export function BillChatDock({ isDesktop = false, placement }: BillChatDockProps) {
+export function BillChatDock({ placement }: BillChatDockProps) {
   const session = useBillChatSession()
-  const mode = placement ?? (isDesktop ? 'rail' : 'drawer')
   const [snapPoint, setSnapPoint] = useState<number | string | null>(BILL_CHAT_DRAWER_PEEK)
   const snap = billChatDrawerSnap(snapPoint)
   const billId = session ? formatBillQueryParam(session.item.bill) : null
@@ -34,15 +30,15 @@ export function BillChatDock({ isDesktop = false, placement }: BillChatDockProps
   }, [session?.sourceId])
 
   useEffect(() => {
-    if (!session?.pendingSelection || mode !== 'drawer') return
+    if (!session?.pendingSelection || placement !== 'drawer') return
     setSnapPoint(BILL_CHAT_DRAWER_HALF)
-  }, [mode, session?.pendingSelection])
+  }, [placement, session?.pendingSelection])
 
   if (!session || !billId) return null
 
-  const collapsed = mode === 'drawer' && snap === 'peek'
+  const collapsed = placement === 'drawer' && snap === 'peek'
   const drawerActions =
-    mode === 'drawer' ? (
+    placement === 'drawer' ? (
       snap === 'peek' ? (
         <Button
           type="button"
@@ -80,7 +76,7 @@ export function BillChatDock({ isDesktop = false, placement }: BillChatDockProps
     />
   )
 
-  if (mode === 'rail') {
+  if (placement === 'rail') {
     return (
       <div
         id={BILL_CHAT_RAIL_ID}
@@ -92,7 +88,7 @@ export function BillChatDock({ isDesktop = false, placement }: BillChatDockProps
     )
   }
 
-  if (mode === 'inline') {
+  if (placement === 'inline') {
     return (
       <div className="bill-chat-dock bill-chat-dock--inline" data-bill={billId}>
         {chat}
@@ -101,26 +97,8 @@ export function BillChatDock({ isDesktop = false, placement }: BillChatDockProps
   }
 
   return (
-    <Drawer
-      open
-      modal={false}
-      dismissible={false}
-      handleOnly
-      noBodyStyles
-      shouldScaleBackground={false}
-      snapPoints={[...BILL_CHAT_DRAWER_SNAP_POINTS]}
-      activeSnapPoint={snapPoint}
-      setActiveSnapPoint={setSnapPoint}
-    >
-      <DrawerContent showOverlay={false} className="bill-chat-drawer h-full max-h-[97%] mt-0">
-        <DrawerTitle className="sr-only">Ask about this bill</DrawerTitle>
-        <DrawerDescription className="sr-only">
-          Pull up to ask follow-up questions without leaving the bill.
-        </DrawerDescription>
-        <div className="bill-chat-drawer-inner" data-snap={snap} data-bill={billId}>
-          {chat}
-        </div>
-      </DrawerContent>
-    </Drawer>
+    <BillChatDrawer snapPoint={snapPoint} setSnapPoint={setSnapPoint} snap={snap} billId={billId}>
+      {chat}
+    </BillChatDrawer>
   )
 }
