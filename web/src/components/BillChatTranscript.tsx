@@ -7,6 +7,8 @@ import type { UIMessage } from 'ai'
 import type { ReactNode } from 'react'
 
 import { evidenceSourceLabel, splitProseParagraphs } from '../utils/billChat'
+import { Conversation, ConversationContent } from './ai-elements/conversation'
+import { Message, MessageContent } from './ai-elements/message'
 
 export type BillChatMessage = UIMessage<
   unknown,
@@ -28,6 +30,18 @@ function userMessageText(message: BillChatMessage): string {
     .filter((part): part is Extract<BillChatPart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .join('')
+}
+
+/** Plain text of a turn for export / Open in ChatGPT or Claude. */
+export function messagePlainText(message: BillChatMessage): string {
+  if (message.role === 'user') return userMessageText(message)
+  const answer = messageAnswer(message)
+  if (answer?.text.trim()) return answer.text.trim()
+  return message.parts
+    .filter((part): part is Extract<BillChatPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n\n')
+    .trim()
 }
 
 function renderUnverifiedProse(text: string): ReactNode {
@@ -82,7 +96,7 @@ function AssistantBubble({
   const refused = messageAnswer(message)?.refused === true
 
   return (
-    <div
+    <MessageContent
       className={`bill-chat-message-content bill-chat-bubble ${
         refused ? 'bill-chat-bubble--refused' : 'bill-chat-bubble--assistant'
       }`}
@@ -124,7 +138,7 @@ function AssistantBubble({
           Answering…
         </p>
       ) : null}
-    </div>
+    </MessageContent>
   )
 }
 
@@ -137,36 +151,39 @@ export type BillChatTranscriptProps = {
 export function BillChatTranscript({ messages, status, onSharePassage }: BillChatTranscriptProps) {
   if (messages.length === 0) return null
   return (
-    <div className="bill-chat-conversation" role="log">
-      <div className="bill-chat-conversation-content">
+    <Conversation className="bill-chat-conversation">
+      <ConversationContent
+        className="bill-chat-conversation-content"
+        scrollClassName="bill-chat-conversation-scroll"
+      >
         {messages.map((message, index) => {
           if (message.role === 'user') {
             return (
-              <div key={message.id} className="bill-chat-message bill-chat-message--user" data-from="user">
-                <div className="bill-chat-message-content bill-chat-bubble bill-chat-bubble--user">
+              <Message key={message.id} from="user" className="bill-chat-message bill-chat-message--user">
+                <MessageContent className="bill-chat-message-content bill-chat-bubble bill-chat-bubble--user">
                   {userMessageText(message)}
-                </div>
-              </div>
+                </MessageContent>
+              </Message>
             )
           }
           if (message.role === 'assistant') {
             return (
-              <div
+              <Message
                 key={message.id}
+                from="assistant"
                 className="bill-chat-message bill-chat-message--assistant"
-                data-from="assistant"
               >
                 <AssistantBubble
                   message={message}
                   streaming={index === messages.length - 1 && status === 'streaming'}
                   onSharePassage={onSharePassage}
                 />
-              </div>
+              </Message>
             )
           }
           return null
         })}
-      </div>
-    </div>
+      </ConversationContent>
+    </Conversation>
   )
 }

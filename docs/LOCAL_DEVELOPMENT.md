@@ -30,6 +30,11 @@ worker.
 Open `http://127.0.0.1:5173` — the seeded sample bills and member spotlights
 appear immediately, no API keys required.
 
+**Alignment grid:** append `?align=1` (or `?align=grid`) to any local or
+preview URL to show the 8px snap overlay while adjusting layout. The lines
+are off unless that query is present (`qa:web` and production stay clean).
+New spacing should use the `--space-*` tokens in `web/src/styles/base.css`.
+
 The Vite dev server proxies `/feed`, `/stats`, `/health`, and `/debug`
 to the worker on `:8787`, so the UI uses same-origin API URLs (matching
 production). **Both dev servers must be running** — if only `dev:web` is up,

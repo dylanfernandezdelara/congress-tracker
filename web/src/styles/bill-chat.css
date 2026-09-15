@@ -1,35 +1,191 @@
+:root {
+  --bill-chat-peek: 180px;
+}
+
+@media (max-width: 1023px) {
+  body:has(.bill-chat-drawer) {
+    padding-bottom: calc(var(--bill-chat-peek) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @layer components {
   .bill-chat {
     min-width: 0;
     max-width: 100%;
   }
 
-  .bill-chat-note {
-    margin: 0 0 0.75rem;
-    font-size: 12px;
-    line-height: 1.4;
-    color: hsl(var(--twc-faint));
+  .bill-chat-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: 0;
   }
 
-  .bill-chat-suggestions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0 0 0.75rem;
+  .bill-chat-header .feed-row-detail-heading {
+    margin: 0;
     min-width: 0;
   }
 
+  .bill-chat-header-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .bill-chat-export-trigger,
+  .bill-chat-open-peek,
+  .bill-chat-minimize {
+    height: auto;
+    padding: var(--space-half) var(--space-2);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .bill-chat-dock--rail {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .bill-chat-dock--rail .bill-chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .bill-chat-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .bill-chat-dock--rail .bill-chat-body,
+  .bill-chat-drawer-inner .bill-chat-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .bill-chat-dock--rail .bill-chat-header,
+  .bill-chat-drawer-inner .bill-chat-header,
+  .bill-chat-dock--rail .bill-chat-suggestions,
+  .bill-chat-drawer-inner .bill-chat-suggestions,
+  .bill-chat-dock--rail .bill-chat-attachments,
+  .bill-chat-drawer-inner .bill-chat-attachments,
+  .bill-chat-dock--rail .bill-chat-error,
+  .bill-chat-drawer-inner .bill-chat-error,
+  .bill-chat-dock--rail .bill-chat-prompt,
+  .bill-chat-drawer-inner .bill-chat-prompt {
+    flex-shrink: 0;
+  }
+
+  .bill-chat-dock--rail .bill-chat-conversation,
+  .bill-chat-drawer-inner .bill-chat-conversation {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* StickToBottom scrolls an inner wrapper; contain must sit on that node. */
+  .bill-chat-conversation-scroll {
+    overscroll-behavior: contain;
+  }
+
+  .bill-chat-drawer {
+    overflow: hidden;
+    background: hsl(var(--twc-card));
+    border-color: hsl(var(--twc-border));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /*
+    Vaul 1.1.2 keeps the sheet at h-full / max-h-[97%] and translates it by
+    --snap-point-height (containerHeight - snapHeight). Size the used column
+    to the visible slice so Send stays in the half / full window after the
+    transcript grows. Do not set Content height to the snap — that double-
+    offsets against the translate.     During drag and snap transitions the
+    drawer JS overwrites this height with the live visible slice
+    (viewport minus the sheet top) because vaul only updates
+    --snap-point-height when a snap settles, and the 0.5s transform
+    interpolates without further style writes. A rAF loop on snap changes
+    and transform transitionrun covers Open chat / Minimize and a
+    same-snap rubber-band. The companion Drawer also
+    sets repositionInputs={false}: default true rewrites Content height
+    when the keyboard opens, and 100% minus the window-based offset then
+    collapses.
+  */
+  .bill-chat-drawer-snap {
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - var(--snap-point-height, 0px));
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Vaul's handle hit-area is 44×44 and centered on the pill. A 100px-wide
+     handle made that box cover Open chat / Continue in… on a 390px peek bar. */
+  .bill-chat-drawer [data-vaul-handle] {
+    width: 32px;
+    height: 5px;
+  }
+
+  .bill-chat-drawer [data-vaul-handle-hitarea] {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .bill-chat-drawer-inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: var(--space-3) var(--space-2) var(--space-2);
+  }
+
+  .bill-chat-drawer-inner .bill-chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .bill-chat-suggestions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-1);
+    margin: 0;
+    min-width: 0;
+  }
+
+  .bill-chat-suggestion:nth-child(n + 3) {
+    grid-column: 1 / -1;
+  }
+
   .bill-chat-suggestion {
+    width: 100%;
     max-width: 100%;
     height: auto;
-    min-height: 1.75rem;
-    padding: 0.3rem 0.7rem;
+    min-height: var(--space-3);
+    padding: var(--space-half) var(--space-2);
     border-radius: 999px;
     font-size: 12px;
     font-weight: 500;
     line-height: 1.3;
     white-space: normal;
     text-align: left;
+    justify-content: flex-start;
     overflow-wrap: anywhere;
   }
 
@@ -43,8 +199,8 @@
   .bill-chat-conversation-content {
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
-    margin: 0 0 0.75rem;
+    gap: var(--space-2);
+    margin: 0;
     min-width: 0;
   }
 
@@ -71,7 +227,7 @@
   .bill-chat-bubble {
     min-width: 0;
     max-width: min(100%, 36rem);
-    padding: 0.55rem 0.75rem;
+    padding: var(--space-2);
     font-size: 13px;
     line-height: 1.45;
   }
@@ -99,7 +255,7 @@
   .bill-chat-prose {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: var(--space-1);
     min-width: 0;
   }
 
@@ -115,9 +271,9 @@
   .bill-chat-quote {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    margin: 0.55rem 0 0;
-    padding: 0.45rem 0 0.15rem 0.7rem;
+    gap: var(--space-1);
+    margin: var(--space-2) 0 0;
+    padding: var(--space-1) 0 var(--space-half) var(--space-2);
     border-left: 3px solid hsl(var(--twc-law));
     min-width: 0;
   }
@@ -141,7 +297,7 @@
   .bill-chat-quote-share {
     align-self: flex-start;
     margin: 0;
-    padding: 0.2rem 0.55rem;
+    padding: var(--space-half) var(--space-2);
     border: 1px solid hsl(var(--twc-border));
     border-radius: 999px;
     background: transparent;
@@ -165,15 +321,15 @@
   .bill-chat-streaming {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    margin-top: 0.4rem;
+    gap: var(--space-1);
+    margin-top: var(--space-1);
     font-size: 11px;
     color: hsl(var(--twc-faint));
   }
 
   .bill-chat-streaming-dot {
-    width: 0.4rem;
-    height: 0.4rem;
+    width: var(--space-1);
+    height: var(--space-1);
     border-radius: 999px;
     background: hsl(var(--twc-faint));
     animation: bill-chat-pulse 1s ease-in-out infinite;
@@ -193,10 +349,10 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.45rem 0.7rem;
-    margin: 0 0 0.75rem;
-    padding: 0.5rem 0.7rem;
-    border-radius: 10px;
+    gap: var(--space-1) var(--space-2);
+    margin: 0;
+    padding: var(--space-1) var(--space-2);
+    border-radius: 8px;
     background: hsl(var(--twc-surface-subtle));
     font-size: 12px;
     color: hsl(var(--twc-secondary));
@@ -204,7 +360,7 @@
 
   .bill-chat-error-retry {
     margin: 0;
-    padding: 0.2rem 0.55rem;
+    padding: var(--space-half) var(--space-2);
     border: 1px solid hsl(var(--twc-border));
     border-radius: 999px;
     background: hsl(var(--twc-card));
@@ -218,18 +374,18 @@
   .bill-chat-attachments {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0 0 0.45rem;
+    gap: var(--space-1);
+    margin: 0;
     min-width: 0;
   }
 
   .bill-chat-attachment {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: var(--space-1);
     max-width: 100%;
     min-width: 0;
-    padding: 0.25rem 0.45rem 0.25rem 0.4rem;
+    padding: var(--space-half) var(--space-1);
     border: 1px solid hsl(var(--twc-border));
     border-radius: 999px;
     background: hsl(var(--twc-card));
@@ -260,8 +416,8 @@
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    width: 1.15rem;
-    height: 1.15rem;
+    width: var(--space-2);
+    height: var(--space-2);
     margin: 0;
     padding: 0;
     border: none;
@@ -281,49 +437,29 @@
     color: hsl(var(--twc-foreground));
   }
 
+  .bill-chat-dock--rail .bill-chat-prompt,
+  .bill-chat-drawer-inner .bill-chat-prompt {
+    margin-top: auto;
+  }
+
   .bill-chat-prompt {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
     min-width: 0;
   }
 
-  .bill-chat-prompt-textarea {
-    display: block;
-    width: 100%;
-    min-width: 0;
-    min-height: 2.6rem;
-    margin: 0;
-    padding: 0.5rem 0.65rem;
-    border: 1px solid hsl(var(--twc-border));
+  .bill-chat-prompt-group {
     border-radius: 12px;
     background: hsl(var(--twc-card));
-    font: inherit;
+  }
+
+  .bill-chat-prompt-group textarea {
+    min-height: var(--space-6);
     font-size: 13px;
     line-height: 1.4;
-    color: hsl(var(--twc-foreground));
-    resize: vertical;
   }
 
-  .bill-chat-prompt-textarea:focus-visible {
-    outline: 2px solid hsl(var(--twc-foreground));
-    outline-offset: 1px;
-  }
-
-  .bill-chat-prompt-textarea:disabled {
-    color: hsl(var(--twc-faint));
-  }
-
-  .bill-chat-prompt-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.4rem;
-  }
-
-  .bill-chat-prompt-submit,
-  .bill-chat-prompt-stop {
+  .bill-chat-prompt-submit {
     height: auto;
-    padding: 0.3rem 0.75rem;
+    padding: var(--space-half) var(--space-2);
     border-radius: 999px;
     font-size: 12px;
     font-weight: 500;

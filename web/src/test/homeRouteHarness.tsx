@@ -35,7 +35,8 @@ export function mockViewport(isDesktop: boolean) {
     matches:
       (isDesktop &&
         (query.includes('min-width: 1024px') || query.includes('min-width: 640px'))) ||
-      (!isDesktop && query.includes('prefers-reduced-motion')),
+      (!isDesktop &&
+        (query.includes('max-width: 1023px') || query.includes('prefers-reduced-motion'))),
     media: query,
     onchange: null,
     addListener: () => {},
