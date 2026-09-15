@@ -168,11 +168,9 @@ export function BillChatSection({
       aria-labelledby="bill-chat-heading"
     >
       <header className="bill-chat-header">
-        <div className="bill-chat-header-copy">
-          <h3 id="bill-chat-heading" className="feed-row-detail-heading">
-            Ask about this bill
-          </h3>
-        </div>
+        <h3 id="bill-chat-heading" className="feed-row-detail-heading">
+          Ask about this bill
+        </h3>
         <div className="bill-chat-header-actions">
           {headerActions}
           <BillChatExportMenu query={exportPrompt} />

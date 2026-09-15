@@ -47,5 +47,6 @@ Preconditions:
 - The chat is `POST /chat/bill` on the Worker. Vite proxies `/chat` to 8788 in the verify stack; the helper's `api` subcommand is GET-only and cannot exercise it — drive the UI.
 - Daily caps (`chat_usage`) are per client per UTC day; the verify D1 is disposable, so a fresh launch resets them, and `npm run seed` also clears `chat_usage` on the shared local D1. A `429` shows `chat-error` with the cap message.
 - Each expanded bill has its own conversation (`useChat` id `bill-chat-<bill>`, cached so rail ↔ drawer remounts keep the thread). Home owns one dock; timeline / New laws pass `presentChat` so a detail presents a session. Last present wins; **Ask about this** (`askNonce`) on a background bill steals the dock; a leftover chip does not. Detaching reclaims.
-- Desktop chat lives in `#bill-chat-rail`, not at the bottom of `Details for <topic>`. Isolated component tests wrap `FeedRowDetail` with `BillChatLayoutProvider` and `<BillChatPane />`.
+- Desktop chat lives in `#bill-chat-rail`, not at the bottom of `Details for <topic>`. Isolated component tests wrap `FeedRowDetail` with `BillChatLayoutProvider` and `<BillChatPane />`. The rail fills the column (`100vh - 64px`); empty-state chips sit on a 2-column grid and the composer is `textarea | Send`.
 - `Open in ChatGPT` / `Open in Claude` navigate off-site; do not click through in headed proof — assert `href` only.
+- Layout overlay: `?align=1` paints the 8px grid on `html[data-align-grid]`. Leave it off for `qa:web` screenshots.

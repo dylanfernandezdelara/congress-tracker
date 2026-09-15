@@ -40,6 +40,15 @@ describe('billChatDrawerSnap', () => {
     expect(billChatCss).toMatch(/\.bill-chat-body[^{]*\{[^}]*min-height: 0/)
   })
 
+  it('snaps the header, chips, and composer to the 8px grid', () => {
+    expect(billChatCss).not.toContain('bill-chat-header-copy')
+    expect(billChatCss).toContain('grid-template-columns: minmax(0, 1fr) auto')
+    expect(billChatCss).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(billChatCss).toContain('.bill-chat-suggestion:nth-child(n + 3)')
+    expect(billChatCss).toContain('gap: var(--space-2)')
+    expect(billChatCss).toContain('align-items: end')
+  })
+
   it('sizes the drawer column to the visible vaul slice, not the untranslated sheet', () => {
     expect(billChatCss).toContain('.bill-chat-drawer-snap')
     expect(billChatCss).toContain('height: calc(100% - var(--snap-point-height, 0px))')

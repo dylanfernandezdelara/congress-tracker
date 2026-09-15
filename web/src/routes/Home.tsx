@@ -34,7 +34,7 @@ import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { useStatsData } from '../hooks/useStatsData'
-import { feedRowKey, itemMatchesBillParam } from '../utils/billDeepLink'
+import { BILL_QUOTE_QUERY_PARAM, feedRowKey, itemMatchesBillParam } from '../utils/billDeepLink'
 import { tightnessDotKey } from '../utils/tightnessLabels'
 import {
   advancedFilterCount,
@@ -159,7 +159,12 @@ export default function Home() {
 
   const openWaitingBill = useCallback(
     (billParam: string) => {
-      setSearchParams({ bill: billParam })
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('bill', billParam)
+        next.delete(BILL_QUOTE_QUERY_PARAM)
+        return next
+      })
     },
     [setSearchParams],
   )
