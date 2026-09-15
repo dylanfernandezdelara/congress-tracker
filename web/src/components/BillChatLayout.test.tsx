@@ -33,6 +33,11 @@ describe('billChatDrawerSnap', () => {
     expect(billChatCss).toContain('.bill-chat-drawer-inner .bill-chat-body')
     expect(billChatCss).toMatch(/\.bill-chat-body[^{]*\{[^}]*min-height: 0/)
   })
+
+  it('sizes the drawer column to the visible vaul slice, not the untranslated sheet', () => {
+    expect(billChatCss).toContain('.bill-chat-drawer-snap')
+    expect(billChatCss).toContain('height: calc(100% - var(--snap-point-height, 0px))')
+  })
 })
 
 function SessionLabel() {

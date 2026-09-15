@@ -111,6 +111,22 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  /*
+    Vaul 1.1.2 keeps the sheet at h-full / max-h-[97%] and translates it by
+    --snap-point-height (containerHeight - snapHeight). Size the used column
+    to the visible slice so Send stays in the half / full window after the
+    transcript grows. Do not set Content height to the snap — that double-
+    offsets against the translate.
+  */
+  .bill-chat-drawer-snap {
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - var(--snap-point-height, 0px));
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   /* Vaul's handle hit-area is 44×44 and centered on the pill. A 100px-wide
      handle made that box cover Open / Open in chat on a 390px peek bar. */
   .bill-chat-drawer [data-vaul-handle] {

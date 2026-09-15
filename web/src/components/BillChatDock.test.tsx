@@ -120,6 +120,9 @@ describe('BillChatDock', () => {
     renderHost(<Presenter item={makeFeedItem()} />, 'drawer')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open chat' }))
+    const snap = document.querySelector('.bill-chat-drawer-snap')
+    expect(snap).not.toBeNull()
+    expect(snap?.querySelector('.bill-chat-prompt')).not.toBeNull()
     expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Minimize' }))
     expect(screen.getByRole('button', { name: 'Open chat' })).toBeInTheDocument()
