@@ -1,11 +1,8 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
+import billChatCss from '../styles/bill-chat.css?raw'
 import {
   BILL_CHAT_DRAWER_FULL,
   BILL_CHAT_DRAWER_HALF,
@@ -28,8 +25,7 @@ describe('billChatDrawerSnap', () => {
   })
 
   it('keeps the JS peek string lockstep with --bill-chat-peek', () => {
-    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../styles/bill-chat.css'), 'utf8')
-    expect(css).toContain(`--bill-chat-peek: ${BILL_CHAT_DRAWER_PEEK}`)
+    expect(billChatCss).toContain(`--bill-chat-peek: ${BILL_CHAT_DRAWER_PEEK}`)
   })
 })
 
