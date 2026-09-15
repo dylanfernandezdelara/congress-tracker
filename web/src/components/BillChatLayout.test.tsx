@@ -5,6 +5,10 @@ import { makeFeedItem } from '../test/feedItemFixtures'
 import billChatCss from '../styles/bill-chat.css?raw'
 import billChatDrawerSource from './BillChatDrawer.tsx?raw'
 import {
+  billChatVisibleSlicePx,
+  syncBillChatDrawerSnapHeight,
+} from './BillChatDrawer'
+import {
   BILL_CHAT_DRAWER_FULL,
   BILL_CHAT_DRAWER_HALF,
   BILL_CHAT_DRAWER_PEEK,
@@ -42,6 +46,23 @@ describe('billChatDrawerSnap', () => {
 
   it('keeps vaul from rewriting Content height when the keyboard opens', () => {
     expect(billChatDrawerSource).toContain('repositionInputs={false}')
+  })
+
+  it('sizes the snap column from the live sheet top, including mid-drag', () => {
+    expect(billChatVisibleSlicePx(422, 844)).toBe(422)
+    expect(billChatVisibleSlicePx(664, 844)).toBe(180)
+    expect(billChatVisibleSlicePx(900, 844)).toBe(0)
+
+    const drawer = document.createElement('div')
+    const snap = document.createElement('div')
+    snap.className = 'bill-chat-drawer-snap'
+    drawer.appendChild(snap)
+    drawer.getBoundingClientRect = () => ({ top: 600 }) as DOMRect
+    const innerHeight = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 })
+    syncBillChatDrawerSnapHeight(drawer)
+    expect(snap.style.height).toBe('244px')
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerHeight })
   })
 })
 
@@ -154,6 +175,7 @@ describe('usePresentBillChat', () => {
       usePresentBillChat({
         item: makeFeedItem({ bill: { congress: 119, type: 'S', number: 2, title } }),
         pendingSelection: null,
+        askNonce: 0,
         onClearSelection: () => {},
         onSharePassage: () => {},
         onQuoteCreated: () => {},
@@ -185,6 +207,7 @@ describe('usePresentBillChat', () => {
       usePresentBillChat({
         item: makeFeedItem(),
         pendingSelection: null,
+        askNonce: 0,
         onClearSelection: () => {},
         onSharePassage: share,
         onQuoteCreated: () => {},

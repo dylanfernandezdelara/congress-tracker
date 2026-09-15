@@ -55,7 +55,7 @@ export type BillChatSessionPayload = {
   item: FeedItem
   pendingSelection: string | null
   /** Increments on each Ask so a repeated passage still lifts the drawer. */
-  askNonce?: number
+  askNonce: number
   onClearSelection: () => void
   onSharePassage: (text: string) => void
   onQuoteCreated: (quote: BillQuote) => void
@@ -169,7 +169,7 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
   const hasPayload = payload != null
   const item = payload?.item
   const pendingSelection = payload?.pendingSelection ?? null
-  const askNonce = payload?.askNonce ?? 0
+  const askNonce = payload?.askNonce
 
   useLayoutEffect(() => {
     if (!actions || !hasPayload) return
@@ -182,7 +182,7 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
   useLayoutEffect(() => {
     const current = payloadRef.current
     if (!actions || !current) return
-    const nonce = current.askNonce ?? 0
+    const nonce = current.askNonce
     const activate = seenAskNonce.current !== null && nonce !== seenAskNonce.current
     seenAskNonce.current = nonce
     actions.present(
