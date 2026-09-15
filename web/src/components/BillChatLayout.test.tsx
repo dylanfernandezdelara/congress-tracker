@@ -51,8 +51,10 @@ describe('billChatDrawerSnap', () => {
 
   it('keeps measuring the snap column through vaul transform transitions', () => {
     expect(BILL_CHAT_DRAWER_TRANSITION_MS).toBe(500)
+    expect(billChatDrawerSource).toContain('transitionrun')
     expect(billChatDrawerSource).toContain('transitionend')
     expect(billChatDrawerSource).toContain('BILL_CHAT_DRAWER_TRANSITION_MS')
+    expect(billChatDrawerSource).toContain("event.type === 'transitionrun'")
   })
 
   it('sizes the snap column from the live sheet top, including mid-drag', () => {

@@ -120,8 +120,9 @@
     drawer JS overwrites this height with the live visible slice
     (viewport minus the sheet top) because vaul only updates
     --snap-point-height when a snap settles, and the 0.5s transform
-    interpolates without further style writes. A rAF loop plus
-    transitionend covers Open chat / Minimize. The companion Drawer also
+    interpolates without further style writes. A rAF loop on snap changes
+    and transform transitionrun covers Open chat / Minimize and a
+    same-snap rubber-band. The companion Drawer also
     sets repositionInputs={false}: default true rewrites Content height
     when the keyboard opens, and 100% minus the window-based offset then
     collapses.

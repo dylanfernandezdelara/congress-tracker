@@ -29,27 +29,42 @@ export function syncBillChatDrawerSnapHeight(drawer: HTMLElement): void {
 export const BILL_CHAT_DRAWER_TRANSITION_MS = 500
 
 function useBillChatDrawerSnapHeight(snapPoint: number | string | null) {
-  const nodeRef = useRef<HTMLDivElement | null>(null)
+  const remasureRef = useRef<() => void>(() => {})
   const cleanupRef = useRef<(() => void) | null>(null)
 
   const bind = useCallback((node: HTMLDivElement | null) => {
     cleanupRef.current?.()
     cleanupRef.current = null
-    nodeRef.current = node
+    remasureRef.current = () => {}
     if (!node) return
+
+    let raf = 0
     const sync = () => syncBillChatDrawerSnapHeight(node)
+    const remasureUntilSettled = () => {
+      cancelAnimationFrame(raf)
+      const deadline = performance.now() + BILL_CHAT_DRAWER_TRANSITION_MS
+      const tick = (now: number) => {
+        sync()
+        if (now < deadline) raf = requestAnimationFrame(tick)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    remasureRef.current = remasureUntilSettled
     sync()
     const mo = new MutationObserver(sync)
     mo.observe(node, { attributes: true, attributeFilter: ['style'] })
     const onTransition = (event: TransitionEvent) => {
       if (event.target !== node) return
       if (event.propertyName && event.propertyName !== 'transform') return
-      sync()
+      if (event.type === 'transitionrun') remasureUntilSettled()
+      else sync()
     }
     node.addEventListener('transitionrun', onTransition)
     node.addEventListener('transitionend', onTransition)
     window.addEventListener('resize', sync)
     cleanupRef.current = () => {
+      cancelAnimationFrame(raf)
+      remasureRef.current = () => {}
       mo.disconnect()
       node.removeEventListener('transitionrun', onTransition)
       node.removeEventListener('transitionend', onTransition)
@@ -58,16 +73,7 @@ function useBillChatDrawerSnapHeight(snapPoint: number | string | null) {
   }, [])
 
   useEffect(() => {
-    const node = nodeRef.current
-    if (!node) return
-    let raf = 0
-    const deadline = performance.now() + BILL_CHAT_DRAWER_TRANSITION_MS
-    const tick = (now: number) => {
-      syncBillChatDrawerSnapHeight(node)
-      if (now < deadline) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    remasureRef.current()
   }, [snapPoint])
 
   return bind
