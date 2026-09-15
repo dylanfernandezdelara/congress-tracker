@@ -29,12 +29,13 @@ import { RightRail } from '../components/RightRail'
 import { SenateWaitingList } from '../components/SenateWaitingList'
 import { TightnessDefectorSheet } from '../components/TightnessDefectorSheet'
 import { TightnessStrip } from '../components/TightnessStrip'
+import { copyAlignGridParam } from '../hooks/useAlignGrid'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { useStatsData } from '../hooks/useStatsData'
-import { BILL_QUOTE_QUERY_PARAM, feedRowKey, itemMatchesBillParam } from '../utils/billDeepLink'
+import { feedRowKey, itemMatchesBillParam } from '../utils/billDeepLink'
 import { tightnessDotKey } from '../utils/tightnessLabels'
 import {
   advancedFilterCount,
@@ -160,9 +161,9 @@ export default function Home() {
   const openWaitingBill = useCallback(
     (billParam: string) => {
       setSearchParams((prev) => {
-        const next = new URLSearchParams(prev)
+        const next = new URLSearchParams()
         next.set('bill', billParam)
-        next.delete(BILL_QUOTE_QUERY_PARAM)
+        copyAlignGridParam(prev, next)
         return next
       })
     },
