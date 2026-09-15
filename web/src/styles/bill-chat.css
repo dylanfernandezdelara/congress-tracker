@@ -148,7 +148,7 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
-    padding: var(--space-3) var(--space-4) var(--space-2);
+    padding: var(--space-3) var(--space-2) var(--space-2);
   }
 
   .bill-chat-drawer-inner .bill-chat {
