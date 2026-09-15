@@ -74,8 +74,14 @@ type SessionHandlers = Pick<
   'onClearSelection' | 'onSharePassage' | 'onQuoteCreated'
 >
 
+type OccupancyRecord = {
+  item: FeedItem
+  pendingSelection: string | null
+}
+
 type BillChatActions = {
-  present: (sourceId: string, payload: BillChatSessionPayload, activate: boolean) => void
+  present: (sourceId: string, record: OccupancyRecord, activate: boolean) => void
+  bindHandlers: (sourceId: string, handlers: SessionHandlers) => void
   reclaim: (sourceId: string) => void
 }
 
@@ -86,25 +92,24 @@ export function BillChatLayoutProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<SourceRecord[]>([])
   const handlersRef = useRef<Record<string, SessionHandlers>>({})
 
-  const present = useCallback((sourceId: string, payload: BillChatSessionPayload, activate: boolean) => {
-    handlersRef.current[sourceId] = {
-      onClearSelection: payload.onClearSelection,
-      onSharePassage: payload.onSharePassage,
-      onQuoteCreated: payload.onQuoteCreated,
-    }
-    const record: SourceRecord = {
+  const present = useCallback((sourceId: string, record: OccupancyRecord, activate: boolean) => {
+    const next: SourceRecord = {
       sourceId,
-      item: payload.item,
-      pendingSelection: payload.pendingSelection,
+      item: record.item,
+      pendingSelection: record.pendingSelection,
     }
     setStack((current) => {
       const exists = current.some((entry) => entry.sourceId === sourceId)
-      if (!exists) return [...current, record]
+      if (!exists) return [...current, next]
       if (activate) {
-        return [...current.filter((entry) => entry.sourceId !== sourceId), record]
+        return [...current.filter((entry) => entry.sourceId !== sourceId), next]
       }
-      return current.map((entry) => (entry.sourceId === sourceId ? record : entry))
+      return current.map((entry) => (entry.sourceId === sourceId ? next : entry))
     })
+  }, [])
+
+  const bindHandlers = useCallback((sourceId: string, handlers: SessionHandlers) => {
+    handlersRef.current[sourceId] = handlers
   }, [])
 
   const reclaim = useCallback((sourceId: string) => {
@@ -112,7 +117,7 @@ export function BillChatLayoutProvider({ children }: { children: ReactNode }) {
     setStack((current) => current.filter((entry) => entry.sourceId !== sourceId))
   }, [])
 
-  const actions = useMemo(() => ({ present, reclaim }), [present, reclaim])
+  const actions = useMemo(() => ({ present, bindHandlers, reclaim }), [present, bindHandlers, reclaim])
   const active = stack[stack.length - 1] ?? null
   const session = useMemo((): BillChatSession | null => {
     if (!active) return null
@@ -166,6 +171,21 @@ export function usePresentBillChat(payload: BillChatSessionPayload | null): void
   useLayoutEffect(() => {
     const current = payloadRef.current
     if (!actions || !current) return
-    actions.present(sourceId, current, Boolean(current.pendingSelection))
+    actions.present(
+      sourceId,
+      { item: current.item, pendingSelection: current.pendingSelection },
+      Boolean(current.pendingSelection),
+    )
   }, [actions, item, pendingSelection, sourceId])
+
+  // Handlers can change without an occupancy change; keep the ref current every commit.
+  useLayoutEffect(() => {
+    const current = payloadRef.current
+    if (!actions || !current) return
+    actions.bindHandlers(sourceId, {
+      onClearSelection: current.onClearSelection,
+      onSharePassage: current.onSharePassage,
+      onQuoteCreated: current.onQuoteCreated,
+    })
+  })
 }

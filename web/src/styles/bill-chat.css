@@ -58,15 +58,11 @@
     margin-bottom: 0;
   }
 
-  .bill-chat-dock--rail,
-  .bill-chat-dock--inline {
+  .bill-chat-dock--rail {
     display: flex;
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-  }
-
-  .bill-chat-dock--rail {
     height: 100%;
   }
 

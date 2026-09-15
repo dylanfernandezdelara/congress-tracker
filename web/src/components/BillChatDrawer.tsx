@@ -1,28 +1,59 @@
-import type { ReactNode } from 'react'
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 
+import { BillChatPane } from './BillChatPane'
 import {
+  BILL_CHAT_DRAWER_HALF,
+  BILL_CHAT_DRAWER_PEEK,
   BILL_CHAT_DRAWER_SNAP_POINTS,
-  type BillChatDrawerSnap,
+  billChatDrawerSnap,
+  useBillChatSession,
 } from './BillChatLayout'
+import { Button } from './ui/button'
 import { Drawer, DrawerDescription, DrawerHandle, DrawerTitle } from './ui/drawer'
 
-type BillChatDrawerProps = {
-  snapPoint: number | string | null
-  setSnapPoint: (point: number | string | null) => void
-  snap: BillChatDrawerSnap
-  billId: string
-  children: ReactNode
-}
-
 /** Non-modal vaul companion: no overlay, no body lock, handle-only drag. */
-export function BillChatDrawer({
-  snapPoint,
-  setSnapPoint,
-  snap,
-  billId,
-  children,
-}: BillChatDrawerProps) {
+export function BillChatDrawer({ billId }: { billId: string }) {
+  const session = useBillChatSession()
+  const [snapPoint, setSnapPoint] = useState<number | string | null>(BILL_CHAT_DRAWER_PEEK)
+  const snap = billChatDrawerSnap(snapPoint)
+  const collapsed = snap === 'peek'
+
+  useEffect(() => {
+    setSnapPoint(BILL_CHAT_DRAWER_PEEK)
+  }, [session?.sourceId])
+
+  useEffect(() => {
+    if (!session?.pendingSelection) return
+    setSnapPoint(BILL_CHAT_DRAWER_HALF)
+  }, [session?.pendingSelection])
+
+  const headerActions =
+    snap === 'peek' ? (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="bill-chat-open-peek"
+        onClick={() => setSnapPoint(BILL_CHAT_DRAWER_HALF)}
+      >
+        Open
+        <ChevronUpIcon />
+      </Button>
+    ) : (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="bill-chat-minimize"
+        onClick={() => setSnapPoint(BILL_CHAT_DRAWER_PEEK)}
+      >
+        Minimize
+        <ChevronDownIcon />
+      </Button>
+    )
+
   return (
     <Drawer
       open
@@ -43,7 +74,7 @@ export function BillChatDrawer({
             Pull up to ask follow-up questions without leaving the bill.
           </DrawerDescription>
           <div className="bill-chat-drawer-inner" data-snap={snap} data-bill={billId}>
-            {children}
+            <BillChatPane collapsed={collapsed} headerActions={headerActions} />
           </div>
         </DrawerPrimitive.Content>
       </DrawerPrimitive.Portal>

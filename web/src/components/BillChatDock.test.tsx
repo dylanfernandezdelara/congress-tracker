@@ -22,6 +22,7 @@ vi.mock('@ai-sdk/react', () => ({
 }))
 
 import { BillChatDock, type BillChatDockPlacement } from './BillChatDock'
+import { BillChatPane } from './BillChatPane'
 import {
   BILL_CHAT_RAIL_ID,
   BillChatLayoutProvider,
@@ -88,10 +89,16 @@ describe('BillChatDock', () => {
     expect(screen.getByRole('button', { name: 'Open in chat' })).toBeInTheDocument()
   })
 
-  it('keeps the chat inline when tests opt out of the rail and drawer', () => {
-    renderHost(<Presenter item={makeFeedItem()} />, 'inline')
+  it('renders the chat pane without a rail or drawer shell', () => {
+    render(
+      <BillChatLayoutProvider>
+        <BillChatPane />
+        <Presenter item={makeFeedItem()} />
+      </BillChatLayoutProvider>,
+    )
 
-    expect(screen.getByRole('heading', { name: 'Ask about this bill' }).closest('.bill-chat-dock--inline')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(document.getElementById(BILL_CHAT_RAIL_ID)).toBeNull()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 

@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import billChatCss from '../styles/bill-chat.css?raw'
@@ -122,5 +122,51 @@ describe('usePresentBillChat', () => {
     expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
     rerender(<App firstTitle="Updated title" />)
     expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
+  })
+
+  it('keeps share handlers current without restacking the occupant', () => {
+    const firstShare = vi.fn()
+    const nextShare = vi.fn()
+
+    function Host({ share }: { share: (text: string) => void }) {
+      usePresentBillChat({
+        item: makeFeedItem(),
+        pendingSelection: null,
+        onClearSelection: () => {},
+        onSharePassage: share,
+        onQuoteCreated: () => {},
+      })
+      return null
+    }
+
+    function ShareButton() {
+      const session = useBillChatSession()
+      return (
+        <button type="button" onClick={() => session?.onSharePassage('hi')}>
+          share
+        </button>
+      )
+    }
+
+    function App({ share }: { share: (text: string) => void }) {
+      return (
+        <BillChatLayoutProvider>
+          <Host share={share} />
+          <SessionLabel />
+          <ShareButton />
+        </BillChatLayoutProvider>
+      )
+    }
+
+    const { rerender } = render(<App share={firstShare} />)
+    expect(screen.getByTestId('session')).toHaveTextContent('S-2:')
+    fireEvent.click(screen.getByRole('button', { name: 'share' }))
+    expect(firstShare).toHaveBeenCalledWith('hi')
+
+    rerender(<App share={nextShare} />)
+    expect(screen.getByTestId('session')).toHaveTextContent('S-2:')
+    fireEvent.click(screen.getByRole('button', { name: 'share' }))
+    expect(nextShare).toHaveBeenCalledWith('hi')
+    expect(firstShare).toHaveBeenCalledTimes(1)
   })
 })

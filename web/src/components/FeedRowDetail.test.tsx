@@ -8,7 +8,7 @@ import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
-import { BillChatDock } from './BillChatDock'
+import { BillChatPane } from './BillChatPane'
 import { BillChatLayoutProvider } from './BillChatLayout'
 import { FeedRowDetail } from './FeedRowDetail'
 
@@ -81,7 +81,7 @@ afterEach(() => {
 function renderDetailWithChat(ui: ReactElement) {
   return render(
     <BillChatLayoutProvider>
-      <BillChatDock placement="inline" />
+      <BillChatPane />
       {ui}
     </BillChatLayoutProvider>,
   )
