@@ -28,7 +28,7 @@ const DrawerHandle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Handle
     ref={ref}
-    className={cn("mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted", className)}
+    className={cn("mx-auto mt-4 bg-muted", className)}
     {...props}
   />
 ))

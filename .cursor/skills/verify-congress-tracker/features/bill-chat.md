@@ -39,7 +39,7 @@ Preconditions:
 - **Ask about this (selection).** Build a selection inside What it does as in `share-quote.md`, wait ~150 ms, then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "Ask about this"`. The composer shows an attachment chip (`.bill-chat-attachment`) whose `title` is the selected text, and the textbox has focus (`document.activeElement.getAttribute('aria-label') === 'Ask about this bill'`).
 - **Proof (attachment).** `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/bill-chat/chat-attachment-desktop.png`.
 - **Share a passage.** `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "Share this passage" --nth 0` then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role dialog --name "Share this quote"`. The URL in the sheet contains `&quote=`.
-- **Mobile.** Override to 390×844 (SKILL.md **Mobile proof**), re-expand the bill, and confirm a `dialog` `Ask about this bill` (peek). Tap **Open** so the composer is visible, then save `chat-answer-390.png` after the answer lands.
+- **Mobile.** Override to 390×844 (SKILL.md **Mobile proof**), re-expand the bill, and confirm a `dialog` `Ask about this bill` (peek). Tap **Open** with `--exact` (otherwise it matches `Open profile for…`) so the composer is visible, then **Minimize** to return to peek. Save `chat-answer-390.png` after an answer lands.
 
 ## Gotchas
 

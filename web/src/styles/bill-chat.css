@@ -83,13 +83,25 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  /* Vaul's handle hit-area is 44×44 and centered on the pill. A 100px-wide
+     handle made that box cover Open / Open in chat on a 390px peek bar. */
+  .bill-chat-drawer [data-vaul-handle] {
+    width: 32px;
+    height: 5px;
+  }
+
+  .bill-chat-drawer [data-vaul-handle-hitarea] {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
   .bill-chat-drawer-inner {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
-    padding: 0 1rem 0.75rem;
+    padding: 1.25rem 1rem 0.75rem;
   }
 
   .bill-chat-drawer-inner .bill-chat {
