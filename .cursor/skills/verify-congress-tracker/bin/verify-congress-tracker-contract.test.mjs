@@ -384,6 +384,47 @@ test('applyViewport always sends a complete device-metrics override', async () =
   assert.deepEqual(restored, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
 })
 
+test('applyViewport is a no-op while the document still carries the same metrics', async () => {
+  const sent = []
+  const win = {}
+  const page = {
+    evaluate: async (fn, arg) => fn(arg),
+    setViewportSize: async (size) => {
+      sent.push(['setViewportSize', size])
+    },
+    context: () => ({
+      newCDPSession: async () => ({
+        send: async (method, params) => {
+          sent.push([method, params])
+        },
+      }),
+    }),
+  }
+  // The marker functions close over `window`; give the fake one to them.
+  const realWindow = globalThis.window
+  globalThis.window = win
+  try {
+    const mobile = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }
+    await applyViewport(page, mobile)
+    assert.equal(sent.length, 2, 'first application resizes and overrides')
+    sent.length = 0
+    // Same metrics on the same document: neither the desktop transient from
+    // setViewportSize nor the override re-send may fire.
+    await applyViewport(page, mobile)
+    assert.deepEqual(sent, [])
+    // Different metrics still apply.
+    await applyViewport(page, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+    assert.deepEqual(sent[0], ['setViewportSize', { width: 1280, height: 800 }])
+    sent.length = 0
+    // A navigation drops the marker (new window object): the next command re-applies.
+    for (const key of Object.keys(win)) delete win[key]
+    await applyViewport(page, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+    assert.equal(sent.length, 2)
+  } finally {
+    globalThis.window = realWindow
+  }
+})
+
 test('evidence paths cannot escape artifacts/verify', () => {
   const ok = resolveEvidencePath('artifacts/verify/feed-timeline/home.png')
   assert.equal(ok, path.join(EVIDENCE_ROOT, 'feed-timeline', 'home.png'))
