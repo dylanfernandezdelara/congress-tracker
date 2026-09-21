@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
+import type { ComponentProps, MutableRefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -36,6 +37,27 @@ vi.mock('@ai-sdk/react', () => ({
   Chat: class Chat {},
   useChat: () => chatMock,
 }))
+
+const { scrollToBottom } = vi.hoisted(() => ({ scrollToBottom: vi.fn() }))
+
+// Real StickToBottom, but the context handed to `contextRef` carries a spy
+// `scrollToBottom` so the composer's submit-time scroll is observable in jsdom.
+vi.mock('use-stick-to-bottom', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('use-stick-to-bottom')>()
+  type Props = ComponentProps<typeof mod.StickToBottom>
+  const StickToBottom = ({ contextRef, ...props }: Props) => (
+    <mod.StickToBottom
+      {...props}
+      contextRef={(context) => {
+        const spied = context ? { ...context, scrollToBottom } : context
+        if (typeof contextRef === 'function') contextRef(spied)
+        else if (contextRef) (contextRef as MutableRefObject<typeof spied>).current = spied
+      }}
+    />
+  )
+  StickToBottom.Content = mod.StickToBottom.Content
+  return { ...mod, StickToBottom }
+})
 
 import { BillChatSection } from './BillChatSection'
 
@@ -81,6 +103,7 @@ beforeEach(() => {
   sendMessage.mockReset()
   regenerate.mockReset()
   stop.mockReset()
+  scrollToBottom.mockReset()
 })
 
 afterEach(() => {
@@ -111,6 +134,18 @@ describe('BillChatSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'What does this bill do?' }))
 
     expect(sendMessage).toHaveBeenCalledWith({ text: 'What does this bill do?' })
+  })
+
+  it('scrolls the log to the bottom when a question is sent', async () => {
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ask about this bill' }), {
+      target: { value: 'Who pays for this?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ text: 'Who pays for this?' }))
+    expect(scrollToBottom).toHaveBeenCalledTimes(1)
   })
 
   it('renders prose, a quoted passage, and shares the passage text', () => {

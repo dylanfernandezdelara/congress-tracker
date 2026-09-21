@@ -4,6 +4,8 @@ import {
 } from '@congress-tracker/shared/chat-api-types'
 import type { UIMessage } from 'ai'
 import { MessageSquareTextIcon } from 'lucide-react'
+import type { Ref } from 'react'
+import type { StickToBottomContext } from 'use-stick-to-bottom'
 
 import { evidenceSourceLabel } from '../utils/billChat'
 import {
@@ -131,6 +133,8 @@ export type BillChatTranscriptProps = {
   onSharePassage: (text: string) => void
   /** Short bill label for the empty-state title, e.g. "H.R. 1". */
   billLabel: string
+  /** StickToBottom context so the composer can `scrollToBottom()` on submit. */
+  conversationRef?: Ref<StickToBottomContext>
 }
 
 export function BillChatTranscript({
@@ -138,13 +142,14 @@ export function BillChatTranscript({
   status,
   onSharePassage,
   billLabel,
+  conversationRef,
 }: BillChatTranscriptProps) {
   const lastMessage = messages[messages.length - 1]
   const awaitingReply =
     status === 'submitted' || (status === 'streaming' && lastMessage?.role !== 'assistant')
 
   return (
-    <Conversation className="bill-chat-conversation">
+    <Conversation className="bill-chat-conversation" contextRef={conversationRef}>
       <ConversationContent className="gap-4 p-0" scrollClassName="overscroll-contain">
         {messages.length === 0 ? (
           <ConversationEmptyState
@@ -176,7 +181,17 @@ export function BillChatTranscript({
             }
           }
         })}
-        {awaitingReply ? <Loader className="text-muted-foreground" aria-label="Answering" /> : null}
+        {awaitingReply ? (
+          // Where the answer will land. MessageContent is `w-fit overflow-hidden`,
+          // so the spinner's rotating bounding box cannot extend the scroll area:
+          // a stretched, unclipped `animate-spin` bounces scrollHeight and makes
+          // StickToBottom read the clamp as a manual scroll up, releasing its lock.
+          <Message from="assistant">
+            <MessageContent>
+              <Loader className="text-muted-foreground" role="status" aria-label="Answering" />
+            </MessageContent>
+          </Message>
+        ) : null}
       </ConversationContent>
       {messages.length > 0 ? <ConversationScrollButton /> : null}
     </Conversation>

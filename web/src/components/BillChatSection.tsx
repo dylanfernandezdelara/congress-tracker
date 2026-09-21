@@ -5,6 +5,7 @@ import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { FileTextIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { StickToBottomContext } from 'use-stick-to-bottom'
 
 import { createBillQuote } from '../api/client'
 import { buildApiUrl } from '../api/fetchJson'
@@ -71,6 +72,7 @@ export function BillChatSection({
   const billLabel = formatShortBillId(item.bill.type, item.bill.number)
   const sectionRef = useRef<HTMLElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const conversationRef = useRef<StickToBottomContext>(null)
   const [input, setInput] = useState('')
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [sharingAnswer, setSharingAnswer] = useState(false)
@@ -138,6 +140,9 @@ export function BillChatSection({
         void sendMessage({ text })
       }
       setInput('')
+      // A reader scrolled up in the log has escaped StickToBottom's lock; a
+      // new question re-engages it so the answer streams into view.
+      void conversationRef.current?.scrollToBottom()
     },
     [attachedSelection, onClearSelection, sendMessage, streaming],
   )
@@ -186,6 +191,7 @@ export function BillChatSection({
             status={status}
             onSharePassage={onSharePassage}
             billLabel={billLabel}
+            conversationRef={conversationRef}
           />
 
           {messages.length === 0 ? (
