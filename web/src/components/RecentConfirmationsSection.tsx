@@ -130,7 +130,7 @@ function ConfirmationItemRow({
                 </section>
               ) : null}
               {!about.text && !voteNote && !voteContext ? (
-                <p className="text-[13px] text-secondary">
+                <p className="text-[13px] text-muted-foreground">
                   Confirmation details are still being prepared.
                 </p>
               ) : null}
@@ -178,7 +178,7 @@ export function RecentConfirmationsSection({
   if (error) {
     return (
       <section className="recent-confirmations" aria-label="Recent confirmations">
-        <p className="text-[13px] text-secondary">{error}</p>
+        <p className="text-[13px] text-muted-foreground">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
             Retry

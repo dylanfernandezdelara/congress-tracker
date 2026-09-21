@@ -17,10 +17,10 @@ const config: Config = {
           DEFAULT: 'hsl(var(--twc-foreground) / <alpha-value>)',
           foreground: 'hsl(var(--twc-background) / <alpha-value>)',
         },
-        // --twc-secondary is mid-gray text; shadcn secondary variants are not usable until a dedicated surface token exists.
+        // shadcn semantics: `bg-secondary` is a raised neutral surface.
         secondary: {
-          DEFAULT: 'hsl(var(--twc-secondary) / <alpha-value>)',
-          foreground: 'hsl(var(--twc-background) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--twc-secondary-surface) / <alpha-value>)',
+          foreground: 'hsl(var(--twc-foreground) / <alpha-value>)',
         },
         muted: {
           // --twc-surface-subtle already embeds alpha (`0 0% 0% / 0.04`).

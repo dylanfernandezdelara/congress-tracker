@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.hasError) {
       return (
         <div className="rounded-xl border border-border bg-card px-4 py-8" role="alert">
-          <p className="text-sm text-secondary">Something went wrong loading this page.</p>
+          <p className="text-sm text-muted-foreground">Something went wrong loading this page.</p>
           <button type="button" className="ghost-button mt-4" onClick={this.handleReload}>
             Reload
           </button>

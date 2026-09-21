@@ -4,11 +4,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 const VARIANT_CLASSES = {
   defector: {
     root: 'h-5 w-5',
-    fallback: 'text-[12px] font-medium text-secondary',
+    fallback: 'text-[12px] font-medium text-muted-foreground',
   },
   profile: {
     root: 'h-16 w-16',
-    fallback: 'text-lg font-bold text-secondary',
+    fallback: 'text-lg font-bold text-muted-foreground',
   },
 } as const
 
