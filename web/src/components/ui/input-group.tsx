@@ -97,16 +97,16 @@ const inputGroupButtonVariants = cva(
   }
 )
 
-function InputGroupButton({
-  className,
-  type = "button",
-  variant = "ghost",
-  size = "xs",
-  ...props
-}: Omit<React.ComponentProps<typeof Button>, "size"> &
-  VariantProps<typeof inputGroupButtonVariants>) {
+// forwardRef (React 18): the registry version relies on React 19 ref-as-prop,
+// and Radix `asChild` triggers need the underlying button ref for anchoring.
+const InputGroupButton = React.forwardRef<
+  HTMLButtonElement,
+  Omit<React.ComponentProps<typeof Button>, "size"> &
+    VariantProps<typeof inputGroupButtonVariants>
+>(({ className, type = "button", variant = "ghost", size = "xs", ...props }, ref) => {
   return (
     <Button
+      ref={ref}
       type={type}
       data-size={size}
       variant={variant}
@@ -114,7 +114,8 @@ function InputGroupButton({
       {...props}
     />
   )
-}
+})
+InputGroupButton.displayName = "InputGroupButton"
 
 function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
   return (

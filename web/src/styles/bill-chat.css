@@ -1,3 +1,9 @@
+/*
+  Layout-only rules for the bill chat dock. The chat surface itself is stock
+  AI Elements + shadcn (Conversation, Message, PromptInput, Suggestion, OpenIn)
+  styled through Tailwind tokens; nothing here restyles those components.
+*/
+
 :root {
   /* Handle + title row + inset, plus vaul's 3% top gap (max-h 97%). */
   --bill-chat-peek: 128px;
@@ -35,7 +41,6 @@
     gap: var(--space-1);
   }
 
-  .bill-chat-export-trigger,
   .bill-chat-open-peek,
   .bill-chat-minimize {
     height: auto;
@@ -43,22 +48,6 @@
     border-radius: 999px;
     font-size: 12px;
     font-weight: 500;
-  }
-
-  /* Composer toolbar: "Open in ▾" mirrors the AI Elements OpenIn trigger. */
-  .bill-chat-export-trigger {
-    gap: var(--space-half);
-    padding-right: calc(var(--space-2) - var(--space-half));
-    color: hsl(var(--twc-secondary));
-  }
-
-  .bill-chat-export-trigger:hover {
-    color: hsl(var(--twc-foreground));
-  }
-
-  .bill-chat-export-trigger svg {
-    width: 0.85rem;
-    height: 0.85rem;
   }
 
   .bill-chat-dock--rail {
@@ -94,16 +83,9 @@
     min-height: 0;
   }
 
-  .bill-chat-dock--rail .bill-chat-header,
-  .bill-chat-drawer-inner .bill-chat-header,
-  .bill-chat-dock--rail .bill-chat-suggestions,
-  .bill-chat-drawer-inner .bill-chat-suggestions,
-  .bill-chat-dock--rail .bill-chat-attachments,
-  .bill-chat-drawer-inner .bill-chat-attachments,
-  .bill-chat-dock--rail .bill-chat-error,
-  .bill-chat-drawer-inner .bill-chat-error,
-  .bill-chat-dock--rail .bill-chat-prompt,
-  .bill-chat-drawer-inner .bill-chat-prompt {
+  /* Only the conversation log flexes; chips, alerts, and the composer keep their height. */
+  .bill-chat-dock--rail .bill-chat-body > :not(.bill-chat-conversation),
+  .bill-chat-drawer-inner .bill-chat-body > :not(.bill-chat-conversation) {
     flex-shrink: 0;
   }
 
@@ -111,12 +93,6 @@
   .bill-chat-drawer-inner .bill-chat-conversation {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: hidden;
-  }
-
-  /* StickToBottom scrolls an inner wrapper; contain must sit on that node. */
-  .bill-chat-conversation-scroll {
-    overscroll-behavior: contain;
   }
 
   .bill-chat-drawer {
@@ -180,359 +156,13 @@
     min-height: 0;
   }
 
-  .bill-chat-suggestions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-1);
-    margin: 0;
-    min-width: 0;
-  }
-
-  .bill-chat-suggestion:nth-child(n + 3) {
-    grid-column: 1 / -1;
-  }
-
-  .bill-chat-suggestion {
-    width: 100%;
-    max-width: 100%;
-    height: auto;
-    min-height: var(--space-3);
-    padding: var(--space-half) var(--space-2);
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1.3;
-    white-space: normal;
-    text-align: left;
-    justify-content: flex-start;
-    overflow-wrap: anywhere;
-  }
-
-  .bill-chat-conversation {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  /* Before the first turn the log slot holds the local .bill-chat-empty markup
-     so the rail / half-snap keeps its shape and the chips stay by the composer. */
-  .bill-chat-conversation--empty {
-    align-items: center;
-    justify-content: center;
-    min-height: 0;
-  }
-
-  .bill-chat-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-2);
-    text-align: center;
-    color: hsl(var(--twc-faint));
-  }
-
-  .bill-chat-empty-icon {
-    width: var(--space-3);
-    height: var(--space-3);
-  }
-
-  .bill-chat-empty-title {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: hsl(var(--twc-foreground));
-  }
-
-  .bill-chat-empty-hint {
-    margin: 0;
-    max-width: 26rem;
-    font-size: 12px;
-    line-height: 1.45;
-    color: hsl(var(--twc-secondary));
-  }
-
-  /* Half snap leaves ~48px between the title row and the chips: keep the
-     one-line title there and bring the icon + hint back at the full snap. */
+  /* Half snap leaves ~48px between the title row and the chips on short
+     phones: keep the ConversationEmptyState title and drop its icon
+     (first child) and description (p) until the full snap. */
   @media (max-width: 1023px) {
-    .bill-chat-empty {
-      padding: var(--space-1);
-    }
-
-    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty-icon,
-    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty-hint {
+    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty > div:first-child,
+    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty p {
       display: none;
-    }
-  }
-
-  .bill-chat-conversation-content {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: 0;
-    min-width: 0;
-  }
-
-  .bill-chat-message {
-    display: flex;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  .bill-chat-message--user {
-    justify-content: flex-end;
-  }
-
-  .bill-chat-message--assistant {
-    justify-content: flex-start;
-  }
-
-  .bill-chat-message-content {
-    min-width: 0;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-  }
-
-  .bill-chat-bubble {
-    min-width: 0;
-    max-width: min(100%, 36rem);
-    padding: var(--space-2);
-    font-size: 13px;
-    line-height: 1.45;
-  }
-
-  .bill-chat-bubble--user {
-    border-radius: 16px 16px 4px 16px;
-    background: hsl(var(--twc-foreground));
-    color: hsl(var(--twc-background));
-  }
-
-  .bill-chat-bubble--assistant {
-    border: 1px solid hsl(var(--twc-border));
-    border-radius: 16px 16px 16px 4px;
-    background: hsl(var(--twc-card));
-    color: hsl(var(--twc-foreground));
-  }
-
-  .bill-chat-bubble--refused {
-    border: 1px solid hsl(var(--twc-border));
-    border-radius: 12px;
-    background: hsl(var(--twc-surface-subtle));
-    color: hsl(var(--twc-secondary));
-  }
-
-  .bill-chat-prose {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .bill-chat-prose p {
-    margin: 0;
-  }
-
-  .bill-chat-unverified {
-    color: hsl(var(--twc-faint));
-    font-style: italic;
-  }
-
-  .bill-chat-quote {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    margin: var(--space-2) 0 0;
-    padding: var(--space-1) 0 var(--space-half) var(--space-2);
-    border-left: 3px solid hsl(var(--twc-law));
-    min-width: 0;
-  }
-
-  .bill-chat-quote-text {
-    margin: 0;
-    font-size: 13px;
-    font-style: italic;
-    line-height: 1.45;
-    color: hsl(var(--twc-foreground));
-  }
-
-  .bill-chat-quote-meta {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.2px;
-    color: hsl(var(--twc-faint));
-  }
-
-  .bill-chat-quote-share {
-    align-self: flex-start;
-    margin: 0;
-    padding: var(--space-half) var(--space-2);
-    border: 1px solid hsl(var(--twc-border));
-    border-radius: 999px;
-    background: transparent;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 500;
-    color: hsl(var(--twc-secondary));
-    cursor: pointer;
-  }
-
-  .bill-chat-quote-share:hover {
-    background: hsl(var(--twc-row-hover));
-    color: hsl(var(--twc-foreground));
-  }
-
-  .bill-chat-quote-share:focus-visible {
-    outline: 2px solid hsl(var(--twc-foreground));
-    outline-offset: 2px;
-  }
-
-  .bill-chat-streaming {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin-top: var(--space-1);
-    font-size: 11px;
-    color: hsl(var(--twc-faint));
-  }
-
-  .bill-chat-streaming-dot {
-    width: var(--space-1);
-    height: var(--space-1);
-    border-radius: 999px;
-    background: hsl(var(--twc-faint));
-    animation: bill-chat-pulse 1s ease-in-out infinite;
-  }
-
-  @keyframes bill-chat-pulse {
-    0%,
-    100% {
-      opacity: 0.35;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
-
-  .bill-chat-error {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1) var(--space-2);
-    margin: 0;
-    padding: var(--space-1) var(--space-2);
-    border-radius: 8px;
-    background: hsl(var(--twc-surface-subtle));
-    font-size: 12px;
-    color: hsl(var(--twc-secondary));
-  }
-
-  .bill-chat-error-retry {
-    margin: 0;
-    padding: var(--space-half) var(--space-2);
-    border: 1px solid hsl(var(--twc-border));
-    border-radius: 999px;
-    background: hsl(var(--twc-card));
-    font: inherit;
-    font-size: 12px;
-    font-weight: 500;
-    color: hsl(var(--twc-foreground));
-    cursor: pointer;
-  }
-
-  .bill-chat-attachments {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    margin: 0;
-    min-width: 0;
-  }
-
-  .bill-chat-attachment {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    max-width: 100%;
-    min-width: 0;
-    padding: var(--space-half) var(--space-1);
-    border: 1px solid hsl(var(--twc-border));
-    border-radius: 999px;
-    background: hsl(var(--twc-card));
-    font-size: 12px;
-    color: hsl(var(--twc-secondary));
-  }
-
-  .bill-chat-attachment-icon {
-    display: inline-flex;
-    flex-shrink: 0;
-    color: hsl(var(--twc-faint));
-  }
-
-  .bill-chat-attachment-icon svg {
-    width: 0.85rem;
-    height: 0.85rem;
-  }
-
-  .bill-chat-attachment-label {
-    overflow: hidden;
-    min-width: 0;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .bill-chat-attachment-remove {
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: var(--space-2);
-    height: var(--space-2);
-    margin: 0;
-    padding: 0;
-    border: none;
-    border-radius: 999px;
-    background: transparent;
-    color: hsl(var(--twc-faint));
-    cursor: pointer;
-  }
-
-  .bill-chat-attachment-remove svg {
-    width: 0.75rem;
-    height: 0.75rem;
-  }
-
-  .bill-chat-attachment-remove:hover,
-  .bill-chat-attachment-remove:focus-visible {
-    color: hsl(var(--twc-foreground));
-  }
-
-  .bill-chat-prompt {
-    min-width: 0;
-  }
-
-  .bill-chat-prompt-group {
-    border-radius: 12px;
-    background: hsl(var(--twc-card));
-  }
-
-  .bill-chat-prompt-group textarea {
-    min-height: var(--space-6);
-    font-size: 13px;
-    line-height: 1.4;
-  }
-
-  .bill-chat-prompt-submit {
-    height: auto;
-    padding: var(--space-half) var(--space-2);
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .bill-chat-streaming-dot {
-      animation: none;
     }
   }
 }

@@ -93,8 +93,8 @@ describe('BillChatSection', () => {
     renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
-    expect(screen.queryByText('Answers quote the bill’s text.')).not.toBeInTheDocument()
-    expect(screen.getByText('Ask about S. 2')).toBeInTheDocument()
+    // Stock ConversationEmptyState inside the log until the first turn.
+    expect(screen.getByRole('log')).toContainElement(screen.getByText('Ask about S. 2'))
     expect(screen.getByRole('button', { name: 'What does this bill do?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Who is affected?' })).toBeInTheDocument()
     expect(
@@ -145,7 +145,7 @@ describe('BillChatSection', () => {
     renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const notice = screen.getByText("The bill text doesn't address this.")
-    expect(notice.closest('.bill-chat-bubble--refused')).toBeTruthy()
+    expect(notice.closest('[data-refused]')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Share this passage' })).not.toBeInTheDocument()
   })
 
@@ -178,7 +178,7 @@ describe('BillChatSection', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
-  it('renders a pending selection chip and sends it on submit, then clears it', () => {
+  it('renders a pending selection chip and sends it on submit, then clears it', async () => {
     const onClearSelection = vi.fn()
     renderWithTooltip(
       <BillChatSection
@@ -193,11 +193,14 @@ describe('BillChatSection', () => {
     expect(screen.getByText('the selected text about rural clinics')).toBeInTheDocument()
     const textarea = screen.getByRole('textbox', { name: 'Ask about this bill' })
     fireEvent.change(textarea, { target: { value: 'What does this mean?' } })
+    // PromptInput reads the message off FormData and resolves attachments before onSubmit.
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(sendMessage).toHaveBeenCalledWith(
-      { text: 'What does this mean?' },
-      { body: { selection: 'the selected text about rural clinics' } },
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        { text: 'What does this mean?' },
+        { body: { selection: 'the selected text about rural clinics' } },
+      ),
     )
     expect(onClearSelection).toHaveBeenCalled()
   })

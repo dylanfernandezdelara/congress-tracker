@@ -1,14 +1,20 @@
 import {
-  BILL_CHAT_UNVERIFIED_PLACEHOLDER,
   type BillChatAnswerData,
   type BillChatQuoteData,
 } from '@congress-tracker/shared/chat-api-types'
 import type { UIMessage } from 'ai'
-import type { ReactNode } from 'react'
+import { MessageSquareTextIcon } from 'lucide-react'
 
-import { evidenceSourceLabel, splitProseParagraphs } from '../utils/billChat'
-import { Conversation, ConversationContent } from './ai-elements/conversation'
-import { Message, MessageContent } from './ai-elements/message'
+import { evidenceSourceLabel } from '../utils/billChat'
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from './ai-elements/conversation'
+import { Loader } from './ai-elements/loader'
+import { Message, MessageContent, MessageResponse } from './ai-elements/message'
+import { Button } from './ui/button'
 
 export type BillChatMessage = UIMessage<
   unknown,
@@ -25,35 +31,19 @@ export function messageAnswer(message: BillChatMessage): BillChatAnswerData | un
   return undefined
 }
 
-function userMessageText(message: BillChatMessage): string {
+function messageText(message: BillChatMessage, separator: string): string {
   return message.parts
     .filter((part): part is Extract<BillChatPart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
-    .join('')
+    .join(separator)
 }
 
 /** Plain text of a turn for export / Open in ChatGPT or Claude. */
 export function messagePlainText(message: BillChatMessage): string {
-  if (message.role === 'user') return userMessageText(message)
+  if (message.role === 'user') return messageText(message, '')
   const answer = messageAnswer(message)
   if (answer?.text.trim()) return answer.text.trim()
-  return message.parts
-    .filter((part): part is Extract<BillChatPart, { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .join('\n\n')
-    .trim()
-}
-
-function renderUnverifiedProse(text: string): ReactNode {
-  const pieces = text.split(BILL_CHAT_UNVERIFIED_PLACEHOLDER)
-  return pieces.map((chunk, index) => (
-    <span key={`prose-${index}`}>
-      {chunk}
-      {index < pieces.length - 1 ? (
-        <span className="bill-chat-unverified">{BILL_CHAT_UNVERIFIED_PLACEHOLDER}</span>
-      ) : null}
-    </span>
-  ))
+  return messageText(message, '\n\n').trim()
 }
 
 type QuotedPassageProps = {
@@ -61,7 +51,7 @@ type QuotedPassageProps = {
   onSharePassage: (text: string) => void
 }
 
-/** B2 inline citation: indented verbatim passage with its section label. */
+/** Verified verbatim passage the answer cites, with its section label. */
 export function QuotedPassage({ quote, onSharePassage }: QuotedPassageProps) {
   const sourceName = evidenceSourceLabel(quote.source)
   const meta =
@@ -70,36 +60,37 @@ export function QuotedPassage({ quote, onSharePassage }: QuotedPassageProps) {
       : quote.section_label || sourceName
 
   return (
-    <figure className="bill-chat-quote">
-      <blockquote className="bill-chat-quote-text">{quote.text}</blockquote>
-      <figcaption className="bill-chat-quote-meta">{meta}</figcaption>
-      <button
+    <figure className="my-0 flex min-w-0 flex-col gap-1 border-l-2 border-law pl-3">
+      <blockquote className="m-0 text-sm italic leading-relaxed text-foreground">
+        {quote.text}
+      </blockquote>
+      <figcaption className="text-xs font-medium text-faint">{meta}</figcaption>
+      <Button
         type="button"
-        className="bill-chat-quote-share"
+        size="sm"
+        variant="ghost"
+        className="h-7 w-fit rounded-full px-2.5 text-xs text-secondary"
         onClick={() => onSharePassage(quote.text)}
       >
         Share this passage
-      </button>
+      </Button>
     </figure>
   )
 }
 
-function AssistantBubble({
+function AssistantTurn({
   message,
-  streaming,
   onSharePassage,
 }: {
   message: BillChatMessage
-  streaming: boolean
   onSharePassage: (text: string) => void
 }) {
   const refused = messageAnswer(message)?.refused === true
 
   return (
     <MessageContent
-      className={`bill-chat-message-content bill-chat-bubble ${
-        refused ? 'bill-chat-bubble--refused' : 'bill-chat-bubble--assistant'
-      }`}
+      className={refused ? 'text-muted-foreground' : undefined}
+      data-refused={refused || undefined}
     >
       {message.parts.map((part, index) => {
         switch (part.type) {
@@ -107,13 +98,11 @@ function AssistantBubble({
             return (
               <div
                 key={`${message.id}-text-${index}`}
-                className="bill-chat-prose"
+                className="min-w-0"
                 data-quotable="answer"
                 data-quotable-id={message.id}
               >
-                {splitProseParagraphs(part.text).map((paragraph, paragraphIndex) => (
-                  <p key={`${message.id}-p-${paragraphIndex}`}>{renderUnverifiedProse(paragraph)}</p>
-                ))}
+                <MessageResponse>{part.text}</MessageResponse>
               </div>
             )
           case 'data-quote':
@@ -132,12 +121,6 @@ function AssistantBubble({
             return null
         }
       })}
-      {streaming ? (
-        <p className="bill-chat-streaming" aria-live="polite">
-          <span className="bill-chat-streaming-dot" />
-          Answering…
-        </p>
-      ) : null}
     </MessageContent>
   )
 }
@@ -146,55 +129,56 @@ export type BillChatTranscriptProps = {
   messages: BillChatMessage[]
   status: 'submitted' | 'streaming' | 'ready' | 'error'
   onSharePassage: (text: string) => void
-  /** Rendered in the log's slot before the first turn so the pane keeps its shape. */
-  emptyState?: ReactNode
+  /** Short bill label for the empty-state title, e.g. "H.R. 1". */
+  billLabel: string
 }
 
 export function BillChatTranscript({
   messages,
   status,
   onSharePassage,
-  emptyState = null,
+  billLabel,
 }: BillChatTranscriptProps) {
-  if (messages.length === 0) {
-    return emptyState ? (
-      <div className="bill-chat-conversation bill-chat-conversation--empty">{emptyState}</div>
-    ) : null
-  }
+  const lastMessage = messages[messages.length - 1]
+  const awaitingReply =
+    status === 'submitted' || (status === 'streaming' && lastMessage?.role !== 'assistant')
+
   return (
     <Conversation className="bill-chat-conversation">
-      <ConversationContent
-        className="bill-chat-conversation-content"
-        scrollClassName="bill-chat-conversation-scroll"
-      >
-        {messages.map((message, index) => {
-          if (message.role === 'user') {
-            return (
-              <Message key={message.id} from="user" className="bill-chat-message bill-chat-message--user">
-                <MessageContent className="bill-chat-message-content bill-chat-bubble bill-chat-bubble--user">
-                  {userMessageText(message)}
-                </MessageContent>
-              </Message>
-            )
+      <ConversationContent className="gap-4 p-0" scrollClassName="overscroll-contain">
+        {messages.length === 0 ? (
+          <ConversationEmptyState
+            className="bill-chat-empty gap-1 p-0 lg:p-2"
+            icon={<MessageSquareTextIcon className="size-6" aria-hidden />}
+            title={`Ask about ${billLabel}`}
+            description="Answers stay grounded in the bill’s text. Start with a suggestion or type your own question."
+          />
+        ) : null}
+        {messages.map((message) => {
+          switch (message.role) {
+            case 'user':
+              return (
+                <Message key={message.id} from="user">
+                  <MessageContent>{messageText(message, '')}</MessageContent>
+                </Message>
+              )
+            case 'assistant':
+              return (
+                <Message key={message.id} from="assistant">
+                  <AssistantTurn message={message} onSharePassage={onSharePassage} />
+                </Message>
+              )
+            case 'system':
+              return null
+            default: {
+              const _exhaustive: never = message.role
+              return _exhaustive
+            }
           }
-          if (message.role === 'assistant') {
-            return (
-              <Message
-                key={message.id}
-                from="assistant"
-                className="bill-chat-message bill-chat-message--assistant"
-              >
-                <AssistantBubble
-                  message={message}
-                  streaming={index === messages.length - 1 && status === 'streaming'}
-                  onSharePassage={onSharePassage}
-                />
-              </Message>
-            )
-          }
-          return null
         })}
+        {awaitingReply ? <Loader className="text-muted-foreground" aria-label="Answering" /> : null}
       </ConversationContent>
+      {messages.length > 0 ? <ConversationScrollButton /> : null}
     </Conversation>
   )
 }

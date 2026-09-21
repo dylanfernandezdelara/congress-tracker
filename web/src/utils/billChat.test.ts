@@ -4,7 +4,6 @@ import {
   capSelection,
   fitPassageForQuote,
   selectionChipLabel,
-  splitProseParagraphs,
   starterChipsFromKeyPoints,
 } from './billChat'
 
@@ -50,9 +49,5 @@ describe('starter chips and selection helpers', () => {
     expect(selectionChipLabel('Speeds up federal permitting for energy and mineral projects and rolls back')).toMatch(
       /…$/,
     )
-  })
-
-  it('splits prose into paragraphs on blank lines', () => {
-    expect(splitProseParagraphs('One.\n\nTwo.\n\n\nThree.')).toEqual(['One.', 'Two.', 'Three.'])
   })
 })

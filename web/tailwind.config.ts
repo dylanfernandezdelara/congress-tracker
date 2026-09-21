@@ -2,7 +2,12 @@ import type { Config } from 'tailwindcss'
 import tailwindcssAnimate from 'tailwindcss-animate'
 
 const config: Config = {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+    // Streamdown (AI Elements MessageResponse) styles its markdown with Tailwind utilities.
+    './node_modules/streamdown/dist/*.js',
+  ],
   theme: {
     extend: {
       colors: {
@@ -17,10 +22,10 @@ const config: Config = {
           DEFAULT: 'hsl(var(--twc-foreground) / <alpha-value>)',
           foreground: 'hsl(var(--twc-background) / <alpha-value>)',
         },
-        // --twc-secondary is mid-gray text; shadcn secondary variants are not usable until a dedicated surface token exists.
+        // shadcn semantics: `bg-secondary` is a raised neutral surface.
         secondary: {
-          DEFAULT: 'hsl(var(--twc-secondary) / <alpha-value>)',
-          foreground: 'hsl(var(--twc-background) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--twc-secondary-surface) / <alpha-value>)',
+          foreground: 'hsl(var(--twc-foreground) / <alpha-value>)',
         },
         muted: {
           // --twc-surface-subtle already embeds alpha (`0 0% 0% / 0.04`).
@@ -48,6 +53,7 @@ const config: Config = {
         ring: 'hsl(var(--twc-foreground) / <alpha-value>)',
         pass: 'hsl(var(--twc-pass) / <alpha-value>)',
         fail: 'hsl(var(--twc-fail) / <alpha-value>)',
+        law: 'hsl(var(--twc-law) / <alpha-value>)',
         surface: {
           subtle: 'hsl(var(--twc-surface-subtle))',
         },
@@ -56,6 +62,14 @@ const config: Config = {
           r: 'hsl(var(--twc-party-r) / <alpha-value>)',
           i: 'hsl(var(--twc-party-i) / <alpha-value>)',
           other: 'hsl(var(--twc-party-other) / <alpha-value>)',
+        },
+      },
+      // House convention predates shadcn: `text-secondary` is mid-gray body
+      // text (--twc-secondary), not text-on-secondary-surface.
+      textColor: {
+        secondary: {
+          DEFAULT: 'hsl(var(--twc-secondary) / <alpha-value>)',
+          foreground: 'hsl(var(--twc-foreground) / <alpha-value>)',
         },
       },
       fontFamily: {

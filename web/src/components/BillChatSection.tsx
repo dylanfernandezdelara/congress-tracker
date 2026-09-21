@@ -3,7 +3,7 @@ import { BILL_CHAT_MAX_QUESTION_CHARS } from '@congress-tracker/shared/chat-api-
 import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { FileTextIcon, MessageSquareTextIcon, XIcon } from 'lucide-react'
+import { FileTextIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { createBillQuote } from '../api/client'
@@ -30,10 +30,12 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from './ai-elements/prompt-input'
-import { Suggestion } from './ai-elements/suggestion'
+import { Suggestion, Suggestions } from './ai-elements/suggestion'
 import { BillChatExportMenu } from './BillChatExportMenu'
 import { BillChatTranscript, messageAnswer, messagePlainText, type BillChatMessage } from './BillChatTranscript'
 import { SelectionMenu } from './SelectionMenu'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
 
 export type { BillChatMessage } from './BillChatTranscript'
 
@@ -66,6 +68,7 @@ export function BillChatSection({
   headerActions,
 }: BillChatSectionProps) {
   const billId = formatBillQueryParam(item.bill)
+  const billLabel = formatShortBillId(item.bill.type, item.bill.number)
   const sectionRef = useRef<HTMLElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
@@ -113,7 +116,7 @@ export function BillChatSection({
     })
     return buildBillChatExportPrompt({
       billLabel: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
-      billId: formatShortBillId(item.bill.type, item.bill.number),
+      billId: billLabel,
       sourceUrl: congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number),
       pageUrl: buildBillShareUrl(item),
       headline: item.digest?.headline,
@@ -122,7 +125,7 @@ export function BillChatSection({
       crsSummary: item.raw_summary_text,
       messages: turns,
     })
-  }, [item, messages])
+  }, [billLabel, item, messages])
 
   const submitQuestion = useCallback(
     (raw: string) => {
@@ -182,72 +185,64 @@ export function BillChatSection({
             messages={messages}
             status={status}
             onSharePassage={onSharePassage}
-            emptyState={
-              <div className="bill-chat-empty">
-                <MessageSquareTextIcon className="bill-chat-empty-icon" aria-hidden />
-                <p className="bill-chat-empty-title">
-                  Ask about {formatShortBillId(item.bill.type, item.bill.number)}
-                </p>
-                <p className="bill-chat-empty-hint">
-                  Answers stay grounded in the bill’s text. Start with a suggestion or type your
-                  own question.
-                </p>
-              </div>
-            }
+            billLabel={billLabel}
           />
 
           {messages.length === 0 ? (
-            <div className="bill-chat-suggestions">
+            <Suggestions className="w-full flex-wrap">
               {starters.map((chip) => (
-                <Suggestion
-                  key={chip}
-                  suggestion={chip}
-                  disabled={streaming}
-                  className="bill-chat-suggestion"
-                  onClick={submitQuestion}
-                />
+                <Suggestion key={chip} suggestion={chip} disabled={streaming} onClick={submitQuestion} />
               ))}
-            </div>
+            </Suggestions>
           ) : null}
 
           {errorText ? (
-            <div className="bill-chat-error" role="alert">
-              <span>{errorText}</span>
-              <button type="button" className="bill-chat-error-retry" onClick={() => void regenerate()}>
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+            >
+              <span className="min-w-0 flex-1">{errorText}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 rounded-full px-3 text-xs"
+                onClick={() => void regenerate()}
+              >
                 Retry
-              </button>
+              </Button>
             </div>
           ) : null}
 
-          <PromptInput className="bill-chat-prompt" onSubmit={() => submitQuestion(input)}>
+          <PromptInput className="bill-chat-prompt" onSubmit={({ text }) => submitQuestion(text)}>
             {attachedSelection ? (
-              <PromptInputHeader className="bill-chat-attachments">
-                <div className="bill-chat-attachment" title={attachedSelection}>
-                  <span className="bill-chat-attachment-icon" aria-hidden>
-                    <FileTextIcon />
-                  </span>
-                  <span className="bill-chat-attachment-label" title={attachedSelection}>
+              <PromptInputHeader>
+                <Badge
+                  variant="secondary"
+                  className="bill-chat-attachment max-w-full gap-1.5 py-1 font-medium"
+                  title={attachedSelection}
+                >
+                  <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="bill-chat-attachment-label min-w-0 truncate">
                     {selectionChipLabel(attachedSelection)}
                   </span>
                   {onClearSelection ? (
                     <button
                       type="button"
-                      className="bill-chat-attachment-remove"
+                      className="inline-flex shrink-0 rounded-full text-muted-foreground hover:text-foreground"
                       aria-label="Remove"
                       onClick={onClearSelection}
                     >
-                      <XIcon />
+                      <XIcon className="size-3" />
                     </button>
                   ) : null}
-                </div>
+                </Badge>
               </PromptInputHeader>
             ) : null}
             <PromptInputBody>
               <PromptInputTextarea
                 ref={textareaRef}
-                rows={2}
                 value={input}
-                disabled={streaming}
                 onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
                 maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
                 aria-label="Ask about this bill"
@@ -258,12 +253,11 @@ export function BillChatSection({
               <PromptInputTools>
                 <BillChatExportMenu query={exportPrompt} />
               </PromptInputTools>
-              <PromptInputSubmit
-                className="bill-chat-prompt-submit"
-                status={status}
-                onStop={stop}
-                disabled={input.trim().length === 0}
-              />
+              {streaming ? (
+                <PromptInputSubmit type="button" status={status} aria-label="Stop" onClick={() => stop()} />
+              ) : (
+                <PromptInputSubmit status="ready" aria-label="Send" disabled={input.trim().length === 0} />
+              )}
             </PromptInputFooter>
           </PromptInput>
         </div>

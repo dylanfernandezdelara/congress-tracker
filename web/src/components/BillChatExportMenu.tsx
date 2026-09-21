@@ -12,7 +12,7 @@ import {
   OpenInSeparator,
   OpenInTrigger,
 } from './ai-elements/open-in-chat'
-import { Button } from './ui/button'
+import { PromptInputButton } from './ai-elements/prompt-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 /**
@@ -27,10 +27,13 @@ export const BILL_CHAT_EXPORT_HINT =
   'Opens ChatGPT or Claude with this bill’s briefing and your questions so far.'
 export const BILL_CHAT_EXPORT_MENU_LABEL = 'Continue in another app'
 
+const COPIED_MS = 1600
+
 type BillChatExportMenuProps = {
   query: string
 }
 
+/** AI Elements `OpenIn` menu placed in the `PromptInput` toolbar. */
 export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
   const [copied, setCopied] = useState(false)
   const copiedTimer = useRef<number | null>(null)
@@ -47,16 +50,10 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
         <TooltipTrigger asChild>
           <span className="inline-flex">
             <OpenInTrigger>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="bill-chat-export-trigger"
-                aria-label={BILL_CHAT_EXPORT_NAME}
-              >
+              <PromptInputButton className="text-secondary" aria-label={BILL_CHAT_EXPORT_NAME}>
                 {BILL_CHAT_EXPORT_TRIGGER}
                 <ChevronDownIcon aria-hidden />
-              </Button>
+              </PromptInputButton>
             </OpenInTrigger>
           </span>
         </TooltipTrigger>
@@ -74,7 +71,7 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
             void copyTextToClipboard(query).then((ok) => {
               setCopied(ok)
               if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
-              copiedTimer.current = window.setTimeout(() => setCopied(false), 1600)
+              copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_MS)
             })
           }}
         >
