@@ -17,9 +17,10 @@ const config: Config = {
           DEFAULT: 'hsl(var(--twc-foreground) / <alpha-value>)',
           foreground: 'hsl(var(--twc-background) / <alpha-value>)',
         },
-        // shadcn semantics: `bg-secondary` is a raised neutral surface.
+        // shadcn semantics: `bg-secondary` is a neutral fill, not the
+        // `--twc-secondary` ink that `text-muted-foreground` uses.
         secondary: {
-          DEFAULT: 'hsl(var(--twc-secondary-surface) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--twc-surface-secondary) / <alpha-value>)',
           foreground: 'hsl(var(--twc-foreground) / <alpha-value>)',
         },
         muted: {
