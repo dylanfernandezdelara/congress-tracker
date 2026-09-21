@@ -157,8 +157,10 @@ describe('BillChatSection', () => {
     expect(fireEvent.keyDown(textbox, { key: 'Enter', isComposing: true })).toBe(true)
     expect(fireEvent.keyDown(textbox, { key: 'Enter', shiftKey: true })).toBe(true)
     // Engines that report the confirm as keyCode 229 with isComposing false
-    // reach the registry handler, which never sends while a reply streams.
-    fireEvent.keyDown(textbox, { key: 'Enter', keyCode: 229 })
+    // are also left alone by the guard; the registry handler then takes the
+    // event (preventDefault + requestSubmit + form.reset) but never sends
+    // while a reply streams, and the controlled value keeps the draft.
+    expect(fireEvent.keyDown(textbox, { key: 'Enter', keyCode: 229 })).toBe(false)
     expect(sendMessage).not.toHaveBeenCalled()
     expect(textbox.value).toBe('And who pays for it?')
   })
@@ -196,6 +198,20 @@ describe('BillChatSection', () => {
     expect(screen.getByText(/Sec\. 3\. Definitions/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Share this passage' }))
     expect(onSharePassage).toHaveBeenCalledWith('The Secretary shall raise the cap.')
+  })
+
+  it('drops model-emitted images from answer prose', () => {
+    chatMock.messages = [
+      assistantMessage([
+        { type: 'text', text: 'See the chart ![tracking pixel](https://attacker.example/p.png) for detail.' },
+        { type: 'data-answer', data: answerPart() },
+      ]),
+    ]
+    const { container } = render(
+      <BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+    expect(screen.getByText(/See the chart/)).toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
   })
 
   it('renders a refused answer as a notice without quote share', () => {
