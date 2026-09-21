@@ -3,10 +3,9 @@
   AI Elements + shadcn (Conversation, Message, PromptInput, Suggestion, OpenIn)
   styled through Tailwind tokens; nothing here restyles those components.
 
-  Inline in the detail panel the section is an auto-height column, so the
-  Conversation never becomes a scrollport; `min-height: 0` and the unstyled
-  `.bill-chat-conversation` / `.bill-chat-prompt` hooks are for a parent that
-  bounds the section's height (a docked rail or drawer).
+  The section is an auto-height column on its own; the rail and drawer
+  bound its height so the Conversation becomes the one scrollport and the
+  composer stays in view.
 */
 
 :root {
@@ -26,36 +25,7 @@
     max-width: 100%;
   }
 
-  .bill-chat-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-16);
-    margin-bottom: 0;
-  }
-
-  .bill-chat-header .feed-row-detail-heading {
-    margin: 0;
-    min-width: 0;
-  }
-
-  .bill-chat-header-actions {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    gap: var(--space-8);
-  }
-
-  .bill-chat-open-peek,
-  .bill-chat-minimize {
-    height: auto;
-    padding: var(--space-4) var(--space-16);
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  .bill-chat-dock--rail {
+  .bill-chat-rail {
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -63,7 +33,7 @@
     height: 100%;
   }
 
-  .bill-chat-dock--rail .bill-chat {
+  .bill-chat-rail .bill-chat {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
@@ -80,7 +50,7 @@
     min-height: 0;
   }
 
-  .bill-chat-dock--rail .bill-chat-body,
+  .bill-chat-rail .bill-chat-body,
   .bill-chat-drawer-inner .bill-chat-body {
     display: flex;
     flex-direction: column;
@@ -89,12 +59,12 @@
   }
 
   /* Only the conversation log flexes; chips, alerts, and the composer keep their height. */
-  .bill-chat-dock--rail .bill-chat-body > :not(.bill-chat-conversation),
+  .bill-chat-rail .bill-chat-body > :not(.bill-chat-conversation),
   .bill-chat-drawer-inner .bill-chat-body > :not(.bill-chat-conversation) {
     flex-shrink: 0;
   }
 
-  .bill-chat-dock--rail .bill-chat-conversation,
+  .bill-chat-rail .bill-chat-conversation,
   .bill-chat-drawer-inner .bill-chat-conversation {
     flex: 1 1 auto;
     min-height: 0;
@@ -108,20 +78,11 @@
   }
 
   /*
-    Vaul 1.1.2 keeps the sheet at h-full / max-h-[97%] and translates it by
-    --snap-point-height (containerHeight - snapHeight). Size the used column
-    to the visible slice so Send stays in the half / full window after the
-    transcript grows. Do not set Content height to the snap — that double-
-    offsets against the translate.     During drag and snap transitions the
-    drawer JS overwrites this height with the live visible slice
-    (viewport minus the sheet top) because vaul only updates
-    --snap-point-height when a snap settles, and the 0.5s transform
-    interpolates without further style writes. A rAF loop on snap changes
-    and transform transitionrun covers Open chat / Minimize and a
-    same-snap rubber-band. The companion Drawer also
-    sets repositionInputs={false}: default true rewrites Content height
-    when the keyboard opens, and 100% minus the window-based offset then
-    collapses.
+    Vaul translates the h-full sheet by --snap-point-height instead of
+    resizing it, so the used column is sized to the visible slice; see
+    hooks/useBillChatDrawerSnapHeight.ts for the live measurement during
+    drags and snap transitions. Do not set Content height to the snap — that
+    double-offsets against the translate.
   */
   .bill-chat-drawer-snap {
     display: flex;
@@ -159,5 +120,38 @@
     flex: 1 1 auto;
     gap: var(--space-16);
     min-height: 0;
+  }
+
+  /* Peek is a title row with Open chat; the bar stays as the title when lifted. */
+  .bill-chat-drawer-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-16);
+    flex-shrink: 0;
+  }
+
+  .bill-chat-drawer-bar-title {
+    margin: 0;
+    min-width: 0;
+  }
+
+  .bill-chat-drawer-toggle {
+    height: auto;
+    padding: var(--space-4) var(--space-16);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* The dialog title is the bar; the section's own heading would repeat it. */
+  .bill-chat-drawer-inner .bill-chat > .feed-row-detail-heading {
+    display: none;
+  }
+
+  /* Half snap has a short log slot: keep the empty state to its title. */
+  .bill-chat-drawer-inner[data-snap='half'] .bill-chat-empty > :not(:has(h3)),
+  .bill-chat-drawer-inner[data-snap='half'] .bill-chat-empty p {
+    display: none;
   }
 }

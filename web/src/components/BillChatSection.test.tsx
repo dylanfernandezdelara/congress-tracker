@@ -118,17 +118,6 @@ describe('BillChatSection', () => {
     ).toBeInTheDocument()
   })
 
-  it('trims the empty state to its title in a compact log slot', () => {
-    render(
-      <BillChatSection item={twoPointItem} compact onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
-    )
-
-    const empty = screen.getByText('Ask about S. 2').closest('.bill-chat-empty')
-    expect(empty).not.toBeNull()
-    expect(empty).toHaveTextContent(/^Ask about S\. 2$/)
-    expect(empty?.querySelector('svg')).toBeNull()
-  })
-
   it('sends a starter chip as the user message', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
@@ -280,22 +269,6 @@ describe('BillChatSection', () => {
       ),
     )
     expect(onClearSelection).toHaveBeenCalled()
-  })
-
-  it('hides the composer when collapsed', () => {
-    render(
-      <BillChatSection
-        item={twoPointItem}
-        collapsed
-        onSharePassage={vi.fn()}
-        onQuoteCreated={vi.fn()}
-        headerActions={<button type="button">Open</button>}
-      />,
-    )
-
-    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
-    expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
   })
 
   it('opens ChatGPT and Claude with a bill briefing', async () => {

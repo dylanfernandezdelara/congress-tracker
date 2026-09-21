@@ -12,7 +12,6 @@ import {
   useState,
   type ClipboardEvent,
   type KeyboardEvent,
-  type ReactNode,
 } from 'react'
 
 import { createBillQuote } from '../api/client'
@@ -61,12 +60,6 @@ export type BillChatSectionProps = {
   onSharePassage: (text: string) => void
   /** A signed answer selection was minted as a quote; the caller opens the share sheet. */
   onQuoteCreated: (quote: BillQuote) => void
-  /** Peek bar: hide the transcript and composer so the handle stays a title row. */
-  collapsed?: boolean
-  /** Short log slot (mobile half snap): trim the empty state to its title. */
-  compact?: boolean
-  /** Drawer Open chat / Minimize (or other chrome) on the title row. */
-  headerActions?: ReactNode
 }
 
 export function BillChatSection({
@@ -75,9 +68,6 @@ export function BillChatSection({
   onClearSelection,
   onSharePassage,
   onQuoteCreated,
-  collapsed = false,
-  compact = false,
-  headerActions,
 }: BillChatSectionProps) {
   const billId = formatBillQueryParam(item.bill)
   const billLabel = formatShortBillId(item.bill.type, item.bill.number)
@@ -103,9 +93,9 @@ export function BillChatSection({
   })
 
   useEffect(() => {
-    if (!pendingSelection || collapsed) return
+    if (!pendingSelection) return
     textareaRef.current?.focus()
-  }, [collapsed, pendingSelection])
+  }, [pendingSelection])
 
   useEffect(() => {
     if (!selectionStatus) return
@@ -203,105 +193,95 @@ export function BillChatSection({
   }
 
   return (
-    <section
-      ref={sectionRef}
-      className={`bill-chat${collapsed ? ' bill-chat--collapsed' : ''}`}
-      aria-labelledby="bill-chat-heading"
-    >
-      <header className="bill-chat-header">
-        <h3 id="bill-chat-heading" className="feed-row-detail-heading">
-          Ask about this bill
-        </h3>
-        {headerActions ? <div className="bill-chat-header-actions">{headerActions}</div> : null}
-      </header>
+    <section ref={sectionRef} className="bill-chat" aria-labelledby="bill-chat-heading">
+      <h3 id="bill-chat-heading" className="feed-row-detail-heading">
+        Ask about this bill
+      </h3>
 
-      {collapsed ? null : (
-        <div className="bill-chat-body">
-          <BillChatTranscript
-            messages={messages}
-            status={status}
-            onSharePassage={onSharePassage}
-            billLabel={billLabel}
-            compact={compact}
-          />
+      <div className="bill-chat-body">
+        <BillChatTranscript
+          messages={messages}
+          status={status}
+          onSharePassage={onSharePassage}
+          billLabel={billLabel}
+        />
 
-          {messages.length === 0 ? (
-            // Registry `Suggestions` is a one-row horizontal scroller with a
-            // hidden scrollbar; in a narrow rail the chips wrap instead so
-            // none are hidden behind a swipe.
-            <div className="flex flex-wrap gap-2">
-              {starters.map((chip) => (
-                <Suggestion key={chip} suggestion={chip} onClick={submitQuestion} />
-              ))}
-            </div>
-          ) : null}
+        {messages.length === 0 ? (
+          // Registry `Suggestions` is a one-row horizontal scroller with a
+          // hidden scrollbar; in a narrow rail the chips wrap instead so
+          // none are hidden behind a swipe.
+          <div className="flex flex-wrap gap-2">
+            {starters.map((chip) => (
+              <Suggestion key={chip} suggestion={chip} onClick={submitQuestion} />
+            ))}
+          </div>
+        ) : null}
 
-          {errorText ? (
-            <div
-              role="alert"
-              className="flex flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+        {errorText ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+          >
+            <span className="min-w-0 flex-1">{errorText}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 rounded-full px-3 text-xs"
+              onClick={() => void regenerate()}
             >
-              <span className="min-w-0 flex-1">{errorText}</span>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 rounded-full px-3 text-xs"
-                onClick={() => void regenerate()}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : null}
+              Retry
+            </Button>
+          </div>
+        ) : null}
 
-          <PromptInput className="bill-chat-prompt" onSubmit={({ text }) => submitQuestion(text)}>
-            {attachedSelection ? (
-              <PromptInputHeader>
-                <Badge
-                  variant="secondary"
-                  className="bill-chat-attachment max-w-full gap-1.5 py-1 font-medium"
-                  title={attachedSelection}
-                >
-                  <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="bill-chat-attachment-label min-w-0 truncate">
-                    {selectionChipLabel(attachedSelection)}
-                  </span>
-                  {onClearSelection ? (
-                    <button
-                      type="button"
-                      className="inline-flex shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-                      aria-label="Remove"
-                      onClick={onClearSelection}
-                    >
-                      <XIcon className="size-3" />
-                    </button>
-                  ) : null}
-                </Badge>
-              </PromptInputHeader>
-            ) : null}
-            <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming} onPasteCapture={keepPasteAsText}>
-              <PromptInputTextarea
-                ref={textareaRef}
-                value={input}
-                onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
-                maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
-                aria-label="Ask about this bill"
-                placeholder="Ask a question about this bill"
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                <BillChatExportMenu briefing={briefing} />
-              </PromptInputTools>
-              {streaming ? (
-                <PromptInputSubmit type="button" status={status} aria-label="Stop" onClick={() => stop()} />
-              ) : (
-                <PromptInputSubmit status="ready" aria-label="Send" disabled={input.trim().length === 0} />
-              )}
-            </PromptInputFooter>
-          </PromptInput>
-        </div>
-      )}
+        <PromptInput className="bill-chat-prompt" onSubmit={({ text }) => submitQuestion(text)}>
+          {attachedSelection ? (
+            <PromptInputHeader>
+              <Badge
+                variant="secondary"
+                className="bill-chat-attachment max-w-full gap-1.5 py-1 font-medium"
+                title={attachedSelection}
+              >
+                <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="bill-chat-attachment-label min-w-0 truncate">
+                  {selectionChipLabel(attachedSelection)}
+                </span>
+                {onClearSelection ? (
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                    aria-label="Remove"
+                    onClick={onClearSelection}
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                ) : null}
+              </Badge>
+            </PromptInputHeader>
+          ) : null}
+          <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming} onPasteCapture={keepPasteAsText}>
+            <PromptInputTextarea
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
+              maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
+              aria-label="Ask about this bill"
+              placeholder="Ask a question about this bill"
+            />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputTools>
+              <BillChatExportMenu briefing={briefing} />
+            </PromptInputTools>
+            {streaming ? (
+              <PromptInputSubmit type="button" status={status} aria-label="Stop" onClick={() => stop()} />
+            ) : (
+              <PromptInputSubmit status="ready" aria-label="Send" disabled={input.trim().length === 0} />
+            )}
+          </PromptInputFooter>
+        </PromptInput>
+      </div>
 
       <SelectionMenu
         selection={selection}

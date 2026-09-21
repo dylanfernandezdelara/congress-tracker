@@ -9,12 +9,13 @@ import type {
   RecentLawsResponse,
   TightnessDot,
 } from '../api/types'
-import { BillChatDock } from '../components/BillChatDock'
+import { BillChatDrawer } from '../components/BillChatDrawer'
 import {
-  BILL_CHAT_DESKTOP_QUERY,
+  BILL_CHAT_RAIL_ID,
   BillChatLayoutProvider,
   useBillChatSession,
 } from '../components/BillChatLayout'
+import { BillChatSection } from '../components/BillChatSection'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
@@ -43,6 +44,9 @@ import {
 } from '../utils/feedAdvancedFilters'
 import { timelineFloorChrome } from '../utils/feedQuiet'
 
+/** Breakpoint at which the left/right rails mount and the chat docks on the right. */
+const DESKTOP_RAILS_QUERY = '(min-width: 1024px)'
+
 function HomeChrome({
   isDesktop,
   left,
@@ -55,9 +59,9 @@ function HomeChrome({
   children: ReactNode
 }) {
   const session = useBillChatSession()
-  const occupied = Boolean(isDesktop && session)
+  const chatRail = isDesktop ? session : null
   return (
-    <div className={`home-shell${occupied ? ' home-shell--reading' : ''}`}>
+    <div className={`home-shell${chatRail ? ' home-shell--reading' : ''}`}>
       {isDesktop ? (
         <aside className="home-rail home-rail--left" aria-label="Session context">
           {left}
@@ -66,13 +70,19 @@ function HomeChrome({
       {children}
       {isDesktop ? (
         <aside
-          className={`home-rail home-rail--right${occupied ? ' home-rail--chat' : ''}`}
-          aria-label={occupied ? 'Ask about this bill' : 'Legislative context'}
+          className={`home-rail home-rail--right${chatRail ? ' home-rail--chat' : ''}`}
+          aria-label={chatRail ? 'Ask about this bill' : 'Legislative context'}
         >
-          {occupied ? <BillChatDock placement="rail" /> : right}
+          {chatRail ? (
+            <div id={BILL_CHAT_RAIL_ID} className="bill-chat-rail" data-bill={chatRail.billId}>
+              <BillChatSection key={chatRail.billId} {...chatRail.chat} />
+            </div>
+          ) : (
+            right
+          )}
         </aside>
       ) : (
-        <BillChatDock placement="drawer" />
+        <BillChatDrawer />
       )}
     </div>
   )
@@ -108,7 +118,7 @@ function emptyFeedCopy(
 }
 
 export default function Home() {
-  const isDesktop = useMediaQuery(BILL_CHAT_DESKTOP_QUERY)
+  const isDesktop = useMediaQuery(DESKTOP_RAILS_QUERY)
   const {
     chamber,
     advancedFilters,

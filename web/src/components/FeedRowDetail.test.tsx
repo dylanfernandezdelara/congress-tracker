@@ -8,8 +8,8 @@ import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
-import { BillChatPane } from './BillChatPane'
-import { BillChatLayoutProvider } from './BillChatLayout'
+import { BillChatLayoutProvider, useBillChatSession } from './BillChatLayout'
+import { BillChatSection } from './BillChatSection'
 import { FeedRowDetail } from './FeedRowDetail'
 
 vi.mock('../api/client', () => ({
@@ -78,10 +78,16 @@ afterEach(() => {
   resetBillChatInstancesForTests()
 })
 
+/** Stand-in for Home's rail / drawer: renders whichever bill is presented. */
+function ChatHost() {
+  const session = useBillChatSession()
+  return session ? <BillChatSection key={session.billId} {...session.chat} /> : null
+}
+
 function renderDetailWithChat(ui: ReactElement) {
   return render(
     <BillChatLayoutProvider>
-      <BillChatPane />
+      <ChatHost />
       {ui}
     </BillChatLayoutProvider>,
   )
@@ -712,14 +718,17 @@ describe('FeedRowDetail', () => {
     vi.useRealTimers()
   })
 
-  it('does not present a chat session unless the host asks', () => {
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
+  it('renders no chat of its own; the layout host shows the presented bill', () => {
+    render(<FeedRowDetail item={makeFeedItem()} />)
     expect(screen.queryByRole('heading', { name: 'Ask about this bill' })).not.toBeInTheDocument()
+
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
+    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
   })
 
   it('sends a selection to the bill chat when Ask about this is used', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} presentChat />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('It does something important in plain language.')
     await act(async () => {
@@ -769,7 +778,7 @@ describe('FeedRowDetail', () => {
       },
       url: 'https://trackcongress.org/?bill=119-s-2&quote=cafecafecafecafe',
     })
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} presentChat />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {
@@ -812,7 +821,7 @@ describe('FeedRowDetail', () => {
         ],
       },
     ]
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} presentChat />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {

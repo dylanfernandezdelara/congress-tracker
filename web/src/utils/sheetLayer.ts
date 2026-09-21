@@ -98,6 +98,18 @@ export function registerSheetLayer(controller: SheetLayerController): SheetLayer
   }
 }
 
+/**
+ * Close the topmost open sheet, for a dismissable layer (the mobile chat
+ * drawer) that receives Escape before the window listener above. True when a
+ * sheet took the key.
+ */
+export function closeTopSheet(): boolean {
+  const top = stack[stack.length - 1]
+  if (!top || top.getIsClosing()) return false
+  top.requestClose()
+  return true
+}
+
 /** Test helper — clears lock state between cases. */
 export function resetSheetLayerForTests(): void {
   stack.length = 0

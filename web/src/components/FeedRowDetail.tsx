@@ -35,8 +35,6 @@ type FeedRowDetailProps = {
   shareUrl?: string
   /** `?quote=` id from a shared link that targets this bill. */
   quoteId?: string | null
-  /** Home hosts present an expanded row so the dock can attach. */
-  presentChat?: boolean
 }
 
 const SELECTION_STATUS_MS = 1800
@@ -118,7 +116,6 @@ export function FeedRowDetail({
   item,
   shareUrl,
   quoteId = null,
-  presentChat = false,
 }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
@@ -132,8 +129,6 @@ export function FeedRowDetail({
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [sharingQuote, setSharingQuote] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [chatSelection, setChatSelection] = useState<string | null>(null)
-  const [askNonce, setAskNonce] = useState(0)
   const detailRef = useRef<HTMLDivElement>(null)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
@@ -192,20 +187,11 @@ export function FeedRowDetail({
     }
   }, [item.bill, share])
 
-  const onClearChatSelection = useCallback(() => setChatSelection(null), [])
-
-  usePresentBillChat(
-    presentChat
-      ? {
-          item,
-          pendingSelection: chatSelection,
-          askNonce,
-          onClearSelection: onClearChatSelection,
-          onSharePassage: handleSharePassage,
-          onQuoteCreated: share.openSheet,
-        }
-      : null,
-  )
+  const askChat = usePresentBillChat({
+    item,
+    onSharePassage: handleSharePassage,
+    onQuoteCreated: share.openSheet,
+  })
 
   const handleCopySelection = async (current: TextSelection) => {
     const ok = await copyTextToClipboard(current.text)
@@ -298,8 +284,7 @@ export function FeedRowDetail({
           void handleShareQuote(current)
         }}
         onAsk={(sel) => {
-          setChatSelection(sel.text)
-          setAskNonce((n) => n + 1)
+          askChat(sel.text)
           clearSelection()
         }}
         onCopy={(current) => {

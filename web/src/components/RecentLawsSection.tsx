@@ -135,7 +135,6 @@ function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) 
                 <FeedRowDetail
                   item={law.item}
                   shareUrl={showTimelineLink ? undefined : sourceUrl}
-                  presentChat
                 />
                 {showTimelineLink ? (
                   <p className="recent-laws-timeline-link">

@@ -10,103 +10,87 @@ import {
   type ReactNode,
 } from 'react'
 
+import { formatBillQueryParam } from '@congress-tracker/shared/bill-id'
 import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 
 import type { FeedItem } from '../api/types'
+import type { BillChatSectionProps } from './BillChatSection'
 
-/** Same breakpoint Home uses to mount the left/right rails. */
-export const BILL_CHAT_DESKTOP_QUERY = '(min-width: 1024px)'
 export const BILL_CHAT_RAIL_ID = 'bill-chat-rail'
 
-/**
- * Vaul 1.1.2: numbers are viewport fractions (`0.5` = half the window).
- * Pixel snaps must be strings (`"128px"`). A bare `88` is 88× the viewport.
- * Keep `--bill-chat-peek` in bill-chat.css equal to this string. The sheet is
- * `max-h-[97%]`, so the visible peek is this minus 3% of the viewport
- * (~103px on an 844px phone): handle, title row, and the 16px inset.
- */
-export const BILL_CHAT_DRAWER_PEEK = '128px'
-export const BILL_CHAT_DRAWER_HALF = 0.5
-/** Leaves the 48px header + notch above the handle so handleOnly can still drag. */
-export const BILL_CHAT_DRAWER_FULL = 0.85
-
-export const BILL_CHAT_DRAWER_SNAP_POINTS = [
-  BILL_CHAT_DRAWER_PEEK,
-  BILL_CHAT_DRAWER_HALF,
-  BILL_CHAT_DRAWER_FULL,
-] as const
-
-export type BillChatDrawerSnap = 'peek' | 'half' | 'full'
-
-export function billChatDrawerSnap(point: number | string | null): BillChatDrawerSnap {
-  switch (point) {
-    case BILL_CHAT_DRAWER_HALF:
-      return 'half'
-    case BILL_CHAT_DRAWER_FULL:
-      return 'full'
-    case BILL_CHAT_DRAWER_PEEK:
-    case null:
-      return 'peek'
-    default:
-      // Unknown values stay peek so a bad snap never throws.
-      return 'peek'
-  }
-}
-
-export type BillChatSessionPayload = {
-  item: FeedItem
-  pendingSelection: string | null
-  /** Increments on each Ask so a repeated passage still lifts the drawer. */
-  askNonce: number
-  onClearSelection: () => void
+type SourceHandlers = {
   onSharePassage: (text: string) => void
   onQuoteCreated: (quote: BillQuote) => void
 }
 
-export type BillChatSession = BillChatSessionPayload & {
+/** What an expanded bill detail contributes to the shared chat. */
+export type BillChatSource = SourceHandlers & { item: FeedItem }
+
+/** What the rail or drawer renders: the chat's props plus identity. */
+export type BillChatSession = {
   sourceId: string
+  billId: string
+  /** Times the reader used "Ask about this" on this source; the drawer lifts when it grows. */
+  asks: number
+  chat: BillChatSectionProps
 }
 
 type SourceRecord = {
   sourceId: string
   item: FeedItem
   pendingSelection: string | null
-  askNonce: number
+  asks: number
 }
 
-type SessionHandlers = Pick<
-  BillChatSessionPayload,
-  'onClearSelection' | 'onSharePassage' | 'onQuoteCreated'
->
-
-type OccupancyRecord = Omit<SourceRecord, 'sourceId'>
-
 type BillChatActions = {
-  present: (sourceId: string, record: OccupancyRecord, activate: boolean) => void
-  bindHandlers: (sourceId: string, handlers: SessionHandlers) => void
+  present: (sourceId: string, item: FeedItem) => void
+  ask: (sourceId: string, text: string) => void
+  clearSelection: (sourceId: string) => void
+  bindHandlers: (sourceId: string, handlers: SourceHandlers) => void
   reclaim: (sourceId: string) => void
 }
 
 const BillChatActionsContext = createContext<BillChatActions | null>(null)
 const BillChatSessionContext = createContext<BillChatSession | null>(null)
 
+/**
+ * One chat surface for the page. Expanded bills register as sources; the
+ * newest registration is shown, and "Ask about this" from any source brings
+ * that source forward. Handlers live in a ref so a re-rendered detail panel
+ * never restacks the occupant.
+ */
 export function BillChatLayoutProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<SourceRecord[]>([])
-  const handlersRef = useRef<Record<string, SessionHandlers>>({})
+  const handlersRef = useRef<Record<string, SourceHandlers>>({})
 
-  const present = useCallback((sourceId: string, record: OccupancyRecord, activate: boolean) => {
-    const next: SourceRecord = { sourceId, ...record }
+  const present = useCallback((sourceId: string, item: FeedItem) => {
     setStack((current) => {
-      const exists = current.some((entry) => entry.sourceId === sourceId)
-      if (!exists) return [...current, next]
-      if (activate) {
-        return [...current.filter((entry) => entry.sourceId !== sourceId), next]
-      }
-      return current.map((entry) => (entry.sourceId === sourceId ? next : entry))
+      const existing = current.find((entry) => entry.sourceId === sourceId)
+      if (!existing) return [...current, { sourceId, item, pendingSelection: null, asks: 0 }]
+      return current.map((entry) => (entry === existing ? { ...entry, item } : entry))
     })
   }, [])
 
-  const bindHandlers = useCallback((sourceId: string, handlers: SessionHandlers) => {
+  const ask = useCallback((sourceId: string, text: string) => {
+    setStack((current) => {
+      const existing = current.find((entry) => entry.sourceId === sourceId)
+      if (!existing) return current
+      const asked = { ...existing, pendingSelection: text, asks: existing.asks + 1 }
+      return [...current.filter((entry) => entry !== existing), asked]
+    })
+  }, [])
+
+  const clearSelection = useCallback((sourceId: string) => {
+    setStack((current) =>
+      current.map((entry) =>
+        entry.sourceId === sourceId && entry.pendingSelection !== null
+          ? { ...entry, pendingSelection: null }
+          : entry,
+      ),
+    )
+  }, [])
+
+  const bindHandlers = useCallback((sourceId: string, handlers: SourceHandlers) => {
     handlersRef.current[sourceId] = handlers
   }, [])
 
@@ -115,26 +99,27 @@ export function BillChatLayoutProvider({ children }: { children: ReactNode }) {
     setStack((current) => current.filter((entry) => entry.sourceId !== sourceId))
   }, [])
 
-  const actions = useMemo(() => ({ present, bindHandlers, reclaim }), [present, bindHandlers, reclaim])
+  const actions = useMemo(
+    () => ({ present, ask, clearSelection, bindHandlers, reclaim }),
+    [present, ask, clearSelection, bindHandlers, reclaim],
+  )
   const active = stack[stack.length - 1] ?? null
   const session = useMemo((): BillChatSession | null => {
     if (!active) return null
+    const { sourceId } = active
     return {
-      sourceId: active.sourceId,
-      item: active.item,
-      pendingSelection: active.pendingSelection,
-      askNonce: active.askNonce,
-      onClearSelection: () => {
-        handlersRef.current[active.sourceId]?.onClearSelection()
-      },
-      onSharePassage: (text) => {
-        handlersRef.current[active.sourceId]?.onSharePassage(text)
-      },
-      onQuoteCreated: (quote) => {
-        handlersRef.current[active.sourceId]?.onQuoteCreated(quote)
+      sourceId,
+      billId: formatBillQueryParam(active.item.bill),
+      asks: active.asks,
+      chat: {
+        item: active.item,
+        pendingSelection: active.pendingSelection,
+        onClearSelection: () => clearSelection(sourceId),
+        onSharePassage: (text) => handlersRef.current[sourceId]?.onSharePassage(text),
+        onQuoteCreated: (quote) => handlersRef.current[sourceId]?.onQuoteCreated(quote),
       },
     }
-  }, [active])
+  }, [active, clearSelection])
 
   return (
     <BillChatActionsContext.Provider value={actions}>
@@ -148,54 +133,42 @@ export function useBillChatSession(): BillChatSession | null {
 }
 
 /**
- * An expanded bill detail registers as a chat source.
- * First present appends. Ask (`askNonce` bump) steals. A leftover chip does not.
- * Detach reclaims.
+ * Register an expanded bill as a chat source while `source` is non-null and
+ * get back its "Ask about this" action. Without a provider (isolated detail
+ * tests) registration and the action are no-ops.
  */
-export function usePresentBillChat(payload: BillChatSessionPayload | null): void {
+export function usePresentBillChat(source: BillChatSource | null): (text: string) => void {
   const actions = useContext(BillChatActionsContext)
   const sourceId = useId()
-  const payloadRef = useRef(payload)
-  payloadRef.current = payload
-  const seenAskNonce = useRef<number | null>(null)
-  const hasPayload = payload != null
-  const item = payload?.item
-  const pendingSelection = payload?.pendingSelection ?? null
-  const askNonce = payload?.askNonce
+  const sourceRef = useRef(source)
+  sourceRef.current = source
+  const item = source?.item ?? null
+  const hasItem = item !== null
 
   useLayoutEffect(() => {
-    if (!actions || !hasPayload) return
-    return () => {
-      seenAskNonce.current = null
-      actions.reclaim(sourceId)
-    }
-  }, [actions, hasPayload, sourceId])
+    if (!actions || !hasItem) return
+    return () => actions.reclaim(sourceId)
+  }, [actions, hasItem, sourceId])
 
   useLayoutEffect(() => {
-    const current = payloadRef.current
-    if (!actions || !current) return
-    const nonce = current.askNonce
-    const activate = seenAskNonce.current !== null && nonce !== seenAskNonce.current
-    seenAskNonce.current = nonce
-    actions.present(
-      sourceId,
-      {
-        item: current.item,
-        pendingSelection: current.pendingSelection,
-        askNonce: nonce,
-      },
-      activate,
-    )
-  }, [actions, item, pendingSelection, askNonce, sourceId])
+    if (!actions || !item) return
+    actions.present(sourceId, item)
+  }, [actions, item, sourceId])
 
   // Handlers can change without a stack write; keep the ref current every commit.
   useLayoutEffect(() => {
-    const current = payloadRef.current
+    const current = sourceRef.current
     if (!actions || !current) return
     actions.bindHandlers(sourceId, {
-      onClearSelection: current.onClearSelection,
       onSharePassage: current.onSharePassage,
       onQuoteCreated: current.onQuoteCreated,
     })
   })
+
+  return useCallback(
+    (text: string) => {
+      actions?.ask(sourceId, text)
+    },
+    [actions, sourceId],
+  )
 }

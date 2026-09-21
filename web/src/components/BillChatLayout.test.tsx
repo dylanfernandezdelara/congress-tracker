@@ -1,57 +1,54 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import billChatCss from '../styles/bill-chat.css?raw'
-import billChatDrawerSource from './BillChatDrawer.tsx?raw'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
+import { BILL_CHAT_DRAWER_PEEK } from './BillChatDrawer'
 import {
-  BILL_CHAT_DRAWER_TRANSITION_MS,
-  billChatVisibleSlicePx,
-  syncBillChatDrawerSnapHeight,
-} from './BillChatDrawer'
-import {
-  BILL_CHAT_DRAWER_FULL,
-  BILL_CHAT_DRAWER_HALF,
-  BILL_CHAT_DRAWER_PEEK,
   BillChatLayoutProvider,
-  billChatDrawerSnap,
   useBillChatSession,
   usePresentBillChat,
+  type BillChatSource,
 } from './BillChatLayout'
+import { BillChatSection } from './BillChatSection'
 
-describe('billChatDrawerSnap', () => {
-  it('maps vaul snap points to peek, half, and full', () => {
-    expect(typeof BILL_CHAT_DRAWER_PEEK).toBe('string')
-    expect(BILL_CHAT_DRAWER_PEEK.endsWith('px')).toBe(true)
-    expect(billChatDrawerSnap(BILL_CHAT_DRAWER_PEEK)).toBe('peek')
-    expect(billChatDrawerSnap(BILL_CHAT_DRAWER_HALF)).toBe('half')
-    expect(billChatDrawerSnap(BILL_CHAT_DRAWER_FULL)).toBe('full')
-    expect(billChatDrawerSnap(null)).toBe('peek')
-    expect(billChatDrawerSnap(0.61)).toBe('peek') // unknown values stay peek
-  })
+vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
+  useChat: () => ({
+    messages: [],
+    status: 'ready',
+    error: undefined,
+    sendMessage: vi.fn(),
+    regenerate: vi.fn(),
+    stop: vi.fn(),
+  }),
+}))
 
+afterEach(() => {
+  resetBillChatInstancesForTests()
+})
+
+describe('bill-chat.css', () => {
   it('keeps the JS peek string lockstep with --bill-chat-peek', () => {
     expect(billChatCss).toContain(`--bill-chat-peek: ${BILL_CHAT_DRAWER_PEEK}`)
   })
 
-  it('makes the chat body a flex child so the transcript can scroll', () => {
-    expect(billChatCss).toContain('.bill-chat-dock--rail .bill-chat-body')
+  it('bounds the chat only inside the rail and drawer so the log is the one scrollport', () => {
+    expect(billChatCss).toContain('.bill-chat-rail .bill-chat-body')
     expect(billChatCss).toContain('.bill-chat-drawer-inner .bill-chat-body')
     expect(billChatCss).toMatch(/\.bill-chat-body[^{]*\{[^}]*min-height: 0/)
-  })
-
-  it('snaps the header and drawer inset to the 8px grid', () => {
-    expect(billChatCss).toContain('grid-template-columns: minmax(0, 1fr) auto')
-    expect(billChatCss).toContain('gap: var(--space-16)')
-    expect(billChatCss).toContain(
-      'padding: var(--space-24) var(--space-16) var(--space-16)',
-    )
-  })
-
-  it('leaves the chat surface to stock AI Elements and only lays out the dock', () => {
     // Only the log flexes; suggestions, alerts, and the PromptInput keep their height.
     expect(billChatCss).toContain('.bill-chat-body > :not(.bill-chat-conversation)')
     expect(billChatCss).toMatch(/\.bill-chat-conversation\s*\{[^}]*flex: 1 1 auto/)
+  })
+
+  it('sizes the drawer column to the visible vaul slice, not the untranslated sheet', () => {
+    expect(billChatCss).toContain('.bill-chat-drawer-snap')
+    expect(billChatCss).toContain('height: calc(100% - var(--snap-point-height, 0px))')
+  })
+
+  it('leaves the chat surface to stock AI Elements and only lays out the dock', () => {
     for (const restyled of [
       'bill-chat-bubble',
       'bill-chat-prose',
@@ -64,40 +61,6 @@ describe('billChatDrawerSnap', () => {
       expect(billChatCss).not.toContain(restyled)
     }
   })
-
-  it('sizes the drawer column to the visible vaul slice, not the untranslated sheet', () => {
-    expect(billChatCss).toContain('.bill-chat-drawer-snap')
-    expect(billChatCss).toContain('height: calc(100% - var(--snap-point-height, 0px))')
-  })
-
-  it('keeps vaul from rewriting Content height when the keyboard opens', () => {
-    expect(billChatDrawerSource).toContain('repositionInputs={false}')
-  })
-
-  it('keeps measuring the snap column through vaul transform transitions', () => {
-    expect(BILL_CHAT_DRAWER_TRANSITION_MS).toBe(500)
-    expect(billChatDrawerSource).toContain('transitionrun')
-    expect(billChatDrawerSource).toContain('transitionend')
-    expect(billChatDrawerSource).toContain('BILL_CHAT_DRAWER_TRANSITION_MS')
-    expect(billChatDrawerSource).toContain("event.type === 'transitionrun'")
-  })
-
-  it('sizes the snap column from the live sheet top, including mid-drag', () => {
-    expect(billChatVisibleSlicePx(422, 844)).toBe(422)
-    expect(billChatVisibleSlicePx(664, 844)).toBe(180)
-    expect(billChatVisibleSlicePx(900, 844)).toBe(0)
-
-    const drawer = document.createElement('div')
-    const snap = document.createElement('div')
-    snap.className = 'bill-chat-drawer-snap'
-    drawer.appendChild(snap)
-    drawer.getBoundingClientRect = () => ({ top: 600 }) as DOMRect
-    const innerHeight = window.innerHeight
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 })
-    syncBillChatDrawerSnapHeight(drawer)
-    expect(snap.style.height).toBe('244px')
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerHeight })
-  })
 })
 
 function SessionLabel() {
@@ -105,36 +68,44 @@ function SessionLabel() {
   return (
     <div data-testid="session">
       {session
-        ? `${session.item.bill.type}-${session.item.bill.number}:${session.pendingSelection ?? ''}`
+        ? `${session.billId}#${session.asks}:${session.chat.pendingSelection ?? ''}`
         : 'none'}
     </div>
   )
 }
 
+const noop = () => {}
+
 function Present({
   type,
   number,
-  pendingSelection = null,
-  askNonce = 0,
+  title,
+  onSharePassage = noop,
+  askLabel,
 }: {
   type: 'S' | 'HR'
   number: number
-  pendingSelection?: string | null
-  askNonce?: number
+  title?: string
+  onSharePassage?: BillChatSource['onSharePassage']
+  /** Renders a button that asks about this text. */
+  askLabel?: string
 }) {
-  usePresentBillChat({
-    item: makeFeedItem({ bill: { congress: 119, type, number, title: `${type} ${number}` } }),
-    pendingSelection,
-    askNonce,
-    onClearSelection: () => {},
-    onSharePassage: () => {},
-    onQuoteCreated: () => {},
+  const ask = usePresentBillChat({
+    item: makeFeedItem({
+      bill: { congress: 119, type, number, title: title ?? `${type} ${number}` },
+    }),
+    onSharePassage,
+    onQuoteCreated: noop,
   })
-  return null
+  return askLabel ? (
+    <button type="button" onClick={() => ask(`about ${type}.${number}`)}>
+      {askLabel}
+    </button>
+  ) : null
 }
 
 describe('usePresentBillChat', () => {
-  it('reclaims the previous source when the latest presenter unmounts', () => {
+  it('shows the newest source and reclaims it when that presenter unmounts', () => {
     function App({ showSecond }: { showSecond: boolean }) {
       return (
         <BillChatLayoutProvider>
@@ -146,52 +117,63 @@ describe('usePresentBillChat', () => {
     }
 
     const { rerender } = render(<App showSecond />)
-    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
+    expect(screen.getByTestId('session')).toHaveTextContent('119-hr-1#0:')
 
     rerender(<App showSecond={false} />)
-    expect(screen.getByTestId('session')).toHaveTextContent('S-2:')
+    expect(screen.getByTestId('session')).toHaveTextContent('119-s-2#0:')
+
+    rerender(<App showSecond />)
+    expect(screen.getByTestId('session')).toHaveTextContent('119-hr-1#0:')
   })
 
-  it('steals the dock when a background source asks', () => {
-    function App({ askFirst }: { askFirst: boolean }) {
+  it('brings a background source forward when it asks, and counts the asks', () => {
+    render(
+      <BillChatLayoutProvider>
+        <Present type="S" number={2} askLabel="ask first" />
+        <Present type="HR" number={1} askLabel="ask second" />
+        <SessionLabel />
+      </BillChatLayoutProvider>,
+    )
+    expect(screen.getByTestId('session')).toHaveTextContent('119-hr-1#0:')
+
+    fireEvent.click(screen.getByRole('button', { name: 'ask first' }))
+    expect(screen.getByTestId('session')).toHaveTextContent('119-s-2#1:about S.2')
+
+    fireEvent.click(screen.getByRole('button', { name: 'ask first' }))
+    expect(screen.getByTestId('session')).toHaveTextContent('119-s-2#2:about S.2')
+
+    fireEvent.click(screen.getByRole('button', { name: 'ask second' }))
+    expect(screen.getByTestId('session')).toHaveTextContent('119-hr-1#1:about HR.1')
+  })
+
+  it('clears only the pending selection, keeping the source and its ask count', () => {
+    function Clear() {
+      const session = useBillChatSession()
       return (
-        <BillChatLayoutProvider>
-          <Present
-            type="S"
-            number={2}
-            pendingSelection={askFirst ? 'from the first bill' : null}
-            askNonce={askFirst ? 1 : 0}
-          />
-          <Present type="HR" number={1} />
-          <SessionLabel />
-        </BillChatLayoutProvider>
+        <button type="button" onClick={() => session?.chat.onClearSelection?.()}>
+          clear
+        </button>
       )
     }
+    render(
+      <BillChatLayoutProvider>
+        <Present type="S" number={2} askLabel="ask" />
+        <SessionLabel />
+        <Clear />
+      </BillChatLayoutProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'ask' }))
+    expect(screen.getByTestId('session')).toHaveTextContent('119-s-2#1:about S.2')
 
-    const { rerender } = render(<App askFirst={false} />)
-    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
-
-    rerender(<App askFirst />)
-    expect(screen.getByTestId('session')).toHaveTextContent('S-2:from the first bill')
+    fireEvent.click(screen.getByRole('button', { name: 'clear' }))
+    expect(screen.getByTestId('session')).toHaveTextContent('119-s-2#1:')
   })
 
-  it('does not steal when an inactive source still has a leftover Ask chip', () => {
-    function First({ title }: { title: string }) {
-      usePresentBillChat({
-        item: makeFeedItem({ bill: { congress: 119, type: 'S', number: 2, title } }),
-        pendingSelection: 'leftover chip',
-        askNonce: 1,
-        onClearSelection: () => {},
-        onSharePassage: () => {},
-        onQuoteCreated: () => {},
-      })
-      return null
-    }
-
+  it('does not restack when an inactive source only re-renders with a patched item', () => {
     function App({ firstTitle }: { firstTitle: string }) {
       return (
         <BillChatLayoutProvider>
-          <First title={firstTitle} />
+          <Present type="S" number={2} title={firstTitle} />
           <Present type="HR" number={1} />
           <SessionLabel />
         </BillChatLayoutProvider>
@@ -199,60 +181,19 @@ describe('usePresentBillChat', () => {
     }
 
     const { rerender } = render(<App firstTitle="Original" />)
-    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
+    expect(screen.getByTestId('session')).toHaveTextContent('119-hr-1#0:')
     rerender(<App firstTitle="Updated title" />)
-    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
-  })
-
-  it('does not steal when only the inactive item identity is patched', () => {
-    function First({ title }: { title: string }) {
-      usePresentBillChat({
-        item: makeFeedItem({ bill: { congress: 119, type: 'S', number: 2, title } }),
-        pendingSelection: null,
-        askNonce: 0,
-        onClearSelection: () => {},
-        onSharePassage: () => {},
-        onQuoteCreated: () => {},
-      })
-      return null
-    }
-
-    function App({ firstTitle }: { firstTitle: string }) {
-      return (
-        <BillChatLayoutProvider>
-          <First title={firstTitle} />
-          <Present type="HR" number={1} />
-          <SessionLabel />
-        </BillChatLayoutProvider>
-      )
-    }
-
-    const { rerender } = render(<App firstTitle="Original" />)
-    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
-    rerender(<App firstTitle="Updated title" />)
-    expect(screen.getByTestId('session')).toHaveTextContent('HR-1:')
+    expect(screen.getByTestId('session')).toHaveTextContent('119-hr-1#0:')
   })
 
   it('keeps share handlers current without restacking the occupant', () => {
     const firstShare = vi.fn()
     const nextShare = vi.fn()
 
-    function Host({ share }: { share: (text: string) => void }) {
-      usePresentBillChat({
-        item: makeFeedItem(),
-        pendingSelection: null,
-        askNonce: 0,
-        onClearSelection: () => {},
-        onSharePassage: share,
-        onQuoteCreated: () => {},
-      })
-      return null
-    }
-
     function ShareButton() {
       const session = useBillChatSession()
       return (
-        <button type="button" onClick={() => session?.onSharePassage('hi')}>
+        <button type="button" onClick={() => session?.chat.onSharePassage('hi')}>
           share
         </button>
       )
@@ -261,7 +202,7 @@ describe('usePresentBillChat', () => {
     function App({ share }: { share: (text: string) => void }) {
       return (
         <BillChatLayoutProvider>
-          <Host share={share} />
+          <Present type="S" number={2} onSharePassage={share} />
           <SessionLabel />
           <ShareButton />
         </BillChatLayoutProvider>
@@ -269,14 +210,42 @@ describe('usePresentBillChat', () => {
     }
 
     const { rerender } = render(<App share={firstShare} />)
-    expect(screen.getByTestId('session')).toHaveTextContent('S-2:')
+    expect(screen.getByTestId('session')).toHaveTextContent('119-s-2#0:')
     fireEvent.click(screen.getByRole('button', { name: 'share' }))
     expect(firstShare).toHaveBeenCalledWith('hi')
 
     rerender(<App share={nextShare} />)
-    expect(screen.getByTestId('session')).toHaveTextContent('S-2:')
+    expect(screen.getByTestId('session')).toHaveTextContent('119-s-2#0:')
     fireEvent.click(screen.getByRole('button', { name: 'share' }))
     expect(nextShare).toHaveBeenCalledWith('hi')
     expect(firstShare).toHaveBeenCalledTimes(1)
+  })
+
+  it('is a no-op without a provider so isolated detail tests still render', () => {
+    render(<Present type="S" number={2} askLabel="ask" />)
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'ask' }))).not.toThrow()
+  })
+
+  it('remounts the chat for a new occupant so the previous draft does not carry over', () => {
+    function Host() {
+      const session = useBillChatSession()
+      return session ? <BillChatSection key={session.billId} {...session.chat} /> : null
+    }
+    function App({ number }: { number: number }) {
+      return (
+        <BillChatLayoutProvider>
+          <Host />
+          <Present type="S" number={number} />
+        </BillChatLayoutProvider>
+      )
+    }
+
+    const { rerender } = render(<App number={2} />)
+    const box = screen.getByRole('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(box, { target: { value: 'draft for S.2' } })
+    expect(box).toHaveValue('draft for S.2')
+
+    rerender(<App number={3} />)
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('')
   })
 })
