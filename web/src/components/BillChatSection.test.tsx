@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -303,30 +303,50 @@ describe('BillChatSection', () => {
     })
   })
 
+  async function openExportMenu() {
+    const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+    fireEvent.pointerDown(trigger)
+    fireEvent.pointerUp(trigger)
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy briefing' }))
+    return trigger
+  }
+
   it('shows the copy result inside the still-open menu, then closes it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     try {
       render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
-      const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
-      fireEvent.pointerDown(trigger)
-      fireEvent.pointerUp(trigger)
-      fireEvent.click(trigger)
-
-      const copy = await screen.findByRole('menuitem', { name: 'Copy briefing' })
-      fireEvent.click(copy)
+      const trigger = await openExportMenu()
 
       // Radix would close on select; the item holds the menu open for the label.
-      const copied = await screen.findByRole('menuitem', { name: 'Copied briefing' })
-      expect(copied).toBeInTheDocument()
+      expect(await screen.findByRole('menuitem', { name: 'Copied briefing' })).toBeInTheDocument()
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining('S. 2'))
       expect(trigger).toHaveAttribute('aria-expanded', 'true')
 
-      await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'), {
-        timeout: 2500,
-      })
+      await act(() => vi.advanceTimersByTimeAsync(1600))
+      expect(trigger).toHaveAttribute('aria-expanded', 'false')
     } finally {
       vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the menu open on a failed copy so the reader can retry', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
+    vi.stubGlobal('prompt', () => null)
+    try {
+      render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+      const trigger = await openExportMenu()
+
+      expect(await screen.findByRole('menuitem', { name: 'Could not copy' })).toBeInTheDocument()
+      await act(() => vi.advanceTimersByTimeAsync(3000))
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
     }
   })
 
