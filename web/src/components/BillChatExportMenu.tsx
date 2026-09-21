@@ -40,22 +40,28 @@ type BillChatExportMenuProps = {
 export function BillChatExportMenu({ briefing }: BillChatExportMenuProps) {
   const [open, setOpen] = useState(false)
   const [copyState, setCopyState] = useState<CopyState>('idle')
-  const copiedTimer = useRef<number | null>(null)
-
-  const clearCopiedTimer = () => {
-    if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
-    copiedTimer.current = null
-  }
-
-  useEffect(() => clearCopiedTimer, [])
+  // Bumped when the menu closes, so a clipboard write still in flight cannot
+  // report into the next open.
+  const openGeneration = useRef(0)
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
     if (!next) {
-      clearCopiedTimer()
+      openGeneration.current += 1
       setCopyState('idle')
     }
   }
+
+  // The confirmation closes the menu on its own; closing early (Escape, an
+  // outside click) resets `copyState`, which clears this timer.
+  useEffect(() => {
+    if (copyState !== 'copied') return
+    const timer = window.setTimeout(() => {
+      setOpen(false)
+      setCopyState('idle')
+    }, COPIED_MS)
+    return () => window.clearTimeout(timer)
+  }, [copyState])
 
   return (
     <OpenIn query={briefing} open={open} onOpenChange={handleOpenChange}>
@@ -89,14 +95,9 @@ export function BillChatExportMenu({ briefing }: BillChatExportMenuProps) {
           // confirmation, then close it; a failure stays put for a retry.
           onSelect={(event) => {
             event.preventDefault()
+            const generation = openGeneration.current
             void copyTextToClipboard(briefing).then((ok) => {
-              clearCopiedTimer()
-              if (!ok) {
-                setCopyState('failed')
-                return
-              }
-              setCopyState('copied')
-              copiedTimer.current = window.setTimeout(() => handleOpenChange(false), COPIED_MS)
+              if (generation === openGeneration.current) setCopyState(ok ? 'copied' : 'failed')
             })
           }}
         >

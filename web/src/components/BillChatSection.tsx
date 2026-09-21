@@ -11,7 +11,6 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
-  type KeyboardEvent,
 } from 'react'
 
 import { createBillQuote } from '../api/client'
@@ -144,21 +143,6 @@ export function BillChatSection({
     [attachedSelection, onClearSelection, sendMessage, streaming],
   )
 
-  // While a reply is in flight the footer shows Stop (type=button), so
-  // PromptInputTextarea's Enter handler finds no disabled submit button and
-  // `requestSubmit()`s; PromptInput then `form.reset()`s the textarea before
-  // `submitQuestion` bails on `streaming`. A draft only survives that reset
-  // because React mirrors a controlled textarea's value into `defaultValue`.
-  // Swallow Enter here instead of leaning on that; Shift+Enter still inserts
-  // a newline and an IME candidate confirm (`isComposing`, or keyCode 229 on
-  // engines that report the confirm after composition ended) is left alone.
-  const holdEnterWhileStreaming = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!streaming || event.key !== 'Enter' || event.shiftKey) return
-    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
-    event.preventDefault()
-    event.stopPropagation()
-  }
-
   // The composer is text-only. The registry textarea cancels any paste that
   // carries a file item (screenshots, rich clipboards from office suites) to
   // attach it, which drops the clipboard text; stopping the event here lets
@@ -260,7 +244,7 @@ export function BillChatSection({
               </Badge>
             </PromptInputHeader>
           ) : null}
-          <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming} onPasteCapture={keepPasteAsText}>
+          <PromptInputBody onPasteCapture={keepPasteAsText}>
             <PromptInputTextarea
               ref={textareaRef}
               value={input}
@@ -276,9 +260,17 @@ export function BillChatSection({
             </PromptInputTools>
             {streaming ? (
               <PromptInputSubmit type="button" status={status} aria-label="Stop" onClick={() => stop()} />
-            ) : (
-              <PromptInputSubmit status="ready" aria-label="Send" disabled={input.trim().length === 0} />
-            )}
+            ) : null}
+            {/* PromptInputTextarea's Enter handler submits the form unless its
+                `button[type=submit]` is disabled, and PromptInput resets the
+                textarea on submit. Keeping Send in the tree, disabled, while
+                Stop shows is what makes Enter keep the draft mid-stream. */}
+            <PromptInputSubmit
+              status="ready"
+              aria-label="Send"
+              disabled={streaming || input.trim().length === 0}
+              className={streaming ? 'hidden' : undefined}
+            />
           </PromptInputFooter>
         </PromptInput>
       </div>
