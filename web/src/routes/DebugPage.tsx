@@ -35,7 +35,7 @@ function statusClass(status: IngestMonitorStatus): string {
   if (status === 'ok') return 'text-pass'
   if (status === 'failed') return 'text-fail'
   // degraded/stale/unknown: visible but not pager-red (degraded is a known tracked state)
-  return 'text-secondary'
+  return 'text-muted-foreground'
 }
 
 function formatTimestamp(value: string | null | undefined): string {
@@ -51,16 +51,16 @@ function PipelineRunDetails({ run, metrics }: { run: RunIdentity; metrics: RunMe
   return (
     <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
       <div>
-        <dt className="text-secondary">Completed</dt>
+        <dt className="text-muted-foreground">Completed</dt>
         <dd>{formatTimestamp(run.completed_at)}</dd>
       </div>
       <div>
-        <dt className="text-secondary">Trigger</dt>
+        <dt className="text-muted-foreground">Trigger</dt>
         <dd>{run.trigger}</dd>
       </div>
       {metrics.map((metric) => (
         <div key={metric.label}>
-          <dt className="text-secondary">{metric.label}</dt>
+          <dt className="text-muted-foreground">{metric.label}</dt>
           <dd>{metric.value}</dd>
         </div>
       ))}
@@ -94,15 +94,15 @@ function FailureDetails({ failure }: { failure: FeedPipelineFailureRecord }) {
   return (
     <dl className="mt-3 grid gap-2 text-sm">
       <div>
-        <dt className="text-secondary">Failed at</dt>
+        <dt className="text-muted-foreground">Failed at</dt>
         <dd>{formatTimestamp(failure.failed_at)}</dd>
       </div>
       <div>
-        <dt className="text-secondary">Trigger</dt>
+        <dt className="text-muted-foreground">Trigger</dt>
         <dd>{failure.trigger}</dd>
       </div>
       <div>
-        <dt className="text-secondary">Error</dt>
+        <dt className="text-muted-foreground">Error</dt>
         <dd className="break-words text-fail">{failure.error}</dd>
       </div>
     </dl>
@@ -119,20 +119,20 @@ function SkipDetails({
   return (
     <dl className="mt-3 grid gap-2 text-sm">
       <div>
-        <dt className="text-secondary">Skipped at</dt>
+        <dt className="text-muted-foreground">Skipped at</dt>
         <dd>{formatTimestamp(skip.skipped_at)}</dd>
       </div>
       <div>
-        <dt className="text-secondary">Trigger</dt>
+        <dt className="text-muted-foreground">Trigger</dt>
         <dd>{skip.trigger}</dd>
       </div>
       <div>
-        <dt className="text-secondary">Reason</dt>
+        <dt className="text-muted-foreground">Reason</dt>
         <dd className="break-words">{SKIP_REASON_LABEL[skip.reason]}</dd>
       </div>
       {isSkipSuperseded(skip, lastScheduledSuccess) && (
         <div>
-          <dt className="text-secondary">Superseded</dt>
+          <dt className="text-muted-foreground">Superseded</dt>
           <dd>A scheduled run has succeeded since this skip.</dd>
         </div>
       )}
@@ -156,11 +156,11 @@ function RunBlock<T extends RunIdentity>({
   return (
     <div className="mt-5 border-t border-border pt-4">
       <h3 className="text-base font-medium">{title}</h3>
-      {description ? <p className="mt-1 text-sm text-secondary">{description}</p> : null}
+      {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
       {run ? (
         <PipelineRunDetails run={run} metrics={metricsFor(run)} />
       ) : (
-        <p className="mt-2 text-sm text-secondary">{emptyLabel}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{emptyLabel}</p>
       )}
     </div>
   )
@@ -208,14 +208,14 @@ function PipelineMonitorSection<T extends RunIdentity>({
         <h2 className="text-lg font-medium">{title}</h2>
         <p className={`text-sm font-medium ${statusClass(status)}`}>{STATUS_LABEL[status]}</p>
       </div>
-      <p className="mt-2 text-sm text-secondary">{message}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-secondary">Cron (UTC)</dt>
+          <dt className="text-muted-foreground">Cron (UTC)</dt>
           <dd className="font-medium">{cronUtc}</dd>
         </div>
         <div>
-          <dt className="text-secondary">Stale after</dt>
+          <dt className="text-muted-foreground">Stale after</dt>
           <dd className="font-medium">{staleAfterHours} hours</dd>
         </div>
         {headerExtras}
@@ -245,7 +245,7 @@ function PipelineMonitorSection<T extends RunIdentity>({
           {lastSkipped ? (
             <SkipDetails skip={lastSkipped} lastScheduledSuccess={lastScheduledSuccess} />
           ) : (
-            <p className="mt-2 text-sm text-secondary">No recorded skips.</p>
+            <p className="mt-2 text-sm text-muted-foreground">No recorded skips.</p>
           )}
         </div>
       )}
@@ -255,7 +255,7 @@ function PipelineMonitorSection<T extends RunIdentity>({
         {lastFailure ? (
           <FailureDetails failure={lastFailure} />
         ) : (
-          <p className="mt-2 text-sm text-secondary">No recorded failures.</p>
+          <p className="mt-2 text-sm text-muted-foreground">No recorded failures.</p>
         )}
       </div>
 
@@ -276,7 +276,7 @@ function FeedMonitorSection({ ingest }: { ingest: IngestMonitorPayload }) {
       headerExtras={
         <>
           <div>
-            <dt className="text-secondary">Latest passage vote in D1</dt>
+            <dt className="text-muted-foreground">Latest passage vote in D1</dt>
             <dd className="font-medium">
               {ingest.latest_passage_vote_date ?? '—'}
               {isFloorQuietDays(ingest.floor_quiet_days)
@@ -285,7 +285,7 @@ function FeedMonitorSection({ ingest }: { ingest: IngestMonitorPayload }) {
             </dd>
           </div>
           <div>
-            <dt className="text-secondary">Missing feed digests</dt>
+            <dt className="text-muted-foreground">Missing feed digests</dt>
             <dd className="font-medium">{ingest.missing_digest_count}</dd>
           </div>
         </>
@@ -315,7 +315,7 @@ function ExecutiveMonitorSection({ executive }: { executive: ExecutiveIngestMoni
       metricsFor={executiveRunMetrics}
       lastFailure={executive.last_failure}
       footer={
-        <p className="mt-4 text-sm text-secondary">
+        <p className="mt-4 text-sm text-muted-foreground">
           Manual override:{' '}
           <code className="rounded bg-surface-subtle px-1">{executive.admin_executive_ingest}</code>
         </p>
@@ -336,15 +336,15 @@ export default function DebugPage() {
   return (
     <main id="content" className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
       <header className="flex flex-col gap-2">
-        <p className="text-sm text-secondary">Internal ops</p>
+        <p className="text-sm text-muted-foreground">Internal ops</p>
         <h1 className="text-2xl font-semibold tracking-tight">Ingest monitor</h1>
-        <p className="text-sm text-secondary">
+        <p className="text-sm text-muted-foreground">
           Ops view for feed and executive ingest health. Not linked in site navigation.
         </p>
       </header>
 
       {monitor.isLoading && (
-        <p className="rounded-xl border border-border bg-card px-4 py-6 text-secondary">
+        <p className="rounded-xl border border-border bg-card px-4 py-6 text-muted-foreground">
           Loading ingest status…
         </p>
       )}
@@ -361,7 +361,7 @@ export default function DebugPage() {
 
           {ingest.executive && <ExecutiveMonitorSection executive={ingest.executive} />}
 
-          <section className="rounded-card border border-border bg-card p-5 text-[13px] text-secondary">
+          <section className="rounded-card border border-border bg-card p-5 text-[13px] text-muted-foreground">
             <h2 className="text-base font-medium text-foreground">Alerting options</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
@@ -411,7 +411,7 @@ export default function DebugPage() {
         </>
       )}
 
-      <p className="text-sm text-secondary">
+      <p className="text-sm text-muted-foreground">
         <Link className="underline decoration-link underline-offset-2" to="/">
           Back to feed
         </Link>

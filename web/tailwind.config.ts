@@ -64,14 +64,6 @@ const config: Config = {
           other: 'hsl(var(--twc-party-other) / <alpha-value>)',
         },
       },
-      // House convention predates shadcn: `text-secondary` is mid-gray body
-      // text (--twc-secondary), not text-on-secondary-surface.
-      textColor: {
-        secondary: {
-          DEFAULT: 'hsl(var(--twc-secondary) / <alpha-value>)',
-          foreground: 'hsl(var(--twc-foreground) / <alpha-value>)',
-        },
-      },
       fontFamily: {
         // One family only — serif/mono aliases map to the system SF Pro stack.
         sans: ['var(--font-family)'],

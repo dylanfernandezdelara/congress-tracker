@@ -164,7 +164,7 @@ export function NotableVotesSection({
     const className = variant === 'compact' ? 'notable-compact' : 'home-enrichment'
     return (
       <section className={className} aria-label="Notable votes">
-        <p className="text-[13px] text-secondary">{error}</p>
+        <p className="text-[13px] text-muted-foreground">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
             Retry

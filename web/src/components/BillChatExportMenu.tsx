@@ -50,7 +50,7 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
         <TooltipTrigger asChild>
           <span className="inline-flex">
             <OpenInTrigger>
-              <PromptInputButton className="text-secondary" aria-label={BILL_CHAT_EXPORT_NAME}>
+              <PromptInputButton className="text-muted-foreground" aria-label={BILL_CHAT_EXPORT_NAME}>
                 {BILL_CHAT_EXPORT_TRIGGER}
                 <ChevronDownIcon aria-hidden />
               </PromptInputButton>

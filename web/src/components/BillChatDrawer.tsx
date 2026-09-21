@@ -150,7 +150,7 @@ export function BillChatDrawer({ billId }: { billId: string }) {
               Pull up to ask follow-up questions without leaving the bill.
             </DrawerDescription>
             <div className="bill-chat-drawer-inner" data-bill={billId} data-snap={snap}>
-              <BillChatPane collapsed={collapsed} headerActions={headerActions} />
+              <BillChatPane collapsed={collapsed} compact={snap !== 'full'} headerActions={headerActions} />
             </div>
           </div>
         </DrawerPrimitive.Content>

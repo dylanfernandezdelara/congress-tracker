@@ -4,8 +4,15 @@ import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { FileTextIcon, XIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { StickToBottomContext } from 'use-stick-to-bottom'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 
 import { createBillQuote } from '../api/client'
 import { buildApiUrl } from '../api/fetchJson'
@@ -31,7 +38,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from './ai-elements/prompt-input'
-import { Suggestion, Suggestions } from './ai-elements/suggestion'
+import { Suggestion } from './ai-elements/suggestion'
 import { BillChatExportMenu } from './BillChatExportMenu'
 import { BillChatTranscript, messageAnswer, messagePlainText, type BillChatMessage } from './BillChatTranscript'
 import { SelectionMenu } from './SelectionMenu'
@@ -55,6 +62,8 @@ export type BillChatSectionProps = {
   onQuoteCreated: (quote: BillQuote) => void
   /** Peek bar: hide the transcript and composer so the handle stays a title row. */
   collapsed?: boolean
+  /** Short log slot (mobile half snap): trim the empty state to its title. */
+  compact?: boolean
   /** Drawer Open chat / Minimize (or other chrome) on the title row. */
   headerActions?: ReactNode
 }
@@ -66,13 +75,13 @@ export function BillChatSection({
   onSharePassage,
   onQuoteCreated,
   collapsed = false,
+  compact = false,
   headerActions,
 }: BillChatSectionProps) {
   const billId = formatBillQueryParam(item.bill)
   const billLabel = formatShortBillId(item.bill.type, item.bill.number)
   const sectionRef = useRef<HTMLElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const conversationRef = useRef<StickToBottomContext>(null)
   const [input, setInput] = useState('')
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [sharingAnswer, setSharingAnswer] = useState(false)
@@ -140,12 +149,22 @@ export function BillChatSection({
         void sendMessage({ text })
       }
       setInput('')
-      // A reader scrolled up in the log has escaped StickToBottom's lock; a
-      // new question re-engages it so the answer streams into view.
-      void conversationRef.current?.scrollToBottom()
     },
     [attachedSelection, onClearSelection, sendMessage, streaming],
   )
+
+  // While a reply is in flight the footer shows Stop (type=button), so
+  // PromptInputTextarea's Enter handler finds no disabled submit button and
+  // `requestSubmit()`s; PromptInput then `form.reset()`s the textarea before
+  // `submitQuestion` bails on `streaming`. A draft only survives that reset
+  // because React mirrors a controlled textarea's value into `defaultValue`.
+  // Swallow Enter here instead of leaning on that; Shift+Enter still inserts
+  // a newline.
+  const holdEnterWhileStreaming = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!streaming || event.key !== 'Enter' || event.shiftKey) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
 
   /** Answer prose is only shareable with the worker's bill-bound signature. */
   const shareAnswerSelection = async (current: TextSelection) => {
@@ -191,15 +210,18 @@ export function BillChatSection({
             status={status}
             onSharePassage={onSharePassage}
             billLabel={billLabel}
-            conversationRef={conversationRef}
+            compact={compact}
           />
 
           {messages.length === 0 ? (
-            <Suggestions className="w-full flex-wrap">
+            // Registry `Suggestions` is a one-row horizontal scroller with a
+            // hidden scrollbar; in a narrow rail the chips wrap instead so
+            // none are hidden behind a swipe.
+            <div className="flex flex-wrap gap-2">
               {starters.map((chip) => (
                 <Suggestion key={chip} suggestion={chip} disabled={streaming} onClick={submitQuestion} />
               ))}
-            </Suggestions>
+            </div>
           ) : null}
 
           {errorText ? (
@@ -245,7 +267,7 @@ export function BillChatSection({
                 </Badge>
               </PromptInputHeader>
             ) : null}
-            <PromptInputBody>
+            <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming}>
               <PromptInputTextarea
                 ref={textareaRef}
                 value={input}

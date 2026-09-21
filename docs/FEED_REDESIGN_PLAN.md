@@ -178,7 +178,7 @@ Inline accordion on row tap — **not** 3D flip, **not** new route in v1.
 | Skeleton | ~64px height × 3 rows | Down from 260px cards |
 | Topic | `text-base font-semibold` | Down from 19px |
 | Event line | `text-sm`; outcome word `font-medium` + pass/fail color | |
-| Teaser | `text-sm text-secondary line-clamp-1` | Optional |
+| Teaser | `text-sm text-muted-foreground line-clamp-1` | Optional |
 | Home list spacing | Replace `space-y-5` card stack with one list | |
 
 ---

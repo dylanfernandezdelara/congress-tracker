@@ -266,6 +266,36 @@ describe("POST /share/quote", () => {
     expect(await otherBill.json()).toMatchObject({ error: "bad_request" });
   });
 
+  it("matches rendered answer text against the signed Markdown", async () => {
+    const secret = "share-test-hmac";
+    const answerText = [
+      "The bill **speeds energy permits** across states:",
+      "",
+      "- It sets a [two-year deadline](https://example.gov) for reviews.",
+      "- Agencies must publish `status` reports.",
+    ].join("\n");
+    const sig = await signAnswer(secret, { bill: "119-hr-4795", text: answerText });
+    const env = createMockEnv({ DB: shareDb().db, CHAT_HMAC_SECRET: secret });
+    // What a reader selects in the Streamdown output: no emphasis markers,
+    // list bullets, or link syntax, and the two list items run together.
+    const response = await handleCreateBillQuote({
+      request: post({
+        bill: "119-hr-4795",
+        text: "It sets a two-year deadline for reviews. Agencies must publish status reports.",
+        answer: { text: answerText, sig },
+      }),
+      env: env as never,
+      json,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      quote: {
+        source: "answer",
+        text: "It sets a two-year deadline for reviews. Agencies must publish status reports.",
+      },
+    });
+  });
+
   it("verifies against stored bill-text sections after digest and CRS", async () => {
     const { db } = shareDb(DIGEST, [
       { ordinal: 0, label: "3.", heading: "Definitions", body: "A widget means a safety device under this Act." },

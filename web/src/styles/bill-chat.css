@@ -155,14 +155,4 @@
     gap: var(--space-2);
     min-height: 0;
   }
-
-  /* Half snap leaves ~48px between the title row and the chips on short
-     phones: keep the ConversationEmptyState title and drop its icon
-     (first child) and description (p) until the full snap. */
-  @media (max-width: 1023px) {
-    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty > div:first-child,
-    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty p {
-      display: none;
-    }
-  }
 }

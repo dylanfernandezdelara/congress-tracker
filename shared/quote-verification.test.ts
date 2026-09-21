@@ -8,6 +8,7 @@ import {
   findQuoteInText,
   findQuoteSource,
   normalizeForQuoteMatch,
+  normalizeMarkdownForQuoteMatch,
   quoteBelongsToBill,
   textContainsQuote,
 } from './quote-verification'
@@ -20,6 +21,25 @@ describe('quote verification', () => {
   it('normalizes typographic punctuation and case for matching', () => {
     expect(normalizeForQuoteMatch('“Smart” grids — faster…')).toBe('"smart" grids - faster...')
     expect(normalizeForQuoteMatch('It’s\u00A0law')).toBe("it's law")
+  })
+
+  it('folds Markdown syntax away so rendered selections match signed answer prose', () => {
+    const markdown = [
+      '## Summary',
+      '',
+      'The bill **raises** the _cap_ and adds `audits`:',
+      '',
+      '1. A [two-year deadline](https://example.gov/x) for reviews.',
+      '> Agencies report \\*quarterly\\*.',
+    ].join('\n')
+    const folded = normalizeMarkdownForQuoteMatch(markdown)
+    expect(folded).toBe(
+      'summary the bill raises the cap and adds audits: a two-year deadline for reviews. agencies report quarterly.',
+    )
+    // Rendered text keeps escaped and intraword marks; folding the selection
+    // the same way keeps those selections matchable.
+    expect(folded).toContain(normalizeMarkdownForQuoteMatch('report *quarterly*.'))
+    expect(normalizeMarkdownForQuoteMatch('a snake_case field')).toBe('a snakecase field')
   })
 
   it('enforces length bounds on the cleaned text', () => {

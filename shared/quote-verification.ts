@@ -52,6 +52,27 @@ export function normalizeForQuoteMatch(text: string): string {
     .toLowerCase()
 }
 
+const MD_LINK_RE = /\[([^\]]*)\]\([^)]*\)/g
+const MD_BLOCK_PREFIX_RE = /^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+|\d{1,3}[.)][ \t]+)/gm
+const MD_INLINE_MARK_RE = /[*_~`]+/g
+const MD_ESCAPE_RE = /\\([\\`*_{}[\]()#+\-.!>~|])/g
+
+/**
+ * Match form for chat-answer prose. The worker signs the raw Markdown it
+ * streamed, but the reader selects text Streamdown has rendered, so bold,
+ * emphasis, inline code, list markers, blockquote and heading prefixes, and
+ * link syntax are folded away before the usual quote normalization.
+ */
+export function normalizeMarkdownForQuoteMatch(markdown: string): string {
+  return normalizeForQuoteMatch(
+    markdown
+      .replace(MD_ESCAPE_RE, '$1')
+      .replace(MD_LINK_RE, '$1')
+      .replace(MD_BLOCK_PREFIX_RE, '')
+      .replace(MD_INLINE_MARK_RE, ''),
+  )
+}
+
 export type QuoteLengthCheck = 'ok' | 'too_short' | 'too_long'
 
 export function checkQuoteLength(cleaned: string): QuoteLengthCheck {

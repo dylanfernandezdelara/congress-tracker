@@ -4,8 +4,8 @@ import {
 } from '@congress-tracker/shared/chat-api-types'
 import type { UIMessage } from 'ai'
 import { MessageSquareTextIcon } from 'lucide-react'
-import type { Ref } from 'react'
-import type { StickToBottomContext } from 'use-stick-to-bottom'
+import { useEffect } from 'react'
+import { useStickToBottomContext } from 'use-stick-to-bottom'
 
 import { evidenceSourceLabel } from '../utils/billChat'
 import {
@@ -71,7 +71,7 @@ export function QuotedPassage({ quote, onSharePassage }: QuotedPassageProps) {
         type="button"
         size="sm"
         variant="ghost"
-        className="h-7 w-fit rounded-full px-2.5 text-xs text-secondary"
+        className="h-7 w-fit rounded-full px-2.5 text-xs text-muted-foreground"
         onClick={() => onSharePassage(quote.text)}
       >
         Share this passage
@@ -127,14 +127,32 @@ function AssistantTurn({
   )
 }
 
+type ChatStatus = 'submitted' | 'streaming' | 'ready' | 'error'
+
+/**
+ * A reader scrolled up in the log has escaped StickToBottom's lock. Each new
+ * question (`status` → `submitted`) re-engages it so the answer streams into
+ * view. Lives inside `Conversation` so the scroll context never leaves it.
+ */
+function FollowNewTurn({ status }: { status: ChatStatus }) {
+  const { scrollToBottom } = useStickToBottomContext()
+  useEffect(() => {
+    if (status === 'submitted') void scrollToBottom()
+  }, [scrollToBottom, status])
+  return null
+}
+
+const EMPTY_STATE_DESCRIPTION =
+  'Answers stay grounded in the bill’s text. Start with a suggestion or type your own question.'
+
 export type BillChatTranscriptProps = {
   messages: BillChatMessage[]
-  status: 'submitted' | 'streaming' | 'ready' | 'error'
+  status: ChatStatus
   onSharePassage: (text: string) => void
   /** Short bill label for the empty-state title, e.g. "H.R. 1". */
   billLabel: string
-  /** StickToBottom context so the composer can `scrollToBottom()` on submit. */
-  conversationRef?: Ref<StickToBottomContext>
+  /** Short log slot (mobile half snap): keep only the empty-state title. */
+  compact?: boolean
 }
 
 export function BillChatTranscript({
@@ -142,21 +160,22 @@ export function BillChatTranscript({
   status,
   onSharePassage,
   billLabel,
-  conversationRef,
+  compact = false,
 }: BillChatTranscriptProps) {
   const lastMessage = messages[messages.length - 1]
   const awaitingReply =
     status === 'submitted' || (status === 'streaming' && lastMessage?.role !== 'assistant')
 
   return (
-    <Conversation className="bill-chat-conversation" contextRef={conversationRef}>
+    <Conversation className="bill-chat-conversation">
+      <FollowNewTurn status={status} />
       <ConversationContent className="gap-4 p-0" scrollClassName="overscroll-contain">
         {messages.length === 0 ? (
           <ConversationEmptyState
             className="bill-chat-empty gap-1 p-0 lg:p-2"
-            icon={<MessageSquareTextIcon className="size-6" aria-hidden />}
+            icon={compact ? undefined : <MessageSquareTextIcon className="size-6" aria-hidden />}
             title={`Ask about ${billLabel}`}
-            description="Answers stay grounded in the bill’s text. Start with a suggestion or type your own question."
+            description={compact ? undefined : EMPTY_STATE_DESCRIPTION}
           />
         ) : null}
         {messages.map((message) => {
@@ -193,7 +212,7 @@ export function BillChatTranscript({
           </Message>
         ) : null}
       </ConversationContent>
-      {messages.length > 0 ? <ConversationScrollButton /> : null}
+      {messages.length > 0 ? <ConversationScrollButton aria-label="Scroll to latest" /> : null}
     </Conversation>
   )
 }

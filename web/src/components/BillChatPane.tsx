@@ -6,9 +6,11 @@ import { BillChatSection } from './BillChatSection'
 
 export function BillChatPane({
   collapsed = false,
+  compact = false,
   headerActions,
 }: {
   collapsed?: boolean
+  compact?: boolean
   headerActions?: ReactNode
 }) {
   const session = useBillChatSession()
@@ -24,6 +26,7 @@ export function BillChatPane({
       onSharePassage={session.onSharePassage}
       onQuoteCreated={session.onQuoteCreated}
       collapsed={collapsed}
+      compact={compact}
       headerActions={headerActions}
     />
   )

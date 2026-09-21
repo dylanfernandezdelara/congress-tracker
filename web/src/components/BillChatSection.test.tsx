@@ -1,5 +1,4 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import type { ComponentProps, MutableRefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -40,23 +39,14 @@ vi.mock('@ai-sdk/react', () => ({
 
 const { scrollToBottom } = vi.hoisted(() => ({ scrollToBottom: vi.fn() }))
 
-// Real StickToBottom, but the context handed to `contextRef` carries a spy
-// `scrollToBottom` so the composer's submit-time scroll is observable in jsdom.
+// Real StickToBottom; only the context hook's `scrollToBottom` is a spy so the
+// new-turn follow inside the Conversation is observable in jsdom.
 vi.mock('use-stick-to-bottom', async (importOriginal) => {
   const mod = await importOriginal<typeof import('use-stick-to-bottom')>()
-  type Props = ComponentProps<typeof mod.StickToBottom>
-  const StickToBottom = ({ contextRef, ...props }: Props) => (
-    <mod.StickToBottom
-      {...props}
-      contextRef={(context) => {
-        const spied = context ? { ...context, scrollToBottom } : context
-        if (typeof contextRef === 'function') contextRef(spied)
-        else if (contextRef) (contextRef as MutableRefObject<typeof spied>).current = spied
-      }}
-    />
-  )
-  StickToBottom.Content = mod.StickToBottom.Content
-  return { ...mod, StickToBottom }
+  return {
+    ...mod,
+    useStickToBottomContext: () => ({ ...mod.useStickToBottomContext(), scrollToBottom }),
+  }
 })
 
 import { BillChatSection } from './BillChatSection'
@@ -136,16 +126,33 @@ describe('BillChatSection', () => {
     expect(sendMessage).toHaveBeenCalledWith({ text: 'What does this bill do?' })
   })
 
-  it('scrolls the log to the bottom when a question is sent', async () => {
+  it('scrolls the log to the bottom once a question is in flight', () => {
+    chatMock.messages = [{ id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'Who pays?' }] }]
+    const { rerender } = renderWithTooltip(
+      <BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+    expect(scrollToBottom).not.toHaveBeenCalled()
+
+    chatMock.status = 'submitted'
+    rerender(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    expect(scrollToBottom).toHaveBeenCalledTimes(1)
+
+    chatMock.status = 'streaming'
+    rerender(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    expect(scrollToBottom).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a draft follow-up when Enter is pressed while a reply streams', () => {
+    chatMock.status = 'streaming'
+    chatMock.messages = [assistantMessage([{ type: 'text', text: 'Working' }])]
     renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Ask about this bill' }), {
-      target: { value: 'Who pays for this?' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    const textbox = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(textbox, { target: { value: 'And who pays for it?' } })
+    fireEvent.keyDown(textbox, { key: 'Enter' })
 
-    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ text: 'Who pays for this?' }))
-    expect(scrollToBottom).toHaveBeenCalledTimes(1)
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(textbox.value).toBe('And who pays for it?')
   })
 
   it('renders prose, a quoted passage, and shares the passage text', () => {

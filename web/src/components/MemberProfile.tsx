@@ -102,7 +102,7 @@ function CrossVoteItem({
         inFeed={vote.in_feed}
         onAfterNavigate={onAfterNavigate}
       >
-        <span className="text-xs text-secondary">
+        <span className="text-xs text-muted-foreground">
           {shortId} · {formatVoteDate(vote.vote_date)} · {againstPartyLabel(vote.position)} ·
           margin {vote.margin}
         </span>
@@ -131,7 +131,7 @@ function SponsoredBillItem({
         inFeed={bill.in_feed}
         onAfterNavigate={onAfterNavigate}
       >
-        <span className="text-xs text-secondary">
+        <span className="text-xs text-muted-foreground">
           {shortId}
           {bill.introduced_date ? ` · ${formatVoteDate(bill.introduced_date)}` : null}
         </span>
