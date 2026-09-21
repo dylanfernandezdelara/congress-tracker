@@ -41,6 +41,32 @@ describe('markdownToPlainText', () => {
     expect(markdownToPlainText('[a * b](https://example.gov)')).toBe('a * b')
   })
 
+  it('drops the whole destination, parens and title included, and only then the link', () => {
+    expect(
+      markdownToPlainText(
+        '[the coverage rules](https://en.wikipedia.org/wiki/Foo_(Bar) "do not apply here") extra words.',
+      ),
+    ).toBe('the coverage rules extra words.')
+    expect(
+      markdownToPlainText(
+        '[Medicare](https://en.wikipedia.org/wiki/Medicare_(United_States)_and_Medicaid) covers seniors.',
+      ),
+    ).toBe('Medicare covers seniors.')
+    expect(markdownToPlainText("[CMS](https://x.gov 'see (Title I) details') acts.")).toBe('CMS acts.')
+    expect(markdownToPlainText('[a](<https://x.gov/a b> (paren title)) rest')).toBe('a rest')
+    expect(markdownToPlainText('[a](  https://x.gov/a\n"two\nlines"  ) rest')).toBe('a rest')
+  })
+
+  it('leaves text that only looks like a link exactly as CommonMark would show it', () => {
+    // An unbalanced or trailing-junk destination is not a link, so the raw
+    // characters are what the reader sees; folding them would invent prose.
+    const malformed = '[The bill does not apply](https://x.gov/Foo_(Bar) to Title II programs) today.'
+    expect(markdownToPlainText(malformed)).toBe(malformed)
+    expect(markdownToPlainText('[a](https://x.gov/(open rest')).toBe('[a](https://x.gov/(open rest')
+    expect(markdownToPlainText('[a] b](https://x.gov) rest')).toBe('[a] b](https://x.gov) rest')
+    expect(markdownToPlainText('see \\[not](a link\\) here')).toBe('see [not](a link) here')
+  })
+
   it('restores each code span by identity when a link destination swallows one', () => {
     // The destination is not rendered, so its span must vanish without
     // handing its body to the next span (which is what the reader sees).

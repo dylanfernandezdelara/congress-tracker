@@ -354,6 +354,23 @@ describe("POST /share/quote", () => {
     expect(invented.status).toBe(422);
   });
 
+  it("never lets a link title or destination tail join the visible prose", async () => {
+    const secret = "share-test-hmac";
+    const signed =
+      '[The coverage rules](https://en.wikipedia.org/wiki/Foo_(Bar) "do not apply here") extend to every state plan.';
+    const sig = await signAnswer(secret, { bill: "119-hr-4795", text: signed });
+    const env = createMockEnv({ DB: shareDb().db, CHAT_HMAC_SECRET: secret });
+    const share = (text: string) =>
+      handleCreateBillQuote({
+        request: post({ bill: "119-hr-4795", text, answer: { text: signed, sig } }),
+        env: env as never,
+        json,
+      });
+
+    expect((await share("The coverage rules extend to every state plan.")).status).toBe(200);
+    expect((await share('The coverage rules "do not apply here"')).status).toBe(422);
+  });
+
   it("verifies against stored bill-text sections after digest and CRS", async () => {
     const { db } = shareDb(DIGEST, [
       { ordinal: 0, label: "3.", heading: "Definitions", body: "A widget means a safety device under this Act." },
