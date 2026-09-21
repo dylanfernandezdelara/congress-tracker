@@ -175,7 +175,8 @@ export function BillChatTranscript({
             className="bill-chat-empty gap-1 p-0 lg:p-2"
             icon={compact ? undefined : <MessageSquareTextIcon className="size-6" aria-hidden />}
             title={`Ask about ${billLabel}`}
-            description={compact ? undefined : EMPTY_STATE_DESCRIPTION}
+            // `undefined` would fall back to the registry's default sentence.
+            description={compact ? '' : EMPTY_STATE_DESCRIPTION}
           />
         ) : null}
         {messages.map((message) => {

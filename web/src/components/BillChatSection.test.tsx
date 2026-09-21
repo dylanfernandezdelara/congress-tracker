@@ -108,6 +108,7 @@ describe('BillChatSection', () => {
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
     // Stock ConversationEmptyState inside the log until the first turn.
     expect(screen.getByRole('log')).toContainElement(screen.getByText('Ask about S. 2'))
+    expect(screen.getByText(/Answers stay grounded/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'What does this bill do?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Who is affected?' })).toBeInTheDocument()
     expect(
@@ -116,6 +117,17 @@ describe('BillChatSection', () => {
     expect(
       screen.getByRole('button', { name: /Explain: Creates a new inspector/ }),
     ).toBeInTheDocument()
+  })
+
+  it('trims the empty state to its title in a compact log slot', () => {
+    renderWithTooltip(
+      <BillChatSection item={twoPointItem} compact onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+
+    const empty = screen.getByText('Ask about S. 2').closest('.bill-chat-empty')
+    expect(empty).not.toBeNull()
+    expect(empty).toHaveTextContent(/^Ask about S\. 2$/)
+    expect(empty?.querySelector('svg')).toBeNull()
   })
 
   it('sends a starter chip as the user message', () => {
