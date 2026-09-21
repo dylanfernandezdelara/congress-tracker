@@ -9,7 +9,6 @@ import {
   findQuoteSource,
   normalizeForQuoteMatch,
   quoteBelongsToBill,
-  stripMarkdownSyntax,
   textContainsQuote,
 } from './quote-verification'
 
@@ -21,35 +20,6 @@ describe('quote verification', () => {
   it('normalizes typographic punctuation and case for matching', () => {
     expect(normalizeForQuoteMatch('“Smart” grids — faster…')).toBe('"smart" grids - faster...')
     expect(normalizeForQuoteMatch('It’s\u00A0law')).toBe("it's law")
-  })
-
-  describe('stripMarkdownSyntax', () => {
-    it('removes paired delimiters, link syntax, and block prefixes', () => {
-      const markdown = [
-        '## Summary',
-        '',
-        'The bill **raises** the _cap_, ~~cuts~~ adds `audits`:',
-        '',
-        '1. A [two-year deadline](https://example.gov/x) for reviews.',
-        '> Agencies ***must*** report.',
-      ].join('\n')
-      expect(stripMarkdownSyntax(markdown)).toBe(
-        [
-          'Summary',
-          '',
-          'The bill raises the cap, cuts adds audits:',
-          '',
-          'A two-year deadline for reviews.',
-          'Agencies must report.',
-        ].join('\n'),
-      )
-    })
-
-    it('keeps marks that render literally', () => {
-      expect(stripMarkdownSyntax('Agencies report \\*quarterly\\*.')).toBe('Agencies report *quarterly*.')
-      expect(stripMarkdownSyntax('a snake_case_field and 2 * 3 * 4')).toBe('a snake_case_field and 2 * 3 * 4')
-      expect(stripMarkdownSyntax('an unclosed **bold run')).toBe('an unclosed **bold run')
-    })
   })
 
   it('enforces length bounds on the cleaned text', () => {

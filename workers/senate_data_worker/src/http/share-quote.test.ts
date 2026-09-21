@@ -266,23 +266,29 @@ describe("POST /share/quote", () => {
     expect(await otherBill.json()).toMatchObject({ error: "bad_request" });
   });
 
-  it("matches rendered answer text against the signed Markdown", async () => {
+  const SIGNED_ANSWER = [
+    "The bill **speeds energy permits** across states:",
+    "",
+    "- It sets a [two-year deadline](https://example.gov) for reviews.",
+    "- Agencies must publish `status` reports.",
+  ].join("\n");
+
+  async function signedAnswerEnv() {
     const secret = "share-test-hmac";
-    const answerText = [
-      "The bill **speeds energy permits** across states:",
-      "",
-      "- It sets a [two-year deadline](https://example.gov) for reviews.",
-      "- Agencies must publish `status` reports.",
-    ].join("\n");
-    const sig = await signAnswer(secret, { bill: "119-hr-4795", text: answerText });
+    const sig = await signAnswer(secret, { bill: "119-hr-4795", text: SIGNED_ANSWER });
     const env = createMockEnv({ DB: shareDb().db, CHAT_HMAC_SECRET: secret });
+    return { env, answer: { text: SIGNED_ANSWER, sig } };
+  }
+
+  it("matches rendered answer text against the signed Markdown", async () => {
+    const { env, answer } = await signedAnswerEnv();
     // What a reader selects on screen: no emphasis markers, list bullets, or
     // link syntax, and the two list items run together.
     const response = await handleCreateBillQuote({
       request: post({
         bill: "119-hr-4795",
         text: "It sets a two-year deadline for reviews. Agencies must publish status reports.",
-        answer: { text: answerText, sig },
+        answer,
       }),
       env: env as never,
       json,
@@ -294,17 +300,23 @@ describe("POST /share/quote", () => {
         text: "It sets a two-year deadline for reviews. Agencies must publish status reports.",
       },
     });
-    // The raw Markdown itself is not what the reader saw, so it is not a quote.
-    const rawSyntax = await handleCreateBillQuote({
+  });
+
+  it("still accepts the signed Markdown as written", async () => {
+    // A transcript that prints answers as plain text shows the raw syntax, so
+    // a selection of it is what that reader saw.
+    const { env, answer } = await signedAnswerEnv();
+    const response = await handleCreateBillQuote({
       request: post({
         bill: "119-hr-4795",
         text: "The bill **speeds energy permits** across states:",
-        answer: { text: answerText, sig },
+        answer,
       }),
       env: env as never,
       json,
     });
-    expect(rawSyntax.status).toBe(422);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ quote: { source: "answer" } });
   });
 
   it("verifies against stored bill-text sections after digest and CRS", async () => {
