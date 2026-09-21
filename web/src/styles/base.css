@@ -40,8 +40,8 @@
     /* 8px snap grid; --space-<px> names carry their pixel value so they do not
        read like Tailwind's 4px scale. Overlay is opt-in (`?align=1`). */
     --grid: 8px;
-    --space-32: 4px;
-    --space-64: var(--grid);
+    --space-4: 4px;
+    --space-8: var(--grid);
     --space-16: calc(var(--grid) * 2);
     --space-24: calc(var(--grid) * 3);
     --space-32: calc(var(--grid) * 4);
