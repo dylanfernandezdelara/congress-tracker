@@ -23,6 +23,7 @@ import { RightRail } from '../components/RightRail'
 import { SenateWaitingList } from '../components/SenateWaitingList'
 import { TightnessDefectorSheet } from '../components/TightnessDefectorSheet'
 import { TightnessStrip } from '../components/TightnessStrip'
+import { copyAlignGridParam } from '../hooks/useAlignGrid'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
@@ -120,7 +121,12 @@ export default function Home() {
 
   const openWaitingBill = useCallback(
     (billParam: string) => {
-      setSearchParams({ bill: billParam })
+      setSearchParams((prev) => {
+        const next = new URLSearchParams()
+        next.set('bill', billParam)
+        copyAlignGridParam(prev, next)
+        return next
+      })
     },
     [setSearchParams],
   )
@@ -288,7 +294,7 @@ export default function Home() {
         {showSkeleton ? <FeedSkeleton /> : null}
 
         {feedError && items.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-card border border-border bg-card px-6 py-8 text-center">
+          <div className="flex flex-col items-center gap-4 rounded-card border border-border bg-card px-6 py-8 text-center">
             <p className="text-[13px] text-muted-foreground">{feedError}</p>
             <button type="button" className="ghost-button" onClick={reloadAll}>
               Retry
