@@ -96,9 +96,10 @@ const TITLE_CLOSER: Record<string, string> = { '"': '"', "'": "'", '(': ')' }
 function linkEnd(text: string, pos: number): number {
   let i = skipSpace(text, pos)
   if (text[i] === '<') {
-    i = text.indexOf('>', i + 1)
-    if (i === -1) return -1
-    i += 1
+    // CommonMark: a `<...>` destination may hold spaces but no line ending or `<`.
+    const end = text.indexOf('>', i + 1)
+    if (end === -1 || /[\n\r<]/.test(text.slice(i + 1, end))) return -1
+    i = end + 1
   } else {
     let depth = 0
     for (; i < text.length; i++) {

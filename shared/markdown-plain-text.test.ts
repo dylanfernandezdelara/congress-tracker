@@ -65,6 +65,12 @@ describe('markdownToPlainText', () => {
     expect(markdownToPlainText('[a](https://x.gov/(open rest')).toBe('[a](https://x.gov/(open rest')
     expect(markdownToPlainText('[a] b](https://x.gov) rest')).toBe('[a] b](https://x.gov) rest')
     expect(markdownToPlainText('see \\[not](a link\\) here')).toBe('see [not](a link) here')
+    // A `<...>` destination cannot span a line ending or hold a bare `<`, so
+    // these are not links and must not glue "rules" onto "extend".
+    const wrapped = '[the rules](<https://x.gov/foo\nbar>) extend far.'
+    expect(markdownToPlainText(wrapped)).toBe(wrapped)
+    const nested = '[the rules](<http://x.com/foo<bar>) extend far.'
+    expect(markdownToPlainText(nested)).toBe(nested)
   })
 
   it('restores each code span by identity when a link destination swallows one', () => {
