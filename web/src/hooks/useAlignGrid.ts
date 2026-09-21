@@ -12,12 +12,6 @@ export function isAlignGridQuery(value: string | null): boolean {
   return ALIGN_GRID_VALUES.has(value.trim().toLowerCase())
 }
 
-/** Keep `?align=` across navigations that otherwise replace the query. */
-export function copyAlignGridParam(from: URLSearchParams, to: URLSearchParams): void {
-  const align = from.get(ALIGN_GRID_QUERY)
-  if (align) to.set(ALIGN_GRID_QUERY, align)
-}
-
 /**
  * Opt-in 8px alignment overlay for layout work. Reads `?align=` and sets
  * `document.documentElement.dataset.alignGrid`. Production and qa:web omit
