@@ -151,6 +151,8 @@ export type BillChatTranscriptProps = {
   onSharePassage: (text: string) => void
   /** Short bill label for the empty-state title, e.g. "H.R. 1". */
   billLabel: string
+  /** Short log slot (mobile half snap): keep only the empty-state title. */
+  compact?: boolean
 }
 
 export function BillChatTranscript({
@@ -158,6 +160,7 @@ export function BillChatTranscript({
   status,
   onSharePassage,
   billLabel,
+  compact = false,
 }: BillChatTranscriptProps) {
   const lastMessage = messages[messages.length - 1]
   const awaitingReply =
@@ -169,10 +172,11 @@ export function BillChatTranscript({
       <ConversationContent className="gap-4 p-0" scrollClassName="overscroll-contain">
         {messages.length === 0 ? (
           <ConversationEmptyState
-            className="bill-chat-empty gap-1 p-2"
-            icon={<MessageSquareTextIcon className="size-6" aria-hidden />}
+            className="bill-chat-empty gap-1 p-0 lg:p-2"
+            icon={compact ? undefined : <MessageSquareTextIcon className="size-6" aria-hidden />}
             title={`Ask about ${billLabel}`}
-            description={EMPTY_STATE_DESCRIPTION}
+            // `undefined` would fall back to the registry's default sentence.
+            description={compact ? '' : EMPTY_STATE_DESCRIPTION}
           />
         ) : null}
         {messages.map((message) => {

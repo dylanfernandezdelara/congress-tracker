@@ -9,6 +9,7 @@ import {
 
 import { makeFeedItem } from '../test/feedItemFixtures'
 import { renderWithTooltip } from '../test/tooltipHarness'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import type { BillChatMessage } from './BillChatSection'
 
 const sendMessage = vi.fn()
@@ -32,6 +33,7 @@ const chatMock: {
 }
 
 vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
   useChat: () => chatMock,
 }))
 
@@ -95,6 +97,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  resetBillChatInstancesForTests()
   vi.restoreAllMocks()
 })
 
@@ -114,6 +117,17 @@ describe('BillChatSection', () => {
     expect(
       screen.getByRole('button', { name: /Explain: Creates a new inspector/ }),
     ).toBeInTheDocument()
+  })
+
+  it('trims the empty state to its title in a compact log slot', () => {
+    renderWithTooltip(
+      <BillChatSection item={twoPointItem} compact onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+
+    const empty = screen.getByText('Ask about S. 2').closest('.bill-chat-empty')
+    expect(empty).not.toBeNull()
+    expect(empty).toHaveTextContent(/^Ask about S\. 2$/)
+    expect(empty?.querySelector('svg')).toBeNull()
   })
 
   it('sends a starter chip as the user message', () => {
@@ -250,6 +264,22 @@ describe('BillChatSection', () => {
     expect(onClearSelection).toHaveBeenCalled()
   })
 
+  it('hides the composer when collapsed', () => {
+    renderWithTooltip(
+      <BillChatSection
+        item={twoPointItem}
+        collapsed
+        onSharePassage={vi.fn()}
+        onQuoteCreated={vi.fn()}
+        headerActions={<button type="button">Open</button>}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
+  })
+
   it('opens ChatGPT and Claude with a bill briefing', async () => {
     renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
@@ -258,6 +288,7 @@ describe('BillChatSection', () => {
     expect(trigger).not.toHaveTextContent('Open in chat')
     // Lives in the composer toolbar next to Send, not on the title row.
     expect(trigger.closest('form.bill-chat-prompt')).not.toBeNull()
+    expect(trigger.closest('.bill-chat-header')).toBeNull()
     fireEvent.pointerDown(trigger)
     fireEvent.pointerUp(trigger)
     fireEvent.click(trigger)

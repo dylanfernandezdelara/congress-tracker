@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { AppLayout } from '../layouts/AppLayout'
 import alignGridCss from '../styles/align-grid.css?raw'
 import baseCss from '../styles/base.css?raw'
+import billChatCss from '../styles/bill-chat.css?raw'
 import chromeCss from '../styles/chrome.css?raw'
 import homeCss from '../styles/home.css?raw'
 import {
@@ -125,12 +126,15 @@ describe('align-grid.css', () => {
     expect(alignGridCss.includes('repeating-linear-gradient', overlayIndex)).toBe(true)
   })
 
-  it('keeps page chrome and the rails on space tokens', () => {
+  it('keeps page chrome and the reading rail on space tokens', () => {
     expect(chromeCss).toContain('margin-top: var(--space-2)')
     expect(chromeCss).toContain('height: var(--site-header-height)')
     expect(chromeCss).toContain('box-shadow: inset 0 -1px 0 hsl(var(--twc-border))')
+    expect(homeCss).toContain('minmax(336px, 26vw)')
     expect(homeCss).toContain('top: var(--site-rail-top)')
-    expect(homeCss).toContain('max-height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom))')
+    expect(homeCss).toContain('height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom))')
+    expect(billChatCss).toContain('--bill-chat-peek: 128px')
+    expect(billChatCss).not.toContain('bill-chat-prompt-footer')
     expect(baseCss).toContain('--site-header-height: 48px')
   })
 })

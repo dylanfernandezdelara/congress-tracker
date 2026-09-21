@@ -17,8 +17,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 /**
  * Visible label. The trigger sits in the composer toolbar, so "Open in ▾"
- * reads as "open this conversation in…" rather than as a way to open the
- * chat pane itself.
+ * reads as "open this conversation in…" and does not collide with the
+ * drawer's "Open chat" control, which stays in the header.
  */
 export const BILL_CHAT_EXPORT_TRIGGER = 'Open in'
 /** Accessible name: this hands the briefing to ChatGPT or Claude, not this pane. */
