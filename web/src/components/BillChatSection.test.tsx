@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -8,6 +8,8 @@ import {
 } from '@congress-tracker/shared/chat-api-types'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { renderWithTooltip } from '../test/tooltipHarness'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import type { BillChatMessage } from './BillChatSection'
 
 const sendMessage = vi.fn()
@@ -31,8 +33,21 @@ const chatMock: {
 }
 
 vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
   useChat: () => chatMock,
 }))
+
+const { scrollToBottom } = vi.hoisted(() => ({ scrollToBottom: vi.fn() }))
+
+// Real StickToBottom; only the context hook's `scrollToBottom` is a spy so the
+// new-turn follow inside the Conversation is observable in jsdom.
+vi.mock('use-stick-to-bottom', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('use-stick-to-bottom')>()
+  return {
+    ...mod,
+    useStickToBottomContext: () => ({ ...mod.useStickToBottomContext(), scrollToBottom }),
+  }
+})
 
 import { BillChatSection } from './BillChatSection'
 
@@ -78,18 +93,22 @@ beforeEach(() => {
   sendMessage.mockReset()
   regenerate.mockReset()
   stop.mockReset()
+  scrollToBottom.mockReset()
 })
 
 afterEach(() => {
+  resetBillChatInstancesForTests()
   vi.restoreAllMocks()
 })
 
 describe('BillChatSection', () => {
   it('renders the heading and starter chips including key-point questions', () => {
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
-    expect(screen.getByText('Answers quote the bill’s text.')).toBeInTheDocument()
+    // Stock ConversationEmptyState inside the log until the first turn.
+    expect(screen.getByRole('log')).toContainElement(screen.getByText('Ask about S. 2'))
+    expect(screen.getByText(/Answers stay grounded/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'What does this bill do?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Who is affected?' })).toBeInTheDocument()
     expect(
@@ -100,12 +119,57 @@ describe('BillChatSection', () => {
     ).toBeInTheDocument()
   })
 
+  it('trims the empty state to its title in a compact log slot', () => {
+    renderWithTooltip(
+      <BillChatSection item={twoPointItem} compact onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+
+    const empty = screen.getByText('Ask about S. 2').closest('.bill-chat-empty')
+    expect(empty).not.toBeNull()
+    expect(empty).toHaveTextContent(/^Ask about S\. 2$/)
+    expect(empty?.querySelector('svg')).toBeNull()
+  })
+
   it('sends a starter chip as the user message', () => {
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'What does this bill do?' }))
 
     expect(sendMessage).toHaveBeenCalledWith({ text: 'What does this bill do?' })
+  })
+
+  it('scrolls the log to the bottom once a question is in flight', () => {
+    chatMock.messages = [{ id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'Who pays?' }] }]
+    const { rerender } = renderWithTooltip(
+      <BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+    expect(scrollToBottom).not.toHaveBeenCalled()
+
+    chatMock.status = 'submitted'
+    rerender(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    expect(scrollToBottom).toHaveBeenCalledTimes(1)
+
+    chatMock.status = 'streaming'
+    rerender(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    expect(scrollToBottom).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a draft follow-up when Enter is pressed while a reply streams', () => {
+    chatMock.status = 'streaming'
+    chatMock.messages = [assistantMessage([{ type: 'text', text: 'Working' }])]
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    const textbox = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(textbox, { target: { value: 'And who pays for it?' } })
+    // fireEvent returns false when the default was prevented: the guard ate it.
+    expect(fireEvent.keyDown(textbox, { key: 'Enter' })).toBe(false)
+
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(textbox.value).toBe('And who pays for it?')
+
+    // An IME candidate confirm and Shift+Enter pass through untouched.
+    expect(fireEvent.keyDown(textbox, { key: 'Enter', isComposing: true })).toBe(true)
+    expect(fireEvent.keyDown(textbox, { key: 'Enter', shiftKey: true })).toBe(true)
   })
 
   it('renders prose, a quoted passage, and shares the passage text', () => {
@@ -118,9 +182,11 @@ describe('BillChatSection', () => {
       ]),
     ]
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByText('The bill raises the spending cap.')).toBeInTheDocument()
+    expect(screen.queryByText('Ask about S. 2')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'What does this bill do?' })).not.toBeInTheDocument()
     expect(screen.getByText('The Secretary shall raise the cap.')).toBeInTheDocument()
     expect(screen.getByText(/Sec\. 3\. Definitions/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Share this passage' }))
@@ -135,17 +201,17 @@ describe('BillChatSection', () => {
       ]),
     ]
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const notice = screen.getByText("The bill text doesn't address this.")
-    expect(notice.closest('.bill-chat-bubble--refused')).toBeTruthy()
+    expect(notice.closest('[data-refused]')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Share this passage' })).not.toBeInTheDocument()
   })
 
   it('shows the parsed error message and retries', () => {
     chatMock.error = new Error(JSON.stringify({ message: 'Too many questions today.' }))
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Too many questions today.')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -155,7 +221,7 @@ describe('BillChatSection', () => {
   it('shows a generic error when the transport message is not JSON', () => {
     chatMock.error = new Error('Failed to fetch')
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Chat is unavailable right now.')
   })
@@ -165,15 +231,15 @@ describe('BillChatSection', () => {
     // message is the worker's errorText, not a JSON body.
     chatMock.error = new Error(BILL_CHAT_STREAM_ERROR_TEXT)
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('The chat service failed. Try again shortly.')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
-  it('renders a pending selection chip and sends it on submit, then clears it', () => {
+  it('renders a pending selection chip and sends it on submit, then clears it', async () => {
     const onClearSelection = vi.fn()
-    render(
+    renderWithTooltip(
       <BillChatSection
         item={twoPointItem}
         pendingSelection="the selected text about rural clinics"
@@ -186,20 +252,68 @@ describe('BillChatSection', () => {
     expect(screen.getByText('the selected text about rural clinics')).toBeInTheDocument()
     const textarea = screen.getByRole('textbox', { name: 'Ask about this bill' })
     fireEvent.change(textarea, { target: { value: 'What does this mean?' } })
+    // PromptInput reads the message off FormData and resolves attachments before onSubmit.
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(sendMessage).toHaveBeenCalledWith(
-      { text: 'What does this mean?' },
-      { body: { selection: 'the selected text about rural clinics' } },
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        { text: 'What does this mean?' },
+        { body: { selection: 'the selected text about rural clinics' } },
+      ),
     )
     expect(onClearSelection).toHaveBeenCalled()
+  })
+
+  it('hides the composer when collapsed', () => {
+    renderWithTooltip(
+      <BillChatSection
+        item={twoPointItem}
+        collapsed
+        onSharePassage={vi.fn()}
+        onQuoteCreated={vi.fn()}
+        headerActions={<button type="button">Open</button>}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Ask about this bill' })).not.toBeInTheDocument()
+  })
+
+  it('opens ChatGPT and Claude with a bill briefing', async () => {
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+    expect(trigger).toHaveTextContent('Open in')
+    expect(trigger).not.toHaveTextContent('Open in chat')
+    // Lives in the composer toolbar next to Send, not on the title row.
+    expect(trigger.closest('form.bill-chat-prompt')).not.toBeNull()
+    expect(trigger.closest('.bill-chat-header')).toBeNull()
+    fireEvent.pointerDown(trigger)
+    fireEvent.pointerUp(trigger)
+    fireEvent.click(trigger)
+
+    const chatgpt = await screen.findByRole('menuitem', { name: /Open in ChatGPT/ })
+    const claude = screen.getByRole('menuitem', { name: /Open in Claude/ })
+    const chatgptHref = chatgpt.getAttribute('href') ?? ''
+    const claudeHref = claude.getAttribute('href') ?? ''
+    expect(chatgptHref).toContain('https://chatgpt.com/?')
+    expect(new URL(chatgptHref).searchParams.get('prompt')).toContain('S. 2')
+    expect(claudeHref).toContain('https://claude.ai/new?')
+    expect(new URL(claudeHref).searchParams.get('q')).toContain('S. 2')
+    expect(screen.getByRole('menuitem', { name: 'Copy briefing' })).toBeInTheDocument()
+    expect(chatgpt.querySelector('svg title')?.textContent).toBe('OpenAI')
+    expect(claude.querySelector('svg title')?.textContent).toBe('Claude')
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    })
   })
 
   it('shows Stop while streaming and disables send', () => {
     chatMock.status = 'streaming'
     chatMock.messages = [assistantMessage([{ type: 'text', text: 'Working' }])]
 
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()

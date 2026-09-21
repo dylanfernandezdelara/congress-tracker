@@ -176,7 +176,7 @@ export function PassageVoteDetails({
             <div className="space-y-0.5">
               <div className="flex items-baseline justify-between gap-3 text-sm">
                 <p className="font-medium text-foreground">{vote.chamber}</p>
-                <p className="shrink-0 font-medium tabular-nums text-secondary">
+                <p className="shrink-0 font-medium tabular-nums text-muted-foreground">
                   {vote.yeas}–{vote.nays}
                 </p>
               </div>

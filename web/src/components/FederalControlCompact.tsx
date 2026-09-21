@@ -72,7 +72,7 @@ export function FederalControlCompact({
   if (error) {
     return (
       <section className="federal-compact" aria-label="Federal Control">
-        <p className="text-[13px] text-secondary">{error}</p>
+        <p className="text-[13px] text-muted-foreground">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
             Retry

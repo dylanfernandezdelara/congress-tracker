@@ -4,7 +4,15 @@ import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { FileTextIcon, XIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 
 import { createBillQuote } from '../api/client'
 import { buildApiUrl } from '../api/fetchJson'
@@ -16,10 +24,25 @@ import {
   selectionChipLabel,
   starterChipsFromKeyPoints,
 } from '../utils/billChat'
-import { copyTextToClipboard } from '../utils/billDeepLink'
+import { billChatInstance } from '../utils/billChatInstance'
+import { buildBillChatExportPrompt } from '../utils/billChatExport'
+import { congressGovBillUrl, formatShortBillId, getBillColloquialName } from '../utils/billLabels'
+import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
-import { BillChatTranscript, messageAnswer, type BillChatMessage } from './BillChatTranscript'
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputHeader,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+} from './ai-elements/prompt-input'
+import { Suggestion } from './ai-elements/suggestion'
+import { BillChatExportMenu } from './BillChatExportMenu'
+import { BillChatTranscript, messageAnswer, messagePlainText, type BillChatMessage } from './BillChatTranscript'
 import { SelectionMenu } from './SelectionMenu'
+import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 
 export type { BillChatMessage } from './BillChatTranscript'
@@ -37,6 +60,12 @@ export type BillChatSectionProps = {
   onSharePassage: (text: string) => void
   /** A signed answer selection was minted as a quote; the caller opens the share sheet. */
   onQuoteCreated: (quote: BillQuote) => void
+  /** Peek bar: hide the transcript and composer so the handle stays a title row. */
+  collapsed?: boolean
+  /** Short log slot (mobile half snap): trim the empty state to its title. */
+  compact?: boolean
+  /** Drawer Open chat / Minimize (or other chrome) on the title row. */
+  headerActions?: ReactNode
 }
 
 export function BillChatSection({
@@ -45,8 +74,12 @@ export function BillChatSection({
   onClearSelection,
   onSharePassage,
   onQuoteCreated,
+  collapsed = false,
+  compact = false,
+  headerActions,
 }: BillChatSectionProps) {
   const billId = formatBillQueryParam(item.bill)
+  const billLabel = formatShortBillId(item.bill.type, item.bill.number)
   const sectionRef = useRef<HTMLElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
@@ -60,19 +93,18 @@ export function BillChatSection({
       }),
     [billId],
   )
+  const chat = useMemo(() => billChatInstance(billId, transport), [billId, transport])
   const { messages, sendMessage, status, stop, error, regenerate } = useChat<BillChatMessage>({
-    id: `bill-chat-${billId}`,
-    transport,
+    chat,
   })
   const { selection, clear: clearSelection } = useTextSelectionMenu(sectionRef, {
     sources: ANSWER_SELECTION_SOURCES,
   })
 
   useEffect(() => {
-    if (!pendingSelection) return
-    sectionRef.current?.scrollIntoView?.({ block: 'nearest' })
+    if (!pendingSelection || collapsed) return
     textareaRef.current?.focus()
-  }, [pendingSelection])
+  }, [collapsed, pendingSelection])
 
   useEffect(() => {
     if (!selectionStatus) return
@@ -87,6 +119,24 @@ export function BillChatSection({
   )
   const errorText = parseChatErrorMessage(error)
   const attachedSelection = pendingSelection ? capSelection(pendingSelection) : null
+  const exportPrompt = useMemo(() => {
+    const turns = messages.flatMap((message) => {
+      if (message.role !== 'user' && message.role !== 'assistant') return []
+      const text = messagePlainText(message)
+      return text ? [{ role: message.role, text }] : []
+    })
+    return buildBillChatExportPrompt({
+      billLabel: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
+      billId: billLabel,
+      sourceUrl: congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number),
+      pageUrl: buildBillShareUrl(item),
+      headline: item.digest?.headline,
+      whatItDoes: item.digest?.what_it_does,
+      keyPoints: item.digest?.key_points,
+      crsSummary: item.raw_summary_text,
+      messages: turns,
+    })
+  }, [billLabel, item, messages])
 
   const submitQuestion = useCallback(
     (raw: string) => {
@@ -103,11 +153,18 @@ export function BillChatSection({
     [attachedSelection, onClearSelection, sendMessage, streaming],
   )
 
-  const onTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      submitQuestion(input)
-    }
+  // While a reply is in flight the footer shows Stop (type=button), so
+  // PromptInputTextarea's Enter handler finds no disabled submit button and
+  // `requestSubmit()`s; PromptInput then `form.reset()`s the textarea before
+  // `submitQuestion` bails on `streaming`. A draft only survives that reset
+  // because React mirrors a controlled textarea's value into `defaultValue`.
+  // Swallow Enter here instead of leaning on that; Shift+Enter still inserts
+  // a newline and an IME candidate confirm (`isComposing`) is left alone, as
+  // in the registry handler.
+  const holdEnterWhileStreaming = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!streaming || event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    event.preventDefault()
+    event.stopPropagation()
   }
 
   /** Answer prose is only shareable with the worker's bill-bound signature. */
@@ -135,107 +192,105 @@ export function BillChatSection({
   }
 
   return (
-    <section ref={sectionRef} className="feed-row-detail-section bill-chat" aria-labelledby="bill-chat-heading">
-      <h3 id="bill-chat-heading" className="feed-row-detail-heading">
-        Ask about this bill
-      </h3>
-      <p className="bill-chat-note">Answers quote the bill’s text.</p>
+    <section
+      ref={sectionRef}
+      className={`bill-chat${collapsed ? ' bill-chat--collapsed' : ''}`}
+      aria-labelledby="bill-chat-heading"
+    >
+      <header className="bill-chat-header">
+        <h3 id="bill-chat-heading" className="feed-row-detail-heading">
+          Ask about this bill
+        </h3>
+        {headerActions ? <div className="bill-chat-header-actions">{headerActions}</div> : null}
+      </header>
 
-      {messages.length === 0 ? (
-        <div className="bill-chat-suggestions">
-          {starters.map((chip) => (
-            <Button
-              key={chip}
-              type="button"
-              size="sm"
-              variant="outline"
-              className="bill-chat-suggestion"
-              disabled={streaming}
-              onClick={() => submitQuestion(chip)}
+      {collapsed ? null : (
+        <div className="bill-chat-body">
+          <BillChatTranscript
+            messages={messages}
+            status={status}
+            onSharePassage={onSharePassage}
+            billLabel={billLabel}
+            compact={compact}
+          />
+
+          {messages.length === 0 ? (
+            // Registry `Suggestions` is a one-row horizontal scroller with a
+            // hidden scrollbar; in a narrow rail the chips wrap instead so
+            // none are hidden behind a swipe.
+            <div className="flex flex-wrap gap-2">
+              {starters.map((chip) => (
+                <Suggestion key={chip} suggestion={chip} disabled={streaming} onClick={submitQuestion} />
+              ))}
+            </div>
+          ) : null}
+
+          {errorText ? (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
             >
-              {chip}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-
-      <BillChatTranscript messages={messages} status={status} onSharePassage={onSharePassage} />
-
-      {errorText ? (
-        <div className="bill-chat-error" role="alert">
-          <span>{errorText}</span>
-          <button type="button" className="bill-chat-error-retry" onClick={() => void regenerate()}>
-            Retry
-          </button>
-        </div>
-      ) : null}
-
-      {attachedSelection ? (
-        <div className="bill-chat-attachments">
-          <div className="bill-chat-attachment" title={attachedSelection}>
-            <span className="bill-chat-attachment-icon" aria-hidden>
-              <FileTextIcon />
-            </span>
-            <span className="bill-chat-attachment-label" title={attachedSelection}>
-              {selectionChipLabel(attachedSelection)}
-            </span>
-            {onClearSelection ? (
-              <button
+              <span className="min-w-0 flex-1">{errorText}</span>
+              <Button
                 type="button"
-                className="bill-chat-attachment-remove"
-                aria-label="Remove"
-                onClick={onClearSelection}
+                size="sm"
+                variant="outline"
+                className="h-7 rounded-full px-3 text-xs"
+                onClick={() => void regenerate()}
               >
-                <XIcon />
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+                Retry
+              </Button>
+            </div>
+          ) : null}
 
-      <form
-        className="bill-chat-prompt"
-        onSubmit={(event) => {
-          event.preventDefault()
-          submitQuestion(input)
-        }}
-      >
-        <textarea
-          ref={textareaRef}
-          className="bill-chat-prompt-textarea"
-          rows={2}
-          value={input}
-          disabled={streaming}
-          onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
-          onKeyDown={onTextareaKeyDown}
-          maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
-          aria-label="Ask about this bill"
-          placeholder="Ask a question about this bill"
-        />
-        <div className="bill-chat-prompt-footer">
-          {streaming ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="bill-chat-prompt-stop"
-              onClick={() => stop()}
-            >
-              Stop
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              size="sm"
-              variant="default"
-              className="bill-chat-prompt-submit"
-              disabled={input.trim().length === 0}
-            >
-              Send
-            </Button>
-          )}
+          <PromptInput className="bill-chat-prompt" onSubmit={({ text }) => submitQuestion(text)}>
+            {attachedSelection ? (
+              <PromptInputHeader>
+                <Badge
+                  variant="secondary"
+                  className="bill-chat-attachment max-w-full gap-1.5 py-1 font-medium"
+                  title={attachedSelection}
+                >
+                  <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="bill-chat-attachment-label min-w-0 truncate">
+                    {selectionChipLabel(attachedSelection)}
+                  </span>
+                  {onClearSelection ? (
+                    <button
+                      type="button"
+                      className="inline-flex shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                      aria-label="Remove"
+                      onClick={onClearSelection}
+                    >
+                      <XIcon className="size-3" />
+                    </button>
+                  ) : null}
+                </Badge>
+              </PromptInputHeader>
+            ) : null}
+            <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming}>
+              <PromptInputTextarea
+                ref={textareaRef}
+                value={input}
+                onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
+                maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
+                aria-label="Ask about this bill"
+                placeholder="Ask a question about this bill"
+              />
+            </PromptInputBody>
+            <PromptInputFooter>
+              <PromptInputTools>
+                <BillChatExportMenu query={exportPrompt} />
+              </PromptInputTools>
+              {streaming ? (
+                <PromptInputSubmit type="button" status={status} aria-label="Stop" onClick={() => stop()} />
+              ) : (
+                <PromptInputSubmit status="ready" aria-label="Send" disabled={input.trim().length === 0} />
+              )}
+            </PromptInputFooter>
+          </PromptInput>
         </div>
-      </form>
+      )}
 
       <SelectionMenu
         selection={selection}

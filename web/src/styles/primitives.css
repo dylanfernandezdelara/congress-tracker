@@ -1,8 +1,4 @@
 @layer components {
-  .text-secondary {
-    color: hsl(var(--twc-secondary));
-  }
-
   .text-faint {
     color: hsl(var(--twc-faint));
   }
