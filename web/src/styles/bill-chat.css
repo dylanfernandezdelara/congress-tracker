@@ -2,6 +2,11 @@
   Layout-only rules for the bill chat dock. The chat surface itself is stock
   AI Elements + shadcn (Conversation, Message, PromptInput, Suggestion, OpenIn)
   styled through Tailwind tokens; nothing here restyles those components.
+
+  Inline in the detail panel the section is an auto-height column, so the
+  Conversation never becomes a scrollport; `min-height: 0` and the unstyled
+  `.bill-chat-conversation` / `.bill-chat-prompt` hooks are for a parent that
+  bounds the section's height (a docked rail or drawer).
 */
 
 :root {

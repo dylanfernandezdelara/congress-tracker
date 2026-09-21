@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -8,7 +8,6 @@ import {
 } from '@congress-tracker/shared/chat-api-types'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
-import { renderWithTooltip } from '../test/tooltipHarness'
 import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import type { BillChatMessage } from './BillChatSection'
 
@@ -103,7 +102,7 @@ afterEach(() => {
 
 describe('BillChatSection', () => {
   it('renders the heading and starter chips including key-point questions', () => {
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
     // Stock ConversationEmptyState inside the log until the first turn.
@@ -120,7 +119,7 @@ describe('BillChatSection', () => {
   })
 
   it('trims the empty state to its title in a compact log slot', () => {
-    renderWithTooltip(
+    render(
       <BillChatSection item={twoPointItem} compact onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
     )
 
@@ -131,7 +130,7 @@ describe('BillChatSection', () => {
   })
 
   it('sends a starter chip as the user message', () => {
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'What does this bill do?' }))
 
@@ -140,7 +139,7 @@ describe('BillChatSection', () => {
 
   it('scrolls the log to the bottom once a question is in flight', () => {
     chatMock.messages = [{ id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'Who pays?' }] }]
-    const { rerender } = renderWithTooltip(
+    const { rerender } = render(
       <BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
     )
     expect(scrollToBottom).not.toHaveBeenCalled()
@@ -157,7 +156,7 @@ describe('BillChatSection', () => {
   it('keeps a draft follow-up when Enter is pressed while a reply streams', () => {
     chatMock.status = 'streaming'
     chatMock.messages = [assistantMessage([{ type: 'text', text: 'Working' }])]
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const textbox = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Ask about this bill' })
     fireEvent.change(textbox, { target: { value: 'And who pays for it?' } })
@@ -178,7 +177,7 @@ describe('BillChatSection', () => {
   })
 
   it('lets a paste that carries a file item fall through as text', () => {
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
     const textbox = screen.getByRole('textbox', { name: 'Ask about this bill' })
     const clipboardData = {
       items: [
@@ -201,7 +200,7 @@ describe('BillChatSection', () => {
       ]),
     ]
 
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByText('The bill raises the spending cap.')).toBeInTheDocument()
     expect(screen.queryByText('Ask about S. 2')).not.toBeInTheDocument()
@@ -220,7 +219,7 @@ describe('BillChatSection', () => {
       ]),
     ]
 
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const notice = screen.getByText("The bill text doesn't address this.")
     expect(notice.closest('[data-refused]')).toBeTruthy()
@@ -230,7 +229,7 @@ describe('BillChatSection', () => {
   it('shows the parsed error message and retries', () => {
     chatMock.error = new Error(JSON.stringify({ message: 'Too many questions today.' }))
 
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Too many questions today.')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -240,7 +239,7 @@ describe('BillChatSection', () => {
   it('shows a generic error when the transport message is not JSON', () => {
     chatMock.error = new Error('Failed to fetch')
 
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Chat is unavailable right now.')
   })
@@ -250,7 +249,7 @@ describe('BillChatSection', () => {
     // message is the worker's errorText, not a JSON body.
     chatMock.error = new Error(BILL_CHAT_STREAM_ERROR_TEXT)
 
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('The chat service failed. Try again shortly.')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
@@ -258,7 +257,7 @@ describe('BillChatSection', () => {
 
   it('renders a pending selection chip and sends it on submit, then clears it', async () => {
     const onClearSelection = vi.fn()
-    renderWithTooltip(
+    render(
       <BillChatSection
         item={twoPointItem}
         pendingSelection="the selected text about rural clinics"
@@ -284,7 +283,7 @@ describe('BillChatSection', () => {
   })
 
   it('hides the composer when collapsed', () => {
-    renderWithTooltip(
+    render(
       <BillChatSection
         item={twoPointItem}
         collapsed
@@ -300,7 +299,7 @@ describe('BillChatSection', () => {
   })
 
   it('opens ChatGPT and Claude with a bill briefing', async () => {
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
     expect(trigger).toHaveTextContent('Open in')
@@ -332,7 +331,7 @@ describe('BillChatSection', () => {
         { type: 'data-answer', data: answerPart() },
       ]),
     ]
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
     fireEvent.pointerDown(trigger)
@@ -351,7 +350,7 @@ describe('BillChatSection', () => {
     chatMock.status = 'streaming'
     chatMock.messages = [assistantMessage([{ type: 'text', text: 'Working' }])]
 
-    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()

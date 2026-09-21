@@ -120,7 +120,7 @@ export function BillChatSection({
   )
   const errorText = parseChatErrorMessage(error)
   const attachedSelection = pendingSelection ? capSelection(pendingSelection) : null
-  const exportPrompt = useMemo(() => {
+  const briefing = useMemo(() => {
     const turns = messages.flatMap((message) => {
       if (message.role !== 'user' && message.role !== 'assistant') return []
       const text = messagePlainText(message)
@@ -291,7 +291,7 @@ export function BillChatSection({
             </PromptInputBody>
             <PromptInputFooter>
               <PromptInputTools>
-                <BillChatExportMenu query={exportPrompt} />
+                <BillChatExportMenu briefing={briefing} />
               </PromptInputTools>
               {streaming ? (
                 <PromptInputSubmit type="button" status={status} aria-label="Stop" onClick={() => stop()} />
