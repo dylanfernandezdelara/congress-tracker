@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { congressGovBillUrl } from '../utils/billLabels'
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { renderWithTooltip } from '../test/tooltipHarness'
 import { FeedRow } from './FeedRow'
 
 const longCrsSummary = `Ukraine Support Act
@@ -11,7 +12,7 @@ ${'This bill provides support to Ukraine and allied countries through security a
 
 describe('FeedRow', () => {
   it('places the vote date in a left rail ahead of the topic column', () => {
-    const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    const { container } = renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     const toggle = container.querySelector('.feed-row-toggle')
     const date = container.querySelector('.feed-row-date')
@@ -23,7 +24,7 @@ describe('FeedRow', () => {
   })
 
   it('shows topic, policy area, and digest lead without expanding; bullets wait for detail', () => {
-    const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    const { container } = renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Plain headline for readers')).toBeInTheDocument()
     const policyArea = screen.getByText('Defense')
@@ -44,7 +45,7 @@ describe('FeedRow', () => {
   })
 
   it('shows digest bullets in the expanded detail panel', () => {
-    render(<FeedRow item={makeFeedItem()} isExpanded={true} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={true} onToggle={() => {}} />)
 
     expect(document.querySelector('.feed-row-teaser')).not.toBeInTheDocument()
 
@@ -59,7 +60,7 @@ describe('FeedRow', () => {
   })
 
   it('explains Senate bill prefix with an accessible tooltip', () => {
-    const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    const { container } = renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     const chip = container.querySelector('.feed-row-chip--bill')
     expect(chip).toHaveAttribute('aria-label', 'Senate bill 2')
@@ -69,7 +70,7 @@ describe('FeedRow', () => {
   })
 
   it('includes outcome and margin in the toggle accessible name', () => {
-    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByRole('button', { name: /Passed/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /52–47/ })).toBeInTheDocument()
@@ -93,7 +94,7 @@ describe('FeedRow', () => {
       latest_passage_date: '2026-06-04',
     })
 
-    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Failed')).toBeInTheDocument()
     expect(screen.getByText('Failed')).toHaveClass('text-fail')
@@ -101,7 +102,7 @@ describe('FeedRow', () => {
   })
 
   it('shows a Text grew mark when added_provisions exist', () => {
-    render(
+    renderWithTooltip(
       <FeedRow
         item={makeFeedItem({
           text_changes: {
@@ -123,7 +124,7 @@ describe('FeedRow', () => {
   })
 
   it('includes the summary in the toggle accessible description', () => {
-    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     const toggle = screen.getByRole('button', { name: /52–47/ })
     const summary = document.querySelector('[data-feed-summary]')
@@ -136,7 +137,7 @@ describe('FeedRow', () => {
   it('calls onToggle when the row button is clicked', () => {
     const onToggle = vi.fn()
 
-    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={onToggle} />)
+    renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={onToggle} />)
 
     fireEvent.click(screen.getByRole('button', { name: /52–47/ }))
 
@@ -144,7 +145,7 @@ describe('FeedRow', () => {
   })
 
   it('exposes aria-controls on the collapsed toggle', () => {
-    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 
     const toggle = screen.getByRole('button', { name: /52–47/ })
     const controls = toggle.getAttribute('aria-controls')
@@ -155,7 +156,7 @@ describe('FeedRow', () => {
   it('toggles on Enter via native button behavior', () => {
     const onToggle = vi.fn()
 
-    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={onToggle} />)
+    renderWithTooltip(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={onToggle} />)
 
     const toggle = screen.getByRole('button', { name: /52–47/ })
     fireEvent.keyDown(toggle, { key: 'Enter' })
@@ -169,7 +170,7 @@ describe('FeedRow', () => {
       raw_summary_text: longCrsSummary,
     })
 
-    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.queryByText('Plain-English summary coming soon.')).not.toBeInTheDocument()
     const teaser = document.querySelector('.feed-row-teaser')
@@ -179,7 +180,7 @@ describe('FeedRow', () => {
   })
 
   it('shows pending summary copy when no digest or CRS text is available', () => {
-    render(
+    renderWithTooltip(
       <FeedRow
         item={makeFeedItem({ digest: null, raw_summary_text: null })}
         isExpanded={false}
@@ -191,7 +192,7 @@ describe('FeedRow', () => {
   })
 
   it('keeps pending summary visible in the detail panel when expanded', () => {
-    render(
+    renderWithTooltip(
       <FeedRow
         item={makeFeedItem({ digest: null, raw_summary_text: null })}
         isExpanded={true}
@@ -206,7 +207,7 @@ describe('FeedRow', () => {
   it('shows a short complete CRS sentence when expanded without a digest and keeps full CRS in disclosure', () => {
     const item = makeFeedItem({ digest: null, raw_summary_text: longCrsSummary })
 
-    render(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
 
     const detailPanel = screen.getByRole('region', { name: /Details for Sample Act/ })
     expect(within(detailPanel).getByRole('heading', { name: 'Summary' })).toBeInTheDocument()
@@ -226,7 +227,7 @@ describe('FeedRow', () => {
   it('tucks the official CRS summary behind a disclosure when a digest exists', () => {
     const item = makeFeedItem({ raw_summary_text: longCrsSummary })
 
-    render(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={item} isExpanded={true} onToggle={() => {}} />)
 
     const detailPanel = screen.getByRole('region', { name: /Details for Plain headline for readers/ })
     const crsDetails = within(detailPanel).getByText('Official CRS summary').closest('details')
@@ -239,7 +240,7 @@ describe('FeedRow', () => {
     const onToggle = vi.fn()
     const item = makeFeedItem()
 
-    render(<FeedRow item={item} isExpanded={true} onToggle={onToggle} />)
+    renderWithTooltip(<FeedRow item={item} isExpanded={true} onToggle={onToggle} />)
 
     const toggle = screen.getByRole('button', { name: /52–47/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
@@ -287,7 +288,7 @@ describe('FeedRow', () => {
       latest_passage_date: '2026-06-04',
     })
 
-    const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+    const { container } = renderWithTooltip(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     const eventLine = container.querySelector('.feed-row-event')
     expect(screen.getByText('Procedural')).toBeInTheDocument()
@@ -325,7 +326,7 @@ describe('FeedRow', () => {
       },
     })
 
-    const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+    const { container } = renderWithTooltip(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     const badge = screen.getByText('Law — unsigned')
     expect(badge).toHaveClass('feed-row-badge--law_unsigned')
@@ -356,7 +357,7 @@ describe('FeedRow', () => {
       },
     })
 
-    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Passed')).toBeInTheDocument()
     expect(screen.getByText("President's desk · day 4/10")).toBeInTheDocument()
@@ -412,7 +413,7 @@ describe('FeedRow', () => {
       ],
     })
 
-    render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+    renderWithTooltip(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText(/About this bill/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Overhauls federal housing programs' })).toHaveAttribute(
@@ -470,7 +471,7 @@ describe('FeedRow', () => {
       },
     })
 
-    const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
+    const { container } = renderWithTooltip(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     const badge = container.querySelector('.feed-row-badge--introduced')
     expect(badge?.textContent).toBe('Introduced')

@@ -33,11 +33,19 @@ export function messageAnswer(message: BillChatMessage): BillChatAnswerData | un
   return undefined
 }
 
-function messageText(message: BillChatMessage): string {
+function messageText(message: BillChatMessage, separator: string): string {
   return message.parts
     .filter((part): part is Extract<BillChatPart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
-    .join('')
+    .join(separator)
+}
+
+/** Plain text of a turn for export / Open in ChatGPT or Claude. */
+export function messagePlainText(message: BillChatMessage): string {
+  if (message.role === 'user') return messageText(message, '')
+  const answer = messageAnswer(message)
+  if (answer?.text.trim()) return answer.text.trim()
+  return messageText(message, '\n\n').trim()
 }
 
 type QuotedPassageProps = {
@@ -172,7 +180,7 @@ export function BillChatTranscript({
             case 'user':
               return (
                 <Message key={message.id} from="user">
-                  <MessageContent>{messageText(message)}</MessageContent>
+                  <MessageContent>{messageText(message, '')}</MessageContent>
                 </Message>
               )
             case 'assistant':

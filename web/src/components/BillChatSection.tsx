@@ -16,8 +16,9 @@ import {
   selectionChipLabel,
   starterChipsFromKeyPoints,
 } from '../utils/billChat'
-import { formatShortBillId } from '../utils/billLabels'
-import { copyTextToClipboard } from '../utils/billDeepLink'
+import { buildBillChatExportPrompt } from '../utils/billChatExport'
+import { congressGovBillUrl, formatShortBillId, getBillColloquialName } from '../utils/billLabels'
+import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
 import {
   PromptInput,
@@ -26,9 +27,11 @@ import {
   PromptInputHeader,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
 } from './ai-elements/prompt-input'
 import { Suggestion } from './ai-elements/suggestion'
-import { BillChatTranscript, messageAnswer, type BillChatMessage } from './BillChatTranscript'
+import { BillChatExportMenu } from './BillChatExportMenu'
+import { BillChatTranscript, messageAnswer, messagePlainText, type BillChatMessage } from './BillChatTranscript'
 import { SelectionMenu } from './SelectionMenu'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -99,6 +102,24 @@ export function BillChatSection({
   )
   const errorText = parseChatErrorMessage(error)
   const attachedSelection = pendingSelection ? capSelection(pendingSelection) : null
+  const exportPrompt = useMemo(() => {
+    const turns = messages.flatMap((message) => {
+      if (message.role !== 'user' && message.role !== 'assistant') return []
+      const text = messagePlainText(message)
+      return text ? [{ role: message.role, text }] : []
+    })
+    return buildBillChatExportPrompt({
+      billLabel: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
+      billId: billLabel,
+      sourceUrl: congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number),
+      pageUrl: buildBillShareUrl(item),
+      headline: item.digest?.headline,
+      whatItDoes: item.digest?.what_it_does,
+      keyPoints: item.digest?.key_points,
+      crsSummary: item.raw_summary_text,
+      messages: turns,
+    })
+  }, [billLabel, item, messages])
 
   const submitQuestion = useCallback(
     (raw: string) => {
@@ -235,7 +256,10 @@ export function BillChatSection({
               placeholder="Ask a question about this bill"
             />
           </PromptInputBody>
-          <PromptInputFooter className="justify-end">
+          <PromptInputFooter>
+            <PromptInputTools>
+              <BillChatExportMenu query={exportPrompt} />
+            </PromptInputTools>
             {streaming ? (
               <PromptInputSubmit type="button" status={status} aria-label="Stop" onClick={() => stop()} />
             ) : (

@@ -1,10 +1,11 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { renderWithTooltip } from '../test/tooltipHarness'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { FeedRowDetail } from './FeedRowDetail'
 
@@ -111,7 +112,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('shows the full digest summary and key points in the detail panel', () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     expect(screen.getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
     expect(
@@ -125,7 +126,7 @@ describe('FeedRowDetail', () => {
   it('shows a short complete CRS sentence when no digest exists and keeps the full CRS in disclosure', () => {
     const crs =
       'This concurrent resolution directs the President to remove U.S. Armed Forces from hostilities against Iran or any part of its government or military unless a declaration of war or specific statutory authorization has been enacted. Congress retains the power to authorize force.'
-    render(
+    renderWithTooltip(
       <FeedRowDetail
         item={makeFeedItem({ digest: null, raw_summary_text: crs })}
       />,
@@ -145,7 +146,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('shows CRS only in the disclosure when digest key points exist without a lead', () => {
-    render(
+    renderWithTooltip(
       <FeedRowDetail
         item={makeFeedItem({
           digest: {
@@ -176,7 +177,7 @@ describe('FeedRowDetail', () => {
       party_splits: [],
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     await waitFor(() => {
       expect(screen.getByText(/No members broke with their party/)).toBeInTheDocument()
@@ -195,7 +196,7 @@ describe('FeedRowDetail', () => {
       party_splits: [],
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     await waitFor(() => {
       expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
@@ -213,7 +214,7 @@ describe('FeedRowDetail', () => {
       date: '2026-06-05',
     } as FeedPassageVote
 
-    render(
+    renderWithTooltip(
       <FeedRowDetail
         item={makeFeedItem({
           passage_votes: [incompleteVote],
@@ -262,7 +263,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('flags provisions added after the summarized bill version', async () => {
-    render(
+    renderWithTooltip(
       <FeedRowDetail
         item={makeFeedItem({
           text_changes: {
@@ -289,7 +290,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('lists companion floor votes alongside the passage vote', async () => {
-    render(
+    renderWithTooltip(
       <FeedRowDetail
         item={makeFeedItem({
           companion_votes: [
@@ -330,7 +331,7 @@ describe('FeedRowDetail', () => {
       party_splits: [],
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Share' }))
     const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
@@ -350,7 +351,7 @@ describe('FeedRowDetail', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
 
-    render(
+    renderWithTooltip(
       <FeedRowDetail
         item={makeFeedItem()}
         shareUrl="https://www.congress.gov/bill/119th-congress/senate-bill/2"
@@ -371,7 +372,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('opens a share sheet that previews title, body, and URL', async () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Share' }).parentElement).toHaveClass('feed-row-detail-topbar')
@@ -386,7 +387,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('portals the share sheet to document.body so a transformed ancestor cannot trap it', async () => {
-    render(
+    renderWithTooltip(
       <div className="feed-row-detail-panel" style={{ transform: 'translateY(0)' }}>
         <FeedRowDetail item={makeFeedItem()} />
       </div>,
@@ -404,7 +405,7 @@ describe('FeedRowDetail', () => {
     const share = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { share, clipboard: { writeText: vi.fn() } })
 
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Share' }))
     const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Share' }))
@@ -521,7 +522,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('renders the share-card preview for the whole bill', async () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Share' }))
     const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
     const card = within(dialog).getByTestId('og-card-preview')
@@ -532,7 +533,7 @@ describe('FeedRowDetail', () => {
   })
 
   it('marks summary text as quotable regions', () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
     const quotable = document.querySelectorAll('[data-quotable]')
     expect(quotable.length).toBeGreaterThanOrEqual(3)
     expect(screen.getByText('It does something important in plain language.')).toHaveAttribute(
@@ -554,7 +555,7 @@ describe('FeedRowDetail', () => {
       },
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc1" />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc1" />)
 
     const mark = await screen.findByText('something important', { selector: 'mark' })
     expect(mark).toHaveClass('quote-highlight', 'quote-highlight--landing')
@@ -576,7 +577,7 @@ describe('FeedRowDetail', () => {
       },
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc2" />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc2" />)
 
     await screen.findByText('Official CRS summary text.', { selector: 'mark' })
     expect(document.querySelector('details.feed-row-crs-details')).toHaveAttribute('open')
@@ -593,7 +594,7 @@ describe('FeedRowDetail', () => {
       },
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc3" />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc3" />)
 
     const callout = await screen.findByLabelText('Shared quote')
     expect(callout).toHaveTextContent('“Text that was rewritten since sharing.”')
@@ -611,7 +612,7 @@ describe('FeedRowDetail', () => {
       },
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc4" />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc4" />)
 
     await waitFor(() => {
       expect(fetchBillQuote).toHaveBeenCalledWith('abc123abc123abc4')
@@ -648,7 +649,7 @@ describe('FeedRowDetail', () => {
       },
       url: 'https://trackcongress.org/?bill=119-s-2&quote=feedfacefeedface',
     })
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('It does something important in plain language.')
     await act(async () => {
@@ -681,7 +682,7 @@ describe('FeedRowDetail', () => {
         'quote_not_in_bill',
       ),
     )
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('Point one')
     await act(async () => {
@@ -699,7 +700,7 @@ describe('FeedRowDetail', () => {
 
   it('sends a selection to the bill chat when Ask about this is used', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('It does something important in plain language.')
     await act(async () => {
@@ -749,7 +750,7 @@ describe('FeedRowDetail', () => {
       },
       url: 'https://trackcongress.org/?bill=119-s-2&quote=cafecafecafecafe',
     })
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {
@@ -792,7 +793,7 @@ describe('FeedRowDetail', () => {
         ],
       },
     ]
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithTooltip(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {
