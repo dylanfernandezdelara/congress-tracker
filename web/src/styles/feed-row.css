@@ -108,7 +108,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: var(--space-32);
+    gap: var(--space-4);
   }
 
   .feed-row-header {
@@ -165,7 +165,7 @@
     /* Separator width (middot + gutters); the ::before below centers in it. */
     --feed-meta-sep: var(--space-16);
     column-gap: var(--feed-meta-sep);
-    row-gap: var(--space-64);
+    row-gap: var(--space-8);
     min-width: 0;
     /* Clips the leading ::before of a chip that wrapped to a new line, so
        lines never start or end with a middot. Do not remove or split into
@@ -537,7 +537,7 @@
   }
 
   .feed-row-detail-heading {
-    margin: 0 0 var(--space-64);
+    margin: 0 0 var(--space-8);
     font-size: 12px;
     font-weight: 500;
     letter-spacing: -0.15px;
@@ -855,7 +855,7 @@
   @media (max-width: 379px) {
     .feed-list {
       --feed-date-rail: calc(var(--grid) * 7);
-      --feed-date-gap: var(--space-64);
+      --feed-date-gap: var(--space-8);
     }
   }
 
