@@ -37,22 +37,23 @@
     --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
     --motion-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
     --radius: 0.75rem;
-    /* 8px snap grid. Overlay is opt-in (`?align=1`); spacing tokens stay on. */
+    /* 8px snap grid; --space-<px> names carry their pixel value so they do not
+       read like Tailwind's 4px scale. Overlay is opt-in (`?align=1`). */
     --grid: 8px;
-    --space-half: calc(var(--grid) / 2);
-    --space-1: var(--grid);
-    --space-2: calc(var(--grid) * 2);
-    --space-3: calc(var(--grid) * 3);
-    --space-4: calc(var(--grid) * 4);
-    --space-5: calc(var(--grid) * 5);
-    --space-6: calc(var(--grid) * 6);
-    --space-8: calc(var(--grid) * 8);
+    --space-4: 4px;
+    --space-8: var(--grid);
+    --space-16: calc(var(--grid) * 2);
+    --space-24: calc(var(--grid) * 3);
+    --space-32: calc(var(--grid) * 4);
+    --space-40: calc(var(--grid) * 5);
+    --space-48: calc(var(--grid) * 6);
+    --space-64: calc(var(--grid) * 8);
     /* Border-box header (hairline is a box-shadow, not extra height). */
     --site-header-height: 48px;
     --site-rail-top: calc(
-      var(--site-header-height) + var(--space-2) + env(safe-area-inset-top, 0px)
+      var(--site-header-height) + var(--space-16) + env(safe-area-inset-top, 0px)
     );
-    --site-rail-bottom: var(--space-2);
+    --site-rail-bottom: var(--space-16);
   }
 
   [data-theme='dark'] {
