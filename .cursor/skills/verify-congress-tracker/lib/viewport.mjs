@@ -81,32 +81,19 @@ function defaultSession(page) {
   return page.context().newCDPSession(page)
 }
 
-const APPLIED_MARKER = '__verifyCongressTrackerViewport'
-
 /**
- * Metrics the page already carries. Every command runs applyViewport, and
- * re-sending an unchanged override (Playwright's setViewportSize first emits
- * a desktop `mobile: false` override, then ours lands) reflows the page with
- * 15px classic scrollbars for a frame: fixed drawers narrow, scroll positions
- * jump, and screenshots catch the mid-reflow state. A window marker survives
- * until navigation, so a fresh document is still configured.
+ * Chromium drops device emulation (deviceScaleFactor, mobile) when the CDP
+ * session that set it detaches, and every helper command is its own process,
+ * so the override must be re-sent each command. The re-send reflows the page
+ * (headless flips between classic 15px and overlay scrollbars); this waits
+ * for that reflow to land before the command body reads or captures anything.
  */
-async function appliedMetrics(page) {
-  if (typeof page.evaluate !== 'function') return null
-  try {
-    const raw = await page.evaluate((key) => window[key] ?? null, APPLIED_MARKER)
-    return typeof raw === 'string' ? raw : null
-  } catch {
-    return null
-  }
-}
-
-async function markApplied(page, serialized) {
+async function settleLayout(page) {
   if (typeof page.evaluate !== 'function') return
   try {
-    await page.evaluate(([key, value]) => {
-      window[key] = value
-    }, [APPLIED_MARKER, serialized])
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    )
   } catch {
     // Navigating away mid-command is fine; the next command re-applies.
   }
@@ -114,8 +101,6 @@ async function markApplied(page, serialized) {
 
 export async function applyViewport(page, metrics, sessionFactory = defaultSession) {
   const next = normalizeMetrics(metrics)
-  const serialized = JSON.stringify(next)
-  if ((await appliedMetrics(page)) === serialized) return next
   await page.setViewportSize({ width: next.width, height: next.height })
   const session = await sessionFactory(page)
   // Always replace the override. Playwright's setViewportSize is the same CDP
@@ -127,6 +112,6 @@ export async function applyViewport(page, metrics, sessionFactory = defaultSessi
     deviceScaleFactor: next.deviceScaleFactor,
     mobile: next.mobile,
   })
-  await markApplied(page, serialized)
+  await settleLayout(page)
   return next
 }
