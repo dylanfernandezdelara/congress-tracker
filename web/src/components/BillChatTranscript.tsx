@@ -1,12 +1,22 @@
 import {
-  BILL_CHAT_UNVERIFIED_PLACEHOLDER,
   type BillChatAnswerData,
   type BillChatQuoteData,
 } from '@congress-tracker/shared/chat-api-types'
 import type { UIMessage } from 'ai'
-import type { ReactNode } from 'react'
+import { MessageSquareTextIcon } from 'lucide-react'
+import { useEffect } from 'react'
+import { useStickToBottomContext } from 'use-stick-to-bottom'
 
-import { evidenceSourceLabel, splitProseParagraphs } from '../utils/billChat'
+import { evidenceSourceLabel } from '../utils/billChat'
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from './ai-elements/conversation'
+import { Loader } from './ai-elements/loader'
+import { Message, MessageContent, MessageResponse } from './ai-elements/message'
+import { Button } from './ui/button'
 
 export type BillChatMessage = UIMessage<
   unknown,
@@ -23,23 +33,11 @@ export function messageAnswer(message: BillChatMessage): BillChatAnswerData | un
   return undefined
 }
 
-function userMessageText(message: BillChatMessage): string {
+function messageText(message: BillChatMessage): string {
   return message.parts
     .filter((part): part is Extract<BillChatPart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .join('')
-}
-
-function renderUnverifiedProse(text: string): ReactNode {
-  const pieces = text.split(BILL_CHAT_UNVERIFIED_PLACEHOLDER)
-  return pieces.map((chunk, index) => (
-    <span key={`prose-${index}`}>
-      {chunk}
-      {index < pieces.length - 1 ? (
-        <span className="bill-chat-unverified">{BILL_CHAT_UNVERIFIED_PLACEHOLDER}</span>
-      ) : null}
-    </span>
-  ))
 }
 
 type QuotedPassageProps = {
@@ -47,7 +45,7 @@ type QuotedPassageProps = {
   onSharePassage: (text: string) => void
 }
 
-/** B2 inline citation: indented verbatim passage with its section label. */
+/** Verified verbatim passage the answer cites, with its section label. */
 export function QuotedPassage({ quote, onSharePassage }: QuotedPassageProps) {
   const sourceName = evidenceSourceLabel(quote.source)
   const meta =
@@ -56,36 +54,37 @@ export function QuotedPassage({ quote, onSharePassage }: QuotedPassageProps) {
       : quote.section_label || sourceName
 
   return (
-    <figure className="bill-chat-quote">
-      <blockquote className="bill-chat-quote-text">{quote.text}</blockquote>
-      <figcaption className="bill-chat-quote-meta">{meta}</figcaption>
-      <button
+    <figure className="my-0 flex min-w-0 flex-col gap-1 border-l-2 border-law pl-3">
+      <blockquote className="m-0 text-sm italic leading-relaxed text-foreground">
+        {quote.text}
+      </blockquote>
+      <figcaption className="text-xs font-medium text-faint">{meta}</figcaption>
+      <Button
         type="button"
-        className="bill-chat-quote-share"
+        size="sm"
+        variant="ghost"
+        className="h-7 w-fit rounded-full px-2.5 text-xs text-muted-foreground"
         onClick={() => onSharePassage(quote.text)}
       >
         Share this passage
-      </button>
+      </Button>
     </figure>
   )
 }
 
-function AssistantBubble({
+function AssistantTurn({
   message,
-  streaming,
   onSharePassage,
 }: {
   message: BillChatMessage
-  streaming: boolean
   onSharePassage: (text: string) => void
 }) {
   const refused = messageAnswer(message)?.refused === true
 
   return (
-    <div
-      className={`bill-chat-message-content bill-chat-bubble ${
-        refused ? 'bill-chat-bubble--refused' : 'bill-chat-bubble--assistant'
-      }`}
+    <MessageContent
+      className={refused ? 'text-muted-foreground' : undefined}
+      data-refused={refused || undefined}
     >
       {message.parts.map((part, index) => {
         switch (part.type) {
@@ -93,13 +92,11 @@ function AssistantBubble({
             return (
               <div
                 key={`${message.id}-text-${index}`}
-                className="bill-chat-prose"
+                className="min-w-0"
                 data-quotable="answer"
                 data-quotable-id={message.id}
               >
-                {splitProseParagraphs(part.text).map((paragraph, paragraphIndex) => (
-                  <p key={`${message.id}-p-${paragraphIndex}`}>{renderUnverifiedProse(paragraph)}</p>
-                ))}
+                <MessageResponse>{part.text}</MessageResponse>
               </div>
             )
           case 'data-quote':
@@ -118,55 +115,93 @@ function AssistantBubble({
             return null
         }
       })}
-      {streaming ? (
-        <p className="bill-chat-streaming" aria-live="polite">
-          <span className="bill-chat-streaming-dot" />
-          Answering…
-        </p>
-      ) : null}
-    </div>
+    </MessageContent>
   )
 }
 
-export type BillChatTranscriptProps = {
-  messages: BillChatMessage[]
-  status: 'submitted' | 'streaming' | 'ready' | 'error'
-  onSharePassage: (text: string) => void
+type ChatStatus = 'submitted' | 'streaming' | 'ready' | 'error'
+
+/**
+ * A reader scrolled up in the log has escaped StickToBottom's lock. Each new
+ * question (`status` → `submitted`) re-engages it so the answer streams into
+ * view. Lives inside `Conversation` so the scroll context never leaves it.
+ */
+function FollowNewTurn({ status }: { status: ChatStatus }) {
+  const { scrollToBottom } = useStickToBottomContext()
+  useEffect(() => {
+    if (status === 'submitted') void scrollToBottom()
+  }, [scrollToBottom, status])
+  return null
 }
 
-export function BillChatTranscript({ messages, status, onSharePassage }: BillChatTranscriptProps) {
-  if (messages.length === 0) return null
+const EMPTY_STATE_DESCRIPTION =
+  'Answers stay grounded in the bill’s text. Start with a suggestion or type your own question.'
+
+export type BillChatTranscriptProps = {
+  messages: BillChatMessage[]
+  status: ChatStatus
+  onSharePassage: (text: string) => void
+  /** Short bill label for the empty-state title, e.g. "H.R. 1". */
+  billLabel: string
+}
+
+export function BillChatTranscript({
+  messages,
+  status,
+  onSharePassage,
+  billLabel,
+}: BillChatTranscriptProps) {
+  const lastMessage = messages[messages.length - 1]
+  const awaitingReply =
+    status === 'submitted' || (status === 'streaming' && lastMessage?.role !== 'assistant')
+
   return (
-    <div className="bill-chat-conversation" role="log">
-      <div className="bill-chat-conversation-content">
-        {messages.map((message, index) => {
-          if (message.role === 'user') {
-            return (
-              <div key={message.id} className="bill-chat-message bill-chat-message--user" data-from="user">
-                <div className="bill-chat-message-content bill-chat-bubble bill-chat-bubble--user">
-                  {userMessageText(message)}
-                </div>
-              </div>
-            )
+    <Conversation className="bill-chat-conversation">
+      <FollowNewTurn status={status} />
+      <ConversationContent className="gap-4 p-0" scrollClassName="overscroll-contain">
+        {messages.length === 0 ? (
+          <ConversationEmptyState
+            className="bill-chat-empty gap-1 p-2"
+            icon={<MessageSquareTextIcon className="size-6" aria-hidden />}
+            title={`Ask about ${billLabel}`}
+            description={EMPTY_STATE_DESCRIPTION}
+          />
+        ) : null}
+        {messages.map((message) => {
+          switch (message.role) {
+            case 'user':
+              return (
+                <Message key={message.id} from="user">
+                  <MessageContent>{messageText(message)}</MessageContent>
+                </Message>
+              )
+            case 'assistant':
+              return (
+                <Message key={message.id} from="assistant">
+                  <AssistantTurn message={message} onSharePassage={onSharePassage} />
+                </Message>
+              )
+            case 'system':
+              return null
+            default: {
+              const _exhaustive: never = message.role
+              return _exhaustive
+            }
           }
-          if (message.role === 'assistant') {
-            return (
-              <div
-                key={message.id}
-                className="bill-chat-message bill-chat-message--assistant"
-                data-from="assistant"
-              >
-                <AssistantBubble
-                  message={message}
-                  streaming={index === messages.length - 1 && status === 'streaming'}
-                  onSharePassage={onSharePassage}
-                />
-              </div>
-            )
-          }
-          return null
         })}
-      </div>
-    </div>
+        {awaitingReply ? (
+          // Where the answer will land. MessageContent is `w-fit overflow-hidden`,
+          // so the spinner's rotating bounding box cannot extend the scroll area:
+          // a stretched, unclipped `animate-spin` bounces scrollHeight and makes
+          // StickToBottom read the clamp as a manual scroll up, releasing its lock.
+          <Message from="assistant">
+            <MessageContent>
+              <Loader className="text-muted-foreground" role="status" aria-label="Answering" />
+            </MessageContent>
+          </Message>
+        ) : null}
+      </ConversationContent>
+      {messages.length > 0 ? <ConversationScrollButton aria-label="Scroll to latest" /> : null}
+    </Conversation>
   )
 }

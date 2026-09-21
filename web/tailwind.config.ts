@@ -2,7 +2,12 @@ import type { Config } from 'tailwindcss'
 import tailwindcssAnimate from 'tailwindcss-animate'
 
 const config: Config = {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+    // Streamdown (AI Elements MessageResponse) styles its markdown with Tailwind utilities.
+    './node_modules/streamdown/dist/*.js',
+  ],
   theme: {
     extend: {
       colors: {
@@ -48,6 +53,7 @@ const config: Config = {
         ring: 'hsl(var(--twc-foreground) / <alpha-value>)',
         pass: 'hsl(var(--twc-pass) / <alpha-value>)',
         fail: 'hsl(var(--twc-fail) / <alpha-value>)',
+        law: 'hsl(var(--twc-law) / <alpha-value>)',
         surface: {
           subtle: 'hsl(var(--twc-surface-subtle))',
         },
