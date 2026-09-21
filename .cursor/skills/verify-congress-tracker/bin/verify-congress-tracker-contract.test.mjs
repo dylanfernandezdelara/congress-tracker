@@ -412,6 +412,11 @@ test('applyViewport still returns when the settle evaluate throws', async () => 
   }
   const applied = await applyViewport(page, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
   assert.deepEqual(applied, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+  // The override itself was still sent; only the settle wait was skipped.
+  assert.deepEqual(
+    sent.map(([method]) => method),
+    ['setViewportSize', 'Emulation.setDeviceMetricsOverride'],
+  )
 })
 
 test('evidence paths cannot escape artifacts/verify', () => {

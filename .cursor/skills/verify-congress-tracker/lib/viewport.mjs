@@ -84,10 +84,11 @@ function defaultSession(page) {
 const SETTLE_TIMEOUT_MS = 250
 
 /**
- * Wait two animation frames so the reflow from a metrics override (headless
- * flips between classic 15px and overlay scrollbars) is committed before the
- * command body reads or captures anything. Bounded: rAF pauses while the
- * document is hidden, and page.evaluate has no timeout of its own.
+ * Wait for the reflow from a metrics override (headless flips between classic
+ * 15px and overlay scrollbars) to commit before the command body reads or
+ * captures anything: two animation frames or SETTLE_TIMEOUT_MS, whichever
+ * comes first, since rAF pauses while the document is hidden and
+ * page.evaluate has no timeout of its own. Any evaluate failure is ignored.
  */
 async function settleLayout(page) {
   try {
