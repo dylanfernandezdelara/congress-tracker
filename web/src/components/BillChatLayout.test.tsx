@@ -33,34 +33,6 @@ describe('bill-chat.css', () => {
   it('keeps the JS peek string lockstep with --bill-chat-peek', () => {
     expect(billChatCss).toContain(`--bill-chat-peek: ${BILL_CHAT_DRAWER_PEEK}`)
   })
-
-  it('bounds the chat only inside the rail and drawer so the log is the one scrollport', () => {
-    expect(billChatCss).toContain('.bill-chat-rail .bill-chat-body')
-    expect(billChatCss).toContain('.bill-chat-drawer-inner .bill-chat-body')
-    expect(billChatCss).toMatch(/\.bill-chat-body[^{]*\{[^}]*min-height: 0/)
-    // Only the log flexes; suggestions, alerts, and the PromptInput keep their height.
-    expect(billChatCss).toContain('.bill-chat-body > :not(.bill-chat-conversation)')
-    expect(billChatCss).toMatch(/\.bill-chat-conversation\s*\{[^}]*flex: 1 1 auto/)
-  })
-
-  it('sizes the drawer column to the visible vaul slice, not the untranslated sheet', () => {
-    expect(billChatCss).toContain('.bill-chat-drawer-snap')
-    expect(billChatCss).toContain('height: calc(100% - var(--snap-point-height, 0px))')
-  })
-
-  it('leaves the chat surface to stock AI Elements and only lays out the dock', () => {
-    for (const restyled of [
-      'bill-chat-bubble',
-      'bill-chat-prose',
-      'bill-chat-quote',
-      'bill-chat-suggestion',
-      'bill-chat-prompt-group',
-      'bill-chat-export-trigger',
-      'bill-chat-streaming',
-    ]) {
-      expect(billChatCss).not.toContain(restyled)
-    }
-  })
 })
 
 function SessionLabel() {

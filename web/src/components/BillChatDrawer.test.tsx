@@ -10,16 +10,27 @@ import {
   type SheetLayerController,
 } from '../utils/sheetLayer'
 
+/** Chat ids (`bill-chat-<bill>`) whose section rendered, in order. */
+const chatRenders: string[] = []
+
 vi.mock('@ai-sdk/react', () => ({
-  Chat: class Chat {},
-  useChat: () => ({
-    messages: [],
-    status: 'ready',
-    error: undefined,
-    sendMessage: vi.fn(),
-    regenerate: vi.fn(),
-    stop: vi.fn(),
-  }),
+  Chat: class Chat {
+    id: string
+    constructor({ id }: { id: string }) {
+      this.id = id
+    }
+  },
+  useChat: ({ chat }: { chat: { id: string } }) => {
+    chatRenders.push(chat.id)
+    return {
+      messages: [],
+      status: 'ready',
+      error: undefined,
+      sendMessage: vi.fn(),
+      regenerate: vi.fn(),
+      stop: vi.fn(),
+    }
+  },
 }))
 
 import {
@@ -64,7 +75,10 @@ describe('billChatDrawerSnap', () => {
     expect(billChatDrawerSnap(BILL_CHAT_DRAWER_HALF)).toBe('half')
     expect(billChatDrawerSnap(BILL_CHAT_DRAWER_FULL)).toBe('full')
     expect(billChatDrawerSnap(null)).toBe('peek')
-    expect(billChatDrawerSnap(0.61)).toBe('peek')
+  })
+
+  it('fails towards an open chat for a snap it does not know', () => {
+    expect(billChatDrawerSnap(0.61)).toBe('half')
   })
 })
 
@@ -74,6 +88,7 @@ describe('BillChatDrawer', () => {
   })
 
   afterEach(() => {
+    chatRenders.length = 0
     resetBillChatInstancesForTests()
     resetSheetLayerForTests()
   })
@@ -148,10 +163,47 @@ describe('BillChatDrawer', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'ask' }))
     expect(textbox()).toBeInTheDocument()
 
+    // The reset happens during render: the new bill's chat never mounts at the
+    // old half snap only to be torn down by an effect (which vaul would tween).
     rerender(<App number={3} />)
     expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-bill', '119-s-3')
     expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'peek')
     expect(textbox()).not.toBeInTheDocument()
+    expect(chatRenders).not.toContain('bill-chat-119-s-3')
+  })
+
+  it('opens straight to half when a background bill is brought forward by Ask', async () => {
+    function Front() {
+      usePresentBillChat({
+        item: makeFeedItem({ bill: { congress: 119, type: 'S', number: 3, title: 'S 3' } }),
+        onSharePassage: noop,
+        onQuoteCreated: noop,
+      })
+      return null
+    }
+    renderDrawer(
+      <>
+        <Presenter number={2} askLabel="ask 2" />
+        <Front />
+      </>,
+    )
+    expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-bill', '119-s-3')
+
+    fireEvent.click(screen.getByRole('button', { name: 'ask 2' }))
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-bill', '119-s-2')
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'half')
+    expect(document.querySelector('.bill-chat-attachment-label')).toHaveTextContent('same passage')
+  })
+
+  it('lets Tab leave the always-open drawer instead of looping inside it', async () => {
+    renderDrawer(<Presenter />)
+    const open = await screen.findByRole('button', { name: 'Open chat' })
+    open.focus()
+
+    // Radix FocusScope would preventDefault and wrap focus back to Open chat.
+    expect(fireEvent.keyDown(open, { key: 'Tab' })).toBe(true)
+    expect(fireEvent.keyDown(open, { key: 'Tab', shiftKey: true })).toBe(true)
   })
 
   it('hands Escape to the topmost sheet instead of swallowing it', async () => {

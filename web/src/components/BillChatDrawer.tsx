@@ -1,5 +1,5 @@
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 
 import { useBillChatDrawerSnapHeight } from '../hooks/useBillChatDrawerSnapHeight'
@@ -35,9 +35,37 @@ export function billChatDrawerSnap(point: number | string | null): BillChatDrawe
     case null:
       return 'peek'
     default:
-      // Unknown values stay peek so a bad snap never throws.
-      return 'peek'
+      // Peek is the one snap that unmounts the composer, so an unknown point
+      // (vaul only reports listed snaps today) fails towards an open chat.
+      return 'half'
   }
+}
+
+type SnapState = {
+  /** Session the snap belongs to; a new occupant resets before its first paint. */
+  sourceId: string | undefined
+  /** `asks` already folded into `point`, so a later Ask can lift a peeked sheet. */
+  asks: number
+  point: number | string | null
+}
+
+function snapForNewOccupant(sourceId: string, asks: number): SnapState {
+  return { sourceId, asks, point: asks > 0 ? BILL_CHAT_DRAWER_HALF : BILL_CHAT_DRAWER_PEEK }
+}
+
+function liftPeek(state: SnapState, asks: number): SnapState {
+  const point = billChatDrawerSnap(state.point) === 'peek' ? BILL_CHAT_DRAWER_HALF : state.point
+  return { ...state, asks, point }
+}
+
+/**
+ * Vaul's Content is a Radix Dialog, whose FocusScope always `loop`s Tab back
+ * inside the layer even when it is non-modal. With the drawer always open that
+ * is a keyboard trap (WCAG 2.1.2): on peek the only stop is Open chat. Keep Tab
+ * from reaching that handler so the browser moves focus out of the sheet.
+ */
+function letTabLeave(event: React.KeyboardEvent<HTMLDivElement>) {
+  if (event.key === 'Tab') event.stopPropagation()
 }
 
 /**
@@ -47,24 +75,32 @@ export function billChatDrawerSnap(point: number | string | null): BillChatDrawe
  */
 export function BillChatDrawer() {
   const session = useBillChatSession()
-  const [snapPoint, setSnapPoint] = useState<number | string | null>(BILL_CHAT_DRAWER_PEEK)
+  const [snapState, setSnapState] = useState<SnapState>({
+    sourceId: undefined,
+    asks: 0,
+    point: BILL_CHAT_DRAWER_PEEK,
+  })
+
+  // Derived during render, not in an effect: the drawer stays mounted across
+  // bills, so a new occupant must paint at peek (or half when it arrives via
+  // Ask) instead of inheriting the previous bill's snap and tweening down.
+  // A further Ask on the same bill lifts a peeked sheet and leaves half / full
+  // where the reader put it.
+  let resolved = snapState
+  if (session && snapState.sourceId !== session.sourceId) {
+    resolved = snapForNewOccupant(session.sourceId, session.asks)
+  } else if (session && session.asks > snapState.asks) {
+    resolved = liftPeek(snapState, session.asks)
+  }
+  if (resolved !== snapState) setSnapState(resolved)
+
+  const snapPoint = resolved.point
+  const setSnapPoint = useCallback(
+    (point: number | string | null) => setSnapState((state) => ({ ...state, point })),
+    [],
+  )
   const drawerRef = useBillChatDrawerSnapHeight(snapPoint)
   const snap = billChatDrawerSnap(snapPoint)
-  const sourceId = session?.sourceId
-  const asks = session?.asks ?? 0
-
-  // A freshly presented bill starts peeked. Each "Ask about this" (a new
-  // source or the same one again) lifts a peeked drawer to half and leaves a
-  // half or full one where the reader put it.
-  useEffect(() => {
-    if (asks === 0) {
-      setSnapPoint(BILL_CHAT_DRAWER_PEEK)
-      return
-    }
-    setSnapPoint((current) =>
-      billChatDrawerSnap(current) === 'peek' ? BILL_CHAT_DRAWER_HALF : current,
-    )
-  }, [sourceId, asks])
 
   if (!session) return null
 
@@ -98,7 +134,12 @@ export function BillChatDrawer() {
             <DrawerDescription className="sr-only">
               Pull up to ask follow-up questions without leaving the bill.
             </DrawerDescription>
-            <div className="bill-chat-drawer-inner" data-bill={session.billId} data-snap={snap}>
+            <div
+              className="bill-chat-drawer-inner"
+              data-bill={session.billId}
+              data-snap={snap}
+              onKeyDown={letTabLeave}
+            >
               <div className="bill-chat-drawer-bar">
                 <p className="feed-row-detail-heading bill-chat-drawer-bar-title" aria-hidden>
                   Ask about this bill
