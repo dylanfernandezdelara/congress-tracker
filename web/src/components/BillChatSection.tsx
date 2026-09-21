@@ -159,9 +159,10 @@ export function BillChatSection({
   // `submitQuestion` bails on `streaming`. A draft only survives that reset
   // because React mirrors a controlled textarea's value into `defaultValue`.
   // Swallow Enter here instead of leaning on that; Shift+Enter still inserts
-  // a newline.
+  // a newline and an IME candidate confirm (`isComposing`) is left alone, as
+  // in the registry handler.
   const holdEnterWhileStreaming = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!streaming || event.key !== 'Enter' || event.shiftKey) return
+    if (!streaming || event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
     event.preventDefault()
     event.stopPropagation()
   }

@@ -17,7 +17,9 @@ export type QuoteRange = { start: number; end: number }
  * Single punctuation policy for quote matching. The verifier folds each class
  * to its ASCII member; the highlighter matches any member of the class. Keeping
  * both derived from these tables is what guarantees a quote the API accepted
- * is one the landing page can mark.
+ * is one the landing page can mark. Chat-answer shares add one pre-step,
+ * `normalizeMarkdownForQuoteMatch`, because the signed answer is Markdown and
+ * the reader selects the rendered text.
  */
 const APOSTROPHE_CLASS = "'\u2018\u2019\u201A\u201B\u2032"
 const DOUBLE_QUOTE_CLASS = '"\u201C\u201D\u201E\u201F\u2033'

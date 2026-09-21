@@ -161,10 +161,15 @@ describe('BillChatSection', () => {
 
     const textbox = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Ask about this bill' })
     fireEvent.change(textbox, { target: { value: 'And who pays for it?' } })
-    fireEvent.keyDown(textbox, { key: 'Enter' })
+    // fireEvent returns false when the default was prevented: the guard ate it.
+    expect(fireEvent.keyDown(textbox, { key: 'Enter' })).toBe(false)
 
     expect(sendMessage).not.toHaveBeenCalled()
     expect(textbox.value).toBe('And who pays for it?')
+
+    // An IME candidate confirm and Shift+Enter pass through untouched.
+    expect(fireEvent.keyDown(textbox, { key: 'Enter', isComposing: true })).toBe(true)
+    expect(fireEvent.keyDown(textbox, { key: 'Enter', shiftKey: true })).toBe(true)
   })
 
   it('renders prose, a quoted passage, and shares the passage text', () => {
