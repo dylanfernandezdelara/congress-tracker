@@ -3,7 +3,8 @@ import {
   checkQuoteLength,
   cleanQuoteText,
   findQuoteSource,
-  normalizeMarkdownForQuoteMatch,
+  normalizeForQuoteMatch,
+  stripMarkdownSyntax,
   type QuoteSourceText,
 } from "../../../../shared/quote-verification";
 import {
@@ -194,10 +195,12 @@ export async function handleCreateBillQuote(params: {
   if (body.answer) {
     // A signed answer is model prose about this bill, not bill text: the quote
     // only has to be part of the answer the worker actually produced. The
-    // signature covers the raw Markdown while the reader selected rendered
-    // text, so both sides are folded to plain prose first.
-    const needle = normalizeMarkdownForQuoteMatch(text);
-    if (!needle || !normalizeMarkdownForQuoteMatch(body.answer.text).includes(needle)) {
+    // signature covers raw Markdown while the reader selected rendered text,
+    // so the signed side is reduced to its rendered form; the selection is
+    // taken as-is so stored quotes never carry syntax the reader did not see.
+    const needle = normalizeForQuoteMatch(text);
+    const rendered = normalizeForQuoteMatch(stripMarkdownSyntax(body.answer.text));
+    if (!needle || !rendered.includes(needle)) {
       return errorResponse(
         json,
         422,

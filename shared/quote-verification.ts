@@ -17,9 +17,7 @@ export type QuoteRange = { start: number; end: number }
  * Single punctuation policy for quote matching. The verifier folds each class
  * to its ASCII member; the highlighter matches any member of the class. Keeping
  * both derived from these tables is what guarantees a quote the API accepted
- * is one the landing page can mark. Chat-answer shares add one pre-step,
- * `normalizeMarkdownForQuoteMatch`, because the signed answer is Markdown and
- * the reader selects the rendered text.
+ * is one the landing page can mark.
  */
 const APOSTROPHE_CLASS = "'\u2018\u2019\u201A\u201B\u2032"
 const DOUBLE_QUOTE_CLASS = '"\u201C\u201D\u201E\u201F\u2033'
@@ -54,26 +52,39 @@ export function normalizeForQuoteMatch(text: string): string {
     .toLowerCase()
 }
 
+const MD_ESCAPABLE = '\\`*_{}[]()#+-.!>~|'
+const MD_ESCAPE_RE = /\\([\\`*_{}[\]()#+\-.!>~|])/g
+const MD_ESCAPE_PLACEHOLDER_RE = /[\uE000-\uE01F]/g
+const MD_CODE_SPAN_RE = /`+([^`]+?)`+/g
 const MD_LINK_RE = /\[([^\]]*)\]\([^)]*\)/g
 const MD_BLOCK_PREFIX_RE = /^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+|\d{1,3}[.)][ \t]+)/gm
-const MD_INLINE_MARK_RE = /[*_~`]+/g
-const MD_ESCAPE_RE = /\\([\\`*_{}[\]()#+\-.!>~|])/g
+const MD_STRONG_RE = /(\*\*|__)(?=\S)([\s\S]*?\S)\1/g
+const MD_STRIKE_RE = /~~(?=\S)([\s\S]*?\S)~~/g
+const MD_EM_STAR_RE = /\*(?=\S)([^*]*?\S)\*/g
+const MD_EM_UNDERSCORE_RE = /(?<![\p{L}\p{N}])_(?=\S)([^_]*?\S)_(?![\p{L}\p{N}])/gu
 
 /**
- * Match form for chat-answer prose. The worker signs the raw Markdown it
- * streamed, but the reader selects the rendered text (a Markdown renderer
- * drops the syntax), so bold, emphasis, inline code, list markers,
- * blockquote and heading prefixes, and link syntax are folded away before
- * the usual quote normalization.
+ * Approximate rendered text of CommonMark/GFM prose: paired emphasis, strong,
+ * strikethrough and code-span delimiters, link syntax, and heading / list /
+ * blockquote prefixes are removed; backslash-escaped punctuation and intraword
+ * underscores stay, as they do on screen. Used to check a selection of a
+ * rendered chat answer against the Markdown the worker signed.
  */
-export function normalizeMarkdownForQuoteMatch(markdown: string): string {
-  return normalizeForQuoteMatch(
-    markdown
-      .replace(MD_ESCAPE_RE, '$1')
-      .replace(MD_LINK_RE, '$1')
-      .replace(MD_BLOCK_PREFIX_RE, '')
-      .replace(MD_INLINE_MARK_RE, ''),
+export function stripMarkdownSyntax(markdown: string): string {
+  let text = markdown.replace(MD_ESCAPE_RE, (_, ch: string) =>
+    String.fromCharCode(0xe000 + MD_ESCAPABLE.indexOf(ch)),
   )
+  text = text.replace(MD_CODE_SPAN_RE, '$1').replace(MD_LINK_RE, '$1').replace(MD_BLOCK_PREFIX_RE, '')
+  let previous: string
+  do {
+    previous = text
+    text = text
+      .replace(MD_STRONG_RE, '$2')
+      .replace(MD_STRIKE_RE, '$1')
+      .replace(MD_EM_STAR_RE, '$1')
+      .replace(MD_EM_UNDERSCORE_RE, '$1')
+  } while (text !== previous)
+  return text.replace(MD_ESCAPE_PLACEHOLDER_RE, (ch) => MD_ESCAPABLE[ch.charCodeAt(0) - 0xe000])
 }
 
 export type QuoteLengthCheck = 'ok' | 'too_short' | 'too_long'

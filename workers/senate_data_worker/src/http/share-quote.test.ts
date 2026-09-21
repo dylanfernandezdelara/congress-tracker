@@ -276,8 +276,8 @@ describe("POST /share/quote", () => {
     ].join("\n");
     const sig = await signAnswer(secret, { bill: "119-hr-4795", text: answerText });
     const env = createMockEnv({ DB: shareDb().db, CHAT_HMAC_SECRET: secret });
-    // What a reader selects in the Streamdown output: no emphasis markers,
-    // list bullets, or link syntax, and the two list items run together.
+    // What a reader selects on screen: no emphasis markers, list bullets, or
+    // link syntax, and the two list items run together.
     const response = await handleCreateBillQuote({
       request: post({
         bill: "119-hr-4795",
@@ -294,6 +294,17 @@ describe("POST /share/quote", () => {
         text: "It sets a two-year deadline for reviews. Agencies must publish status reports.",
       },
     });
+    // The raw Markdown itself is not what the reader saw, so it is not a quote.
+    const rawSyntax = await handleCreateBillQuote({
+      request: post({
+        bill: "119-hr-4795",
+        text: "The bill **speeds energy permits** across states:",
+        answer: { text: answerText, sig },
+      }),
+      env: env as never,
+      json,
+    });
+    expect(rawSyntax.status).toBe(422);
   });
 
   it("verifies against stored bill-text sections after digest and CRS", async () => {

@@ -8,8 +8,8 @@ import {
   findQuoteInText,
   findQuoteSource,
   normalizeForQuoteMatch,
-  normalizeMarkdownForQuoteMatch,
   quoteBelongsToBill,
+  stripMarkdownSyntax,
   textContainsQuote,
 } from './quote-verification'
 
@@ -23,23 +23,33 @@ describe('quote verification', () => {
     expect(normalizeForQuoteMatch('It’s\u00A0law')).toBe("it's law")
   })
 
-  it('folds Markdown syntax away so rendered selections match signed answer prose', () => {
-    const markdown = [
-      '## Summary',
-      '',
-      'The bill **raises** the _cap_ and adds `audits`:',
-      '',
-      '1. A [two-year deadline](https://example.gov/x) for reviews.',
-      '> Agencies report \\*quarterly\\*.',
-    ].join('\n')
-    const folded = normalizeMarkdownForQuoteMatch(markdown)
-    expect(folded).toBe(
-      'summary the bill raises the cap and adds audits: a two-year deadline for reviews. agencies report quarterly.',
-    )
-    // Rendered text keeps escaped and intraword marks; folding the selection
-    // the same way keeps those selections matchable.
-    expect(folded).toContain(normalizeMarkdownForQuoteMatch('report *quarterly*.'))
-    expect(normalizeMarkdownForQuoteMatch('a snake_case field')).toBe('a snakecase field')
+  describe('stripMarkdownSyntax', () => {
+    it('removes paired delimiters, link syntax, and block prefixes', () => {
+      const markdown = [
+        '## Summary',
+        '',
+        'The bill **raises** the _cap_, ~~cuts~~ adds `audits`:',
+        '',
+        '1. A [two-year deadline](https://example.gov/x) for reviews.',
+        '> Agencies ***must*** report.',
+      ].join('\n')
+      expect(stripMarkdownSyntax(markdown)).toBe(
+        [
+          'Summary',
+          '',
+          'The bill raises the cap, cuts adds audits:',
+          '',
+          'A two-year deadline for reviews.',
+          'Agencies must report.',
+        ].join('\n'),
+      )
+    })
+
+    it('keeps marks that render literally', () => {
+      expect(stripMarkdownSyntax('Agencies report \\*quarterly\\*.')).toBe('Agencies report *quarterly*.')
+      expect(stripMarkdownSyntax('a snake_case_field and 2 * 3 * 4')).toBe('a snake_case_field and 2 * 3 * 4')
+      expect(stripMarkdownSyntax('an unclosed **bold run')).toBe('an unclosed **bold run')
+    })
   })
 
   it('enforces length bounds on the cleaned text', () => {
