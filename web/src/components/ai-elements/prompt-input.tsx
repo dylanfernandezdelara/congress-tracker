@@ -76,6 +76,11 @@ export function PromptInputFooter({ className, ...props }: HTMLAttributes<HTMLDi
     <InputGroupAddon
       align="block-end"
       className={cn("justify-between", className)}
+      // InputGroupAddon focuses an <input>; this group wraps a <textarea>.
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest("button")) return
+        event.currentTarget.parentElement?.querySelector("textarea")?.focus()
+      }}
       {...props}
     />
   )

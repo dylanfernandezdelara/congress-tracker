@@ -21,7 +21,6 @@ import { buildBillChatExportPrompt } from '../utils/billChatExport'
 import { congressGovBillUrl, formatShortBillId, getBillColloquialName } from '../utils/billLabels'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
-import { ConversationEmptyState } from './ai-elements/conversation'
 import {
   PromptInput,
   PromptInputBody,
@@ -184,12 +183,16 @@ export function BillChatSection({
             status={status}
             onSharePassage={onSharePassage}
             emptyState={
-              <ConversationEmptyState
-                className="bill-chat-empty"
-                icon={<MessageSquareTextIcon aria-hidden />}
-                title={`Ask about ${formatShortBillId(item.bill.type, item.bill.number)}`}
-                description="Answers stay grounded in the bill’s text. Start with a suggestion or type your own question."
-              />
+              <div className="bill-chat-empty">
+                <MessageSquareTextIcon className="bill-chat-empty-icon" aria-hidden />
+                <p className="bill-chat-empty-title">
+                  Ask about {formatShortBillId(item.bill.type, item.bill.number)}
+                </p>
+                <p className="bill-chat-empty-hint">
+                  Answers stay grounded in the bill’s text. Start with a suggestion or type your
+                  own question.
+                </p>
+              </div>
             }
           />
 

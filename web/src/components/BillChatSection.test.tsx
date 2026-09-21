@@ -94,7 +94,7 @@ describe('BillChatSection', () => {
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
     expect(screen.queryByText('Answers quote the bill’s text.')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Ask about S. 2' })).toBeInTheDocument()
+    expect(screen.getByText('Ask about S. 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'What does this bill do?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Who is affected?' })).toBeInTheDocument()
     expect(
@@ -126,7 +126,7 @@ describe('BillChatSection', () => {
     renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByText('The bill raises the spending cap.')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Ask about S. 2' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Ask about S. 2')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'What does this bill do?' })).not.toBeInTheDocument()
     expect(screen.getByText('The Secretary shall raise the cap.')).toBeInTheDocument()
     expect(screen.getByText(/Sec\. 3\. Definitions/)).toBeInTheDocument()
