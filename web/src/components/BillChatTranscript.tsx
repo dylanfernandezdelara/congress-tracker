@@ -146,10 +146,21 @@ export type BillChatTranscriptProps = {
   messages: BillChatMessage[]
   status: 'submitted' | 'streaming' | 'ready' | 'error'
   onSharePassage: (text: string) => void
+  /** Rendered in the log's slot before the first turn so the pane keeps its shape. */
+  emptyState?: ReactNode
 }
 
-export function BillChatTranscript({ messages, status, onSharePassage }: BillChatTranscriptProps) {
-  if (messages.length === 0) return null
+export function BillChatTranscript({
+  messages,
+  status,
+  onSharePassage,
+  emptyState = null,
+}: BillChatTranscriptProps) {
+  if (messages.length === 0) {
+    return emptyState ? (
+      <div className="bill-chat-conversation bill-chat-conversation--empty">{emptyState}</div>
+    ) : null
+  }
   return (
     <Conversation className="bill-chat-conversation">
       <ConversationContent

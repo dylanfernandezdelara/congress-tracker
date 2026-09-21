@@ -1,4 +1,4 @@
-import { CopyIcon } from 'lucide-react'
+import { ChevronDownIcon, CopyIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { copyTextToClipboard } from '../utils/billDeepLink'
@@ -15,12 +15,17 @@ import {
 import { Button } from './ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
-/** Visible label — must not collide with the drawer “Open chat” peek control. */
-export const BILL_CHAT_EXPORT_TRIGGER = 'Continue in…'
+/**
+ * Visible label. The trigger sits in the composer toolbar, so "Open in ▾"
+ * reads as "open this conversation in…" and does not collide with the
+ * drawer's "Open chat" control, which stays in the header.
+ */
+export const BILL_CHAT_EXPORT_TRIGGER = 'Open in'
 /** Accessible name: this hands the briefing to ChatGPT or Claude, not this pane. */
-export const BILL_CHAT_EXPORT_NAME = 'Continue this bill in ChatGPT or Claude'
+export const BILL_CHAT_EXPORT_NAME = 'Open this conversation in ChatGPT or Claude'
 export const BILL_CHAT_EXPORT_HINT =
-  'Opens ChatGPT or Claude with this bill’s briefing and your questions.'
+  'Opens ChatGPT or Claude with this bill’s briefing and your questions so far.'
+export const BILL_CHAT_EXPORT_MENU_LABEL = 'Continue in another app'
 
 type BillChatExportMenuProps = {
   query: string
@@ -50,16 +55,17 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
                 aria-label={BILL_CHAT_EXPORT_NAME}
               >
                 {BILL_CHAT_EXPORT_TRIGGER}
+                <ChevronDownIcon aria-hidden />
               </Button>
             </OpenInTrigger>
           </span>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-56">
+        <TooltipContent side="top" className="max-w-56">
           {BILL_CHAT_EXPORT_HINT}
         </TooltipContent>
       </Tooltip>
-      <OpenInContent align="end">
-        <OpenInLabel>Continue this bill in</OpenInLabel>
+      <OpenInContent align="start">
+        <OpenInLabel>{BILL_CHAT_EXPORT_MENU_LABEL}</OpenInLabel>
         <OpenInChatGPT />
         <OpenInClaude />
         <OpenInSeparator />

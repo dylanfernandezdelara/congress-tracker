@@ -94,6 +94,7 @@ describe('BillChatSection', () => {
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
     expect(screen.queryByText('Answers quote the bill’s text.')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ask about S. 2' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'What does this bill do?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Who is affected?' })).toBeInTheDocument()
     expect(
@@ -125,6 +126,8 @@ describe('BillChatSection', () => {
     renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByText('The bill raises the spending cap.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Ask about S. 2' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'What does this bill do?' })).not.toBeInTheDocument()
     expect(screen.getByText('The Secretary shall raise the cap.')).toBeInTheDocument()
     expect(screen.getByText(/Sec\. 3\. Definitions/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Share this passage' }))
@@ -218,9 +221,12 @@ describe('BillChatSection', () => {
   it('opens ChatGPT and Claude with a bill briefing', async () => {
     renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
-    const trigger = screen.getByRole('button', { name: 'Continue this bill in ChatGPT or Claude' })
-    expect(trigger).toHaveTextContent('Continue in…')
+    const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+    expect(trigger).toHaveTextContent('Open in')
     expect(trigger).not.toHaveTextContent('Open in chat')
+    // Lives in the composer toolbar next to Send, not on the title row.
+    expect(trigger.closest('form.bill-chat-prompt')).not.toBeNull()
+    expect(trigger.closest('.bill-chat-header')).toBeNull()
     fireEvent.pointerDown(trigger)
     fireEvent.pointerUp(trigger)
     fireEvent.click(trigger)
@@ -234,6 +240,8 @@ describe('BillChatSection', () => {
     expect(claudeHref).toContain('https://claude.ai/new?')
     expect(new URL(claudeHref).searchParams.get('q')).toContain('S. 2')
     expect(screen.getByRole('menuitem', { name: 'Copy briefing' })).toBeInTheDocument()
+    expect(chatgpt.querySelector('svg title')?.textContent).toBe('OpenAI')
+    expect(claude.querySelector('svg title')?.textContent).toBe('Claude')
     await waitFor(() => {
       expect(trigger).toHaveAttribute('aria-expanded', 'true')
     })

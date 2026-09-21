@@ -1,5 +1,6 @@
 :root {
-  --bill-chat-peek: 180px;
+  /* Handle + title row + inset, plus vaul's 3% top gap (max-h 97%). */
+  --bill-chat-peek: 128px;
 }
 
 @media (max-width: 1023px) {
@@ -42,6 +43,22 @@
     border-radius: 999px;
     font-size: 12px;
     font-weight: 500;
+  }
+
+  /* Composer toolbar: "Open in ▾" mirrors the AI Elements OpenIn trigger. */
+  .bill-chat-export-trigger {
+    gap: var(--space-half);
+    padding-right: calc(var(--space-2) - var(--space-half));
+    color: hsl(var(--twc-secondary));
+  }
+
+  .bill-chat-export-trigger:hover {
+    color: hsl(var(--twc-foreground));
+  }
+
+  .bill-chat-export-trigger svg {
+    width: 0.85rem;
+    height: 0.85rem;
   }
 
   .bill-chat-dock--rail {
@@ -134,7 +151,7 @@
   }
 
   /* Vaul's handle hit-area is 44×44 and centered on the pill. A 100px-wide
-     handle made that box cover Open chat / Continue in… on a 390px peek bar. */
+     handle made that box cover Open chat on a 390px peek bar. */
   .bill-chat-drawer [data-vaul-handle] {
     width: 32px;
     height: 5px;
@@ -194,6 +211,53 @@
     flex-direction: column;
     min-width: 0;
     max-width: 100%;
+  }
+
+  /* Before the first turn the log slot holds the AI Elements empty state so
+     the rail / half-snap keeps its shape and the chips stay by the composer. */
+  .bill-chat-conversation--empty {
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  .bill-chat-empty {
+    gap: var(--space-1);
+    padding: var(--space-2);
+    color: hsl(var(--twc-faint));
+  }
+
+  .bill-chat-empty svg {
+    width: var(--space-3);
+    height: var(--space-3);
+  }
+
+  .bill-chat-empty h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .bill-chat-empty p {
+    margin: 0;
+    max-width: 26rem;
+    font-size: 12px;
+    line-height: 1.45;
+    color: hsl(var(--twc-secondary));
+  }
+
+  /* Half snap leaves ~48px between the title row and the chips: keep the
+     one-line title there and bring the icon + hint back at the full snap. */
+  @media (max-width: 1023px) {
+    .bill-chat-empty {
+      padding: var(--space-1);
+    }
+
+    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty > div:has(> svg),
+    .bill-chat-drawer-inner:not([data-snap='full']) .bill-chat-empty p {
+      display: none;
+    }
   }
 
   .bill-chat-conversation-content {
@@ -435,11 +499,6 @@
   .bill-chat-attachment-remove:hover,
   .bill-chat-attachment-remove:focus-visible {
     color: hsl(var(--twc-foreground));
-  }
-
-  .bill-chat-dock--rail .bill-chat-prompt,
-  .bill-chat-drawer-inner .bill-chat-prompt {
-    margin-top: auto;
   }
 
   .bill-chat-prompt {

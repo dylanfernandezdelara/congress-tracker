@@ -3,7 +3,7 @@ import { BILL_CHAT_MAX_QUESTION_CHARS } from '@congress-tracker/shared/chat-api-
 import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { FileTextIcon, XIcon } from 'lucide-react'
+import { FileTextIcon, MessageSquareTextIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { createBillQuote } from '../api/client'
@@ -21,7 +21,7 @@ import { buildBillChatExportPrompt } from '../utils/billChatExport'
 import { congressGovBillUrl, formatShortBillId, getBillColloquialName } from '../utils/billLabels'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
 import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
-import { Suggestion } from './ai-elements/suggestion'
+import { ConversationEmptyState } from './ai-elements/conversation'
 import {
   PromptInput,
   PromptInputBody,
@@ -29,7 +29,9 @@ import {
   PromptInputHeader,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
 } from './ai-elements/prompt-input'
+import { Suggestion } from './ai-elements/suggestion'
 import { BillChatExportMenu } from './BillChatExportMenu'
 import { BillChatTranscript, messageAnswer, messagePlainText, type BillChatMessage } from './BillChatTranscript'
 import { SelectionMenu } from './SelectionMenu'
@@ -51,7 +53,7 @@ export type BillChatSectionProps = {
   onQuoteCreated: (quote: BillQuote) => void
   /** Peek bar: hide the transcript and composer so the handle stays a title row. */
   collapsed?: boolean
-  /** Drawer Open chat / Minimize (or other chrome) next to Continue in… */
+  /** Drawer Open chat / Minimize (or other chrome) on the title row. */
   headerActions?: ReactNode
 }
 
@@ -172,14 +174,25 @@ export function BillChatSection({
         <h3 id="bill-chat-heading" className="feed-row-detail-heading">
           Ask about this bill
         </h3>
-        <div className="bill-chat-header-actions">
-          {headerActions}
-          <BillChatExportMenu query={exportPrompt} />
-        </div>
+        {headerActions ? <div className="bill-chat-header-actions">{headerActions}</div> : null}
       </header>
 
       {collapsed ? null : (
         <div className="bill-chat-body">
+          <BillChatTranscript
+            messages={messages}
+            status={status}
+            onSharePassage={onSharePassage}
+            emptyState={
+              <ConversationEmptyState
+                className="bill-chat-empty"
+                icon={<MessageSquareTextIcon aria-hidden />}
+                title={`Ask about ${formatShortBillId(item.bill.type, item.bill.number)}`}
+                description="Answers stay grounded in the bill’s text. Start with a suggestion or type your own question."
+              />
+            }
+          />
+
           {messages.length === 0 ? (
             <div className="bill-chat-suggestions">
               {starters.map((chip) => (
@@ -193,8 +206,6 @@ export function BillChatSection({
               ))}
             </div>
           ) : null}
-
-          <BillChatTranscript messages={messages} status={status} onSharePassage={onSharePassage} />
 
           {errorText ? (
             <div className="bill-chat-error" role="alert">
@@ -241,6 +252,9 @@ export function BillChatSection({
               />
             </PromptInputBody>
             <PromptInputFooter>
+              <PromptInputTools>
+                <BillChatExportMenu query={exportPrompt} />
+              </PromptInputTools>
               <PromptInputSubmit
                 className="bill-chat-prompt-submit"
                 status={status}

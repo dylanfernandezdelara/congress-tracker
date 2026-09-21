@@ -133,7 +133,7 @@ describe('align-grid.css', () => {
     expect(homeCss).toContain('minmax(336px, 26vw)')
     expect(homeCss).toContain('top: var(--site-rail-top)')
     expect(homeCss).toContain('height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom))')
-    expect(billChatCss).toContain('--bill-chat-peek: 180px')
+    expect(billChatCss).toContain('--bill-chat-peek: 128px')
     expect(billChatCss).not.toContain('bill-chat-prompt-footer')
     expect(baseCss).toContain('--site-header-height: 48px')
   })

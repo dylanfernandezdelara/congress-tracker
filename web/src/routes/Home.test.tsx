@@ -796,7 +796,7 @@ describe('Home', () => {
     const rail = document.getElementById('bill-chat-rail')
     expect(rail?.querySelector('#bill-chat-heading')).toHaveTextContent('Ask about this bill')
     expect(
-      within(rail as HTMLElement).getByRole('button', { name: 'Continue this bill in ChatGPT or Claude' }),
+      within(rail as HTMLElement).getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' }),
     ).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Vote tightness' })).not.toBeInTheDocument()
     expect(document.querySelector('.home-shell--reading')).not.toBeNull()

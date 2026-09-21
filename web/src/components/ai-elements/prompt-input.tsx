@@ -73,8 +73,17 @@ export const PromptInputTextarea = forwardRef<HTMLTextAreaElement, PromptInputTe
 
 export function PromptInputFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <InputGroupAddon align="block-end" className={cn("justify-end", className)} {...props} />
+    <InputGroupAddon
+      align="block-end"
+      className={cn("justify-between", className)}
+      {...props}
+    />
   )
+}
+
+/** Left-hand toolbar slot of the footer (model pickers, Open in…). */
+export function PromptInputTools({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("flex items-center gap-1", className)} {...props} />
 }
 
 export type PromptInputSubmitProps = ComponentProps<typeof InputGroupButton> & {

@@ -20,10 +20,12 @@ export const BILL_CHAT_RAIL_ID = 'bill-chat-rail'
 
 /**
  * Vaul 1.1.2: numbers are viewport fractions (`0.5` = half the window).
- * Pixel snaps must be strings (`"180px"`). A bare `88` is 88× the viewport.
- * Keep `--bill-chat-peek` in bill-chat.css equal to this string.
+ * Pixel snaps must be strings (`"128px"`). A bare `88` is 88× the viewport.
+ * Keep `--bill-chat-peek` in bill-chat.css equal to this string. The sheet is
+ * `max-h-[97%]`, so the visible peek is this minus 3% of the viewport
+ * (~103px on an 844px phone): handle, title row, and the 16px inset.
  */
-export const BILL_CHAT_DRAWER_PEEK = '180px'
+export const BILL_CHAT_DRAWER_PEEK = '128px'
 export const BILL_CHAT_DRAWER_HALF = 0.5
 /** Leaves the 48px header + notch above the handle so handleOnly can still drag. */
 export const BILL_CHAT_DRAWER_FULL = 0.85
