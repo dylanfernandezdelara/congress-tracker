@@ -81,21 +81,27 @@ function defaultSession(page) {
   return page.context().newCDPSession(page)
 }
 
+const SETTLE_TIMEOUT_MS = 250
+
 /**
- * Chromium drops device emulation (deviceScaleFactor, mobile) when the CDP
- * session that set it detaches, and every helper command is its own process,
- * so the override must be re-sent each command. The re-send reflows the page
- * (headless flips between classic 15px and overlay scrollbars); this waits
- * for that reflow to land before the command body reads or captures anything.
+ * Wait two animation frames so the reflow from a metrics override (headless
+ * flips between classic 15px and overlay scrollbars) is committed before the
+ * command body reads or captures anything. Bounded: rAF pauses while the
+ * document is hidden, and page.evaluate has no timeout of its own.
  */
 async function settleLayout(page) {
-  if (typeof page.evaluate !== 'function') return
   try {
     await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      (timeoutMs) =>
+        new Promise((resolve) => {
+          setTimeout(resolve, timeoutMs)
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        }),
+      SETTLE_TIMEOUT_MS,
     )
   } catch {
-    // Navigating away mid-command is fine; the next command re-applies.
+    // The page navigated or its context was destroyed; the command body runs
+    // against whatever layout is there, which is the pre-fix behavior.
   }
 }
 
@@ -103,9 +109,12 @@ export async function applyViewport(page, metrics, sessionFactory = defaultSessi
   const next = normalizeMetrics(metrics)
   await page.setViewportSize({ width: next.width, height: next.height })
   const session = await sessionFactory(page)
-  // Always replace the override. Playwright's setViewportSize is the same CDP
-  // method and caches the last size; clearDeviceMetricsOverride would wipe it
-  // while leaving that cache intact, so the next 1280×800 set is a no-op.
+  // Always replace the override, even for unchanged metrics: Chromium drops
+  // deviceScaleFactor / mobile when the CDP session that set them detaches,
+  // and every helper command is its own process. Playwright's setViewportSize
+  // is the same CDP method and caches the last size; clearDeviceMetricsOverride
+  // would wipe it while leaving that cache intact, so the next 1280×800 set
+  // would be a no-op.
   await session.send('Emulation.setDeviceMetricsOverride', {
     width: next.width,
     height: next.height,
