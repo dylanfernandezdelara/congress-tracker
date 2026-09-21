@@ -25,7 +25,7 @@
   .feed-search {
     display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: var(--space-64);
     min-width: 0;
     width: 100%;
   }

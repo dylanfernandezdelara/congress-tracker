@@ -193,7 +193,7 @@
   .site-header-brand {
     display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: var(--space-64);
     min-width: 0;
     grid-row: 1;
     grid-column: 1;
@@ -212,7 +212,7 @@
   .site-header-actions {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-32);
     grid-row: 1;
     grid-column: 2;
   }

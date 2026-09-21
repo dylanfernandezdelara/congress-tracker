@@ -145,6 +145,7 @@ function InputGroupInput({
   )
 }
 
+// forwardRef (React 18): PromptInputTextarea forwards its ref through here.
 const InputGroupTextarea = React.forwardRef<
   HTMLTextAreaElement,
   React.ComponentProps<"textarea">

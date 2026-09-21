@@ -155,6 +155,25 @@ describe('BillChatSection', () => {
     // An IME candidate confirm and Shift+Enter pass through untouched.
     expect(fireEvent.keyDown(textbox, { key: 'Enter', isComposing: true })).toBe(true)
     expect(fireEvent.keyDown(textbox, { key: 'Enter', shiftKey: true })).toBe(true)
+    // Engines that report the confirm as keyCode 229 with isComposing false
+    // reach the registry handler, which never sends while a reply streams.
+    fireEvent.keyDown(textbox, { key: 'Enter', keyCode: 229 })
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(textbox.value).toBe('And who pays for it?')
+  })
+
+  it('lets a paste that carries a file item fall through as text', () => {
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    const textbox = screen.getByRole('textbox', { name: 'Ask about this bill' })
+    const clipboardData = {
+      items: [
+        { kind: 'file', getAsFile: () => new File(['x'], 'shot.png', { type: 'image/png' }) },
+        { kind: 'string', getAsFile: () => null },
+      ],
+    }
+    // The registry textarea would preventDefault to attach the file; the
+    // composer has no attachments, so the browser paste must stay in charge.
+    expect(fireEvent.paste(textbox, { clipboardData })).toBe(true)
   })
 
   it('renders prose, a quoted passage, and shares the passage text', () => {
