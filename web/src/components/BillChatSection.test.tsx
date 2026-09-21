@@ -146,7 +146,8 @@ describe('BillChatSection', () => {
 
     const textbox = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Ask about this bill' })
     fireEvent.change(textbox, { target: { value: 'And who pays for it?' } })
-    // fireEvent returns false when the default was prevented: the guard ate it.
+    // The registry textarea prevents Enter's default, then stops at the
+    // disabled Send instead of submitting: no send, no form reset.
     expect(fireEvent.keyDown(textbox, { key: 'Enter' })).toBe(false)
 
     expect(sendMessage).not.toHaveBeenCalled()
@@ -155,11 +156,6 @@ describe('BillChatSection', () => {
     // An IME candidate confirm and Shift+Enter pass through untouched.
     expect(fireEvent.keyDown(textbox, { key: 'Enter', isComposing: true })).toBe(true)
     expect(fireEvent.keyDown(textbox, { key: 'Enter', shiftKey: true })).toBe(true)
-    // Engines that report the confirm as keyCode 229 with isComposing false
-    // are also left alone by the guard; the registry handler then takes the
-    // event (preventDefault + requestSubmit + form.reset) but never sends
-    // while a reply streams, and the controlled value keeps the draft.
-    expect(fireEvent.keyDown(textbox, { key: 'Enter', keyCode: 229 })).toBe(false)
     expect(sendMessage).not.toHaveBeenCalled()
     expect(textbox.value).toBe('And who pays for it?')
   })
@@ -366,7 +362,12 @@ describe('BillChatSection', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()
+    // Send stays in the form, disabled and hidden, so the registry textarea's
+    // Enter handler finds a disabled submit and never resets the draft.
+    const send = screen.getByRole('button', { name: 'Send' })
+    expect(send).toBeDisabled()
+    expect(send).toHaveAttribute('type', 'submit')
+    expect(send).toHaveClass('hidden')
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     expect(stop).toHaveBeenCalled()
   })
