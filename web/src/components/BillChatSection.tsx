@@ -4,7 +4,15 @@ import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { FileTextIcon, XIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from 'react'
 
 import { createBillQuote } from '../api/client'
 import { buildApiUrl } from '../api/fetchJson'
@@ -142,12 +150,22 @@ export function BillChatSection({
   // `submitQuestion` bails on `streaming`. A draft only survives that reset
   // because React mirrors a controlled textarea's value into `defaultValue`.
   // Swallow Enter here instead of leaning on that; Shift+Enter still inserts
-  // a newline and an IME candidate confirm (`isComposing`) is left alone, as
-  // in the registry handler.
+  // a newline and an IME candidate confirm (`isComposing`, or keyCode 229 on
+  // engines that report the confirm after composition ended) is left alone.
   const holdEnterWhileStreaming = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!streaming || event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    if (!streaming || event.key !== 'Enter' || event.shiftKey) return
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
     event.preventDefault()
     event.stopPropagation()
+  }
+
+  // The composer is text-only. The registry textarea cancels any paste that
+  // carries a file item (screenshots, rich clipboards from office suites) to
+  // attach it, which drops the clipboard text; stopping the event here lets
+  // the browser's default paste insert that text instead.
+  const keepPasteAsText = (event: ClipboardEvent<HTMLDivElement>) => {
+    const items = event.clipboardData?.items
+    if (items && Array.from(items).some((item) => item.kind === 'file')) event.stopPropagation()
   }
 
   /** Answer prose is only shareable with the worker's bill-bound signature. */
@@ -198,7 +216,7 @@ export function BillChatSection({
           // instead so none are hidden behind a swipe.
           <div className="flex flex-wrap gap-2">
             {starters.map((chip) => (
-              <Suggestion key={chip} suggestion={chip} disabled={streaming} onClick={submitQuestion} />
+              <Suggestion key={chip} suggestion={chip} onClick={submitQuestion} />
             ))}
           </div>
         ) : null}
@@ -246,7 +264,7 @@ export function BillChatSection({
               </Badge>
             </PromptInputHeader>
           ) : null}
-          <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming}>
+          <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming} onPasteCapture={keepPasteAsText}>
             <PromptInputTextarea
               ref={textareaRef}
               value={input}

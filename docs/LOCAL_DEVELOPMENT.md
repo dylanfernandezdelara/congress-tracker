@@ -32,8 +32,10 @@ appear immediately, no API keys required.
 
 **Alignment grid:** append `?align=1` (or `?align=grid`) to any local or
 preview URL to show the 8px snap overlay while adjusting layout. The lines
-are off unless that query is present (`qa:web` and production stay clean).
-New spacing should use the `--space-*` tokens in `web/src/styles/base.css`.
+are off unless that query is present (`qa:web` and production stay clean),
+and in-app navigation that rewrites the query drops it — re-add it by hand.
+New spacing should use the `--space-<px>` tokens in `web/src/styles/base.css`
+(`--space-16` is 16px; the number is pixels, not Tailwind's 4px scale).
 
 The Vite dev server proxies `/feed`, `/stats`, `/health`, and `/debug`
 to the worker on `:8787`, so the UI uses same-origin API URLs (matching
