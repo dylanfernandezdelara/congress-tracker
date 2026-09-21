@@ -319,6 +319,41 @@ describe("POST /share/quote", () => {
     expect(await response.json()).toMatchObject({ quote: { source: "answer" } });
   });
 
+  it("rejects a Markdown-decorated selection that neither the signed text nor its rendering contains", async () => {
+    // Only the signed side is folded: a selection carrying marks the answer
+    // never had is not "in" the answer just because the words are.
+    const { env, answer } = await signedAnswerEnv();
+    const response = await handleCreateBillQuote({
+      request: post({
+        bill: "119-hr-4795",
+        text: "The bill *speeds energy permits* across __states__:",
+        answer,
+      }),
+      env: env as never,
+      json,
+    });
+    expect(response.status).toBe(422);
+  });
+
+  it("shares only what a code span inside a link destination let the reader see", async () => {
+    const secret = "share-test-hmac";
+    const signed = "See [CMS](`Title I`) — the bill does not apply to `Title II` programs under this Act.";
+    const sig = await signAnswer(secret, { bill: "119-hr-4795", text: signed });
+    const env = createMockEnv({ DB: shareDb().db, CHAT_HMAC_SECRET: secret });
+    const share = (text: string) =>
+      handleCreateBillQuote({
+        request: post({ bill: "119-hr-4795", text, answer: { text: signed, sig } }),
+        env: env as never,
+        json,
+      });
+
+    const visible = await share("the bill does not apply to Title II programs");
+    expect(visible.status).toBe(200);
+    // A shifted restore would put the swallowed span's body here instead.
+    const invented = await share("the bill does not apply to Title I programs");
+    expect(invented.status).toBe(422);
+  });
+
   it("verifies against stored bill-text sections after digest and CRS", async () => {
     const { db } = shareDb(DIGEST, [
       { ordinal: 0, label: "3.", heading: "Definitions", body: "A widget means a safety device under this Act." },

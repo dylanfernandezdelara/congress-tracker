@@ -41,9 +41,17 @@ describe('markdownToPlainText', () => {
     expect(markdownToPlainText('[a * b](https://example.gov)')).toBe('a * b')
   })
 
+  it('restores each code span by identity when a link destination swallows one', () => {
+    // The destination is not rendered, so its span must vanish without
+    // handing its body to the next span (which is what the reader sees).
+    expect(
+      markdownToPlainText('See [CMS](`Title I`) — the bill does not apply to `Title II` programs extra.'),
+    ).toBe('See CMS — the bill does not apply to Title II programs extra.')
+  })
+
   it('never emits placeholder scalars or "undefined" for private-use input', () => {
-    const out = markdownToPlainText('The bill raises the cap. \uE013\uE002 extra words **here**')
+    const out = markdownToPlainText('The bill raises the cap. \uE013\uE002\uE100\uF8FF extra words **here**')
     expect(out).toBe('The bill raises the cap.  extra words here')
-    expect(out).not.toMatch(/undefined|[\uE000-\uE0FF]/)
+    expect(out).not.toMatch(/undefined|[\uE000-\uF8FF]/)
   })
 })

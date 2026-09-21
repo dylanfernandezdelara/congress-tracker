@@ -5,6 +5,9 @@
  *
  * 1. Code-span bodies, then backslash-escaped punctuation, are swapped for
  *    private-use placeholders so `` `**x**` `` and `\*` survive as literal text.
+ *    Every span gets its own scalar: a placeholder that stage 2 discards (a
+ *    code span inside a link destination) must not shift the bodies that
+ *    later spans restore, or the fold would contain text that was never shown.
  * 2. Link syntax and heading / list / blockquote prefixes are dropped, then
  *    paired strong / emphasis / strikethrough delimiters are unwrapped until
  *    nothing changes (nesting such as `***x***`).
@@ -22,10 +25,11 @@ const ESCAPE_PLACEHOLDER_RE = new RegExp(
   `[\\u${ESCAPE_BASE.toString(16)}-\\u${(ESCAPE_BASE + MD_ESCAPABLE.length - 1).toString(16)}]`,
   'g',
 )
-const CODE_PLACEHOLDER = '\uE0FF'
-const CODE_PLACEHOLDER_RE = /\uE0FF/g
+const SPAN_BASE = 0xe100
+const SPAN_LIMIT = 0xf8ff - SPAN_BASE + 1
+const SPAN_PLACEHOLDER_RE = /[\uE100-\uF8FF]/g
 /** Private-use scalars this module hands out; any already present would collide. */
-const RESERVED_PUA_RE = /[\uE000-\uE0FF]/g
+const RESERVED_PUA_RE = /[\uE000-\uF8FF]/g
 
 const MD_CODE_SPAN_RE = /`+([^`]+?)`+/g
 const MD_LINK_RE = /\[([^\]]*)\]\([^)]*\)/g
@@ -40,8 +44,11 @@ export function markdownToPlainText(markdown: string): string {
   let text = markdown
     .replace(RESERVED_PUA_RE, '')
     .replace(MD_CODE_SPAN_RE, (_, body: string) => {
+      // Past the placeholder range (an 8KB answer cannot get there) the body
+      // is left inline and may lose literal marks; never a shifted restore.
+      if (codeSpans.length >= SPAN_LIMIT) return body
       codeSpans.push(body)
-      return CODE_PLACEHOLDER
+      return String.fromCharCode(SPAN_BASE + codeSpans.length - 1)
     })
     .replace(MD_ESCAPE_RE, (_, ch: string) => String.fromCharCode(ESCAPE_BASE + MD_ESCAPABLE.indexOf(ch)))
 
@@ -56,8 +63,7 @@ export function markdownToPlainText(markdown: string): string {
       .replace(MD_EM_UNDERSCORE_RE, '$1')
   } while (text !== previous)
 
-  let nextSpan = 0
   return text
-    .replace(CODE_PLACEHOLDER_RE, () => codeSpans[nextSpan++] ?? '')
+    .replace(SPAN_PLACEHOLDER_RE, (ch) => codeSpans[ch.charCodeAt(0) - SPAN_BASE] ?? '')
     .replace(ESCAPE_PLACEHOLDER_RE, (ch) => MD_ESCAPABLE[ch.charCodeAt(0) - ESCAPE_BASE]!)
 }
