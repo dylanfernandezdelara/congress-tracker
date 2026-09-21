@@ -13,7 +13,7 @@ import {
   OpenInTrigger,
 } from './ai-elements/open-in-chat'
 import { PromptInputButton } from './ai-elements/prompt-input'
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
 // The trigger sits in the composer toolbar, so "Open in ▾" reads as "open
 // this conversation in…"; the accessible name says where.
@@ -25,10 +25,11 @@ const MENU_LABEL = 'Continue in another app'
 const COPIED_MS = 1600
 
 type BillChatExportMenuProps = {
-  query: string
+  /** Plain-text briefing handed to ChatGPT / Claude as the opening prompt. */
+  briefing: string
 }
 
-export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
+export function BillChatExportMenu({ briefing }: BillChatExportMenuProps) {
   const [copied, setCopied] = useState(false)
   const copiedTimer = useRef<number | null>(null)
 
@@ -39,22 +40,26 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
   }, [])
 
   return (
-    <OpenIn query={query}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex">
-            <OpenInTrigger>
-              <PromptInputButton className="text-muted-foreground" aria-label={TRIGGER_NAME}>
-                {TRIGGER_LABEL}
-                <ChevronDownIcon aria-hidden />
-              </PromptInputButton>
-            </OpenInTrigger>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-56">
-          {TRIGGER_HINT}
-        </TooltipContent>
-      </Tooltip>
+    <OpenIn query={briefing}>
+      {/* Own provider, like the vendored Message tooltips: the menu renders
+          anywhere a bill detail mounts, not only under an app-level provider. */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <OpenInTrigger>
+                <PromptInputButton className="text-muted-foreground" aria-label={TRIGGER_NAME}>
+                  {TRIGGER_LABEL}
+                  <ChevronDownIcon aria-hidden />
+                </PromptInputButton>
+              </OpenInTrigger>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-56">
+            {TRIGGER_HINT}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <OpenInContent align="start">
         <OpenInLabel>{MENU_LABEL}</OpenInLabel>
         <OpenInChatGPT />
@@ -62,7 +67,7 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
         <OpenInSeparator />
         <OpenInItem
           onSelect={() => {
-            void copyTextToClipboard(query).then((ok) => {
+            void copyTextToClipboard(briefing).then((ok) => {
               setCopied(ok)
               if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
               copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_MS)

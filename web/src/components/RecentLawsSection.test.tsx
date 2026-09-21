@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,7 +8,6 @@ import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import type { FeedItem, RecentLawItem } from '../api/types'
 import { makeFeedItem } from '../test/feedItemFixtures'
-import { renderWithTooltip } from '../test/tooltipHarness'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { RecentLawsSection } from './RecentLawsSection'
 
@@ -77,7 +76,7 @@ function sampleLaw(overrides: Partial<RecentLawItem> = {}): RecentLawItem {
 }
 
 function renderSection(ui: ReactElement) {
-  return renderWithTooltip(<MemoryRouter future={routerFuture}>{ui}</MemoryRouter>)
+  return render(<MemoryRouter future={routerFuture}>{ui}</MemoryRouter>)
 }
 
 describe('RecentLawsSection', () => {
