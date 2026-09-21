@@ -4,14 +4,15 @@
     --twc-background: 0 0% 98%;
     --twc-foreground: 0 0% 16%;
     --twc-secondary: 0 0% 36%;
-    /* shadcn `secondary` surface (user chat bubbles, secondary badges). */
-    --twc-secondary-surface: 0 0% 93%;
     --twc-faint: 0 0% 62%;
     --twc-card: 0 0% 100%;
     --twc-border: 0 0% 90%;
     --twc-border-hover: 0 0% 80%;
     --twc-border-muted: 0 0% 90%;
     --twc-surface-subtle: 0 0% 0% / 0.04;
+    /* Opaque neutral fill behind shadcn `secondary` variants; a step darker
+       than the card in light mode and a step lighter in dark mode. */
+    --twc-surface-secondary: 0 0% 93%;
     --twc-skeleton: 0 0% 0% / 0.05;
     --twc-link-decoration: 0 0% 0% / 0.2;
     --twc-ghost-border: 0 0% 0% / 0.1;
@@ -43,7 +44,6 @@
     --twc-background: 0 0% 4%;
     --twc-foreground: 0 0% 93%;
     --twc-secondary: 0 0% 65%;
-    --twc-secondary-surface: 0 0% 15%;
     /* Raised from 43% (#6E6E6E, ~3.6:1 on card) to meet WCAG AA on card/bg. */
     --twc-faint: 0 0% 52%;
     --twc-card: 0 0% 8%;
@@ -51,6 +51,7 @@
     --twc-border-hover: 0 0% 24%;
     --twc-border-muted: 0 0% 16%;
     --twc-surface-subtle: 0 0% 100% / 0.06;
+    --twc-surface-secondary: 0 0% 15%;
     --twc-skeleton: 0 0% 100% / 0.04;
     --twc-link-decoration: 0 0% 100% / 0.2;
     --twc-ghost-border: 0 0% 100% / 0.1;
