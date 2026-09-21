@@ -117,8 +117,8 @@ export function BillChatSection({
       return text ? [{ role: message.role, text }] : []
     })
     return buildBillChatExportPrompt({
-      billLabel: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
-      billId: billLabel,
+      shortBillId: billLabel,
+      displayName: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
       sourceUrl: congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number),
       pageUrl: buildBillShareUrl(item),
       headline: item.digest?.headline,

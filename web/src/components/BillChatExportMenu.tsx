@@ -15,17 +15,12 @@ import {
 import { PromptInputButton } from './ai-elements/prompt-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
-/**
- * Visible label. The trigger sits in the composer toolbar, so "Open in ▾"
- * reads as "open this conversation in…" rather than as a way to open the
- * chat pane itself.
- */
-export const BILL_CHAT_EXPORT_TRIGGER = 'Open in'
-/** Accessible name: this hands the briefing to ChatGPT or Claude, not this pane. */
-export const BILL_CHAT_EXPORT_NAME = 'Open this conversation in ChatGPT or Claude'
-export const BILL_CHAT_EXPORT_HINT =
-  'Opens ChatGPT or Claude with this bill’s briefing and your questions so far.'
-export const BILL_CHAT_EXPORT_MENU_LABEL = 'Continue in another app'
+// The trigger sits in the composer toolbar, so "Open in ▾" reads as "open
+// this conversation in…"; the accessible name says where.
+const TRIGGER_LABEL = 'Open in'
+const TRIGGER_NAME = 'Open this conversation in ChatGPT or Claude'
+const TRIGGER_HINT = 'Opens ChatGPT or Claude with this bill’s briefing and your questions so far.'
+const MENU_LABEL = 'Continue in another app'
 
 const COPIED_MS = 1600
 
@@ -33,7 +28,6 @@ type BillChatExportMenuProps = {
   query: string
 }
 
-/** AI Elements `OpenIn` menu placed in the `PromptInput` toolbar. */
 export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
   const [copied, setCopied] = useState(false)
   const copiedTimer = useRef<number | null>(null)
@@ -50,19 +44,19 @@ export function BillChatExportMenu({ query }: BillChatExportMenuProps) {
         <TooltipTrigger asChild>
           <span className="inline-flex">
             <OpenInTrigger>
-              <PromptInputButton className="text-muted-foreground" aria-label={BILL_CHAT_EXPORT_NAME}>
-                {BILL_CHAT_EXPORT_TRIGGER}
+              <PromptInputButton className="text-muted-foreground" aria-label={TRIGGER_NAME}>
+                {TRIGGER_LABEL}
                 <ChevronDownIcon aria-hidden />
               </PromptInputButton>
             </OpenInTrigger>
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-56">
-          {BILL_CHAT_EXPORT_HINT}
+          {TRIGGER_HINT}
         </TooltipContent>
       </Tooltip>
       <OpenInContent align="start">
-        <OpenInLabel>{BILL_CHAT_EXPORT_MENU_LABEL}</OpenInLabel>
+        <OpenInLabel>{MENU_LABEL}</OpenInLabel>
         <OpenInChatGPT />
         <OpenInClaude />
         <OpenInSeparator />

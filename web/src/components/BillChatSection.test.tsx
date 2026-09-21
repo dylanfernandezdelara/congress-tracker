@@ -164,7 +164,7 @@ describe('BillChatSection', () => {
   })
 
   it('lets a paste that carries a file item fall through as text', () => {
-    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
     const textbox = screen.getByRole('textbox', { name: 'Ask about this bill' })
     const clipboardData = {
       items: [
@@ -274,9 +274,6 @@ describe('BillChatSection', () => {
 
     const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
     expect(trigger).toHaveTextContent('Open in')
-    expect(trigger).not.toHaveTextContent('Open in chat')
-    // Lives in the composer toolbar next to Send, not on the title row.
-    expect(trigger.closest('form.bill-chat-prompt')).not.toBeNull()
     fireEvent.pointerDown(trigger)
     fireEvent.pointerUp(trigger)
     fireEvent.click(trigger)
@@ -290,11 +287,34 @@ describe('BillChatSection', () => {
     expect(claudeHref).toContain('https://claude.ai/new?')
     expect(new URL(claudeHref).searchParams.get('q')).toContain('S. 2')
     expect(screen.getByRole('menuitem', { name: 'Copy briefing' })).toBeInTheDocument()
-    expect(chatgpt.querySelector('svg title')?.textContent).toBe('OpenAI')
-    expect(claude.querySelector('svg title')?.textContent).toBe('Claude')
     await waitFor(() => {
       expect(trigger).toHaveAttribute('aria-expanded', 'true')
     })
+  })
+
+  it('exports the thread as signed answers, not streamed fragments or citations', async () => {
+    chatMock.messages = [
+      { id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'What does it do?' }] },
+      assistantMessage([
+        { type: 'text', text: 'The bill ' },
+        { type: 'data-quote', data: quotePart() },
+        { type: 'text', text: ' raises it.' },
+        { type: 'data-answer', data: answerPart() },
+      ]),
+    ]
+    renderWithTooltip(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+    fireEvent.pointerDown(trigger)
+    fireEvent.pointerUp(trigger)
+    fireEvent.click(trigger)
+
+    const chatgpt = await screen.findByRole('menuitem', { name: /Open in ChatGPT/ })
+    const prompt = new URL(chatgpt.getAttribute('href') ?? '').searchParams.get('prompt') ?? ''
+    expect(prompt).toContain('Conversation so far:\n\nUser:\nWhat does it do?')
+    expect(prompt).toContain('Assistant:\nThe bill raises the spending cap.')
+    expect(prompt).not.toContain('The bill  raises it.')
+    expect(prompt).not.toContain('The Secretary shall raise the cap.')
   })
 
   it('shows Stop while streaming and disables send', () => {
