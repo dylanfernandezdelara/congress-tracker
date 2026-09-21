@@ -129,8 +129,10 @@ export function BillChatSection({
   // `submitQuestion` bails on `streaming`. A draft only survives that reset
   // because React mirrors a controlled textarea's value into `defaultValue`.
   // Swallow Enter here instead of leaning on that; Shift+Enter still inserts
-  // a newline and an IME candidate confirm (`isComposing`, or keyCode 229 on
-  // engines that report the confirm after composition ended) is left alone.
+  // a newline. An IME candidate confirm (`isComposing`, or keyCode 229 on
+  // engines that report the confirm after composition ended) is left alone,
+  // so that one path still reaches the registry handler and `form.reset()`;
+  // there the controlled value is what keeps the draft.
   const holdEnterWhileStreaming = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!streaming || event.key !== 'Enter' || event.shiftKey) return
     if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return

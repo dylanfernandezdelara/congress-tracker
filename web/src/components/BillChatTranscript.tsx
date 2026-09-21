@@ -96,7 +96,10 @@ function AssistantTurn({
                 data-quotable="answer"
                 data-quotable-id={message.id}
               >
-                <MessageResponse>{part.text}</MessageResponse>
+                {/* Answers are prose about a bill: a model-emitted image is an
+                    arbitrary fetch the reader never asked for, so drop it. Links
+                    keep Streamdown's confirm-before-open safety. */}
+                <MessageResponse disallowedElements={ANSWER_DISALLOWED_ELEMENTS}>{part.text}</MessageResponse>
               </div>
             )
           case 'data-quote':
@@ -121,10 +124,14 @@ function AssistantTurn({
 
 type ChatStatus = 'submitted' | 'streaming' | 'ready' | 'error'
 
+const ANSWER_DISALLOWED_ELEMENTS = ['img']
+
 /**
- * A reader scrolled up in the log has escaped StickToBottom's lock. Each new
- * question (`status` → `submitted`) re-engages it so the answer streams into
- * view. Lives inside `Conversation` so the scroll context never leaves it.
+ * Re-engage StickToBottom's lock on each new question (`status` →
+ * `submitted`) so the answer streams into view. Only observable when a parent
+ * gives `.bill-chat-conversation` a bounded height; the inline section grows
+ * with its content, so there the log never scrolls and this is a no-op. Lives
+ * inside `Conversation` so the scroll context never leaves it.
  */
 function FollowNewTurn({ status }: { status: ChatStatus }) {
   const { scrollToBottom } = useStickToBottomContext()
