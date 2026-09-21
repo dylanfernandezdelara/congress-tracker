@@ -307,6 +307,33 @@ describe('BillChatSection', () => {
     })
   })
 
+  it('shows the copy result inside the still-open menu, then closes it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    try {
+      render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+      const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+      fireEvent.pointerDown(trigger)
+      fireEvent.pointerUp(trigger)
+      fireEvent.click(trigger)
+
+      const copy = await screen.findByRole('menuitem', { name: 'Copy briefing' })
+      fireEvent.click(copy)
+
+      // Radix would close on select; the item holds the menu open for the label.
+      const copied = await screen.findByRole('menuitem', { name: 'Copied briefing' })
+      expect(copied).toBeInTheDocument()
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('S. 2'))
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+
+      await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'), {
+        timeout: 2500,
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('exports the thread as signed answers, not streamed fragments or citations', async () => {
     chatMock.messages = [
       { id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'What does it do?' }] },

@@ -24,23 +24,41 @@ const MENU_LABEL = 'Continue in another app'
 
 const COPIED_MS = 1600
 
+type CopyState = 'idle' | 'copied' | 'failed'
+
+const COPY_LABEL: Record<CopyState, string> = {
+  idle: 'Copy briefing',
+  copied: 'Copied briefing',
+  failed: 'Could not copy',
+}
+
 type BillChatExportMenuProps = {
   /** Plain-text briefing handed to ChatGPT / Claude as the opening prompt. */
   briefing: string
 }
 
 export function BillChatExportMenu({ briefing }: BillChatExportMenuProps) {
-  const [copied, setCopied] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [copyState, setCopyState] = useState<CopyState>('idle')
   const copiedTimer = useRef<number | null>(null)
 
-  useEffect(() => {
-    return () => {
-      if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
+  const clearCopiedTimer = () => {
+    if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
+    copiedTimer.current = null
+  }
+
+  useEffect(() => clearCopiedTimer, [])
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) {
+      clearCopiedTimer()
+      setCopyState('idle')
     }
-  }, [])
+  }
 
   return (
-    <OpenIn query={briefing}>
+    <OpenIn query={briefing} open={open} onOpenChange={handleOpenChange}>
       {/* Own provider, like the vendored Message tooltips: the menu renders
           anywhere a bill detail mounts, not only under an app-level provider. */}
       <TooltipProvider>
@@ -66,16 +84,24 @@ export function BillChatExportMenu({ briefing }: BillChatExportMenuProps) {
         <OpenInClaude />
         <OpenInSeparator />
         <OpenInItem
-          onSelect={() => {
+          // Radix closes the menu on select, which would unmount the result
+          // label before anyone sees it. Hold the menu open for the
+          // confirmation, then close it; a failure stays put for a retry.
+          onSelect={(event) => {
+            event.preventDefault()
             void copyTextToClipboard(briefing).then((ok) => {
-              setCopied(ok)
-              if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current)
-              copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_MS)
+              clearCopiedTimer()
+              if (!ok) {
+                setCopyState('failed')
+                return
+              }
+              setCopyState('copied')
+              copiedTimer.current = window.setTimeout(() => handleOpenChange(false), COPIED_MS)
             })
           }}
         >
           <CopyIcon />
-          {copied ? 'Copied briefing' : 'Copy briefing'}
+          {COPY_LABEL[copyState]}
         </OpenInItem>
       </OpenInContent>
     </OpenIn>
