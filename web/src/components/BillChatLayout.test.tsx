@@ -42,9 +42,9 @@ describe('billChatDrawerSnap', () => {
 
   it('snaps the header and drawer inset to the 8px grid', () => {
     expect(billChatCss).toContain('grid-template-columns: minmax(0, 1fr) auto')
-    expect(billChatCss).toContain('gap: var(--space-2)')
+    expect(billChatCss).toContain('gap: var(--space-16)')
     expect(billChatCss).toContain(
-      'padding: var(--space-3) var(--space-2) var(--space-2)',
+      'padding: var(--space-24) var(--space-16) var(--space-16)',
     )
   })
 

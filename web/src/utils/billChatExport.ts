@@ -6,8 +6,10 @@ export type BillChatExportTurn = {
 }
 
 export type BillChatExportInput = {
-  billLabel: string
-  billId: string
+  /** Short citation form, e.g. `H.R. 1`. */
+  shortBillId: string
+  /** Colloquial or headline name of the bill. */
+  displayName: string
   sourceUrl: string
   pageUrl: string
   headline?: string | null
@@ -34,13 +36,13 @@ export function buildBillChatExportPrompt(input: BillChatExportInput): string {
   const lines: string[] = [
     'You are helping me understand a U.S. Congress bill.',
     '',
-    `Bill: ${input.billId} — ${input.billLabel}`,
+    `Bill: ${input.shortBillId} — ${input.displayName}`,
     `Official text: ${input.sourceUrl}`,
     `Track Congress: ${input.pageUrl}`,
   ]
 
   const headline = input.headline?.trim()
-  if (headline && headline !== input.billLabel) {
+  if (headline && headline !== input.displayName) {
     lines.push(`Headline: ${headline}`)
   }
 

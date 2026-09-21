@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
@@ -126,8 +127,8 @@ export function BillChatSection({
       return text ? [{ role: message.role, text }] : []
     })
     return buildBillChatExportPrompt({
-      billLabel: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
-      billId: billLabel,
+      shortBillId: billLabel,
+      displayName: getBillColloquialName({ ...item.bill, headline: item.digest?.headline }),
       sourceUrl: congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number),
       pageUrl: buildBillShareUrl(item),
       headline: item.digest?.headline,
@@ -159,12 +160,22 @@ export function BillChatSection({
   // `submitQuestion` bails on `streaming`. A draft only survives that reset
   // because React mirrors a controlled textarea's value into `defaultValue`.
   // Swallow Enter here instead of leaning on that; Shift+Enter still inserts
-  // a newline and an IME candidate confirm (`isComposing`) is left alone, as
-  // in the registry handler.
+  // a newline and an IME candidate confirm (`isComposing`, or keyCode 229 on
+  // engines that report the confirm after composition ended) is left alone.
   const holdEnterWhileStreaming = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!streaming || event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    if (!streaming || event.key !== 'Enter' || event.shiftKey) return
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
     event.preventDefault()
     event.stopPropagation()
+  }
+
+  // The composer is text-only. The registry textarea cancels any paste that
+  // carries a file item (screenshots, rich clipboards from office suites) to
+  // attach it, which drops the clipboard text; stopping the event here lets
+  // the browser's default paste insert that text instead.
+  const keepPasteAsText = (event: ClipboardEvent<HTMLDivElement>) => {
+    const items = event.clipboardData?.items
+    if (items && Array.from(items).some((item) => item.kind === 'file')) event.stopPropagation()
   }
 
   /** Answer prose is only shareable with the worker's bill-bound signature. */
@@ -220,7 +231,7 @@ export function BillChatSection({
             // none are hidden behind a swipe.
             <div className="flex flex-wrap gap-2">
               {starters.map((chip) => (
-                <Suggestion key={chip} suggestion={chip} disabled={streaming} onClick={submitQuestion} />
+                <Suggestion key={chip} suggestion={chip} onClick={submitQuestion} />
               ))}
             </div>
           ) : null}
@@ -268,7 +279,7 @@ export function BillChatSection({
                 </Badge>
               </PromptInputHeader>
             ) : null}
-            <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming}>
+            <PromptInputBody onKeyDownCapture={holdEnterWhileStreaming} onPasteCapture={keepPasteAsText}>
               <PromptInputTextarea
                 ref={textareaRef}
                 value={input}

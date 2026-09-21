@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { BILL_CHAT_EXPORT_MAX_CHARS, buildBillChatExportPrompt } from './billChatExport'
 
 const base = {
-  billLabel: 'House passes a broad energy permitting and production package',
-  billId: 'H.R. 1',
+  shortBillId: 'H.R. 1',
+  displayName: 'House passes a broad energy permitting and production package',
   sourceUrl: 'https://www.congress.gov/bill/119th-congress/house-bill/1',
   pageUrl: 'https://trackcongress.org/?bill=119-hr-1',
   headline: 'House passes a broad energy permitting and production package',
