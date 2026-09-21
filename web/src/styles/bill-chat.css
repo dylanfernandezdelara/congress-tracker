@@ -213,8 +213,8 @@
     max-width: 100%;
   }
 
-  /* Before the first turn the log slot holds the AI Elements empty state so
-     the rail / half-snap keeps its shape and the chips stay by the composer. */
+  /* Before the first turn the log slot holds the local .bill-chat-empty markup
+     so the rail / half-snap keeps its shape and the chips stay by the composer. */
   .bill-chat-conversation--empty {
     align-items: center;
     justify-content: center;
