@@ -11,11 +11,13 @@ import {
   mockViewport,
   pageResponse,
   renderHome,
+  setMockViewport,
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
 import { formatVoteDate } from '../utils/billLabels'
 import { chamberFloorDetail } from '../utils/feedQuiet'
 import { floorChipLabel } from '../utils/floorStatusCopy'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
@@ -85,6 +87,7 @@ describe('Home', () => {
     vi.clearAllMocks()
     clearMemberProfileCache()
     resetSheetLayerForTests()
+    resetBillChatInstancesForTests()
     document.body.style.overflow = ''
   })
 
@@ -488,6 +491,23 @@ describe('Home', () => {
     expect(params).not.toContain('q=')
   })
 
+  it('keeps ?align=1 when opening a Senate-waiting bill', async () => {
+    mockViewport(false)
+    renderHome('/?align=1&chamber=Senate&q=lands')
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /House-passed contracting bill waiting in the Senate/,
+      }),
+    )
+
+    const params = screen.getByTestId('search-params').textContent ?? ''
+    expect(params).toContain('bill=119-hr-33')
+    expect(params).toContain('align=1')
+    expect(params).not.toContain('chamber=')
+    expect(params).not.toContain('q=')
+  })
+
   it('opens a member profile from a left-rail spotlight', async () => {
     mockViewport(true)
     renderHome()
@@ -540,7 +560,7 @@ describe('Home', () => {
       .mockResolvedValueOnce(pageResponse([senateItem, houseItem], { total: 2 }))
       .mockResolvedValueOnce(pageResponse([houseItem], { total: 1 }))
 
-    renderHome()
+    renderHome('/?align=1')
 
     expect(await screen.findByText('Senate headline')).toBeInTheDocument()
     expect(screen.getByText('House headline')).toBeInTheDocument()
@@ -555,7 +575,10 @@ describe('Home', () => {
     expect(screen.queryByText('Senate headline')).not.toBeInTheDocument()
     expect(screen.getByText(/1 of 1 bill/)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'House' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByTestId('search-params')).toHaveTextContent('chamber=House')
+    const params = screen.getByTestId('search-params').textContent ?? ''
+    expect(params).toContain('chamber=House')
+    // In-page filters copy the existing query, so the layout overlay stays on.
+    expect(params).toContain('align=1')
   })
 
   it('treats invalid chamber query values as All', async () => {
@@ -763,6 +786,50 @@ describe('Home', () => {
     expect(
       screen.queryByText('That bill is no longer in the recent feed.'),
     ).not.toBeInTheDocument()
+  })
+
+  it('docks bill chat in the right rail when a timeline row is expanded', async () => {
+    renderHome()
+    expect(await screen.findByRole('region', { name: 'Vote tightness' })).toBeInTheDocument()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Plain headline for readers/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('complementary', { name: 'Ask about this bill' })).toBeInTheDocument()
+    })
+    const rail = document.getElementById('bill-chat-rail')
+    expect(rail?.querySelector('#bill-chat-heading')).toHaveTextContent('Ask about this bill')
+    expect(
+      within(rail as HTMLElement).getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Vote tightness' })).not.toBeInTheDocument()
+    expect(document.querySelector('.home-shell--reading')).not.toBeNull()
+  })
+
+  it('keeps the composer draft and opens the drawer at half when the viewport crosses to mobile', async () => {
+    renderHome()
+    fireEvent.click(await screen.findByRole('button', { name: /Plain headline for readers/i }))
+
+    const box = await screen.findByRole('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(box, { target: { value: 'who pays for it' } })
+
+    act(() => setMockViewport(false))
+
+    expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'half')
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('who pays for it')
+    expect(screen.queryByRole('button', { name: 'Open chat' })).not.toBeInTheDocument()
+  })
+
+  it('opens a bottom chat drawer when a timeline row is expanded on mobile', async () => {
+    mockViewport(false)
+    renderHome()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Plain headline for readers/i }))
+
+    expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open chat' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Vote tightness' })).toBeInTheDocument()
   })
 
   it('writes the expanded bill into the URL and removes it on collapse', async () => {

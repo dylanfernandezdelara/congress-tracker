@@ -1,11 +1,15 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
+import { BillChatLayoutProvider, useBillChatSession } from './BillChatLayout'
+import { BillChatSection } from './BillChatSection'
 import { FeedRowDetail } from './FeedRowDetail'
 
 vi.mock('../api/client', () => ({
@@ -42,6 +46,7 @@ const chatMock: {
 }
 
 vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
   useChat: () => chatMock,
 }))
 
@@ -70,7 +75,23 @@ afterEach(() => {
   clearMemberProfileCache()
   clearRollDefectorsCache()
   resetSheetLayerForTests()
+  resetBillChatInstancesForTests()
 })
+
+/** Stand-in for Home's rail / drawer: renders whichever bill is presented. */
+function ChatHost() {
+  const session = useBillChatSession()
+  return session ? <BillChatSection key={session.billId} {...session.chat} /> : null
+}
+
+function renderDetailWithChat(ui: ReactElement) {
+  return render(
+    <BillChatLayoutProvider>
+      <ChatHost />
+      {ui}
+    </BillChatLayoutProvider>,
+  )
+}
 
 describe('FeedRowDetail', () => {
   it('shows party defectors for an expanded vote when member data exists', async () => {
@@ -697,9 +718,17 @@ describe('FeedRowDetail', () => {
     vi.useRealTimers()
   })
 
+  it('renders no chat of its own; the layout host shows the presented bill', () => {
+    render(<FeedRowDetail item={makeFeedItem()} />)
+    expect(screen.queryByRole('heading', { name: 'Ask about this bill' })).not.toBeInTheDocument()
+
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
+    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
+  })
+
   it('sends a selection to the bill chat when Ask about this is used', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('It does something important in plain language.')
     await act(async () => {
@@ -749,7 +778,7 @@ describe('FeedRowDetail', () => {
       },
       url: 'https://trackcongress.org/?bill=119-s-2&quote=cafecafecafecafe',
     })
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {
@@ -792,7 +821,7 @@ describe('FeedRowDetail', () => {
         ],
       },
     ]
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
 
     selectQuotableText('The bill raises the spending cap for rural clinics.')
     await act(async () => {

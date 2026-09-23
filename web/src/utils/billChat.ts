@@ -76,13 +76,6 @@ export function evidenceSourceLabel(source: BillChatEvidenceSource): string {
   }
 }
 
-export function splitProseParagraphs(text: string): string[] {
-  return text
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => paragraph.length > 0)
-}
-
 /**
  * Fit a quoted passage into the share-quote length cap: keep whole sentences
  * while they fit, otherwise cut the first sentence at a word boundary. The

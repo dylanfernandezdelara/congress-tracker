@@ -30,20 +30,47 @@ export type HomeApiMocks = {
   fetchPortfolioStats: Mock
 }
 
+const viewportListeners = new Set<() => void>()
+let viewportDesktop = true
+
+function viewportMatches(query: string): boolean {
+  return (
+    (viewportDesktop &&
+      (query.includes('min-width: 1024px') || query.includes('min-width: 640px'))) ||
+    (!viewportDesktop &&
+      (query.includes('max-width: 1023px') || query.includes('prefers-reduced-motion')))
+  )
+}
+
 export function mockViewport(isDesktop: boolean) {
+  viewportDesktop = isDesktop
+  viewportListeners.clear()
   window.matchMedia = ((query: string) => ({
-    matches:
-      (isDesktop &&
-        (query.includes('min-width: 1024px') || query.includes('min-width: 640px'))) ||
-      (!isDesktop && query.includes('prefers-reduced-motion')),
+    get matches() {
+      return viewportMatches(query)
+    },
     media: query,
     onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addListener: (listener: () => void) => {
+      viewportListeners.add(listener)
+    },
+    removeListener: (listener: () => void) => {
+      viewportListeners.delete(listener)
+    },
+    addEventListener: (_type: string, listener: () => void) => {
+      viewportListeners.add(listener)
+    },
+    removeEventListener: (_type: string, listener: () => void) => {
+      viewportListeners.delete(listener)
+    },
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia
+}
+
+/** Flip the viewport and notify listeners already subscribed by `useMediaQuery`. */
+export function setMockViewport(isDesktop: boolean) {
+  viewportDesktop = isDesktop
+  for (const listener of [...viewportListeners]) listener()
 }
 
 const routerFuture = {

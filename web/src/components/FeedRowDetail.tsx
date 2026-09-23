@@ -17,7 +17,7 @@ import { useBillShare } from '../hooks/useBillShare'
 import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
 import { useSharedQuoteLanding } from '../hooks/useSharedQuoteLanding'
 import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
-import { BillChatSection } from './BillChatSection'
+import { usePresentBillChat } from './BillChatLayout'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
@@ -112,7 +112,11 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
   )
 }
 
-export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailProps) {
+export function FeedRowDetail({
+  item,
+  shareUrl,
+  quoteId = null,
+}: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
   const summary = getFeedSummaryContent(item)
@@ -125,7 +129,6 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [sharingQuote, setSharingQuote] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [chatSelection, setChatSelection] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
@@ -172,7 +175,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
     }
   }
 
-  const handleSharePassage = async (text: string) => {
+  const handleSharePassage = useCallback(async (text: string) => {
     try {
       const { quote } = await createBillQuote({
         bill: formatBillQueryParam(item.bill),
@@ -182,7 +185,13 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
     } catch (error) {
       setToast(shareQuoteErrorCopy(error))
     }
-  }
+  }, [item.bill, share])
+
+  const askChat = usePresentBillChat({
+    item,
+    onSharePassage: handleSharePassage,
+    onQuoteCreated: share.openSheet,
+  })
 
   const handleCopySelection = async (current: TextSelection) => {
     const ok = await copyTextToClipboard(current.text)
@@ -241,16 +250,6 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         />
       </section>
 
-      <BillChatSection
-        item={item}
-        pendingSelection={chatSelection}
-        onClearSelection={() => setChatSelection(null)}
-        onSharePassage={(text) => {
-          void handleSharePassage(text)
-        }}
-        onQuoteCreated={share.openSheet}
-      />
-
       <footer className="feed-row-detail-footer">
         <a
           href={sourceUrl}
@@ -285,7 +284,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
           void handleShareQuote(current)
         }}
         onAsk={(sel) => {
-          setChatSelection(sel.text)
+          askChat(sel.text)
           clearSelection()
         }}
         onCopy={(current) => {

@@ -10,6 +10,9 @@
     --twc-border-hover: 0 0% 80%;
     --twc-border-muted: 0 0% 90%;
     --twc-surface-subtle: 0 0% 0% / 0.04;
+    /* Opaque neutral fill behind shadcn `secondary` variants; a step darker
+       than the card in light mode and a step lighter in dark mode. */
+    --twc-surface-secondary: 0 0% 93%;
     --twc-skeleton: 0 0% 0% / 0.05;
     --twc-link-decoration: 0 0% 0% / 0.2;
     --twc-ghost-border: 0 0% 0% / 0.1;
@@ -34,6 +37,23 @@
     --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
     --motion-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
     --radius: 0.75rem;
+    /* 8px snap grid; --space-<px> names carry their pixel value so they do not
+       read like Tailwind's 4px scale. Overlay is opt-in (`?align=1`). */
+    --grid: 8px;
+    --space-4: 4px;
+    --space-8: var(--grid);
+    --space-16: calc(var(--grid) * 2);
+    --space-24: calc(var(--grid) * 3);
+    --space-32: calc(var(--grid) * 4);
+    --space-40: calc(var(--grid) * 5);
+    --space-48: calc(var(--grid) * 6);
+    --space-64: calc(var(--grid) * 8);
+    /* Border-box header (hairline is a box-shadow, not extra height). */
+    --site-header-height: 48px;
+    --site-rail-top: calc(
+      var(--site-header-height) + var(--space-16) + env(safe-area-inset-top, 0px)
+    );
+    --site-rail-bottom: var(--space-16);
   }
 
   [data-theme='dark'] {
@@ -48,6 +68,7 @@
     --twc-border-hover: 0 0% 24%;
     --twc-border-muted: 0 0% 16%;
     --twc-surface-subtle: 0 0% 100% / 0.06;
+    --twc-surface-secondary: 0 0% 15%;
     --twc-skeleton: 0 0% 100% / 0.04;
     --twc-link-decoration: 0 0% 100% / 0.2;
     --twc-ghost-border: 0 0% 100% / 0.1;

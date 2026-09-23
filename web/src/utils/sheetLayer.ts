@@ -98,6 +98,49 @@ export function registerSheetLayer(controller: SheetLayerController): SheetLayer
   }
 }
 
+/**
+ * Close the topmost open sheet, for a dismissable layer (the mobile chat
+ * drawer) that receives Escape before the window listener above. True when a
+ * sheet took the key.
+ */
+export function closeTopSheet(): boolean {
+  const top = stack[stack.length - 1]
+  if (!top || top.getIsClosing()) return false
+  top.requestClose()
+  return true
+}
+
+/**
+ * Radix's dismissable layer sees Escape on `document` during capture, before
+ * the focused control. Cancel that dismiss, then close the top sheet once
+ * this keydown has finished dispatching. A control that calls `preventDefault`
+ * (member suggestions, a search clear) keeps the sheet.
+ *
+ * `queueMicrotask` is too early: browsers checkpoint microtasks between
+ * listeners, so the close ran before the focused control's own keydown.
+ */
+export function handEscapeToTopSheet(event: KeyboardEvent): void {
+  let claimedByControl = false
+  const nativePreventDefault = event.preventDefault.bind(event)
+  Object.defineProperty(event, 'preventDefault', {
+    configurable: true,
+    writable: true,
+    value: () => {
+      claimedByControl = true
+      nativePreventDefault()
+    },
+  })
+  nativePreventDefault()
+  setTimeout(() => {
+    Object.defineProperty(event, 'preventDefault', {
+      configurable: true,
+      writable: true,
+      value: nativePreventDefault,
+    })
+    if (!claimedByControl) closeTopSheet()
+  }, 0)
+}
+
 /** Test helper — clears lock state between cases. */
 export function resetSheetLayerForTests(): void {
   stack.length = 0
