@@ -23,6 +23,7 @@ import { RightRail } from '../components/RightRail'
 import { SenateWaitingList } from '../components/SenateWaitingList'
 import { TightnessDefectorSheet } from '../components/TightnessDefectorSheet'
 import { TightnessStrip } from '../components/TightnessStrip'
+import { copyAlignGridParam } from '../hooks/useAlignGrid'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useFeedPagination } from '../hooks/useFeedPagination'
 import { useMediaQuery } from '../hooks/useMediaQuery'
@@ -120,7 +121,12 @@ export default function Home() {
 
   const openWaitingBill = useCallback(
     (billParam: string) => {
-      setSearchParams({ bill: billParam })
+      setSearchParams((prev) => {
+        const next = new URLSearchParams()
+        next.set('bill', billParam)
+        copyAlignGridParam(prev, next)
+        return next
+      })
     },
     [setSearchParams],
   )
