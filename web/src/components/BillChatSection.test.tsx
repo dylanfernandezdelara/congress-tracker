@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -33,6 +33,18 @@ const chatMock: {
 vi.mock('@ai-sdk/react', () => ({
   useChat: () => chatMock,
 }))
+
+const { scrollToBottom } = vi.hoisted(() => ({ scrollToBottom: vi.fn() }))
+
+// Real StickToBottom; only the context hook's `scrollToBottom` is a spy so the
+// new-turn follow inside the Conversation is observable in jsdom.
+vi.mock('use-stick-to-bottom', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('use-stick-to-bottom')>()
+  return {
+    ...mod,
+    useStickToBottomContext: () => ({ ...mod.useStickToBottomContext(), scrollToBottom }),
+  }
+})
 
 import { BillChatSection } from './BillChatSection'
 
@@ -78,6 +90,7 @@ beforeEach(() => {
   sendMessage.mockReset()
   regenerate.mockReset()
   stop.mockReset()
+  scrollToBottom.mockReset()
 })
 
 afterEach(() => {
@@ -89,7 +102,9 @@ describe('BillChatSection', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
-    expect(screen.getByText('Answers quote the bill’s text.')).toBeInTheDocument()
+    // Stock ConversationEmptyState inside the log until the first turn.
+    expect(screen.getByRole('log')).toContainElement(screen.getByText('Ask about S. 2'))
+    expect(screen.getByText(/Answers stay grounded/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'What does this bill do?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Who is affected?' })).toBeInTheDocument()
     expect(
@@ -108,6 +123,57 @@ describe('BillChatSection', () => {
     expect(sendMessage).toHaveBeenCalledWith({ text: 'What does this bill do?' })
   })
 
+  it('scrolls the log to the bottom once a question is in flight', () => {
+    chatMock.messages = [{ id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'Who pays?' }] }]
+    const { rerender } = render(
+      <BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+    expect(scrollToBottom).not.toHaveBeenCalled()
+
+    chatMock.status = 'submitted'
+    rerender(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    expect(scrollToBottom).toHaveBeenCalledTimes(1)
+
+    chatMock.status = 'streaming'
+    rerender(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    expect(scrollToBottom).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a draft follow-up when Enter is pressed while a reply streams', () => {
+    chatMock.status = 'streaming'
+    chatMock.messages = [assistantMessage([{ type: 'text', text: 'Working' }])]
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    const textbox = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(textbox, { target: { value: 'And who pays for it?' } })
+    // The registry textarea prevents Enter's default, then stops at the
+    // disabled Send instead of submitting: no send, no form reset.
+    expect(fireEvent.keyDown(textbox, { key: 'Enter' })).toBe(false)
+
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(textbox.value).toBe('And who pays for it?')
+
+    // An IME candidate confirm and Shift+Enter pass through untouched.
+    expect(fireEvent.keyDown(textbox, { key: 'Enter', isComposing: true })).toBe(true)
+    expect(fireEvent.keyDown(textbox, { key: 'Enter', shiftKey: true })).toBe(true)
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(textbox.value).toBe('And who pays for it?')
+  })
+
+  it('lets a paste that carries a file item fall through as text', () => {
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+    const textbox = screen.getByRole('textbox', { name: 'Ask about this bill' })
+    const clipboardData = {
+      items: [
+        { kind: 'file', getAsFile: () => new File(['x'], 'shot.png', { type: 'image/png' }) },
+        { kind: 'string', getAsFile: () => null },
+      ],
+    }
+    // The registry textarea would preventDefault to attach the file; the
+    // composer has no attachments, so the browser paste must stay in charge.
+    expect(fireEvent.paste(textbox, { clipboardData })).toBe(true)
+  })
+
   it('renders prose, a quoted passage, and shares the passage text', () => {
     const onSharePassage = vi.fn()
     chatMock.messages = [
@@ -121,10 +187,26 @@ describe('BillChatSection', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={onSharePassage} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByText('The bill raises the spending cap.')).toBeInTheDocument()
+    expect(screen.queryByText('Ask about S. 2')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'What does this bill do?' })).not.toBeInTheDocument()
     expect(screen.getByText('The Secretary shall raise the cap.')).toBeInTheDocument()
     expect(screen.getByText(/Sec\. 3\. Definitions/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Share this passage' }))
     expect(onSharePassage).toHaveBeenCalledWith('The Secretary shall raise the cap.')
+  })
+
+  it('drops model-emitted images from answer prose', () => {
+    chatMock.messages = [
+      assistantMessage([
+        { type: 'text', text: 'See the chart ![tracking pixel](https://attacker.example/p.png) for detail.' },
+        { type: 'data-answer', data: answerPart() },
+      ]),
+    ]
+    const { container } = render(
+      <BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />,
+    )
+    expect(screen.getByText(/See the chart/)).toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
   })
 
   it('renders a refused answer as a notice without quote share', () => {
@@ -138,7 +220,7 @@ describe('BillChatSection', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     const notice = screen.getByText("The bill text doesn't address this.")
-    expect(notice.closest('.bill-chat-bubble--refused')).toBeTruthy()
+    expect(notice.closest('[data-refused]')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Share this passage' })).not.toBeInTheDocument()
   })
 
@@ -171,7 +253,7 @@ describe('BillChatSection', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
-  it('renders a pending selection chip and sends it on submit, then clears it', () => {
+  it('renders a pending selection chip and sends it on submit, then clears it', async () => {
     const onClearSelection = vi.fn()
     render(
       <BillChatSection
@@ -186,11 +268,14 @@ describe('BillChatSection', () => {
     expect(screen.getByText('the selected text about rural clinics')).toBeInTheDocument()
     const textarea = screen.getByRole('textbox', { name: 'Ask about this bill' })
     fireEvent.change(textarea, { target: { value: 'What does this mean?' } })
+    // PromptInput reads the message off FormData and resolves attachments before onSubmit.
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(sendMessage).toHaveBeenCalledWith(
-      { text: 'What does this mean?' },
-      { body: { selection: 'the selected text about rural clinics' } },
+    await waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        { text: 'What does this mean?' },
+        { body: { selection: 'the selected text about rural clinics' } },
+      ),
     )
     expect(onClearSelection).toHaveBeenCalled()
   })
@@ -202,7 +287,12 @@ describe('BillChatSection', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()
+    // Send stays in the form, disabled and hidden, so the registry textarea's
+    // Enter handler finds a disabled submit and never resets the draft.
+    const send = screen.getByRole('button', { name: 'Send' })
+    expect(send).toBeDisabled()
+    expect(send).toHaveAttribute('type', 'submit')
+    expect(send).toHaveClass('hidden')
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     expect(stop).toHaveBeenCalled()
   })
