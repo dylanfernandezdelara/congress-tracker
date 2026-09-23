@@ -242,6 +242,8 @@ describe('Home advanced filters', () => {
     })
     expect(memberInput).toHaveValue('')
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(screen.getByTestId('search-params').textContent ?? '').toContain('bill=')
   })
 
   it('opens filters in a bottom sheet on narrow viewports and Escape clears member draft first', async () => {
