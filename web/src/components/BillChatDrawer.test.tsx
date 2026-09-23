@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
@@ -39,8 +39,10 @@ import {
   BILL_CHAT_DRAWER_PEEK,
   BillChatDrawer,
   billChatDrawerSnap,
+  isBillChatDrawerSnapPoint,
 } from './BillChatDrawer'
-import { BillChatLayoutProvider, usePresentBillChat } from './BillChatLayout'
+import { BillChatSection } from './BillChatSection'
+import { BillChatLayoutProvider, useBillChatSession, usePresentBillChat } from './BillChatLayout'
 
 const noop = () => {}
 
@@ -79,6 +81,15 @@ describe('billChatDrawerSnap', () => {
 
   it('fails towards an open chat for a snap it does not know', () => {
     expect(billChatDrawerSnap(0.61)).toBe('half')
+  })
+
+  it('rejects the undefined point vaul writes when a handle click walks off the last snap', () => {
+    expect(isBillChatDrawerSnapPoint(undefined)).toBe(false)
+    expect(isBillChatDrawerSnapPoint(null)).toBe(false)
+    expect(isBillChatDrawerSnapPoint(0.61)).toBe(false)
+    expect(isBillChatDrawerSnapPoint(BILL_CHAT_DRAWER_PEEK)).toBe(true)
+    expect(isBillChatDrawerSnapPoint(BILL_CHAT_DRAWER_HALF)).toBe(true)
+    expect(isBillChatDrawerSnapPoint(BILL_CHAT_DRAWER_FULL)).toBe(true)
   })
 })
 
@@ -194,6 +205,67 @@ describe('BillChatDrawer', () => {
     expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-bill', '119-s-2')
     expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'half')
     expect(document.querySelector('.bill-chat-attachment-label')).toHaveTextContent('same passage')
+  })
+
+  it('does not cycle snaps when the handle is tapped', async () => {
+    renderDrawer(<Presenter />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Open chat' }))
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'half')
+
+    const handle = document.querySelector('[data-vaul-handle]')
+    expect(handle).not.toBeNull()
+    fireEvent.click(handle as Element)
+
+    // Vaul waits out a double-tap before cycling. preventCycle must leave half put.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'half')
+    expect(textbox()).toBeInTheDocument()
+  })
+
+  it('keeps an unsent draft across minimize', async () => {
+    renderDrawer(<Presenter />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Open chat' }))
+    fireEvent.change(textbox() as HTMLElement, { target: { value: 'still drafting' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize' }))
+    expect(textbox()).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open chat' }))
+    expect(textbox()).toHaveValue('still drafting')
+  })
+
+  it('opens at half with the draft when it mounts over a session the rail was already showing', async () => {
+    function Surface({ mobile }: { mobile: boolean }) {
+      const session = useBillChatSession()
+      if (!session) return null
+      return mobile ? (
+        <BillChatDrawer />
+      ) : (
+        <BillChatSection key={session.billId} {...session.chat} />
+      )
+    }
+    function App({ mobile }: { mobile: boolean }) {
+      return (
+        <BillChatLayoutProvider>
+          <Presenter />
+          <Surface mobile={mobile} />
+        </BillChatLayoutProvider>
+      )
+    }
+
+    const { rerender } = render(<App mobile={false} />)
+    const box = await screen.findByRole('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(box, { target: { value: 'who pays for it' } })
+
+    rerender(<App mobile={true} />)
+
+    expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'half')
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('who pays for it')
+    expect(screen.queryByRole('button', { name: 'Open chat' })).not.toBeInTheDocument()
   })
 
   it('lets Tab leave the always-open drawer instead of looping inside it', async () => {

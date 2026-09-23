@@ -21,7 +21,14 @@ export const BILL_CHAT_DRAWER_HALF = 0.5
 /** Leaves the 48px header + notch above the handle so handleOnly can still drag. */
 export const BILL_CHAT_DRAWER_FULL = 0.85
 
-const SNAP_POINTS = [BILL_CHAT_DRAWER_PEEK, BILL_CHAT_DRAWER_HALF, BILL_CHAT_DRAWER_FULL]
+const SNAP_POINTS = [BILL_CHAT_DRAWER_PEEK, BILL_CHAT_DRAWER_HALF, BILL_CHAT_DRAWER_FULL] as const
+
+/** Vaul's handle click at the last snap calls the setter with `undefined`. */
+export function isBillChatDrawerSnapPoint(
+  point: number | string | null | undefined,
+): point is (typeof SNAP_POINTS)[number] {
+  return point != null && (SNAP_POINTS as readonly (number | string)[]).includes(point)
+}
 
 export type BillChatDrawerSnap = 'peek' | 'half' | 'full'
 
@@ -35,8 +42,8 @@ export function billChatDrawerSnap(point: number | string | null): BillChatDrawe
     case null:
       return 'peek'
     default:
-      // Peek is the one snap that unmounts the composer, so an unknown point
-      // (vaul only reports listed snaps today) fails towards an open chat.
+      // Peek unmounts the composer. An unknown point, including the `undefined`
+      // a handle click used to write past the last snap, fails towards open.
       return 'half'
   }
 }
@@ -75,11 +82,14 @@ function letTabLeave(event: React.KeyboardEvent<HTMLDivElement>) {
  */
 export function BillChatDrawer() {
   const session = useBillChatSession()
-  const [snapState, setSnapState] = useState<SnapState>({
-    sourceId: undefined,
-    asks: 0,
-    point: BILL_CHAT_DRAWER_PEEK,
-  })
+  // Crossing 1024px mounts this drawer for the first time while the rail was
+  // already showing the composer. Start at half so that handoff stays open.
+  // A session that arrives later still peeks, via the reset below.
+  const [snapState, setSnapState] = useState<SnapState>(() =>
+    session
+      ? { sourceId: session.sourceId, asks: session.asks, point: BILL_CHAT_DRAWER_HALF }
+      : { sourceId: undefined, asks: 0, point: BILL_CHAT_DRAWER_PEEK },
+  )
 
   // Derived during render, not in an effect: the drawer stays mounted across
   // bills, so a new occupant must paint at peek (or half when it arrives via
@@ -95,10 +105,9 @@ export function BillChatDrawer() {
   if (resolved !== snapState) setSnapState(resolved)
 
   const snapPoint = resolved.point
-  const setSnapPoint = useCallback(
-    (point: number | string | null) => setSnapState((state) => ({ ...state, point })),
-    [],
-  )
+  const setSnapPoint = useCallback((point: number | string | null) => {
+    setSnapState((state) => (isBillChatDrawerSnapPoint(point) ? { ...state, point } : state))
+  }, [])
   const drawerRef = useBillChatDrawerSnapHeight(snapPoint)
   const snap = billChatDrawerSnap(snapPoint)
 
@@ -113,7 +122,7 @@ export function BillChatDrawer() {
       noBodyStyles
       shouldScaleBackground={false}
       repositionInputs={false}
-      snapPoints={SNAP_POINTS}
+      snapPoints={[...SNAP_POINTS]}
       activeSnapPoint={snapPoint}
       setActiveSnapPoint={setSnapPoint}
     >
@@ -129,7 +138,8 @@ export function BillChatDrawer() {
           }}
         >
           <div className="bill-chat-drawer-snap">
-            <DrawerHandle />
+            {/* Clicks would walk off the last snap into `undefined` and desync the sheet. Drag still moves it. */}
+            <DrawerHandle preventCycle />
             <DrawerTitle className="sr-only">Ask about this bill</DrawerTitle>
             <DrawerDescription className="sr-only">
               Pull up to ask follow-up questions without leaving the bill.

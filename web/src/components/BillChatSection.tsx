@@ -23,7 +23,7 @@ import {
   selectionChipLabel,
   starterChipsFromKeyPoints,
 } from '../utils/billChat'
-import { billChatInstance } from '../utils/billChatInstance'
+import { billChatInstance, readBillChatDraft, writeBillChatDraft } from '../utils/billChatInstance'
 import { buildBillChatExportPrompt } from '../utils/billChatExport'
 import { congressGovBillUrl, formatShortBillId, getBillColloquialName } from '../utils/billLabels'
 import { buildBillShareUrl, copyTextToClipboard } from '../utils/billDeepLink'
@@ -72,7 +72,15 @@ export function BillChatSection({
   const billLabel = formatShortBillId(item.bill.type, item.bill.number)
   const sectionRef = useRef<HTMLElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => readBillChatDraft(billId))
+  const setDraft = useCallback(
+    (value: string) => {
+      const next = value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS)
+      writeBillChatDraft(billId, next)
+      setInput(next)
+    },
+    [billId],
+  )
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [sharingAnswer, setSharingAnswer] = useState(false)
   const transport = useMemo(
@@ -138,9 +146,9 @@ export function BillChatSection({
       } else {
         void sendMessage({ text })
       }
-      setInput('')
+      setDraft('')
     },
-    [attachedSelection, onClearSelection, sendMessage, streaming],
+    [attachedSelection, onClearSelection, sendMessage, setDraft, streaming],
   )
 
   // The composer is text-only. The registry textarea cancels any paste that
@@ -248,7 +256,7 @@ export function BillChatSection({
             <PromptInputTextarea
               ref={textareaRef}
               value={input}
-              onChange={(event) => setInput(event.target.value.slice(0, BILL_CHAT_MAX_QUESTION_CHARS))}
+              onChange={(event) => setDraft(event.target.value)}
               maxLength={BILL_CHAT_MAX_QUESTION_CHARS}
               aria-label="Ask about this bill"
               placeholder="Ask a question about this bill"

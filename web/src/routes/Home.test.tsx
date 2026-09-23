@@ -11,6 +11,7 @@ import {
   mockViewport,
   pageResponse,
   renderHome,
+  setMockViewport,
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
 import { formatVoteDate } from '../utils/billLabels'
@@ -803,6 +804,21 @@ describe('Home', () => {
     ).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Vote tightness' })).not.toBeInTheDocument()
     expect(document.querySelector('.home-shell--reading')).not.toBeNull()
+  })
+
+  it('keeps the composer draft and opens the drawer at half when the viewport crosses to mobile', async () => {
+    renderHome()
+    fireEvent.click(await screen.findByRole('button', { name: /Plain headline for readers/i }))
+
+    const box = await screen.findByRole('textbox', { name: 'Ask about this bill' })
+    fireEvent.change(box, { target: { value: 'who pays for it' } })
+
+    act(() => setMockViewport(false))
+
+    expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(document.querySelector('.bill-chat-drawer-inner')).toHaveAttribute('data-snap', 'half')
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('who pays for it')
+    expect(screen.queryByRole('button', { name: 'Open chat' })).not.toBeInTheDocument()
   })
 
   it('opens a bottom chat drawer when a timeline row is expanded on mobile', async () => {

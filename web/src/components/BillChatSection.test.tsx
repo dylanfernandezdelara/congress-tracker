@@ -118,6 +118,31 @@ describe('BillChatSection', () => {
     ).toBeInTheDocument()
   })
 
+  it('restores an unsent draft when the composer remounts and drops it after send', async () => {
+    const props = {
+      item: twoPointItem,
+      onSharePassage: vi.fn(),
+      onQuoteCreated: vi.fn(),
+    }
+    const first = render(<BillChatSection {...props} />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ask about this bill' }), {
+      target: { value: 'who pays' },
+    })
+    first.unmount()
+
+    const second = render(<BillChatSection {...props} />)
+    const restored = screen.getByRole('textbox', { name: 'Ask about this bill' })
+    expect(restored).toHaveValue('who pays')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ text: 'who pays' }))
+    expect(restored).toHaveValue('')
+    second.unmount()
+
+    render(<BillChatSection {...props} />)
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('')
+  })
+
   it('sends a starter chip as the user message', () => {
     render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
 
