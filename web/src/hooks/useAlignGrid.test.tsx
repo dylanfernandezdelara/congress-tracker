@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 
 import { AppLayout } from '../layouts/AppLayout'
 import alignGridCss from '../styles/align-grid.css?raw'
-import { ALIGN_GRID_ON, isAlignGridQuery, useAlignGrid } from './useAlignGrid'
+import { ALIGN_GRID_ON, copyAlignGridParam, isAlignGridQuery, useAlignGrid } from './useAlignGrid'
 
 const routerFuture = {
   v7_startTransition: true,
@@ -36,6 +36,23 @@ describe('isAlignGridQuery', () => {
     expect(isAlignGridQuery('off')).toBe(false)
     expect(isAlignGridQuery('')).toBe(false)
     expect(isAlignGridQuery(null)).toBe(false)
+  })
+})
+
+describe('copyAlignGridParam', () => {
+  it('copies align onto a replacement query and ignores other keys', () => {
+    const next = new URLSearchParams()
+    next.set('bill', '119-hr-1')
+    copyAlignGridParam(new URLSearchParams('align=1&chamber=Senate'), next)
+    expect(next.get('bill')).toBe('119-hr-1')
+    expect(next.get('align')).toBe('1')
+    expect(next.get('chamber')).toBeNull()
+  })
+
+  it('leaves the target alone when align is absent', () => {
+    const next = new URLSearchParams('bill=119-hr-1')
+    copyAlignGridParam(new URLSearchParams('chamber=Senate'), next)
+    expect(next.toString()).toBe('bill=119-hr-1')
   })
 })
 
@@ -88,12 +105,36 @@ describe('AppLayout align overlay', () => {
   })
 })
 
+/** Rule selectors in `css`, comments stripped. `@media` / `@layer` heads contain `@` and are skipped. */
+function ruleSelectors(css: string): string[] {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const selectors: string[] = []
+  for (const match of stripped.matchAll(/([^{}@]+)\{/g)) {
+    const head = match[1] ?? ''
+    for (const part of head.split(',')) {
+      const sel = part.trim()
+      if (sel) selectors.push(sel)
+    }
+  }
+  return selectors
+}
+
 describe('align-grid.css', () => {
-  it('paints lines only under [data-align-grid]', () => {
-    // The overlay must stay opt-in: an unconditioned `html::before` would
-    // draw the grid on production and in qa:web screenshots.
-    expect(alignGridCss).toContain('html[data-align-grid]::before')
+  it('scopes every ::before rule to [data-align-grid]', () => {
+    // jsdom does not compute ::before styles, so this walks the stylesheet
+    // instead. An unconditioned `html::before` anywhere in the file — including
+    // after the gated rule, which a from-start regex would miss — fails here.
+    const befores = ruleSelectors(alignGridCss).filter((sel) => sel.includes('::before'))
+    expect(befores.length).toBeGreaterThan(0)
+    for (const sel of befores) {
+      expect(sel).toContain('[data-align-grid]')
+    }
     expect(alignGridCss).toContain('pointer-events: none')
-    expect(alignGridCss).not.toMatch(/^[^[]*html::before/)
+  })
+
+  it('flags an unconditioned ::before that follows a gated one', () => {
+    const css = 'html[data-align-grid]::before { content: ""; } html::before { content: ""; }'
+    const befores = ruleSelectors(css).filter((sel) => sel.includes('::before'))
+    expect(befores.some((sel) => !sel.includes('[data-align-grid]'))).toBe(true)
   })
 })
