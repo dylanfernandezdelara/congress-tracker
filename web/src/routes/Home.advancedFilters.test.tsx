@@ -228,7 +228,7 @@ describe('Home advanced filters', () => {
 
     fireEvent.keyDown(memberInput, { key: 'Escape' })
     await act(async () => {
-      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
@@ -238,7 +238,7 @@ describe('Home advanced filters', () => {
 
     fireEvent.keyDown(memberInput, { key: 'Escape' })
     await act(async () => {
-      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
     expect(memberInput).toHaveValue('')
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()

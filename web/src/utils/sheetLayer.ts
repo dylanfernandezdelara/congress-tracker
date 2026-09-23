@@ -112,9 +112,12 @@ export function closeTopSheet(): boolean {
 
 /**
  * Radix's dismissable layer sees Escape on `document` during capture, before
- * the focused control. Cancel the event so that layer does not dismiss, then
- * close the top sheet after the control has had its turn. A control that
- * calls `preventDefault` (member suggestions, a search clear) keeps the sheet.
+ * the focused control. Cancel that dismiss, then close the top sheet once
+ * this keydown has finished dispatching. A control that calls `preventDefault`
+ * (member suggestions, a search clear) keeps the sheet.
+ *
+ * `queueMicrotask` is too early: browsers checkpoint microtasks between
+ * listeners, so the close ran before the focused control's own keydown.
  */
 export function handEscapeToTopSheet(event: KeyboardEvent): void {
   let claimedByControl = false
@@ -128,14 +131,14 @@ export function handEscapeToTopSheet(event: KeyboardEvent): void {
     },
   })
   nativePreventDefault()
-  queueMicrotask(() => {
+  setTimeout(() => {
     Object.defineProperty(event, 'preventDefault', {
       configurable: true,
       writable: true,
       value: nativePreventDefault,
     })
     if (!claimedByControl) closeTopSheet()
-  })
+  }, 0)
 }
 
 /** Test helper — clears lock state between cases. */

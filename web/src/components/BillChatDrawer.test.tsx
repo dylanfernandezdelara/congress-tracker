@@ -291,7 +291,7 @@ describe('BillChatDrawer', () => {
 
     fireEvent.keyDown(document.body, { key: 'Escape' })
     await act(async () => {
-      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
     expect(sheet.requestClose).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()

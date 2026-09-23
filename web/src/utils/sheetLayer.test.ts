@@ -74,7 +74,7 @@ describe('sheetLayer', () => {
     input.addEventListener('keydown', handEscapeToTopSheet, { capture: true })
 
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(layer.requestClose).not.toHaveBeenCalled()
     input.remove()
@@ -89,7 +89,7 @@ describe('sheetLayer', () => {
 
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
     expect(layer.requestClose).not.toHaveBeenCalled()
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(layer.requestClose).toHaveBeenCalledTimes(1)
     input.remove()
