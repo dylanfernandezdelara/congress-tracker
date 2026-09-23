@@ -137,10 +137,9 @@ const ANSWER_DISALLOWED_ELEMENTS = ['img']
 
 /**
  * Re-engage StickToBottom's lock on each new question (`status` →
- * `submitted`) so the answer streams into view. Only observable when a parent
- * gives `.bill-chat-conversation` a bounded height; the inline section grows
- * with its content, so there the log never scrolls and this is a no-op. Lives
- * inside `Conversation` so the scroll context never leaves it.
+ * `submitted`) so the answer streams into view. The rail and the drawer bound
+ * `.bill-chat-body`, which makes `.bill-chat-conversation` the scrollport this
+ * acts on. Lives inside `Conversation` so the scroll context never leaves it.
  */
 function FollowNewTurn({ status }: { status: ChatStatus }) {
   const { scrollToBottom } = useStickToBottomContext()
@@ -177,7 +176,7 @@ export function BillChatTranscript({
       <ConversationContent className="gap-4 p-0" scrollClassName="overscroll-contain">
         {messages.length === 0 ? (
           <ConversationEmptyState
-            className="bill-chat-empty gap-1 p-2"
+            className="bill-chat-empty gap-1 p-0 lg:p-2"
             icon={<MessageSquareTextIcon className="size-6" aria-hidden />}
             title={`Ask about ${billLabel}`}
             description={EMPTY_STATE_DESCRIPTION}

@@ -179,6 +179,10 @@ export const MemberSponsorCombobox = forwardRef<
     setMemberDraft('')
     setSuggestions([])
     setPickedName(null)
+    // A typed name that was never committed is only local state. An empty
+    // commit still goes through the filter writer, which drops ?bill= and
+    // collapses the open row.
+    if (!sponsor && !sponsorQ) return
     onCommit({ sponsor: null, sponsorQ: '' })
   }
 

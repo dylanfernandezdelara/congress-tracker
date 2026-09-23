@@ -8,6 +8,7 @@ import {
 } from '@congress-tracker/shared/chat-api-types'
 
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import type { BillChatMessage } from './BillChatSection'
 
 const sendMessage = vi.fn()
@@ -31,6 +32,7 @@ const chatMock: {
 }
 
 vi.mock('@ai-sdk/react', () => ({
+  Chat: class Chat {},
   useChat: () => chatMock,
 }))
 
@@ -94,6 +96,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  resetBillChatInstancesForTests()
   vi.restoreAllMocks()
 })
 
@@ -113,6 +116,31 @@ describe('BillChatSection', () => {
     expect(
       screen.getByRole('button', { name: /Explain: Creates a new inspector/ }),
     ).toBeInTheDocument()
+  })
+
+  it('restores an unsent draft when the composer remounts and drops it after send', async () => {
+    const props = {
+      item: twoPointItem,
+      onSharePassage: vi.fn(),
+      onQuoteCreated: vi.fn(),
+    }
+    const first = render(<BillChatSection {...props} />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ask about this bill' }), {
+      target: { value: 'who pays' },
+    })
+    first.unmount()
+
+    const second = render(<BillChatSection {...props} />)
+    const restored = screen.getByRole('textbox', { name: 'Ask about this bill' })
+    expect(restored).toHaveValue('who pays')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ text: 'who pays' }))
+    expect(restored).toHaveValue('')
+    second.unmount()
+
+    render(<BillChatSection {...props} />)
+    expect(screen.getByRole('textbox', { name: 'Ask about this bill' })).toHaveValue('')
   })
 
   it('sends a starter chip as the user message', () => {
