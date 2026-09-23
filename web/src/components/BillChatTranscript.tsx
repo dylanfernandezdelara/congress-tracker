@@ -40,6 +40,15 @@ function messageText(message: BillChatMessage): string {
     .join('')
 }
 
+/**
+ * Plain text of a turn for the export briefing: the signed final answer when
+ * it has landed (verified passages excluded), otherwise the streamed prose.
+ */
+export function messagePlainText(message: BillChatMessage): string {
+  const answer = message.role === 'assistant' ? messageAnswer(message) : undefined
+  return (answer?.text ?? messageText(message)).trim()
+}
+
 type QuotedPassageProps = {
   quote: BillChatQuoteData
   onSharePassage: (text: string) => void

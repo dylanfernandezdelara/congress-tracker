@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -278,6 +278,101 @@ describe('BillChatSection', () => {
       ),
     )
     expect(onClearSelection).toHaveBeenCalled()
+  })
+
+  it('opens ChatGPT and Claude with a bill briefing', async () => {
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+    expect(trigger).toHaveTextContent('Open in')
+    fireEvent.pointerDown(trigger)
+    fireEvent.pointerUp(trigger)
+    fireEvent.click(trigger)
+
+    const chatgpt = await screen.findByRole('menuitem', { name: /Open in ChatGPT/ })
+    const claude = screen.getByRole('menuitem', { name: /Open in Claude/ })
+    const chatgptHref = chatgpt.getAttribute('href') ?? ''
+    const claudeHref = claude.getAttribute('href') ?? ''
+    expect(chatgptHref).toContain('https://chatgpt.com/?')
+    expect(new URL(chatgptHref).searchParams.get('prompt')).toContain('S. 2')
+    expect(claudeHref).toContain('https://claude.ai/new?')
+    expect(new URL(claudeHref).searchParams.get('q')).toContain('S. 2')
+    expect(screen.getByRole('menuitem', { name: 'Copy briefing' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    })
+  })
+
+  async function openExportMenu() {
+    const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+    fireEvent.pointerDown(trigger)
+    fireEvent.pointerUp(trigger)
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy briefing' }))
+    return trigger
+  }
+
+  it('shows the copy result inside the still-open menu, then closes it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    try {
+      render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+      const trigger = await openExportMenu()
+
+      // Radix would close on select; the item holds the menu open for the label.
+      expect(await screen.findByRole('menuitem', { name: 'Copied briefing' })).toBeInTheDocument()
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('S. 2'))
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+
+      await act(() => vi.advanceTimersByTimeAsync(1600))
+      expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the menu open on a failed copy so the reader can retry', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
+    vi.stubGlobal('prompt', () => null)
+    try {
+      render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+      const trigger = await openExportMenu()
+
+      expect(await screen.findByRole('menuitem', { name: 'Could not copy' })).toBeInTheDocument()
+      await act(() => vi.advanceTimersByTimeAsync(3000))
+      expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+
+  it('exports the thread as signed answers, not streamed fragments or citations', async () => {
+    chatMock.messages = [
+      { id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'What does it do?' }] },
+      assistantMessage([
+        { type: 'text', text: 'The bill ' },
+        { type: 'data-quote', data: quotePart() },
+        { type: 'text', text: ' raises it.' },
+        { type: 'data-answer', data: answerPart() },
+      ]),
+    ]
+    render(<BillChatSection item={twoPointItem} onSharePassage={vi.fn()} onQuoteCreated={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: 'Open this conversation in ChatGPT or Claude' })
+    fireEvent.pointerDown(trigger)
+    fireEvent.pointerUp(trigger)
+    fireEvent.click(trigger)
+
+    const chatgpt = await screen.findByRole('menuitem', { name: /Open in ChatGPT/ })
+    const prompt = new URL(chatgpt.getAttribute('href') ?? '').searchParams.get('prompt') ?? ''
+    expect(prompt).toContain('Conversation so far:\n\nUser:\nWhat does it do?')
+    expect(prompt).toContain('Assistant:\nThe bill raises the spending cap.')
+    expect(prompt).not.toContain('The bill  raises it.')
+    expect(prompt).not.toContain('The Secretary shall raise the cap.')
   })
 
   it('shows Stop while streaming and disables send', () => {
