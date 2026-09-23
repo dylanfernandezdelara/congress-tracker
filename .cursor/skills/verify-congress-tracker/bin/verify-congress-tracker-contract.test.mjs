@@ -351,9 +351,11 @@ test('browser commands reuse a persisted CDP viewport instead of resetting to 12
   )
 })
 
-test('applyViewport always sends a complete device-metrics override', async () => {
-  const sent = []
-  const page = {
+function recordingPage(sent) {
+  return {
+    evaluate: async () => {
+      sent.push(['evaluate'])
+    },
     setViewportSize: async (size) => {
       sent.push(['setViewportSize', size])
     },
@@ -365,6 +367,11 @@ test('applyViewport always sends a complete device-metrics override', async () =
       }),
     }),
   }
+}
+
+test('applyViewport always sends a complete device-metrics override', async () => {
+  const sent = []
+  const page = recordingPage(sent)
   await applyViewport(page, { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
   assert.deepEqual(sent[1], [
     'Emulation.setDeviceMetricsOverride',
@@ -382,6 +389,34 @@ test('applyViewport always sends a complete device-metrics override', async () =
     false,
   )
   assert.deepEqual(restored, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+})
+
+test('applyViewport resizes, overrides, then settles on every call, even for unchanged metrics', async () => {
+  const sent = []
+  const page = recordingPage(sent)
+  const mobile = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }
+  await applyViewport(page, mobile)
+  await applyViewport(page, mobile)
+  const sequence = ['setViewportSize', 'Emulation.setDeviceMetricsOverride', 'evaluate']
+  assert.deepEqual(
+    sent.map(([method]) => method),
+    [...sequence, ...sequence],
+  )
+})
+
+test('applyViewport still returns when the settle evaluate throws', async () => {
+  const sent = []
+  const page = recordingPage(sent)
+  page.evaluate = async () => {
+    throw new Error('Execution context was destroyed')
+  }
+  const applied = await applyViewport(page, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+  assert.deepEqual(applied, { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+  // The override itself was still sent; only the settle wait was skipped.
+  assert.deepEqual(
+    sent.map(([method]) => method),
+    ['setViewportSize', 'Emulation.setDeviceMetricsOverride'],
+  )
 })
 
 test('evidence paths cannot escape artifacts/verify', () => {

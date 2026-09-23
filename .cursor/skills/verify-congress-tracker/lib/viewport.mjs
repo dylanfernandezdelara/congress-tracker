@@ -81,18 +81,47 @@ function defaultSession(page) {
   return page.context().newCDPSession(page)
 }
 
+const SETTLE_TIMEOUT_MS = 250
+
+/**
+ * Wait for the reflow from a metrics override (headless flips between classic
+ * 15px and overlay scrollbars) to commit before the command body reads or
+ * captures anything: two animation frames or SETTLE_TIMEOUT_MS, whichever
+ * comes first, since rAF pauses while the document is hidden and
+ * page.evaluate has no timeout of its own. Any evaluate failure is ignored.
+ */
+async function settleLayout(page) {
+  try {
+    await page.evaluate(
+      (timeoutMs) =>
+        new Promise((resolve) => {
+          setTimeout(resolve, timeoutMs)
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        }),
+      SETTLE_TIMEOUT_MS,
+    )
+  } catch {
+    // The page navigated or its context was destroyed; the command body runs
+    // against whatever layout is there, which is the pre-fix behavior.
+  }
+}
+
 export async function applyViewport(page, metrics, sessionFactory = defaultSession) {
   const next = normalizeMetrics(metrics)
   await page.setViewportSize({ width: next.width, height: next.height })
   const session = await sessionFactory(page)
-  // Always replace the override. Playwright's setViewportSize is the same CDP
-  // method and caches the last size; clearDeviceMetricsOverride would wipe it
-  // while leaving that cache intact, so the next 1280×800 set is a no-op.
+  // Always replace the override, even for unchanged metrics: Chromium drops
+  // deviceScaleFactor / mobile when the CDP session that set them detaches,
+  // and every helper command is its own process. Playwright's setViewportSize
+  // is the same CDP method and caches the last size; clearDeviceMetricsOverride
+  // would wipe it while leaving that cache intact, so the next 1280×800 set
+  // would be a no-op.
   await session.send('Emulation.setDeviceMetricsOverride', {
     width: next.width,
     height: next.height,
     deviceScaleFactor: next.deviceScaleFactor,
     mobile: next.mobile,
   })
+  await settleLayout(page)
   return next
 }
