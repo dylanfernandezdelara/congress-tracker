@@ -1,9 +1,9 @@
 import { formatBillQueryParam, parseBillQueryParam } from "../../../../shared/bill-id";
+import { markdownToPlainText } from "../../../../shared/markdown-plain-text";
 import {
   checkQuoteLength,
   cleanQuoteText,
   findQuoteSource,
-  normalizeForQuoteMatch,
   type QuoteSourceText,
 } from "../../../../shared/quote-verification";
 import {
@@ -193,9 +193,15 @@ export async function handleCreateBillQuote(params: {
   let source: BillQuoteSource;
   if (body.answer) {
     // A signed answer is model prose about this bill, not bill text: the quote
-    // only has to be part of the answer the worker actually produced.
-    const needle = normalizeForQuoteMatch(text);
-    if (!needle || !normalizeForQuoteMatch(body.answer.text).includes(needle)) {
+    // only has to be part of the answer the worker actually produced. The
+    // signature covers raw Markdown; the reader may have selected it as-is
+    // (plain-text transcript) or as rendered prose, so both forms are sources.
+    const signed = body.answer.text;
+    const matched = findQuoteSource(text, [
+      { source: "answer" as const, text: signed },
+      { source: "answer" as const, text: markdownToPlainText(signed) },
+    ]);
+    if (!matched) {
       return errorResponse(
         json,
         422,
