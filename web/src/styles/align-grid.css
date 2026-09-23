@@ -1,0 +1,51 @@
+@layer components {
+  /*
+    Viewport overlay for layout work. Off unless `html[data-align-grid]` is set
+    (`?align=1` / `?align=grid` via useAlignGrid). Origin is (0,0) because
+    `--site-header-height` (48) plus `--space-16` lands on the 64px major line
+    (`--site-rail-top`). pointer-events none so it never intercepts clicks.
+    qa:web and production leave the attribute unset.
+  */
+  html[data-align-grid]::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background-image:
+      repeating-linear-gradient(
+        to right,
+        hsl(var(--twc-accent) / 0.08) 0,
+        hsl(var(--twc-accent) / 0.08) 1px,
+        transparent 1px,
+        transparent var(--grid)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        hsl(var(--twc-accent) / 0.08) 0,
+        hsl(var(--twc-accent) / 0.08) 1px,
+        transparent 1px,
+        transparent var(--grid)
+      ),
+      repeating-linear-gradient(
+        to right,
+        hsl(var(--twc-accent) / 0.2) 0,
+        hsl(var(--twc-accent) / 0.2) 1px,
+        transparent 1px,
+        transparent var(--space-64)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        hsl(var(--twc-accent) / 0.2) 0,
+        hsl(var(--twc-accent) / 0.2) 1px,
+        transparent 1px,
+        transparent var(--space-64)
+      );
+  }
+
+  @media print {
+    html[data-align-grid]::before {
+      display: none;
+    }
+  }
+}

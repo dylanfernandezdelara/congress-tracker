@@ -3,8 +3,8 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 0.65rem;
-    margin: 0 0 1rem;
+    gap: var(--space-16);
+    margin: 0 0 var(--space-16);
     min-width: 0;
   }
 
@@ -12,7 +12,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.65rem 0.85rem;
+    gap: var(--space-16) var(--space-16);
     min-width: 0;
   }
 
@@ -25,7 +25,7 @@
   .feed-search {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: var(--space-8);
     min-width: 0;
     width: 100%;
   }
@@ -458,7 +458,7 @@
   .home-shell {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: var(--space-24);
     width: 100%;
   }
 
@@ -867,15 +867,15 @@
     .home-shell {
       display: grid;
       grid-template-columns: 240px minmax(0, 1fr) 280px;
-      gap: 2rem;
+      gap: var(--space-32);
       align-items: start;
     }
 
     .home-rail {
       display: block;
       position: sticky;
-      top: 64px;
-      max-height: calc(100vh - 80px);
+      top: var(--site-rail-top);
+      max-height: calc(100vh - var(--site-rail-top) - var(--site-rail-bottom));
       overflow-x: hidden;
       overflow-y: auto;
       overscroll-behavior: contain;
@@ -884,7 +884,7 @@
     .home-rail-stack {
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: var(--space-32);
     }
   }
 }

@@ -1,4 +1,5 @@
 @import './styles/base.css';
+@import './styles/align-grid.css';
 @import './styles/primitives.css';
 @import './styles/member-profile-trigger.css';
 @import './styles/feed-row.css';
