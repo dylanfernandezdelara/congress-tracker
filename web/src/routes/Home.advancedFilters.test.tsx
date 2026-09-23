@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
@@ -9,6 +9,7 @@ import {
   renderHome,
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
+import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
@@ -45,6 +46,7 @@ describe('Home advanced filters', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     clearMemberProfileCache()
+    resetBillChatInstancesForTests()
     resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
@@ -196,6 +198,50 @@ describe('Home advanced filters', () => {
     expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0 })
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('')
+  })
+
+  it('keeps the filter sheet open when Escape dismisses member suggestions over the chat drawer', async () => {
+    mockViewport(false)
+    fetchMembersSearch.mockResolvedValue({
+      items: [
+        {
+          bioguide_id: 'LOCAL:H002',
+          name: 'Rep. Sample Loyal (local)',
+          chamber: 'House',
+          party: 'D',
+          state: 'NY',
+          district: 10,
+        },
+      ],
+      q: 'Loyal',
+      limit: 8,
+    })
+    renderHome()
+    fireEvent.click(await screen.findByRole('button', { name: /Plain headline for readers/i }))
+    expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' })
+    const memberInput = within(dialog).getByPlaceholderText('Name or last name')
+    fireEvent.change(memberInput, { target: { value: 'Loyal' } })
+    expect(await within(dialog).findByRole('option', { name: /Sample Loyal/ })).toBeInTheDocument()
+
+    fireEvent.keyDown(memberInput, { key: 'Escape' })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('option', { name: /Sample Loyal/ })).not.toBeInTheDocument()
+    expect(memberInput).toHaveValue('Loyal')
+    expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('sponsor_q=')
+
+    fireEvent.keyDown(memberInput, { key: 'Escape' })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(memberInput).toHaveValue('')
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
   })
 
   it('opens filters in a bottom sheet on narrow viewports and Escape clears member draft first', async () => {

@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 
 import { useBillChatDrawerSnapHeight } from '../hooks/useBillChatDrawerSnapHeight'
-import { closeTopSheet } from '../utils/sheetLayer'
+import { handEscapeToTopSheet } from '../utils/sheetLayer'
 import { useBillChatSession } from './BillChatLayout'
 import { BillChatSection } from './BillChatSection'
 import { Button } from './ui/button'
@@ -21,13 +21,15 @@ export const BILL_CHAT_DRAWER_HALF = 0.5
 /** Leaves the 48px header + notch above the handle so handleOnly can still drag. */
 export const BILL_CHAT_DRAWER_FULL = 0.85
 
-const SNAP_POINTS = [BILL_CHAT_DRAWER_PEEK, BILL_CHAT_DRAWER_HALF, BILL_CHAT_DRAWER_FULL] as const
+const SNAP_POINTS: Array<
+  typeof BILL_CHAT_DRAWER_PEEK | typeof BILL_CHAT_DRAWER_HALF | typeof BILL_CHAT_DRAWER_FULL
+> = [BILL_CHAT_DRAWER_PEEK, BILL_CHAT_DRAWER_HALF, BILL_CHAT_DRAWER_FULL]
 
 /** Vaul's handle click at the last snap calls the setter with `undefined`. */
 export function isBillChatDrawerSnapPoint(
   point: number | string | null | undefined,
 ): point is (typeof SNAP_POINTS)[number] {
-  return point != null && (SNAP_POINTS as readonly (number | string)[]).includes(point)
+  return point != null && SNAP_POINTS.includes(point as (typeof SNAP_POINTS)[number])
 }
 
 export type BillChatDrawerSnap = 'peek' | 'half' | 'full'
@@ -122,7 +124,7 @@ export function BillChatDrawer() {
       noBodyStyles
       shouldScaleBackground={false}
       repositionInputs={false}
-      snapPoints={[...SNAP_POINTS]}
+      snapPoints={SNAP_POINTS}
       activeSnapPoint={snapPoint}
       setActiveSnapPoint={setSnapPoint}
     >
@@ -131,11 +133,9 @@ export function BillChatDrawer() {
           ref={drawerRef}
           className="bill-chat-drawer fixed inset-x-0 bottom-0 z-30 mt-0 flex h-full max-h-[97%] flex-col rounded-t-[10px] border bg-background"
           // The drawer is always open, so it is the top Radix layer and takes
-          // Escape before the window listener that closes our sheets. Hand the
-          // key to the topmost sheet (share, profile, tightness) instead.
-          onEscapeKeyDown={(event) => {
-            if (closeTopSheet()) event.preventDefault()
-          }}
+          // Escape in the capture phase, before a focused control can claim it.
+          // Hand the key to the topmost sheet only when that control does not.
+          onEscapeKeyDown={handEscapeToTopSheet}
         >
           <div className="bill-chat-drawer-snap">
             {/* Clicks would walk off the last snap into `undefined` and desync the sheet. Drag still moves it. */}

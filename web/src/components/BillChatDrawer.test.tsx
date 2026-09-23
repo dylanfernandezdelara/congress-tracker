@@ -290,6 +290,9 @@ describe('BillChatDrawer', () => {
     const registration = registerSheetLayer(sheet)
 
     fireEvent.keyDown(document.body, { key: 'Escape' })
+    await act(async () => {
+      await Promise.resolve()
+    })
     expect(sheet.requestClose).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
     registration.unregister()
