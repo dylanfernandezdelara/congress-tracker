@@ -488,6 +488,23 @@ describe('Home', () => {
     expect(params).not.toContain('q=')
   })
 
+  it('keeps ?align=1 when opening a Senate-waiting bill', async () => {
+    mockViewport(false)
+    renderHome('/?align=1&chamber=Senate&q=lands')
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /House-passed contracting bill waiting in the Senate/,
+      }),
+    )
+
+    const params = screen.getByTestId('search-params').textContent ?? ''
+    expect(params).toContain('bill=119-hr-33')
+    expect(params).toContain('align=1')
+    expect(params).not.toContain('chamber=')
+    expect(params).not.toContain('q=')
+  })
+
   it('opens a member profile from a left-rail spotlight', async () => {
     mockViewport(true)
     renderHome()
@@ -540,7 +557,7 @@ describe('Home', () => {
       .mockResolvedValueOnce(pageResponse([senateItem, houseItem], { total: 2 }))
       .mockResolvedValueOnce(pageResponse([houseItem], { total: 1 }))
 
-    renderHome()
+    renderHome('/?align=1')
 
     expect(await screen.findByText('Senate headline')).toBeInTheDocument()
     expect(screen.getByText('House headline')).toBeInTheDocument()
@@ -555,7 +572,10 @@ describe('Home', () => {
     expect(screen.queryByText('Senate headline')).not.toBeInTheDocument()
     expect(screen.getByText(/1 of 1 bill/)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'House' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByTestId('search-params')).toHaveTextContent('chamber=House')
+    const params = screen.getByTestId('search-params').textContent ?? ''
+    expect(params).toContain('chamber=House')
+    // In-page filters copy the existing query, so the layout overlay stays on.
+    expect(params).toContain('align=1')
   })
 
   it('treats invalid chamber query values as All', async () => {
