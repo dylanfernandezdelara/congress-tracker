@@ -103,7 +103,7 @@ function FailureDetails({ failure }: { failure: FeedPipelineFailureRecord }) {
       </div>
       <div>
         <dt className="text-muted-foreground">Error</dt>
-        <dd className="break-words text-fail">{failure.error}</dd>
+        <dd className="wrap-break-word text-fail">{failure.error}</dd>
       </div>
     </dl>
   )
@@ -128,7 +128,7 @@ function SkipDetails({
       </div>
       <div>
         <dt className="text-muted-foreground">Reason</dt>
-        <dd className="break-words">{SKIP_REASON_LABEL[skip.reason]}</dd>
+        <dd className="wrap-break-word">{SKIP_REASON_LABEL[skip.reason]}</dd>
       </div>
       {isSkipSuperseded(skip, lastScheduledSuccess) && (
         <div>
