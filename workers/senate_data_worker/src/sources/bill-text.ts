@@ -68,7 +68,7 @@ export function parseBillSections(xml: string): BillSection[] {
   return out;
 }
 
-/** One top-level section with its full plain-text body (chat grounding evidence). */
+/** One top-level section with its full plain-text body (quote verification source). */
 export interface BillSectionBody {
   /** `1.`, `303A.` — empty when the print omits `<enum>`. */
   label: string;

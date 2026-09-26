@@ -259,7 +259,7 @@ export async function runFeedPipeline(
       );
     }
 
-    // Full-text sections for grounded chat (capped; full crawl is admin bill-text-backfill).
+    // Full-text sections for quote verification (capped; full crawl is admin bill-text-backfill).
     const textSections = await refreshBillTextSections(env, bills, trigger);
     if (textSections.warnings.length > 0) {
       console.warn(

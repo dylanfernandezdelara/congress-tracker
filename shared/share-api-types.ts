@@ -1,6 +1,9 @@
 /** Shared JSON contracts for /share/* — consumed by worker and web. */
 
-/** Where a shared quote was verified against. */
+/**
+ * Where a shared quote was verified against. `answer` is no longer created;
+ * it stays so quotes stored with it keep resolving.
+ */
 export type BillQuoteSource = 'digest' | 'crs' | 'bill_text' | 'answer'
 
 export interface BillQuoteBill {
@@ -23,12 +26,6 @@ export interface CreateBillQuoteRequest {
   /** Canonical bill param, e.g. `119-hr-1`. */
   bill: string
   text: string
-  /**
-   * Required when the quote comes from a chat answer (PR B). The worker
-   * verifies `sig` (HMAC over `bill-chat-answer\n<bill>\n<text>`, so it is
-   * bound to `bill`) before accepting the quote.
-   */
-  answer?: { text: string; sig: string }
 }
 
 export interface CreateBillQuoteResponse {
@@ -51,7 +48,6 @@ export type CreateBillQuoteError =
   | 'bill_not_found'
   | 'quote_not_in_bill'
   | 'rate_limited'
-  | 'unsupported_source'
 
 export const BILL_QUOTE_MIN_CHARS = 12
 export const BILL_QUOTE_MAX_CHARS = 280

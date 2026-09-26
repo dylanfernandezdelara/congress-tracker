@@ -1,8 +1,8 @@
 import { formatBillQueryParam, parseBillQueryParam } from "../../../../shared/bill-id";
-import { markdownToPlainText } from "../../../../shared/markdown-plain-text";
 import {
   checkQuoteLength,
   cleanQuoteText,
+  digestQuoteSourceText,
   findQuoteSource,
   type QuoteSourceText,
 } from "../../../../shared/quote-verification";
@@ -10,14 +10,11 @@ import {
   BILL_QUOTE_MAX_CHARS,
   BILL_QUOTE_MIN_CHARS,
   BILL_QUOTE_QUERY_PARAM,
-  type BillQuoteSource,
   type CreateBillQuoteError,
   type CreateBillQuoteRequest,
   type CreateBillQuoteResponse,
   type GetBillQuoteResponse,
 } from "../../../../shared/share-api-types";
-import { verifyAnswerSignature } from "../chat/answer-signature";
-import { buildEvidenceChunks } from "../chat/bill-chat-evidence";
 import type { Env } from "../config";
 import {
   buildBillQuoteId,
@@ -70,20 +67,13 @@ function parseCreateRequest(body: unknown): CreateBillQuoteRequest | null {
   if (!body || typeof body !== "object") return null;
   const record = body as Record<string, unknown>;
   if (typeof record.bill !== "string" || typeof record.text !== "string") return null;
-  const request: CreateBillQuoteRequest = { bill: record.bill, text: record.text };
-  if (record.answer !== undefined) {
-    if (!record.answer || typeof record.answer !== "object") return null;
-    const answer = record.answer as Record<string, unknown>;
-    if (typeof answer.text !== "string" || typeof answer.sig !== "string") return null;
-    request.answer = { text: answer.text, sig: answer.sig };
-  }
-  return request;
+  return { bill: record.bill, text: record.text };
 }
 
 /**
  * Verification sources a reader could have selected from, in precedence order
- * (digest → CRS → bill-text sections). Built from the same evidence chunks the
- * chat grounds on, so "shareable" and "citable" are one definition.
+ * (digest → CRS → bill-text sections in ordinal order). Empty sources are
+ * dropped.
  */
 export function quoteSourcesForBill(
   row: {
@@ -92,11 +82,20 @@ export function quoteSourcesForBill(
   },
   sections: BillTextSectionRow[] = []
 ): QuoteSourceText[] {
-  return buildEvidenceChunks({
-    digest: parseStoredDigest(row.digest_json),
-    crsSummary: row.raw_summary_text,
-    sections,
-  }).map((chunk) => ({ source: chunk.source, text: chunk.text }));
+  const sources: QuoteSourceText[] = [
+    {
+      source: "digest",
+      text: cleanQuoteText(digestQuoteSourceText(parseStoredDigest(row.digest_json))),
+    },
+    { source: "crs", text: cleanQuoteText(row.raw_summary_text ?? "") },
+    ...[...sections]
+      .sort((a, b) => a.ordinal - b.ordinal)
+      .map((section): QuoteSourceText => ({
+        source: "bill_text",
+        text: cleanQuoteText(section.body),
+      })),
+  ];
+  return sources.filter((entry) => entry.text);
 }
 
 /**
@@ -146,26 +145,6 @@ export async function handleCreateBillQuote(params: {
   if (!bill) {
     return errorResponse(json, 400, "bad_request", "`bill` must look like 119-hr-1.");
   }
-  if (body.answer) {
-    const secret = env.CHAT_HMAC_SECRET;
-    if (!secret) {
-      return errorResponse(
-        json,
-        400,
-        "unsupported_source",
-        "Sharing chat answers is not available"
-      );
-    }
-    const valid = await verifyAnswerSignature(
-      secret,
-      { bill: formatBillQueryParam(bill), text: body.answer.text },
-      body.answer.sig
-    );
-    if (!valid) {
-      return errorResponse(json, 400, "bad_request", "answer signature is invalid for this bill");
-    }
-  }
-
   const text = cleanQuoteText(body.text);
   const length = checkQuoteLength(text);
   if (length === "too_short") {
@@ -190,38 +169,15 @@ export async function handleCreateBillQuote(params: {
     return errorResponse(json, 404, "bill_not_found", "That bill is not in the feed yet.");
   }
 
-  let source: BillQuoteSource;
-  if (body.answer) {
-    // A signed answer is model prose about this bill, not bill text: the quote
-    // only has to be part of the answer the worker actually produced. The
-    // signature covers raw Markdown; the reader may have selected it as-is
-    // (plain-text transcript) or as rendered prose, so both forms are sources.
-    const signed = body.answer.text;
-    const matched = findQuoteSource(text, [
-      { source: "answer" as const, text: signed },
-      { source: "answer" as const, text: markdownToPlainText(signed) },
-    ]);
-    if (!matched) {
-      return errorResponse(
-        json,
-        422,
-        "quote_not_in_bill",
-        "That text is not part of this chat answer, so it cannot be shared as a quote."
-      );
-    }
-    source = "answer";
-  } else {
-    const stored = await getBillText(env.DB, bill);
-    const matched = findQuoteSource(text, quoteSourcesForBill(row, stored?.sections ?? []));
-    if (!matched) {
-      return errorResponse(
-        json,
-        422,
-        "quote_not_in_bill",
-        "That text is not part of this bill's summary, so it cannot be shared as a quote."
-      );
-    }
-    source = matched.source;
+  const stored = await getBillText(env.DB, bill);
+  const matched = findQuoteSource(text, quoteSourcesForBill(row, stored?.sections ?? []));
+  if (!matched) {
+    return errorResponse(
+      json,
+      422,
+      "quote_not_in_bill",
+      "That text is not part of this bill's summary, so it cannot be shared as a quote."
+    );
   }
 
   const id = await buildBillQuoteId(bill, text);
@@ -234,7 +190,7 @@ export async function handleCreateBillQuote(params: {
       "This bill already has the maximum number of shared quotes."
     );
   }
-  const quote = existing ?? (await insertBillQuote(env.DB, { id, bill, text, source }));
+  const quote = existing ?? (await insertBillQuote(env.DB, { id, bill, text, source: matched.source }));
   const response: CreateBillQuoteResponse = {
     quote,
     url: buildBillQuoteShareUrl(quote.bill, quote.id, publicShareOrigin(new URL(request.url))),

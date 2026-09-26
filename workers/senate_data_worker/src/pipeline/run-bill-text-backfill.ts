@@ -21,7 +21,7 @@ export interface BillTextBackfillResult extends RefreshBillTextSectionsResult {
   bills_remaining: number;
 }
 
-/** Feed-visible bills: the same membership the daily run grounds chat on. */
+/** Feed-visible bills: the same membership the daily run stores text for. */
 export async function selectFeedTextCandidates(env: Env) {
   const lookback = lookbackStartIso(VOTE_LOOKBACK_DAYS);
   const votedBills = await selectRecentVotedBills(env.DB, lookback, FEED_MAX_BILLS);
