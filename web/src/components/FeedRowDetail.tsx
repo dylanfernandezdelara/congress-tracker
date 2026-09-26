@@ -5,7 +5,6 @@ import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 import { createBillQuote } from '../api/client'
 import type { FeedItem, FeedPrimarySponsor } from '../api/types'
 import { copyTextToClipboard, formatBillQueryParam } from '../utils/billDeepLink'
-import { fitPassageForQuote } from '../utils/billChat'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
@@ -17,7 +16,6 @@ import { useBillShare } from '../hooks/useBillShare'
 import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
 import { useSharedQuoteLanding } from '../hooks/useSharedQuoteLanding'
 import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
-import { usePresentBillChat } from './BillChatLayout'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
@@ -38,8 +36,6 @@ type FeedRowDetailProps = {
 }
 
 const SELECTION_STATUS_MS = 1800
-/** Bill-text regions this panel's selection menu handles; answer bubbles are the chat section's. */
-const BILL_TEXT_SELECTION_SOURCES = ['digest', 'crs'] as const
 
 function SharedQuoteCallout({ quote }: { quote: BillQuote }) {
   return (
@@ -112,11 +108,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
   )
 }
 
-export function FeedRowDetail({
-  item,
-  shareUrl,
-  quoteId = null,
-}: FeedRowDetailProps) {
+export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
   const summary = getFeedSummaryContent(item)
@@ -141,7 +133,6 @@ export function FeedRowDetail({
   })
   const { selection, clear: clearSelection } = useTextSelectionMenu(detailRef, {
     enabled: !share.open,
-    sources: BILL_TEXT_SELECTION_SOURCES,
   })
   const landing = useSharedQuoteLanding({
     item,
@@ -174,24 +165,6 @@ export function FeedRowDetail({
       setSharingQuote(false)
     }
   }
-
-  const handleSharePassage = useCallback(async (text: string) => {
-    try {
-      const { quote } = await createBillQuote({
-        bill: formatBillQueryParam(item.bill),
-        text: fitPassageForQuote(text),
-      })
-      share.openSheet(quote)
-    } catch (error) {
-      setToast(shareQuoteErrorCopy(error))
-    }
-  }, [item.bill, share])
-
-  const askChat = usePresentBillChat({
-    item,
-    onSharePassage: handleSharePassage,
-    onQuoteCreated: share.openSheet,
-  })
 
   const handleCopySelection = async (current: TextSelection) => {
     const ok = await copyTextToClipboard(current.text)
@@ -282,10 +255,6 @@ export function FeedRowDetail({
         busy={sharingQuote}
         onShareQuote={(current) => {
           void handleShareQuote(current)
-        }}
-        onAsk={(sel) => {
-          askChat(sel.text)
-          clearSelection()
         }}
         onCopy={(current) => {
           void handleCopySelection(current)

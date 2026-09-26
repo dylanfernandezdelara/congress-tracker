@@ -9,8 +9,6 @@ type SelectionMenuProps = {
   status?: string | null
   busy?: boolean
   onShareQuote: (selection: TextSelection) => void
-  /** Hidden when omitted (chat ships separately). */
-  onAsk?: (selection: TextSelection) => void
   onCopy: (selection: TextSelection) => void
 }
 
@@ -31,7 +29,7 @@ function menuPosition(rect: DOMRect, size: { width: number; height: number }): C
 }
 
 /**
- * F2 floating actions for a text selection: `Share quote` · `Ask about this` · `Copy`.
+ * F2 floating actions for a text selection: `Share quote` · `Copy`.
  * Rendered in a portal so it is never clipped by the detail panel; `mousedown`
  * is swallowed so clicking a button keeps the DOM selection alive.
  */
@@ -40,7 +38,6 @@ export function SelectionMenu({
   status,
   busy = false,
   onShareQuote,
-  onAsk,
   onCopy,
 }: SelectionMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -80,16 +77,6 @@ export function SelectionMenu({
           >
             {busy ? 'Sharing…' : 'Share quote'}
           </button>
-          {onAsk ? (
-            <button
-              type="button"
-              className="selection-menu-button"
-              disabled={busy}
-              onClick={() => onAsk(selection)}
-            >
-              Ask about this
-            </button>
-          ) : null}
           <button
             type="button"
             className="selection-menu-button"

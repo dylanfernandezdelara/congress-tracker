@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
@@ -9,7 +9,6 @@ import {
   renderHome,
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
-import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
@@ -46,7 +45,6 @@ describe('Home advanced filters', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     clearMemberProfileCache()
-    resetBillChatInstancesForTests()
     resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
@@ -200,7 +198,7 @@ describe('Home advanced filters', () => {
     expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('')
   })
 
-  it('keeps the filter sheet open when Escape dismisses member suggestions over the chat drawer', async () => {
+  it('keeps the filter sheet and the open bill when Escape dismisses member suggestions', async () => {
     mockViewport(false)
     fetchMembersSearch.mockResolvedValue({
       items: [
@@ -218,7 +216,7 @@ describe('Home advanced filters', () => {
     })
     renderHome()
     fireEvent.click(await screen.findByRole('button', { name: /Plain headline for readers/i }))
-    expect(await screen.findByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
+    expect(screen.getByTestId('search-params').textContent ?? '').toContain('bill=')
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     const dialog = await screen.findByRole('dialog', { name: 'Filters' })
@@ -227,9 +225,6 @@ describe('Home advanced filters', () => {
     expect(await within(dialog).findByRole('option', { name: /Sample Loyal/ })).toBeInTheDocument()
 
     fireEvent.keyDown(memberInput, { key: 'Escape' })
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
 
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('option', { name: /Sample Loyal/ })).not.toBeInTheDocument()
@@ -237,12 +232,8 @@ describe('Home advanced filters', () => {
     expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('sponsor_q=')
 
     fireEvent.keyDown(memberInput, { key: 'Escape' })
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
     expect(memberInput).toHaveValue('')
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Ask about this bill' })).toBeInTheDocument()
     expect(screen.getByTestId('search-params').textContent ?? '').toContain('bill=')
   })
 

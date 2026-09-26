@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
@@ -9,13 +9,6 @@ import type {
   RecentLawsResponse,
   TightnessDot,
 } from '../api/types'
-import { BillChatDrawer } from '../components/BillChatDrawer'
-import {
-  BILL_CHAT_RAIL_ID,
-  BillChatLayoutProvider,
-  useBillChatSession,
-} from '../components/BillChatLayout'
-import { BillChatSection } from '../components/BillChatSection'
 import { ChamberFilterControl } from '../components/ChamberFilterControl'
 import { FederalControlCompact } from '../components/FederalControlCompact'
 import { FeedAdvancedFilters } from '../components/FeedAdvancedFilters'
@@ -45,49 +38,7 @@ import {
 } from '../utils/feedAdvancedFilters'
 import { timelineFloorChrome } from '../utils/feedQuiet'
 
-/** Breakpoint at which the left/right rails mount and the chat docks on the right. */
-const DESKTOP_RAILS_QUERY = '(min-width: 1024px)'
-
-function HomeChrome({
-  isDesktop,
-  left,
-  right,
-  children,
-}: {
-  isDesktop: boolean
-  left: ReactNode
-  right: ReactNode
-  children: ReactNode
-}) {
-  const session = useBillChatSession()
-  const chatRail = isDesktop ? session : null
-  return (
-    <div className={`home-shell${chatRail ? ' home-shell--reading' : ''}`}>
-      {isDesktop ? (
-        <aside className="home-rail home-rail--left" aria-label="Session context">
-          {left}
-        </aside>
-      ) : null}
-      {children}
-      {isDesktop ? (
-        <aside
-          className={`home-rail home-rail--right${chatRail ? ' home-rail--chat' : ''}`}
-          aria-label={chatRail ? 'Ask about this bill' : 'Legislative context'}
-        >
-          {chatRail ? (
-            <div id={BILL_CHAT_RAIL_ID} className="bill-chat-rail" data-bill={chatRail.billId}>
-              <BillChatSection key={chatRail.billId} {...chatRail.chat} />
-            </div>
-          ) : (
-            right
-          )}
-        </aside>
-      ) : (
-        <BillChatDrawer />
-      )}
-    </div>
-  )
-}
+const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
 
 function FeedSkeleton() {
   return (
@@ -119,7 +70,7 @@ function emptyFeedCopy(
 }
 
 export default function Home() {
-  const isDesktop = useMediaQuery(DESKTOP_RAILS_QUERY)
+  const isDesktop = useMediaQuery(DESKTOP_RAIL_QUERY)
   const {
     chamber,
     advancedFilters,
@@ -295,17 +246,16 @@ export default function Home() {
 
   return (
     <MemberProfileProvider>
-      <BillChatLayoutProvider>
-        <HomeChrome
-          isDesktop={isDesktop}
-          left={
-            <div className="home-rail-stack">
-              {federalControl}
-              <section aria-label="Members in Congress">{memberSpotlights}</section>
-            </div>
-          }
-          right={<div className="home-rail-stack">{legislativeContext}</div>}
-        >
+      <div className="home-shell">
+      {isDesktop ? (
+        <aside className="home-rail home-rail--left" aria-label="Session context">
+          <div className="home-rail-stack">
+            {federalControl}
+            <section aria-label="Members in Congress">{memberSpotlights}</section>
+          </div>
+        </aside>
+      ) : null}
+
       <main id="content" className="home-feed-column feed-main">
         <div className="home-feed-toolbar">
           <FeedAdvancedFilters
@@ -480,14 +430,20 @@ export default function Home() {
           </div>
         ) : null}
       </main>
-        </HomeChrome>
-      </BillChatLayoutProvider>
+
+      {isDesktop ? (
+        <aside className="home-rail home-rail--right" aria-label="Legislative context">
+          <div className="home-rail-stack">{legislativeContext}</div>
+        </aside>
+      ) : null}
+
       <TightnessDefectorSheet
         open={selectedDot != null}
         dot={selectedDot}
         selectionKey={defectorSheetKey}
         onClose={closeTightnessDot}
       />
+      </div>
     </MemberProfileProvider>
   )
 }

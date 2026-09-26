@@ -2,18 +2,14 @@ import { useCallback, useEffect, useState, type RefObject } from 'react'
 
 import { cleanQuoteText } from '@congress-tracker/shared/quote-verification'
 
-/** Attribute marking text a reader may quote. Value is the source kind (`digest`, `crs`, `answer`). */
+/** Attribute marking text a reader may quote. Value is the source kind (`digest`, `crs`). */
 export const QUOTABLE_ATTR = 'data-quotable'
-/** Optional id on a quotable region (chat message id for `answer` selections). */
-export const QUOTABLE_ID_ATTR = 'data-quotable-id'
 
 export type TextSelection = {
   /** Whitespace-collapsed selected text. */
   text: string
   /** Which quotable region the selection sits in (`data-quotable` value). */
   source: string
-  /** Optional id on the quotable region (`data-quotable-id`), e.g. a chat message id. */
-  sourceId: string | null
   /** Viewport rectangle of the selection, refreshed on scroll. */
   rect: DOMRect
 }
@@ -25,21 +21,8 @@ function closestQuotable(node: Node | null): HTMLElement | null {
   return element?.closest<HTMLElement>(`[${QUOTABLE_ATTR}]`) ?? null
 }
 
-export type TextSelectionOptions = {
-  enabled?: boolean
-  /**
-   * Only report selections whose `data-quotable` value is listed. Lets two
-   * menus share one DOM subtree (the detail panel handles bill text, the chat
-   * section handles its own answers) without both claiming a selection.
-   */
-  sources?: readonly string[]
-}
-
 /** Current selection when it lies within one quotable region inside `container`. */
-export function readQuotableSelection(
-  container: HTMLElement | null,
-  sources?: readonly string[],
-): TextSelection | null {
+export function readQuotableSelection(container: HTMLElement | null): TextSelection | null {
   if (!container || typeof window === 'undefined') return null
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null
@@ -48,18 +31,11 @@ export function readQuotableSelection(
   const start = closestQuotable(range.startContainer)
   const end = closestQuotable(range.endContainer)
   if (!start || start !== end) return null
-  const source = start.getAttribute(QUOTABLE_ATTR) || 'digest'
-  if (sources && !sources.includes(source)) return null
   const text = cleanQuoteText(selection.toString())
   if (!text) return null
   const rect = range.getBoundingClientRect()
   if (rect.width === 0 && rect.height === 0) return null
-  return {
-    text,
-    source,
-    sourceId: start.getAttribute(QUOTABLE_ID_ATTR),
-    rect,
-  }
+  return { text, source: start.getAttribute(QUOTABLE_ATTR) || 'digest', rect }
 }
 
 /**
@@ -69,10 +45,9 @@ export function readQuotableSelection(
  */
 export function useTextSelectionMenu(
   containerRef: RefObject<HTMLElement | null>,
-  options: TextSelectionOptions = {},
+  options: { enabled?: boolean } = {},
 ): { selection: TextSelection | null; clear: () => void } {
   const enabled = options.enabled ?? true
-  const sources = options.sources
   const [selection, setSelection] = useState<TextSelection | null>(null)
 
   const clear = useCallback(() => {
@@ -88,7 +63,7 @@ export function useTextSelectionMenu(
     }
     let timer: number | null = null
     const refresh = () => {
-      setSelection(readQuotableSelection(containerRef.current, sources))
+      setSelection(readQuotableSelection(containerRef.current))
     }
     const scheduleRefresh = () => {
       if (timer !== null) window.clearTimeout(timer)
@@ -98,9 +73,7 @@ export function useTextSelectionMenu(
       }, SETTLE_MS)
     }
     const onScroll = () => {
-      setSelection((current) =>
-        current ? readQuotableSelection(containerRef.current, sources) : current,
-      )
+      setSelection((current) => (current ? readQuotableSelection(containerRef.current) : current))
     }
     document.addEventListener('selectionchange', scheduleRefresh)
     document.addEventListener('pointerup', scheduleRefresh)
@@ -115,7 +88,7 @@ export function useTextSelectionMenu(
       window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onScroll)
     }
-  }, [containerRef, enabled, sources])
+  }, [containerRef, enabled])
 
   return { selection, clear }
 }
