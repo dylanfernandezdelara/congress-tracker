@@ -6,7 +6,7 @@ export const NO_STORE_HEADERS = { "Cache-Control": cacheNoStore };
 
 /**
  * `{ error, message }` envelope shared by the public write endpoints
- * (`/share/quote`, `/chat/bill`). `E` is the endpoint's error-code union.
+ * (`/share/quote`). `E` is the endpoint's error-code union.
  */
 export function publicErrorResponse<E extends string>(
   json: JsonFn,

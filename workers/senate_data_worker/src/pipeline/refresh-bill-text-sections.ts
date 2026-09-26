@@ -45,7 +45,7 @@ function storedPrintMatches(
 /**
  * Keep `bill_text_sections` in step with the newest Congress.gov print for the
  * given bills. Bills with no stored document are served first so a fresh
- * deploy fills the chat corpus before it re-checks bills that already have
+ * deploy fills the section corpus before it re-checks bills that already have
  * text. One metadata probe per bill per day; XML is downloaded only when the
  * newest version differs from the stored one. Per-bill failures become
  * warnings and never fail the caller.

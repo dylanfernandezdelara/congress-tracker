@@ -294,7 +294,7 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_bill_quotes_bill
     ON bill_quotes (congress, bill_type, number)`,
-  // Full bill text for grounded chat: one document row per bill (which print
+  // Full bill text for quote verification: one document row per bill (which print
   // is stored, when it was probed) and its top-level sections as plain text.
   `CREATE TABLE IF NOT EXISTS bill_text_documents (
   congress INTEGER NOT NULL,
@@ -316,14 +316,6 @@ export const SCHEMA_DDL = [
   heading TEXT NOT NULL,
   body TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, bill_number, ordinal)
-)`,
-  // Daily chat-turn counters: one row per UTC day + client (IP or `anonymous`),
-  // plus `client_key = '*'` for the site-wide cap.
-  `CREATE TABLE IF NOT EXISTS chat_usage (
-  day TEXT NOT NULL,
-  client_key TEXT NOT NULL,
-  count INTEGER NOT NULL,
-  PRIMARY KEY (day, client_key)
 )`,
 ];
 
