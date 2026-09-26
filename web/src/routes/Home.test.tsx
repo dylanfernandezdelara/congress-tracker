@@ -554,6 +554,7 @@ describe('Home', () => {
     fetchFeed
       .mockResolvedValueOnce(pageResponse([senateItem, houseItem], { total: 2 }))
       .mockResolvedValueOnce(pageResponse([houseItem], { total: 1 }))
+      .mockResolvedValue(pageResponse([senateItem, houseItem], { total: 2 }))
 
     renderHome('/?align=1')
 
@@ -574,6 +575,15 @@ describe('Home', () => {
     expect(params).toContain('chamber=House')
     // In-page filters copy the existing query, so the layout overlay stays on.
     expect(params).toContain('align=1')
+
+    // Choosing All again clears the chamber filter.
+    fireEvent.click(screen.getByRole('radio', { name: 'All' }))
+    await waitFor(() => {
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+    })
+    expect(await screen.findByText('Senate headline')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'All' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('chamber=')
   })
 
   it('treats invalid chamber query values as All', async () => {
@@ -994,9 +1004,10 @@ describe('Home', () => {
     fireEvent.change(input, { target: { value: 'hr1' } })
     fireEvent.keyDown(input, { key: 'Enter' })
 
-    await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, q: 'hr1' })
-    })
+    // Immediately: flush pending React work without letting any timer run, so the 300ms typing debounce
+    // cannot be what fetched. Only Enter can make this pass.
+    await act(async () => {})
+    expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, q: 'hr1' })
     expect(screen.getByTestId('search-params')).toHaveTextContent('q=hr1')
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))

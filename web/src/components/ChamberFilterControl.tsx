@@ -1,4 +1,5 @@
 import type { ChamberFilter, ChamberFilterOption } from '../utils/chamberFilter'
+import { SegmentedControl, SegmentedControlItem } from './dfdl/segmented-control'
 
 type ChamberFilterControlProps = {
   value: ChamberFilter | null
@@ -8,25 +9,18 @@ type ChamberFilterControlProps = {
 const OPTIONS: ChamberFilterOption[] = ['All', 'House', 'Senate']
 
 export function ChamberFilterControl({ value, onChange }: ChamberFilterControlProps) {
-  const selected: ChamberFilterOption = value ?? 'All'
-
   return (
-    <div className="chamber-filter" role="radiogroup" aria-label="Filter by chamber">
-      {OPTIONS.map((option) => {
-        const checked = selected === option
-        return (
-          <button
-            key={option}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            className={`chamber-filter-option${checked ? ' is-selected' : ''}`}
-            onClick={() => onChange(option === 'All' ? null : option)}
-          >
-            {option}
-          </button>
-        )
-      })}
-    </div>
+    <SegmentedControl
+      variant="underline"
+      aria-label="Filter by chamber"
+      value={value ?? 'All'}
+      onValueChange={(next) => onChange(next === 'All' ? null : (next as ChamberFilter))}
+    >
+      {OPTIONS.map((option) => (
+        <SegmentedControlItem key={option} value={option}>
+          {option}
+        </SegmentedControlItem>
+      ))}
+    </SegmentedControl>
   )
 }

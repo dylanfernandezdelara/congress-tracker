@@ -1,3 +1,5 @@
+import { Input } from './dfdl/input'
+
 type FeedSearchInputProps = {
   value: string
   onChange: (value: string) => void
@@ -13,7 +15,8 @@ export function FeedSearchInput({ value, onChange, onSubmit, onClear }: FeedSear
       <label className="visually-hidden" htmlFor="feed-search-input">
         Search bills
       </label>
-      <input
+      <Input
+        variant="underline"
         id="feed-search-input"
         type="search"
         className="feed-search-input"

@@ -4,7 +4,8 @@
  * engine differences, so this drives the running app and asserts the sheet behaviors people rely on:
  * close by Escape, Close button and backdrop; stacked sheets close from the top; focus returns to the opener;
  * Escape in the filter's member field clears the field before it closes the sheet; the sheet is bottom-docked on
- * phones and centered on wider screens; it enters on the drawer curve over 500ms.
+ * phones and centered on wider screens; it enters on the drawer curve over 500ms; it takes dark colors in the dark theme.
+ * The desktop filters panel (not a sheet) expands over 200ms and leaves the member suggestions unclipped.
  *
  * Needs the local stack with seeded data (npm run seed, dev:worker, dev:web).
  * Env: QA_WEB_URL (default http://127.0.0.1:5173). Exits 1 on any failure. WebKit is skipped if not installed.
@@ -102,7 +103,7 @@ const checks = [
       await waitForSheetsToSettle(page)
       const box = await page.locator('[role=dialog]').boundingBox()
       if (Math.abs(box.y + box.height - 844) > 1) throw new Error(`sheet bottom at ${box.y + box.height}, expected 844`)
-      const field = page.locator('[role=dialog] input').first()
+      const field = page.locator('[role=dialog]').getByPlaceholder('Name or last name')
       await field.fill('Sand')
       await page.keyboard.press('Escape')
       await page.waitForTimeout(600)
@@ -110,6 +111,59 @@ const checks = [
       if ((await openDialogs(page)).length !== 1) throw new Error('Escape in the member field closed the sheet')
       await page.keyboard.press('Escape')
       await waitForDialogs(page, 0)
+    },
+  },
+  {
+    name: 'dark theme: the sheet and the selected segment are dark-mode colors',
+    viewport: { width: 1280, height: 800 },
+    theme: 'dark',
+    async run(page) {
+      // Lightness of a computed color, 0 to 1, through canvas so oklch and rgb read the same.
+      const lightness = (locator, prop) =>
+        locator.evaluate((el, p) => {
+          const ctx = document.createElement('canvas').getContext('2d')
+          ctx.fillStyle = getComputedStyle(el)[p]
+          ctx.fillRect(0, 0, 1, 1)
+          const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
+          return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+        }, prop)
+      const selected = page.locator('[aria-label="Filter by chamber"] [aria-checked=true]')
+      if ((await lightness(selected, 'color')) < 0.5) throw new Error('selected chamber text is dark on the dark page')
+      await page.locator('.member-profile-trigger').first().click()
+      await waitForDialogs(page, 1)
+      await waitForSheetsToSettle(page)
+      const bg = await lightness(page.locator('[data-slot=sheet]'), 'backgroundColor')
+      if (bg > 0.3) throw new Error(`sheet background lightness ${bg.toFixed(2)} in dark theme`)
+    },
+  },
+  {
+    name: 'desktop filters expand over 200ms and do not clip the member suggestions',
+    viewport: { width: 1280, height: 800 },
+    async run(page) {
+      await page.locator('.feed-advanced-filters-toggle').click()
+      // The transition registers a frame or two after the click; poll for it.
+      const duration = await page
+        .waitForFunction(() => {
+          const el = document.querySelector('[data-slot=collapsible-content]')
+          const a = document.getAnimations().find((x) => x.effect?.target === el && x.transitionProperty === 'height')
+          return a ? a.effect.getTiming().duration : false
+        }, null, { timeout: 1000, polling: 'raf' })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      if (Math.round(duration ?? 0) !== 200) throw new Error(`filters panel height transition ${duration}ms, expected 200`)
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-slot=collapsible-content]')
+        return el && !el.hasAttribute('data-moving') && getComputedStyle(el).overflow === 'visible'
+      }, null, { timeout: 3000 })
+      await page.locator('[data-slot=collapsible-content]').getByPlaceholder('Name or last name').fill('Sa')
+      const option = page.locator('.feed-member-suggestions [role=option]').first()
+      await option.waitFor({ timeout: 3000 })
+      const box = await option.boundingBox()
+      const hit = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.feed-member-suggestions'), { x: box.x + box.width / 2, y: box.y + box.height / 2 })
+      if (!hit) throw new Error('member suggestions are hidden or clipped')
+      await page.keyboard.press('Escape')
+      await page.locator('.feed-advanced-filters-toggle').click()
+      await page.waitForFunction(() => !document.querySelector('[data-slot=collapsible-content]'), null, { timeout: 3000 })
     },
   },
   {
@@ -157,8 +211,9 @@ async function main() {
     }
     for (const check of checks) {
       const page = await browser.newPage({ viewport: check.viewport })
+      if (check.theme) await page.addInitScript((t) => localStorage.setItem('theme', t), check.theme)
       try {
-        await page.goto(baseUrl, { waitUntil: 'networkidle' })
+        await page.goto(baseUrl, { waitUntil: 'load' })
         await page.locator('.member-profile-trigger').first().waitFor()
         await check.run(page)
         console.log(`  [PASS] ${engine} / ${check.name}`)
