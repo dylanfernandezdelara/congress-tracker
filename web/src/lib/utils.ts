@@ -20,6 +20,7 @@ const twMerge = extendTailwindMerge({
         "motion-dialog",
         "motion-fade",
         "motion-reveal",
+        "motion-expand",
         "sheet-popup",
         "sheet-backdrop",
         "toast-root",

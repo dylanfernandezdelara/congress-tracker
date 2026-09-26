@@ -19,6 +19,7 @@ import {
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
 import { AnimatedSheet } from './AnimatedSheet'
+import { Collapsible, CollapsibleContent } from './dfdl/collapsible'
 import { SegmentedControl, SegmentedControlItem } from './dfdl/segmented-control'
 import {
   MemberSponsorCombobox,
@@ -286,10 +287,12 @@ export function FeedAdvancedFilters({
         </ul>
       ) : null}
 
-      {inlinePanel && open ? (
-        <div className="feed-advanced-filters-panel" id={panelId}>
-          {fields}
-        </div>
+      {inlinePanel ? (
+        <Collapsible open={open}>
+          <CollapsibleContent expand id={panelId}>
+            <div className="feed-advanced-filters-panel">{fields}</div>
+          </CollapsibleContent>
+        </Collapsible>
       ) : null}
 
       {!inlinePanel ? (

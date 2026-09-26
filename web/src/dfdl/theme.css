@@ -16,7 +16,7 @@
     type       text-headline text-display text-title text-heading text-body text-reading text-ui text-caption (size + leading + weight); font-display font-heading font-sans font-mono; h-control
     elevation  elevation-raised elevation-floating; hairline hairline-t hairline-b hairline-r hairline-b-strong (1px lines that do not take layout space); hairline-l (2px quote bar)
     motion     ease-out ease-in-out ease-drawer, duration-instant/fast/normal/slow/slower, transition-interactive, transition-icon, press;
-               motion-pop motion-tooltip motion-dialog motion-fade motion-reveal (Base UI popups), sheet-popup sheet-backdrop,
+               motion-pop motion-tooltip motion-dialog motion-fade motion-reveal motion-expand (Base UI popups), sheet-popup sheet-backdrop,
                toast-root toast-content, tabs-indicator
     measure    max-w-reading max-w-content
     rhythm     p-minor p-major gap-minor gap-major (8px / 24px)
@@ -372,6 +372,30 @@
   }
   &[data-ending-style] {
     transition-duration: calc(var(--motion-fast) * var(--motion-exit-factor));
+  }
+}
+
+/* Collapsible with expand: height follows Base UI's measured panel height (auto at rest) and the content fades
+   with it. Clips only while the height moves (data-moving, set by CollapsibleContent). Reduced motion keeps the fade
+   and drops the height change. */
+@utility motion-expand {
+  height: var(--collapsible-panel-height);
+  transition-property: height, opacity;
+  transition-duration: var(--motion-normal);
+  transition-timing-function: var(--motion-ease-out);
+  &[data-moving] {
+    overflow: hidden;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    height: 0;
+    opacity: 0;
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--motion-normal) * var(--motion-exit-factor));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition-property: opacity;
   }
 }
 
