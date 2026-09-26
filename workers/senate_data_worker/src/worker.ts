@@ -9,6 +9,7 @@ import { scheduleZoneEdgeCachePurge } from "./http/cache-purge";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
+import { runSummarySweep } from "./pipeline/run-summary-sweep";
 import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
 
 export default {
@@ -22,9 +23,12 @@ export default {
 
     if (isExecutiveCron) {
       ctx.waitUntil(
-        withPipelineLease(env.DB, () =>
-          runExecutivePostsPipeline(env, { trigger: "scheduled" })
-        )
+        // The summary sweep rides the hourly lease: it writes digests, so it must not overlap the feed run.
+        withPipelineLease(env.DB, async () => {
+          const executive = await runExecutivePostsPipeline(env, { trigger: "scheduled" });
+          const summarySweep = await runSummarySweep(env);
+          return { ...executive, summarySweep };
+        })
           .then((result) => {
             console.log(
               JSON.stringify({

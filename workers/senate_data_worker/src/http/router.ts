@@ -16,6 +16,7 @@ import {
 } from "../d1/pipeline-state";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
+import { runSummarySweep } from "../pipeline/run-summary-sweep";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedWithMemberVotes } from "../pipeline/run-feed-with-member-votes";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
@@ -30,6 +31,7 @@ import {
   EXECUTIVE_PIPELINE_STALE_HOURS,
   EXECUTIVE_POSTS_CRON_UTC,
   SENATE_VOTE_MENU_MAX_BYTES,
+  SUMMARY_SWEEP_ADMIN_MAX_BILLS,
 } from "../constants";
 import {
   normalizePolicyFilter,
@@ -469,6 +471,14 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
     runExecutivePostsPipeline(env, { trigger: "admin" }),
   "/__pipeline/run/process-backfill": ({ env }) => runProcessBackfillPipeline(env),
   "/__pipeline/run/process-refresh": ({ env }) => refreshBillProcessQueue(env),
+  // Clears the headline backlog faster than the hourly sweep; ?limit= up to the admin cap.
+  "/__pipeline/run/summary-sweep": ({ env, url }) => {
+    const requested = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+    const limit = Number.isFinite(requested) && requested > 0
+      ? Math.min(requested, SUMMARY_SWEEP_ADMIN_MAX_BILLS)
+      : SUMMARY_SWEEP_ADMIN_MAX_BILLS;
+    return runSummarySweep(env, { limit });
+  },
 };
 
 const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
