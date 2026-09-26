@@ -84,15 +84,15 @@
 
 <main>
   <h1>Bill Summary Test</h1>
-  <p class="lede">Each bill below has five summaries: four cheap models reading the bill text, and what the site shows today. Labels are shuffled per bill so you judge the writing, not the model. For each bill, mark the one you'd most want a reader to see, flag any with a mistake, and add a note if something is off. Your picks save as you go. Turn on “Show models” when you're done.</p>
+  <p class="lede">Each bill below has five summaries, one per model, labeled in a shuffled order so you judge the writing, not the model. For each bill, mark the one you'd most want a reader to see, flag any with a mistake, and add a note if something is off. Your picks save as you go. Turn on “Show models” when you're done.</p>
   <p class="offline" id="offline" hidden>Picks can't be saved in this view. You can still read everything.</p>
 
   <div class="bar">
     <span class="progress" id="progress"></span>
     <span class="seg" role="group" aria-label="Which bills">
       <button type="button" data-set="all" aria-pressed="true">All</button>
-      <button type="button" data-set="practice" aria-pressed="false">Practice (4)</button>
-      <button type="button" data-set="test" aria-pressed="false">Test (16)</button>
+      <button type="button" data-set="practice" aria-pressed="false" hidden>Practice</button>
+      <button type="button" data-set="test" aria-pressed="false" hidden>Test</button>
     </span>
     <label class="toggle"><input type="checkbox" id="reveal"> Show models</label>
     <span class="saving" id="saving" aria-live="polite"></span>
@@ -133,6 +133,7 @@
       ${body}
       ${flags ? `<div class="flags">${flags}</div>` : ''}
       <div class="meta">${c.grade != null ? `Reading grade ${c.grade}` : ''}${meta ? ` · ${meta}` : ''}</div>
+      ${state.reveal && c.judge ? `<div class="flags">${c.judge.runs.map((r) => `<span class="flag ${r.passed ? '' : 'bad'}" title="${esc(r.reason ?? '')}">Judge, run ${r.run}: ${r.passed ? 'pass' : 'fails ' + esc(r.fails.join(', '))}</span>`).join('')}</div>` : ''}
       <div class="actions">
         <button type="button" class="best" data-act="best" aria-pressed="${isBest}">Best</button>
         <button type="button" class="err" data-act="error" aria-pressed="${isErr}">Has an error</button>
@@ -146,7 +147,7 @@
     el.hidden = !state.reveal
     if (!state.reveal) return
     const rows = Object.keys(DATA.models).map((m) => {
-      let best = 0, errors = 0, flags = 0, bad = 0, cost = 0, grades = [], failed = 0
+      let best = 0, errors = 0, flags = 0, bad = 0, cost = 0, grades = [], failed = 0, jPass = 0, jAll = 0, consistent = 0, judgedBills = 0
       for (const b of DATA.bills) {
         const c = b.candidates.find((x) => x.model === m)
         if (!c) continue
@@ -158,11 +159,17 @@
         cost += c.cost || 0
         if (c.grade != null) grades.push(c.grade)
         if (!c.summary) failed++
+        if (c.judge) {
+          judgedBills++
+          jPass += c.judge.runs.filter((r) => r.passed).length
+          jAll += c.judge.runs.length
+          if (c.judge.runs.every((r) => r.passed)) consistent++
+        }
       }
       const grade = grades.length ? (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(1) : '–'
-      return `<tr><td>${esc(DATA.models[m])}</td><td class="num">${best}</td><td class="num">${errors}</td><td class="num">${bad}</td><td class="num">${flags}</td><td class="num">${grade}</td><td class="num">${failed}</td><td class="num">${m === 'baseline_production' ? '–' : '$' + cost.toFixed(3)}</td></tr>`
+      return `<tr><td>${esc(DATA.models[m])}</td><td class="num">${best}</td><td class="num">${errors}</td><td class="num">${bad}</td><td class="num">${flags}</td><td class="num">${grade}</td><td class="num">${failed}</td><td class="num">${jAll ? `${jPass}/${jAll}` : '–'}</td><td class="num">${judgedBills ? `${consistent}/${judgedBills}` : '–'}</td><td class="num">${m === 'baseline_production' ? '–' : '$' + cost.toFixed(3)}</td></tr>`
     })
-    el.innerHTML = `<table><thead><tr><th>Source</th><th>Your “Best”</th><th>Your “Error”</th><th>Fact / wording flags</th><th>All flags</th><th>Avg grade</th><th>Failed</th><th>Cost, 20 bills</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
+    el.innerHTML = `<table><thead><tr><th>Source</th><th>Your “Best”</th><th>Your “Error”</th><th>Fact / wording flags</th><th>All flags</th><th>Avg grade</th><th>Failed</th><th>Judge pass (all runs)</th><th>Bills where every run passes</th><th>Cost</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
   }
 
   function render() {

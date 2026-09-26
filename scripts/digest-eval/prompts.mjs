@@ -7,6 +7,9 @@
  * services and obligations, names who is affected, and stays strictly neutral.
  */
 
+/** Recorded with every output so results can be compared by prompt version. */
+export const PROMPT_VERSION = 'v3'
+
 const SYSTEM = `You explain U.S. legislation to everyday readers (grade 7–8 reading level) so they can decide whether they would support it. You are accurate, concrete, and strictly neutral. You return only JSON.`
 
 /** Shared rules; the same wording in every pass so single-pass and combined summaries read alike. */
@@ -16,17 +19,26 @@ const RULES = `WHAT TO SAY
 - Name who acts in plain words ("the Transportation Department", "the IRS", "states"), never "officials" or "the Secretary".
 - Refer to programs by what they do, not their legal label: "federal grants for international studies programs", not "Title VI funding". If a legal label must appear, explain it in the same sentence.
 - Include the tradeoffs the text itself states: amounts cut or added, fees, new requirements, deadlines, who pays.
+- Say what changes from what: when the sources show the current rule or amount and what the bill changes it to ("striking “2024” and inserting “2029”", or the CRS summary describing current law), give both: "extends the program from 2024 to 2029", "keeps the lower rates that were set to expire after 2025". Take the "before" only from the sources, never from memory. If the sources do not say what the rule is today, describe only the new rule.
+- Say what the measure reacts to: when it overturns, blocks, delays, or responds to someone's action (a state's rule, an agency decision, a court ruling), name who and what, from the sources: "would overturn federal approval of California's stricter emission rules for harbor boats". State the action and whose it is; do not characterize motives.
+- Say what kind of change it is when that matters: a constitutional amendment ("would change the Constitution, not just a law"), a resolution that only expresses a view ("does not change law"), a law's end date being extended, a regulation being overturned.
 
 ACCURACY
+- Keep the bill's strength of language. "Requires" only when the text requires; "would allow" when it permits; "would have X consider" when it says consider; "would study" for studies; "authorizes" projects or spending when it authorizes them, "funds" or "provides $X" only when it appropriates money. Never turn "consider", "may", or "authorize" into "must", "will", or "funds".
 - Use only facts stated in the SOURCES below. Never change a number, dollar amount, percentage, or date. Write large amounts readably ($45 billion, $5 trillion, $2,200) without changing the value.
 - Do not predict effects, costs, or winners and losers beyond what the text says.
+- Plain definitions are the one exception: you may explain a term or program in a few common words from general knowledge ("harbor craft, such as tugboats and ferries"; "payments to counties that cannot tax federal land"). Never add numbers, effects, history, or motives that the sources do not state.
 - Bills often only amend other laws ("strike X and insert Y"). Name the program or law being changed only if the title, short title, a section header, or the CRS summary names it. If the practical effect cannot be read from the sources, describe the topic ("changes rules for payments to counties with federal land") instead of guessing specifics.
 - If the sources conflict, trust the bill text over the CRS summary (the text may be a newer version). But when the text refers to something indirectly (a defined term, a country or program named only by legal reference), use the CRS summary to name it plainly: "Israel", not "a covered country".
+- Dates: a recurring deadline is written as recurring ("every year by July 31"); a one-time date includes its year ("by March 1, 2027"); a deadline counted from enactment stays that way ("within 270 days after it becomes law").
 - State thresholds exactly as the text does ("people over 65", "under 18", "at least 80 hours"). Do not convert them ("through age 64").
 
 NEUTRALITY
 - No judging words: landmark, sweeping, historic, controversial, common-sense, radical, extreme, commonsense, bold, critical, crucial, harmful, dangerous.
 - No party framing and no characterizing motives. Describe what the bill does, never whether it is good.
+
+VOTES
+- The VOTES listed are what happened on the floor. Never contradict them. If a vote failed, say so plainly ("Failed in the House 212–206; it needed two-thirds"). Do not call a bill "introduced" or "sent to committee" when it has had a floor vote.
 
 TENSE
 - Not yet law: "would" ("would ban…", "would require…").
@@ -53,14 +65,35 @@ const OUTPUT = `Return ONLY this JSON:
 - 2–4 key_points (at most 5 for very long bills). Each is a different concrete change. "section" is the section it comes from ("Sec. 3", "Title VII"), or null if the source has none.
 - confidence: "text" when you read the bill text; "crs" when only the CRS summary was available; "title_only" when you only had the title. With title_only, keep every claim to what the title literally says and use 2 key_points at most.`
 
+const TWO_THIRDS = (question, bill) =>
+  /suspend the rules|overrid/i.test(question ?? '') ||
+  (/^(HJRES|SJRES)$/.test(bill.type) && /^\s*proposing an amendment to the constitution/i.test(bill.title ?? ''))
+
+function votesLine(bill) {
+  if (!bill.votes?.length) return 'VOTES: none recorded'
+  return `VOTES:\n${bill.votes
+    .map((v) => `- ${v.chamber}, ${v.vote_date}: ${v.question} — ${v.result} ${v.yeas}–${v.nays}${TWO_THIRDS(v.question, bill) ? ' (needed two-thirds of those voting)' : ''}`)
+    .join('\n')}`
+}
+
+/** Status for the prompt: text versions say what passed; a recorded vote also says what failed. */
+function statusLabel(bill) {
+  const last = bill.votes?.at(-1)
+  if (bill.status.stage === 'introduced' && last) {
+    return `${last.result === 'Passed' ? 'Passed' : 'Failed a vote in'} the ${last.chamber} (${last.yeas}–${last.nays}) — not law`
+  }
+  return `${bill.status.label}${bill.status.stage === 'law' ? ' — this is law' : ' — not law'}`
+}
+
 function metadata(bill) {
   const sponsor = bill.sponsor ? `${bill.sponsor.name}` : 'unknown'
   return `BILL: ${bill.type} ${bill.number} (${bill.congress}th Congress)
 OFFICIAL TITLE: ${bill.title}
 SPONSOR: ${sponsor}
-STATUS: ${bill.status.label}${bill.status.stage === 'law' ? ' — this is law' : ' — not law'}
+STATUS: ${statusLabel(bill)}
 COMMITTEES: ${bill.committees.join('; ') || 'none listed'}
-POLICY AREA: ${bill.policyArea ?? 'not yet assigned'}`
+POLICY AREA: ${bill.policyArea ?? 'not yet assigned'}
+${votesLine(bill)}`
 }
 
 function sources(bill, text) {
