@@ -90,7 +90,6 @@ export function TightnessDefectorSheet({
       selectionKey={selectionKey}
       onClose={onClose}
       titleId={titleId}
-      closeAriaLabel="Close vote defectors"
       panelClassName="tightness-sheet"
     >
       <header className="tightness-sheet-header">

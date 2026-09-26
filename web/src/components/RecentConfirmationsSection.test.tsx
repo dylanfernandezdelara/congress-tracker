@@ -178,6 +178,9 @@ describe('RecentConfirmationsSection', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Expand details for Jane Doe/i }))
+    // The details did open (otherwise the absences below would pass for the wrong reason).
+    expect(screen.getByRole('button', { name: /details for Jane Doe/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Congress.gov' })).toBeInTheDocument()
     expect(screen.queryByText('Why it was contested')).not.toBeInTheDocument()
     expect(
       screen.queryByText('Some hearing note that would overclaim a lopsided vote.'),

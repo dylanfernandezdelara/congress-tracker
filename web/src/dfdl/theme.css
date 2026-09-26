@@ -1,0 +1,459 @@
+/*
+  dfdl theme for Tailwind v4: maps the tokens in tokens.css onto Tailwind utilities and adds the motion,
+  elevation and hairline utilities the @dfdl components use. Import after tailwindcss and tokens.css.
+*/
+
+/*
+  Tailwind surface for dfdl tokens.
+
+  Components use only these utilities:
+    surfaces   bg-page bg-subtle bg-surface bg-surface-hover bg-surface-active bg-sunken bg-raised bg-overlay
+    text       text-fg text-fg-secondary text-fg-tertiary text-fg-strong text-fg-disabled text-fg-inverse text-fg-on-accent
+    borders    border-line border-line-subtle border-line-strong divide-separator, outline-focus / ring-focus
+    accent     bg-accent-bg border-accent-border bg-accent-solid hover:bg-accent-solid-hover text-accent-text
+    status     {danger,success,warning}: bg-*-bg border-*-border bg-* text-*-text
+    rounded    rounded-xs rounded-sm rounded-md rounded-lg rounded-xl rounded-full (concentric: outer = inner + padding)
+    type       text-headline text-display text-title text-heading text-body text-reading text-ui text-caption (size + leading + weight); font-display font-heading font-sans font-mono; h-control
+    elevation  elevation-raised elevation-floating; hairline hairline-t hairline-b hairline-r (1px lines that do not take layout space); hairline-l (2px quote bar)
+    motion     ease-out ease-in-out ease-drawer, duration-instant/fast/normal/slow/slower, transition-interactive, transition-icon, press;
+               motion-pop motion-tooltip motion-dialog motion-fade motion-reveal (Base UI popups), sheet-popup sheet-backdrop,
+               toast-root toast-content, tabs-indicator
+    measure    max-w-reading max-w-content
+    rhythm     p-minor p-major gap-minor gap-major (8px / 24px)
+
+  Primitives are deliberately not exposed as utilities; that is what keeps them out of components.
+  Theme keys map to differently named source tokens on purpose: a theme key that equals its source
+  name compiles to a self-referential CSS variable.
+*/
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  --font-serif: var(--font-lora), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-heading-family);
+  --font-display: var(--font-display-family);
+
+  /* Type roles. text-headline / text-display / text-title / text-heading / text-body / text-reading / text-ui / text-caption set size, leading and weight together. */
+  --text-headline: var(--type-headline-size);
+  --text-headline--line-height: var(--type-headline-leading);
+  --text-headline--font-weight: var(--type-headline-weight);
+  --text-headline--letter-spacing: var(--type-headline-tracking);
+  --text-display: var(--type-display-size);
+  --text-display--line-height: var(--type-display-leading);
+  --text-display--font-weight: var(--type-display-weight);
+  --text-display--letter-spacing: var(--type-display-tracking);
+  --text-title: var(--type-title-size);
+  --text-title--line-height: var(--type-title-leading);
+  --text-title--font-weight: var(--type-title-weight);
+  --text-title--letter-spacing: var(--type-title-tracking);
+  --text-heading: var(--type-heading-size);
+  --text-heading--line-height: var(--type-heading-leading);
+  --text-heading--font-weight: var(--type-heading-weight);
+  --text-heading--letter-spacing: var(--type-heading-tracking);
+  --text-body: var(--type-body-size);
+  --text-body--line-height: var(--type-body-leading);
+  --text-body--font-weight: var(--type-body-weight);
+  --text-reading: var(--type-reading-size);
+  --text-reading--line-height: var(--type-reading-leading);
+  --text-reading--font-weight: var(--type-reading-weight);
+  --text-ui: var(--type-ui-size);
+  --text-ui--line-height: var(--type-ui-leading);
+  --text-ui--font-weight: var(--type-ui-weight);
+  --text-caption: var(--type-caption-size);
+  --text-caption--line-height: var(--type-caption-leading);
+  --text-caption--font-weight: var(--type-caption-weight);
+  --spacing-control: var(--type-control-height);
+
+  --spacing-minor: var(--space-minor);
+  --spacing-major: var(--space-major);
+  --container-reading: var(--measure-reading);
+  --container-content: var(--measure-content);
+  --container-site: 104rem;
+  --spacing-toast: 22.5rem;
+
+  --radius-xs: var(--rounded-xs);
+  --radius-sm: var(--rounded-sm);
+  --radius-md: var(--rounded-md);
+  --radius-lg: var(--rounded-lg);
+  --radius-xl: var(--rounded-xl);
+  --radius-full: var(--rounded-full);
+
+  --ease-out: var(--motion-ease-out);
+  --ease-in-out: var(--motion-ease-in-out);
+  --ease-drawer: var(--motion-ease-drawer);
+  --ease-spring: var(--motion-ease-spring);
+  --blur-icon: var(--motion-icon-blur);
+
+  --color-page: var(--bg-page);
+  --color-subtle: var(--bg-subtle);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-surface-active: var(--bg-surface-active);
+  --color-sunken: var(--bg-sunken);
+  --color-raised: var(--bg-raised);
+  --color-overlay: var(--bg-overlay);
+
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+  --color-fg-strong: var(--fg-strong);
+  --color-fg-disabled: var(--fg-disabled);
+  --color-fg-inverse: var(--fg-inverse);
+  --color-fg-on-accent: var(--fg-on-accent);
+
+  --color-line: var(--border-default);
+  --color-line-subtle: var(--border-subtle);
+  --color-line-strong: var(--border-strong);
+  --color-separator: var(--border-separator);
+  --color-focus: var(--border-focus);
+
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-border: var(--accent-border);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-solid-hover: var(--accent-solid-hover);
+  --color-accent-text: var(--accent-text);
+
+  --color-danger: var(--status-danger);
+  --color-danger-bg: var(--status-danger-bg);
+  --color-danger-border: var(--status-danger-border);
+  --color-danger-text: var(--status-danger-text);
+  --color-success: var(--status-success);
+  --color-success-bg: var(--status-success-bg);
+  --color-success-border: var(--status-success-border);
+  --color-success-text: var(--status-success-text);
+  --color-warning: var(--status-warning);
+  --color-warning-bg: var(--status-warning-bg);
+  --color-warning-border: var(--status-warning-border);
+  --color-warning-text: var(--status-warning-text);
+
+
+  /* shadcn compatibility: their names, our values, so stock Base UI components render on dfdl tokens.
+     `primary` here is shadcn's word for the accent fill. For body text use text-fg, never text-primary. */
+  --color-background: var(--bg-page);
+  --color-foreground: var(--fg);
+  --color-card: var(--bg-surface);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--bg-raised);
+  --color-popover-foreground: var(--fg-strong);
+  --color-primary: var(--accent-solid);
+  --color-primary-foreground: var(--fg-on-accent);
+  --color-secondary: var(--bg-subtle);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--bg-sunken);
+  --color-muted-foreground: var(--fg-secondary);
+  --color-accent: var(--bg-surface-active);
+  --color-accent-foreground: var(--fg-strong);
+  --color-destructive: var(--status-danger);
+  --color-border: var(--border-default);
+  --color-input: var(--border-default);
+  --color-ring: var(--border-focus);
+}
+
+:root {
+  --radius: var(--rounded-md);
+}
+
+/*
+  Motion utilities. Tailwind has no theme namespace for durations or transition-property sets,
+  so these give the dfdl motion tokens real class names. Transition only what changes.
+*/
+@utility duration-instant {
+  transition-duration: var(--motion-instant);
+}
+@utility duration-fast {
+  transition-duration: var(--motion-fast);
+}
+@utility duration-normal {
+  transition-duration: var(--motion-normal);
+}
+@utility duration-slow {
+  transition-duration: var(--motion-slow);
+}
+@utility duration-slower {
+  transition-duration: var(--motion-slower);
+}
+/* Interactive controls: color and surface change plus press feedback. */
+@utility transition-interactive {
+  transition-property: color, background-color, border-color, box-shadow, scale;
+}
+/* Icon swaps: cross-fade with opacity, scale and blur, never visibility. */
+@utility transition-icon {
+  transition-property: opacity, scale, filter;
+}
+/* Elevation. Plain box-shadow utilities rather than Tailwind's shadow-* namespace, which @shadcn/lint 0.1.0
+   cannot distinguish from shadow-<color> and flags as a raw color. */
+@utility elevation-raised {
+  box-shadow: var(--elevation-raised);
+}
+@utility elevation-floating {
+  box-shadow: var(--elevation-floating);
+}
+/* Hairlines that do not take layout space. A 1px border pushes everything below it off the grid; a shadow does not.
+   Use these for dividers and framed groups; use `border` only where the box height already accounts for it. */
+@utility hairline-b {
+  box-shadow: inset 0 -1px 0 var(--color-separator);
+}
+@utility hairline-t {
+  box-shadow: inset 0 1px 0 var(--color-separator);
+}
+@utility hairline-l {
+  box-shadow: inset 2px 0 0 var(--color-line);
+}
+@utility hairline-r {
+  box-shadow: inset -1px 0 0 var(--color-separator);
+}
+@utility hairline {
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+/* Press feedback. Scale is movement, so it is dropped under reduced motion; color and shadow changes still carry the state. */
+@utility press {
+  &:active {
+    scale: var(--motion-press);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active {
+      scale: none;
+    }
+  }
+}
+
+/*
+  Popup motion for Base UI parts, which mark enter and exit with data-starting-style and data-ending-style.
+  Enter at the part's duration; exit at --motion-exit-factor of it along the same path. Reduced motion keeps the fade.
+*/
+@utility motion-pop {
+  transform-origin: var(--transform-origin);
+  transition-property: opacity, scale;
+  transition-duration: var(--motion-normal);
+  transition-timing-function: var(--motion-ease-out);
+  &[data-starting-style] {
+    opacity: 0;
+    scale: var(--motion-pop-scale);
+  }
+  &[data-ending-style] {
+    opacity: 0;
+    scale: calc(1 - (1 - var(--motion-pop-scale)) * var(--motion-exit-scale));
+    transition-duration: calc(var(--motion-normal) * var(--motion-exit-factor));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-starting-style],
+    &[data-ending-style] {
+      scale: 1;
+    }
+  }
+}
+@utility motion-tooltip {
+  transform-origin: var(--transform-origin);
+  transition-property: opacity, scale;
+  transition-duration: var(--motion-instant);
+  transition-timing-function: var(--motion-ease-out);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+    scale: 0.97;
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--motion-instant) * var(--motion-exit-factor));
+  }
+  &[data-instant] {
+    transition-duration: 0ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-starting-style],
+    &[data-ending-style] {
+      scale: 1;
+    }
+  }
+}
+@utility motion-dialog {
+  transition-property: opacity, scale;
+  transition-duration: var(--motion-slow);
+  transition-timing-function: var(--motion-ease-out);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+    scale: 0.96;
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--motion-slow) * var(--motion-exit-factor));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-starting-style],
+    &[data-ending-style] {
+      scale: 1;
+    }
+  }
+}
+@utility motion-fade {
+  transition-property: opacity;
+  transition-duration: var(--motion-slow);
+  transition-timing-function: var(--motion-ease-out);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--motion-slow) * var(--motion-exit-factor));
+  }
+}
+
+/* Sheet (Base UI Drawer, bottom). Translates by its own height on the drawer curve; follows the finger while swiped;
+   exits at 75%, or faster after a strong swipe. A sheet with a nested sheet open steps back: lifted and scaled. */
+@utility sheet-popup {
+  max-height: min(88dvh, 40rem);
+  transform: translateY(var(--drawer-swipe-movement-y, 0px));
+  transition-property: transform;
+  transition-duration: var(--motion-slower);
+  transition-timing-function: var(--motion-ease-drawer);
+  &[data-swiping] {
+    transition-duration: 0ms;
+    user-select: none;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    transform: translateY(100%);
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--motion-slower) * var(--motion-exit-factor) * var(--drawer-swipe-strength, 1));
+  }
+  /* From 640px the sheet floats centered; it still enters from below, so it travels half the viewport plus half itself. */
+  @media (min-width: 40rem) {
+    max-height: min(85dvh, 36rem);
+    &[data-starting-style],
+    &[data-ending-style] {
+      transform: translateY(calc(50vh + 50%));
+    }
+  }
+  &[data-nested-drawer-open] {
+    transform: translateY(calc(var(--drawer-swipe-movement-y, 0px) - 1rem)) scale(0.96);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition-property: opacity;
+    &[data-starting-style],
+    &[data-ending-style],
+    &[data-nested-drawer-open] {
+      transform: none;
+    }
+    &[data-starting-style],
+    &[data-ending-style] {
+      opacity: 0;
+    }
+  }
+}
+@utility sheet-backdrop {
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+  transition-property: opacity;
+  transition-duration: var(--motion-slower);
+  transition-timing-function: var(--motion-ease-drawer);
+  &[data-swiping] {
+    transition-duration: 0ms;
+  }
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--motion-slower) * var(--motion-exit-factor));
+  }
+}
+
+/* Collapsible: the panel opens at once (height never animates); its content fades in. */
+@utility motion-reveal {
+  transition-property: opacity;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--motion-ease-out);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+  &[data-ending-style] {
+    transition-duration: calc(var(--motion-fast) * var(--motion-exit-factor));
+  }
+}
+
+/* Toast (Base UI). Enters 16px from below; leaves by fading (or along the swipe). Stacked toasts peek and shrink
+   behind the front one and spread out on hover. Only transform and opacity move. */
+@utility toast-root {
+  --toast-gap: 0.5rem;
+  --toast-peek: 0.5rem;
+  --toast-scale: calc(max(0, 1 - (var(--toast-index) * 0.05)));
+  --toast-shrink-y: calc((1 - var(--toast-scale)) * var(--toast-frontmost-height, var(--toast-height)));
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: calc(1000 - var(--toast-index));
+  transform-origin: bottom center;
+  user-select: none;
+  transform: translateX(var(--toast-swipe-movement-x)) translateY(calc(var(--toast-swipe-movement-y) - var(--toast-index) * var(--toast-peek) - var(--toast-shrink-y))) scale(var(--toast-scale));
+  transition-property: transform, opacity;
+  transition-duration: var(--motion-normal);
+  transition-timing-function: var(--motion-ease-out);
+  &::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    height: calc(var(--toast-gap) + 1px);
+  }
+  &[data-expanded] {
+    transform: translateX(var(--toast-swipe-movement-x)) translateY(calc(var(--toast-offset-y) * -1 - var(--toast-index) * var(--toast-gap) + var(--toast-swipe-movement-y)));
+  }
+  &[data-starting-style] {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  &[data-ending-style] {
+    opacity: 0;
+    transition-duration: calc(var(--motion-normal) * var(--motion-exit-factor));
+  }
+  &[data-limited] {
+    opacity: 0;
+  }
+  &[data-ending-style][data-swipe-direction="right"] {
+    transform: translateX(calc(var(--toast-swipe-movement-x) + 100%)) translateY(calc(var(--toast-offset-y) * -1 - var(--toast-index) * var(--toast-gap)));
+  }
+  &[data-ending-style][data-swipe-direction="down"] {
+    transform: translateY(calc(var(--toast-swipe-movement-y) + 100%));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-starting-style] {
+      transform: none;
+    }
+  }
+}
+@utility toast-content {
+  transition-property: opacity;
+  transition-duration: var(--motion-normal);
+  transition-timing-function: var(--motion-ease-out);
+  &[data-behind] {
+    opacity: 0;
+  }
+  &[data-expanded] {
+    opacity: 1;
+  }
+}
+
+/* A popup as wide as the control it opens from (Base UI sets --anchor-width on the positioner). */
+@utility w-anchor {
+  width: var(--anchor-width);
+}
+
+/* Tabs indicator: a 1px bar scaled to the active tab (see ui/tabs.tsx). Transform only; appears once measured. */
+@utility tabs-indicator {
+  width: 1px;
+  transform-origin: left;
+  translate: var(--tab-x, 0) 0;
+  scale: var(--tab-w, 0) 1;
+  opacity: 0;
+  &[data-ready] {
+    opacity: 1;
+    transition-property: translate, scale;
+    transition-duration: var(--motion-normal);
+    transition-timing-function: var(--motion-ease-in-out);
+    @media (prefers-reduced-motion: reduce) {
+      transition-duration: 0ms;
+    }
+  }
+}

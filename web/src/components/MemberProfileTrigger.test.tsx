@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { renderWithMemberProfile } from '../test/memberProfileHarness'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { MemberProfileSeed } from './MemberProfile'
 import { MemberProfileTrigger } from './MemberProfileTrigger'
 
@@ -23,7 +22,6 @@ const seed: MemberProfileSeed = {
 afterEach(() => {
   vi.clearAllMocks()
   clearMemberProfileCache()
-  resetSheetLayerForTests()
   document.body.style.overflow = ''
 })
 
@@ -69,7 +67,7 @@ describe('MemberProfileTrigger', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Open profile for Brian Fitzpatrick' }))
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })

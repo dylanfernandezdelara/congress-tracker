@@ -1,24 +1,13 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 
-import { useAnimatedDismiss } from '../hooks/useAnimatedDismiss'
-import {
-  registerSheetLayer,
-  SHEET_BASE_Z_INDEX,
-  type SheetLayerController,
-} from '../utils/sheetLayer'
-
-const EXIT_ANIMATION_FALLBACK_MS = 400
-const EXIT_ANIMATION_NAME = 'sheet-sink'
+import { Sheet, SheetContent } from './dfdl/sheet'
 
 type AnimatedSheetProps = {
   open: boolean
   selectionKey: number
   onClose: () => void
   titleId: string
-  /** Accessible name for the backdrop dismiss control. */
-  closeAriaLabel: string
-  /** Label for the dismiss control (defaults to Close). */
+  /** Visible label for the dismiss control (defaults to Close). */
   closeLabel?: string
   /**
    * When true, render the dismiss control in a sticky footer after children
@@ -32,18 +21,15 @@ type AnimatedSheetProps = {
 }
 
 /**
- * Shared bottom/centered sheet chrome used by member profiles, notable
- * bills, and bill share: backdrop, animated panel, focus trap, and body
- * scroll lock. Always portaled to `document.body` so `position: fixed`
- * is viewport-relative even when a caller sits under a CSS transform
- * (feed-row detail enter animation).
+ * Shared sheet chrome for member profiles, notable bills, bill share and the rest, on the dfdl Sheet
+ * (Base UI Drawer): docked to the bottom on phones, centered from 640px, swipe to dismiss, focus trap,
+ * scroll lock, and stacking when one sheet opens another. `onClose` runs after the exit animation.
  */
 export function AnimatedSheet({
   open,
   selectionKey,
   onClose,
   titleId,
-  closeAriaLabel,
   closeLabel = 'Close',
   footerDismiss = false,
   panelClassName,
@@ -52,24 +38,28 @@ export function AnimatedSheet({
 }: AnimatedSheetProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
-  const [layerZIndex, setLayerZIndex] = useState(SHEET_BASE_Z_INDEX)
-  const controllerRef = useRef<SheetLayerController>({
-    requestClose: () => undefined,
-    getIsClosing: () => false,
-    panel: null,
-  })
+  const [closing, setClosing] = useState(false)
+  // Base UI skips the enter transition for a drawer that mounts already open, and these sheets mount when a
+  // selection is made. Render closed for the first frame, then open, so the sheet slides in.
+  const [entered, setEntered] = useState(false)
 
-  const { rootRef, panelRef, isClosing, getIsClosing, requestClose } = useAnimatedDismiss({
-    onDismissed: onClose,
-    exitAnimationName: EXIT_ANIMATION_NAME,
-    fallbackMs: EXIT_ANIMATION_FALLBACK_MS,
-    cancelKey: selectionKey,
-    restoreFocusRef: closeRef,
-  })
+  useEffect(() => {
+    if (!open) {
+      setEntered(false)
+      return
+    }
+    // Opened from code rather than a Base UI trigger: remember what had focus so closing returns there.
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const frame = requestAnimationFrame(() => setEntered(true))
+    return () => cancelAnimationFrame(frame)
+  }, [open])
 
-  controllerRef.current.requestClose = requestClose
-  controllerRef.current.getIsClosing = getIsClosing
-  controllerRef.current.panel = panelRef.current
+  // A new selection (or reopening) cancels a dismiss that is still animating.
+  useEffect(() => {
+    setClosing(false)
+  }, [open, selectionKey])
+
+  const requestClose = useCallback(() => setClosing(true), [])
 
   useEffect(() => {
     if (!requestCloseRef) return
@@ -79,63 +69,40 @@ export function AnimatedSheet({
     }
   }, [requestClose, requestCloseRef])
 
-  useEffect(() => {
-    if (!open) return
-
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
-    returnFocusRef.current = previouslyFocused
-    // Footer dismiss sits below scrollable content — avoid scrolling fields away.
-    closeRef.current?.focus({ preventScroll: footerDismiss })
-
-    const { unregister, zIndex } = registerSheetLayer(controllerRef.current)
-    setLayerZIndex(zIndex)
-    return () => {
-      unregister()
-      returnFocusRef.current?.focus()
-      returnFocusRef.current = null
-    }
-  }, [open, footerDismiss])
-
-  // Keep the stack's panel pointer current after each paint.
-  useEffect(() => {
-    controllerRef.current.panel = panelRef.current
-  })
-
-  if (!open) return null
-
-  const panelClasses = ['sheet-panel', panelClassName].filter(Boolean).join(' ')
   const dismissButton = (
     <button ref={closeRef} type="button" className="sheet-close" onClick={requestClose}>
       {closeLabel}
     </button>
   )
 
-  return createPortal(
-    <div
-      ref={rootRef}
-      className={`sheet-root${isClosing ? ' sheet-root--closing' : ''}`}
-      style={{ zIndex: layerZIndex }}
-      role="presentation"
+  return (
+    <Sheet
+      open={open && entered && !closing}
+      onOpenChange={(next) => {
+        if (!next) setClosing(true)
+      }}
+      onOpenChangeComplete={(isOpen) => {
+        // Only a real dismiss finishes here; the closed first frame before the enter animation must not.
+        if (!isOpen && open && closing) {
+          // Return focus before onClose: callers unmount the sheet there, before Base UI's own restore would run.
+          const target = returnFocusRef.current
+          if (target?.isConnected) target.focus({ preventScroll: true })
+          onClose()
+        }
+      }}
     >
-      <button
-        type="button"
-        className="sheet-backdrop"
-        aria-label={closeAriaLabel}
-        onClick={requestClose}
-      />
-      <div
-        ref={panelRef}
-        className={panelClasses}
-        role="dialog"
-        aria-modal="true"
+      <SheetContent
+        className={panelClassName}
         aria-labelledby={titleId}
+        initialFocus={closeRef}
+        finalFocus={returnFocusRef}
+        // A departing sheet is inert: unfocusable and hidden from assistive tech while it animates out.
+        {...((open && closing) || !open ? { inert: '' } : {})}
       >
         {footerDismiss ? null : <div className="sheet-toolbar">{dismissButton}</div>}
         {children}
         {footerDismiss ? <div className="sheet-footer">{dismissButton}</div> : null}
-      </div>
-    </div>,
-    document.body,
+      </SheetContent>
+    </Sheet>
   )
 }

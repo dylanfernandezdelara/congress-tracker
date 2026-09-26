@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { DefectorEntry, PortfolioMovers, SessionStatsResponse } from '../api/types'
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
@@ -120,7 +119,6 @@ describe('LeftSidebar', () => {
   afterEach(() => {
     vi.clearAllMocks()
     clearMemberProfileCache()
-    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 
@@ -134,7 +132,7 @@ describe('LeftSidebar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open profile for Brian Fitzpatrick' }))
 
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })

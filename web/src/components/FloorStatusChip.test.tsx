@@ -2,7 +2,6 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { ChamberFloorDetail } from '../utils/feedQuiet'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { FloorStatusChip } from './FloorStatusChip'
 
 function detail(
@@ -32,7 +31,6 @@ function detail(
 }
 
 afterEach(() => {
-  resetSheetLayerForTests()
   document.body.style.overflow = ''
 })
 
@@ -50,14 +48,14 @@ describe('FloorStatusChip', () => {
     )
   })
 
-  it('opens a concise sheet with per-chamber facts, not a long lead', () => {
+  it('opens a concise sheet with per-chamber facts, not a long lead', async () => {
     render(
       <FloorStatusChip house={detail('House')} senate={detail('Senate')} />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: /House & Senate in recess/ }))
 
-    const dialog = screen.getByRole('dialog', { name: 'Floor status' })
+    const dialog = (await screen.findByRole('dialog', { name: 'Floor status' }))
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).queryByText(/do not return together/)).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/set separate floor calendars/)).not.toBeInTheDocument()

@@ -212,7 +212,6 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       selectionKey={selectionKey}
       onClose={onClose}
       titleId={titleId}
-      closeAriaLabel="Close profile"
       requestCloseRef={requestCloseRef}
     >
       <div className="flex items-center gap-3.5">

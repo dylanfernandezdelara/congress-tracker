@@ -14,6 +14,9 @@
 
 @import 'tailwindcss';
 @import 'tw-animate-css';
+/* dfdl component utilities and theme keys. The app's own @theme below wins on shared keys (shadcn color
+   aliases, fonts, radius sm/md/lg); dfdl's base.css is not imported, so page defaults stay the app's. */
+@import './dfdl/theme.css';
 
 @theme {
   --color-border: hsl(var(--twc-border));

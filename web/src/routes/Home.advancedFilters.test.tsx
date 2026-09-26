@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { settleSheets } from '../test/sheetExit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
@@ -9,7 +10,6 @@ import {
   renderHome,
   stubHomeRouteDefaults,
 } from '../test/homeRouteHarness'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
   fetchFeed: vi.fn(),
@@ -45,7 +45,6 @@ describe('Home advanced filters', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     clearMemberProfileCache()
-    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 
@@ -225,15 +224,18 @@ describe('Home advanced filters', () => {
     expect(await within(dialog).findByRole('option', { name: /Sample Loyal/ })).toBeInTheDocument()
 
     fireEvent.keyDown(memberInput, { key: 'Escape' })
+    // Let any sheet close start before asserting it did not: a sheet closes a few frames after Escape.
+    await settleSheets()
 
-    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Filters' }))).not.toHaveAttribute('inert')
     expect(within(dialog).queryByRole('option', { name: /Sample Loyal/ })).not.toBeInTheDocument()
     expect(memberInput).toHaveValue('Loyal')
     expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('sponsor_q=')
 
     fireEvent.keyDown(memberInput, { key: 'Escape' })
+    await settleSheets()
     expect(memberInput).toHaveValue('')
-    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Filters' }))).not.toHaveAttribute('inert')
     expect(screen.getByTestId('search-params').textContent ?? '').toContain('bill=')
   })
 
@@ -250,9 +252,10 @@ describe('Home advanced filters', () => {
     const memberInput = within(dialog).getByPlaceholderText('Name or last name')
     fireEvent.change(memberInput, { target: { value: 'Schumer' } })
     fireEvent.keyDown(memberInput, { key: 'Escape' })
+    await settleSheets()
 
     expect(memberInput).toHaveValue('')
-    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Filters' }))).not.toHaveAttribute('inert')
   })
 
   it('commits a typed member name when Done closes the filter sheet', async () => {

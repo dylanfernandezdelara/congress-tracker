@@ -36,7 +36,6 @@ export function NotableBillSheet({
       selectionKey={selectionKey}
       onClose={onClose}
       titleId={titleId}
-      closeAriaLabel="Close bill details"
       panelClassName="notable-bill-sheet"
     >
       <header className="notable-bill-sheet-header">

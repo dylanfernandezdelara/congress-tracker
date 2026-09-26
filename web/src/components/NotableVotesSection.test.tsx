@@ -1,9 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
 import type { NotableVoteEntry } from '../api/types'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { renderWithMemberProfile } from '../test/memberProfileHarness'
 import { NotableVotesSection } from './NotableVotesSection'
 
@@ -66,7 +65,7 @@ describe('NotableVotesSection', () => {
     expect(screen.queryByText(/119th Congress/i)).not.toBeInTheDocument()
   })
 
-  it('opens an in-place bill sheet when the notable headline is clicked', () => {
+  it('opens an in-place bill sheet when the notable headline is clicked', async () => {
     renderWithMemberProfile(<NotableVotesSection notable={[sampleEntry()]} />)
 
     fireEvent.click(
@@ -75,9 +74,9 @@ describe('NotableVotesSection', () => {
       }),
     )
 
-    const dialog = screen.getByRole('dialog', {
+    const dialog = (await screen.findByRole('dialog', {
       name: 'Gives Money for Border and Immigration Enforcement Until 2029',
-    })
+    }))
     expect(dialog).toBeInTheDocument()
     expect(screen.getByText(/214–212 \(2\)/)).toBeInTheDocument()
     expect(screen.getByText('Funds border enforcement programs through 2029.')).toBeInTheDocument()
@@ -87,7 +86,7 @@ describe('NotableVotesSection', () => {
     )
   })
 
-  it('opens a bill sheet from the compact headline without changing the page URL', () => {
+  it('opens a bill sheet from the compact headline without changing the page URL', async () => {
     renderWithMemberProfile(<NotableVotesSection variant="compact" notable={[sampleEntry()]} />)
 
     fireEvent.click(
@@ -97,9 +96,9 @@ describe('NotableVotesSection', () => {
     )
 
     expect(
-      screen.getByRole('dialog', {
+      (await screen.findByRole('dialog', {
         name: 'Gives Money for Border and Immigration Enforcement Until 2029',
-      }),
+      })),
     ).toBeInTheDocument()
     expect(screen.getByText('What it does')).toBeInTheDocument()
   })
@@ -107,7 +106,6 @@ describe('NotableVotesSection', () => {
   afterEach(() => {
     vi.clearAllMocks()
     clearMemberProfileCache()
-    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 
@@ -161,7 +159,7 @@ describe('NotableVotesSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open profile for Jane Example' }))
 
-    expect(screen.getByRole('dialog', { name: 'Jane Example' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Jane Example' }))).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('CA-12')).toBeInTheDocument()
     })
@@ -195,8 +193,10 @@ describe('NotableVotesSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open profile for Jane Example' }))
 
-    expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
-    expect(screen.getByText('CA-12')).toBeInTheDocument()
+    // Wait for the sheet itself; asserting "no loading message" before it renders would pass vacuously.
+    const dialog = await screen.findByRole('dialog', { name: 'Jane Example' })
+    expect(within(dialog).queryByText('Loading session voting stats…')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('CA-12')).toBeInTheDocument()
   })
 
   it('states when no members broke with their party', () => {
@@ -259,19 +259,19 @@ describe('NotableVotesSection', () => {
       }),
     )
     expect(
-      screen.getByRole('dialog', {
+      (await screen.findByRole('dialog', {
         name: 'Gives Money for Border and Immigration Enforcement Until 2029',
-      }),
+      })),
     ).toBeInTheDocument()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Open profile for Jane Example' })[0]!)
-    expect(screen.getByRole('dialog', { name: 'Jane Example' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Jane Example' }))).toBeInTheDocument()
     // Bill sheet stays mounted underneath.
     expect(
-      screen.getByRole('dialog', {
+      (await screen.findByRole('dialog', {
         name: 'Gives Money for Border and Immigration Enforcement Until 2029',
         hidden: true,
-      }),
+      })),
     ).toBeInTheDocument()
 
     await waitFor(() => {
