@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { toastManager } from '@/lib/toast'
+
 import { makeFeedItem } from '../test/feedItemFixtures'
 import {
   billSearchQueryFromParam,
   billShareOrigin,
-  buildBillQuoteSharePayload,
   buildBillSharePayload,
   buildBillShareUrl,
   clearBillDeepLinkParams,
@@ -14,6 +15,7 @@ import {
   formatBillQueryParam,
   itemMatchesBillParam,
   PRODUCTION_ORIGIN,
+  shareBill,
   shareBillViaNavigator,
 } from './billDeepLink'
 
@@ -42,27 +44,10 @@ describe('billDeepLink', () => {
     )
   })
 
-  it('appends the quote id to the share URL when given', () => {
-    const item = makeFeedItem({ bill: { congress: 119, type: 'HR', number: 1, title: null } })
-    expect(buildBillShareUrl(item, 'https://example.test/', 'abc123abc123abc1')).toBe(
-      'https://example.test/?bill=119-hr-1&quote=abc123abc123abc1',
-    )
+  it('clears the bill deep link together with a legacy quote id', () => {
     const params = new URLSearchParams('bill=119-hr-1&quote=abc&chamber=House')
     clearBillDeepLinkParams(params)
     expect(params.toString()).toBe('chamber=House')
-  })
-
-  it('builds a quote share payload with the quote as the body', () => {
-    const payload = buildBillQuoteSharePayload(
-      makeFeedItem(),
-      { id: 'abc123abc123abc1', text: 'It does something important' },
-      'https://preview.test/',
-    )
-    expect(payload.title).toBe('Plain headline for readers')
-    expect(payload.text).toBe('“It does something important”')
-    expect(payload.url).toBe('https://preview.test/?bill=119-s-2&quote=abc123abc123abc1')
-    expect(payload.clipboardText.startsWith('“It does something important”')).toBe(true)
-    expect(payload.clipboardText).toContain(payload.url)
   })
 
   it('rewrites production hosts to the apex origin', () => {
@@ -76,27 +61,19 @@ describe('billDeepLink', () => {
     )
   })
 
-  it('builds paste-ready share text from digest fields', () => {
-    const item = makeFeedItem()
-    const payload = buildBillSharePayload(item, undefined, 'https://preview.test/')
-    expect(payload.title).toBe('Plain headline for readers')
-    expect(payload.text).toBe('It does something important in plain language.')
-    expect(payload.url).toBe('https://preview.test/?bill=119-s-2')
-    expect(payload.clipboardText).toBe(
-      'Plain headline for readers\n\nIt does something important in plain language.\n\nhttps://preview.test/?bill=119-s-2',
-    )
+  it('shares the headline and the link, nothing else', () => {
+    const payload = buildBillSharePayload(makeFeedItem(), undefined, 'https://preview.test/')
+    expect(payload).toEqual({ title: 'Plain headline for readers', url: 'https://preview.test/?bill=119-s-2' })
   })
 
-  it('falls back to title-only text when the digest is thin', () => {
+  it('falls back to the bill title when there is no digest', () => {
     const item = makeFeedItem({
       digest: null,
       raw_summary_text: null,
       bill: { congress: 119, type: 'HR', number: 4795, title: 'A short title-only intro' },
     })
     const payload = buildBillSharePayload(item, undefined, 'https://preview.test/')
-    expect(payload.title).toBe('A short title-only intro')
-    expect(payload.text).toBe('A short title-only intro')
-    expect(payload.clipboardText).toContain('https://preview.test/?bill=119-hr-4795')
+    expect(payload).toEqual({ title: 'A short title-only intro', url: 'https://preview.test/?bill=119-hr-4795' })
   })
 
   it('maps a bill param to a feed search query', () => {
@@ -118,7 +95,7 @@ describe('billDeepLink', () => {
     const prompt = vi.spyOn(window, 'prompt').mockReturnValue('https://example.test/')
 
     await expect(copyTextToClipboard('https://example.test/')).resolves.toBe(true)
-    expect(prompt).toHaveBeenCalledWith('Copy share text', 'https://example.test/')
+    expect(prompt).toHaveBeenCalledWith('Copy link', 'https://example.test/')
   })
 
   it('shares via navigator.share and treats cancel as cancelled', async () => {
@@ -128,13 +105,60 @@ describe('billDeepLink', () => {
 
     const payload = buildBillSharePayload(makeFeedItem(), undefined, 'https://preview.test/')
     await expect(shareBillViaNavigator(payload)).resolves.toBe('shared')
-    expect(share).toHaveBeenCalledWith({
-      title: payload.title,
-      text: payload.text,
-      url: payload.url,
-    })
+    expect(share).toHaveBeenCalledWith({ title: payload.title, url: payload.url })
 
     share.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'))
     await expect(shareBillViaNavigator(payload)).resolves.toBe('cancelled')
+  })
+
+  describe('shareBill', () => {
+    it('opens the share sheet and shows no toast', async () => {
+      const share = vi.fn().mockResolvedValue(undefined)
+      const writeText = vi.fn()
+      vi.stubGlobal('navigator', { share, clipboard: { writeText } })
+      const add = vi.spyOn(toastManager, 'add')
+
+      await shareBill(makeFeedItem())
+
+      expect(share).toHaveBeenCalledTimes(1)
+      expect(share.mock.calls[0]![0].url).toMatch(/\?bill=119-s-2$/)
+      expect(writeText).not.toHaveBeenCalled()
+      expect(add).not.toHaveBeenCalled()
+    })
+
+    it('does nothing more when the reader dismisses the share sheet', async () => {
+      const share = vi.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError'))
+      const writeText = vi.fn()
+      vi.stubGlobal('navigator', { share, clipboard: { writeText } })
+      const add = vi.spyOn(toastManager, 'add')
+
+      await shareBill(makeFeedItem())
+
+      expect(writeText).not.toHaveBeenCalled()
+      expect(add).not.toHaveBeenCalled()
+    })
+
+    it('copies the link and says so where there is no share sheet', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      vi.stubGlobal('navigator', { clipboard: { writeText } })
+      const add = vi.spyOn(toastManager, 'add')
+
+      await shareBill(makeFeedItem())
+
+      expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?bill=119-s-2$/))
+      expect(add).toHaveBeenCalledWith({ title: 'Link copied' })
+    })
+
+    it('copies the link when the share sheet is refused', async () => {
+      const share = vi.fn().mockRejectedValue(new DOMException('no', 'NotAllowedError'))
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      vi.stubGlobal('navigator', { share, clipboard: { writeText } })
+      const add = vi.spyOn(toastManager, 'add')
+
+      await shareBill(makeFeedItem())
+
+      expect(writeText).toHaveBeenCalledTimes(1)
+      expect(add).toHaveBeenCalledWith({ title: 'Link copied' })
+    })
   })
 })

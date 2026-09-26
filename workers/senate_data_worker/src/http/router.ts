@@ -52,7 +52,6 @@ import { searchMembers } from "../d1/members";
 import { listPolicyAreas } from "../d1/policy-areas";
 import { tryRewriteBillOg } from "./bill-og";
 import { handleOgImageRoute, parseOgImagePath } from "./og-image";
-import { handleCreateBillQuote, handleGetBillQuote } from "./share-quote";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
@@ -62,7 +61,6 @@ import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
 import { buildCommitteesLeaderboard } from "../storage/committee-leaderboard";
 import { runProcessBackfillPipeline } from "../pipeline/run-process-backfill";
-import { runBillTextBackfillPipeline } from "../pipeline/run-bill-text-backfill";
 import { refreshBillProcessQueue } from "../pipeline/refresh-bill-process";
 import type {
   CommitteesLeaderboardResponse,
@@ -471,7 +469,6 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
     runExecutivePostsPipeline(env, { trigger: "admin" }),
   "/__pipeline/run/process-backfill": ({ env }) => runProcessBackfillPipeline(env),
   "/__pipeline/run/process-refresh": ({ env }) => refreshBillProcessQueue(env),
-  "/__pipeline/run/bill-text-backfill": ({ env }) => runBillTextBackfillPipeline(env),
 };
 
 const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
@@ -731,7 +728,6 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       "member search unavailable"
     );
   },
-  "/share/quote.json": ({ env, url, json }) => handleGetBillQuote({ env, url, json }),
   "/stats/policy-areas.json": ({ env, json }) =>
     handleStatsJson(
       json,
@@ -872,11 +868,6 @@ export async function handlePublicFetch(
   const pipeline = PIPELINE_ROUTES[pathname];
   if (pipeline) {
     return handlePipelineRoute(request, env, json, () => pipeline(routeCtx), ctx);
-  }
-
-  // Public write: reader-shared quotes (verified verbatim; idempotent ids).
-  if (pathname === "/share/quote") {
-    return handleCreateBillQuote({ request, env, json });
   }
 
   if (request.method !== "GET") {

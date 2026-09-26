@@ -1083,9 +1083,8 @@ describe("HTTP API", () => {
     expect(ASSETS.fetch).not.toHaveBeenCalled();
   });
 
-  it("accepts public quote shares on preview hosts without admin auth", async () => {
-    // No digest row in the mock DB → the handler ran (past auth) and 404s on the bill.
-    const response = await handlePublicFetch(
+  it("no longer accepts or serves shared quotes", async () => {
+    const write = await handlePublicFetch(
       new Request("https://abc-congress-tracker-api.acct.workers.dev/share/quote", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -1093,24 +1092,13 @@ describe("HTTP API", () => {
       }),
       createMockEnv({ DEV_OPEN_PIPELINE: undefined }) as any
     );
-    expect(response.status).toBe(404);
-    expect(await response.json()).toMatchObject({ error: "bill_not_found" });
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
-  });
+    expect(write.status).toBe(405);
 
-  it("routes quote lookups and rejects non-POST share writes", async () => {
     const lookup = await handlePublicFetch(
       new Request("https://worker.example.com/share/quote.json?id=abcdefabcdefabcd"),
       createMockEnv() as any
     );
     expect(lookup.status).toBe(404);
-    expect(await lookup.json()).toMatchObject({ error: "not_found" });
-
-    const wrongMethod = await handlePublicFetch(
-      new Request("https://worker.example.com/share/quote", { method: "PUT" }),
-      createMockEnv() as any
-    );
-    expect(wrongMethod.status).toBe(405);
   });
 
   it("serves the dynamic OG card path through the image handler", async () => {

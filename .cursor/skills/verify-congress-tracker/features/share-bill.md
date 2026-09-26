@@ -1,12 +1,13 @@
 # Share a bill
 
-Expanded bill detail lets a reader share a paste-ready blurb and deep link. Opening that `/?bill=` URL expands the matching row.
+Expanded bill detail has one Share icon. One tap opens the system share sheet with the bill's headline and `/?bill=` link; where there is no share sheet it copies the link and a `Link copied` pill shows at the bottom. The link's preview card (`/og/bill/<id>.png`) carries the headline, the outcome, and yes/no counts over party-colored bars. Opening the link expands the matching row.
 
 ## Sub-features
 
-- `share-sheet` opens from a single iOS-style share icon (square + upward arrow) at the top of the expanded detail. The sheet previews title, body, and URL. Copy lives **inside** the sheet only — there is no competing Copy link control in the row or footer.
-- `share-copy` copies paste-ready `{headline}\n\n{what_it_does}\n\n{url}` text from the sheet action.
-- `share-deeplink` opens `/?bill=119-hr-1` and expands the energy bill without a click.
+- `share-one-tap` — the icon at the top of the expanded detail. No sheet or preview of our own opens.
+- `share-copy-fallback` — without `navigator.share` the link alone is copied and `Link copied` shows in the Notifications region.
+- `share-deeplink` — `/?bill=119-hr-1` expands the energy bill without a click. Old links with `&quote=` open the bill too and the param is dropped.
+- `share-card` — `GET /og/bill/119-hr-1.png` renders the card; `/?bill=` HTML from the Worker points `og:image` at it.
 
 ## How to get to it (user POV)
 
@@ -20,18 +21,13 @@ Preconditions:
 - Doctor reports a seeded feed. Visible energy topic is `House passes a broad energy permitting and production package` (UI strips `(local sample)`). First timeline row is `Sanders introduces a ban on artificial superintelligence`.
 - Chamber is `All` and the searchbox is empty.
 
-- **Expand first row (desktop).** Reset the viewport to desktop, then load home. Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser cdp --method Emulation.setDeviceMetricsOverride --params '{"width":1280,"height":800,"deviceScaleFactor":1,"mobile":false}'` then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser goto --path /` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role heading --name "Chronological timeline"`. Click the first timeline row: `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "/Sanders introduces a ban on artificial/" --nth 0`. The details region appears. A single **Share** icon (no **Copy link** in the row) sits above **What it does**.
-- **Open share sheet (desktop).** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "Share"`. A dialog `Share this bill` is fully on-screen. The first row stays in the viewport (not shoved above the fold). The sheet is a child of `document.body`, not `.feed-row-detail-panel`.
-- **Proof (desktop sheet).** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --aria --path artifacts/verify/share-bill/sheet.aria.txt` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/share-bill/after-share-desktop.png`.
-- **Open share sheet (390).** Override the viewport. Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser cdp --method Emulation.setDeviceMetricsOverride --params '{"width":390,"height":844,"deviceScaleFactor":2,"mobile":true}'` then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser goto --path /` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role heading --name "Chronological timeline"`. Expand the first row (`/Sanders introduces a ban on artificial/`), then click **Share**. The sheet and first-row headline stay on-screen.
-- **Proof (390 sheet).** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/share-bill/after-share-390.png`.
-- **Deep link.** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser cdp --method Emulation.setDeviceMetricsOverride --params '{"width":1280,"height":800,"deviceScaleFactor":1,"mobile":false}'` then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser goto --path "/?bill=119-hr-1"` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role region --name "/Details for House passes a broad energy/"`. The energy row is expanded without clicking.
-- **Proof (deep link).** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser snapshot --aria --path artifacts/verify/share-bill/deeplink.aria.txt` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/share-bill/deeplink.png`.
+- **Expand first row (desktop).** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser cdp --method Emulation.setDeviceMetricsOverride --params '{"width":1280,"height":800,"deviceScaleFactor":1,"mobile":false}'` then `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser goto --path /` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role heading --name "Chronological timeline"`. Click the first row: `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "/Sanders introduces a ban on artificial/" --nth 0`. A single **Share** icon sits above **What it does**.
+- **Share (desktop, no share sheet).** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser click --role button --name "Share"`. No dialog opens; `Link copied` appears bottom center and the clipboard holds only the `/?bill=` URL.
+- **Proof.** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser screenshot --path artifacts/verify/share-bill/link-copied.png`.
+- **Deep link.** Run `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser goto --path "/?bill=119-hr-1&quote=abcdefabcdefabcd"` and `./.cursor/skills/verify-congress-tracker/bin/verify-congress-tracker browser wait --role region --name "/Details for House passes a broad energy/"`. The energy row is expanded and the address bar no longer has `quote=`.
+- **Card.** After `npm run build:web`, curl the Worker (`127.0.0.1:8788/?bill=119-hr-1`, not Vite) and check `og:image` points at `/og/bill/119-hr-1.png?v=…`; fetch that PNG and look at it.
 
 ## Gotchas
 
-- Desktop Chrome in the helper often has no `navigator.share`. The icon still opens the preview sheet; **Copy link** inside the sheet is the paste path.
-- There is no second Copy link control in the expanded detail or footer.
-- UI strips `(local sample)` from the bill headline. The preview body still uses the digest `what_it_does` text.
-- OG rewrite is Worker HTML, not Vite. The verify stack serves the UI from Vite on 5174; a placeholder `web/dist` is only enough for wrangler to start. Prove rewritten `og:title` by curling the Worker on `127.0.0.1:8788/?bill=119-hr-1` after a real build (`npm run build:web`), not against the Vite origin.
-- `.feed-row-detail-panel` keeps a CSS transform from its enter animation. The sheet **must** portal to `document.body` so `position: fixed` is viewport-relative.
+- Desktop Chrome in the helper has no `navigator.share`, so the copy fallback is what you see there. On iPhone the system share sheet opens instead; test that on a device.
+- OG rewrite is Worker HTML, not Vite. The Vite origin never rewrites `og:*`.

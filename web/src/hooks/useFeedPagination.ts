@@ -5,7 +5,7 @@ import { fetchFeed } from '../api/client'
 import type { FeedItem, FeedPageResponse } from '../api/types'
 import { FEED_PAGE_SIZE } from '../constants/feed'
 import {
-  BILL_QUOTE_QUERY_PARAM,
+  LEGACY_QUOTE_QUERY_PARAM,
   billSearchQueryFromParam,
   clearBillDeepLinkParams,
   feedRowKey,
@@ -85,7 +85,7 @@ export function useFeedPagination() {
     ...advanced,
   }
   const billParam = searchParams.get('bill')
-  const quoteParam = searchParams.get(BILL_QUOTE_QUERY_PARAM)?.trim() || null
+  const hasLegacyQuote = searchParams.has(LEGACY_QUOTE_QUERY_PARAM)
 
   const [retryKey, setRetryKey] = useState(0)
   const [draftQuery, setDraftQuery] = useState(filters.q)
@@ -144,6 +144,11 @@ export function useFeedPagination() {
     },
     [setSearchParams],
   )
+
+  // Links shared before quote sharing was removed carry `&quote=`: the bill still opens, the id is dropped.
+  useEffect(() => {
+    if (hasLegacyQuote) replaceSearchParams((params) => params.delete(LEGACY_QUOTE_QUERY_PARAM))
+  }, [hasLegacyQuote, replaceSearchParams])
 
   const loadFeedPage = useCallback(
     async (offset: number, mode: 'replace' | 'append', nextFilters: FeedFilters) => {
@@ -382,8 +387,6 @@ export function useFeedPagination() {
         deepLinkBillRef.current = bill
         deepLinkQueryRef.current = deepLinkQueryKey(filtersRef.current, bill)
         replaceSearchParams((params) => {
-          // A stale quote id must not follow the reader to a different bill.
-          if (params.get('bill') !== bill) params.delete(BILL_QUOTE_QUERY_PARAM)
           params.set('bill', bill)
         })
       }
@@ -501,8 +504,6 @@ export function useFeedPagination() {
     billMissingNotice,
     /** Bill the URL deep-links to (also set when a reader expands a row). */
     billParam,
-    /** `?quote=` id, only meaningful for `billParam`'s row. */
-    quoteParam,
     lastFeedModeRef,
     reloadFeed,
     loadMore,

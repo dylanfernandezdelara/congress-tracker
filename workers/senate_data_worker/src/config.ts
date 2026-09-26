@@ -15,11 +15,6 @@ export interface Env {
    * plain Worker `fetch` is Akamai-blocked (HTTP 403). Optional in tests.
    */
   BROWSER?: SenateBrowserBinding;
-  /**
-   * Workers Rate Limiting binding for public `POST /share/quote` (per-IP burst
-   * cap). Optional: unit tests and older local wrangler runs omit it.
-   */
-  SHARE_RATE_LIMITER?: RateLimit;
   CONGRESS: string;
   SESSION: string;
   ALLOWED_ORIGIN?: string;

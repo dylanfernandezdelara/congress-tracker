@@ -1,52 +1,25 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-import type { BillQuote } from '@congress-tracker/shared/share-api-types'
-
-import { createBillQuote } from '../api/client'
 import type { FeedItem, FeedPrimarySponsor } from '../api/types'
-import { copyTextToClipboard, formatBillQueryParam } from '../utils/billDeepLink'
+import { shareBill } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
 import { getBillLifecycleStages } from '../utils/billLifecycleStages'
 import { getFeedSummaryContent, isProceduralFeedItem } from '../utils/feedRowLabels'
-import { latestPassageVote } from '../utils/ogCardModel'
-import { shareQuoteErrorCopy } from '../utils/shareQuoteCopy'
 import { primarySponsorDisplay } from '../utils/sponsorLabels'
-import { useBillShare } from '../hooks/useBillShare'
-import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
-import { useSharedQuoteLanding } from '../hooks/useSharedQuoteLanding'
-import { notify } from '@/lib/toast'
-import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
+import { useRollDefectors } from '../hooks/useRollDefectors'
 import { BillPipeline } from './BillPipeline'
-import { BillShareSheet } from './BillShareSheet'
 import { BillTextChangesSection } from './BillTextChangesSection'
 import { ShareIcon } from './ShareIcon'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 import { FeedSummarySections } from './FeedSummarySections'
 import { MemberProfileTrigger } from './MemberProfileTrigger'
 import { PassageVoteDetails } from './PassageVoteDetails'
-import { SelectionMenu } from './SelectionMenu'
 
 type FeedRowDetailProps = {
   item: FeedItem
   /** Override for the share URL; defaults to the timeline deep link. */
   shareUrl?: string
-  /** `?quote=` id from a shared link that targets this bill. */
-  quoteId?: string | null
-}
-
-const SELECTION_STATUS_MS = 1800
-
-function SharedQuoteCallout({ quote }: { quote: BillQuote }) {
-  return (
-    <aside className="shared-quote-callout" aria-label="Shared quote">
-      <p className="shared-quote-callout-label">Shared quote</p>
-      <p className="shared-quote-callout-text">“{quote.text}”</p>
-      <p className="shared-quote-callout-note">
-        This passage is no longer in the summary shown below.
-      </p>
-    </aside>
-  )
 }
 
 function SponsorLine({ sponsor }: { sponsor: FeedPrimarySponsor }) {
@@ -108,7 +81,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
   )
 }
 
-export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailProps) {
+export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   const sourceUrl = congressGovBillUrl(item.bill.congress, item.bill.type, item.bill.number)
   const isProcedural = isProceduralFeedItem(item)
   const summary = getFeedSummaryContent(item)
@@ -118,58 +91,10 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
       ? (stages.find((stage) => stage.key === 'outcome')?.detail ?? null)
       : null
   const defectorsByRoll = useRollDefectors(item.passage_votes)
-  const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
-  const [sharingQuote, setSharingQuote] = useState(false)
-  const detailRef = useRef<HTMLDivElement>(null)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
-  const latestVote = latestPassageVote(item.passage_votes)
-  const latestRollKey = latestVote ? voteRollKey(latestVote) : null
-  const latestDefectors = latestRollKey ? defectorsByRoll.get(latestRollKey) : undefined
-  const share = useBillShare(item, {
-    shareUrl,
-    partySplits: latestDefectors?.status === 'ready' ? latestDefectors.partySplits : [],
-  })
-  const { selection, clear: clearSelection } = useTextSelectionMenu(detailRef, {
-    enabled: !share.open,
-  })
-  const landing = useSharedQuoteLanding({
-    item,
-    quoteId,
-    summary,
-    containerRef: detailRef,
-    notify,
-  })
-
-  useEffect(() => {
-    if (!selectionStatus) return
-    const timer = window.setTimeout(() => setSelectionStatus(null), SELECTION_STATUS_MS)
-    return () => window.clearTimeout(timer)
-  }, [selectionStatus])
-
-  const handleShareQuote = async (current: TextSelection) => {
-    setSharingQuote(true)
-    try {
-      const { quote } = await createBillQuote({
-        bill: formatBillQueryParam(item.bill),
-        text: current.text,
-      })
-      clearSelection()
-      share.openSheet(quote)
-    } catch (error) {
-      setSelectionStatus(shareQuoteErrorCopy(error))
-    } finally {
-      setSharingQuote(false)
-    }
-  }
-
-  const handleCopySelection = async (current: TextSelection) => {
-    const ok = await copyTextToClipboard(current.text)
-    setSelectionStatus(ok ? 'Copied' : "Couldn't copy")
-  }
-
   return (
-    <div className="feed-row-detail" ref={detailRef}>
+    <div className="feed-row-detail">
       <div className="feed-row-detail-topbar">
         {sponsorDisplay && item.primary_sponsor ? (
           <p className="feed-row-sponsor">
@@ -180,7 +105,9 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         <button
           type="button"
           className="feed-row-share"
-          onClick={() => share.openSheet(null)}
+          onClick={() => {
+            void shareBill(item, shareUrl)
+          }}
           aria-label="Share"
           title="Share"
         >
@@ -188,9 +115,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         </button>
       </div>
 
-      {landing.quote && !landing.inSummary ? <SharedQuoteCallout quote={landing.quote} /> : null}
-
-      <FeedSummarySections content={summary} highlight={landing.highlight} />
+      <FeedSummarySections content={summary} />
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 
@@ -230,34 +155,6 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
           Read on congress.gov ↗
         </a>
       </footer>
-
-      <BillShareSheet
-        open={share.open}
-        selectionKey={share.selectionKey}
-        payload={share.payload}
-        card={share.card}
-        copied={share.copied}
-        onClose={share.closeSheet}
-        onShare={() => {
-          void share.share()
-        }}
-        onCopy={() => {
-          void share.copyLink()
-        }}
-      />
-
-      <SelectionMenu
-        selection={selection}
-        status={selectionStatus}
-        busy={sharingQuote}
-        onShareQuote={(current) => {
-          void handleShareQuote(current)
-        }}
-        onCopy={(current) => {
-          void handleCopySelection(current)
-        }}
-      />
-
     </div>
   )
 }

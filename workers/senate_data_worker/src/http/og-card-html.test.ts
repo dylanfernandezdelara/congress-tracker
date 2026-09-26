@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import type { OgCardModel, OgCardTally } from "../../../../shared/og-card";
-import { OG_CARD_SITE_LABEL } from "../../../../shared/og-card";
-import { buildOgCardHtml, ogCardLegend } from "./og-card-html";
+import { OG_CARD_COLORS, type OgCardModel } from "../../../../shared/og-card";
+import { buildOgCardHtml } from "./og-card-html";
+
+const { party: PARTY, track: TRACK, law: LAW } = OG_CARD_COLORS;
 
 function model(overrides: Partial<OgCardModel> = {}): OgCardModel {
   return {
+    bill_label: "H.R. 1",
     docket: "H.R. 1 · 119th Congress",
     headline: "House passes a permitting package",
-    quote: null,
+    outcome: "passed",
+    outcome_label: "Passed House",
+    outcome_date: null,
     status_line: "Passed House 219–213 · Sep 3, 2026",
     tally: {
       chamber: "House",
@@ -20,150 +24,117 @@ function model(overrides: Partial<OgCardModel> = {}): OgCardModel {
         { party: "I", yeas: 0, nays: 6, party_line: "nay" },
       ],
     },
+    two_thirds: false,
     ...overrides,
   };
 }
 
+/** Background colors in document order: the page, the panel, then each bar's segments and track. */
 function backgroundColors(html: string): string[] {
   return [...html.matchAll(/background-color:(#[0-9a-fA-F]{6})/g)].map((m) => m[1]!);
 }
 
-describe("ogCardLegend", () => {
-  it("uses Yea/Nay totals when there are no party splits", () => {
-    const tally: OgCardTally = {
-      chamber: "House",
-      yeas: 219,
-      nays: 213,
-      party_splits: [],
-    };
-    expect(ogCardLegend(tally)).toEqual({ yea: "Yea 219", nay: "Nay 213" });
-  });
-
-  it("prefixes per-party counts in bar order, skipping zeros", () => {
-    const tally: OgCardTally = {
-      chamber: "House",
-      yeas: 219,
-      nays: 213,
-      party_splits: [
-        { party: "D", yeas: 212, nays: 2, party_line: "yea" },
-        { party: "R", yeas: 7, nays: 205, party_line: "nay" },
-        { party: "I", yeas: 0, nays: 6, party_line: "nay" },
-      ],
-    };
-    expect(ogCardLegend(tally)).toEqual({
-      yea: "Yea 219 · D 212 · R 7",
-      nay: "Nay 213 · R 205 · I 6 · D 2",
-    });
-  });
-});
+/** Bar segments as `color:count`, in document order (yes bar first). */
+function barSegments(html: string): string[] {
+  return [...html.matchAll(/flex-grow:(\d+);flex-basis:0;height:24px;background-color:(#[0-9a-fA-F]{6})/g)].map(
+    (m) => `${m[2]}:${m[1]}`
+  );
+}
 
 describe("buildOgCardHtml", () => {
-  it("renders a sans headline when quote is null", () => {
-    const html = buildOgCardHtml(model({ quote: null }));
-    expect(html).toContain("TRACK CONGRESS");
-    expect(html).toContain("H.R. 1 · 119th Congress");
+  it("shows the wordmark with the bill number, the headline, the outcome and both counts", () => {
+    const html = buildOgCardHtml(model());
+    expect(html).toContain("Track Congress · H.R. 1");
     expect(html).toContain("House passes a permitting package");
-    expect(html).toContain("font-size:58px");
-    expect(html).toContain("font-weight:700");
-    expect(html).toContain("font-family:Inter");
-    expect(html).not.toContain("\u201c");
-    expect(html).toContain(OG_CARD_SITE_LABEL);
-    expect(html).toContain("Passed House 219–213 · Sep 3, 2026");
+    expect(html).toContain("Passed House");
+    expect(html).toMatch(/>219<\/div>.*>yes<\/div>/);
+    expect(html).toMatch(/>213<\/div>.*>no<\/div>/);
   });
 
-  it("renders a serif quote with a decorative mark and muted headline", () => {
+  it("leaves out what the picture or the message app already says", () => {
+    const html = buildOgCardHtml(model());
+    expect(html).not.toContain("trackcongress.org");
+    expect(html).not.toContain("Sep 3, 2026");
+    expect(html).not.toContain("119th Congress");
+    expect(html).not.toMatch(/\bD 212\b|\bR 205\b/);
+    expect(html).not.toContain("2/3");
+  });
+
+  it("splits each side's bar by party in D, I, R order on one scale, then the unfilled track", () => {
+    const html = buildOgCardHtml(model());
+    expect(barSegments(html)).toEqual([
+      `${PARTY.D}:212`,
+      `${PARTY.R}:7`,
+      `${TRACK}:213`,
+      `${PARTY.D}:2`,
+      `${PARTY.I}:6`,
+      `${PARTY.R}:205`,
+      `${TRACK}:219`,
+    ]);
+  });
+
+  it("draws a unanimous vote as one full yes bar and an empty no bar", () => {
     const html = buildOgCardHtml(
       model({
-        quote: "This bill speeds energy permits.",
-        headline: "House passes a permitting package",
+        tally: {
+          chamber: "House",
+          yeas: 424,
+          nays: 0,
+          party_splits: [
+            { party: "D", yeas: 213, nays: 0, party_line: "yea" },
+            { party: "R", yeas: 210, nays: 0, party_line: "yea" },
+            { party: "I", yeas: 1, nays: 0, party_line: "yea" },
+          ],
+        },
       })
     );
-    expect(html).toContain("\u201c");
-    expect(html).toContain("This bill speeds energy permits.");
-    expect(html).toContain("font-size:46px");
-    expect(html).toContain("font-family:'Source Serif 4'");
-    expect(html).toContain("line-clamp:4");
-    expect(html).toContain("font-size:22px");
-    expect(html).toContain("text-overflow:ellipsis");
-    expect(html).toContain("House passes a permitting package");
-    expect(html).not.toContain("font-size:58px");
+    expect(barSegments(html)).toEqual([`${PARTY.D}:213`, `${PARTY.I}:1`, `${PARTY.R}:210`, `${TRACK}:424`]);
+  });
+
+  it("uses one neutral segment per side when the party split does not reconcile", () => {
+    const html = buildOgCardHtml(
+      model({ tally: { chamber: "Senate", yeas: 51, nays: 49, party_splits: [] } })
+    );
+    expect(barSegments(html)).toEqual([`${PARTY.Other}:51`, `${TRACK}:49`, `${PARTY.Other}:49`, `${TRACK}:51`]);
+  });
+
+  it("marks two-thirds on the yes bar only when the vote needed it", () => {
+    const html = buildOgCardHtml(model({ outcome: "failed", outcome_label: "Failed House", two_thirds: true }));
+    expect(html.match(/>2\/3</g)).toHaveLength(1);
+    expect(html).toContain(`left:${(2 / 3) * 100}%`);
+    expect(html).toContain("Failed House");
+  });
+
+  it("shows a law's date under Became law, in the law color, with no counts", () => {
+    const html = buildOgCardHtml(
+      model({ outcome: "law", outcome_label: "Became law", outcome_date: "Jul 4, 2025", tally: null })
+    );
+    expect(html).toContain(`color:${LAW};">Became law`);
+    expect(html).toContain("Jul 4, 2025");
+    expect(html).not.toContain(">yes<");
+    expect(backgroundColors(html)).not.toContain(TRACK);
+  });
+
+  it("says only In committee for a bill with no vote yet", () => {
+    const html = buildOgCardHtml(
+      model({ outcome: "no_vote", outcome_label: "In committee", tally: null, status_line: "Introduced · In committee" })
+    );
+    expect(html).toContain("In committee");
+    expect(html).not.toContain("No vote yet");
+    expect(html).not.toContain(">yes<");
   });
 
   it("neutralizes angle brackets without entity-encoding text (satori prints entities literally)", () => {
     const html = buildOgCardHtml(
-      model({
-        docket: `H.R. 1 <x> & "y"`,
-        headline: `Say <b>no</b> & "maybe"`,
-        quote: `He said <yes> & "go"`,
-        status_line: `Passed <House> & "219"`,
-        tally: null,
-      })
+      model({ bill_label: `H.R. 1 <x>`, headline: `Say <b>no</b> & "maybe"`, outcome_label: `Passed <House>` })
     );
     expect(html).not.toContain("<x>");
     expect(html).not.toContain("<b>");
-    expect(html).not.toContain("<yes>");
     expect(html).not.toContain("<House>");
     expect(html).not.toContain("&amp;");
     expect(html).not.toContain("&quot;");
-    expect(html).toContain(`H.R. 1 \u2039x\u203a & "y"`);
-    expect(html).toContain(`Say \u2039b\u203ano\u2039/b\u203a & "maybe"`);
-    expect(html).toContain(`He said \u2039yes\u203a & "go"`);
-    expect(html).toContain(`Passed \u2039House\u203a & "219"`);
-  });
-
-  it("draws party-split bar segments in locked order and colors", () => {
-    const html = buildOgCardHtml(model());
-    const colors = backgroundColors(html);
-    // card #ffffff, accent #111827, then yea D→R and nay R→I→D
-    expect(colors).toContain("#2563eb");
-    expect(colors).toContain("#dc2626");
-    expect(colors).toContain("#fecaca");
-    expect(colors).toContain("#ddd6fe");
-    expect(colors).toContain("#bfdbfe");
-    const barColors = colors.filter((c) =>
-      ["#2563eb", "#dc2626", "#fecaca", "#ddd6fe", "#bfdbfe"].includes(c)
-    );
-    expect(barColors).toEqual(["#2563eb", "#dc2626", "#fecaca", "#ddd6fe", "#bfdbfe"]);
-    expect(html).toContain("Yea 219 · D 212 · R 7");
-    expect(html).toContain("Nay 213 · R 205 · I 6 · D 2");
-    expect(html).toContain("height:14px");
-    expect(html).toContain("margin-right:2px");
-    expect(html).not.toContain("In committee");
-  });
-
-  it("uses Other-party colors when the tally has no splits", () => {
-    const html = buildOgCardHtml(
-      model({
-        tally: { chamber: "Senate", yeas: 51, nays: 49, party_splits: [] },
-      })
-    );
-    const barColors = backgroundColors(html).filter((c) => c === "#374151" || c === "#d1d5db");
-    expect(barColors).toEqual(["#374151", "#d1d5db"]);
-    expect(html).toContain("Yea 51");
-    expect(html).toContain("Nay 49");
-  });
-
-  it("renders a status chip instead of a bar when tally is null", () => {
-    const html = buildOgCardHtml(
-      model({
-        status_line: "Became law · Sep 1, 2026",
-        tally: null,
-      })
-    );
-    expect(html).toContain("Sep 1, 2026");
-    expect(html).toContain("border:2px solid #e5e7eb");
-    expect(html).not.toContain("background-color:#2563eb");
-    expect(html).not.toContain("Yea ");
-  });
-
-  it("uses In committee on the chip when status_line has no separator", () => {
-    const html = buildOgCardHtml(
-      model({
-        status_line: "Still moving",
-        tally: null,
-      })
-    );
-    expect(html).toContain("In committee");
-    expect(html).toContain("Still moving");
+    expect(html).toContain(`H.R. 1 ‹x›`);
+    expect(html).toContain(`Say ‹b›no‹/b› & "maybe"`);
+    expect(html).toContain(`Passed ‹House›`);
   });
 });

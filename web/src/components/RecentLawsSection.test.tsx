@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -271,15 +271,12 @@ describe('RecentLawsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand details for H.R. 1' }))
     expect(screen.getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
 
+    // No system share sheet here, so one tap copies the link itself.
     fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy link' }))
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalled()
+      expect(writeText).toHaveBeenCalledTimes(1)
     })
-    const copied = String(writeText.mock.calls[0]?.[0] ?? '')
-    expect(copied).toContain('bill=119-hr-1')
-    expect(await within(dialog).findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+    expect(writeText.mock.calls[0]![0]).toMatch(/\/\?bill=119-hr-1$/)
   })
 
   it('copies the congress.gov URL for aged-out laws', async () => {
@@ -295,15 +292,10 @@ describe('RecentLawsSection', () => {
     expect(screen.getByRole('heading', { name: 'What it does' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy link' }))
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalled()
+      expect(writeText).toHaveBeenCalledTimes(1)
     })
-    const copied = String(writeText.mock.calls[0]?.[0] ?? '')
-    expect(copied).toContain('/bill/119th-congress/house-bill/1')
-    expect(copied).not.toContain('bill=')
-    expect(await within(dialog).findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+    expect(writeText.mock.calls[0]![0]).toMatch(/\/bill\/119th-congress\/house-bill\/1$/)
   })
 
   it('falls back to Became law when law_kind is null', () => {

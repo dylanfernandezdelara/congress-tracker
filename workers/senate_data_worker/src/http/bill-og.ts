@@ -8,10 +8,7 @@ import {
   parseShareDigestJson,
 } from "../../../../shared/share-copy";
 import { ogCardImagePath, ogCardVersion, type OgCardModel } from "../../../../shared/og-card";
-import { quoteBelongsToBill } from "../../../../shared/quote-verification";
-import { BILL_QUOTE_QUERY_PARAM, type BillQuote } from "../../../../shared/share-api-types";
 import type { Env } from "../config";
-import { getBillQuote, isBillQuoteId } from "../d1/bill-quotes";
 import { getDigest, type DigestRow } from "../d1/digests";
 import { loadOgCardModel } from "./og-card-model";
 import { isProductionPipelineHost } from "./pipeline-auth";
@@ -40,18 +37,12 @@ export function publicShareOrigin(url: URL): string {
 export function ogImageFields(
   bill: { congress: number; type: string; number: number },
   model: OgCardModel,
-  quote: BillQuote | null,
   imageOrigin: string
 ): Pick<ShareMetaFields, "image" | "imageAlt"> {
-  const path = ogCardImagePath(bill, {
-    quoteId: quote?.id ?? null,
-    version: ogCardVersion(model),
-  });
+  const path = ogCardImagePath(bill, { version: ogCardVersion(model) });
   return {
     image: `${imageOrigin}${path}`,
-    imageAlt: quote
-      ? `“${quote.text}” — ${model.docket}, ${model.status_line}`
-      : `${model.headline} — ${model.docket}, ${model.status_line}`,
+    imageAlt: `${model.headline} — ${model.docket}, ${model.status_line}`,
   };
 }
 
@@ -200,8 +191,7 @@ export function rewriteShareMeta(html: string, fields: ShareMetaFields): string 
 
 export function ogFieldsFromDigest(
   row: DigestRow | null,
-  bill: { congress: number; type: string; number: number },
-  quote: BillQuote | null = null
+  bill: { congress: number; type: string; number: number }
 ): ShareMetaFields | null {
   if (!row) return null;
   const parsed = parseShareDigestJson(row.digest_json);
@@ -213,25 +203,7 @@ export function ogFieldsFromDigest(
     bill,
   });
   if (!copy.title && !copy.text) return null;
-  const fields = buildBillOgFields(copy, bill);
-  if (!quote) return fields;
-  return {
-    ...fields,
-    description: `“${quote.text}”`,
-    url: `${fields.url}&${BILL_QUOTE_QUERY_PARAM}=${quote.id}`,
-  };
-}
-
-/** Stored quote for `?quote=` when it exists and belongs to this bill; else null. */
-export async function resolveSharedQuote(
-  env: Env,
-  url: URL,
-  bill: { congress: number; type: string; number: number }
-): Promise<BillQuote | null> {
-  const raw = url.searchParams.get(BILL_QUOTE_QUERY_PARAM)?.trim().toLowerCase();
-  if (!isBillQuoteId(raw)) return null;
-  const quote = await getBillQuote(env.DB, raw);
-  return quote && quoteBelongsToBill(quote, bill) ? quote : null;
+  return buildBillOgFields(copy, bill);
 }
 
 function billOgHeaders(shell: Response): Headers {
@@ -274,18 +246,15 @@ export async function tryRewriteBillOg(
 
   const row = await getDigest(env.DB, parsed.congress, parsed.type, parsed.number);
   if (!row) return shell;
-  const quote = await resolveSharedQuote(env, url, parsed);
-  let fields = ogFieldsFromDigest(row, parsed, quote);
+  // An old quote link (`&quote=`) gets the bill's card; quotes are no longer shared.
+  let fields = ogFieldsFromDigest(row, parsed);
   if (!fields) return shell;
 
   // The dynamic card is an enhancement: any model failure keeps the static image.
   try {
-    const card = await loadOgCardModel(env, parsed, quote?.id ?? null, {
-      digestRow: row,
-      quote,
-    });
+    const card = await loadOgCardModel(env, parsed, { digestRow: row });
     if (card.ok) {
-      fields = { ...fields, ...ogImageFields(parsed, card.model, quote, publicShareOrigin(url)) };
+      fields = { ...fields, ...ogImageFields(parsed, card.model, publicShareOrigin(url)) };
     }
   } catch (err: unknown) {
     console.warn("bill_og_card_model_failed", err);

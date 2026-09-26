@@ -12,11 +12,15 @@ import {
 import { createMockEnv } from "./test-fixtures";
 
 const CARD: OgCardModel = {
+  bill_label: "H.R. 1",
   docket: "H.R. 1 · 119th Congress",
   headline: "House passes a permitting package",
-  quote: null,
+  outcome: "passed",
+  outcome_label: "Passed House",
+  outcome_date: null,
   status_line: "Passed House 219–213 · Sep 3, 2026",
   tally: { chamber: "House", yeas: 219, nays: 213, party_splits: [] },
+  two_thirds: false,
 };
 
 function pngResponse(body = "png-bytes"): Response {
@@ -50,8 +54,7 @@ async function route(
     render?: (html: string) => Promise<Response>;
     loadModel?: (
       env: Env,
-      bill: { congress: number; type: string; number: number },
-      quoteId: string | null
+      bill: { congress: number; type: string; number: number }
     ) => Promise<LoadOgCardModelResult>;
     cache?: ReturnType<typeof mockCache>;
   } = {}
@@ -164,20 +167,19 @@ describe("handleOgImageRoute", () => {
     const loadModel = vi.fn(
       async (
         _env: Env,
-        bill: { congress: number; type: string; number: number },
-        quoteId: string | null
+        bill: { congress: number; type: string; number: number }
       ): Promise<LoadOgCardModelResult> => {
         expect(bill).toEqual({ congress: 119, type: "HR", number: 1 });
-        expect(quoteId).toBe("deadbeefdeadbeef");
         return { ok: true, model: CARD };
       }
     );
     const render = vi.fn(async (html: string) => {
-      expect(html).toContain("TRACK CONGRESS");
+      expect(html).toContain("Track Congress · H.R. 1");
       expect(html).toContain("House passes a permitting package");
       return pngResponse("rendered-png");
     });
 
+    // An old quote link's image URL still carries `quote=`; the card is the bill's.
     const res = await route("/og/bill/119-hr-1.png?quote=deadbeefdeadbeef&v=ver1", {
       cache,
       ctx: { waitUntil },
@@ -194,27 +196,9 @@ describe("handleOgImageRoute", () => {
     await waitUntil.mock.calls[0]![0];
     expect(cache.put).toHaveBeenCalledTimes(1);
     const putReq = cache.put.mock.calls[0]![0] as Request;
-    expect(putReq.url).toContain("quote=deadbeefdeadbeef");
+    expect(putReq.url).not.toContain("quote=");
     expect(putReq.url).toContain(`v=${ogCardVersion(CARD)}`);
     expect(putReq.url).not.toContain("ver1");
-  });
-
-  it("treats an invalid q as absent", async () => {
-    const loadModel = vi.fn(
-      async (
-        _env: Env,
-        _bill: { congress: number; type: string; number: number },
-        quoteId: string | null
-      ): Promise<LoadOgCardModelResult> => {
-        expect(quoteId).toBeNull();
-        return { ok: true, model: CARD };
-      }
-    );
-    await route("/og/bill/119-hr-1.png?quote=NOT-HEX", {
-      cache: mockCache(),
-      loadModel,
-    });
-    expect(loadModel).toHaveBeenCalled();
   });
 
   it("awaits cache.put when ctx is omitted", async () => {
@@ -227,7 +211,7 @@ describe("handleOgImageRoute", () => {
     const res = await route("/og/bill/119-hr-1.png", {
       env: envWithAssets(null),
       cache: mockCache(),
-      loadModel: async () => ({ ok: false, reason: "quote_not_found" }),
+      loadModel: async () => ({ ok: false, reason: "bill_not_found" }),
     });
     expect(res.headers.get("x-og-card")).toBe("fallback");
     const bytes = new Uint8Array(await res.arrayBuffer());

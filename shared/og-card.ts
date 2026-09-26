@@ -1,19 +1,19 @@
 /**
- * Model for the 1200×630 "tally" share card (canvas option H4).
+ * Model for the 1200×630 share card: headline on the left, the outcome on the
+ * right with yes and no counts and a party-colored bar under each.
  * The worker renders it to PNG (`/og/bill/:id.png`); the web share sheet renders
  * an HTML twin so the preview matches what crawlers fetch.
  */
-import { formatBillDocket, formatBillQueryParam, trimDisplayTitle } from './bill-id'
+import { formatBillDocket, formatBillQueryParam, formatShortBillId, trimDisplayTitle } from './bill-id'
 import { proceduralHeadline } from './procedural-titles'
 import type { RollPartySplit } from './stats-api-types'
-import { BILL_QUOTE_QUERY_PARAM } from './share-api-types'
 
 export const OG_CARD_WIDTH = 1200
 export const OG_CARD_HEIGHT = 630
 export const OG_CARD_SITE_LABEL = 'trackcongress.org'
-/** Longest quote the card will render before truncating with an ellipsis. */
-export const OG_CARD_QUOTE_MAX_CHARS = 220
 export const OG_CARD_HEADLINE_MAX_CHARS = 140
+/** Bump when the card's look changes, so link previews refetch every card. */
+export const OG_CARD_DESIGN = 'scoreboard-1'
 
 export interface OgCardTally {
   chamber: 'House' | 'Senate'
@@ -23,33 +23,34 @@ export interface OgCardTally {
   party_splits: RollPartySplit[]
 }
 
+/** What the card's right panel says happened. */
+export type OgCardOutcome = 'passed' | 'failed' | 'law' | 'vetoed' | 'no_vote'
+
 export interface OgCardModel {
-  /** `H.R. 1 · 119th Congress` */
+  /** `H.R. 1`, shown beside the wordmark. */
+  bill_label: string
+  /** `H.R. 1 · 119th Congress`, for alt text. */
   docket: string
-  /** Digest headline (or trimmed official title) — main text when `quote` is null. */
+  /** Digest headline (or trimmed official title). */
   headline: string
-  /** Verbatim shared quote; when present it becomes the main text. */
-  quote: string | null
-  /** `Passed House 219–213 · Sep 3, 2026`, `Became law · …`, `Introduced · In committee`. */
+  outcome: OgCardOutcome
+  /** `Passed House`, `Failed Senate`, `Became law`, `Vetoed`, `In committee`. */
+  outcome_label: string
+  /** Enactment or veto date (`Jul 4, 2025`); null otherwise. */
+  outcome_date: string | null
+  /** One-line status for alt text: `Passed House 219–213 · Sep 3, 2026`. */
   status_line: string
-  /** Party-split bar data; null for bills with no passage vote yet. */
+  /** Yes and no counts with party splits; null unless the outcome is a vote. */
   tally: OgCardTally | null
+  /** The vote needed two-thirds (suspension, veto override, constitutional amendment). */
+  two_thirds: boolean
 }
 
-/** Order segments are drawn left → right: yea side by party, then nay side. */
-export type OgCardBarSegment = {
-  party: 'D' | 'R' | 'I' | 'Other'
-  side: 'yea' | 'nay'
-  count: number
-}
+export type OgCardParty = 'D' | 'I' | 'Other' | 'R'
 
-const PARTY_ORDER: Array<OgCardBarSegment['party']> = ['D', 'I', 'Other', 'R']
+/** Left-to-right order of party segments inside each bar. */
+export const OG_CARD_PARTY_ORDER: ReadonlyArray<OgCardParty> = ['D', 'I', 'Other', 'R']
 
-/**
- * Bar segments for the tally. With party splits: D→I→Other→R yeas, then
- * R→Other→I→D nays so the two "outer" colors meet their own party's nays.
- * Without splits: a single yea segment and a single nay segment.
- */
 /**
  * Party splits come from per-member roll rows, the tally from the roll header.
  * Only trust the split when both agree, otherwise a partially ingested roll
@@ -66,71 +67,51 @@ export function reconciledPartySplits(tally: OgCardTally): RollPartySplit[] {
   return yeas === tally.yeas && nays === tally.nays ? tally.party_splits : []
 }
 
-export function ogCardBarSegments(tally: OgCardTally): OgCardBarSegment[] {
-  const total = tally.yeas + tally.nays
-  if (total <= 0) return []
-  const splits = reconciledPartySplits(tally)
-  if (splits.length === 0) {
-    return [
-      { party: 'Other', side: 'yea', count: tally.yeas },
-      { party: 'Other', side: 'nay', count: tally.nays },
-    ]
-  }
-  const byParty = new Map<OgCardBarSegment['party'], RollPartySplit>()
-  for (const split of splits) {
-    const key = normalizeBarParty(split.party)
-    const existing = byParty.get(key)
-    byParty.set(
-      key,
-      existing
-        ? { ...existing, yeas: existing.yeas + split.yeas, nays: existing.nays + split.nays }
-        : { ...split, party: key },
-    )
-  }
-  const yeas: OgCardBarSegment[] = []
-  const nays: OgCardBarSegment[] = []
-  for (const party of PARTY_ORDER) {
-    const split = byParty.get(party)
-    if (!split) continue
-    if (split.yeas > 0) yeas.push({ party, side: 'yea', count: split.yeas })
-    if (split.nays > 0) nays.push({ party, side: 'nay', count: split.nays })
-  }
-  return [...yeas, ...nays.reverse()]
-}
-
-function normalizeBarParty(party: string): OgCardBarSegment['party'] {
+function normalizeBarParty(party: string): OgCardParty {
   const code = party.trim().toUpperCase()
   if (code === 'D' || code === 'R' || code === 'I') return code
   return 'Other'
 }
 
-const YEA_PARTY_ORDER: ReadonlyArray<OgCardBarSegment['party']> = ['D', 'I', 'Other', 'R']
-const NAY_PARTY_ORDER: ReadonlyArray<OgCardBarSegment['party']> = ['R', 'Other', 'I', 'D']
-
-function partyCountPrefix(splits: RollPartySplit[], side: 'yea' | 'nay'): string {
-  if (splits.length === 0) return ''
-  const order = side === 'yea' ? YEA_PARTY_ORDER : NAY_PARTY_ORDER
-  const parts: string[] = []
-  for (const party of order) {
-    let count = 0
-    for (const split of splits) {
-      if (normalizeBarParty(split.party) !== party) continue
-      count += side === 'yea' ? split.yeas : split.nays
-    }
-    if (count > 0) parts.push(`${party} ${count}`)
+/**
+ * One side's votes by party, in bar order. Without reconciled splits the side
+ * is a single `Other` segment, drawn in the neutral color.
+ */
+export function ogCardSideSegments(
+  tally: OgCardTally,
+  side: 'yea' | 'nay',
+): Array<{ party: OgCardParty; count: number }> {
+  const total = side === 'yea' ? tally.yeas : tally.nays
+  if (total <= 0) return []
+  const splits = reconciledPartySplits(tally)
+  if (splits.length === 0) return [{ party: 'Other', count: total }]
+  const byParty = new Map<OgCardParty, number>()
+  for (const split of splits) {
+    const party = normalizeBarParty(split.party)
+    byParty.set(party, (byParty.get(party) ?? 0) + (side === 'yea' ? split.yeas : split.nays))
   }
-  return parts.join(' · ')
+  return OG_CARD_PARTY_ORDER.filter((party) => (byParty.get(party) ?? 0) > 0).map((party) => ({
+    party,
+    count: byParty.get(party)!,
+  }))
 }
 
-/** Legend labels under the tally bar: total first, party detail only when splits reconcile. */
-export function ogCardLegend(tally: OgCardTally): { yea: string; nay: string } {
-  const splits = reconciledPartySplits(tally)
-  const yeaDetail = partyCountPrefix(splits, 'yea')
-  const nayDetail = partyCountPrefix(splits, 'nay')
-  return {
-    yea: yeaDetail ? `Yea ${tally.yeas} · ${yeaDetail}` : `Yea ${tally.yeas}`,
-    nay: nayDetail ? `Nay ${tally.nays} · ${nayDetail}` : `Nay ${tally.nays}`,
-  }
+/**
+ * Passage that needs two-thirds of those voting: House suspension votes, veto
+ * overrides, and joint resolutions proposing a constitutional amendment.
+ */
+export function requiresTwoThirds(params: {
+  question: string | null | undefined
+  billType: string
+  officialTitle: string | null | undefined
+}): boolean {
+  const question = params.question ?? ''
+  if (/suspend the rules/i.test(question) || /overrid/i.test(question)) return true
+  const type = params.billType.toUpperCase()
+  return (
+    (type === 'HJRES' || type === 'SJRES') &&
+    /^\s*proposing an amendment to the constitution/i.test(params.officialTitle ?? '')
+  )
 }
 
 export function truncateForCard(text: string, max: number): string {
@@ -159,6 +140,8 @@ export function formatCardDate(iso: string | null | undefined): string | null {
 
 export type OgCardStatusVote = {
   chamber: string
+  /** Roll-call question, e.g. `On Motion to Suspend the Rules and Pass`. */
+  question?: string | null
   yeas: number
   nays: number
   result: string
@@ -188,47 +171,25 @@ export function buildStatusLine(params: {
   return 'Introduced · In committee'
 }
 
-/** Chip label used when a bill has no passage vote: the part after `Introduced · `. */
-export function ogCardStatusChipLabel(statusLine: string): string {
-  const sep = ' · '
-  const idx = statusLine.indexOf(sep)
-  if (idx === -1) return 'In committee'
-  return statusLine.slice(idx + sep.length).trim() || 'In committee'
-}
-
 export function ogCardDocket(bill: { congress: number; type: string; number: number }): string {
   return formatBillDocket(bill.type, bill.number, bill.congress)
 }
 
 /**
- * Colors shared by the PNG renderer and the HTML preview so the two cards stay
- * pixel-comparable. Fixed light palette: link cards ignore the site theme.
+ * Card colors: dfdl's warm neutrals with saturated party colors, brighter than
+ * the site's so the bars read at message-thumbnail size. Fixed light palette:
+ * link cards ignore the site theme.
  */
-type OgCardPartyPalette = Record<OgCardBarSegment['party'], string>
-
-export const OG_CARD_COLORS: {
-  ink: string
-  muted: string
-  faint: string
-  quoteMark: string
-  chipBorder: string
-  background: string
-  yea: OgCardPartyPalette
-  nay: OgCardPartyPalette
-} = {
-  ink: '#111827',
-  muted: '#6b7280',
-  faint: '#9ca3af',
-  quoteMark: '#d1d5db',
-  chipBorder: '#e5e7eb',
-  background: '#ffffff',
-  yea: { D: '#2563eb', R: '#dc2626', I: '#7c3aed', Other: '#374151' },
-  nay: { D: '#bfdbfe', R: '#fecaca', I: '#ddd6fe', Other: '#d1d5db' },
-}
-
-export function ogCardSegmentColor(segment: OgCardBarSegment): string {
-  return segment.side === 'yea' ? OG_CARD_COLORS.yea[segment.party] : OG_CARD_COLORS.nay[segment.party]
-}
+export const OG_CARD_COLORS = {
+  page: '#fffcf7',
+  panel: '#f4efe7',
+  track: '#e6e0d7',
+  ink: '#090501',
+  secondary: '#787165',
+  tertiary: '#8c8579',
+  law: '#a8680e',
+  party: { D: '#0f62f0', I: '#8c4fd0', Other: '#787165', R: '#e21d2c' } satisfies Record<OgCardParty, string>,
+} as const
 
 export type OgCardAssembleInput = {
   bill: { congress: number; type: string; number: number }
@@ -236,8 +197,6 @@ export type OgCardAssembleInput = {
   digestHeadline: string | null | undefined
   /** Official bill title; fallback headline source. */
   officialTitle: string | null | undefined
-  /** Verbatim shared quote; becomes the main text when present. */
-  quote: string | null | undefined
   /** Newest passage vote on the bill, if any. */
   latestVote: OgCardStatusVote | null
   /** Per-party splits for `latestVote`; empty when not ingested. */
@@ -259,48 +218,68 @@ export function assembleOgCardModel(input: OgCardAssembleInput): OgCardModel {
     (officialTitle ? proceduralHeadline(officialTitle) || trimDisplayTitle(officialTitle) : null) ||
     ogCardDocket(input.bill)
   const vote = input.latestVote
-  const tally: OgCardTally | null = vote
-    ? {
-        chamber: vote.chamber === 'Senate' ? 'Senate' : 'House',
-        yeas: vote.yeas,
-        nays: vote.nays,
-        party_splits: input.partySplits,
-      }
-    : null
+  const lawDate = formatCardDate(input.becameLawDate)
+  const vetoDate = lawDate ? null : formatCardDate(input.vetoedDate)
+  const chamber = vote?.chamber === 'Senate' ? 'Senate' : 'House'
+  let outcome: OgCardOutcome
+  let outcomeLabel: string
+  if (lawDate) {
+    outcome = 'law'
+    outcomeLabel = 'Became law'
+  } else if (vetoDate) {
+    outcome = 'vetoed'
+    outcomeLabel = 'Vetoed'
+  } else if (vote) {
+    outcome = passedVerb(vote.result) === 'Failed' ? 'failed' : 'passed'
+    outcomeLabel = `${outcome === 'failed' ? 'Failed' : 'Passed'} ${chamber}`
+  } else {
+    outcome = 'no_vote'
+    outcomeLabel = 'In committee'
+  }
+  const isVote = outcome === 'passed' || outcome === 'failed'
   return {
+    bill_label: formatShortBillId(input.bill.type, input.bill.number),
     docket: ogCardDocket(input.bill),
     headline: truncateForCard(headlineSource, OG_CARD_HEADLINE_MAX_CHARS),
-    quote: input.quote ? truncateForCard(input.quote, OG_CARD_QUOTE_MAX_CHARS) : null,
+    outcome,
+    outcome_label: outcomeLabel,
+    outcome_date: lawDate ?? vetoDate,
     status_line: buildStatusLine({
       latestVote: vote,
       becameLawDate: input.becameLawDate ?? null,
       vetoedDate: input.vetoedDate ?? null,
     }),
-    tally,
+    tally:
+      isVote && vote
+        ? { chamber, yeas: vote.yeas, nays: vote.nays, party_splits: input.partySplits }
+        : null,
+    two_thirds:
+      isVote && vote
+        ? requiresTwoThirds({ question: vote.question, billType: input.bill.type, officialTitle })
+        : false,
   }
 }
 
 /**
- * Path (origin-relative) of the PNG for a bill, optionally scoped to a quote.
- * `v` is a content version so social caches refetch when the card changes.
+ * Path (origin-relative) of the PNG for a bill. `v` is a content version so
+ * social caches refetch when the card changes.
  */
 export function ogCardImagePath(
   bill: { congress: number; type: string; number: number },
-  options: { quoteId?: string | null; version: string },
+  options: { version: string },
 ): string {
-  const params = new URLSearchParams()
-  if (options.quoteId) params.set(BILL_QUOTE_QUERY_PARAM, options.quoteId)
-  params.set('v', options.version)
-  return `/og/bill/${formatBillQueryParam(bill)}.png?${params.toString()}`
+  return `/og/bill/${formatBillQueryParam(bill)}.png?v=${options.version}`
 }
 
 /** Short, deterministic version token for `ogCardImagePath`. */
 export function ogCardVersion(model: OgCardModel): string {
   const input = JSON.stringify([
+    OG_CARD_DESIGN,
     model.headline,
-    model.quote,
-    model.status_line,
-    model.tally ? [model.tally.yeas, model.tally.nays, model.tally.party_splits.length] : null,
+    model.outcome_label,
+    model.outcome_date,
+    model.two_thirds,
+    model.tally ? [model.tally.yeas, model.tally.nays, reconciledPartySplits(model.tally)] : null,
   ])
   // FNV-1a 32-bit: short, stable across worker + web, no crypto dependency.
   let hash = 0x811c9dc5

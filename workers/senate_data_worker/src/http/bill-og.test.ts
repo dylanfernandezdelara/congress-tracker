@@ -243,25 +243,12 @@ describe("bill OG rewrite", () => {
     expect(metaContent(fallbackHtml, "property", "og:image")).toBe("https://trackcongress.org/og-image.png");
   });
 
-  it("uses the shared quote as the description and image when q= matches the bill", async () => {
-    const quote = {
-      id: "abcdefabcdefabcd",
-      congress: 119,
-      bill_type: "HR",
-      number: 4795,
-      text: "Speeds energy permits and production.",
-      source: "digest",
-      created_at: "2026-09-01T00:00:00Z",
-    };
+  it("gives an old quote link the bill's own card and canonical URL", async () => {
     const db = {
       exec: vi.fn(async () => {}),
       prepare: vi.fn((sql: string) => ({
         bind: vi.fn().mockReturnThis(),
-        first: vi.fn(async () => {
-          if (sql.includes("FROM bill_digests")) return digestRow();
-          if (sql.includes("FROM bill_quotes")) return quote;
-          return null;
-        }),
+        first: vi.fn(async () => (sql.includes("FROM bill_digests") ? digestRow() : null)),
         all: vi.fn(async () => ({ results: [] })),
         run: vi.fn(async () => ({ success: true, meta: { duration: 0, changes: 0 } })),
       })),
@@ -271,53 +258,20 @@ describe("bill OG rewrite", () => {
         async () => new Response(SITE_HTML, { headers: { "content-type": "text/html; charset=utf-8" } })
       ),
     };
-    const env = createMockEnv({
-      ASSETS,
-      DB: db,
-    });
     const response = await tryRewriteBillOg(
-      new Request("https://trackcongress.org/?bill=119-hr-4795&quote=ABCDEFABCDEFABCD", {
-        headers: { Accept: "text/html" },
-      }),
-      env as never
-    );
-    const html = await response!.text();
-    expect(metaContent(html, "property", "og:description")).toBe(
-      "“Speeds energy permits and production.”"
-    );
-    expect(metaContent(html, "property", "og:url")).toBe(
-      `${PRODUCTION_ORIGIN}/?bill=119-hr-4795&amp;quote=abcdefabcdefabcd`
-    );
-    expect(metaContent(html, "property", "og:image")).toMatch(
-      /^https:\/\/trackcongress\.org\/og\/bill\/119-hr-4795\.png\?quote=abcdefabcdefabcd&amp;v=[0-9a-f]{8}$/
-    );
-    expect(metaContent(html, "property", "og:image:alt")).toContain("“Speeds energy permits and production.”");
-
-    // A quote for another bill is ignored: whole-bill meta, no q= in og:url.
-    const otherQuoteDb = {
-      ...db,
-      prepare: vi.fn((sql: string) => ({
-        bind: vi.fn().mockReturnThis(),
-        first: vi.fn(async () => {
-          if (sql.includes("FROM bill_digests")) return digestRow();
-          if (sql.includes("FROM bill_quotes")) return { ...quote, number: 1 };
-          return null;
-        }),
-        all: vi.fn(async () => ({ results: [] })),
-        run: vi.fn(async () => ({ success: true, meta: { duration: 0, changes: 0 } })),
-      })),
-    } as unknown as D1Database;
-    const ignored = await tryRewriteBillOg(
       new Request("https://trackcongress.org/?bill=119-hr-4795&quote=abcdefabcdefabcd", {
         headers: { Accept: "text/html" },
       }),
-      createMockEnv({ ASSETS, DB: otherQuoteDb }) as never
+      createMockEnv({ ASSETS, DB: db }) as never
     );
-    const ignoredHtml = await ignored!.text();
-    expect(metaContent(ignoredHtml, "property", "og:description")).toBe(
-      "Speeds energy permits and production."
+    const html = await response!.text();
+    expect(metaContent(html, "property", "og:description")).toBe("Speeds energy permits and production.");
+    expect(metaContent(html, "property", "og:url")).toBe(`${PRODUCTION_ORIGIN}/?bill=119-hr-4795`);
+    expect(metaContent(html, "property", "og:image")).toMatch(
+      /^https:\/\/trackcongress\.org\/og\/bill\/119-hr-4795\.png\?v=[0-9a-f]{8}$/
     );
-    expect(metaContent(ignoredHtml, "property", "og:url")).toBe(`${PRODUCTION_ORIGIN}/?bill=119-hr-4795`);
+    expect(html).not.toContain("quote=");
+    expect(db.prepare).not.toHaveBeenCalledWith(expect.stringContaining("bill_quotes"));
   });
 
   it("does not intercept non-document or non-bill requests", async () => {
