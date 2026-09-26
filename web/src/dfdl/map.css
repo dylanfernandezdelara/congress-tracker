@@ -8,12 +8,6 @@
 @import './tokens.css';
 @import './tokens.hsl.css';
 
-/* tokens.css switches elevation on .dark; this app switches on data-theme. */
-[data-theme='dark'] {
-  --elevation-raised: inset 0 0 0 1px oklch(100% 0 0 / 0.04), 0 1px 1px oklch(0 0 0 / 0.24);
-  --elevation-floating: inset 0 0 0 1px oklch(100% 0 0 / 0.06), 0 16px 40px oklch(0 0 0 / 0.45);
-}
-
 :root,
 [data-theme='dark'] {
   --twc-background: var(--hsl-bg-page);

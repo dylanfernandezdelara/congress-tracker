@@ -14,7 +14,7 @@
     status     {danger,success,warning}: bg-*-bg border-*-border bg-* text-*-text
     rounded    rounded-xs rounded-sm rounded-md rounded-lg rounded-xl rounded-full (concentric: outer = inner + padding)
     type       text-headline text-display text-title text-heading text-body text-reading text-ui text-caption (size + leading + weight); font-display font-heading font-sans font-mono; h-control
-    elevation  elevation-raised elevation-floating; hairline hairline-t hairline-b hairline-r (1px lines that do not take layout space); hairline-l (2px quote bar)
+    elevation  elevation-raised elevation-floating; hairline hairline-t hairline-b hairline-r hairline-b-strong (1px lines that do not take layout space); hairline-l (2px quote bar)
     motion     ease-out ease-in-out ease-drawer, duration-instant/fast/normal/slow/slower, transition-interactive, transition-icon, press;
                motion-pop motion-tooltip motion-dialog motion-fade motion-reveal (Base UI popups), sheet-popup sheet-backdrop,
                toast-root toast-content, tabs-indicator
@@ -201,6 +201,10 @@
 }
 @utility hairline-r {
   box-shadow: inset -1px 0 0 var(--color-separator);
+}
+/* The selected item in an underline segmented control, and a focused underline field. */
+@utility hairline-b-strong {
+  box-shadow: inset 0 -1px 0 var(--color-fg-strong);
 }
 @utility hairline {
   box-shadow: inset 0 0 0 1px var(--color-line);

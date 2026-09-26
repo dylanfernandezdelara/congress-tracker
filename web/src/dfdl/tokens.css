@@ -300,7 +300,8 @@
   --outline-image: oklch(0 0 0 / 0.1);
 }
 
-.dark {
+/* Dark on either convention: a .dark class (next-themes, shadcn) or data-theme="dark" on the root. */
+.dark, [data-theme="dark"] {
   --bg-page: var(--neutral-dark-1);
   --bg-subtle: var(--neutral-dark-2);
   --bg-surface: var(--neutral-dark-2);
@@ -357,7 +358,7 @@
   --accent-solid-hover: var(--ember-light-10);
   --accent-text: var(--ember-light-11);
 }
-.dark[data-accent="ember"], [data-accent="ember"] .dark, .dark [data-accent="ember"] {
+.dark[data-accent="ember"], [data-accent="ember"] .dark, .dark [data-accent="ember"], [data-theme="dark"][data-accent="ember"], [data-accent="ember"] [data-theme="dark"], [data-theme="dark"] [data-accent="ember"] {
   --border-focus: var(--ember-dark-9);
   --accent-bg: var(--ember-dark-3);
   --accent-border: var(--ember-dark-6);
@@ -373,7 +374,7 @@
   --accent-solid-hover: var(--indigo-light-10);
   --accent-text: var(--indigo-light-11);
 }
-.dark[data-accent="indigo"], [data-accent="indigo"] .dark, .dark [data-accent="indigo"] {
+.dark[data-accent="indigo"], [data-accent="indigo"] .dark, .dark [data-accent="indigo"], [data-theme="dark"][data-accent="indigo"], [data-accent="indigo"] [data-theme="dark"], [data-theme="dark"] [data-accent="indigo"] {
   --border-focus: var(--indigo-dark-9);
   --accent-bg: var(--indigo-dark-3);
   --accent-border: var(--indigo-dark-6);

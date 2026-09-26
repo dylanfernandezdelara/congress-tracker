@@ -1,11 +1,23 @@
 "use client"
 
 import { Drawer } from "@base-ui/react/drawer"
-import type { ComponentProps } from "react"
+import { useEffect, useState, type ComponentProps } from "react"
 
 import { cn } from "@/lib/utils"
 
-const Sheet = Drawer.Root
+/**
+ * Base UI skips the enter transition for a drawer that mounts already open (a sheet rendered when a selection is
+ * made). A controlled Sheet therefore renders closed for its first frame, then open, so it always slides in.
+ * Opened from code rather than a SheetTrigger? Pass `finalFocus` on SheetContent so closing returns focus.
+ */
+function Sheet({ open, ...props }: ComponentProps<typeof Drawer.Root>) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+  return <Drawer.Root open={open === undefined ? undefined : open && mounted} {...props} />
+}
 const SheetTrigger = Drawer.Trigger
 const SheetClose = Drawer.Close
 

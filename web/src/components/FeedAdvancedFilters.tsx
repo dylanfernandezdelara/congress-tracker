@@ -19,6 +19,7 @@ import {
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
 import { AnimatedSheet } from './AnimatedSheet'
+import { SegmentedControl, SegmentedControlItem } from './dfdl/segmented-control'
 import {
   MemberSponsorCombobox,
   type MemberSponsorComboboxHandle,
@@ -100,27 +101,19 @@ function FilterFields({
 
       <fieldset className="feed-filter-field feed-filter-field--segment">
         <legend className="feed-filter-field-label">Proposed by</legend>
-        <div className="feed-filter-segment" role="radiogroup" aria-label="Sponsor chamber">
-          {SPONSOR_CHAMBER_OPTIONS.map((option) => {
-            const checked = (filters.sponsorChamber ?? '') === option.value
-            return (
-              <button
-                key={option.label}
-                type="button"
-                role="radio"
-                aria-checked={checked}
-                className={`feed-filter-segment-option${checked ? ' is-selected' : ''}`}
-                onClick={() =>
-                  onChange({
-                    sponsorChamber: option.value === '' ? null : option.value,
-                  })
-                }
-              >
-                {option.label}
-              </button>
-            )
-          })}
-        </div>
+        <SegmentedControl
+          variant="underline"
+          aria-label="Sponsor chamber"
+          className="w-full"
+          value={filters.sponsorChamber ?? ''}
+          onValueChange={(next) => onChange({ sponsorChamber: next === '' ? null : (next as NonNullable<AdvancedFeedFilters['sponsorChamber']>) })}
+        >
+          {SPONSOR_CHAMBER_OPTIONS.map((option) => (
+            <SegmentedControlItem key={option.label} value={option.value} className="flex-1 justify-center">
+              {option.label}
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
       </fieldset>
 
       <label className="feed-filter-field">

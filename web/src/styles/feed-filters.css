@@ -206,46 +206,10 @@
     min-width: 0;
   }
 
-  .feed-filter-segment {
-    display: flex;
-    align-items: stretch;
-    width: 100%;
-    border-bottom: 1px solid hsl(var(--twc-border));
-  }
 
-  .feed-filter-segment-option {
-    flex: 1 1 0;
-    margin: 0;
-    min-height: 2.25rem;
-    padding: 0.35rem 0.4rem;
-    border: none;
-    border-bottom: 1px solid transparent;
-    margin-bottom: -1px;
-    background: transparent;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 400;
-    letter-spacing: -0.1px;
-    color: hsl(var(--twc-faint));
-    cursor: pointer;
-    text-align: center;
-    touch-action: manipulation;
-  }
 
-  .feed-filter-segment-option:hover {
-    color: hsl(var(--twc-secondary));
-  }
 
-  .feed-filter-segment-option.is-selected {
-    color: hsl(var(--twc-foreground));
-    font-weight: 500;
-    border-bottom-color: hsl(var(--twc-foreground));
-  }
 
-  .feed-filter-segment-option:focus-visible {
-    outline: 2px solid hsl(var(--twc-foreground));
-    outline-offset: 2px;
-  }
 
   .feed-filter-field--member {
     grid-column: 1 / -1;
