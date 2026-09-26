@@ -83,14 +83,6 @@ if (typeof window !== 'undefined') {
   )
 }
 
-if (typeof window !== 'undefined' && typeof window.ResizeObserver !== 'function') {
-  window.ResizeObserver = class ResizeObserver {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  }
-}
-
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,

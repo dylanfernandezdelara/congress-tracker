@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  closeTopSheet,
-  handEscapeToTopSheet,
   registerSheetLayer,
   resetSheetLayerForTests,
   SHEET_BASE_Z_INDEX,
@@ -61,63 +59,6 @@ describe('sheetLayer', () => {
 
     expect(upper.requestClose).toHaveBeenCalledTimes(1)
     expect(lower.requestClose).not.toHaveBeenCalled()
-  })
-
-  it('lets a focused control claim Escape before the top sheet closes', async () => {
-    const layer = controller()
-    registerSheetLayer(layer)
-    const input = document.createElement('input')
-    document.body.append(input)
-    input.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') event.preventDefault()
-    })
-    input.addEventListener('keydown', handEscapeToTopSheet, { capture: true })
-
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(layer.requestClose).not.toHaveBeenCalled()
-    input.remove()
-  })
-
-  it('closes the top sheet after Escape when no focused control claims it', async () => {
-    const layer = controller()
-    registerSheetLayer(layer)
-    const input = document.createElement('input')
-    document.body.append(input)
-    input.addEventListener('keydown', handEscapeToTopSheet, { capture: true })
-
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-    expect(layer.requestClose).not.toHaveBeenCalled()
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(layer.requestClose).toHaveBeenCalledTimes(1)
-    input.remove()
-  })
-
-  it('lets a dismissable layer hand Escape to the top sheet without a double close', () => {
-    const lower = controller()
-    const upper = controller()
-    registerSheetLayer(lower)
-    registerSheetLayer(upper)
-
-    // Mirrors the mobile chat drawer: Radix sees the key first, the drawer
-    // closes the top sheet and prevents default, then the window listener runs.
-    const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
-    expect(closeTopSheet()).toBe(true)
-    event.preventDefault()
-    window.dispatchEvent(event)
-
-    expect(upper.requestClose).toHaveBeenCalledTimes(1)
-    expect(lower.requestClose).not.toHaveBeenCalled()
-  })
-
-  it('reports no sheet to close when the stack is empty or the top is already closing', () => {
-    expect(closeTopSheet()).toBe(false)
-    const closing = controller({ getIsClosing: () => true })
-    registerSheetLayer(closing)
-    expect(closeTopSheet()).toBe(false)
-    expect(closing.requestClose).not.toHaveBeenCalled()
   })
 
   it('ignores Escape when a nested handler already prevented default', () => {

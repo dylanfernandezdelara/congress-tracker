@@ -8,7 +8,6 @@ function makeSelection(): TextSelection {
   return {
     text: 'raises the cap',
     source: 'digest',
-    sourceId: null,
     rect: new DOMRect(200, 300, 120, 18),
   }
 }
@@ -31,22 +30,11 @@ describe('SelectionMenu', () => {
 
     const toolbar = screen.getByRole('toolbar', { name: 'Selected text actions' })
     expect(toolbar).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Ask about this' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Share quote' }))
     expect(onShareQuote).toHaveBeenCalledWith(selection)
     fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
     expect(onCopy).toHaveBeenCalledWith(selection)
-  })
-
-  it('shows Ask about this only when a handler is supplied', () => {
-    const onAsk = vi.fn()
-    const selection = makeSelection()
-    render(
-      <SelectionMenu selection={selection} onShareQuote={vi.fn()} onAsk={onAsk} onCopy={vi.fn()} />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Ask about this' }))
-    expect(onAsk).toHaveBeenCalledWith(selection)
   })
 
   it('replaces the buttons with a status message and disables while busy', () => {

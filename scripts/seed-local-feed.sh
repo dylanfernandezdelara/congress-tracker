@@ -274,12 +274,6 @@ CREATE TABLE IF NOT EXISTS bill_text_sections (
   body TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, bill_number, ordinal)
 );
-CREATE TABLE IF NOT EXISTS chat_usage (
-  day TEXT NOT NULL,
-  client_key TEXT NOT NULL,
-  count INTEGER NOT NULL,
-  PRIMARY KEY (day, client_key)
-);
 
 -- Offline sample mode: wipe live-ingested feed rows so seed replaces rather
 -- than merging production-shaped local ingest.
@@ -292,9 +286,6 @@ DELETE FROM confirmation_votes;
 DELETE FROM bill_text_changes;
 DELETE FROM bill_text_documents;
 DELETE FROM bill_text_sections;
--- Local chat runs share one `anonymous` client key; a re-seed starts the
--- per-day chat caps over so UI work is never blocked by yesterday's questions.
-DELETE FROM chat_usage;
 
 -- Offline sample mode: drop real-roster rows so hasRealMemberRoster stays false
 -- and LOCAL:* defectors/portfolios remain visible in /stats/defectors.json and
@@ -443,8 +434,8 @@ VALUES
   (119, 'HR', 22, 'Introduced in House', '${D_OLDER}', 'Engrossed in House', '${D_OLDER}',
    '[{"label":"Sec. 4.","heading":"Public spending dashboard details"}]', 0, '${D_OLDER}T00:00:00.000Z');
 
--- Sample bill text so the grounded chat (POST /chat/bill) has verbatim
--- evidence offline. Uses the stored-section shape the daily refresh writes.
+-- Sample bill text so POST /share/quote can verify bill-text passages
+-- offline. Uses the stored-section shape the daily refresh writes.
 INSERT OR REPLACE INTO bill_text_documents
   (congress, bill_type, bill_number, text_version, text_version_date, section_count, checked_at, fetched_at)
 VALUES

@@ -1,15 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
-import { resetBillChatInstancesForTests } from '../utils/billChatInstance'
 import { resetSheetLayerForTests } from '../utils/sheetLayer'
-import { BillChatLayoutProvider, useBillChatSession } from './BillChatLayout'
-import { BillChatSection } from './BillChatSection'
 import { FeedRowDetail } from './FeedRowDetail'
 
 vi.mock('../api/client', () => ({
@@ -17,37 +13,6 @@ vi.mock('../api/client', () => ({
   fetchMemberProfile: vi.fn(),
   fetchBillQuote: vi.fn(),
   createBillQuote: vi.fn(),
-}))
-
-const chatMock: {
-  messages: Array<{
-    id: string
-    role: 'user' | 'assistant'
-    parts: Array<
-      | { type: 'text'; text: string }
-      | {
-          type: 'data-answer'
-          data: { text: string; sig: string | null; unverified_quotes: number; refused: boolean }
-        }
-    >
-  }>
-  status: 'ready'
-  error: undefined
-  sendMessage: ReturnType<typeof vi.fn>
-  regenerate: ReturnType<typeof vi.fn>
-  stop: ReturnType<typeof vi.fn>
-} = {
-  messages: [],
-  status: 'ready',
-  error: undefined,
-  sendMessage: vi.fn(),
-  regenerate: vi.fn(),
-  stop: vi.fn(),
-}
-
-vi.mock('@ai-sdk/react', () => ({
-  Chat: class Chat {},
-  useChat: () => chatMock,
 }))
 
 import { createBillQuote, fetchBillQuote, fetchMemberProfile, fetchVoteDefectors } from '../api/client'
@@ -71,27 +36,10 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks()
   vi.unstubAllGlobals()
-  chatMock.messages = []
   clearMemberProfileCache()
   clearRollDefectorsCache()
   resetSheetLayerForTests()
-  resetBillChatInstancesForTests()
 })
-
-/** Stand-in for Home's rail / drawer: renders whichever bill is presented. */
-function ChatHost() {
-  const session = useBillChatSession()
-  return session ? <BillChatSection key={session.billId} {...session.chat} /> : null
-}
-
-function renderDetailWithChat(ui: ReactElement) {
-  return render(
-    <BillChatLayoutProvider>
-      <ChatHost />
-      {ui}
-    </BillChatLayoutProvider>,
-  )
-}
 
 describe('FeedRowDetail', () => {
   it('shows party defectors for an expanded vote when member data exists', async () => {
@@ -715,125 +663,6 @@ describe('FeedRowDetail', () => {
       'not part of this bill\'s summary',
     )
     expect(screen.queryByRole('dialog', { name: 'Share this quote' })).not.toBeInTheDocument()
-    vi.useRealTimers()
-  })
-
-  it('renders no chat of its own; the layout host shows the presented bill', () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
-    expect(screen.queryByRole('heading', { name: 'Ask about this bill' })).not.toBeInTheDocument()
-
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
-    expect(screen.getByRole('heading', { name: 'Ask about this bill' })).toBeInTheDocument()
-  })
-
-  it('sends a selection to the bill chat when Ask about this is used', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
-
-    selectQuotableText('It does something important in plain language.')
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(200)
-    })
-    const toolbar = await screen.findByRole('toolbar', { name: 'Selected text actions' })
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Ask about this' }))
-
-    expect(screen.queryByRole('toolbar', { name: 'Selected text actions' })).not.toBeInTheDocument()
-    expect(document.querySelector('.bill-chat-attachment')).toHaveAttribute(
-      'title',
-      'It does something important in plain language.',
-    )
-    expect(document.querySelector('.bill-chat-attachment-label')).toHaveTextContent(
-      'It does something important in plain language.',
-    )
-    vi.useRealTimers()
-  })
-
-  it('shares selected chat-answer text with the signed answer payload', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    chatMock.messages = [
-      {
-        id: 'asst-1',
-        role: 'assistant',
-        parts: [
-          { type: 'text', text: 'The bill raises the spending cap for rural clinics.' },
-          {
-            type: 'data-answer',
-            data: {
-              text: 'The bill raises the spending cap for rural clinics.',
-              sig: 'deadbeef',
-              unverified_quotes: 0,
-              refused: false,
-            },
-          },
-        ],
-      },
-    ]
-    vi.mocked(createBillQuote).mockResolvedValue({
-      quote: {
-        id: 'cafecafecafecafe',
-        bill: { congress: 119, type: 'S', number: 2 },
-        text: 'The bill raises the spending cap for rural clinics.',
-        source: 'answer',
-        created_at: '2026-09-01T00:00:00.000Z',
-      },
-      url: 'https://trackcongress.org/?bill=119-s-2&quote=cafecafecafecafe',
-    })
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
-
-    selectQuotableText('The bill raises the spending cap for rural clinics.')
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(200)
-    })
-    const toolbar = await screen.findByRole('toolbar', { name: 'Selected text actions' })
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Share quote' }))
-
-    await waitFor(() => {
-      expect(createBillQuote).toHaveBeenCalledWith({
-        bill: '119-s-2',
-        text: 'The bill raises the spending cap for rural clinics.',
-        answer: {
-          text: 'The bill raises the spending cap for rural clinics.',
-          sig: 'deadbeef',
-        },
-      })
-    })
-    expect(await screen.findByRole('dialog', { name: 'Share this quote' })).toBeInTheDocument()
-    vi.useRealTimers()
-  })
-
-  it('blocks sharing a chat answer when the signature is missing', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    chatMock.messages = [
-      {
-        id: 'asst-1',
-        role: 'assistant',
-        parts: [
-          { type: 'text', text: 'The bill raises the spending cap for rural clinics.' },
-          {
-            type: 'data-answer',
-            data: {
-              text: 'The bill raises the spending cap for rural clinics.',
-              sig: null,
-              unverified_quotes: 0,
-              refused: false,
-            },
-          },
-        ],
-      },
-    ]
-    renderDetailWithChat(<FeedRowDetail item={makeFeedItem()} />)
-
-    selectQuotableText('The bill raises the spending cap for rural clinics.')
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(200)
-    })
-    const toolbar = await screen.findByRole('toolbar', { name: 'Selected text actions' })
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Share quote' }))
-
-    expect(await within(toolbar).findByRole('status')).toHaveTextContent(
-      'Sharing chat answers is unavailable',
-    )
-    expect(createBillQuote).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
 })
