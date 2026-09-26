@@ -1,0 +1,69 @@
+/*
+  dfdl design tokens for Track Congress, applied through a mapping layer. The app's own --twc-* HSL channels
+  point at dfdl semantics (tokens.hsl.css, generated from the same source as tokens.css), so components keep
+  their classes. Track Congress runs in dfdl quiet mode (data-quiet on <html>): titles in sans and the accent
+  collapsed into the neutrals, because party colors already carry meaning here. Type sizes stay the app's own.
+  Source of truth: https://github.com/dylanfernandezdelara/dfdl-ui (tokens are copied; do not edit them here).
+*/
+@import './tokens.css';
+@import './tokens.hsl.css';
+
+/* tokens.css switches elevation on .dark; this app switches on data-theme. */
+[data-theme='dark'] {
+  --elevation-raised: inset 0 0 0 1px oklch(100% 0 0 / 0.04), 0 1px 1px oklch(0 0 0 / 0.24);
+  --elevation-floating: inset 0 0 0 1px oklch(100% 0 0 / 0.06), 0 16px 40px oklch(0 0 0 / 0.45);
+}
+
+:root,
+[data-theme='dark'] {
+  --twc-background: var(--hsl-bg-page);
+  --twc-foreground: var(--hsl-fg);
+  --twc-secondary: var(--hsl-fg-secondary);
+  --twc-faint: var(--hsl-fg-tertiary);
+  --twc-card: var(--hsl-bg-raised);
+  --twc-surface-secondary: var(--hsl-bg-surface-active);
+  --twc-border: var(--hsl-border-default);
+  --twc-border-hover: var(--hsl-border-strong);
+  --twc-border-muted: var(--hsl-border-subtle);
+  --twc-surface-subtle: var(--hsl-fg) / 0.04;
+  --twc-skeleton: var(--hsl-fg) / 0.05;
+  --twc-link-decoration: var(--hsl-accent-solid) / 0.35;
+  --twc-ghost-border: var(--hsl-fg) / 0.1;
+  --twc-ghost-border-hover: var(--hsl-fg) / 0.2;
+  --twc-glow: var(--hsl-fg) / 0.03;
+  --twc-row-hover: var(--hsl-fg) / 0.03;
+  --twc-row-active: var(--hsl-fg) / 0.05;
+  --twc-card-shadow: var(--elevation-floating);
+  /* Quiet mode: the accent is the strongest neutral. */
+  --twc-accent: var(--hsl-accent-solid);
+  --twc-pass: var(--hsl-status-success);
+  --twc-fail: var(--hsl-status-danger);
+  --twc-law: var(--hsl-status-warning);
+
+  /* The app names its curves --motion-ease-*; dfdl's tokens use the same prefix. dfdl never eases in. */
+  --motion-ease-in: var(--motion-ease-out);
+  --motion-ease-sheet: var(--motion-ease-drawer);
+  --radius: var(--rounded-md);
+}
+
+/* Press feedback on the app's pressables (dfdl: scale 0.97 over 150ms; none under reduced motion). */
+button,
+[role='button'],
+[role='radio'],
+[role='tab'] {
+  transition-property: transform, scale, background-color, color, border-color, opacity;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--motion-ease-out);
+}
+button:active:not(:disabled),
+[role='radio']:active,
+[role='tab']:active {
+  scale: var(--motion-press);
+}
+@media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled),
+  [role='radio']:active,
+  [role='tab']:active {
+    scale: none;
+  }
+}
