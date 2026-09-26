@@ -39,6 +39,16 @@ export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
 export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
+/**
+ * Summary sweep (hourly): bills without a CRS-backed digest are re-checked on
+ * Congress.gov, oldest check first, so intros and public laws outside the feed
+ * window still get a plain-language headline and pick up CRS text when it lands.
+ */
+export const SUMMARY_SWEEP_MAX_BILLS_PER_RUN = 10;
+/** Admin `POST /__pipeline/run/summary-sweep` cap per invocation. */
+export const SUMMARY_SWEEP_ADMIN_MAX_BILLS = 40;
+/** A bill is re-checked at most once per this many hours. */
+export const SUMMARY_SWEEP_RECHECK_HOURS = 24;
 /** Max new nomination background rewrites per feed pipeline run. */
 export const CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES = 10;
 /** Max nomination metadata fetches (Congress.gov) per feed pipeline run. */

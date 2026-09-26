@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -280,6 +280,16 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_process_refresh_queue_pending
     ON process_refresh_queue (last_hydrated_at, queued_at)`,
+  // Last Congress.gov summary check per bill, for the hourly summary sweep
+  // (pipeline/run-summary-sweep.ts). Separate from bill_digests so a check that
+  // finds nothing new still records itself without touching the digest row.
+  `CREATE TABLE IF NOT EXISTS bill_summary_checks (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, number)
+)`,
 ];
 
 /**
@@ -313,6 +323,16 @@ const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[]
     COALESCE(amount_min, -1),
     COALESCE(amount_max, -1)
   )`,
+    ],
+  },
+  {
+    // Quote sharing and its bill-text ingest were removed; nothing reads these.
+    toVersion: 11,
+    statements: [
+      `DROP INDEX IF EXISTS idx_bill_quotes_bill`,
+      `DROP TABLE IF EXISTS bill_quotes`,
+      `DROP TABLE IF EXISTS bill_text_sections`,
+      `DROP TABLE IF EXISTS bill_text_documents`,
     ],
   },
 ];

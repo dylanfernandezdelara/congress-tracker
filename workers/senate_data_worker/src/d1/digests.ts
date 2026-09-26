@@ -240,3 +240,63 @@ export async function selectDigestBillRefs(
     number: row.number,
   }));
 }
+
+export interface SummarySweepCandidate {
+  congress: number;
+  bill_type: string;
+  number: number;
+}
+
+/**
+ * Bills still waiting on a CRS-backed digest — no digest, a deterministic title
+ * fallback, or an LLM title-only rewrite with no CRS text — whose last summary
+ * check is older than `checkedBeforeIso` (or never happened). Never-checked
+ * bills come first, then the oldest checks, so every bill takes its turn.
+ */
+export async function selectSummarySweepCandidates(
+  db: D1Database,
+  params: { congress: number; checkedBeforeIso: string; limit: number }
+): Promise<SummarySweepCandidate[]> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT d.congress, d.bill_type, d.number
+       FROM bill_digests d
+       LEFT JOIN bill_summary_checks c
+         ON c.congress = d.congress AND c.bill_type = d.bill_type AND c.number = d.number
+       WHERE d.congress = ?1
+         AND (
+           d.digest_json IS NULL
+           OR d.raw_summary_text IS NULL
+           OR TRIM(d.raw_summary_text) = ''
+           OR (json_valid(d.digest_json) AND json_extract(d.digest_json, '$.source') = ?4)
+         )
+         AND (c.checked_at IS NULL OR c.checked_at < ?2)
+       ORDER BY c.checked_at IS NOT NULL, c.checked_at, d.updated_at DESC
+       LIMIT ?3`
+    )
+    .bind(params.congress, params.checkedBeforeIso, params.limit, DIGEST_SOURCE_TITLE_FALLBACK)
+    .all<SummarySweepCandidate>();
+  return results ?? [];
+}
+
+/** Record a summary check (whatever it found) so the sweep moves on to other bills. */
+export async function markSummaryChecked(
+  db: D1Database,
+  bills: SummarySweepCandidate[],
+  checkedAtIso: string
+): Promise<void> {
+  if (bills.length === 0) return;
+  await ensureSchema(db);
+  await db.batch(
+    bills.map((bill) =>
+      db
+        .prepare(
+          `INSERT INTO bill_summary_checks (congress, bill_type, number, checked_at)
+           VALUES (?1, ?2, ?3, ?4)
+           ON CONFLICT (congress, bill_type, number) DO UPDATE SET checked_at = excluded.checked_at`
+        )
+        .bind(bill.congress, bill.bill_type, bill.number, checkedAtIso)
+    )
+  );
+}

@@ -119,6 +119,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/process-backfill` — capped/resumable committee-process discovery + hydration (admin; re-invoke until `bills_remaining` is 0)
 - `POST /__pipeline/run/process-refresh` — hydrate pending `process_refresh_queue` bills only (admin; daily feed also force-refreshes a capped slice of feed bills)
 - `POST /__pipeline/run/executive-posts` — Truth Social executive ingest (admin; also hourly cron)
+- `POST /__pipeline/run/summary-sweep?limit=` — summary sweep (admin; also hourly after executive posts). Bills without a CRS-backed digest (none yet, a title fallback, or an LLM title-only rewrite) are re-checked on Congress.gov, never-checked then oldest-checked first, each at most once per `SUMMARY_SWEEP_RECHECK_HOURS` (24; `bill_summary_checks`), through the same phases as the feed digests: no digest → plain-language rewrite from the title, CRS arrived → rewrite from CRS. This is what gives intros and public laws outside the feed window a plain headline. Hourly cap `SUMMARY_SWEEP_MAX_BILLS_PER_RUN` (10), admin cap 40
 - `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 
 **Sidebar data backfill (production):** Daily cron already chains feed then `member-votes`. After

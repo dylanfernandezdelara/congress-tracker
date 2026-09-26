@@ -8,6 +8,10 @@ vi.mock("./pipeline/run-executive-posts", () => ({
   runExecutivePostsPipeline: vi.fn(),
 }));
 
+vi.mock("./pipeline/run-summary-sweep", () => ({
+  runSummarySweep: vi.fn(async () => ({ checked: 3, written: 3, rewritten: 3, skipped: 0, warnings: [] })),
+}));
+
 vi.mock("./d1/pipeline-state", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./d1/pipeline-state")>();
   return {
@@ -37,6 +41,7 @@ import {
   PIPELINE_LEASE_TTL_MS,
 } from "./constants";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
+import { runSummarySweep } from "./pipeline/run-summary-sweep";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import handler from "./worker";
 
@@ -219,7 +224,7 @@ describe("worker", () => {
     log.mockRestore();
   });
 
-  it("runs executive posts pipeline on hourly cron", async () => {
+  it("runs executive posts, then the summary sweep, on the hourly cron", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.mocked(runExecutivePostsPipeline).mockResolvedValue({
       fetched: 5,
@@ -239,10 +244,15 @@ describe("worker", () => {
 
     expect(EXECUTIVE_POSTS_CRON_UTC).toBe("20 * * * *");
     expect(runExecutivePostsPipeline).toHaveBeenCalled();
+    expect(runSummarySweep).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(runExecutivePostsPipeline).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(runSummarySweep).mock.invocationCallOrder[0]!,
+    );
     expect(runFeedWithMemberVotes).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('"event":"executive_posts_pipeline_complete"'),
     );
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('"summarySweep":{"checked":3'));
     log.mockRestore();
   });
 
