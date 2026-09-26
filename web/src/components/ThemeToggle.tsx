@@ -2,11 +2,11 @@ import { useLayoutEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark'
 
-// Hex mirrors of `--twc-background` in styles/base.css (light 0 0% 98%, dark 0 0% 4%).
-// Keep in sync when those tokens change; meta theme-color needs resolved hex, not CSS vars.
+// Hex mirrors of the page background, dfdl's `--bg-page` (src/dfdl/tokens.css, neutral step 1 light and dark),
+// also set in index.html. Keep in sync when those tokens change; meta theme-color needs resolved hex, not CSS vars.
 const THEME_COLOR: Record<Theme, string> = {
-  light: '#fafafa',
-  dark: '#0a0a0a',
+  light: '#fffcf7',
+  dark: '#13110c',
 }
 
 function readTheme(): Theme {

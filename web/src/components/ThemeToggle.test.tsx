@@ -16,7 +16,7 @@ function setThemeMeta(content: string) {
 describe('ThemeToggle', () => {
   beforeEach(() => {
     document.documentElement.dataset.theme = 'light'
-    setThemeMeta('#fafafa')
+    setThemeMeta('#fffcf7')
     localStorage.clear()
   })
 
@@ -32,7 +32,7 @@ describe('ThemeToggle', () => {
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(localStorage.getItem('theme')).toBe('dark')
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
-      '#0a0a0a',
+      '#13110c',
     )
     const lightButton = screen.getByRole('button', { name: 'Switch to light theme' })
     expect(lightButton).toBeInTheDocument()
@@ -43,7 +43,7 @@ describe('ThemeToggle', () => {
     expect(document.documentElement.dataset.theme).toBe('light')
     expect(localStorage.getItem('theme')).toBe('light')
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
-      '#fafafa',
+      '#fffcf7',
     )
   })
 })
