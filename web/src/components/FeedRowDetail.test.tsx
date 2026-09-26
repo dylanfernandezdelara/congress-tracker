@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FeedPassageVote } from '../api/types'
@@ -13,12 +14,9 @@ import { FeedRowDetail } from './FeedRowDetail'
 vi.mock('../api/client', () => ({
   fetchVoteDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
-  fetchBillQuote: vi.fn(),
-  createBillQuote: vi.fn(),
 }))
 
-import { createBillQuote, fetchBillQuote, fetchMemberProfile, fetchVoteDefectors } from '../api/client'
-import { ApiError } from '../api/fetchJson'
+import { fetchMemberProfile, fetchVoteDefectors } from '../api/client'
 import { renderWithMemberProfile } from '../test/memberProfileHarness'
 
 beforeEach(() => {
@@ -286,108 +284,52 @@ describe('FeedRowDetail', () => {
     })
   })
 
-  it('copies paste-ready share text to the clipboard', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { clipboard: { writeText } })
-    vi.mocked(fetchVoteDefectors).mockResolvedValue({
-      chamber: 'Senate',
-      congress: 119,
-      session: 2,
-      roll_number: 9002,
-      as_of: '2026-06-05T00:00:00.000Z',
-      member_votes_available: false,
-      defectors: [],
-      party_splits: [],
-    })
-
-    render(<FeedRowDetail item={makeFeedItem()} />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy link' }))
-
-    await waitFor(() => {
-      expect(writeText).toHaveBeenCalled()
-    })
-    const copied = String(writeText.mock.calls[0]?.[0] ?? '')
-    expect(copied).toContain('Plain headline for readers')
-    expect(copied).toContain('It does something important in plain language.')
-    expect(copied).toContain('bill=119-s-2')
-    expect(await within(dialog).findByRole('button', { name: 'Copied' })).toBeInTheDocument()
-  })
-
-  it('copies an explicit shareUrl inside paste-ready text', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { clipboard: { writeText } })
-
-    render(
-      <FeedRowDetail
-        item={makeFeedItem()}
-        shareUrl="https://www.congress.gov/bill/119th-congress/senate-bill/2"
-      />,
+  function renderWithToaster(ui: ReactElement) {
+    return render(
+      <>
+        {ui}
+        <Toaster variant="pill" toastManager={toastManager} />
+      </>,
     )
+  }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Copy link' }))
-
-    await waitFor(() => {
-      expect(writeText).toHaveBeenCalled()
-    })
-    const copied = String(writeText.mock.calls[0]?.[0] ?? '')
-    expect(copied).toContain('https://www.congress.gov/bill/119th-congress/senate-bill/2')
-    expect(copied).toContain('Plain headline for readers')
-    expect(await within(dialog).findByRole('button', { name: 'Copied' })).toBeInTheDocument()
-  })
-
-  it('opens a share sheet that previews title, body, and URL', async () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
-
-    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Share' }).parentElement).toHaveClass('feed-row-detail-topbar')
-    expect(screen.queryByRole('button', { name: 'Copy link' })).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    expect(dialog).toHaveTextContent('Plain headline for readers')
-    expect(dialog).toHaveTextContent('It does something important in plain language.')
-    expect(dialog).toHaveTextContent('bill=119-s-2')
-    expect(within(dialog).getByRole('button', { name: 'Copy link' })).toBeInTheDocument()
-  })
-
-  it('portals the share sheet to document.body so a transformed ancestor cannot trap it', async () => {
-    render(
-      <div className="feed-row-detail-panel" style={{ transform: 'translateY(0)' }}>
-        <FeedRowDetail item={makeFeedItem()} />
-      </div>,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    expect(dialog.closest('.feed-row-detail-panel')).toBeNull()
-    // The sheet's outermost node (Base UI's portal container) hangs directly off <body>.
-    let root: HTMLElement = dialog
-    while (root.parentElement && root.parentElement !== document.body) root = root.parentElement
-    expect(root.parentElement).toBe(document.body)
-  })
-
-  it('shares via navigator.share from the preview sheet', async () => {
+  it('shares in one tap: the system share sheet gets the headline and the link, and nothing else opens', async () => {
     const share = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { share, clipboard: { writeText: vi.fn() } })
 
-    render(<FeedRowDetail item={makeFeedItem()} />)
+    renderWithToaster(<FeedRowDetail item={makeFeedItem()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Share' }))
 
-    await waitFor(() => {
-      expect(share).toHaveBeenCalled()
-    })
-    expect(share.mock.calls[0]?.[0]).toMatchObject({
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    expect(share.mock.calls[0]![0]).toEqual({
       title: 'Plain headline for readers',
-      text: 'It does something important in plain language.',
+      url: expect.stringMatching(/\?bill=119-s-2$/),
     })
-    expect(String((share.mock.calls[0]?.[0] as { url?: string }).url)).toContain('bill=119-s-2')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Notifications' })).toHaveTextContent('')
+  })
+
+  it('copies the link and says so where there is no share sheet', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    renderWithToaster(
+      <FeedRowDetail item={makeFeedItem()} shareUrl="https://www.congress.gov/bill/119th-congress/senate-bill/2" />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith('https://www.congress.gov/bill/119th-congress/senate-bill/2'),
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Notifications' })).toHaveTextContent('Link copied'),
+    )
+  })
+
+  it('keeps summary text plain: no quote marks or quotable regions', () => {
+    const { container } = render(<FeedRowDetail item={makeFeedItem()} />)
+    expect(container.querySelector('[data-quotable], mark')).toBeNull()
+    expect(screen.getByText('It does something important in plain language.')).toBeInTheDocument()
   })
 
   it('shows the primary sponsor above the fold when the payload has one', async () => {
@@ -489,190 +431,5 @@ describe('FeedRowDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
     })
-  })
-
-  it('renders the share-card preview for the whole bill', async () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    const card = within(dialog).getByTestId('og-card-preview')
-    expect(card).toHaveTextContent('S. 2 · 119th Congress')
-    expect(card).toHaveTextContent('Plain headline for readers')
-    expect(card).toHaveTextContent('Passed Senate 52–47 · Jun 5, 2026')
-    expect(card).toHaveTextContent('Yea 52')
-  })
-
-  it('marks summary text as quotable regions', () => {
-    render(<FeedRowDetail item={makeFeedItem()} />)
-    const quotable = document.querySelectorAll('[data-quotable]')
-    expect(quotable.length).toBeGreaterThanOrEqual(3)
-    expect(screen.getByText('It does something important in plain language.')).toHaveAttribute(
-      'data-quotable',
-      'digest',
-    )
-  })
-
-  it('highlights a shared quote in place, scrolls to it, and toasts', async () => {
-    const scrollIntoView = vi.fn()
-    Element.prototype.scrollIntoView = scrollIntoView
-    vi.mocked(fetchBillQuote).mockResolvedValue({
-      quote: {
-        id: 'abc123abc123abc1',
-        bill: { congress: 119, type: 'S', number: 2 },
-        text: 'something important',
-        source: 'digest',
-        created_at: '2026-09-01T00:00:00.000Z',
-      },
-    })
-
-    render(
-      <>
-        <FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc1" />
-        <Toaster variant="pill" toastManager={toastManager} />
-      </>,
-    )
-
-    const mark = await screen.findByText('something important', { selector: 'mark' })
-    expect(mark).toHaveClass('quote-highlight', 'quote-highlight--landing')
-    // The pill lives in the polite live region, so screen readers hear it.
-    const notifications = screen.getByRole('region', { name: 'Notifications' })
-    await waitFor(() => expect(notifications).toHaveTextContent('Shared quote'))
-    await waitFor(() => {
-      expect(scrollIntoView).toHaveBeenCalled()
-    })
-    // Highlighted in place, so no fallback callout (the toast shares its label, so ask for the landmark).
-    expect(screen.queryByRole('complementary', { name: 'Shared quote' })).not.toBeInTheDocument()
-  })
-
-  it('opens the CRS disclosure when the shared quote lives there', async () => {
-    vi.mocked(fetchBillQuote).mockResolvedValue({
-      quote: {
-        id: 'abc123abc123abc2',
-        bill: { congress: 119, type: 'S', number: 2 },
-        text: 'Official CRS summary text.',
-        source: 'crs',
-        created_at: '2026-09-01T00:00:00.000Z',
-      },
-    })
-
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc2" />)
-
-    await screen.findByText('Official CRS summary text.', { selector: 'mark' })
-    expect(document.querySelector('details.feed-row-crs-details')).toHaveAttribute('open')
-  })
-
-  it('falls back to a callout when the shared quote no longer matches the summary', async () => {
-    vi.mocked(fetchBillQuote).mockResolvedValue({
-      quote: {
-        id: 'abc123abc123abc3',
-        bill: { congress: 119, type: 'S', number: 2 },
-        text: 'Text that was rewritten since sharing.',
-        source: 'digest',
-        created_at: '2026-09-01T00:00:00.000Z',
-      },
-    })
-
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc3" />)
-
-    const callout = await screen.findByLabelText('Shared quote')
-    expect(callout).toHaveTextContent('“Text that was rewritten since sharing.”')
-    expect(document.querySelector('mark[data-quote-highlight]')).toBeNull()
-  })
-
-  it('ignores a shared quote stored for a different bill', async () => {
-    vi.mocked(fetchBillQuote).mockResolvedValue({
-      quote: {
-        id: 'abc123abc123abc4',
-        bill: { congress: 119, type: 'HR', number: 1 },
-        text: 'something important',
-        source: 'digest',
-        created_at: '2026-09-01T00:00:00.000Z',
-      },
-    })
-
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc4" />)
-
-    await waitFor(() => {
-      expect(fetchBillQuote).toHaveBeenCalledWith('abc123abc123abc4')
-    })
-    expect(document.querySelector('mark[data-quote-highlight]')).toBeNull()
-    expect(screen.queryByLabelText('Shared quote')).not.toBeInTheDocument()
-  })
-
-  function selectQuotableText(text: string) {
-    const paragraph = screen.getByText(text)
-    const range = document.createRange()
-    range.selectNodeContents(paragraph)
-    ;(range as unknown as { getBoundingClientRect: () => DOMRect }).getBoundingClientRect = () =>
-      new DOMRect(100, 200, 160, 18)
-    vi.spyOn(window, 'getSelection').mockReturnValue({
-      isCollapsed: false,
-      rangeCount: 1,
-      getRangeAt: () => range,
-      toString: () => text,
-      removeAllRanges: vi.fn(),
-    } as unknown as Selection)
-    fireEvent(document, new Event('selectionchange'))
-  }
-
-  it('shares a selected passage: verifies it, then opens the sheet with the quote card', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    vi.mocked(createBillQuote).mockResolvedValue({
-      quote: {
-        id: 'feedfacefeedface',
-        bill: { congress: 119, type: 'S', number: 2 },
-        text: 'It does something important in plain language.',
-        source: 'digest',
-        created_at: '2026-09-01T00:00:00.000Z',
-      },
-      url: 'https://trackcongress.org/?bill=119-s-2&quote=feedfacefeedface',
-    })
-    render(<FeedRowDetail item={makeFeedItem()} />)
-
-    selectQuotableText('It does something important in plain language.')
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(200)
-    })
-    const toolbar = await screen.findByRole('toolbar', { name: 'Selected text actions' })
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Share quote' }))
-
-    await waitFor(() => {
-      expect(createBillQuote).toHaveBeenCalledWith({
-        bill: '119-s-2',
-        text: 'It does something important in plain language.',
-      })
-    })
-    const dialog = await screen.findByRole('dialog', { name: 'Share this quote' })
-    const card = within(dialog).getByTestId('og-card-preview')
-    expect(card).toHaveTextContent('It does something important in plain language.')
-    expect(within(dialog).getByText(/quote=feedfacefeedface/)).toBeInTheDocument()
-    expect(within(dialog).getByText('“It does something important in plain language.”')).toBeInTheDocument()
-    vi.useRealTimers()
-  })
-
-  it('surfaces the API validation message when a selection cannot be shared', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    vi.mocked(createBillQuote).mockRejectedValue(
-      new ApiError(
-        "That text is not part of this bill's summary, so it cannot be shared as a quote.",
-        422,
-        'Unprocessable Entity',
-        'quote_not_in_bill',
-      ),
-    )
-    render(<FeedRowDetail item={makeFeedItem()} />)
-
-    selectQuotableText('Point one')
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(200)
-    })
-    const toolbar = await screen.findByRole('toolbar', { name: 'Selected text actions' })
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Share quote' }))
-
-    expect(await within(toolbar).findByRole('status')).toHaveTextContent(
-      'not part of this bill\'s summary',
-    )
-    expect(screen.queryByRole('dialog', { name: 'Share this quote' })).not.toBeInTheDocument()
-    vi.useRealTimers()
   })
 })

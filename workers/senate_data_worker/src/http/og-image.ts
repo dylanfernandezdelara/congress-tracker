@@ -1,8 +1,6 @@
 import { parseBillQueryParam } from "../../../../shared/bill-id";
 import { ogCardImagePath, ogCardVersion } from "../../../../shared/og-card";
-import { BILL_QUOTE_QUERY_PARAM } from "../../../../shared/share-api-types";
 import type { Env } from "../config";
-import { isBillQuoteId } from "../d1/bill-quotes";
 import { buildOgCardHtml } from "./og-card-html";
 import { loadOgCardModel } from "./og-card-model";
 import type { OgRenderer } from "./og-render";
@@ -87,24 +85,18 @@ export function parseOgImagePath(pathname: string): string | null {
   }
 }
 
-function parseQuoteId(raw: string | null): string | null {
-  const id = raw?.trim().toLowerCase() ?? "";
-  return isBillQuoteId(id) ? id : null;
-}
-
 /**
- * Cache key built from what the card actually depends on — bill, quote id, and
- * the server-computed content version — never from the request's own query
+ * Cache key built from what the card actually depends on — the bill and the
+ * server-computed content version — never from the request's own query
  * string. Junk or attacker-varied params therefore collapse onto one cached
  * render instead of forcing a fresh satori pass each time.
  */
 export function ogImageCacheKey(
   origin: string,
   bill: { congress: number; type: string; number: number },
-  quoteId: string | null,
   version: string
 ): Request {
-  return new Request(new URL(ogCardImagePath(bill, { quoteId, version }), origin), { method: "GET" });
+  return new Request(new URL(ogCardImagePath(bill, { version }), origin), { method: "GET" });
 }
 
 /**
@@ -130,18 +122,17 @@ export async function handleOgImageRoute(params: {
     return plainText(404, "Not Found");
   }
 
-  const quoteId = parseQuoteId(url.searchParams.get(BILL_QUOTE_QUERY_PARAM));
   const loadModel = deps?.loadModel ?? loadOgCardModel;
   const render = deps?.render ?? defaultRender;
 
   try {
-    const loaded = await loadModel(env, bill, quoteId);
+    const loaded = await loadModel(env, bill);
     if (!loaded.ok) {
       return staticFallbackResponse(env, url);
     }
 
     const cache = deps?.cache ?? edgeCache();
-    const cacheKey = ogImageCacheKey(url.origin, bill, quoteId, ogCardVersion(loaded.model));
+    const cacheKey = ogImageCacheKey(url.origin, bill, ogCardVersion(loaded.model));
     const cached = cache ? await cache.match(cacheKey) : undefined;
     if (cached) return cached;
 

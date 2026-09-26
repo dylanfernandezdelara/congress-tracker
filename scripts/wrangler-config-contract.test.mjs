@@ -147,23 +147,7 @@ function parseRateLimitBindings(filePath) {
   return bindings
 }
 
-test('public share rate limiter is bound identically in production and preview on both configs', () => {
-  for (const configPath of [rootConfigPath, workerConfigPath]) {
-    const bindings = parseRateLimitBindings(configPath)
-    const share = bindings.filter((binding) => binding.name === 'SHARE_RATE_LIMITER')
-    assert.deepEqual(
-      share.map((binding) => binding.env).sort(),
-      ['preview', 'production'],
-      `${configPath} must bind SHARE_RATE_LIMITER for production and env.preview`,
-    )
-    const [first, ...rest] = share
-    for (const binding of rest) {
-      assert.equal(binding.namespace_id, first.namespace_id)
-      assert.equal(binding.limit, first.limit)
-      assert.equal(binding.period, first.period)
-    }
-    assert.equal(first.period, 60, 'Workers rate limiting supports 10s or 60s periods')
-  }
+test('rate-limit bindings match between the root and worker configs', () => {
   assert.deepEqual(parseRateLimitBindings(rootConfigPath), parseRateLimitBindings(workerConfigPath))
 })
 

@@ -27,15 +27,12 @@ type FeedRowProps = {
   item: FeedItem
   isExpanded: boolean
   onToggle: (item: FeedItem) => void
-  /** Shared quote id from the URL when this row is the deep-linked bill. */
-  quoteId?: string | null
 }
 
 export const FeedRow = memo(function FeedRow({
   item,
   isExpanded,
   onToggle,
-  quoteId = null,
 }: FeedRowProps) {
   const badgeId = useId()
   const topicId = useId()
@@ -174,7 +171,7 @@ export const FeedRow = memo(function FeedRow({
         <Collapsible open={isExpanded}>
           <CollapsibleContent expand id={detailId} role="region" aria-label={`Details for ${topic}`}>
             <div className="feed-row-detail-panel">
-              <FeedRowDetail item={item} quoteId={quoteId} />
+              <FeedRowDetail item={item} />
             </div>
           </CollapsibleContent>
         </Collapsible>

@@ -35,7 +35,6 @@ function modelDb(options: {
   digest?: DigestRow | null;
   votes?: Array<typeof VOTE>;
   lifecycle?: Record<string, unknown> | null;
-  quote?: Record<string, unknown> | null;
 }) {
   return {
     exec: vi.fn(async () => {}),
@@ -45,7 +44,6 @@ function modelDb(options: {
         first: async () => {
           if (sql.includes("FROM bill_digests")) return options.digest ?? null;
           if (sql.includes("FROM bill_lifecycle")) return options.lifecycle ?? null;
-          if (sql.includes("FROM bill_quotes")) return options.quote ?? null;
           return null;
         },
         all: async () => {
@@ -80,69 +78,93 @@ describe("og card model", () => {
     );
   });
 
-  it("assembles headline, tally, and status from D1", async () => {
-    const env = createMockEnv({ DB: modelDb({ digest: DIGEST, votes: [VOTE] }) });
-    const result = await loadOgCardModel(env as never, { congress: 119, type: "HR", number: 1 }, null);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.model).toEqual({
-      docket: "H.R. 1 · 119th Congress",
-      headline: "House passes a permitting package",
-      quote: null,
-      status_line: "Passed House 219–213 · Sep 3, 2026",
-      tally: { chamber: "House", yeas: 219, nays: 213, party_splits: [] },
+  const HR1 = { congress: 119, type: "HR", number: 1 };
+  const lifecycleRow = (dates: Record<string, string>) => ({
+    congress: 119,
+    bill_type: "HR",
+    bill_number: 1,
+    became_law_date: null,
+    vetoed_date: null,
+    law_kind: null,
+    ...dates,
+  });
+  const load = (db: Parameters<typeof modelDb>[0], bill = HR1) =>
+    loadOgCardModel(createMockEnv({ DB: modelDb(db) }) as never, bill);
+
+  it("assembles headline, outcome, tally, and status from D1", async () => {
+    const result = await load({ digest: DIGEST, votes: [VOTE] });
+    expect(result).toEqual({
+      ok: true,
+      model: {
+        bill_label: "H.R. 1",
+        docket: "H.R. 1 · 119th Congress",
+        headline: "House passes a permitting package",
+        outcome: "passed",
+        outcome_label: "Passed House",
+        outcome_date: null,
+        status_line: "Passed House 219–213 · Sep 3, 2026",
+        tally: { chamber: "House", yeas: 219, nays: 213, party_splits: [] },
+        two_thirds: false,
+      },
     });
   });
 
-  it("uses the trimmed title when there is no digest headline and drops the tally without votes", async () => {
-    const env = createMockEnv({ DB: modelDb({ digest: { ...DIGEST, digest_json: null } }) });
-    const result = await loadOgCardModel(env as never, { congress: 119, type: "HR", number: 1 }, null);
+  it("uses the trimmed title when there is no digest headline, and says In committee without votes", async () => {
+    const result = await load({ digest: { ...DIGEST, digest_json: null } });
     expect(result).toMatchObject({
       ok: true,
-      model: { headline: "One Big Bill Act", status_line: "Introduced · In committee", tally: null },
+      model: {
+        headline: "One Big Bill Act",
+        outcome: "no_vote",
+        outcome_label: "In committee",
+        outcome_date: null,
+        tally: null,
+        two_thirds: false,
+      },
     });
   });
 
-  it("returns bill_not_found / quote_not_found reasons", async () => {
-    const missing = await loadOgCardModel(
-      createMockEnv({ DB: modelDb({ digest: null }) }) as never,
-      { congress: 119, type: "HR", number: 1 },
-      null
-    );
-    expect(missing).toEqual({ ok: false, reason: "bill_not_found" });
-
-    const otherBill = {
-      id: "abcdefabcdefabcd",
-      congress: 119,
-      bill_type: "S",
-      number: 9,
-      text: "Quote text",
-      source: "digest",
-      created_at: "2026-09-01T00:00:00Z",
-    };
-    const mismatch = await loadOgCardModel(
-      createMockEnv({ DB: modelDb({ digest: DIGEST, quote: otherBill }) }) as never,
-      { congress: 119, type: "HR", number: 1 },
-      "abcdefabcdefabcd"
-    );
-    expect(mismatch).toEqual({ ok: false, reason: "quote_not_found" });
+  it("puts enactment ahead of the vote, with its date and no tally", async () => {
+    const result = await load({ digest: DIGEST, votes: [VOTE], lifecycle: lifecycleRow({ became_law_date: "2025-07-04" }) });
+    expect(result).toMatchObject({
+      ok: true,
+      model: { outcome: "law", outcome_label: "Became law", outcome_date: "Jul 4, 2025", tally: null },
+    });
   });
 
-  it("puts a matching quote on the card", async () => {
-    const quote = {
-      id: "abcdefabcdefabcd",
-      congress: 119,
-      bill_type: "HR",
-      number: 1,
-      text: "Speeds permits.",
-      source: "digest",
-      created_at: "2026-09-01T00:00:00Z",
+  it("shows a veto with its date", async () => {
+    const result = await load({ digest: DIGEST, votes: [VOTE], lifecycle: lifecycleRow({ vetoed_date: "2026-09-08" }) });
+    expect(result).toMatchObject({
+      ok: true,
+      model: { outcome: "vetoed", outcome_label: "Vetoed", outcome_date: "Sep 8, 2026", tally: null },
+    });
+  });
+
+  it("marks a failed vote, and one that needed two-thirds", async () => {
+    const suspension = { ...VOTE, question: "On Motion to Suspend the Rules and Pass", result: "Failed", yeas: 212, nays: 206 };
+    expect(await load({ digest: DIGEST, votes: [suspension] })).toMatchObject({
+      ok: true,
+      model: { outcome: "failed", outcome_label: "Failed House", two_thirds: true, tally: { yeas: 212, nays: 206 } },
+    });
+    const override = { ...VOTE, chamber: "Senate", question: "On Overriding the Veto" };
+    expect(await load({ digest: DIGEST, votes: [override] })).toMatchObject({
+      ok: true,
+      model: { outcome_label: "Passed Senate", two_thirds: true },
+    });
+  });
+
+  it("treats a constitutional amendment as a two-thirds vote on any question", async () => {
+    const amendment = {
+      ...DIGEST,
+      bill_type: "HJRES",
+      title: "Proposing an amendment to the Constitution of the United States relative to the Supreme Court.",
     };
-    const result = await loadOgCardModel(
-      createMockEnv({ DB: modelDb({ digest: DIGEST, quote }) }) as never,
-      { congress: 119, type: "hr", number: 1 },
-      "abcdefabcdefabcd"
-    );
-    expect(result).toMatchObject({ ok: true, model: { quote: "Speeds permits." } });
+    const result = await load({ digest: amendment, votes: [VOTE] }, { congress: 119, type: "HJRES", number: 1 });
+    expect(result).toMatchObject({ ok: true, model: { two_thirds: true, bill_label: "H.J.Res. 1" } });
+    expect(await load({ digest: DIGEST, votes: [VOTE] })).toMatchObject({ ok: true, model: { two_thirds: false } });
+  });
+
+  it("returns bill_not_found without a digest", async () => {
+    expect(await load({ digest: null })).toEqual({ ok: false, reason: "bill_not_found" });
   });
 });

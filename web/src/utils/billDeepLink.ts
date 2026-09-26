@@ -3,17 +3,21 @@ import {
   formatShortBillId,
   parseBillQueryParam,
 } from '@congress-tracker/shared/bill-id'
-import { BILL_QUOTE_QUERY_PARAM, type BillQuote } from '@congress-tracker/shared/share-api-types'
 import { PRODUCTION_ORIGIN, buildShareCopy } from '@congress-tracker/shared/share-copy'
+
+import { notify } from '@/lib/toast'
 
 import type { FeedItem } from '../api/types'
 
-export { BILL_QUOTE_QUERY_PARAM, formatBillQueryParam, parseBillQueryParam, PRODUCTION_ORIGIN }
+export { formatBillQueryParam, parseBillQueryParam, PRODUCTION_ORIGIN }
 
-/** Drop the bill deep-link params together; a quote id is meaningless without its bill. */
+/** `&quote=` from links shared before quote sharing was removed; stripped on arrival. */
+export const LEGACY_QUOTE_QUERY_PARAM = 'quote'
+
+/** Drop the bill deep-link params together (and any legacy quote id). */
 export function clearBillDeepLinkParams(params: URLSearchParams): void {
   params.delete('bill')
-  params.delete(BILL_QUOTE_QUERY_PARAM)
+  params.delete(LEGACY_QUOTE_QUERY_PARAM)
 }
 
 export function feedRowKey(item: FeedItem): string {
@@ -35,13 +39,8 @@ export function billShareOrigin(href = window.location.href): string {
   return url.origin
 }
 
-export function buildBillShareUrl(
-  item: Pick<FeedItem, 'bill'>,
-  href = window.location.href,
-  quoteId?: string | null,
-): string {
-  const base = `${billShareOrigin(href)}/?bill=${formatBillQueryParam(item.bill)}`
-  return quoteId ? `${base}&${BILL_QUOTE_QUERY_PARAM}=${encodeURIComponent(quoteId)}` : base
+export function buildBillShareUrl(item: Pick<FeedItem, 'bill'>, href = window.location.href): string {
+  return `${billShareOrigin(href)}/?bill=${formatBillQueryParam(item.bill)}`
 }
 
 /** `q=` value that matches feed bill-id search (`119-hr-1` → `H.R. 1`). */
@@ -52,38 +51,19 @@ export function billSearchQueryFromParam(billParam: string): string | null {
   return trimmed || null
 }
 
+/**
+ * What a share sends: the bill's title and its link. The link's preview card
+ * (headline, outcome, vote) carries everything else, so no body text is added
+ * to repeat it in the message.
+ */
 export type BillSharePayload = {
   title: string
-  text: string
   url: string
-  clipboardText: string
 }
 
 export function buildBillSharePayload(
   item: Pick<FeedItem, 'bill' | 'digest' | 'raw_summary_text'>,
   urlOverride?: string,
-  href = window.location.href,
-): BillSharePayload {
-  const { title, text } = buildShareCopy({
-    headline: item.digest?.headline,
-    whatItDoes: item.digest?.what_it_does,
-    crsSummary: item.raw_summary_text,
-    title: item.bill.title,
-    bill: item.bill,
-  })
-  const url = urlOverride ?? buildBillShareUrl(item, href)
-  return {
-    title,
-    text,
-    url,
-    clipboardText: `${title}\n\n${text}\n\n${url}`,
-  }
-}
-
-/** Share payload for a stored quote: the quote is the body, the link carries its id. */
-export function buildBillQuoteSharePayload(
-  item: Pick<FeedItem, 'bill' | 'digest' | 'raw_summary_text'>,
-  quote: Pick<BillQuote, 'id' | 'text'>,
   href = window.location.href,
 ): BillSharePayload {
   const { title } = buildShareCopy({
@@ -93,14 +73,7 @@ export function buildBillQuoteSharePayload(
     title: item.bill.title,
     bill: item.bill,
   })
-  const url = buildBillShareUrl(item, href, quote.id)
-  const text = `“${quote.text}”`
-  return {
-    title,
-    text,
-    url,
-    clipboardText: `${text}\n\n${title}\n\n${url}`,
-  }
+  return { title, url: urlOverride ?? buildBillShareUrl(item, href) }
 }
 
 export function canUseWebShare(): boolean {
@@ -112,11 +85,7 @@ export async function shareBillViaNavigator(
 ): Promise<'shared' | 'cancelled' | 'unavailable'> {
   if (!canUseWebShare()) return 'unavailable'
   try {
-    await navigator.share({
-      title: payload.title,
-      text: payload.text,
-      url: payload.url,
-    })
+    await navigator.share({ title: payload.title, url: payload.url })
     return 'shared'
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
@@ -133,6 +102,21 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   } catch {
     // Fall through to prompt.
   }
-  const result = window.prompt('Copy share text', text)
+  const result = window.prompt('Copy link', text)
   return result !== null
+}
+
+/**
+ * One tap to share a bill: the system share sheet where there is one (phones,
+ * Safari, Edge), otherwise the link is copied and a "Link copied" toast shows.
+ * Dismissing the share sheet does nothing further.
+ */
+export async function shareBill(
+  item: Pick<FeedItem, 'bill' | 'digest' | 'raw_summary_text'>,
+  urlOverride?: string,
+): Promise<void> {
+  const payload = buildBillSharePayload(item, urlOverride)
+  const result = await shareBillViaNavigator(payload)
+  if (result !== 'unavailable') return
+  if (await copyTextToClipboard(payload.url)) notify('Link copied')
 }

@@ -5,12 +5,9 @@ import {
   type OgCardModel,
   type OgCardTally,
 } from "../../../../shared/og-card";
-import { quoteBelongsToBill } from "../../../../shared/quote-verification";
 import { parseShareDigestJson } from "../../../../shared/share-copy";
-import type { BillQuote } from "../../../../shared/share-api-types";
 import { computeRollDefectors } from "../analytics/defectors";
 import type { Env } from "../config";
-import { getBillQuote } from "../d1/bill-quotes";
 import { getDigest, type DigestRow } from "../d1/digests";
 import { getLifecycle } from "../d1/lifecycle";
 import { getPassageVotesForBill } from "../d1/votes";
@@ -21,33 +18,22 @@ export { buildStatusLine, formatCardDate };
 
 export type LoadOgCardModelResult =
   | { ok: true; model: OgCardModel }
-  | { ok: false; reason: "bill_not_found" | "quote_not_found" };
+  | { ok: false; reason: "bill_not_found" };
 
 /**
- * Assemble the share-card model from D1: digest headline, optional stored
- * quote (must belong to the bill), newest passage vote + party splits.
+ * Assemble the share-card model from D1: digest headline, newest passage vote
+ * with party splits, and enactment or veto dates.
  */
 export async function loadOgCardModel(
   env: Env,
   bill: OgCardBillRef,
-  quoteId: string | null,
-  preloaded: { digestRow?: DigestRow | null; quote?: BillQuote | null } = {}
+  preloaded: { digestRow?: DigestRow | null } = {}
 ): Promise<LoadOgCardModelResult> {
   const digestRow =
     preloaded.digestRow !== undefined
       ? preloaded.digestRow
       : await getDigest(env.DB, bill.congress, bill.type, bill.number);
   if (!digestRow) return { ok: false, reason: "bill_not_found" };
-
-  let quote: string | null = null;
-  if (quoteId) {
-    const stored =
-      preloaded.quote !== undefined ? preloaded.quote : await getBillQuote(env.DB, quoteId);
-    if (!stored || !quoteBelongsToBill(stored, bill)) {
-      return { ok: false, reason: "quote_not_found" };
-    }
-    quote = stored.text;
-  }
 
   const [votes, lifecycle] = await Promise.all([
     getPassageVotesForBill(env.DB, bill.congress, bill.type, bill.number),
@@ -76,7 +62,6 @@ export async function loadOgCardModel(
       bill,
       digestHeadline: parseShareDigestJson(digestRow.digest_json).headline,
       officialTitle: digestRow.title,
-      quote,
       latestVote,
       partySplits,
       becameLawDate: lifecycle?.became_law_date,
