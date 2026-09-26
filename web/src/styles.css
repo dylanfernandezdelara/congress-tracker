@@ -12,6 +12,82 @@
 @import './styles/quote-share.css';
 @import './styles/bill-chat.css';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@source '../node_modules/streamdown/dist/*.js';
+
+
+@theme {
+  --color-border: hsl(var(--twc-border));
+  --color-border-hover: hsl(var(--twc-border-hover));
+  --color-border-muted: hsl(var(--twc-border-muted));
+
+  --color-background: hsl(var(--twc-background));
+  --color-foreground: hsl(var(--twc-foreground));
+
+  --color-primary: hsl(var(--twc-foreground));
+  --color-primary-foreground: hsl(var(--twc-background));
+
+  --color-secondary: hsl(var(--twc-surface-secondary));
+  --color-secondary-foreground: hsl(var(--twc-foreground));
+
+  --color-muted: hsl(var(--twc-surface-subtle));
+  --color-muted-foreground: hsl(var(--twc-secondary));
+
+  --color-popover: hsl(var(--twc-card));
+  --color-popover-foreground: hsl(var(--twc-foreground));
+
+  --color-destructive: hsl(var(--twc-fail));
+  --color-destructive-foreground: hsl(var(--twc-background));
+
+  --color-faint: hsl(var(--twc-faint));
+
+  --color-card: hsl(var(--twc-card));
+  --color-card-foreground: hsl(var(--twc-foreground));
+
+  --color-accent: hsl(var(--twc-accent));
+  --color-accent-foreground: hsl(var(--twc-background));
+
+  --color-input: hsl(var(--twc-border));
+  --color-ring: hsl(var(--twc-foreground));
+  --color-pass: hsl(var(--twc-pass));
+  --color-fail: hsl(var(--twc-fail));
+  --color-law: hsl(var(--twc-law));
+
+  --color-surface-subtle: hsl(var(--twc-surface-subtle));
+
+  --color-party-d: hsl(var(--twc-party-d));
+  --color-party-r: hsl(var(--twc-party-r));
+  --color-party-i: hsl(var(--twc-party-i));
+  --color-party-other: hsl(var(--twc-party-other));
+
+  --font-sans: var(--font-family);
+  --font-serif: var(--font-family);
+  --font-mono: var(--font-family);
+
+  --radius-nav: 8px;
+  --radius-card: 16px;
+  --radius-pill: 9999px;
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
