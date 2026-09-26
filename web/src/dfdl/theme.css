@@ -432,6 +432,13 @@
     opacity: 0;
     transform: translateY(16px);
   }
+  /* Pill: as wide as its text, centered in the viewport. */
+  &[data-variant="pill"] {
+    left: 0;
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+  }
   &[data-ending-style] {
     opacity: 0;
     transition-duration: calc(var(--motion-normal) * var(--motion-exit-factor));

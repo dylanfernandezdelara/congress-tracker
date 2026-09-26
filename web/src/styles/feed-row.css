@@ -518,11 +518,6 @@
   .feed-row-detail-panel {
     border-top: 1px solid hsl(var(--twc-border));
     padding: var(--space-16) var(--feed-detail-pad-x) var(--space-16) var(--feed-content-inset);
-    animation: feed-row-detail-enter 0.3s var(--motion-ease-out) both;
-  }
-
-  .feed-row-detail-panel[hidden] {
-    display: none;
   }
 
   .feed-row-detail {
@@ -810,23 +805,7 @@
     }
   }
 
-  @keyframes feed-row-detail-enter {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .feed-row-detail-panel {
-      animation: none;
-    }
-
     .feed-row-chevron {
       transition: none;
     }

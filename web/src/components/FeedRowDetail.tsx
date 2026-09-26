@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import type { BillQuote } from '@congress-tracker/shared/share-api-types'
 
@@ -15,6 +15,7 @@ import { primarySponsorDisplay } from '../utils/sponsorLabels'
 import { useBillShare } from '../hooks/useBillShare'
 import { useRollDefectors, voteRollKey } from '../hooks/useRollDefectors'
 import { useSharedQuoteLanding } from '../hooks/useSharedQuoteLanding'
+import { notify } from '@/lib/toast'
 import { useTextSelectionMenu, type TextSelection } from '../hooks/useTextSelectionMenu'
 import { BillPipeline } from './BillPipeline'
 import { BillShareSheet } from './BillShareSheet'
@@ -25,7 +26,6 @@ import { FeedSummarySections } from './FeedSummarySections'
 import { MemberProfileTrigger } from './MemberProfileTrigger'
 import { PassageVoteDetails } from './PassageVoteDetails'
 import { SelectionMenu } from './SelectionMenu'
-import { Toast } from './Toast'
 
 type FeedRowDetailProps = {
   item: FeedItem
@@ -120,7 +120,6 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
   const defectorsByRoll = useRollDefectors(item.passage_votes)
   const [selectionStatus, setSelectionStatus] = useState<string | null>(null)
   const [sharingQuote, setSharingQuote] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
 
@@ -139,7 +138,7 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
     quoteId,
     summary,
     containerRef: detailRef,
-    notify: setToast,
+    notify,
   })
 
   useEffect(() => {
@@ -147,8 +146,6 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
     const timer = window.setTimeout(() => setSelectionStatus(null), SELECTION_STATUS_MS)
     return () => window.clearTimeout(timer)
   }, [selectionStatus])
-
-  const dismissToast = useCallback(() => setToast(null), [])
 
   const handleShareQuote = async (current: TextSelection) => {
     setSharingQuote(true)
@@ -261,7 +258,6 @@ export function FeedRowDetail({ item, shareUrl, quoteId = null }: FeedRowDetailP
         }}
       />
 
-      <Toast message={toast} onDismiss={dismissToast} />
     </div>
   )
 }

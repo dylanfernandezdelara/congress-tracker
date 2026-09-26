@@ -15,6 +15,7 @@ import { feedItemTextGrew } from '../utils/textGrew'
 import { BillIdChip } from './BillIdChip'
 import { ExpandChevron } from './ExpandChevron'
 import { FeedRowDate } from './FeedRowDate'
+import { Collapsible, CollapsibleContent } from './dfdl/collapsible'
 import { FeedRowDetail } from './FeedRowDetail'
 import { FeedRowExecutiveQuote } from './FeedRowExecutiveQuote'
 
@@ -169,15 +170,14 @@ export const FeedRow = memo(function FeedRow({
           </div>
         ) : null}
 
-        <div
-          id={detailId}
-          className="feed-row-detail-panel"
-          role="region"
-          aria-label={`Details for ${topic}`}
-          hidden={!isExpanded}
-        >
-          {isExpanded ? <FeedRowDetail item={item} quoteId={quoteId} /> : null}
-        </div>
+        {/* Details mount only while open or closing, and the height animates so the rows below slide. */}
+        <Collapsible open={isExpanded}>
+          <CollapsibleContent expand id={detailId} role="region" aria-label={`Details for ${topic}`}>
+            <div className="feed-row-detail-panel">
+              <FeedRowDetail item={item} quoteId={quoteId} />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </article>
     </li>
   )

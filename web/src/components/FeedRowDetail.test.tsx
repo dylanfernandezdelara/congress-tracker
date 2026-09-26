@@ -5,6 +5,9 @@ import type { FeedPassageVote } from '../api/types'
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
+import { Toaster } from '@/components/dfdl/toast'
+import { toastManager } from '@/lib/toast'
+
 import { FeedRowDetail } from './FeedRowDetail'
 
 vi.mock('../api/client', () => ({
@@ -522,15 +525,23 @@ describe('FeedRowDetail', () => {
       },
     })
 
-    render(<FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc1" />)
+    render(
+      <>
+        <FeedRowDetail item={makeFeedItem()} quoteId="abc123abc123abc1" />
+        <Toaster variant="pill" toastManager={toastManager} />
+      </>,
+    )
 
     const mark = await screen.findByText('something important', { selector: 'mark' })
     expect(mark).toHaveClass('quote-highlight', 'quote-highlight--landing')
-    expect(await screen.findByRole('status')).toHaveTextContent('Shared quote')
+    // The pill lives in the polite live region, so screen readers hear it.
+    const notifications = screen.getByRole('region', { name: 'Notifications' })
+    await waitFor(() => expect(notifications).toHaveTextContent('Shared quote'))
     await waitFor(() => {
       expect(scrollIntoView).toHaveBeenCalled()
     })
-    expect(screen.queryByLabelText('Shared quote')).not.toBeInTheDocument()
+    // Highlighted in place, so no fallback callout (the toast shares its label, so ask for the landmark).
+    expect(screen.queryByRole('complementary', { name: 'Shared quote' })).not.toBeInTheDocument()
   })
 
   it('opens the CRS disclosure when the shared quote lives there', async () => {

@@ -5,7 +5,7 @@
  * close by Escape, Close button and backdrop; stacked sheets close from the top; focus returns to the opener;
  * Escape in the filter's member field clears the field before it closes the sheet; the sheet is bottom-docked on
  * phones and centered on wider screens; it enters on the drawer curve over 500ms; it takes dark colors in the dark theme.
- * The desktop filters panel (not a sheet) expands over 200ms and leaves the member suggestions unclipped.
+ * The desktop filters panel and feed row details (not sheets) expand over 200ms and are unclipped once open.
  *
  * Needs the local stack with seeded data (npm run seed, dev:worker, dev:web).
  * Env: QA_WEB_URL (default http://127.0.0.1:5173). Exits 1 on any failure. WebKit is skipped if not installed.
@@ -164,6 +164,28 @@ const checks = [
       await page.keyboard.press('Escape')
       await page.locator('.feed-advanced-filters-toggle').click()
       await page.waitForFunction(() => !document.querySelector('[data-slot=collapsible-content]'), null, { timeout: 3000 })
+    },
+  },
+  {
+    name: 'feed row details expand over 200ms and are unclipped once open',
+    viewport: { width: 1280, height: 800 },
+    async run(page) {
+      await page.locator('.feed-row-toggle').first().click()
+      const duration = await page
+        .waitForFunction(() => {
+          const el = document.querySelector('.feed-row [data-slot=collapsible-content]')
+          const a = document.getAnimations().find((x) => x.effect?.target === el && x.transitionProperty === 'height')
+          return a ? a.effect.getTiming().duration : false
+        }, null, { timeout: 1000, polling: 'raf' })
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      if (Math.round(duration ?? 0) !== 200) throw new Error(`row details height transition ${duration}ms, expected 200`)
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.feed-row [data-slot=collapsible-content]')
+        return el && !el.hasAttribute('data-moving') && getComputedStyle(el).overflow === 'visible'
+      }, null, { timeout: 3000 })
+      await page.locator('.feed-row-toggle').first().click()
+      await page.waitForFunction(() => !document.querySelector('.feed-row [data-slot=collapsible-content]'), null, { timeout: 3000 })
     },
   },
   {

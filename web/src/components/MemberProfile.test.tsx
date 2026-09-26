@@ -448,7 +448,8 @@ describe('MemberProfile', () => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
     expect(screen.getByText('BF')).toBeInTheDocument()
-    expect(screen.getByText('BF')).toHaveAttribute('aria-hidden', 'true')
+    // Initials are decoration: the whole avatar is hidden from assistive tech (the name is the dialog title).
+    expect(screen.getByText('BF').closest('[data-slot=avatar]')).toHaveAttribute('aria-hidden', 'true')
     expect((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })).querySelector('img')).toBeNull()
   })
 
