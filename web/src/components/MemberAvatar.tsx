@@ -1,15 +1,10 @@
 import { memberInitials } from '../utils/memberPhoto'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar } from '@/components/dfdl/avatar'
 
+/* The app's two sizes sit outside dfdl's 24/32/40 scale: 20px beside a name in a vote list, 64px on a profile. */
 const VARIANT_CLASSES = {
-  defector: {
-    root: 'h-5 w-5',
-    fallback: 'text-[12px] font-medium text-muted-foreground',
-  },
-  profile: {
-    root: 'h-16 w-16',
-    fallback: 'text-lg font-bold text-muted-foreground',
-  },
+  defector: 'size-5',
+  profile: 'size-16 text-heading',
 } as const
 
 type MemberAvatarProps = {
@@ -20,23 +15,14 @@ type MemberAvatarProps = {
 }
 
 export function MemberAvatar({ name, photoUrl, variant }: MemberAvatarProps) {
-  const classes = VARIANT_CLASSES[variant]
-  const showPhoto = Boolean(photoUrl)
-
   return (
-    <Avatar className={classes.root} aria-hidden="true">
-      {showPhoto ? (
-        <AvatarImage
-          src={photoUrl}
-          alt=""
-          className="object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-      ) : null}
-      <AvatarFallback className={classes.fallback} aria-hidden="true">
-        {memberInitials(name)}
-      </AvatarFallback>
-    </Avatar>
+    <Avatar
+      size={variant === 'defector' ? 'sm' : 'lg'}
+      className={VARIANT_CLASSES[variant]}
+      src={photoUrl || undefined}
+      alt=""
+      fallback={memberInitials(name)}
+      aria-hidden="true"
+    />
   )
 }

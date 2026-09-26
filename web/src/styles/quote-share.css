@@ -138,35 +138,6 @@
   }
 
   /* ---- Transient toast ---- */
-  .app-toast {
-    position: fixed;
-    left: 50%;
-    bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
-    z-index: 70;
-    margin: 0;
-    padding: 0.5rem 0.9rem;
-    border: 1px solid hsl(var(--twc-border));
-    border-radius: 999px;
-    background: hsl(var(--twc-card));
-    box-shadow: var(--twc-card-shadow);
-    font-size: 12px;
-    font-weight: 500;
-    color: hsl(var(--twc-foreground));
-    transform: translateX(-50%);
-    animation: app-toast-in 160ms ease-out;
-  }
-
-  @keyframes app-toast-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-
   /* ---- Share-card preview (HTML twin of /og/bill/:id.png) ---- */
   .og-card-preview {
     container-type: inline-size;
