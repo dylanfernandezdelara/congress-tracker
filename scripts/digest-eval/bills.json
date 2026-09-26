@@ -1,0 +1,26 @@
+{
+  "practice": [
+    { "id": "119-hr-10516", "why": "short new bill, text but no CRS; title says almost nothing" },
+    { "id": "119-hr-4795", "why": "charged topic, party-line vote" },
+    { "id": "119-hres-1499", "why": "procedural rule for debate" },
+    { "id": "119-hr-1", "why": "530-page law, split into parts" }
+  ],
+  "test": [
+    { "id": "119-hr-10590", "why": "brand new, title only (no text yet)" },
+    { "id": "119-hr-10593", "why": "new, short text, no CRS" },
+    { "id": "119-s-5493", "why": "new Senate bill, may lack text" },
+    { "id": "119-hr-10326", "why": "party-line 217-207" },
+    { "id": "119-hr-4646", "why": "unanimous 424-0" },
+    { "id": "119-hjres-1", "why": "constitutional amendment, failed two-thirds" },
+    { "id": "119-hr-1501", "why": "party-line, environmental reviews" },
+    { "id": "119-hr-9436", "why": "narrow regulatory (lobster gear, whales)" },
+    { "id": "119-hres-1490", "why": "charged resolution" },
+    { "id": "119-hr-9500", "why": "tax numbers" },
+    { "id": "119-hr-9340", "why": "energy costs" },
+    { "id": "119-hr-9497", "why": "long authorization bill (WRDA)" },
+    { "id": "119-hconres-93", "why": "war powers, charged" },
+    { "id": "119-hjres-213", "why": "Congressional Review Act disapproval" },
+    { "id": "119-s-307", "why": "Senate bill passed House" },
+    { "id": "119-hr-2978", "why": "financial regulation" }
+  ]
+}
