@@ -1,0 +1,264 @@
+<title>Bill Summary Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --page: #fffcf7; --subtle: #f4efe7; --line: #e6e0d7; --ink: #090501; --fg: #464035; --fg2: #787165; --fg3: #8c8579;
+    --best: #1f6b3a; --best-bg: #e3f1e6; --err: #9b2c2c; --err-bg: #fbe6e4; --warn: #7a5a12; --warn-bg: #f7eed7; --focus: #090501;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #13110c; --subtle: #1c1a15; --line: #2f2b24; --ink: #f3efe8; --fg: #cfc8bc; --fg2: #a39c90; --fg3: #8a8378;
+      --best: #8fd0a2; --best-bg: #1b2e21; --err: #f0a39c; --err-bg: #3a1f1c; --warn: #e8c97a; --warn-bg: #33291a; --focus: #f3efe8;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #13110c; --subtle: #1c1a15; --line: #2f2b24; --ink: #f3efe8; --fg: #cfc8bc; --fg2: #a39c90; --fg3: #8a8378;
+    --best: #8fd0a2; --best-bg: #1b2e21; --err: #f0a39c; --err-bg: #3a1f1c; --warn: #e8c97a; --warn-bg: #33291a; --focus: #f3efe8;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--page); color: var(--fg); font: 15px/24px Inter, ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 32px 96px; }
+  h1 { font-size: 28px; line-height: 36px; font-weight: 700; color: var(--ink); margin: 0; }
+  h2 { font-size: 20px; line-height: 28px; font-weight: 700; color: var(--ink); margin: 0; text-wrap: balance; }
+  h3 { font-size: 16px; line-height: 24px; font-weight: 700; color: var(--ink); margin: 0; text-wrap: balance; }
+  p { margin: 0; }
+  .lede { margin-top: 8px; color: var(--fg2); max-width: 72ch; }
+  button { font: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--page); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-block: 12px; margin-top: 16px; border-bottom: 1px solid var(--line); }
+  .progress { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: none; color: var(--fg2); padding: 4px 12px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--subtle); color: var(--ink); font-weight: 600; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--fg); cursor: pointer; }
+  .saving { color: var(--fg3); font-size: 13px; }
+
+  .score { margin-top: 20px; overflow-x: auto; }
+  .score table { border-collapse: collapse; min-width: 640px; width: 100%; font-variant-numeric: tabular-nums; }
+  .score th, .score td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .score th { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg3); }
+  .score td.num { text-align: right; }
+
+  .bill { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); display: grid; gap: 16px; }
+  .bill-head { display: grid; gap: 4px; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg3); }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chip { display: inline-flex; align-items: center; min-height: 24px; padding-inline: 8px; border-radius: 6px; background: var(--subtle); color: var(--fg); font-size: 13px; }
+  .bill-head a { color: var(--fg2); font-size: 13px; }
+  .official { color: var(--fg2); font-size: 14px; max-width: 90ch; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; align-items: start; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; background: var(--page); }
+  .card.is-best { border-color: var(--best); box-shadow: 0 0 0 1px var(--best); }
+  .card.has-error { border-color: var(--err); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .letter { font-weight: 700; color: var(--ink); }
+  .model { font-size: 12px; color: var(--fg3); text-align: right; }
+  .what { color: var(--fg); }
+  .who { display: flex; flex-wrap: wrap; gap: 4px; }
+  .who .chip { font-size: 12px; min-height: 22px; }
+  ul.points { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+  .sec { color: var(--fg3); font-size: 12px; white-space: nowrap; }
+  .inside { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .inside-row { display: grid; gap: 2px; }
+  .inside-row b { color: var(--ink); font-weight: 600; }
+  .share { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .share span { display: block; height: 100%; background: var(--fg2); }
+  .flags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .flag { font-size: 12px; line-height: 16px; padding: 3px 6px; border-radius: 5px; background: var(--warn-bg); color: var(--warn); }
+  .flag.bad { background: var(--err-bg); color: var(--err); }
+  .meta { font-size: 12px; color: var(--fg3); font-variant-numeric: tabular-nums; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .actions button { border: 1px solid var(--line); background: var(--page); color: var(--fg); border-radius: 7px; padding: 4px 10px; cursor: pointer; min-height: 32px; }
+  .actions button[aria-pressed="true"].best { background: var(--best-bg); border-color: var(--best); color: var(--best); font-weight: 600; }
+  .actions button[aria-pressed="true"].err { background: var(--err-bg); border-color: var(--err); color: var(--err); font-weight: 600; }
+  textarea { width: 100%; min-height: 56px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink); background: var(--subtle); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; }
+  .failed { color: var(--err); }
+  .note-hint { font-size: 12px; color: var(--fg3); }
+  .offline { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); }
+</style>
+
+<main>
+  <h1>Bill Summary Test</h1>
+  <p class="lede">Each bill below has five summaries: four cheap models reading the bill text, and what the site shows today. Labels are shuffled per bill so you judge the writing, not the model. For each bill, mark the one you'd most want a reader to see, flag any with a mistake, and add a note if something is off. Your picks save as you go. Turn on “Show models” when you're done.</p>
+  <p class="offline" id="offline" hidden>Picks can't be saved in this view. You can still read everything.</p>
+
+  <div class="bar">
+    <span class="progress" id="progress"></span>
+    <span class="seg" role="group" aria-label="Which bills">
+      <button type="button" data-set="all" aria-pressed="true">All</button>
+      <button type="button" data-set="practice" aria-pressed="false">Practice (4)</button>
+      <button type="button" data-set="test" aria-pressed="false">Test (16)</button>
+    </span>
+    <label class="toggle"><input type="checkbox" id="reveal"> Show models</label>
+    <span class="saving" id="saving" aria-live="polite"></span>
+  </div>
+
+  <section class="score" id="score" hidden></section>
+  <div id="bills"></div>
+</main>
+
+<script>
+  const DATA = /*DATA*/null
+  const state = { set: 'all', reveal: false, judgments: {}, db: null }
+  try { state.reveal = localStorage.getItem('reveal-' + DATA.round) === '1' } catch {}
+  document.getElementById('reveal').checked = state.reveal
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+  const docId = (billId) => `${DATA.round}-${billId}`
+  const judgmentFor = (billId) => state.judgments[docId(billId)] ?? { best: null, errors: [], notes: {} }
+
+  function card(bill, c) {
+    const j = judgmentFor(bill.id)
+    const isBest = j.best === c.model
+    const isErr = (j.errors ?? []).includes(c.model)
+    const s = c.summary
+    const flags = c.flags.map((f) => `<span class="flag ${/not in|failed|judging/.test(f) ? 'bad' : ''}">${esc(f)}</span>`).join('')
+    const body = s
+      ? `<h3>${esc(s.headline)}</h3>
+         ${s.what_it_does ? `<p class="what">${esc(s.what_it_does)}</p>` : ''}
+         ${s.who_it_affects?.length ? `<div class="who">${s.who_it_affects.map((w) => `<span class="chip">${esc(w)}</span>`).join('')}</div>` : ''}
+         ${s.key_points?.length ? `<ul class="points">${s.key_points.map((k) => `<li>${esc(k.text)} ${k.section ? `<span class="sec">${esc(k.section)}</span>` : ''}</li>`).join('')}</ul>` : ''}
+         ${s.inside?.length ? `<div class="inside"><span class="eyebrow">What's inside</span>${s.inside.map((r) => `<div class="inside-row"><span><b>${esc(r.part)}</b> · ${esc(r.summary)} <span class="sec">${esc(r.section ?? '')}</span></span>${r.share ? `<div class="share" title="${r.share}% of the bill's text"><span style="width:${Math.min(100, r.share)}%"></span></div>` : ''}</div>`).join('')}</div>` : ''}`
+      : `<p class="failed">No summary: ${esc(c.error)}</p>`
+    const model = state.reveal ? esc(DATA.models[c.model] ?? c.model) : ''
+    const meta = state.reveal && c.model !== 'baseline_production' ? `$${c.cost.toFixed(4)} · ${c.seconds ?? '?'}s` : ''
+    const note = (j.notes ?? {})[c.model] ?? ''
+    return `<article class="card ${isBest ? 'is-best' : ''} ${isErr ? 'has-error' : ''}" data-bill="${bill.id}" data-model="${c.model}">
+      <div class="card-top"><span class="letter">${c.letter}</span><span class="model">${model}</span></div>
+      ${body}
+      ${flags ? `<div class="flags">${flags}</div>` : ''}
+      <div class="meta">${c.grade != null ? `Reading grade ${c.grade}` : ''}${meta ? ` · ${meta}` : ''}</div>
+      <div class="actions">
+        <button type="button" class="best" data-act="best" aria-pressed="${isBest}">Best</button>
+        <button type="button" class="err" data-act="error" aria-pressed="${isErr}">Has an error</button>
+      </div>
+      ${isErr || note ? `<textarea data-act="note" aria-label="Note on summary ${c.letter}" placeholder="What's wrong or missing?">${esc(note)}</textarea>` : ''}
+    </article>`
+  }
+
+  function renderScore() {
+    const el = document.getElementById('score')
+    el.hidden = !state.reveal
+    if (!state.reveal) return
+    const rows = Object.keys(DATA.models).map((m) => {
+      let best = 0, errors = 0, flags = 0, bad = 0, cost = 0, grades = [], failed = 0
+      for (const b of DATA.bills) {
+        const c = b.candidates.find((x) => x.model === m)
+        if (!c) continue
+        const j = judgmentFor(b.id)
+        if (j.best === m) best++
+        if ((j.errors ?? []).includes(m)) errors++
+        flags += c.flags.length
+        bad += c.flags.filter((f) => /not in|judging/.test(f)).length
+        cost += c.cost || 0
+        if (c.grade != null) grades.push(c.grade)
+        if (!c.summary) failed++
+      }
+      const grade = grades.length ? (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(1) : '–'
+      return `<tr><td>${esc(DATA.models[m])}</td><td class="num">${best}</td><td class="num">${errors}</td><td class="num">${bad}</td><td class="num">${flags}</td><td class="num">${grade}</td><td class="num">${failed}</td><td class="num">${m === 'baseline_production' ? '–' : '$' + cost.toFixed(3)}</td></tr>`
+    })
+    el.innerHTML = `<table><thead><tr><th>Source</th><th>Your “Best”</th><th>Your “Error”</th><th>Fact / wording flags</th><th>All flags</th><th>Avg grade</th><th>Failed</th><th>Cost, 20 bills</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
+  }
+
+  function render() {
+    const bills = DATA.bills.filter((b) => state.set === 'all' || b.set === state.set)
+    const judged = DATA.bills.filter((b) => judgmentFor(b.id).best).length
+    document.getElementById('progress').textContent = `${judged} of ${DATA.bills.length} bills judged`
+    document.getElementById('bills').innerHTML = bills.map((b) => `
+      <section class="bill" id="${b.id}">
+        <div class="bill-head">
+          <span class="eyebrow">${b.set === 'practice' ? 'Practice' : 'Test'} · ${esc(b.why)}</span>
+          <h2>${esc(b.label)}</h2>
+          <p class="official">${esc(b.title)}</p>
+          <div class="facts"><span class="chip">${esc(b.status)}</span><span class="chip">${esc(b.text)}</span><span class="chip">${esc(b.crs)}</span>${b.parts ? `<span class="chip">Summarized in ${b.parts} parts</span>` : ''}</div>
+          <a href="${b.url}" target="_blank" rel="noopener">Read on congress.gov ↗</a>
+        </div>
+        <div class="cards">${b.candidates.map((c) => card(b, c)).join('')}</div>
+      </section>`).join('')
+    renderScore()
+  }
+
+  async function save(billId, next) {
+    const id = docId(billId)
+    state.judgments[id] = next
+    render()
+    if (!state.db) return
+    const saving = document.getElementById('saving')
+    saving.textContent = 'Saving…'
+    try {
+      await state.db.collection('judgments').doc(id).set({ ...next, round: DATA.round, bill: billId, at: new Date().toISOString() })
+      saving.textContent = 'Saved'
+    } catch (e) {
+      saving.textContent = e?.code === 'invalid_argument' ? 'You can view but not save picks here' : 'Could not save; try again'
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const setBtn = e.target.closest('[data-set]')
+    if (setBtn) {
+      state.set = setBtn.dataset.set
+      document.querySelectorAll('[data-set]').forEach((b) => b.setAttribute('aria-pressed', String(b === setBtn)))
+      render()
+      return
+    }
+    const btn = e.target.closest('button[data-act]')
+    if (!btn) return
+    const cardEl = btn.closest('.card')
+    const billId = cardEl.dataset.bill
+    const model = cardEl.dataset.model
+    const j = structuredClone(judgmentFor(billId))
+    j.errors = j.errors ?? []
+    j.notes = j.notes ?? {}
+    if (btn.dataset.act === 'best') j.best = j.best === model ? null : model
+    if (btn.dataset.act === 'error') j.errors = j.errors.includes(model) ? j.errors.filter((m) => m !== model) : [...j.errors, model]
+    save(billId, j)
+  })
+
+  let noteTimer = null
+  document.addEventListener('input', (e) => {
+    if (e.target.dataset?.act !== 'note') return
+    const cardEl = e.target.closest('.card')
+    const billId = cardEl.dataset.bill
+    const model = cardEl.dataset.model
+    const value = e.target.value
+    clearTimeout(noteTimer)
+    noteTimer = setTimeout(() => {
+      const j = structuredClone(judgmentFor(billId))
+      j.notes = { ...(j.notes ?? {}), [model]: value }
+      j.errors = j.errors ?? []
+      state.judgments[docId(billId)] = j
+      // Save without re-rendering, so typing is never interrupted.
+      if (state.db) state.db.collection('judgments').doc(docId(billId)).set({ ...j, round: DATA.round, bill: billId, at: new Date().toISOString() }).then(() => { document.getElementById('saving').textContent = 'Saved' }, () => { document.getElementById('saving').textContent = 'Could not save note' })
+    }, 700)
+  })
+
+  document.getElementById('reveal').addEventListener('change', (e) => {
+    state.reveal = e.target.checked
+    try { localStorage.setItem('reveal-' + DATA.round, state.reveal ? '1' : '0') } catch {}
+    render()
+  })
+
+  render()
+
+  ;(async () => {
+    const db = await window.claude?.use?.('db')
+    if (!db) {
+      document.getElementById('offline').hidden = false
+      return
+    }
+    state.db = db
+    db.collection('judgments').where('round', '==', DATA.round).onSnapshot(
+      (snap) => {
+        const typing = document.activeElement?.tagName === 'TEXTAREA'
+        for (const d of snap.docs) state.judgments[d.id] = d.data()
+        if (!typing) render()
+      },
+      () => { document.getElementById('offline').hidden = false },
+    )
+  })()
+</script>
