@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { holdSheetExit, pressEscapeIn } from '../test/sheetExit'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import type { MemberProfileResponse } from '../api/types'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { MemberProfileSeed } from './MemberProfile'
 import { MemberProfileProvider, useOpenMemberProfile } from './MemberProfileProvider'
 
@@ -52,11 +52,6 @@ const profileA: MemberProfileResponse = {
   as_of: '2026-07-20T00:00:00.000Z',
 }
 
-function endAnimation(element: HTMLElement, animationName: string) {
-  const event = new Event('animationend', { bubbles: true })
-  Object.defineProperty(event, 'animationName', { value: animationName })
-  fireEvent(element, event)
-}
 
 function Opener({ seed, label }: { seed: MemberProfileSeed; label: string }) {
   const open = useOpenMemberProfile()
@@ -70,7 +65,6 @@ function Opener({ seed, label }: { seed: MemberProfileSeed; label: string }) {
 afterEach(() => {
   vi.clearAllMocks()
   clearMemberProfileCache()
-  resetSheetLayerForTests()
   document.body.style.overflow = ''
 })
 
@@ -97,12 +91,14 @@ describe('MemberProfileProvider', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Open A' }))
+    await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open B' }))
+    // The open modal hides the page behind it from assistive tech, so reach the second opener with hidden: true.
+    fireEvent.click(screen.getByRole('button', { name: 'Open B', hidden: true }))
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(screen.getByRole('dialog', { name: 'Grace Other' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Grace Other' }))).toBeInTheDocument()
 
     await waitFor(() => {
       expect(screen.getByText('CA-12')).toBeInTheDocument()
@@ -123,14 +119,15 @@ describe('MemberProfileProvider', () => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
 
-    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
-    fireEvent.keyDown(window, { key: 'Escape' })
-    expect(dialog.closest('.sheet-root')).toHaveAttribute('inert')
+    const dialog = (await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))
+    const exit = holdSheetExit()
+    await pressEscapeIn(dialog)
+    await waitFor(() => expect(dialog).toHaveAttribute('inert'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open A' }))
-    expect(dialog.closest('.sheet-root')).not.toHaveAttribute('inert')
-    endAnimation(dialog, 'sheet-sink')
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open A', hidden: true }))
+    exit.finish()
+    await waitFor(() => expect(dialog).not.toHaveAttribute('inert'))
+    expect((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))).toBeInTheDocument()
   })
 
   it('throws when the opener hook is used outside the provider', () => {

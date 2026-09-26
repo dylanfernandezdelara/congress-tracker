@@ -8,7 +8,6 @@ import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import type { FeedItem, RecentLawItem } from '../api/types'
 import { makeFeedItem } from '../test/feedItemFixtures'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { RecentLawsSection } from './RecentLawsSection'
 
 vi.mock('../api/client', () => ({
@@ -97,7 +96,6 @@ describe('RecentLawsSection', () => {
     vi.clearAllMocks()
     vi.unstubAllGlobals()
     clearRollDefectorsCache()
-    resetSheetLayerForTests()
   })
 
   it('renders feed-style rows with headline, law meta, bill id, and date', () => {

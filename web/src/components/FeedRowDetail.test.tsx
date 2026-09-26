@@ -5,7 +5,6 @@ import type { FeedPassageVote } from '../api/types'
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { clearRollDefectorsCache } from '../api/rollDefectorsCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { FeedRowDetail } from './FeedRowDetail'
 
 vi.mock('../api/client', () => ({
@@ -38,7 +37,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
   clearMemberProfileCache()
   clearRollDefectorsCache()
-  resetSheetLayerForTests()
 })
 
 describe('FeedRowDetail', () => {
@@ -363,10 +361,11 @@ describe('FeedRowDetail', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Share' }))
     const dialog = await screen.findByRole('dialog', { name: 'Share this bill' })
-    const root = dialog.closest('.sheet-root')
-    expect(root).not.toBeNull()
-    expect(root?.parentElement).toBe(document.body)
-    expect(root?.closest('.feed-row-detail-panel')).toBeNull()
+    expect(dialog.closest('.feed-row-detail-panel')).toBeNull()
+    // The sheet's outermost node (Base UI's portal container) hangs directly off <body>.
+    let root: HTMLElement = dialog
+    while (root.parentElement && root.parentElement !== document.body) root = root.parentElement
+    expect(root.parentElement).toBe(document.body)
   })
 
   it('shares via navigator.share from the preview sheet', async () => {
@@ -459,7 +458,7 @@ describe('FeedRowDetail', () => {
     fireEvent.mouseEnter(nameButton)
     fireEvent.click(nameButton)
 
-    expect(screen.getByRole('dialog', { name: 'Rep. Sample Loyal (local)' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Rep. Sample Loyal (local)' }))).toBeInTheDocument()
     await waitFor(() => {
       expect(fetchMemberProfile).toHaveBeenCalledWith('LOCAL:H002')
       expect(screen.getByText('NY-10')).toBeInTheDocument()

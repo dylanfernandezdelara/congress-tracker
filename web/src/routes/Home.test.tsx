@@ -16,7 +16,6 @@ import {
 import { formatVoteDate } from '../utils/billLabels'
 import { chamberFloorDetail } from '../utils/feedQuiet'
 import { floorChipLabel } from '../utils/floorStatusCopy'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 const homeApi = vi.hoisted(() => ({
   fetchFeed: vi.fn(),
@@ -84,7 +83,6 @@ describe('Home', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     clearMemberProfileCache()
-    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 
@@ -513,7 +511,7 @@ describe('Home', () => {
       await screen.findByRole('button', { name: 'Open profile for Brian Fitzpatrick' }),
     )
 
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))).toBeInTheDocument()
     await waitFor(() => {
       expect(fetchMemberProfile).toHaveBeenCalled()
       expect(screen.getByText('PA-1')).toBeInTheDocument()

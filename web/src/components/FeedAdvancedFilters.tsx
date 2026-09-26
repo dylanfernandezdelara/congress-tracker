@@ -305,7 +305,6 @@ export function FeedAdvancedFilters({
           selectionKey={sheetKey}
           onClose={closeFilters}
           titleId={sheetTitleId}
-          closeAriaLabel="Close filters"
           closeLabel="Done"
           footerDismiss
           panelClassName="feed-filters-sheet"

@@ -1,15 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-function endAnimation(element: HTMLElement, animationName: string) {
-  const event = new Event('animationend', { bubbles: true })
-  Object.defineProperty(event, 'animationName', { value: animationName })
-  fireEvent(element, event)
-}
-
 import { clearMemberProfileCache } from '../api/memberProfileCache'
+import { pressEscapeIn } from '../test/sheetExit'
 import { makeTightnessDot } from '../test/tightnessFixtures'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 
 vi.mock('../api/client', () => ({
   fetchVoteDefectors: vi.fn(),
@@ -28,7 +22,6 @@ describe('TightnessDefectorSheet', () => {
     vi.clearAllMocks()
     clearMemberProfileCache()
     clearRollDefectorsCache()
-    resetSheetLayerForTests()
     document.body.style.overflow = ''
   })
 
@@ -66,7 +59,7 @@ describe('TightnessDefectorSheet', () => {
       />,
     )
 
-    expect(screen.getByRole('dialog', { name: 'H.R. 88' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'H.R. 88' }))).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Who broke with their party' })).toBeInTheDocument()
     await waitFor(() => {
       expect(fetchVoteDefectorsMock).toHaveBeenCalledWith({
@@ -141,22 +134,22 @@ describe('TightnessDefectorSheet', () => {
     trigger.focus()
     fireEvent.click(trigger)
 
-    const profile = screen.getByRole('dialog', { name: 'Rep. Sample Crossover (local)' })
+    const profile = (await screen.findByRole('dialog', { name: 'Rep. Sample Crossover (local)' }))
     expect(profile).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'H.R. 88', hidden: true })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'H.R. 88', hidden: true }))).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('CA-12')).toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: 'Escape' })
-    endAnimation(profile, 'sheet-sink')
+    // Escape closes only the sheet on top.
+    await pressEscapeIn(profile)
 
     await waitFor(() => {
       expect(
         screen.queryByRole('dialog', { name: 'Rep. Sample Crossover (local)' }),
       ).not.toBeInTheDocument()
     })
-    expect(screen.getByRole('dialog', { name: 'H.R. 88' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'H.R. 88' }))).toBeInTheDocument()
     await waitFor(() => {
       expect(trigger).toHaveFocus()
     })

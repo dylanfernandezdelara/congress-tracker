@@ -38,7 +38,6 @@ export function BillShareSheet({
       selectionKey={selectionKey}
       onClose={onClose}
       titleId={titleId}
-      closeAriaLabel="Close share preview"
       panelClassName="bill-share-sheet"
     >
       <header className="bill-share-sheet-header">

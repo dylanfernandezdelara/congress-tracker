@@ -4,7 +4,6 @@ import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache, loadMemberProfile } from '../api/memberProfileCache'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import type { MemberProfileResponse } from '../api/types'
 import { MemberProfile, type MemberProfileSeed } from './MemberProfile'
 
@@ -107,22 +106,15 @@ vi.mock('../api/client', () => ({
 }))
 
 import { ApiError } from '../api/fetchJson'
+import { holdSheetExit, pressEscapeIn, settleSheets } from '../test/sheetExit'
 import { fetchMemberProfile } from '../api/client'
 
 const fetchMemberProfileMock = vi.mocked(fetchMemberProfile)
 
-/* jsdom has no AnimationEvent constructor, so fireEvent.animationEnd drops the
-   animationName init; build the event by hand instead. */
-function endAnimation(element: HTMLElement, animationName: string) {
-  const event = new Event('animationend', { bubbles: true })
-  Object.defineProperty(event, 'animationName', { value: animationName })
-  fireEvent(element, event)
-}
 
 afterEach(() => {
   vi.clearAllMocks()
   clearMemberProfileCache()
-  resetSheetLayerForTests()
   document.body.style.overflow = ''
 })
 
@@ -135,17 +127,20 @@ describe('MemberProfile', () => {
   })
 
   it('shows seed identity immediately and loads session stats', async () => {
-    fetchMemberProfileMock.mockResolvedValue(profile)
+    // Keep the request in flight until the seed state has been checked; a resolved mock would race it.
+    let resolveProfile!: (value: typeof profile) => void
+    fetchMemberProfileMock.mockReturnValue(new Promise((resolve) => (resolveProfile = resolve)))
 
     renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Voting record' })).toBeInTheDocument()
     expect(screen.getByText('Frequent cross-voter')).toBeInTheDocument()
     expect(screen.getByText('BF')).toBeInTheDocument()
     expect(screen.getByText('Republican')).toBeInTheDocument()
     expect(screen.getByText('R-PA')).toBeInTheDocument()
 
+    resolveProfile(profile)
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
@@ -178,17 +173,19 @@ describe('MemberProfile', () => {
 
     renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
+    await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })
     expect(screen.queryByText('Loading session voting stats…')).not.toBeInTheDocument()
     expect(screen.getByText('PA-1')).toBeInTheDocument()
     expect(screen.getByText('Republican')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
   })
 
-  it('shows a loading message while session stats are in flight', () => {
+  it('shows a loading message while session stats are in flight', async () => {
     fetchMemberProfileMock.mockReturnValue(new Promise(() => undefined))
 
     renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={() => undefined} />)
 
+    await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })
     expect(screen.getByText('Loading session voting stats…')).toBeInTheDocument()
     expect(screen.getByText('R-PA')).toBeInTheDocument()
   })
@@ -254,30 +251,31 @@ describe('MemberProfile', () => {
     expect(screen.queryByRole('region', { name: 'Recent party-line breaks' })).not.toBeInTheDocument()
   })
 
-  it('closes on Escape and backdrop click after the exit animation', async () => {
+  it('closes on Escape after the exit animation, and on a backdrop click', async () => {
     fetchMemberProfileMock.mockResolvedValue(profile)
     const onClose = vi.fn()
 
-    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+    const { rerender } = renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
 
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
-    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    const dialog = (await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))
 
-    fireEvent.keyDown(window, { key: 'Escape' })
+    const exit = holdSheetExit()
+    await pressEscapeIn(dialog)
+    // The departing dialog must be inert (unfocusable, hidden from AT) while it animates out.
+    await waitFor(() => expect(dialog).toHaveAttribute('inert'))
     expect(onClose).not.toHaveBeenCalled()
-    // The departing dialog must be inert (unfocusable, hidden from AT).
-    expect(dialog.closest('.sheet-root')).toHaveAttribute('inert')
-    // A stray enter-animation end must not finish the close.
-    endAnimation(dialog, 'sheet-rise')
-    expect(onClose).not.toHaveBeenCalled()
-    endAnimation(dialog, 'sheet-sink')
-    expect(onClose).toHaveBeenCalledTimes(1)
+    exit.finish()
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    endAnimation(dialog, 'sheet-sink')
-    expect(onClose).toHaveBeenCalledTimes(2)
+    rerender(<MemberProfile open seed={seed} selectionKey={2} onClose={onClose} />)
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).not.toHaveAttribute('inert')
+    })
+    fireEvent.click(document.querySelector('.sheet-backdrop') as HTMLElement)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(2))
   })
 
   it('ignores repeated close requests while the exit animation is running', async () => {
@@ -289,14 +287,39 @@ describe('MemberProfile', () => {
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
-    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    const dialog = (await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))
 
-    fireEvent.keyDown(window, { key: 'Escape' })
-    fireEvent.keyDown(window, { key: 'Escape' })
-    fireEvent.click(screen.getByRole('button', { name: 'Close profile' }))
-    endAnimation(dialog, 'sheet-sink')
+    const exit = holdSheetExit()
+    await pressEscapeIn(dialog)
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Close', hidden: true }))
+    await settleSheets()
+    expect(onClose).not.toHaveBeenCalled()
+    exit.finish()
 
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    await settleSheets()
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for the exit animation before closing from the Close button', async () => {
+    fetchMemberProfileMock.mockResolvedValue(profile)
+    const onClose = vi.fn()
+
+    renderProfile(<MemberProfile open seed={seed} selectionKey={1} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
+    })
+    const dialog = (await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))
+
+    const exit = holdSheetExit()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(dialog).toHaveAttribute('inert'))
+    await settleSheets()
+    expect(onClose).not.toHaveBeenCalled()
+    exit.finish()
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
   it('cancels a pending close when a new profile is selected mid-animation', async () => {
@@ -311,7 +334,9 @@ describe('MemberProfile', () => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: 'Escape' })
+    const exit = holdSheetExit()
+    await pressEscapeIn((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })))
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toHaveAttribute('inert'))
 
     const otherSeed: MemberProfileSeed = {
       ...seed,
@@ -319,12 +344,13 @@ describe('MemberProfile', () => {
       name: 'Grace Other',
     }
     rerender(<MemberProfile open seed={otherSeed} selectionKey={2} onClose={onClose} />)
+    exit.finish()
 
-    const dialog = screen.getByRole('dialog', { name: 'Grace Other' })
-    endAnimation(dialog, 'sheet-sink')
-
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Grace Other' })).not.toHaveAttribute('inert')
+    })
+    await settleSheets()
     expect(onClose).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog', { name: 'Grace Other' })).toBeInTheDocument()
   })
 
   it('cancels a pending close when the same member is re-selected mid-animation', async () => {
@@ -339,19 +365,20 @@ describe('MemberProfile', () => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
 
-    fireEvent.keyDown(window, { key: 'Escape' })
+    const exit = holdSheetExit()
+    await pressEscapeIn((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })))
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toHaveAttribute('inert'))
 
     /* Re-selecting the same member bumps selectionKey with an unchanged seed. */
     rerender(<MemberProfile open seed={seed} selectionKey={2} onClose={onClose} />)
+    exit.finish()
 
-    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
-    expect(dialog.closest('.sheet-root')).not.toHaveAttribute('inert')
+    const dialog = (await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))
+    await waitFor(() => expect(dialog).not.toHaveAttribute('inert'))
     // Cancelling the close pulls focus back into the still-open modal.
-    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
-    endAnimation(dialog, 'sheet-sink')
-
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus())
+    await settleSheets()
     expect(onClose).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
   })
 
   it('labels a Senate seat as Senator · state', async () => {
@@ -422,7 +449,7 @@ describe('MemberProfile', () => {
     })
     expect(screen.getByText('BF')).toBeInTheDocument()
     expect(screen.getByText('BF')).toHaveAttribute('aria-hidden', 'true')
-    expect(screen.getByRole('dialog', { name: 'Brian Fitzpatrick' }).querySelector('img')).toBeNull()
+    expect((await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })).querySelector('img')).toBeNull()
   })
 
   it('renders Other for an unrecognized party code', async () => {
@@ -437,6 +464,7 @@ describe('MemberProfile', () => {
       />,
     )
 
+    await screen.findByRole('dialog')
     expect(screen.getByText('Other')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('PA-1')).toBeInTheDocument()
@@ -620,15 +648,18 @@ describe('MemberProfile', () => {
         screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
       ).toBeInTheDocument()
     })
-    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    const dialog = (await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))
+    const exit = holdSheetExit()
     fireEvent.click(
       screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
     )
     await waitFor(() => {
-      expect(dialog.closest('.sheet-root')).toHaveAttribute('inert')
+      expect(dialog).toHaveAttribute('inert')
     })
-    endAnimation(dialog, 'sheet-sink')
-    expect(onClose).toHaveBeenCalled()
+    await settleSheets()
+    expect(onClose).not.toHaveBeenCalled()
+    exit.finish()
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
   it('keeps the sheet open when an in-feed bill link is opened in a new tab', async () => {
@@ -642,13 +673,13 @@ describe('MemberProfile', () => {
         screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
       ).toBeInTheDocument()
     })
-    const dialog = screen.getByRole('dialog', { name: 'Brian Fitzpatrick' })
+    const dialog = (await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' }))
     fireEvent.click(
       screen.getByRole('link', { name: /House passes a federal spending oversight bill/ }),
       { metaKey: true },
     )
-    await Promise.resolve()
-    expect(dialog.closest('.sheet-root')).not.toHaveAttribute('inert')
+    await settleSheets()
+    expect(dialog).not.toHaveAttribute('inert')
     expect(onClose).not.toHaveBeenCalled()
   })
 

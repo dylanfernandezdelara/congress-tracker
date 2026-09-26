@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { renderWithMemberProfile } from '../test/memberProfileHarness'
-import { resetSheetLayerForTests } from '../utils/sheetLayer'
 import { PassageVoteDetails, VoteSplitBar } from './PassageVoteDetails'
 
 vi.mock('../api/client', () => ({
@@ -27,7 +26,6 @@ const senateVote = {
 afterEach(() => {
   vi.clearAllMocks()
   clearMemberProfileCache()
-  resetSheetLayerForTests()
   document.body.style.overflow = ''
 })
 
@@ -126,7 +124,7 @@ describe('PassageVoteDetails', () => {
     )
 
     fireEvent.click(profileButton)
-    expect(screen.getByRole('dialog', { name: 'Chris Coons' })).toBeInTheDocument()
+    expect((await screen.findByRole('dialog', { name: 'Chris Coons' }))).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'View on Congress.gov' })).toBeInTheDocument()
     })

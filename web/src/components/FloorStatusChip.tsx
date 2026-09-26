@@ -47,7 +47,6 @@ export function FloorStatusSheet({
       selectionKey={selectionKey}
       onClose={onClose}
       titleId={titleId}
-      closeAriaLabel="Close floor status"
       panelClassName="floor-status-sheet"
     >
       <h2 id={titleId} className="floor-status-sheet-title">
