@@ -30,10 +30,15 @@ export function judgeSources(bill, summary) {
   if (!bill.parts?.length) {
     return `${crs}\n\nBILL TEXT (${bill.textVersion?.type ?? 'none'}):\n${bill.text ?? 'not yet published — only the title is available'}`
   }
-  const cited = new Set()
-  for (const k of summary.key_points ?? []) for (const n of citedSections(k.section)) cited.add(n)
-  const text = sectionText(bill, [...cited]) ?? ''
-  return `${crs}\n\nCITED SECTIONS OF THE BILL TEXT (the bill is ${bill.tokens.toLocaleString()} tokens long; only the sections the summary cites are shown):\n${text.slice(0, 120_000)}`
+  // Each key point gets its own share of the space, so a summary that cites many long sections cannot push the
+  // last point's sections past the limit (which would make a correct figure look unsupported).
+  const points = summary.key_points ?? []
+  const perPoint = Math.floor(120_000 / Math.max(1, points.length))
+  const blocks = points.map((k, i) => {
+    const text = sectionText(bill, citedSections(k.section)) ?? '(no matching section found)'
+    return `-- For key point ${i + 1} (${k.section ?? 'no section cited'}):\n${text.slice(0, perPoint)}`
+  })
+  return `${crs}\n\nCITED SECTIONS OF THE BILL TEXT (the bill is ${bill.tokens.toLocaleString()} tokens long; only the sections each key point cites are shown):\n${blocks.join('\n\n')}`
 }
 
 export function judgeMessages(bill, summary) {
