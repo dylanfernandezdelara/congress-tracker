@@ -194,8 +194,9 @@ way they would, so summaries lead with concrete effects on people and stay stric
   for another reason. A full backfill is a separate, deliberate run.
 - **Reader feedback** `POST /feedback/summary` `{bill:"119-hr-1", kind:"helpful"|"unhelpful"|"mistake", note?}`
   (the "Was this summary helpful? / Report a mistake" row under a summary). Stored in `digest_feedback` with the
-  summary's headline, model, prompt version and fingerprint; site origin only; a per-day IP hash (never the IP)
-  caps each reader at 30 a day and 3 mistake reports per bill. Read it with
+  summary's headline, model, prompt version and fingerprint; site origin only. A keyed per-day hash of the
+  reader's address (`FEEDBACK_HASH_SECRET`; never the IP, erased the next day) caps each reader at 30 a day
+  and 3 mistake reports per bill per day. Read it with
   `SELECT kind, count(*) FROM digest_feedback GROUP BY kind` or the mistakes with their notes.
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be

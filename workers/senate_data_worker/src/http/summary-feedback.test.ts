@@ -12,7 +12,7 @@ vi.mock("../d1/schema", async (importOriginal) => ({
 }));
 
 import { SCHEMA_DDL } from "../d1/schema";
-import { FEEDBACK_MAX_MISTAKES_PER_BILL_PER_DAY } from "../d1/summary-feedback";
+import { FEEDBACK_MAX_MISTAKES_PER_BILL_PER_DAY, FEEDBACK_MAX_PER_CLIENT_PER_DAY } from "../d1/summary-feedback";
 import { handleSummaryFeedback } from "./summary-feedback";
 
 const NOW = new Date("2026-09-27T03:00:00.000Z");
@@ -33,12 +33,12 @@ describe("POST /feedback/summary", () => {
         encoding: "utf8",
       }) || "[]"
     );
-  const post = (body: unknown, headers: Record<string, string> = {}) =>
+  const post = (body: unknown, headers: Record<string, string> = {}, method = "POST") =>
     handleSummaryFeedback(
       new Request("https://trackcongress.org/feedback/summary", {
-        method: "POST",
+        method,
         headers: { Origin: "https://trackcongress.org", "CF-Connecting-IP": "203.0.113.7", ...headers },
-        body: typeof body === "string" ? body : JSON.stringify(body),
+        body: method === "GET" ? undefined : typeof body === "string" ? body : JSON.stringify(body),
       }),
       env,
       json,
@@ -50,7 +50,11 @@ describe("POST /feedback/summary", () => {
     dbPath = join(dir, "t.sqlite");
     execFileSync("sqlite3", [dbPath], { input: SCHEMA_DDL.map((s) => `${s};`).join("\n") });
     execFileSync("sqlite3", [dbPath, `INSERT INTO bill_digests VALUES (119, 'HR', 1, 't', NULL, NULL, '${digest}', 'x', 'x')`]);
-    env = { DB: sqliteD1(dbPath), ALLOWED_ORIGIN: "https://trackcongress.org,https://www.trackcongress.org" } as Env;
+    env = {
+      DB: sqliteD1(dbPath),
+      ALLOWED_ORIGIN: "https://trackcongress.org,https://www.trackcongress.org",
+      FEEDBACK_HASH_SECRET: "test-secret",
+    } as Env;
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -80,12 +84,34 @@ describe("POST /feedback/summary", () => {
     expect((await post({ bill: "119-hr-1", kind: "mistake" }, { "CF-Connecting-IP": "198.51.100.2" })).status).toBe(200);
   });
 
-  it("refuses other origins, bad input, and bills without a summary", async () => {
+  it("drops a note sent with a vote, caps each reader's day, and erases earlier days' hashes", async () => {
+    execFileSync("sqlite3", [dbPath, `INSERT INTO digest_feedback (congress, bill_type, number, kind, client_hash, created_at) VALUES (119, 'HR', 1, 'helpful', 'old', '2026-09-25T10:00:00.000Z')`]);
+    await post({ bill: "119-hr-1", kind: "helpful", note: "a note" });
+    expect(rows().map((r: { note: string | null; client_hash: string }) => [r.note, r.client_hash === "" ? "erased" : "kept"])).toEqual([
+      [null, "erased"],
+      [null, "kept"],
+    ]);
+    const hash = rows()[1].client_hash as string;
+    const values = Array.from({ length: FEEDBACK_MAX_PER_CLIENT_PER_DAY }, (_, i) => `(119, 'HR', 1, 'mistake', '${hash}', '2026-09-27T01:${String(i).padStart(2, "0")}:00.000Z')`);
+    execFileSync("sqlite3", [dbPath, `INSERT INTO digest_feedback (congress, bill_type, number, kind, client_hash, created_at) VALUES ${values.join(",")}`]);
+    expect((await post({ bill: "119-hr-1", kind: "helpful" })).status).toBe(429);
+  });
+
+  it("refuses other or missing origins, other methods, large bodies, bad input, and bills without a summary", async () => {
     expect((await post({ bill: "119-hr-1", kind: "helpful" }, { Origin: "https://evil.example" })).status).toBe(403);
+    expect((await post({ bill: "119-hr-1", kind: "helpful" }, { Origin: "" })).status).toBe(403);
+    expect((await post(null, {}, "GET")).status).toBe(405);
+    expect((await post({ bill: "119-hr-1", kind: "mistake", note: "é".repeat(2_100) })).status).toBe(413);
+    expect((await post({ bill: "119-hr-1", kind: "helpful" }, { "Content-Length": "999999" })).status).toBe(413);
     expect((await post("not json")).status).toBe(400);
     expect((await post({ bill: "hr1", kind: "helpful" })).status).toBe(400);
     expect((await post({ bill: "119-hr-1", kind: "love" })).status).toBe(400);
     expect((await post({ bill: "119-hr-2", kind: "helpful" })).status).toBe(404);
     expect(rows()).toEqual([]);
+  });
+
+  it("accepts any origin when the site allows all (preview and local dev)", async () => {
+    env = { ...env, ALLOWED_ORIGIN: "*" } as Env;
+    expect((await post({ bill: "119-hr-1", kind: "helpful" }, { Origin: "http://localhost:5173" })).status).toBe(200);
   });
 });

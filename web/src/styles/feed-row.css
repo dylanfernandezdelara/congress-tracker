@@ -438,7 +438,23 @@
     color: hsl(var(--twc-secondary));
   }
 
-  /* Summary feedback: quiet text buttons, like the defector toggle. */
+  /* Summary feedback: quiet text buttons, like the defector toggle. The thanks and the buttons share a line. */
+  .feed-row-feedback-block {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.5rem;
+  }
+
+  .feed-row-feedback-block > .feed-row-feedback-form {
+    flex-basis: 100%;
+  }
+
+  .feed-row-feedback:focus {
+    outline: none;
+  }
+
   .feed-row-feedback {
     margin: 0;
     display: flex;

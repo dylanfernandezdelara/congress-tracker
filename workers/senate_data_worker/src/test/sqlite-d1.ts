@@ -6,7 +6,7 @@ export function sqliteD1(dbPath: string): D1Database {
     value === null || value === undefined ? "NULL" :
     typeof value === "number" ? String(value) : `'${String(value).replace(/'/g, "''")}'`;
   const statement = (sql: string, binds: unknown[] = []) => {
-    // Numbered (?1) binds by index; bare ? binds in order.
+    // Numbered (?1) binds by index; bare ? binds in order. A literal ? inside a SQL string would be replaced too.
     let next = 0;
     const bound = sql.replace(/\?(\d+)?/g, (_m, n: string | undefined) => literal(binds[n ? Number(n) - 1 : next++]));
     const run = (json: boolean) =>

@@ -16,6 +16,16 @@ export interface SummaryFeedback {
   summary: { headline: string | null; model: string | null; promptVersion: string | null; fingerprint: string | null };
 }
 
+/** True when this reader has already sent the day's maximum. */
+export async function overDailyLimit(db: D1Database, clientHash: string, nowIso = new Date().toISOString()): Promise<boolean> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(`SELECT count(*) AS total FROM digest_feedback WHERE client_hash = ?1 AND created_at >= ?2`)
+    .bind(clientHash, `${nowIso.slice(0, 10)}T00:00:00.000Z`)
+    .first<{ total: number }>();
+  return (row?.total ?? 0) >= FEEDBACK_MAX_PER_CLIENT_PER_DAY;
+}
+
 /**
  * Store one piece of feedback. A helpful/unhelpful vote replaces the reader's earlier vote on the same bill that day
  * (changing your mind is not a second vote). Returns "rate_limited" past the daily caps.
@@ -57,10 +67,15 @@ export async function recordSummaryFeedback(
       feedback.clientHash,
       nowIso
     );
+  // Rate limits only look at today, so earlier days' hashes are erased: stored feedback cannot be tied to a reader.
+  const forget = db
+    .prepare(`UPDATE digest_feedback SET client_hash = '' WHERE client_hash != '' AND created_at < ?1`)
+    .bind(`${day}T00:00:00.000Z`);
   if (feedback.kind === "mistake") {
-    await insert.run();
+    await db.batch([insert, forget]);
   } else {
     await db.batch([
+      forget,
       db
         .prepare(
           `DELETE FROM digest_feedback WHERE client_hash = ?1 AND congress = ?2 AND bill_type = ?3 AND number = ?4
