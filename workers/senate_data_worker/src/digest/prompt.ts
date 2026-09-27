@@ -13,7 +13,12 @@
  * Import-free on purpose: scripts/digest-eval loads this file directly, so production and the evals share one prompt.
  */
 
-export const PROMPT_VERSION = "v3";
+export const PROMPT_VERSION = "v3.1";
+/**
+ * Part of every summary's fingerprint. Bump it only when existing summaries should be rewritten (a rewrite of the
+ * whole site costs a few dollars); minor prompt versions apply to new writes and are recorded in `generator`.
+ */
+export const PROMPT_EPOCH = "v3";
 
 export interface DigestVote {
   chamber: string;
@@ -74,6 +79,7 @@ NEUTRALITY
 
 VOTES
 - The VOTES listed are what happened on the floor. Never contradict them. If a vote failed, say so plainly ("Failed in the House 212–206; it needed two-thirds"). Do not call a bill "introduced" or "sent to committee" when it has had a floor vote.
+- A headline that mentions a vote says how it ended: "House passes…", "House rejects…", "Senate fails to override…". Never "votes to" or "votes on", which leave the outcome unclear.
 
 TENSE
 - Not yet law: "would" ("would ban…", "would require…").
@@ -81,7 +87,7 @@ TENSE
 - Procedural measures (rules for floor debate, scheduling) and commemorative or opinion resolutions: say what kind of measure it is. For a rule, the headline names the most notable measure it sets up ("House sets rules for debating Israel boycott bill and four others"); each key point is one measure, in plain words. Opinion resolutions ("Resolution condemns…") express views and do not change law; say so.
 
 STYLE
-- Headline: 6–12 words. Lead with the change for people. Not the bill's name, not "This bill", not "New legislation".
+- Headline: 6–12 words. Lead with the change for people. Not the bill's name, not "This bill", not "New legislation". If it mentions a vote, name the result ("House passes", "House rejects"), never "votes to".
   Good: "Bill would ban airline fees that exceed what the service costs"
   Bad: "New legislation aims to adjust fees in transportation projects" (vague, and wrong)
   For a bill that changes many things, name the two or three biggest changes for people: "Law extends tax cuts, adds Medicaid work rules, funds border detention", not "Taxes and benefit rules change for families".

@@ -1,0 +1,21 @@
+{
+  "round": "round3b-v3.1",
+  "bills": [
+    "119-hjres-1",
+    "119-hr-4795",
+    "119-hr-2140",
+    "119-hjres-213",
+    "119-hconres-89"
+  ],
+  "runs": 2,
+  "singleRunBills": [],
+  "candidates": [
+    {
+      "key": "claude-sonnet-5",
+      "name": "Claude Sonnet 5 (normal API: batch refused for this account)",
+      "model": "anthropic/claude-sonnet-5",
+      "batch": false,
+      "temperature": 0.2
+    }
+  ]
+}
