@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { BillDigestInsideRow } from '@congress-tracker/shared/digest-api-types'
+import { SummaryFeedback } from './SummaryFeedback'
 import {
   FEED_SUMMARY_PENDING,
   getFeedSummarySectionsModel,
@@ -83,9 +84,11 @@ type FeedSummarySectionsProps = {
   content: FeedSummaryContent
   /** The bill's text on Congress.gov; key points link their section there. */
   textUrl?: string | null
+  /** The bill (`119-hr-1`) for "Was this summary helpful?"; omit to hide the feedback row. */
+  feedbackBill?: string | null
 }
 
-export function FeedSummarySections({ content, textUrl = null }: FeedSummarySectionsProps) {
+export function FeedSummarySections({ content, textUrl = null, feedbackBill = null }: FeedSummarySectionsProps) {
   const { primary, keyPoints, whoItAffects, inside, provisional, crsDisclosure } = getFeedSummarySectionsModel(content)
 
   return (
@@ -143,6 +146,8 @@ export function FeedSummarySections({ content, textUrl = null }: FeedSummarySect
       ) : null}
 
       {inside.length > 0 ? <InsideSection rows={inside} /> : null}
+
+      {feedbackBill && primary.kind === 'what_it_does' ? <SummaryFeedback bill={feedbackBill} /> : null}
 
       {crsDisclosure ? (
         <details className="feed-row-crs-details">

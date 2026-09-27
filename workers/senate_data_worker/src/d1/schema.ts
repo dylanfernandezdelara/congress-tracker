@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -300,6 +300,24 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_digest_jobs_state ON digest_jobs (state, queued_at)`,
   `CREATE INDEX IF NOT EXISTS idx_digest_jobs_batch ON digest_jobs (batch_id)`,
+  // Reader feedback on a bill's summary ("Was this helpful?", "Report a mistake"), with the summary's generator so
+  // feedback can be tied to a model and prompt version. client_hash is a per-day hash of the IP, for rate limits only.
+  `CREATE TABLE IF NOT EXISTS digest_feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  note TEXT,
+  headline TEXT,
+  model TEXT,
+  prompt_version TEXT,
+  fingerprint TEXT,
+  client_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_digest_feedback_client ON digest_feedback (client_hash, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_digest_feedback_bill ON digest_feedback (congress, bill_type, number, created_at)`,
   `CREATE TABLE IF NOT EXISTS digest_batches (
   id TEXT PRIMARY KEY,
   model TEXT NOT NULL,

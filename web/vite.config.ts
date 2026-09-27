@@ -41,6 +41,7 @@ export default defineConfig({
     // workerOrigin (default :8787).
     proxy: {
       '/feed': { target: workerOrigin, changeOrigin: true },
+      '/feedback': { target: workerOrigin, changeOrigin: true },
       '/stats': { target: workerOrigin, changeOrigin: true },
       '/health': { target: workerOrigin, changeOrigin: true },
       '/share': { target: workerOrigin, changeOrigin: true },

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type { FeedItem, FeedPrimarySponsor } from '../api/types'
+import { formatBillQueryParam } from '@congress-tracker/shared/bill-id'
 import { shareBill } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
@@ -115,7 +116,11 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
         </button>
       </div>
 
-      <FeedSummarySections content={summary} textUrl={`${sourceUrl}/text`} />
+      <FeedSummarySections
+        content={summary}
+        textUrl={`${sourceUrl}/text`}
+        feedbackBill={formatBillQueryParam(item.bill)}
+      />
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 

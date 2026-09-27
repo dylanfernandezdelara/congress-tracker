@@ -1,5 +1,6 @@
 import type { IngestMonitorPayload } from '@congress-tracker/shared/ingest-api-types'
 import { applyAdvancedFeedParams, type AdvancedFeedFilters } from '../utils/feedAdvancedFilters'
+import { getApiBaseUrl } from './config'
 import { fetchJson } from './fetchJson'
 import type {
   CommitteesLeaderboardResponse,
@@ -157,4 +158,20 @@ export async function fetchVoteDefectors(params: {
 export async function fetchMemberProfile(bioguideId: string): Promise<MemberProfileResponse> {
   const params = new URLSearchParams({ bioguide_id: bioguideId })
   return fetchJson<MemberProfileResponse>(`/stats/member.json?${params}`)
+}
+
+export type SummaryFeedbackKind = 'helpful' | 'unhelpful' | 'mistake'
+
+/** Reader feedback on a bill's summary. Resolves false when the worker refuses it (rate limit, no summary). */
+export async function sendSummaryFeedback(feedback: {
+  bill: string
+  kind: SummaryFeedbackKind
+  note?: string
+}): Promise<boolean> {
+  const response = await fetch(`${getApiBaseUrl()}/feedback/summary`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feedback),
+  })
+  return response.ok
 }
