@@ -28,13 +28,17 @@ function decode(text: string): string {
   });
 }
 
-/** Bill XML → readable text that keeps section numbers ("SEC. 2. HEADER") on their own lines and quoted text quoted. */
+/**
+ * Bill XML → readable text that keeps section numbers ("SEC. 2. HEADER") on their own lines and quoted text quoted.
+ * A defined term (`The term <term>critical material</term> means`) is quoted too, which the checks read as the bill's
+ * own term.
+ */
 export function billXmlToText(xml: string): string {
   return decode(
     xml
       .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<quote>/g, "“")
-      .replace(/<\/quote>/g, "”")
+      .replace(/<(quote|term)\b[^>]*>/g, "“")
+      .replace(/<\/(quote|term)>/g, "”")
       .replace(/<section\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g, "\n\nSEC. $1 $2\n")
       .replace(
         /<(subtitle|title|division|part|chapter)\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g,
