@@ -25,7 +25,9 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? 
 function shareOf(section: string | null, parts: BillTextPart[], totalTokens: number): number | null {
   if (!section || !parts.length || totalTokens <= 0) return null;
   const prefix = section.split("/")[0]!.trim().toLowerCase();
-  const tokens = parts.filter((p) => p.label.toLowerCase().startsWith(prefix)).reduce((n, p) => n + p.tokens, 0);
+  // "Title I" must not match "Title II": the prefix has to end at a word boundary.
+  const matches = (label: string) => label.toLowerCase().startsWith(prefix) && !/[a-z0-9]/.test(label.charAt(prefix.length).toLowerCase());
+  const tokens = parts.filter((p) => matches(p.label)).reduce((n, p) => n + p.tokens, 0);
   return tokens ? Math.min(100, Math.round((tokens / totalTokens) * 100)) : null;
 }
 

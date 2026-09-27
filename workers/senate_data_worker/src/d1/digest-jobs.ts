@@ -242,3 +242,15 @@ export async function insertDigestStubs(
     )
   );
 }
+
+/** Which of these bills already have a row on the site (and so should be kept current). */
+export async function selectKnownBills(db: D1Database, congress: number, bills: BillRef[]): Promise<Set<string>> {
+  const numbers = [...new Set(bills.map((b) => Math.trunc(b.number)).filter((n) => Number.isFinite(n) && n > 0))];
+  if (numbers.length === 0) return new Set();
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(`SELECT bill_type, number FROM bill_digests WHERE congress = ?1 AND number IN (${numbers.join(",")})`)
+    .bind(congress)
+    .all<{ bill_type: string; number: number }>();
+  return new Set((results ?? []).map((r) => `${normalizeBillType(r.bill_type)}-${r.number}`));
+}

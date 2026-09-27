@@ -4,10 +4,11 @@ import type { BillRef } from "../types";
 
 export interface UpdatedBill extends BillRef {
   title: string | null;
+  introducedDate: string | null;
 }
 
 interface BillListResponse {
-  bills?: Array<{ congress?: number; type?: string; number?: string | number; title?: string }>;
+  bills?: Array<{ congress?: number; type?: string; number?: string | number; title?: string; introducedDate?: string }>;
   pagination?: { next?: string };
 }
 
@@ -28,7 +29,7 @@ export async function fetchUpdatedBillsPage(
   for (const b of body.bills ?? []) {
     const number = Number(b.number);
     if (!b.type || !Number.isFinite(number) || b.congress !== params.congress) continue;
-    bills.push({ congress: params.congress, type: normalizeBillType(b.type), number, title: b.title?.trim() || null });
+    bills.push({ congress: params.congress, type: normalizeBillType(b.type), number, title: b.title?.trim() || null, introducedDate: b.introducedDate ?? null });
   }
   return { bills, hasMore: Boolean(nextPageUrl(body.pagination?.next, apiKey)) && (body.bills?.length ?? 0) >= params.limit };
 }

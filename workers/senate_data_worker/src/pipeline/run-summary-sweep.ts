@@ -3,6 +3,7 @@ import {
   DIGEST_BATCH_EXPIRE_HOURS,
   DIGEST_BATCH_MAX_ATTEMPTS,
   DIGEST_DISCOVERY_PAGES_PER_RUN,
+  DIGEST_NEW_BILL_DAYS,
   DIGEST_RECHECK_HOURS,
   DIGEST_RECHECK_PER_RUN,
   DIGEST_REWRITES_PER_RUN,
@@ -18,6 +19,7 @@ import {
   selectBatchJobs,
   selectOpenBatches,
   selectQueuedJobs,
+  selectKnownBills,
   selectRecheckBills,
   settleJob,
   type DigestJob,
@@ -222,9 +224,14 @@ class Sweep {
         offset: cursor.offset,
         limit: DISCOVERY_PAGE_SIZE,
       });
-      await insertDigestStubs(this.env.DB, bills, nowIso);
-      await enqueueDigestJobs(this.env.DB, bills, "new", nowIso);
-      this.result.discovered += bills.length;
+      // New bills, and bills already on the site. Other old bills that changed are the backfill's, not the sweep's.
+      const known = await selectKnownBills(this.env.DB, congress, bills);
+      const newSince = new Date(this.now.getTime() - DIGEST_NEW_BILL_DAYS * 86_400_000).toISOString().slice(0, 10);
+      const fresh = bills.filter((b) => (b.introducedDate ?? "") >= newSince);
+      const wanted = bills.filter((b) => known.has(`${b.type}-${b.number}`) || (b.introducedDate ?? "") >= newSince);
+      await insertDigestStubs(this.env.DB, fresh, nowIso);
+      await enqueueDigestJobs(this.env.DB, wanted, "new", nowIso);
+      this.result.discovered += wanted.length;
       if (hasMore) {
         cursor = { ...cursor, offset: cursor.offset + bills.length };
         continue;

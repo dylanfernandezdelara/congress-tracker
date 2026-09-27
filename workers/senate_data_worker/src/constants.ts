@@ -48,6 +48,8 @@ export const DIGEST_BATCH_BILLS_PER_RUN = 40;
 export const DIGEST_SWEEP_ADMIN_MAX_BILLS = 60;
 /** Congress.gov update-list pages (250 bills each) read per run. */
 export const DIGEST_DISCOVERY_PAGES_PER_RUN = 2;
+/** Discovery summarizes bills introduced within this many days, plus changed bills already on the site. */
+export const DIGEST_NEW_BILL_DAYS = 30;
 /** Bills still waiting on text or a CRS summary are re-checked at most this often. */
 export const DIGEST_RECHECK_HOURS = 24;
 export const DIGEST_RECHECK_PER_RUN = 20;
