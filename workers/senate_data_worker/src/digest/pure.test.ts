@@ -76,6 +76,17 @@ describe("checks", () => {
     expect(result.blocking).toEqual(['judging word "sweeping"', "number not in sources: 50000000000"]);
   });
 
+  it("blocks 'dirty' and 'polluting', except as a term the bill defines", () => {
+    const engines = sources({ title: "Clean Diesel Act", text: "SEC. 2. Grants\nGrants to replace diesel engines." });
+    const at = (what: string, bill = engines) =>
+      checkSummary(summary({ what_it_does: what, key_points: [{ text: "Funds engine grants", section: null }] }), bill).blocking;
+    expect(at("Pays for retrofitting dirty diesel engines.")).toEqual(['judging word "dirty"']);
+    expect(at("Pays for replacing polluting diesel engines.")).toEqual(['judging word "polluting"']);
+    expect(at("Pays for replacing older diesel engines.")).toEqual([]);
+    const defined = sources({ text: "SEC. 2. Definitions\nThe term “dirty bomb” means a radiological dispersal device." });
+    expect(at("Raises penalties for building a dirty bomb.", defined)).toEqual([]);
+  });
+
   it("warns, not blocks, when a key point's number is elsewhere in the bill", () => {
     const result = checkSummary(summary({ key_points: [{ text: "Reports due within 270 days", section: "Sec. 2" }] }), sources());
     expect(result.blocking).toEqual([]);
