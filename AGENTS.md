@@ -214,9 +214,11 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - **Judge** (eval rounds only, never production): Gemini 3.8 Flash, calibrated against Dylan's picks. Try
   another with `DIGEST_JUDGE_MODEL=<openrouter id>` (and `DIGEST_JUDGE_EFFORT=high|max` for reasoning models);
   results are written per model and never overwrite Gemini's. Tried 2026-09-27 on the same calibration set:
-  DeepSeek V4.1 Flash ($0.18 vs $0.96) missed 5 of 6 planted "consider"→"require" errors and gave no verdict
-  on ~30% of calls; Muse Spark 1.3 max ($0.21) caught every planted error but agreed with 2 of 5 round-2 picks
-  (Gemini 5 of 5): stricter on inferred wording ("stricter rules", "who it affects"). Use it as a second opinion.
+  DeepSeek V4.1 Flash ($0.18 vs $0.96) caught 1 of 8 planted "consider"→"require" errors and gave no verdict
+  on 40% of calls. Muse Spark 1.3 max ($0.21) caught every planted number, vote and neutrality error and 6 of 8
+  strength errors, but passed only 3 of Dylan's 5 round-2 picks on the run he reviewed (1 of 5 across all three
+  runs; Gemini 5 of 5 either way): stricter on inferred wording ("stricter rules", "who it affects"). Use it as a
+  second opinion on factual support.
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
