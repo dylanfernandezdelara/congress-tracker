@@ -204,13 +204,15 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   for (const w of JUDGING) {
     if (!new RegExp(`\\b${w}\\b`).test(plain)) continue;
     // A term the bill defines is not a judgment: every use in the summary must be a two-word phrase the bill defines
-    // (the term “critical material” means; ‘…’ when nested in an amendment). Titles ("Stop Reckless Spending Act")
+    // (the term “critical material” means / has the meaning given; ‘…’ when nested in an amendment; bill XML's
+    // <term> arrives quoted from billXmlToText). Titles ("Stop Reckless Spending Act")
     // and findings ("devastating wildfires") are the sponsor's framing and stay blocked.
     const uses = [...plain.matchAll(new RegExp(`\\b${w}\\b(?:[- ]([a-z]+))?`, "g"))];
     const billTerm = (next: string | undefined) => {
       if (!next) return false;
       const phrase = `${w}[- ]${next.replace(/s$/, "")}s?`;
-      return new RegExp(`term [“"‘']${phrase}\\b[^”"’']{0,40}[”"’']|[“"‘']${phrase}\\b[^”"’']{0,40}[”"’'] means`).test(billText);
+      // "The term “x” means", "The terms “x” and “y” mean", "“x” has the meaning given", "“x” … have the meanings given".
+      return new RegExp(`terms? [“"‘']${phrase}\\b[^”"’']{0,40}[”"’']|[“"‘']${phrase}\\b[^”"’']{0,40}[”"’'] (means?|ha(s|ve) the meanings?)`).test(billText);
     };
     if (!uses.every((u) => billTerm(u[1]))) blocking.push(`judging word "${w}"`);
   }
