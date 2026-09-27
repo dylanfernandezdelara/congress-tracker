@@ -18,7 +18,8 @@ describe('SiteFooter', () => {
 
     const note = screen.getByText(/written by a language model/i)
     expect(note).toHaveTextContent(/from the bill’s text/i)
-    expect(note).toHaveTextContent(/checked against it/i)
+    expect(note).toHaveTextContent(/from its title or the CRS summary/i)
+    expect(note).toHaveTextContent(/screened for numbers and wording/i)
     expect(note).toHaveTextContent(/official CRS summary/i)
   })
 })

@@ -8,8 +8,9 @@ export function SiteFooter() {
       </p>
       <p className="site-footer-disclaimer">
         Plain-language bill summaries are written by a language model from the bill&rsquo;s text
-        and checked against it before they appear; the official CRS summary is shown beneath
-        when one exists.
+        (or, until the text is published, from its title or the CRS summary) and screened for
+        numbers and wording the sources do not support. The official CRS summary, when one
+        exists, is available beneath each one.
       </p>
     </footer>
   )
