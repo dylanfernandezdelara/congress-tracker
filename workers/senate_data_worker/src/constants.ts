@@ -66,6 +66,14 @@ export const DIGEST_SWEEP_RUN_WINDOW_MS = 11 * 60_000;
 export const SUMMARY_SWEEP_LEASE_TTL_MS = 16 * 60_000;
 /** Admin `POST /__pipeline/run/summary-sweep` cap per invocation (?limit=, applies to both). */
 export const DIGEST_SWEEP_ADMIN_MAX_BILLS = 60;
+/**
+ * Backfill (pipeline/run-summary-backfill.ts): a page of the Congress's bills is queued only while fewer than this
+ * many jobs wait, so new bills never queue behind thousands of old ones.
+ */
+export const DIGEST_BACKFILL_QUEUE_FLOOR = 60;
+/** Share of the daily budget backfill jobs may use; the rest stays for new bills and rewrites. */
+export const DIGEST_BACKFILL_BUDGET_SHARE = 0.5;
+export const DIGEST_BACKFILL_PAGE_SIZE = 100;
 /** Congress.gov update-list pages (250 bills each) read per run. */
 export const DIGEST_DISCOVERY_PAGES_PER_RUN = 2;
 /** Discovery summarizes bills introduced within this many days, plus changed bills already on the site. */

@@ -11,6 +11,7 @@ const jobsApi = vi.hoisted(() => ({
   markAttempt: vi.fn(),
   markJobsBatched: vi.fn(),
   selectBatchJobs: vi.fn(),
+  countQueuedJobs: vi.fn(),
   selectKnownBills: vi.fn(),
   selectOpenBatches: vi.fn(),
   selectQueuedJobs: vi.fn(),
@@ -21,6 +22,7 @@ const mockGetDigest = vi.fn();
 const mockGetState = vi.fn();
 const mockSetState = vi.fn();
 const mockBudgetLeft = vi.fn();
+const mockSpentToday = vi.fn();
 const mockRecordSpend = vi.fn();
 const mockGetBatch = vi.fn();
 const mockSubmitBatch = vi.fn();
@@ -42,6 +44,8 @@ vi.mock("../d1/pipeline-state", () => ({
 }));
 vi.mock("../digest/budget", () => ({
   budgetLeft: (...a: unknown[]) => mockBudgetLeft(...a),
+  spentToday: (...a: unknown[]) => mockSpentToday(...a),
+  dailyBudget: () => 1,
   recordSpend: (...a: unknown[]) => mockRecordSpend(...a),
 }));
 vi.mock("../digest/openrouter-client", () => ({
@@ -74,6 +78,7 @@ const job = (number: number, overrides: Partial<DigestJob> = {}): DigestJob => (
   batchId: null,
   fingerprint: null,
   readFailures: 0,
+  origin: "live",
   ...overrides,
 });
 
@@ -137,6 +142,7 @@ describe("runSummarySweep", () => {
     mockGetState.mockResolvedValue(null);
     mockFetchUpdated.mockResolvedValue({ bills: [], hasMore: false });
     mockBudgetLeft.mockResolvedValue(1);
+    mockSpentToday.mockResolvedValue(0);
     mockGetDigest.mockResolvedValue(null);
     mockPrepare.mockImplementation(async (_env: Env, ref: { number: number }) => prepared(ref.number));
   });
@@ -283,8 +289,10 @@ describe("runSummarySweep", () => {
             { congress: 119, type: "HR", number: 3, title: "Old unknown bill", introducedDate: "2025-03-01", changedOn: "2026-09-26" },
           ],
           hasMore: true,
+          // Congress.gov returned 5 rows; 2 were dropped (other Congress, bad number), so the offset moves by 5.
+          pageSize: 5,
         })
-        .mockResolvedValueOnce({ bills: [], hasMore: false });
+        .mockResolvedValueOnce({ bills: [], hasMore: false, pageSize: 0 });
 
       const result = await runSummarySweep(env, { now: NOW });
 
@@ -297,13 +305,74 @@ describe("runSummarySweep", () => {
       expect(result.discovered).toBe(2);
       const first = mockFetchUpdated.mock.calls[0]![1];
       const second = mockFetchUpdated.mock.calls[1]![1];
-      expect(second).toMatchObject({ fromIso: first.fromIso, toIso: first.toIso, offset: 3 });
+      expect(second).toMatchObject({ fromIso: first.fromIso, toIso: first.toIso, offset: 5 });
       // The window is exhausted: the next one starts 3 hours before this one ended.
       expect(mockSetState).toHaveBeenCalledWith(env.DB, "digest_discovery_cursor", {
         fromIso: "2026-09-26T09:20:00.000Z",
         toIso: NOW.toISOString(),
         offset: 0,
       });
+    });
+  });
+
+  describe("backfill", () => {
+    const cursor = (overrides: Record<string, unknown> = {}) => ({ congress: 119, fromDay: "2025-03-01", offset: 40, done: false, startedAt: "t", ...overrides });
+    const withCursor = (c: unknown) =>
+      mockGetState.mockImplementation(async (_db, key: string) => (key === "digest_backfill_cursor" ? c : null));
+    const backfillPage = (page: Record<string, unknown>) =>
+      mockFetchUpdated.mockImplementation(async (_key, params: { offset: number; fromIso?: string }) =>
+        params.fromIso?.endsWith("T00:00:00.000Z")
+          ? { bills: [], hasMore: false, total: 0, pageSize: 0, lastDay: null, lastDayCount: 0, ...page }
+          : { bills: [], hasMore: false, total: 0, pageSize: 0, lastDay: null, lastDayCount: 0 }
+      );
+    const old = (number: number) => ({ congress: 119, type: "HR", number, title: "Old", introducedDate: "2025-02-01", changedOn: "2025-03-02" });
+
+    it("queues a page as backfill jobs and moves the cursor to the page's last update day", async () => {
+      withCursor(cursor());
+      jobsApi.countQueuedJobs.mockResolvedValue(10);
+      backfillPage({ bills: [old(7), old(8)], hasMore: true, pageSize: 100, lastDay: "2025-03-04", lastDayCount: 3 });
+
+      const result = await runSummarySweep(env, { now: NOW });
+
+      const call = mockFetchUpdated.mock.calls.find((c) => (c[1] as { fromIso?: string }).fromIso === "2025-03-01T00:00:00.000Z")!;
+      expect(call[1]).toMatchObject({ offset: 40, limit: 100 });
+      expect(jobsApi.enqueueDigestJobs).toHaveBeenCalledWith(env.DB, [old(7), old(8)], "new", NOW.toISOString(), "backfill");
+      expect(result.backfilled).toBe(2);
+      expect(mockSetState).toHaveBeenCalledWith(env.DB, "digest_backfill_cursor", cursor({ fromDay: "2025-03-04", offset: 3 }));
+    });
+
+    it("advances by the raw page size inside one day, even when rows were dropped", async () => {
+      withCursor(cursor());
+      jobsApi.countQueuedJobs.mockResolvedValue(0);
+      backfillPage({ bills: [], hasMore: false, pageSize: 100, lastDay: "2025-03-01", lastDayCount: 100 });
+
+      await runSummarySweep(env, { now: NOW });
+
+      expect(mockSetState).toHaveBeenCalledWith(env.DB, "digest_backfill_cursor", cursor({ offset: 140, done: true }));
+    });
+
+    it("waits while the queue is full, or once backfill has used its share of the budget", async () => {
+      withCursor(cursor());
+      jobsApi.countQueuedJobs.mockResolvedValue(60);
+      await runSummarySweep(env, { now: NOW });
+      jobsApi.countQueuedJobs.mockResolvedValue(0);
+      mockSpentToday.mockResolvedValue(0.5);
+      const result = await runSummarySweep(env, { now: NOW });
+
+      expect(mockFetchUpdated.mock.calls.some((c) => (c[1] as { fromIso?: string }).fromIso?.startsWith("2025-"))).toBe(false);
+      expect(result.backfilled).toBe(0);
+    });
+
+    it("stops writing backfill jobs once they have used their share, but keeps writing live ones", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(
+        onlyMatters([job(1, { matters: true }), job(2, { matters: true, origin: "backfill" })])
+      );
+      mockSpentToday.mockResolvedValue(0.6);
+      mockWrite.mockResolvedValue({ ...stored, cost: 0.014 });
+
+      await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(mockWrite.mock.calls.map((c) => (c[1] as PreparedBill).ref.number)).toEqual([1]);
     });
   });
 

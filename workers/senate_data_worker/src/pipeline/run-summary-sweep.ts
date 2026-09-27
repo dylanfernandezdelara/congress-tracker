@@ -1,4 +1,7 @@
 import {
+  DIGEST_BACKFILL_BUDGET_SHARE,
+  DIGEST_BACKFILL_PAGE_SIZE,
+  DIGEST_BACKFILL_QUEUE_FLOOR,
   DIGEST_BATCH_BILLS_PER_RUN,
   DIGEST_BATCH_MAX_TOKENS,
   DIGEST_BATCH_SCAN_PER_RUN,
@@ -20,6 +23,7 @@ import type { Env } from "../config";
 import { congressNumber } from "../config";
 import {
   closeDigestBatch,
+  countQueuedJobs,
   enqueueDigestJobs,
   insertDigestBatch,
   insertDigestStubs,
@@ -36,7 +40,7 @@ import {
 } from "../d1/digest-jobs";
 import { getDigest, storedGenerator } from "../d1/digests";
 import { getPipelineState, setPipelineState } from "../d1/pipeline-state";
-import { budgetLeft, recordSpend } from "../digest/budget";
+import { budgetLeft, dailyBudget, recordSpend, spentToday } from "../digest/budget";
 import { approxTokens } from "../digest/bill-text-parse";
 import { newBillModel, type DigestModel } from "../digest/models";
 import {
@@ -60,12 +64,15 @@ import {
   type WriteOutcome,
 } from "../digest/write";
 import { fetchUpdatedBillsPage } from "../sources/updated-bills";
+import { BACKFILL_CURSOR_KEY, type BackfillCursor } from "./run-summary-backfill";
 import type { BillRef } from "../types";
 import { billLabel } from "./bill-label";
 
 export interface SummarySweepResult {
   collected: number;
   discovered: number;
+  /** Bills queued by a running backfill this run. */
+  backfilled: number;
   rechecked: number;
   unchanged: number;
   /** Bills whose summaries kept failing the checks for the same inputs; retried when the bill changes. */
@@ -127,6 +134,7 @@ class Sweep {
   readonly result: SummarySweepResult = {
     collected: 0,
     discovered: 0,
+    backfilled: 0,
     rechecked: 0,
     unchanged: 0,
     parked: 0,
@@ -343,7 +351,7 @@ class Sweep {
       offset: 0,
     };
     for (let page = 0; page < DIGEST_DISCOVERY_PAGES_PER_RUN; page += 1) {
-      const { bills, hasMore } = await fetchUpdatedBillsPage(apiKey, {
+      const { bills, hasMore, pageSize } = await fetchUpdatedBillsPage(apiKey, {
         congress,
         fromIso: cursor.fromIso,
         toIso: cursor.toIso,
@@ -359,13 +367,45 @@ class Sweep {
       await enqueueDigestJobs(this.env.DB, wanted, "new", nowIso);
       this.result.discovered += wanted.length;
       if (hasMore) {
-        cursor = { ...cursor, offset: cursor.offset + bills.length };
+        cursor = { ...cursor, offset: cursor.offset + pageSize };
         continue;
       }
       cursor = { fromIso: new Date(Date.parse(cursor.toIso) - DISCOVERY_OVERLAP_MS).toISOString(), toIso: nowIso, offset: 0 };
       break;
     }
     await setPipelineState(this.env.DB, DISCOVERY_CURSOR_KEY, cursor);
+  }
+
+  // 2b. The backfill, if one is running: another page of the Congress's bills whenever the queue runs short.
+  async backfill(): Promise<void> {
+    const apiKey = this.env.CONGRESS_API_KEY;
+    const cursor = await getPipelineState<BackfillCursor>(this.env.DB, BACKFILL_CURSOR_KEY);
+    if (!apiKey?.trim() || !cursor || cursor.done || cursor.congress !== congressNumber(this.env)) return;
+    if ((await countQueuedJobs(this.env.DB)) >= DIGEST_BACKFILL_QUEUE_FLOOR) return;
+    if (!(await this.backfillHasBudget())) return;
+    // Walk day by day (oldest update first), with an offset only inside the current day. A bill updated mid-walk
+    // moves ahead of the cursor and is visited again; nothing already passed can shift under the offset.
+    const page = await fetchUpdatedBillsPage(apiKey, {
+      congress: cursor.congress,
+      fromIso: `${cursor.fromDay}T00:00:00.000Z`,
+      toIso: this.now.toISOString(),
+      offset: cursor.offset,
+      limit: DIGEST_BACKFILL_PAGE_SIZE,
+    });
+    const nowIso = this.now.toISOString();
+    await insertDigestStubs(this.env.DB, page.bills, nowIso);
+    await enqueueDigestJobs(this.env.DB, page.bills, "new", nowIso, "backfill");
+    this.result.backfilled += page.bills.length;
+    const next: BackfillCursor =
+      page.lastDay && page.lastDay > cursor.fromDay
+        ? { ...cursor, fromDay: page.lastDay, offset: page.lastDayCount }
+        : { ...cursor, offset: cursor.offset + page.pageSize };
+    await setPipelineState(this.env.DB, BACKFILL_CURSOR_KEY, { ...next, done: !page.hasMore } satisfies BackfillCursor);
+  }
+
+  /** Backfill work may use at most DIGEST_BACKFILL_BUDGET_SHARE of the day's budget; the rest is for new bills. */
+  private async backfillHasBudget(): Promise<boolean> {
+    return (await spentToday(this.env)) < dailyBudget(this.env) * DIGEST_BACKFILL_BUDGET_SHARE;
   }
 
   // 3. Bills still waiting on their text or CRS summary: those are not always announced by an update date.
@@ -384,6 +424,8 @@ class Sweep {
     let writes = 0;
     for (const job of await selectQueuedJobs(this.env.DB, { matters: true, limit: DIGEST_REWRITE_SCAN_PER_RUN })) {
       if (writes >= limit || !this.canWriteNow() || this.pastRunDeadline()) return;
+      // Backfill jobs come last; once they have used their share of the day's budget, they wait for tomorrow.
+      if (job.origin === "backfill" && !(await this.backfillHasBudget())) return;
       try {
         const prepared = await prepareBill(this.env, job);
         if (await isCurrent(this.env, prepared, "rewrite")) {
@@ -415,6 +457,7 @@ class Sweep {
     let tokens = ready.reduce((n, p) => n + p.totalTokens, 0);
     for (const job of await selectQueuedJobs(this.env.DB, { matters: false, limit: DIGEST_BATCH_SCAN_PER_RUN })) {
       if (ready.length >= limit + this.longRewrites.length || tokens >= DIGEST_BATCH_MAX_TOKENS || this.pastRunDeadline()) break;
+      if (job.origin === "backfill" && !(await this.backfillHasBudget())) break;
       try {
         const prepared = await prepareBill(this.env, job);
         if (await isCurrent(this.env, prepared, "new")) {
@@ -489,6 +532,7 @@ export async function runSummarySweep(
   const steps: Array<[string, () => Promise<void>]> = [
     ["collect", () => sweep.collect()],
     ["discover", () => (options.discover === false ? Promise.resolve() : sweep.discover())],
+    ["backfill", () => (options.discover === false ? Promise.resolve() : sweep.backfill())],
     ["recheck", () => sweep.recheck()],
     ["rewrite", () => sweep.rewrite(options.rewrites ?? DIGEST_REWRITES_PER_RUN)],
     ["submit", () => sweep.submit(options.batchBills ?? DIGEST_BATCH_BILLS_PER_RUN)],

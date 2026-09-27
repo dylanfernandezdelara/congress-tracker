@@ -11,7 +11,7 @@ export interface UpdatedBill extends BillRef {
 
 interface BillListResponse {
   bills?: Array<{ congress?: number; type?: string; number?: string | number; title?: string; introducedDate?: string; updateDate?: string; updateDateIncludingText?: string }>;
-  pagination?: { next?: string };
+  pagination?: { next?: string; count?: number };
 }
 
 /**
@@ -20,11 +20,23 @@ interface BillListResponse {
  */
 export async function fetchUpdatedBillsPage(
   apiKey: string,
-  params: { congress: number; fromIso: string; toIso: string; offset: number; limit: number }
-): Promise<{ bills: UpdatedBill[]; hasMore: boolean }> {
+  params: { congress: number; fromIso?: string; toIso?: string; offset: number; limit: number }
+): Promise<{
+  bills: UpdatedBill[];
+  hasMore: boolean;
+  total: number | null;
+  /** Rows Congress.gov returned, before any were dropped: what an offset must advance by. */
+  pageSize: number;
+  /** The last row's update day, and how many rows on the page share it (for day-by-day paging). */
+  lastDay: string | null;
+  lastDayCount: number;
+}> {
+  const window =
+    params.fromIso && params.toIso
+      ? `&fromDateTime=${params.fromIso.slice(0, 19)}Z&toDateTime=${params.toIso.slice(0, 19)}Z`
+      : "";
   const url =
-    `https://api.congress.gov/v3/bill/${params.congress}?format=json&sort=updateDate+asc` +
-    `&fromDateTime=${params.fromIso.slice(0, 19)}Z&toDateTime=${params.toIso.slice(0, 19)}Z` +
+    `https://api.congress.gov/v3/bill/${params.congress}?format=json&sort=updateDate+asc${window}` +
     `&offset=${params.offset}&limit=${params.limit}&api_key=${apiKey}`;
   const body = await fetchJson<BillListResponse>(url);
   const bills: UpdatedBill[] = [];
@@ -33,5 +45,14 @@ export async function fetchUpdatedBillsPage(
     if (!b.type || !Number.isFinite(number) || b.congress !== params.congress) continue;
     bills.push({ congress: params.congress, type: normalizeBillType(b.type), number, title: b.title?.trim() || null, introducedDate: b.introducedDate ?? null, changedOn: (b.updateDateIncludingText ?? b.updateDate)?.slice(0, 10) ?? null });
   }
-  return { bills, hasMore: Boolean(nextPageUrl(body.pagination?.next, apiKey)) && (body.bills?.length ?? 0) >= params.limit };
+  const days = (body.bills ?? []).map((b) => b.updateDate?.slice(0, 10) ?? "");
+  const lastDay = days.at(-1) || null;
+  return {
+    bills,
+    hasMore: Boolean(nextPageUrl(body.pagination?.next, apiKey)) && (body.bills?.length ?? 0) >= params.limit,
+    total: typeof body.pagination?.count === "number" ? body.pagination.count : null,
+    pageSize: body.bills?.length ?? 0,
+    lastDay,
+    lastDayCount: lastDay ? days.filter((d) => d === lastDay).length : 0,
+  };
 }

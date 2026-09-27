@@ -11,6 +11,8 @@ vi.mock("./schema", async (importOriginal) => ({
 }));
 
 import {
+  countQueuedJobs,
+  selectBackfillSiteBills,
   enqueueDigestJobs,
   markAttempt,
   insertDigestStubs,
@@ -137,5 +139,47 @@ describe("digest jobs", () => {
     const due = await selectRecheckBills(db, { congress: 119, checkedBeforeIso: "2026-09-25T10:00:00.000Z", limit: 10 });
     // 3 is already queued; 4 is written from text; 5 is pre-v3; 8 was never queued (backfill); 9 had no title.
     expect(due.map((b) => b.number).sort()).toEqual([1, 2, 7]);
+  });
+
+  it("puts backfill jobs after live ones, and a live reason takes a bill out of the backfill lane", async () => {
+    await enqueueDigestJobs(db, [hr(1), hr(2)], "new", T0, "backfill");
+    await enqueueDigestJobs(db, [hr(3)], "new", T1);
+    expect((await selectQueuedJobs(db, { matters: false, limit: 10 })).map((j) => [j.number, j.origin])).toEqual([
+      [3, "live"],
+      [1, "backfill"],
+      [2, "backfill"],
+    ]);
+    await enqueueDigestJobs(db, [hr(2)], "new", T1);
+    await enqueueDigestJobs(db, [hr(3)], "new", T1, "backfill");
+    // A finished live job that the backfill re-queues joins the backfill lane.
+    await enqueueDigestJobs(db, [hr(4)], "new", T0);
+    await settleJob(db, hr(4), "done", { nowIso: T0 });
+    await enqueueDigestJobs(db, [hr(4)], "new", T1, "backfill");
+    expect((await selectQueuedJobs(db, { matters: false, limit: 10 })).map((j) => [j.number, j.origin])).toEqual([
+      [2, "live"],
+      [3, "live"],
+      [1, "backfill"],
+      [4, "backfill"],
+    ]);
+  });
+
+  it("finds site bills without a current summary that are not already queued, bills that matter first", async () => {
+    const v3 = JSON.stringify({ headline: "h", what_it_does: "w", generator: { tier: "new", fingerprint: "f" } });
+    sql(`
+      INSERT INTO bill_digests VALUES (119, 'HR', 1, 't', NULL, NULL, NULL, '${T0}', '${T0}');
+      INSERT INTO bill_digests VALUES (119, 'HR', 2, 't', NULL, NULL, '{"headline":"old","what_it_does":"free model"}', '${T0}', '${T1}');
+      INSERT INTO bill_digests VALUES (119, 'HR', 3, 't', NULL, NULL, '${v3}', '${T0}', '${T0}');
+      INSERT INTO bill_digests VALUES (119, 'HR', 4, 't', NULL, NULL, NULL, '${T0}', '${T0}');
+      INSERT INTO bill_digests VALUES (118, 'HR', 5, 't', NULL, NULL, NULL, '${T0}', '${T0}');
+      INSERT INTO votes VALUES ('House', 119, 2, 11, 119, 'HR', 1, 'On Passage', 'Passed', 300, 100, '2026-09-01', 1);
+    `);
+    await enqueueDigestJobs(db, [hr(4)], "new", T0);
+
+    const bills = await selectBackfillSiteBills(db, 119);
+    expect(bills.map((b) => [b.number, b.matters])).toEqual([
+      [1, true],
+      [2, false],
+    ]);
+    expect(await countQueuedJobs(db)).toBe(1);
   });
 });
