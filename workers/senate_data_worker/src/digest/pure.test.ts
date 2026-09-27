@@ -168,6 +168,8 @@ describe("checks", () => {
     expect(check("Funds processing.", "This critical bill would fund mineral refining")).toEqual(['judging word "critical"']);
     // The `<term>x</term> means` form, without "The term" before it.
     const means = billXmlToText("<paragraph><enum>(3)</enum><header>Critical material</header><text><term>Critical material</term> means a material on the list.</text></paragraph>");
+    const plural = billXmlToText("<text>The terms <term>critical material</term> and <term>critical mineral</term> have the meanings given those terms in section 2.</text>");
+    expect(checkSummary(summary({ what_it_does: "Would fund critical material and critical mineral projects.", key_points: [{ text: "Starts a pilot", section: null }] }), sources({ text: plural })).blocking).toEqual([]);
     expect(means).toContain("“Critical material” means");
     expect(checkSummary(summary({ what_it_does: "Funds critical materials processing.", key_points: [{ text: "Starts a pilot", section: null }] }), sources({ text: means })).blocking).toEqual([]);
     // Without a definition, the same XML's header and pilot name do not exempt the word.

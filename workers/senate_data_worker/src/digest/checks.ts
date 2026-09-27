@@ -211,7 +211,8 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
     const billTerm = (next: string | undefined) => {
       if (!next) return false;
       const phrase = `${w}[- ]${next.replace(/s$/, "")}s?`;
-      return new RegExp(`term [“"‘']${phrase}\\b[^”"’']{0,40}[”"’']|[“"‘']${phrase}\\b[^”"’']{0,40}[”"’'] (means|has the meaning)`).test(billText);
+      // "The term “x” means", "The terms “x” and “y” mean", "“x” has the meaning given", "“x” … have the meanings given".
+      return new RegExp(`terms? [“"‘']${phrase}\\b[^”"’']{0,40}[”"’']|[“"‘']${phrase}\\b[^”"’']{0,40}[”"’'] (means?|ha(s|ve) the meanings?)`).test(billText);
     };
     if (!uses.every((u) => billTerm(u[1]))) blocking.push(`judging word "${w}"`);
   }
