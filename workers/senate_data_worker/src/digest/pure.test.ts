@@ -164,6 +164,17 @@ describe("checks", () => {
     expect(at("Bill would require Congress approve any new tariffs")).toEqual([]);
   });
 
+  it("checks who_it_affects for numbers and judging words like every other field", () => {
+    const at = (who: string[]) => checkSummary(summary({ who_it_affects: who }), sources()).blocking;
+    expect(at(["airline passengers", "airlines"])).toEqual([]);
+    expect(at(["about 40 million airline passengers"])).toEqual(["number not in sources: 40000000"]);
+    expect(at(["airlines with reckless fee practices"])).toEqual(['judging word "reckless"']);
+    // A group never runs into the next field.
+    expect(checkSummary(summary({ who_it_affects: ["airline passengers facing critical"], key_points: [{ text: "materials fees rise", section: null }] }), sources()).blocking).toEqual([
+      'judging word "critical"',
+    ]);
+  });
+
   it("allows fixed terms of art", () => {
     expect(checkSummary(summary({ what_it_does: "Funds critical minerals mapping." }), sources()).blocking).toEqual([]);
   });
