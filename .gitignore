@@ -15,8 +15,8 @@ node_modules
 
 # Build artifacts
 /target/
-artifacts/
-web/artifacts/
+artifacts
+web/artifacts
 web/output/
 docs/screenshots/
 senate-*.png
