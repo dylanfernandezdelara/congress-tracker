@@ -359,6 +359,10 @@
     color: hsl(var(--twc-faint));
   }
 
+  .site-footer-disclaimer + .site-footer-disclaimer {
+    margin-top: var(--space-8);
+  }
+
   @media (min-width: 640px) {
     .page-shell {
       padding-right: max(var(--space-24), env(safe-area-inset-right, 0px));
