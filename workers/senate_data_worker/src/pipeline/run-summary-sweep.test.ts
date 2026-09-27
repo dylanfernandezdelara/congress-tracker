@@ -186,7 +186,7 @@ describe("runSummarySweep", () => {
       // The $0.003 estimate was counted at submit; only the difference is recorded now.
       expect(jobsApi.closeDigestBatch).toHaveBeenCalledWith(env.DB, "b1", "collected", 0.004);
       expect(mockRecordSpend).toHaveBeenCalledTimes(1);
-      expect(mockRecordSpend.mock.calls[0]![1]).toBeCloseTo(0.001);
+      expect(mockRecordSpend.mock.calls[0]![1]).toBeCloseTo(0.001, 6);
       expect(result).toMatchObject({ collected: 3, stored: 2, spentUsd: 0.014 });
     });
 
@@ -233,7 +233,7 @@ describe("runSummarySweep", () => {
       expect(settled()).toEqual([[1, "queued"]]);
       expect(mockCancelBatch).toHaveBeenCalledWith(env, "b1");
       expect(jobsApi.closeDigestBatch).toHaveBeenCalledWith(env.DB, "b1", "failed", 0);
-      expect(mockRecordSpend.mock.calls[0]![1]).toBeCloseTo(-0.003);
+      expect(mockRecordSpend.mock.calls[0]![1]).toBeCloseTo(-0.003, 6);
     });
 
     it("frees the bills of an expired batch whose status can no longer be read", async () => {
