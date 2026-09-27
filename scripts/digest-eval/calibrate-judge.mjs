@@ -20,7 +20,18 @@ import { chat } from './run-round.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const evalDir = join(here, '..', '..', 'artifacts', 'digest-eval')
-export const JUDGE = { key: 'judge', model: 'google/gemini-3.8-flash', temperature: 0, maxTokens: 3000 }
+/** The calibrated judge. Try another with DIGEST_JUDGE_MODEL=<openrouter id>; results are written per model. */
+const EFFORT = process.env.DIGEST_JUDGE_EFFORT
+export const JUDGE = {
+  key: 'judge',
+  model: process.env.DIGEST_JUDGE_MODEL || 'google/gemini-3.8-flash',
+  // A reasoning judge (DIGEST_JUDGE_EFFORT=high|max) thinks before answering, so it needs a bigger output budget.
+  ...(EFFORT ? { reasoning: { effort: EFFORT }, maxTokens: 16000 } : { temperature: 0, maxTokens: 3000 }),
+}
+/** File suffix for a non-default judge's results, so a trial never overwrites the calibrated judge's. */
+export const JUDGE_SUFFIX = process.env.DIGEST_JUDGE_MODEL
+  ? `-${process.env.DIGEST_JUDGE_MODEL.replace(/[^a-z0-9.]+/gi, '_')}${EFFORT ? `-${EFFORT}` : ''}`
+  : ''
 
 const lists = JSON.parse(readFileSync(join(here, 'bills.json'), 'utf8'))
 const ids = [...lists.practice, ...lists.test].map((b) => b.id)
@@ -94,7 +105,7 @@ const PLANTS = {
 
 async function judge(b, s) {
   try {
-    const r = await chat(JUDGE, judgeMessages(b, s), 3000)
+    const r = await chat(JUDGE, judgeMessages(b, s), JUDGE.maxTokens)
     return { verdict: r.json, cost: r.cost }
   } catch (err) {
     return { verdict: null, error: err.message, cost: 0 }
@@ -149,6 +160,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     verdicts,
     planted: plantedVerdicts.map(({ summary, ...rest }) => rest),
   }
-  writeFileSync(join(outDir, plantedOnly ? 'sensitivity.json' : 'calibration.json'), JSON.stringify(report, null, 2))
+  writeFileSync(join(outDir, `${plantedOnly ? 'sensitivity' : 'calibration'}${JUDGE_SUFFIX}.json`), JSON.stringify(report, null, 2))
   console.log(JSON.stringify({ judge: report.judge, cost: `$${cost.toFixed(3)}`, agreement: report.agreement, sensitivity: report.sensitivity }, null, 2))
 }
