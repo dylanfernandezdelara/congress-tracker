@@ -16,7 +16,7 @@ const feedResult = {
   billsSelected: 1,
   digestsWritten: 1,
   digestsSkipped: 0,
-  digestsRewritten: 1,
+  digestsQueued: 1,
   digestWarnings: [],
   chamberWarnings: [],
   lifecycleRefreshed: 0,

@@ -1,37 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DIGEST_SOURCE_TITLE_FALLBACK } from "../d1/digests";
 import { parseDigestRefreshRequest, runDigestRefreshPipeline } from "./run-digest-refresh";
 
-const mockFetchBillSummaryBundle = vi.fn();
-const mockRewriteSummary = vi.fn();
-const mockUpsertDigest = vi.fn();
-const mockGetDigest = vi.fn();
+const mockPrepareBill = vi.fn();
+const mockWriteSummary = vi.fn();
+const mockSettleJob = vi.fn();
 const mockReplaceBillSponsors = vi.fn();
-const mockResolveOpenRouterModel = vi.fn();
 
-vi.mock("../sources/congress-client", () => ({
-  fetchBillSummaryBundle: (...args: unknown[]) => mockFetchBillSummaryBundle(...args),
-}));
-
-vi.mock("../synthesis/openrouter", () => ({
-  rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
-}));
-
-vi.mock("../d1/digests", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../d1/digests")>();
-  return {
-    ...actual,
-    getDigest: (...args: unknown[]) => mockGetDigest(...args),
-    upsertDigest: (...args: unknown[]) => mockUpsertDigest(...args),
-  };
-});
-
+vi.mock("../digest/prepare", () => ({ prepareBill: (...args: unknown[]) => mockPrepareBill(...args) }));
+vi.mock("../digest/write", () => ({ writeSummary: (...args: unknown[]) => mockWriteSummary(...args) }));
+vi.mock("../d1/digest-jobs", () => ({ settleJob: (...args: unknown[]) => mockSettleJob(...args) }));
 vi.mock("../d1/sponsors", () => ({
   replaceBillSponsors: (...args: unknown[]) => mockReplaceBillSponsors(...args),
-}));
-
-vi.mock("../synthesis/model", () => ({
-  resolveOpenRouterModel: (...args: unknown[]) => mockResolveOpenRouterModel(...args),
 }));
 
 function createEnv(): any {
@@ -65,142 +44,52 @@ describe("parseDigestRefreshRequest", () => {
 });
 
 describe("runDigestRefreshPipeline", () => {
+  const sponsors = [{ bioguideId: "G000555", state: "NY", fullName: "Rep. Example", party: "D", isPrimary: true }];
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveOpenRouterModel.mockResolvedValue("nvidia/nemotron-3-ultra-550b-a55b:free");
-    mockReplaceBillSponsors.mockResolvedValue(undefined);
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "Sample Act",
-      policyArea: "Education",
-      rawSummaryText: "Official CRS summary text.",
-      introducedDate: "2025-01-01",
-      sponsors: [],
-    });
-    mockRewriteSummary.mockResolvedValue({
-      headline: "Sample headline",
-      what_it_does: "Blocks federal aid for ghost students.",
-      key_points: ["Requires campus verification"],
-      terms_explained: [],
-    });
-    mockUpsertDigest.mockResolvedValue(undefined);
-    mockGetDigest.mockResolvedValue(null);
+    mockPrepareBill.mockImplementation(async (_env, ref) => ({ ref, bundle: { sponsors } }));
   });
 
-  it("stores a title fallback when the rewrite misses and no LLM digest exists", async () => {
-    mockRewriteSummary.mockResolvedValue(null);
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "Equal Pay for Equal Work Act",
-      policyArea: null,
-      rawSummaryText: null,
-      introducedDate: null,
-      sponsors: [],
-    });
+  it("rewrites named bills through the shared writer and marks their queue jobs done", async () => {
+    mockWriteSummary.mockResolvedValue({ status: "stored", model: "anthropic/claude-sonnet-5", cost: 0.012, warnings: [] });
+    const bill = { congress: 119, type: "HR", number: 1 };
 
-    const result = await runDigestRefreshPipeline(createEnv(), [
-      { congress: 119, type: "HR", number: 10239 },
-    ]);
+    const result = await runDigestRefreshPipeline(createEnv(), [bill]);
 
-    expect(result).toMatchObject({
-      refreshed: 0,
-      skipped: 1,
-      fallbacksWritten: 1,
-      failures: [{ bill: "HR10239", reason: "openrouter_rewrite_failed_title_fallback_written" }],
-    });
-    expect(mockUpsertDigest).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        number: 10239,
-        digest: expect.objectContaining({ source: DIGEST_SOURCE_TITLE_FALLBACK }),
-      })
-    );
-  });
-
-  it("never overwrites a stored LLM digest with a fallback when the rewrite misses", async () => {
-    mockRewriteSummary.mockResolvedValue(null);
-    mockGetDigest.mockResolvedValue({
-      congress: 119,
-      bill_type: "HR",
-      number: 1234,
-      title: "Sample Act",
-      policy_area: "Education",
-      raw_summary_text: "Official CRS summary text.",
-      digest_json: JSON.stringify({ headline: "Existing", what_it_does: "Already good." }),
-    });
-
-    const result = await runDigestRefreshPipeline(createEnv(), [
-      { congress: 119, type: "HR", number: 1234 },
-    ]);
-
-    expect(result).toMatchObject({
-      refreshed: 0,
-      skipped: 1,
-      fallbacksWritten: 0,
-      failures: [{ bill: "HR1234", reason: "openrouter_rewrite_failed" }],
-    });
-    expect(mockUpsertDigest).not.toHaveBeenCalled();
-  });
-
-  it("rewrites and upserts digests even when a digest already exists", async () => {
-    const result = await runDigestRefreshPipeline(createEnv(), [
-      { congress: 119, type: "HR", number: 1234 },
-    ]);
-
-    expect(result).toMatchObject({
-      model: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    expect(mockWriteSummary).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ ref: bill }), "rewrite");
+    expect(mockReplaceBillSponsors).toHaveBeenCalledWith({}, bill, sponsors);
+    expect(mockSettleJob).toHaveBeenCalledWith({}, bill, "done");
+    expect(result).toEqual({
       requested: 1,
       refreshed: 1,
       skipped: 0,
+      models: ["anthropic/claude-sonnet-5"],
+      costUsd: 0.012,
       failures: [],
     });
-    expect(mockReplaceBillSponsors).toHaveBeenCalledOnce();
-    expect(mockRewriteSummary).toHaveBeenCalledOnce();
-    expect(mockUpsertDigest).toHaveBeenCalledOnce();
   });
 
-  it("rewrites from title when CRS text is missing", async () => {
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "Sample Act",
-      policyArea: null,
-      rawSummaryText: null,
-      introducedDate: null,
-      sponsors: [],
-    });
+  it("reports rejected summaries, budget stops and upstream errors per bill", async () => {
+    mockWriteSummary
+      .mockResolvedValueOnce({ status: "rejected", model: "m", cost: 0.01, reasons: ["number not in sources: 45"] })
+      .mockResolvedValueOnce({ status: "over_budget", cost: 0 });
+    mockPrepareBill.mockImplementationOnce(async (_env, ref) => ({ ref, bundle: { sponsors } }))
+      .mockImplementationOnce(async (_env, ref) => ({ ref, bundle: { sponsors } }))
+      .mockRejectedValueOnce(new Error("HTTP 503"));
 
     const result = await runDigestRefreshPipeline(createEnv(), [
-      { congress: 119, type: "S", number: 2 },
-    ]);
-
-    expect(result.refreshed).toBe(1);
-    expect(result.skipped).toBe(0);
-    expect(result.failures).toEqual([]);
-    expect(mockRewriteSummary).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        title: "Sample Act",
-        rawSummary: null,
-      }),
-      expect.anything()
-    );
-    expect(mockUpsertDigest).toHaveBeenCalledOnce();
-  });
-
-  it("records failures when both title and CRS text are missing", async () => {
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: null,
-      policyArea: null,
-      rawSummaryText: null,
-      introducedDate: null,
-      sponsors: [],
-    });
-
-    const result = await runDigestRefreshPipeline(createEnv(), [
-      { congress: 119, type: "S", number: 2 },
+      { congress: 119, type: "HR", number: 1 },
+      { congress: 119, type: "HR", number: 2 },
+      { congress: 119, type: "HR", number: 3 },
     ]);
 
     expect(result.refreshed).toBe(0);
-    expect(result.skipped).toBe(1);
-    expect(result.failures[0]).toMatchObject({ bill: "S2", reason: "no_title_or_crs" });
-    expect(mockRewriteSummary).not.toHaveBeenCalled();
-    expect(mockReplaceBillSponsors).toHaveBeenCalledOnce();
+    expect(result.failures).toEqual([
+      { bill: "HR1", reason: "rejected: number not in sources: 45" },
+      { bill: "HR2", reason: "daily budget spent" },
+      { bill: "HR3", reason: "upstream_error: HTTP 503" },
+    ]);
+    expect(mockSettleJob).not.toHaveBeenCalled();
   });
 });

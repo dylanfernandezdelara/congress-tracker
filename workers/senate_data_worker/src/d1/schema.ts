@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 13;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -280,6 +280,35 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_process_refresh_queue_pending
     ON process_refresh_queue (last_hydrated_at, queued_at)`,
+  // Plain-language summary queue (digest/). A bill is queued when something it is summarized from may have
+  // changed; the hourly sweep re-reads it, skips it if its fingerprint is unchanged, and otherwise writes a
+  // summary now (Sonnet rewrites) or adds it to a Luna batch. `updated_at` doubles as the last check time.
+  `CREATE TABLE IF NOT EXISTS digest_jobs (
+  congress INTEGER NOT NULL,
+  bill_type TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  batch_id TEXT,
+  fingerprint TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  read_failures INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  queued_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (congress, bill_type, number)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_digest_jobs_state ON digest_jobs (state, queued_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_digest_jobs_batch ON digest_jobs (batch_id)`,
+  `CREATE TABLE IF NOT EXISTS digest_batches (
+  id TEXT PRIMARY KEY,
+  model TEXT NOT NULL,
+  requests INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  submitted_at TEXT NOT NULL,
+  collected_at TEXT,
+  cost REAL
+)`,
 ];
 
 /**
@@ -287,7 +316,7 @@ export const SCHEMA_DDL = [
  * DDL stays in SCHEMA_DDL (IF NOT EXISTS); destructive/cleanup SQL lives here.
  * Dedup DELETE must run before the unique index is created.
  */
-const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[] }> = [
+export const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[] }> = [
   {
     toVersion: 1,
     statements: [
@@ -314,6 +343,27 @@ const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[]
     COALESCE(amount_max, -1)
   )`,
     ],
+  },
+  {
+    // Quote sharing and its bill-text ingest were removed; nothing reads these.
+    toVersion: 11,
+    statements: [
+      `DROP INDEX IF EXISTS idx_bill_quotes_bill`,
+      `DROP TABLE IF EXISTS bill_quotes`,
+      `DROP TABLE IF EXISTS bill_text_sections`,
+      `DROP TABLE IF EXISTS bill_text_documents`,
+    ],
+  },
+  {
+    // Summary queue (digest_jobs / digest_batches, in SCHEMA_DDL) replaces the sweep's per-bill check table.
+    toVersion: 12,
+    statements: [`DROP TABLE IF EXISTS bill_summary_checks`],
+  },
+  {
+    // Bills that could not be read count separately from failed summaries (digest/ sweep parking). New installs get
+    // the column from SCHEMA_DDL; this adds it to tables created at v12. Safe to run twice (see ensureSchema).
+    toVersion: 13,
+    statements: [`ALTER TABLE digest_jobs ADD COLUMN read_failures INTEGER NOT NULL DEFAULT 0`],
   },
 ];
 
@@ -368,7 +418,12 @@ export async function ensureSchema(db: D1Database): Promise<void> {
   for (const migration of SCHEMA_MIGRATIONS) {
     if (migration.toVersion > fromVersion && migration.toVersion <= SCHEMA_VERSION) {
       for (const sql of migration.statements) {
-        await db.prepare(sql).run();
+        try {
+          await db.prepare(sql).run();
+        } catch (err) {
+          // SQLite has no ADD COLUMN IF NOT EXISTS: a column added by DDL or by a concurrent instance is fine.
+          if (!/duplicate column name/i.test(err instanceof Error ? err.message : String(err))) throw err;
+        }
       }
     }
   }

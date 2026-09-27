@@ -1,0 +1,54 @@
+{
+  "round": "round2",
+  "bills": [
+    "119-hr-1",
+    "119-hjres-1",
+    "119-hr-4795",
+    "119-hr-2140",
+    "119-hjres-213"
+  ],
+  "runs": 3,
+  "singleRunBills": [
+    "119-hr-1"
+  ],
+  "candidates": [
+    {
+      "key": "deepseek-v4.1-flash",
+      "name": "DeepSeek V4.1 Flash",
+      "model": "deepseek/deepseek-v4.1-flash"
+    },
+    {
+      "key": "glm-5.3-flash-fast",
+      "name": "GLM-5.3 Flash (fastest host)",
+      "model": "z-ai/glm-5.3-flash",
+      "provider": {
+        "sort": "throughput"
+      },
+      "maxTokens": 10000
+    },
+    {
+      "key": "gpt-6-luna-high",
+      "name": "GPT-6 Luna (high effort, batch)",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "batch": true,
+      "maxTokens": 12000
+    },
+    {
+      "key": "gpt-6-sol",
+      "name": "GPT-6 Sol (batch)",
+      "model": "openai/gpt-6-sol",
+      "batch": true,
+      "maxTokens": 8000
+    },
+    {
+      "key": "claude-sonnet-5",
+      "name": "Claude Sonnet 5 (normal API: batch refused for this account)",
+      "model": "anthropic/claude-sonnet-5",
+      "batch": false,
+      "temperature": 0.2
+    }
+  ]
+}

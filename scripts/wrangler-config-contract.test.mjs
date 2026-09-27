@@ -111,13 +111,13 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.observabilityHeadSamplingRate, worker.observabilityHeadSamplingRate)
 })
 
-test('cron triggers keep daily feed and hourly executive on distinct minutes', () => {
+test('cron triggers keep the daily feed, hourly executive and hourly summary sweep on distinct minutes', () => {
   // Schedule strings are locked to TypeScript constants in
   // workers/senate_data_worker/src/wrangler-cron-contract.test.ts.
-  // Here we only assert the lease-safety invariant: both pipelines share one
+  // Here we only assert the lease-safety invariant: all pipelines share one
   // D1 write lease, so crons must not fire on the same minute.
   const root = parseWranglerConfig(rootConfigPath)
-  assert.equal(root.crons.length, 2, 'expected exactly two cron triggers')
+  assert.equal(root.crons.length, 3, 'expected exactly three cron triggers')
   const minutes = root.crons.map((cron) => {
     const minuteField = cron.split(' ')[0]
     assert.match(minuteField, /^\d+$/, `cron minute must be numeric: ${cron}`)

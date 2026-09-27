@@ -9,7 +9,13 @@ import { scheduleZoneEdgeCachePurge } from "./http/cache-purge";
 import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
-import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
+import { runSummarySweep } from "./pipeline/run-summary-sweep";
+import {
+  EXECUTIVE_POSTS_CRON_UTC,
+  FEED_PIPELINE_CRON_UTC,
+  SUMMARY_SWEEP_CRON_UTC,
+  SUMMARY_SWEEP_LEASE_TTL_MS,
+} from "./constants";
 
 export default {
   fetch(request: Request, env: Env, ctx?: ExecutionContext) {
@@ -22,9 +28,7 @@ export default {
 
     if (isExecutiveCron) {
       ctx.waitUntil(
-        withPipelineLease(env.DB, () =>
-          runExecutivePostsPipeline(env, { trigger: "scheduled" })
-        )
+        withPipelineLease(env.DB, () => runExecutivePostsPipeline(env, { trigger: "scheduled" }))
           .then((result) => {
             console.log(
               JSON.stringify({
@@ -55,6 +59,25 @@ export default {
                 scheduledTime: controller.scheduledTime,
                 error: message,
               }),
+            );
+          }),
+      );
+      return;
+    }
+
+    if (cron === SUMMARY_SWEEP_CRON_UTC) {
+      // Writes digests, so it takes the write lease like the feed and executive runs.
+      ctx.waitUntil(
+        withPipelineLease(env.DB, () => runSummarySweep(env), { ttlMs: SUMMARY_SWEEP_LEASE_TTL_MS })
+          .then((result) => {
+            console.log(JSON.stringify({ event: "summary_sweep_complete", scheduledTime: controller.scheduledTime, ...result }));
+            if (result.stored > 0) scheduleZoneEdgeCachePurge(env, ctx);
+          })
+          .catch((err: unknown) => {
+            const busy = isPipelineBusyError(err);
+            const message = err instanceof Error ? err.message : String(err);
+            console[busy ? "log" : "error"](
+              JSON.stringify({ event: busy ? "summary_sweep_skipped_busy" : "summary_sweep_failed", scheduledTime: controller.scheduledTime, error: message }),
             );
           }),
       );

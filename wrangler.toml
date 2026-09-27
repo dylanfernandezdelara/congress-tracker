@@ -30,7 +30,7 @@ not_found_handling = "single-page-application"
 run_worker_first = true
 
 [triggers]
-crons = ["0 10 * * *", "20 * * * *"]
+crons = ["0 10 * * *", "20 * * * *", "35 * * * *"]
 
 [observability]
 enabled = true

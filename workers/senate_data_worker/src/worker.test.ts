@@ -8,6 +8,10 @@ vi.mock("./pipeline/run-executive-posts", () => ({
   runExecutivePostsPipeline: vi.fn(),
 }));
 
+vi.mock("./pipeline/run-summary-sweep", () => ({
+  runSummarySweep: vi.fn(async () => ({ stored: 3, batched: 2, warnings: [] })),
+}));
+
 vi.mock("./d1/pipeline-state", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./d1/pipeline-state")>();
   return {
@@ -17,15 +21,15 @@ vi.mock("./d1/pipeline-state", async (importOriginal) => {
 });
 
 const withPipelineLeaseMock = vi.fn(
-  async <T>(_db: D1Database, fn: () => Promise<T>) => fn(),
+  async <T>(_db: D1Database, fn: () => Promise<T>, _options?: { ttlMs?: number }) => fn(),
 );
 
 vi.mock("./d1/pipeline-lease", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./d1/pipeline-lease")>();
   return {
     ...actual,
-    withPipelineLease: <T>(db: D1Database, fn: () => Promise<T>) =>
-      withPipelineLeaseMock(db, fn),
+    withPipelineLease: <T>(db: D1Database, fn: () => Promise<T>, options?: { ttlMs?: number }) =>
+      withPipelineLeaseMock(db, fn, options),
   };
 });
 
@@ -33,10 +37,12 @@ import { PipelineBusyError } from "./d1/pipeline-lease";
 import { recordFeedPipelineSkipped } from "./d1/pipeline-state";
 import {
   EXECUTIVE_POSTS_CRON_UTC,
+  SUMMARY_SWEEP_CRON_UTC,
   FEED_PIPELINE_CRON_UTC,
   PIPELINE_LEASE_TTL_MS,
 } from "./constants";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
+import { runSummarySweep } from "./pipeline/run-summary-sweep";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import handler from "./worker";
 
@@ -128,7 +134,7 @@ describe("worker", () => {
       billsSelected: 3,
       digestsWritten: 1,
       digestsSkipped: 2,
-      digestsRewritten: 1,
+      digestsQueued: 1,
       digestWarnings: [],
       chamberWarnings: [],
       lifecycleRefreshed: 0,
@@ -219,7 +225,7 @@ describe("worker", () => {
     log.mockRestore();
   });
 
-  it("runs executive posts pipeline on hourly cron", async () => {
+  it("runs executive posts alone on the :20 cron, and the summary sweep on its own :35 cron", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.mocked(runExecutivePostsPipeline).mockResolvedValue({
       fetched: 5,
@@ -239,10 +245,25 @@ describe("worker", () => {
 
     expect(EXECUTIVE_POSTS_CRON_UTC).toBe("20 * * * *");
     expect(runExecutivePostsPipeline).toHaveBeenCalled();
+    expect(runSummarySweep).not.toHaveBeenCalled();
     expect(runFeedWithMemberVotes).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('"event":"executive_posts_pipeline_complete"'),
     );
+
+    const sweep = createScheduledContext();
+    handler.scheduled(
+      { cron: SUMMARY_SWEEP_CRON_UTC, scheduledTime: 5_678 } as ScheduledController,
+      createMockEnv() as any,
+      sweep.ctx,
+    );
+    await sweep.awaitScheduled();
+    expect(SUMMARY_SWEEP_CRON_UTC).toBe("35 * * * *");
+    // A sweep killed at the 15-minute limit must not hold the lease past the 10:00 feed.
+    expect(withPipelineLeaseMock.mock.calls.at(-1)![2]).toEqual({ ttlMs: 16 * 60_000 });
+    expect(runSummarySweep).toHaveBeenCalledTimes(1);
+    expect(runExecutivePostsPipeline).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('"event":"summary_sweep_complete","scheduledTime":5678,"stored":3'));
     log.mockRestore();
   });
 

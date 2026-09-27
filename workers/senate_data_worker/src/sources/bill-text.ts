@@ -13,7 +13,7 @@ interface TextVersionFormat {
   url?: string;
 }
 
-interface TextVersionItem {
+export interface TextVersionItem {
   type?: string;
   date?: string;
   formats?: TextVersionFormat[];
@@ -209,7 +209,7 @@ export interface BillTextChangesSource {
   latestVersion: BillTextVersion | null;
 }
 
-function billPathSegment(type: string): string {
+export function billPathSegment(type: string): string {
   return type.toLowerCase();
 }
 
@@ -246,7 +246,7 @@ export async function fetchBillTextChangesSource(
  * `Content-Length`, which Congress.gov omits on chunked responses. Returns null
  * when the document is too large to diff.
  */
-async function fetchBillTextXml(url: string): Promise<string | null> {
+export async function fetchBillTextXml(url: string): Promise<string | null> {
   const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${redactUrl(url)}`);
 

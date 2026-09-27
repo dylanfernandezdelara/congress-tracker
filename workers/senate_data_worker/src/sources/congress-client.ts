@@ -18,6 +18,7 @@ export type { PublicLawRecord };
 interface BillSummary {
   text?: string;
   updateDate?: string;
+  actionDesc?: string;
 }
 
 interface BillSummariesResponse {
@@ -50,6 +51,8 @@ export interface BillSummaryBundle {
   title: string | null;
   policyArea: string | null;
   rawSummaryText: string | null;
+  /** Which bill version the CRS summary describes ("Introduced in House"), when there is one. */
+  rawSummaryVersion?: string | null;
   introducedDate: string | null;
   /** Primary sponsors from the bill detail payload (state denormalized). */
   sponsors: BillSponsorRecord[];
@@ -121,6 +124,7 @@ export async function fetchBillSummaryBundle(
     title: detailRes.bill?.title ?? null,
     policyArea: detailRes.bill?.policyArea?.name ?? null,
     rawSummaryText: latest?.text ? stripHtmlToText(latest.text) : null,
+    rawSummaryVersion: latest?.actionDesc ?? null,
     introducedDate: detailRes.bill?.introducedDate?.slice(0, 10) ?? null,
     sponsors: parseBillSponsors(detailRes.bill?.sponsors),
   };

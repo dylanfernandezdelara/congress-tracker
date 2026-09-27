@@ -35,7 +35,6 @@ import { mergeLifecycleRefreshCandidates, refreshBillLifecycles } from "./refres
 import { refreshBillTextChanges } from "./refresh-bill-text-changes";
 import { enqueueProcessBills } from "../d1/bill-process";
 import { hydrateProcessBills } from "./refresh-bill-process";
-import { resolveOpenRouterModel } from "../synthesis/model";
 
 export interface RunFeedResult {
   votesUpserted: number;
@@ -43,7 +42,7 @@ export interface RunFeedResult {
   billsSelected: number;
   digestsWritten: number;
   digestsSkipped: number;
-  digestsRewritten: number;
+  digestsQueued: number;
   digestWarnings: string[];
   chamberWarnings: string[];
   lifecycleRefreshed: number;
@@ -156,15 +155,14 @@ export async function runFeedPipeline(
       introResult.bills,
       feedWindowBills
     );
-    const model = await resolveOpenRouterModel(env);
     let digestResult = {
       written: 0,
       skipped: 0,
-      rewritten: 0,
+      queued: 0,
       warnings: [] as string[],
     };
     try {
-      digestResult = await refreshFeedDigests(env, bills, model, {
+      digestResult = await refreshFeedDigests(env, bills, {
         prioritize: feedWindowBills,
       });
     } catch (err) {
@@ -173,7 +171,7 @@ export async function runFeedPipeline(
     }
     const digestsWritten = digestResult.written;
     const digestsSkipped = digestResult.skipped;
-    const digestsRewritten = digestResult.rewritten;
+    const digestsQueued = digestResult.queued;
     const digestWarnings = digestResult.warnings;
 
     if (digestWarnings.length > 0) {
@@ -291,7 +289,7 @@ export async function runFeedPipeline(
       billsSelected: bills.length,
       digestsWritten,
       digestsSkipped,
-      digestsRewritten,
+      digestsQueued,
       digestWarnings,
       chamberWarnings,
       lifecycleRefreshed,

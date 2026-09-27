@@ -12,9 +12,29 @@ export type { BillDigestContent };
  */
 export const DIGEST_SOURCE_TITLE_FALLBACK = "title_fallback";
 
-/** `digest_json` shape: public content plus the worker-only fallback marker. */
+/** How a summary was made. Worker-only: stripped from the public feed like the fallback marker. */
+export interface DigestGenerator {
+  /** OpenRouter model id. */
+  model: string;
+  /** Prompt version (digest/prompt.ts PROMPT_VERSION). */
+  prompt_version: string;
+  /** "new": first summary of a bill (Luna, batch). "rewrite": a bill that matters, rewritten by Sonnet. */
+  tier: "new" | "rewrite";
+  /** Bill text version the summary read, or null when written from the CRS summary or title. */
+  text_version: string | null;
+  /** Hash of everything the summary was written from; unchanged inputs are never re-summarized. */
+  fingerprint: string;
+  /** Written part by part (a bill too long for one pass). */
+  long: boolean;
+  /** Pre-store check warnings (not blocking), kept for the evals. */
+  warnings?: string[];
+  generated_at: string;
+}
+
+/** `digest_json` shape: public content plus worker-only markers. */
 export interface StoredBillDigest extends BillDigestContent {
   source?: typeof DIGEST_SOURCE_TITLE_FALLBACK;
+  generator?: DigestGenerator;
 }
 
 function parseStoredDigestJson(json: string | null): StoredBillDigest | null {
@@ -31,58 +51,12 @@ function parseStoredDigestJson(json: string | null): StoredBillDigest | null {
 export function parseStoredDigest(json: string | null): BillDigestContent | null {
   const parsed = parseStoredDigestJson(json);
   if (!parsed) return null;
-  const { source: _source, ...content } = parsed;
+  const { source: _source, generator: _generator, ...content } = parsed;
   return content;
 }
 
-/** True when OpenRouter can write a digest from CRS and/or the bill title. */
-export function hasDigestRewriteSource(params: {
-  title?: string | null;
-  rawSummary?: string | null;
-}): boolean {
-  return Boolean(params.title?.trim() || params.rawSummary?.trim());
-}
-
-/**
- * Deterministic metadata-only digest (see `buildTitleFallbackDigest`). Parses
- * as complete so the feed and `/health` treat it as present, but every digest
- * writer retries the LLM rewrite for it.
- */
 export function isTitleFallbackDigest(json: string | null): boolean {
   return parseStoredDigestJson(json)?.source === DIGEST_SOURCE_TITLE_FALLBACK;
-}
-
-/**
- * Complete LLM title-only digest that should rewrite when CRS text later
- * appears. Title fallbacks are excluded: they retry regardless of CRS.
- */
-export function needsCrsUpgrade(existing: {
-  digest_json?: string | null;
-  raw_summary_text?: string | null;
-} | null): boolean {
-  const json = existing?.digest_json ?? null;
-  return Boolean(
-    parseStoredDigest(json) && !isTitleFallbackDigest(json) && !existing?.raw_summary_text?.trim()
-  );
-}
-
-/**
- * - `incomplete`: no parseable digest; rewrite, else write a title fallback.
- * - `fallback_upgrade`: deterministic title fallback stored; retry the LLM.
- * - `crs_upgrade`: LLM title-only digest; rewrite only once CRS text exists.
- * - `complete`: CRS-backed LLM digest; nothing to rewrite.
- */
-export type DigestPhase = "incomplete" | "fallback_upgrade" | "crs_upgrade" | "complete";
-
-export function classifyDigestPhase(existing: {
-  digest_json?: string | null;
-  raw_summary_text?: string | null;
-} | null): DigestPhase {
-  const json = existing?.digest_json ?? null;
-  if (!parseStoredDigest(json)) return "incomplete";
-  if (isTitleFallbackDigest(json)) return "fallback_upgrade";
-  if (needsCrsUpgrade(existing)) return "crs_upgrade";
-  return "complete";
 }
 
 export interface DigestRow {
@@ -239,4 +213,19 @@ export async function selectDigestBillRefs(
     type: normalizeBillType(row.bill_type),
     number: row.number,
   }));
+}
+
+/** The generator record of a stored summary, or null for summaries written before v3. */
+export function storedGenerator(json: string | null): DigestGenerator | null {
+  return parseStoredDigestJson(json)?.generator ?? null;
+}
+
+/**
+ * Whether a bill should be queued for a (better) summary: it has none from the current writer, or it matters now
+ * and its summary is a first pass. Changed inputs are found by the hourly sweep's fingerprint check instead.
+ */
+export function wantsSummary(json: string | null, tier: DigestGenerator["tier"]): boolean {
+  const generator = storedGenerator(json);
+  if (!generator) return true;
+  return tier === "rewrite" && generator.tier !== "rewrite" && !generator.long;
 }

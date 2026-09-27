@@ -1,7 +1,7 @@
 # Ingest monitoring
 
-Crons (UTC): daily feed `0 10 * * *`, hourly executive `20 * * * *`. Distinct
-minutes avoid write-lease collisions.
+Crons (UTC): daily feed `0 10 * * *`, hourly executive `20 * * * *`, hourly
+summary sweep `35 * * * *`. Distinct minutes avoid write-lease collisions.
 
 Scheduled runs persist success/failure in D1. A busy lease records
 `last_skipped` (`pipeline_busy`) without changing status fields — alert when
@@ -53,26 +53,33 @@ with no `bill_digests` row. Older session-backfill rows and bills ranked past
 that window are expected to lack rewrites. A count above 0 marks ingest
 **`degraded`** (it no longer stays `ok` with only an annotation).
 
-An OpenRouter miss (non-2xx, empty, or unparseable JSON in both prompt modes)
-for a bill that has a title or CRS text no longer leaves `digest_json` NULL.
-Every digest writer (daily feed refresh, hourly executive hydrate, admin
-`digest-refresh`) stores a deterministic **title fallback** digest instead:
-headline = title, lead = CRS opening sentence or a sentence restating the
-title; never invented CRS content. The row carries a worker-only
-`source: "title_fallback"` marker in `digest_json` that the public feed strips.
-The daily feed refresh records `…OpenRouter rewrite returned no digest; wrote
-deterministic title fallback digest` in `last_success.digest_warnings` (also
-the `feed_pipeline_partial_digest_refresh` log event); executive hydrate logs
-`executive_bill_digest_title_fallback`; `digest-refresh` reports
-`openrouter_rewrite_failed_title_fallback_written` (it never replaces a stored
-LLM digest with a fallback). The next daily run retries the LLM for every
-stored fallback (after new incompletes, before CRS upgrades, and only while
-`DIGEST_MAX_NEW_REWRITES` remains — over-budget fallbacks wait silently for a
-later run) and warns again if it still misses. Bills over the per-run rewrite
-budget also get a fallback, summarized in one `rewrite budget (N) spent…`
-warning. Only a bill with
-neither title nor CRS text stays empty, and that is warned per bill. Digest
-warnings never change `status`; `missing_digest_count` does.
+A bill with no summary yet gets a deterministic **title fallback** digest right away
+(headline = title, lead = CRS opening sentence or a sentence restating the title;
+never invented content; worker-only `source: "title_fallback"` marker the public
+feed strips), from the daily feed refresh or the hourly executive hydrate, so it
+leaves `missing_digest_count`. The plain-language summary replaces it from the
+hourly summary sweep (see AGENTS.md → Plain-language summaries).
+
+The sweep logs `summary_sweep_complete` (or `summary_sweep_skipped_busy` /
+`summary_sweep_failed`) with `collected` (batch replies processed), `discovered`,
+`rechecked`, `unchanged` (fingerprint matched, no model call), `parked`,
+`rewritten`, `batched`, `stored`, `failed`, `spentUsd` and `warnings`. Things to watch:
+
+- `warnings` with `rejected: number not in sources: …` — a model invented a
+  figure and the retry did too; the old summary stays. Each paid try is counted
+  before it is made, and after 3 failed tries on the same inputs the bill is
+  **parked** (`parked` in the log) until the bill changes. Occasional parking is
+  expected; many is a prompt or checks problem (add a parked bill to the evals and
+  run `npm run digest:regress`). Parked bills:
+  `SELECT * FROM digest_jobs WHERE last_error LIKE 'parked%'`.
+- `daily summary budget spent` / `budget too low for a batch` — spend hit `DIGEST_DAILY_BUDGET_USD` ($1 default).
+  Normal spend is cents a day; hitting it means a flood of rewrites or a price change.
+- `batch … expired|failed; N bill(s) requeued` — OpenRouter batch trouble. Bills
+  go back in the queue; after `DIGEST_BATCH_MAX_ATTEMPTS` they are written directly.
+- A growing queue: `SELECT state, count(*) FROM digest_jobs GROUP BY state`.
+- Spend by day: `SELECT key, value_json FROM pipeline_state WHERE key LIKE 'digest_spend:%'`.
+
+Digest warnings never change `status`; `missing_digest_count` does.
 
 House ingest that hits the per-run detail cap records `House ingest truncated:…`
 and is **`degraded`** (newest-first fetch still lands the current week's rolls).

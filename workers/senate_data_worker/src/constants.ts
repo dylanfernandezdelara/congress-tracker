@@ -37,8 +37,48 @@ export const INTRO_DETAIL_FETCHES_PER_RUN = 25;
 export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 /** Minimum LLM confidence to auto-link a bill. */
 export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
-export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
+/**
+ * Plain-language summaries (pipeline/run-summary-sweep.ts, hourly). Bills that matter are rewritten directly, a
+ * few per run; everything else goes to one Luna batch per run. Spend is also capped per day (DIGEST_DAILY_BUDGET_USD).
+ */
+export const DIGEST_REWRITES_PER_RUN = 5;
+export const DIGEST_BATCH_BILLS_PER_RUN = 40;
+/** Queued jobs looked at per run, per queue: unchanged bills are skipped without counting against the caps above. */
+export const DIGEST_REWRITE_SCAN_PER_RUN = 15;
+export const DIGEST_BATCH_SCAN_PER_RUN = 80;
+/** A batch stops taking bills at about this many input tokens (a few giant bills can fill it). */
+export const DIGEST_BATCH_MAX_TOKENS = 1_500_000;
+/** Bills collected from finished batches per run; the rest wait in the open batch for the next run. */
+export const DIGEST_COLLECT_BILLS_PER_RUN = 40;
+/**
+ * Synchronous (normal API) writes per run, across rewrites, collect fallbacks and direct writes, and the wall time
+ * after which no new one starts. Cron invocations end at 15 minutes; a write cut off there is still counted.
+ */
+export const DIGEST_SYNC_WRITES_PER_RUN = 8;
+export const DIGEST_SWEEP_WRITE_WINDOW_MS = 10 * 60_000;
+/** No new bill of any kind is started after this; with a write in flight the run still ends inside 15 minutes. */
+export const DIGEST_SWEEP_RUN_WINDOW_MS = 11 * 60_000;
+/**
+ * The sweep's write lease: longer than any invocation can live (15 minutes), so a run killed at the limit frees the
+ * lease by :51, well before the 10:00 feed.
+ */
+export const SUMMARY_SWEEP_LEASE_TTL_MS = 16 * 60_000;
+/** Admin `POST /__pipeline/run/summary-sweep` cap per invocation (?limit=, applies to both). */
+export const DIGEST_SWEEP_ADMIN_MAX_BILLS = 60;
+/** Congress.gov update-list pages (250 bills each) read per run. */
+export const DIGEST_DISCOVERY_PAGES_PER_RUN = 2;
+/** Discovery summarizes bills introduced within this many days, plus changed bills already on the site. */
+export const DIGEST_NEW_BILL_DAYS = 30;
+/** Bills still waiting on text or a CRS summary are re-checked at most this often. */
+export const DIGEST_RECHECK_HOURS = 24;
+export const DIGEST_RECHECK_PER_RUN = 20;
+/** OpenRouter batches finish within 24 hours; after this a batch is treated as expired. */
+export const DIGEST_BATCH_EXPIRE_HOURS = 26;
+/** After this many tries for the same inputs a bill is written directly instead of batched again. */
+export const DIGEST_BATCH_MAX_ATTEMPTS = 2;
+/** After this many failed tries for the same inputs a bill is parked until it changes (no more spend on it). */
+export const DIGEST_MAX_ATTEMPTS = 3;
 /** Max new nomination background rewrites per feed pipeline run. */
 export const CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES = 10;
 /** Max nomination metadata fetches (Congress.gov) per feed pipeline run. */
@@ -143,6 +183,12 @@ export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
  * a collision silently skips the daily feed ingest.
  */
 export const EXECUTIVE_POSTS_CRON_UTC = "20 * * * *";
+/**
+ * Hourly summary sweep (pipeline/run-summary-sweep.ts). Its own invocation, so it has its own subrequest and
+ * wall-time budget. At :35 with a 16-minute lease (SUMMARY_SWEEP_LEASE_TTL_MS), even a sweep killed at the wall limit
+ * frees the write lease before the 10:00 feed.
+ */
+export const SUMMARY_SWEEP_CRON_UTC = "35 * * * *";
 
 /** Alert if no successful scheduled ingest within this many hours after cron. */
 export { FEED_PIPELINE_STALE_HOURS } from "../../../shared/ingest-monitor-status";

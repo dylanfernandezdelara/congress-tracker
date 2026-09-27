@@ -1,19 +1,11 @@
 import { DIGEST_REFRESH_MAX_BILLS } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import {
-  classifyDigestPhase,
-  getDigest,
-  hasDigestRewriteSource,
-  upsertDigest,
-} from "../d1/digests";
+import { settleJob } from "../d1/digest-jobs";
 import { replaceBillSponsors } from "../d1/sponsors";
-import { billLabel } from "./bill-label";
-import { fetchBillSummaryBundle } from "../sources/congress-client";
+import { prepareBill } from "../digest/prepare";
+import { writeSummary } from "../digest/write";
 import { parseBillQueryList } from "../sources/parse-bill-query";
-import { resolveOpenRouterModel } from "../synthesis/model";
-import { rewriteSummary } from "../synthesis/openrouter";
-import { buildTitleFallbackDigest } from "../synthesis/title-fallback-digest";
 import type { BillRef } from "../types";
 
 export interface DigestRefreshFailure {
@@ -22,12 +14,12 @@ export interface DigestRefreshFailure {
 }
 
 export interface RunDigestRefreshResult {
-  model: string;
   requested: number;
   refreshed: number;
   skipped: number;
-  /** Deterministic title fallbacks stored for bills whose LLM rewrite missed. */
-  fallbacksWritten: number;
+  /** Models that wrote the stored summaries. */
+  models: string[];
+  costUsd: number;
   failures: DigestRefreshFailure[];
 }
 
@@ -35,103 +27,52 @@ function formatBillKey(bill: BillRef): string {
   return `${bill.type}${bill.number}`;
 }
 
-export async function runDigestRefreshPipeline(
-  env: Env,
-  bills: BillRef[]
-): Promise<RunDigestRefreshResult> {
-  const model = await resolveOpenRouterModel(env);
+/**
+ * Admin: rewrite named bills now, through the same writer as the hourly sweep (Sonnet; Luna for giant bills),
+ * whatever their fingerprint. Counts against the daily budget.
+ */
+export async function runDigestRefreshPipeline(env: Env, bills: BillRef[]): Promise<RunDigestRefreshResult> {
   const limited = bills.slice(0, DIGEST_REFRESH_MAX_BILLS);
   const failures: DigestRefreshFailure[] = [];
+  const models = new Set<string>();
   let refreshed = 0;
   let skipped = 0;
-  let fallbacksWritten = 0;
+  let costUsd = 0;
 
   for (const bill of limited) {
     const key = formatBillKey(bill);
-
     try {
-      const bundle = await fetchBillSummaryBundle(env, bill);
-      await replaceBillSponsors(env.DB, bill, bundle.sponsors);
-      if (!hasDigestRewriteSource({ title: bundle.title, rawSummary: bundle.rawSummaryText })) {
-        skipped += 1;
-        failures.push({ bill: key, reason: "no_title_or_crs" });
+      const prepared = await prepareBill(env, bill);
+      await replaceBillSponsors(env.DB, bill, prepared.bundle.sponsors);
+      const outcome = await writeSummary(env, prepared, "rewrite");
+      costUsd += outcome.cost;
+      if (outcome.status === "stored") {
+        refreshed += 1;
+        models.add(outcome.model);
+        await settleJob(env.DB, bill, "done");
         continue;
       }
-
-      const digest = await rewriteSummary(
-        env,
-        {
-          title: bundle.title,
-          billLabel: billLabel(bill.type, bill.number, bill.congress),
-          policyArea: bundle.policyArea,
-          rawSummary: bundle.rawSummaryText,
-        },
-        model
-      );
-
-      if (!digest) {
-        skipped += 1;
-        // Never overwrite a stored LLM digest with a fallback; only fill holes
-        // (or refresh an existing fallback) so the bill leaves missing_digest_count.
-        const existing = await getDigest(env.DB, bill.congress, bill.type, bill.number);
-        const phase = classifyDigestPhase(existing);
-        const fallback =
-          phase === "incomplete" || phase === "fallback_upgrade"
-            ? buildTitleFallbackDigest({ title: bundle.title, rawSummary: bundle.rawSummaryText })
-            : null;
-        if (fallback) {
-          await upsertDigest(env.DB, {
-            congress: bill.congress,
-            billType: bill.type,
-            number: bill.number,
-            title: bundle.title,
-            policyArea: bundle.policyArea,
-            rawSummaryText: bundle.rawSummaryText,
-            digest: fallback,
-          });
-          fallbacksWritten += 1;
-          failures.push({ bill: key, reason: "openrouter_rewrite_failed_title_fallback_written" });
-        } else {
-          failures.push({ bill: key, reason: "openrouter_rewrite_failed" });
-        }
-        continue;
-      }
-
-      await upsertDigest(env.DB, {
-        congress: bill.congress,
-        billType: bill.type,
-        number: bill.number,
-        title: bundle.title,
-        policyArea: bundle.policyArea,
-        rawSummaryText: bundle.rawSummaryText,
-        digest,
-      });
-
-      refreshed += 1;
-    } catch (err) {
       skipped += 1;
       failures.push({
         bill: key,
-        reason: "upstream_error",
+        reason:
+          outcome.status === "rejected"
+            ? `rejected: ${outcome.reasons.join("; ")}`
+            : outcome.status === "failed"
+              ? outcome.reason
+              : "daily budget spent",
       });
+    } catch (err) {
+      skipped += 1;
+      failures.push({ bill: key, reason: `upstream_error: ${err instanceof Error ? err.message : String(err)}` });
     }
   }
 
   if (bills.length > DIGEST_REFRESH_MAX_BILLS) {
-    failures.push({
-      bill: "*",
-      reason: `truncated_to_${DIGEST_REFRESH_MAX_BILLS}_bills`,
-    });
+    failures.push({ bill: "*", reason: `truncated_to_${DIGEST_REFRESH_MAX_BILLS}_bills` });
   }
 
-  return {
-    model,
-    requested: bills.length,
-    refreshed,
-    skipped,
-    fallbacksWritten,
-    failures,
-  };
+  return { requested: bills.length, refreshed, skipped, models: [...models], costUsd: Math.round(costUsd * 1e4) / 1e4, failures };
 }
 
 export function parseDigestRefreshRequest(url: URL, env: Env): BillRef[] {
