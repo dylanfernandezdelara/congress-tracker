@@ -45,6 +45,7 @@ vi.mock("../digest/budget", () => ({
   recordSpend: (...a: unknown[]) => mockRecordSpend(...a),
 }));
 vi.mock("../digest/openrouter-client", () => ({
+  AccountError: class AccountError extends Error {},
   getBatch: (...a: unknown[]) => mockGetBatch(...a),
   submitBatch: (...a: unknown[]) => mockSubmitBatch(...a),
   cancelBatch: (...a: unknown[]) => mockCancelBatch(...a),
@@ -72,6 +73,7 @@ const job = (number: number, overrides: Partial<DigestJob> = {}): DigestJob => (
   attempts: 0,
   batchId: null,
   fingerprint: null,
+  readFailures: 0,
   ...overrides,
 });
 
@@ -211,6 +213,26 @@ describe("runSummarySweep", () => {
       expect(settled()).toEqual([[1, "done"]]);
     });
 
+    it("counts a combine that throws as a failed try on the bill's own inputs, so repeats still park it", async () => {
+      mockPrepare.mockResolvedValue(prepared(1, { parts: longParts, totalTokens: 40_000, basis: "text" }));
+      mockGetBatch.mockResolvedValue({
+        status: "completed",
+        done: true,
+        cost: 0.01,
+        results: [item("119-hr-1:part0", '{"part":"A"}'), item("119-hr-1:part1", '{"part":"B"}')],
+      });
+      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1", attempts: 2 })]);
+      mockCombine.mockRejectedValue(new Error("The operation was aborted due to timeout"));
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(jobsApi.markAttempt).toHaveBeenCalledWith(env.DB, expect.objectContaining({ number: 1 }), "fp1", 3);
+      expect(settledWith()).toEqual([
+        [1, "done", expect.objectContaining({ fingerprint: "fp1", attempts: 3, error: "The operation was aborted due to timeout" })],
+      ]);
+      expect(result.failed).toBe(1);
+    });
+
     it("leaves bills in an open batch when the run has no write capacity left", async () => {
       mockPrepare.mockResolvedValue(prepared(1, { parts: longParts, totalTokens: 40_000, basis: "text" }));
       mockGetBatch.mockResolvedValue({ status: "completed", done: true, cost: 0.01, results: [] });
@@ -336,9 +358,9 @@ describe("runSummarySweep", () => {
       expect(result.spentUsd).toBe(0.1);
     });
 
-    it("skips a parked bill without paying, and gives an unreadable bill a counted try", async () => {
+    it("skips a parked bill without paying, and counts unreadable bills apart from failed summaries", async () => {
       jobsApi.selectQueuedJobs.mockImplementation(
-        onlyMatters([job(1, { matters: true, attempts: 3, fingerprint: "fp1" }), job(2, { matters: true, attempts: 2, fingerprint: "unreadable" })])
+        onlyMatters([job(1, { matters: true, attempts: 3, fingerprint: "fp1" }), job(2, { matters: true, attempts: 2, fingerprint: "fp2", readFailures: 2 })])
       );
       mockPrepare.mockImplementation(async (_e, ref: { number: number }) => {
         if (ref.number === 2) throw new Error("HTTP 503");
@@ -349,7 +371,22 @@ describe("runSummarySweep", () => {
 
       expect(mockWrite).not.toHaveBeenCalled();
       expect(result.parked).toBe(1);
-      expect(settledWith()[1]).toEqual([2, "done", expect.objectContaining({ fingerprint: "unreadable", attempts: 3 })]);
+      // The third unreadable run parks it; its summary attempts and fingerprint are left as they were.
+      const [, state, params] = settledWith()[1]!;
+      expect(state).toBe("done");
+      expect(params).toEqual({ error: "parked: unreadable 3 times: HTTP 503", readFailures: 3 });
+    });
+
+    it("does not count a refusing OpenRouter account against the bill, and stops direct writes", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(
+        onlyMatters([job(1, { matters: true, attempts: 2, fingerprint: "fp1" }), job(2, { matters: true })])
+      );
+      mockWrite.mockResolvedValue({ status: "failed", cost: 0, reason: "OpenRouter account: Insufficient credits", account: true });
+
+      await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+      expect(settledWith()).toEqual([[1, "queued", expect.objectContaining({ fingerprint: "fp1", attempts: 2 })]]);
     });
 
     it("stops rewriting when the day's budget is spent", async () => {

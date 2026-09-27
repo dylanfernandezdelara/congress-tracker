@@ -82,6 +82,17 @@ describe("digest jobs", () => {
     expect(row()).toMatchObject({ state: "done", attempts: 0 });
   });
 
+  it("counts unreadable runs apart, and clears them once the bill is read", async () => {
+    const failures = () =>
+      JSON.parse(execFileSync("sqlite3", ["-json", dbPath, "SELECT read_failures, attempts FROM digest_jobs"], { encoding: "utf8" }))[0];
+    await enqueueDigestJobs(db, [hr(1)], "new", T0);
+    await markJobsBatched(db, [{ ref: hr(1), fingerprint: "a" }], "b1", T0);
+    await settleJob(db, hr(1), "queued", { readFailures: 2 });
+    expect(failures()).toEqual({ read_failures: 2, attempts: 1 });
+    await settleJob(db, hr(1), "done", { fingerprint: "a", attempts: 0 });
+    expect(failures()).toEqual({ read_failures: 0, attempts: 0 });
+  });
+
   it("does not re-queue a bill checked on a later day than its last Congress.gov change", async () => {
     await enqueueDigestJobs(db, [hr(1), hr(2)], "new", T0);
     await settleJob(db, hr(1), "done", { nowIso: "2026-09-26T09:00:00.000Z" });

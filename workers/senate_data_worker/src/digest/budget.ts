@@ -17,11 +17,14 @@ export async function spentToday(env: Env, now = new Date()): Promise<number> {
   return state?.usd ?? 0;
 }
 
-/** Add to today's spend. Last-writer-wins is fine: the cap is a guard, and one hourly run writes at a time. */
+/**
+ * Add to today's spend; a negative amount corrects an earlier estimate (never below zero). Last-writer-wins is
+ * fine: the cap is a guard, and one sweep writes at a time.
+ */
 export async function recordSpend(env: Env, usd: number, now = new Date()): Promise<void> {
-  if (!(usd > 0)) return;
+  if (!Number.isFinite(usd) || usd === 0) return;
   const current = await spentToday(env, now);
-  await setPipelineState(env.DB, key(today(now)), { usd: Math.round((current + usd) * 1e6) / 1e6 });
+  await setPipelineState(env.DB, key(today(now)), { usd: Math.max(0, Math.round((current + usd) * 1e6) / 1e6) });
 }
 
 export async function budgetLeft(env: Env, now = new Date()): Promise<number> {

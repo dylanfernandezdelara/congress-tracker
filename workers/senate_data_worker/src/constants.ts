@@ -57,6 +57,13 @@ export const DIGEST_COLLECT_BILLS_PER_RUN = 40;
  */
 export const DIGEST_SYNC_WRITES_PER_RUN = 8;
 export const DIGEST_SWEEP_WRITE_WINDOW_MS = 10 * 60_000;
+/** No new bill of any kind is started after this; with a write in flight the run still ends inside 15 minutes. */
+export const DIGEST_SWEEP_RUN_WINDOW_MS = 11 * 60_000;
+/**
+ * The sweep's write lease: longer than any invocation can live (15 minutes), so a run killed at the limit frees the
+ * lease by :51, well before the 10:00 feed.
+ */
+export const SUMMARY_SWEEP_LEASE_TTL_MS = 16 * 60_000;
 /** Admin `POST /__pipeline/run/summary-sweep` cap per invocation (?limit=, applies to both). */
 export const DIGEST_SWEEP_ADMIN_MAX_BILLS = 60;
 /** Congress.gov update-list pages (250 bills each) read per run. */
@@ -178,7 +185,8 @@ export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
 export const EXECUTIVE_POSTS_CRON_UTC = "20 * * * *";
 /**
  * Hourly summary sweep (pipeline/run-summary-sweep.ts). Its own invocation, so it has its own subrequest and
- * wall-time budget. At :35 a sweep that runs its full ~15 minutes still frees the write lease before the 10:00 feed.
+ * wall-time budget. At :35 with a 16-minute lease (SUMMARY_SWEEP_LEASE_TTL_MS), even a sweep killed at the wall limit
+ * frees the write lease before the 10:00 feed.
  */
 export const SUMMARY_SWEEP_CRON_UTC = "35 * * * *";
 

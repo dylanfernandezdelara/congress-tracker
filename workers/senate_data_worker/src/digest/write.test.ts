@@ -7,7 +7,10 @@ const mockUpsert = vi.fn();
 const mockBudgetLeft = vi.fn();
 const mockRecordSpend = vi.fn();
 
-vi.mock("./openrouter-client", () => ({ chatCompletion: (...args: unknown[]) => mockChat(...args) }));
+vi.mock("./openrouter-client", () => ({
+  AccountError: class AccountError extends Error {},
+  chatCompletion: (...args: unknown[]) => mockChat(...args),
+}));
 vi.mock("../d1/digests", () => ({ upsertDigest: (...args: unknown[]) => mockUpsert(...args) }));
 vi.mock("./budget", () => ({
   budgetLeft: (...args: unknown[]) => mockBudgetLeft(...args),
@@ -154,7 +157,7 @@ describe("writeSummary", () => {
   it("reports a provider failure without storing anything", async () => {
     mockChat.mockRejectedValue(new Error("HTTP 502"));
 
-    expect(await writeSummary(env, prepared(), "new")).toEqual({ status: "failed", cost: 0, reason: "HTTP 502" });
+    expect(await writeSummary(env, prepared(), "new")).toEqual({ status: "failed", cost: 0, reason: "HTTP 502", account: false });
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 });
