@@ -8,7 +8,7 @@
 !.dev.vars.example
 
 # Dependencies
-node_modules/
+node_modules
 
 # Cloudflare Wrangler
 .wrangler/
