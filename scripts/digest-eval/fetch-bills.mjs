@@ -51,8 +51,8 @@ export function xmlToText(xml) {
   return decode(
     xml
       .replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/<quote>/g, '“')
-      .replace(/<\/quote>/g, '”')
+      .replace(/<(quote|term)\b[^>]*>/g, '“')
+      .replace(/<\/(quote|term)>/g, '”')
       .replace(/<section\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g, '\n\nSEC. $1 $2\n')
       .replace(/<(subtitle|title|division|part|chapter)\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g, (_m, tag, e, h) => `\n\n${tag.toUpperCase()} ${e} — ${h}\n`)
       .replace(/<\/?(subsection|paragraph|subparagraph|clause|quoted-block|p|text)\b[^>]*>/g, '\n')
