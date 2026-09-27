@@ -1,0 +1,31 @@
+{
+  "round": "round3-v3.1",
+  "bills": [
+    "119-hjres-1",
+    "119-hr-4795",
+    "119-hr-2140",
+    "119-hjres-213",
+    "119-hconres-89"
+  ],
+  "runs": 2,
+  "singleRunBills": [],
+  "candidates": [
+    {
+      "key": "gpt-6-luna-high",
+      "name": "GPT-6 Luna (high effort, batch)",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "batch": true,
+      "maxTokens": 12000
+    },
+    {
+      "key": "claude-sonnet-5",
+      "name": "Claude Sonnet 5 (normal API: batch refused for this account)",
+      "model": "anthropic/claude-sonnet-5",
+      "batch": false,
+      "temperature": 0.2
+    }
+  ]
+}

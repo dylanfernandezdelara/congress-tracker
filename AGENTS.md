@@ -162,7 +162,7 @@ Every bill summary is written by `workers/senate_data_worker/src/digest/` from t
 reader is someone deciding whether they would support the bill and whether their members voted the
 way they would, so summaries lead with concrete effects on people and stay strictly neutral.
 
-- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3). Bills over ~30k tokens are split along their
+- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.1; recorded on each summary). Bills over ~30k tokens are split along their
   own divisions/titles (`bill-text-parse.ts`), summarized per part, then combined with a "What's
   inside" breakdown. Import-free, so `scripts/digest-eval` uses the same file.
 - **Models** `digest/models.ts`: new bills → `openai/gpt-6-luna` (high effort) through OpenRouter's
@@ -176,7 +176,9 @@ way they would, so summaries lead with concrete effects on people and stay stric
   (Luna ↔ Sonnet; for long bills only the combine pass), and otherwise the current summary stays.
   Warnings are kept in `generator.warnings`.
 - **Provenance** `digest_json.generator` (worker-only, stripped from the feed): model, prompt version,
-  tier, text version, `fingerprint` (hash of everything the summary was written from), `long`.
+  tier, text version, `fingerprint` (hash of everything the summary was written from), `long`. The fingerprint
+  carries `PROMPT_EPOCH` (v3), not the prompt version: a minor prompt change applies to new writes only; bump
+  the epoch to have the sweep rewrite stored summaries as their bills come up (a site-wide rewrite costs dollars).
 - **Queue** `digest_jobs` / `digest_batches` (`d1/digest-jobs.ts`). The hourly sweep
   (`pipeline/run-summary-sweep.ts`, its own `:35` cron) collects finished
   batches, discovers bills Congress.gov updated (all types, cursor in `pipeline_state`; only bills

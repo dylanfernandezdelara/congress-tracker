@@ -17,6 +17,7 @@ vi.mock("./budget", () => ({
   recordSpend: (...args: unknown[]) => mockRecordSpend(...args),
 }));
 
+import { PROMPT_VERSION } from "./prompt";
 import { writeSummary } from "./write";
 
 const env = { DB: {} as D1Database } as Env;
@@ -85,7 +86,7 @@ describe("writeSummary", () => {
     expect(stored.basis).toBe("text");
     expect(stored.generator).toMatchObject({
       model: SONNET,
-      prompt_version: "v3",
+      prompt_version: PROMPT_VERSION,
       tier: "rewrite",
       fingerprint: "fp1",
       long: false,
