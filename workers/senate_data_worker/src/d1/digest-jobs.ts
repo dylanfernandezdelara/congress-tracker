@@ -298,6 +298,34 @@ export async function insertDigestStubs(
   );
 }
 
+/** Jobs waiting for a first summary (the backfill tops the queue up only when it is short). */
+export async function countQueuedJobs(db: D1Database): Promise<number> {
+  await ensureSchema(db);
+  const row = await db.prepare(`SELECT count(*) AS n FROM digest_jobs WHERE state = 'queued'`).first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/**
+ * Bills on the site without a summary from the current writer (none, a title fallback, or an older model's), that
+ * are not already waiting in the queue. `matters` as in the queue, so the backfill can estimate Sonnet rewrites.
+ */
+export async function selectBackfillSiteBills(db: D1Database, congress: number): Promise<Array<BillRef & { matters: boolean }>> {
+  await ensureSchema(db);
+  const { results } = await db
+    .prepare(
+      `SELECT j.congress, j.bill_type, j.number, CASE WHEN ${MATTERS_SQL} THEN 1 ELSE 0 END AS matters
+       FROM bill_digests j
+       LEFT JOIN digest_jobs q ON q.congress = j.congress AND q.bill_type = j.bill_type AND q.number = j.number
+       WHERE j.congress = ?1
+         AND (q.state IS NULL OR q.state = 'done')
+         AND (j.digest_json IS NULL OR NOT json_valid(j.digest_json) OR json_extract(j.digest_json, '$.generator') IS NULL)
+       ORDER BY matters DESC, j.updated_at DESC`
+    )
+    .bind(congress)
+    .all<{ congress: number; bill_type: string; number: number; matters: number }>();
+  return (results ?? []).map((r) => ({ congress: r.congress, type: normalizeBillType(r.bill_type), number: r.number, matters: r.matters === 1 }));
+}
+
 /** Which of these bills already have a row on the site (and so should be kept current). */
 export async function selectKnownBills(db: D1Database, congress: number, bills: BillRef[]): Promise<Set<string>> {
   const numbers = [...new Set(bills.map((b) => Math.trunc(b.number)).filter((n) => Number.isFinite(n) && n > 0))];

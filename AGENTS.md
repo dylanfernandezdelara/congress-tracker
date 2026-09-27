@@ -190,8 +190,13 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - **Budget** `DIGEST_DAILY_BUDGET_USD` (default $1; expected spend is cents a day), tracked in
   `pipeline_state` (`digest_spend:YYYY-MM-DD`). A batch's estimated cost counts when it is sent and
   the difference when it is collected. Over budget, the sweep waits for tomorrow.
-- **Backfill**: summaries from before v3 (no `generator`) are left alone unless the bill is queued
-  for another reason. A full backfill is a separate, deliberate run.
+- **Backfill** `POST /__pipeline/run/summary-backfill` (admin; **dry run unless `apply=1`**): returns
+  bills, how many matter, estimated cost and days. `scope=site` queues the bills on the site without a
+  current summary; `scope=congress` starts a walk over every bill of the Congress (cursor
+  `digest_backfill_cursor`), which the sweep feeds a page at a time only while fewer than
+  `DIGEST_BACKFILL_QUEUE_FLOOR` jobs wait, so new bills never queue behind it. Spend stays under the
+  daily budget; raise `DIGEST_DAILY_BUDGET_USD` for the duration to go faster. Without it, summaries
+  from before v3 are left alone unless the bill is queued for another reason.
 - **Reader feedback** `POST /feedback/summary` `{bill:"119-hr-1", kind:"helpful"|"unhelpful"|"mistake", note?}`
   (the "Was this summary helpful? / Report a mistake" row under a summary). Stored in `digest_feedback` with the
   summary's headline, model, prompt version and fingerprint; site origin only. A keyed per-day hash of the

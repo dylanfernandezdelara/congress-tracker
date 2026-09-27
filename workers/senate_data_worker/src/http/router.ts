@@ -17,6 +17,7 @@ import {
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
 import { runSummarySweep } from "../pipeline/run-summary-sweep";
+import { runSummaryBackfill } from "../pipeline/run-summary-backfill";
 import { handleSummaryFeedback } from "./summary-feedback";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedWithMemberVotes } from "../pipeline/run-feed-with-member-votes";
@@ -472,6 +473,17 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
     runExecutivePostsPipeline(env, { trigger: "admin" }),
   "/__pipeline/run/process-backfill": ({ env }) => runProcessBackfillPipeline(env),
   "/__pipeline/run/process-refresh": ({ env }) => refreshBillProcessQueue(env),
+  // Summaries for older bills. Dry run unless ?apply=1: ?scope=site (bills on the site, queued now) or
+  // ?scope=congress (every bill of the Congress, walked by the hourly sweep). Returns counts and estimated cost.
+  "/__pipeline/run/summary-backfill": ({ env, url }) => {
+    const scope = url.searchParams.get("scope") === "congress" ? "congress" : "site";
+    const limit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+    return runSummaryBackfill(env, {
+      scope,
+      apply: url.searchParams.get("apply") === "1",
+      ...(Number.isFinite(limit) && limit > 0 ? { limit } : {}),
+    });
+  },
   // Clears the headline backlog faster than the hourly sweep; ?limit= up to the admin cap.
   "/__pipeline/run/summary-sweep": ({ env, url }) => {
     const requested = Number.parseInt(url.searchParams.get("limit") ?? "", 10);

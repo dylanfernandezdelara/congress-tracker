@@ -11,6 +11,7 @@ const jobsApi = vi.hoisted(() => ({
   markAttempt: vi.fn(),
   markJobsBatched: vi.fn(),
   selectBatchJobs: vi.fn(),
+  countQueuedJobs: vi.fn(),
   selectKnownBills: vi.fn(),
   selectOpenBatches: vi.fn(),
   selectQueuedJobs: vi.fn(),
@@ -304,6 +305,39 @@ describe("runSummarySweep", () => {
         toIso: NOW.toISOString(),
         offset: 0,
       });
+    });
+  });
+
+  describe("backfill", () => {
+    it("tops up the queue with a page of the Congress's bills only while the queue is short", async () => {
+      mockGetState.mockImplementation(async (_db, key: string) =>
+        key === "digest_backfill_cursor" ? { congress: 119, offset: 200, done: false, startedAt: "t" } : null
+      );
+      jobsApi.countQueuedJobs.mockResolvedValue(10);
+      mockFetchUpdated.mockImplementation(async (_key, params: { offset: number; fromIso?: string }) =>
+        params.fromIso
+          ? { bills: [], hasMore: false, total: 0 }
+          : { bills: [{ congress: 119, type: "HR", number: 7, title: "Old bill", introducedDate: "2025-02-01", changedOn: "2025-03-01" }], hasMore: false, total: 201 }
+      );
+
+      const result = await runSummarySweep(env, { now: NOW });
+
+      const backfillCall = mockFetchUpdated.mock.calls.find((c) => !(c[1] as { fromIso?: string }).fromIso)!;
+      expect(backfillCall[1]).toMatchObject({ congress: 119, offset: 200, limit: 100 });
+      expect(result.backfilled).toBe(1);
+      expect(mockSetState).toHaveBeenCalledWith(env.DB, "digest_backfill_cursor", { congress: 119, offset: 201, done: true, startedAt: "t" });
+    });
+
+    it("waits while the queue is already full", async () => {
+      mockGetState.mockImplementation(async (_db, key: string) =>
+        key === "digest_backfill_cursor" ? { congress: 119, offset: 0, done: false, startedAt: "t" } : null
+      );
+      jobsApi.countQueuedJobs.mockResolvedValue(60);
+
+      const result = await runSummarySweep(env, { now: NOW });
+
+      expect(mockFetchUpdated.mock.calls.every((c) => (c[1] as { fromIso?: string }).fromIso)).toBe(true);
+      expect(result.backfilled).toBe(0);
     });
   });
 
