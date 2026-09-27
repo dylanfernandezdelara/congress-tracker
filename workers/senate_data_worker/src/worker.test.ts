@@ -21,15 +21,15 @@ vi.mock("./d1/pipeline-state", async (importOriginal) => {
 });
 
 const withPipelineLeaseMock = vi.fn(
-  async <T>(_db: D1Database, fn: () => Promise<T>) => fn(),
+  async <T>(_db: D1Database, fn: () => Promise<T>, _options?: { ttlMs?: number }) => fn(),
 );
 
 vi.mock("./d1/pipeline-lease", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./d1/pipeline-lease")>();
   return {
     ...actual,
-    withPipelineLease: <T>(db: D1Database, fn: () => Promise<T>) =>
-      withPipelineLeaseMock(db, fn),
+    withPipelineLease: <T>(db: D1Database, fn: () => Promise<T>, options?: { ttlMs?: number }) =>
+      withPipelineLeaseMock(db, fn, options),
   };
 });
 
@@ -259,6 +259,8 @@ describe("worker", () => {
     );
     await sweep.awaitScheduled();
     expect(SUMMARY_SWEEP_CRON_UTC).toBe("35 * * * *");
+    // A sweep killed at the 15-minute limit must not hold the lease past the 10:00 feed.
+    expect(withPipelineLeaseMock.mock.calls.at(-1)![2]).toEqual({ ttlMs: 16 * 60_000 });
     expect(runSummarySweep).toHaveBeenCalledTimes(1);
     expect(runExecutivePostsPipeline).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('"event":"summary_sweep_complete","scheduledTime":5678,"stored":3'));
