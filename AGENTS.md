@@ -162,7 +162,7 @@ Every bill summary is written by `workers/senate_data_worker/src/digest/` from t
 reader is someone deciding whether they would support the bill and whether their members voted the
 way they would, so summaries lead with concrete effects on people and stay strictly neutral.
 
-- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.2; recorded on each summary). Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. Bills over ~30k tokens are split along their
+- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.3; recorded on each summary). "Who it affects" groups must be named in the sources or be the direct subject of a provision. Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. Bills over ~30k tokens are split along their
   own divisions/titles (`bill-text-parse.ts`), summarized per part, then combined with a "What's
   inside" breakdown. Import-free, so `scripts/digest-eval` uses the same file.
 - **Models** `digest/models.ts`: new bills → `openai/gpt-6-luna` (high effort) through OpenRouter's
@@ -223,6 +223,9 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
+  Latest round `round5.json` (v3.3, 5 voted bills, Luna + Sonnet, 2 runs, ~$0.20 with the judge): Luna 10/10
+  (v3.2: 9/10, the recurring-deadline miss is gone); Sonnet 7/10 (v3.2: 8/10), still writing "U.S. voters" for the
+  nine-justices amendment despite the groups rule; Sonnet's "House votes to…" headlines on H.J.Res. 213 are gone.
 
 ## Project structure
 
