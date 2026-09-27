@@ -55,10 +55,12 @@ export function numbersIn(text: string | null | undefined): Set<number> {
     if (!Number.isFinite(n)) continue;
     values.add(m[2] ? Math.round(n * SCALE[m[2].toLowerCase()]!) : n);
   }
-  for (const [word, n] of Object.entries(WORD_NUMBERS)) {
-    if (new RegExp(`\\b${word}\\b`, "i").test(s)) values.add(n);
-  }
+  // Compounds first, then removed: "twenty-one" is 21, not also 20 and 1.
   for (const m of s.matchAll(COMPOUND)) values.add(TENS[m[1]!.toLowerCase()]! + UNITS[m[2]!.toLowerCase()]!);
+  const rest = s.replace(COMPOUND, " ");
+  for (const [word, n] of Object.entries(WORD_NUMBERS)) {
+    if (new RegExp(`\\b${word}\\b`, "i").test(rest)) values.add(n);
+  }
   return values;
 }
 
@@ -150,6 +152,7 @@ export function sectionText(fullText: string | null, sections: string[]): string
   return found.length ? found.join("\n") : null;
 }
 
+/** The reader-facing fields, one per line, so a phrase never spans two fields. */
 export function readerText(summary: CheckableSummary): string {
   return [
     summary.headline,
@@ -158,7 +161,7 @@ export function readerText(summary: CheckableSummary): string {
     ...(summary.inside ?? []).map((r) => r.summary),
   ]
     .filter(Boolean)
-    .join(" ");
+    .join("\n");
 }
 
 export function checkSummary(summary: CheckableSummary, sources: CheckableSources, options: { long?: boolean } = {}): CheckResult {
@@ -181,21 +184,17 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   const text = readerText(summary);
   // Fixed terms of art are not judgments ("critical minerals", "critical-mineral", "critical access hospitals").
   const plain = text.toLowerCase().replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care)\b/g, "");
-  const title = (sources.title ?? "").toLowerCase();
   const billText = (sources.text ?? "").toLowerCase();
   for (const w of JUDGING) {
     if (!new RegExp(`\\b${w}\\b`).test(plain)) continue;
-    // The bill's own term is not a judgment: every use in the summary must be a two-word phrase from the bill's title
-    // ("Critical Materials Future Act") or a term the bill defines (the term “critical material” means). Phrases
-    // from a bill's findings ("devastating wildfires") are the sponsor's framing and stay blocked.
+    // A term the bill defines is not a judgment: every use in the summary must be a two-word phrase the bill defines
+    // (the term “critical material” means; ‘…’ when nested in an amendment). Titles ("Stop Reckless Spending Act")
+    // and findings ("devastating wildfires") are the sponsor's framing and stay blocked.
     const uses = [...plain.matchAll(new RegExp(`\\b${w}\\b(?:[- ]([a-z]+))?`, "g"))];
     const billTerm = (next: string | undefined) => {
       if (!next) return false;
       const phrase = `${w}[- ]${next.replace(/s$/, "")}s?`;
-      return (
-        new RegExp(`\\b${phrase}\\b`).test(title) ||
-        new RegExp(`term [“"]${phrase}\\b[^”"]{0,40}[”"]|[“"]${phrase}\\b[^”"]{0,40}[”"] means`).test(billText)
-      );
+      return new RegExp(`term [“"‘']${phrase}\\b[^”"’']{0,40}[”"’']|[“"‘']${phrase}\\b[^”"’']{0,40}[”"’'] means`).test(billText);
     };
     if (!uses.every((u) => billTerm(u[1]))) blocking.push(`judging word "${w}"`);
   }

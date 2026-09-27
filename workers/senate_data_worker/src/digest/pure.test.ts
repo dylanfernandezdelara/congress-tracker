@@ -114,9 +114,15 @@ describe("checks", () => {
   });
 
   it("reads numbers the bill spells out", () => {
-    expect([...numbersIn("a workweek longer than thirty-two hours, then thirty eight, then Ninety-Nine")]).toEqual(
-      expect.arrayContaining([32, 38, 99, 30, 90])
-    );
+    const spelled = [...numbersIn("a workweek longer than thirty-two hours, then thirty eight, then Ninety-Nine")];
+    expect(spelled).toEqual(expect.arrayContaining([32, 38, 99]));
+    // A compound is one number, not also its parts.
+    expect(spelled).not.toEqual(expect.arrayContaining([30]));
+    expect(spelled).not.toEqual(expect.arrayContaining([2]));
+    const hours = sources({ text: "SEC. 2. Hours\nno more than twenty-one hours" });
+    expect(checkSummary(summary({ key_points: [{ text: "Caps the week at 20 hours", section: "Sec. 2" }] }), hours).blocking).toEqual([
+      "number not in sources: 20",
+    ]);
     const workweek = sources({ text: "SEC. 2. Workweek\nfor a workweek longer than thirty-two hours" });
     expect(checkSummary(summary({ key_points: [{ text: "Cuts the workweek to 32 hours", section: "Sec. 2" }] }), workweek).blocking).toEqual([]);
   });
@@ -124,13 +130,24 @@ describe("checks", () => {
   it("allows a judging word only as the bill's own named or defined term, never its findings' framing", () => {
     const bill = sources({
       title: "Critical Materials Future Act of 2025",
-      text: "SEC. 2. Definitions\nThe term “harmful algal bloom” means a bloom.\n\nSEC. 3. Findings\nWildfires are devastating wildfires.",
+      text:
+        "SEC. 2. Definitions\nThe term “harmful algal bloom” means a bloom. " +
+        "“(3) the term ‘critical material’ means a material.”\n\nSEC. 3. Findings\nWildfires are devastating wildfires.",
     });
     const blocked = (what: string) =>
       checkSummary(summary({ what_it_does: what, key_points: [{ text: "Starts a pilot program", section: null }] }), bill).blocking;
     expect(blocked("Funds critical materials processing and tracks harmful algal blooms.")).toEqual([]);
+    expect(blocked("Funds critical-materials processing.")).toEqual([]);
     expect(blocked("Funds critical materials processing, a critical step.")).toEqual(['judging word "critical"']);
     expect(blocked("Responds to devastating wildfires.")).toEqual(['judging word "devastating"']);
+    // A loaded title is the sponsor's framing too.
+    const titled = sources({ title: "Stop Reckless Spending Act", text: "SEC. 2. Limits\nLimits spending." });
+    expect(
+      checkSummary(summary({ what_it_does: "Ends reckless spending.", key_points: [{ text: "Limits spending", section: null }] }), titled).blocking
+    ).toEqual(['judging word "reckless"']);
+    // A phrase never spans two fields.
+    const spanning = summary({ headline: "Bill would make funding critical", what_it_does: "Materials processing gets funds.", key_points: [{ text: "Starts a pilot", section: null }] });
+    expect(checkSummary(spanning, bill).blocking).toEqual(['judging word "critical"']);
   });
 
   it("allows fixed terms of art", () => {
