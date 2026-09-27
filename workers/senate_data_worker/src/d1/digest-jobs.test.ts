@@ -20,7 +20,7 @@ import {
   selectRecheckBills,
   settleJob,
 } from "./digest-jobs";
-import { SCHEMA_DDL, SCHEMA_MIGRATIONS } from "./schema";
+import { SCHEMA_DDL } from "./schema";
 
 const T0 = "2026-09-26T10:00:00.000Z";
 const T1 = "2026-09-26T11:00:00.000Z";
@@ -37,7 +37,7 @@ describe("digest jobs", () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "digest-jobs-"));
     dbPath = join(dir, "t.sqlite");
-    sql([...SCHEMA_DDL, ...SCHEMA_MIGRATIONS.flatMap((m) => m.statements)].map((s) => `${s};`).join("\n"));
+    sql(SCHEMA_DDL.map((s) => `${s};`).join("\n"));
     db = sqliteD1(dbPath);
   });
 

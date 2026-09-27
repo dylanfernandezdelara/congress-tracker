@@ -13,6 +13,10 @@ export function sqliteD1(dbPath: string): D1Database {
       bound,
       bind: (...values: unknown[]) => statement(sql, values),
       all: async () => ({ results: run(true) ? JSON.parse(run(true)) : [] }),
+      first: async () => {
+        const out = run(true);
+        return out ? (JSON.parse(out)[0] ?? null) : null;
+      },
       run: async () => {
         run(false);
         return { success: true };

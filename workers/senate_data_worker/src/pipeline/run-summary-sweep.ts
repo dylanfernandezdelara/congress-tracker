@@ -188,7 +188,10 @@ class Sweep {
   private async parkedJob(job: DigestJob, prepared: PreparedBill): Promise<boolean> {
     if (Sweep.attemptsFor(job, prepared.fingerprint) < DIGEST_MAX_ATTEMPTS) return false;
     this.result.parked += 1;
-    await settleJob(this.env.DB, job, "done", { error: `parked after ${job.attempts} failed attempts; retried when the bill changes` });
+    await settleJob(this.env.DB, job, "done", {
+      error: `parked after ${job.attempts} failed attempts; retried when the bill changes`,
+      readFailures: 0,
+    });
     return true;
   }
 
@@ -375,7 +378,7 @@ class Sweep {
         const prepared = await prepareBill(this.env, job);
         if (await isCurrent(this.env, prepared, "rewrite")) {
           this.result.unchanged += 1;
-          await settleJob(this.env.DB, job, "done");
+          await settleJob(this.env.DB, job, "done", { readFailures: 0 });
           continue;
         }
         if (await this.parkedJob(job, prepared)) continue;
@@ -406,7 +409,7 @@ class Sweep {
         const prepared = await prepareBill(this.env, job);
         if (await isCurrent(this.env, prepared, "new")) {
           this.result.unchanged += 1;
-          await settleJob(this.env.DB, job, "done");
+          await settleJob(this.env.DB, job, "done", { readFailures: 0 });
         } else if (await this.parkedJob(job, prepared)) {
           continue;
         } else if (Sweep.attemptsFor(job, prepared.fingerprint) >= DIGEST_BATCH_MAX_ATTEMPTS && !isLong(prepared)) {
