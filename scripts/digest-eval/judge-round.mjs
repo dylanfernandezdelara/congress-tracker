@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { JUDGE } from './calibrate-judge.mjs'
+import { JUDGE, JUDGE_SUFFIX } from './calibrate-judge.mjs'
 import { checkSummary } from './checks.mjs'
 import { judgeMessages, judgePassed, JUDGE_DIMENSIONS } from './judge.mjs'
 import { chat } from './run-round.mjs'
@@ -16,7 +16,7 @@ import { chat } from './run-round.mjs'
 const here = dirname(fileURLToPath(import.meta.url))
 const evalDir = join(here, '..', '..', 'artifacts', 'digest-eval')
 const config = JSON.parse(readFileSync(process.argv[2], 'utf8'))
-const outFile = join(evalDir, 'judge', `${config.round}.json`)
+const outFile = join(evalDir, 'judge', `${config.round}${JUDGE_SUFFIX}.json`)
 mkdirSync(dirname(outFile), { recursive: true })
 
 const items = []
@@ -44,7 +44,7 @@ await Promise.all(Array.from({ length: 6 }, async () => {
     let verdict = null
     let cost = 0
     try {
-      const r = await chat(JUDGE, judgeMessages(bill, summary), 3000)
+      const r = await chat(JUDGE, judgeMessages(bill, summary), JUDGE.maxTokens)
       verdict = r.json
       cost = r.cost
     } catch (err) {

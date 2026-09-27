@@ -9,7 +9,7 @@
  * 2. Sensitivity: plant one known error in each human-picked best summary (a changed number, a wrong vote outcome,
  *    a judging word, a date that loses its year) and count how many the judge fails on the right dimension.
  *
- * Writes artifacts/digest-eval/judge/calibration.json. Usage: node scripts/digest-eval/calibrate-judge.mjs
+ * Writes artifacts/digest-eval/judge/calibration.json (calibration-<model>[-<effort>].json for a trial judge). Usage: node scripts/digest-eval/calibrate-judge.mjs
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -20,7 +20,19 @@ import { chat } from './run-round.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const evalDir = join(here, '..', '..', 'artifacts', 'digest-eval')
-export const JUDGE = { key: 'judge', model: 'google/gemini-3.8-flash', temperature: 0, maxTokens: 3000 }
+/** The calibrated judge. Try another with DIGEST_JUDGE_MODEL=<openrouter id>; results are written per model. */
+const EFFORT = process.env.DIGEST_JUDGE_EFFORT
+export const JUDGE = {
+  key: 'judge',
+  model: process.env.DIGEST_JUDGE_MODEL || 'google/gemini-3.8-flash',
+  // A reasoning judge (DIGEST_JUDGE_EFFORT=high|max) thinks before answering, so it needs a bigger output budget.
+  ...(EFFORT ? { reasoning: { effort: EFFORT }, maxTokens: 16000 } : { temperature: 0, maxTokens: 3000 }),
+}
+/** File suffix for a non-default judge's results, so a trial never overwrites the calibrated judge's. */
+export const JUDGE_SUFFIX =
+  process.env.DIGEST_JUDGE_MODEL || EFFORT
+    ? `-${JUDGE.model.replace(/[^a-z0-9.]+/gi, '_')}${EFFORT ? `-${EFFORT.replace(/[^a-z]+/gi, '')}` : ''}`
+    : ''
 
 const lists = JSON.parse(readFileSync(join(here, 'bills.json'), 'utf8'))
 const ids = [...lists.practice, ...lists.test].map((b) => b.id)
@@ -94,7 +106,7 @@ const PLANTS = {
 
 async function judge(b, s) {
   try {
-    const r = await chat(JUDGE, judgeMessages(b, s), 3000)
+    const r = await chat(JUDGE, judgeMessages(b, s), JUDGE.maxTokens)
     return { verdict: r.json, cost: r.cost }
   } catch (err) {
     return { verdict: null, error: err.message, cost: 0 }
@@ -149,6 +161,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     verdicts,
     planted: plantedVerdicts.map(({ summary, ...rest }) => rest),
   }
-  writeFileSync(join(outDir, plantedOnly ? 'sensitivity.json' : 'calibration.json'), JSON.stringify(report, null, 2))
+  writeFileSync(join(outDir, `${plantedOnly ? 'sensitivity' : 'calibration'}${JUDGE_SUFFIX}.json`), JSON.stringify(report, null, 2))
   console.log(JSON.stringify({ judge: report.judge, cost: `$${cost.toFixed(3)}`, agreement: report.agreement, sensitivity: report.sensitivity }, null, 2))
 }
