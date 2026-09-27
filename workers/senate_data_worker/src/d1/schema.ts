@@ -292,6 +292,7 @@ export const SCHEMA_DDL = [
   batch_id TEXT,
   fingerprint TEXT,
   attempts INTEGER NOT NULL DEFAULT 0,
+  read_failures INTEGER NOT NULL DEFAULT 0,
   last_error TEXT,
   queued_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -359,7 +360,8 @@ export const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: s
     statements: [`DROP TABLE IF EXISTS bill_summary_checks`],
   },
   {
-    // Bills that could not be read count separately from failed summaries (digest/ sweep parking).
+    // Bills that could not be read count separately from failed summaries (digest/ sweep parking). New installs get
+    // the column from SCHEMA_DDL; this adds it to tables created at v12. Safe to run twice (see ensureSchema).
     toVersion: 13,
     statements: [`ALTER TABLE digest_jobs ADD COLUMN read_failures INTEGER NOT NULL DEFAULT 0`],
   },
@@ -416,7 +418,12 @@ export async function ensureSchema(db: D1Database): Promise<void> {
   for (const migration of SCHEMA_MIGRATIONS) {
     if (migration.toVersion > fromVersion && migration.toVersion <= SCHEMA_VERSION) {
       for (const sql of migration.statements) {
-        await db.prepare(sql).run();
+        try {
+          await db.prepare(sql).run();
+        } catch (err) {
+          // SQLite has no ADD COLUMN IF NOT EXISTS: a column added by DDL or by a concurrent instance is fine.
+          if (!/duplicate column name/i.test(err instanceof Error ? err.message : String(err))) throw err;
+        }
       }
     }
   }
