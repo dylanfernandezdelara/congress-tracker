@@ -37,7 +37,7 @@ describe('FeedSummarySections', () => {
     )
 
     expect(screen.getByRole('list', { name: 'Who it affects' })).toHaveTextContent('taxpayersMedicaid enrollees')
-    const ref = screen.getByRole('link', { name: 'Sec. 70101, bill text on Congress.gov' })
+    const ref = screen.getByRole('link', { name: 'Sec. 70101, full bill text on Congress.gov (opens in a new tab)' })
     expect(ref).toHaveAttribute('href', 'https://www.congress.gov/bill/119th-congress/house-bill/1/text')
     expect(screen.getAllByRole('link')).toHaveLength(1)
     expect(screen.getByRole('heading', { name: 'What’s inside' })).toBeInTheDocument()
@@ -64,6 +64,19 @@ describe('FeedSummarySections', () => {
     expect(screen.getByText('Changes SNAP')).toBeInTheDocument()
     expect(document.querySelectorAll('.feed-row-inside-bar')).toHaveLength(0)
     expect(screen.queryByText(/of the bill/)).toBeNull()
+  })
+
+  it('shows a section as plain text without a text URL, and adds nothing for an older summary', () => {
+    render(
+      <FeedSummarySections
+        content={content({ whatItDoes: 'Older summary.', keyPoints: ['A point', 'B point'], keyPointSections: ['Sec. 2', null] })}
+      />,
+    )
+
+    expect(screen.getByText('Sec. 2')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
+    for (const name of ['Who it affects', 'What’s inside']) expect(screen.queryByRole('heading', { name })).toBeNull()
+    expect(screen.queryByText(/Early summary/)).toBeNull()
   })
 
   it('marks a summary written from the title alone as provisional', () => {

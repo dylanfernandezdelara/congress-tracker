@@ -675,7 +675,7 @@ describe('getFeedSummaryContent', () => {
         key_points: ['Extends cuts', 'Adds work rules'],
         terms_explained: [],
         key_point_sections: ['Sec. 70101'],
-        who_it_affects: ['taxpayers', ' ', 'Medicaid enrollees', 'farmers', 'extra'],
+        who_it_affects: ['taxpayers', ' ', 'taxpayers', 'Medicaid enrollees', 'farmers', 'extra'],
         inside,
         basis: 'title_only',
       },

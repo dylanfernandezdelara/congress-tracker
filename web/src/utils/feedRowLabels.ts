@@ -274,10 +274,12 @@ export function toFeedSummaryContent(fields: {
     keyPoints,
     crsSummary,
     pending: !whatItDoes && keyPoints.length === 0 && !crsSummary,
-    // Normalization only trims and caps, so indexes still line up with the stored sections.
+    // The worker stores key points already normalized (non-empty, trimmed), so indexes line up with the sections.
     keyPointSections: keyPoints.map((_, i) => sections[i]?.trim() || null),
-    whoItAffects: (fields.who_it_affects ?? []).map((w) => w.trim()).filter(Boolean).slice(0, 3),
-    inside: (fields.inside ?? []).filter((row) => row.part?.trim() && row.summary?.trim()),
+    whoItAffects: [...new Set((fields.who_it_affects ?? []).map((w) => w.trim()).filter(Boolean))].slice(0, 3),
+    inside: (fields.inside ?? [])
+      .filter((row) => row.part?.trim() && row.summary?.trim())
+      .map((row) => ({ ...row, section: row.section ?? null, share: typeof row.share === 'number' ? row.share : null })),
     provisional: fields.basis === 'title_only',
   }
 }

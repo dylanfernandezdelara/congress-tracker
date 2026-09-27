@@ -58,8 +58,8 @@ function InsideSection({ rows }: { rows: BillDigestInsideRow[] }) {
     <section className="feed-row-detail-section">
       <h3 className="feed-row-detail-heading">What&rsquo;s inside</h3>
       <ul className="feed-row-inside" aria-label="What's inside">
-        {rows.map((row) => (
-          <li key={`${row.part}-${row.section ?? ''}`} className="feed-row-inside-row">
+        {rows.map((row, index) => (
+          <li key={`${index}-${row.part}`} className="feed-row-inside-row">
             <div className="feed-row-inside-head">
               <span className="feed-row-inside-part">{row.part}</span>
               {sized && row.share !== null ? (
@@ -92,6 +92,12 @@ export function FeedSummarySections({ content, textUrl = null }: FeedSummarySect
     <>
       <PrimarySummarySection primary={primary} />
 
+      {provisional ? (
+        <p className="feed-row-summary-provisional">
+          Early summary from the bill&rsquo;s title. It updates when the full text is published.
+        </p>
+      ) : null}
+
       {whoItAffects.length > 0 ? (
         <section className="feed-row-detail-section">
           <h3 className="feed-row-detail-heading">Who it affects</h3>
@@ -121,7 +127,7 @@ export function FeedSummarySections({ content, textUrl = null }: FeedSummarySect
                         href={textUrl}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label={`${point.section}, bill text on Congress.gov`}
+                        aria-label={`${point.section}, full bill text on Congress.gov (opens in a new tab)`}
                       >
                         {point.section}
                       </a>
@@ -137,12 +143,6 @@ export function FeedSummarySections({ content, textUrl = null }: FeedSummarySect
       ) : null}
 
       {inside.length > 0 ? <InsideSection rows={inside} /> : null}
-
-      {provisional ? (
-        <p className="feed-row-summary-provisional">
-          Early summary from the bill&rsquo;s title. It updates when the full text is published.
-        </p>
-      ) : null}
 
       {crsDisclosure ? (
         <details className="feed-row-crs-details">

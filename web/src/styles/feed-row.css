@@ -358,6 +358,8 @@
 
   .feed-row-affects-chip + .feed-row-affects-chip::before {
     content: '·';
+    /* Decorative: not read aloud where alt text for content is supported. */
+    content: '·' / '';
     margin-right: 0.375rem;
     color: hsl(var(--twc-faint));
   }
@@ -367,7 +369,7 @@
     font-size: 12px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    color: hsl(var(--twc-faint));
+    color: hsl(var(--twc-secondary));
   }
 
   a.feed-row-section-ref {
@@ -377,7 +379,7 @@
   }
 
   a.feed-row-section-ref:hover {
-    color: hsl(var(--twc-secondary));
+    color: hsl(var(--twc-foreground));
   }
 
   /* What's inside (long bills): one row per part, sized by its share of the bill's text. */
@@ -402,6 +404,7 @@
   }
 
   .feed-row-inside-part {
+    min-width: 0;
     font-size: 13px;
     font-weight: 500;
     line-height: 1.4;
@@ -409,6 +412,8 @@
   }
 
   .feed-row-inside-share {
+    flex-shrink: 0;
+    white-space: nowrap;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
     color: hsl(var(--twc-faint));
@@ -440,7 +445,7 @@
     margin: 0;
     font-size: 12px;
     line-height: 1.4;
-    color: hsl(var(--twc-faint));
+    color: hsl(var(--twc-secondary));
   }
 
   .feed-row-summary-body {
