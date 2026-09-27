@@ -21,6 +21,8 @@ export interface CheckableSources {
   /** Full text, or every part's text joined, or null when not published. */
   text: string | null;
   statusLabel: string;
+  /** Every recorded floor vote as the prompt lists it, so tallies from earlier votes are known facts. */
+  votesText?: string | null;
 }
 
 export interface CheckResult {
@@ -150,7 +152,7 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   const plain = text.toLowerCase().replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care)\b/g, "");
   for (const w of JUDGING) if (new RegExp(`\\b${w}\\b`).test(plain)) blocking.push(`judging word "${w}"`);
 
-  const known = numbersIn([sources.title, sources.crsText, sources.text, sources.statusLabel].join("\n"));
+  const known = numbersIn([sources.title, sources.crsText, sources.text, sources.statusLabel, sources.votesText].join("\n"));
   const crsNumbers = numbersIn([sources.title, sources.crsText].join("\n"));
   // Key points are checked against the sections they cite, which catches a wrong figure in a 500-page bill even
   // when the same number appears elsewhere in it. Uncited points, and everything else, use all sources.

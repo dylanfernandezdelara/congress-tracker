@@ -234,24 +234,24 @@ describe("runSummarySweep", () => {
   describe("the queue", () => {
     it("rewrites bills that matter, skipping ones already current", async () => {
       jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) =>
-        matters ? [job(1, { matters: true }), job(2, { matters: true })] : []
+        matters ? [job(1, { matters: true }), job(2, { matters: true }), job(3, { matters: true })] : []
       );
-      mockGetDigest.mockImplementation(async (_db, _c, _t, n: number) =>
-        n === 1
-          ? { digest_json: JSON.stringify({ headline: "h", what_it_does: "w", generator: { tier: "rewrite", fingerprint: "fp1", long: false } }) }
-          : null
-      );
+      const rewritten = (fingerprint: string) => ({
+        digest_json: JSON.stringify({ headline: "h", what_it_does: "w", generator: { tier: "rewrite", fingerprint, long: false } }),
+      });
+      // 1 is current; 2 has no summary; 3 was rewritten from inputs that have since changed.
+      mockGetDigest.mockImplementation(async (_db, _c, _t, n: number) => (n === 1 ? rewritten("fp1") : n === 3 ? rewritten("old") : null));
       mockWrite.mockResolvedValue({ ...stored, cost: 0.015 });
 
       const result = await runSummarySweep(env, { now: NOW, discover: false });
 
-      expect(mockWrite).toHaveBeenCalledTimes(1);
-      expect(mockWrite).toHaveBeenCalledWith(env, expect.objectContaining({ fingerprint: "fp2" }), "rewrite");
+      expect(mockWrite.mock.calls.map((c) => (c[1] as PreparedBill).fingerprint)).toEqual(["fp2", "fp3"]);
       expect(settled()).toEqual([
         [1, "done"],
         [2, "done"],
+        [3, "done"],
       ]);
-      expect(result).toMatchObject({ unchanged: 1, rewritten: 1 });
+      expect(result).toMatchObject({ unchanged: 1, rewritten: 2 });
     });
 
     it("stops rewriting when the day's budget is spent", async () => {

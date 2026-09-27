@@ -1,6 +1,6 @@
 # Congress Tracker
 
-Cloudflare-native app: ingest House + Senate **passage** roll-call votes, join CRS summaries, rewrite to plain English via OpenRouter, serve an action-row feed.
+Cloudflare-native app: ingest House + Senate **passage** roll-call votes, summarize bills in plain English from their text via OpenRouter (`digest/`), serve an action-row feed.
 
 ## Runtime surfaces
 
@@ -113,13 +113,13 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/feed` (cron also runs feed + member-votes daily at 10:00 UTC)
 - `POST /__pipeline/senate-vote-menu` — admin upload of Senate LIS vote-menu XML into D1 cache (`?run_feed=1` to chain ingest); break-glass when Browser Rendering + D1 cache both fail. Daily cron uses the Worker `BROWSER` binding to fetch senate.gov after plain `fetch` 403s. Ops script: `npm run refresh:senate-menu`
 - `POST /__pipeline/purge-cache` — zone-wide Cloudflare edge cache purge (admin; also runs automatically after successful pipeline writes when `CACHE_PURGE_TOKEN` is set)
-- `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — force-rewrite digests for specific bills (admin). Uses CRS when present; otherwise title + policy-area LLM rewrite (same as daily feed). On an LLM miss it stores a deterministic title fallback only when no LLM digest exists (`fallbacksWritten`, failure reason `openrouter_rewrite_failed_title_fallback_written`). Cap `DIGEST_REFRESH_MAX_BILLS` (25). Daily/admin `POST /__pipeline/run/feed` also fills missing feed digests first (up to `DIGEST_MAX_NEW_REWRITES`)
+- `POST /__pipeline/run/digest-refresh?bill=HR1234&bills=S.2` — rewrite named bills now (admin), through the same writer as the sweep (`digest/write.ts`: Sonnet, Luna for giant bills), whatever their fingerprint. Counts against the daily budget. Cap `DIGEST_REFRESH_MAX_BILLS` (25). Returns `models`, `costUsd` and per-bill `failures` (a rejected summary lists the blocking checks)
 - `POST /__pipeline/run/session-backfill` — full-session vote backfill (admin)
 - `POST /__pipeline/run/member-votes` — ingest per-member passage votes (admin; also chained after daily feed cron)
 - `POST /__pipeline/run/process-backfill` — capped/resumable committee-process discovery + hydration (admin; re-invoke until `bills_remaining` is 0)
 - `POST /__pipeline/run/process-refresh` — hydrate pending `process_refresh_queue` bills only (admin; daily feed also force-refreshes a capped slice of feed bills)
 - `POST /__pipeline/run/executive-posts` — Truth Social executive ingest (admin; also hourly cron)
-- `POST /__pipeline/run/summary-sweep?limit=` — summary sweep (admin; also hourly after executive posts). Bills without a CRS-backed digest (none yet, a title fallback, or an LLM title-only rewrite) are re-checked on Congress.gov, never-checked then oldest-checked first, each at most once per `SUMMARY_SWEEP_RECHECK_HOURS` (24; `bill_summary_checks`), through the same phases as the feed digests: no digest → plain-language rewrite from the title, CRS arrived → rewrite from CRS. This is what gives intros and public laws outside the feed window a plain headline. Hourly cap `SUMMARY_SWEEP_MAX_BILLS_PER_RUN` (10), admin cap 40
+- `POST /__pipeline/run/summary-sweep?limit=` — the hourly summary sweep, on demand (admin; `limit` caps both rewrites and batch bills, max `DIGEST_SWEEP_ADMIN_MAX_BILLS`). See **Plain-language summaries** below
 - `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 
 **Sidebar data backfill (production):** Daily cron already chains feed then `member-votes`. After
@@ -139,14 +139,10 @@ best-effort `member-votes`) at **10:00 UTC**, and `runExecutivePostsPipeline` ho
 never shares a minute with the daily feed cron (both share one write lease).
 `wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
 `workers/senate_data_worker` only after `wrangler versions upload` previews. The feed pipeline
-only upserts **new** passage votes (skips known roll-call keys) and writes digests for bills
-that do not yet have one (capped by `DIGEST_MAX_NEW_REWRITES`). When OpenRouter returns no
-parseable digest for a bill that has a title or CRS text, every digest writer (feed refresh,
-executive hydrate, admin `digest-refresh`) stores a deterministic title fallback built in
-`synthesis/title-fallback-digest.ts` (worker-only `source: "title_fallback"` marker in
-`digest_json`, stripped from the public feed) instead of a NULL tombstone. Admin `digest-refresh`
-writes a fallback only when no LLM digest exists. The feed refresh
-records a `digest_warnings` entry and retries the LLM for stored fallbacks on the next run.
+only upserts **new** passage votes (skips known roll-call keys). For digests it only stores sponsors,
+gives a bill with no summary a deterministic title fallback (`synthesis/title-fallback-digest.ts`,
+worker-only `source: "title_fallback"` marker, stripped from the public feed) so the feed never shows
+a hole, and queues the bill for a summary; the hourly sweep writes it.
 Because Congress.gov lists House
 votes oldest-first, daily runs scan list pages until the lookback window is reached (~5 list
 requests per run for the current session). Ingest success/failure is persisted in D1
@@ -158,11 +154,49 @@ web ops UI at `/debug`. See `docs/MONITORING.md`. Manual production ingestion is
 Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/feed-api-types.ts`
 (imported by worker + web).
 
+## Plain-language summaries
+
+Every bill summary is written by `workers/senate_data_worker/src/digest/` from the bill's own text
+(newest printed version from Congress.gov), with the CRS summary and floor votes as context. The
+reader is someone deciding whether they would support the bill and whether their members voted the
+way they would, so summaries lead with concrete effects on people and stay strictly neutral.
+
+- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3). Bills over ~30k tokens are split along their
+  own divisions/titles (`bill-text-parse.ts`), summarized per part, then combined with a "What's
+  inside" breakdown. Import-free, so `scripts/digest-eval` uses the same file.
+- **Models** `digest/models.ts`: new bills → `openai/gpt-6-luna` (high effort) through OpenRouter's
+  **Batch API** (half price, usually minutes). Bills that matter (floor vote or action, reported by
+  committee, law, feed window, named in an executive post) → `anthropic/claude-sonnet-5` on the
+  normal API (OpenRouter refuses Sonnet batches). Giant bills stay on Luna at every tier. Overrides:
+  `DIGEST_NEW_MODEL`, `DIGEST_REWRITE_MODEL`, `DIGEST_REWRITE_BATCH=1`. Not `OPENROUTER_MODEL`
+  (that one is for the free-model features: blurbs, confirmations, executive links).
+- **Checks** `digest/checks.ts` run before anything is stored: a number the sources do not contain,
+  a judging word, or an empty field blocks the summary; the writer retries once with the other model
+  (Luna ↔ Sonnet; for long bills only the combine pass), and otherwise the current summary stays.
+  Warnings are kept in `generator.warnings`.
+- **Provenance** `digest_json.generator` (worker-only, stripped from the feed): model, prompt version,
+  tier, text version, `fingerprint` (hash of everything the summary was written from), `long`.
+- **Queue** `digest_jobs` / `digest_batches` (`d1/digest-jobs.ts`). The hourly sweep
+  (`pipeline/run-summary-sweep.ts`, on the `:20` cron after executive posts) collects finished
+  batches, discovers bills Congress.gov updated (all types, cursor in `pipeline_state`; only bills
+  introduced in the last `DIGEST_NEW_BILL_DAYS` or already on the site), re-checks bills still waiting
+  on text or CRS, rewrites a few bills that matter, and sends the rest to one Luna batch. A bill whose
+  fingerprint is unchanged costs no model call. Writers elsewhere (feed, executive hydrate, public
+  laws) only queue bills.
+- **Budget** `DIGEST_DAILY_BUDGET_USD` (default $1; expected spend is cents a day), tracked in
+  `pipeline_state` (`digest_spend:YYYY-MM-DD`). Over budget, the sweep waits for tomorrow.
+- **Backfill**: summaries from before v3 (no `generator`) are left alone unless the bill is queued
+  for another reason. A full backfill is a separate, deliberate run.
+- **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
+  (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
+  blocked. Model rounds and the calibrated judge are in the same folder.
+
 ## Project structure
 
 - `workers/senate_data_worker/src/pipeline/run-feed.ts` — ingestion orchestrator
 - `workers/senate_data_worker/src/sources/` — House/Senate vote + Congress.gov clients
-- `workers/senate_data_worker/src/synthesis/` — OpenRouter digests + grounded summaries (`grounded-summary.ts`, `openrouter-chat.ts`, `llm-json.ts`; confirmation vote-context adapter in `confirmation-vote-context.ts`)
+- `workers/senate_data_worker/src/digest/` — plain-language bill summaries (see above)
+- `workers/senate_data_worker/src/synthesis/` — title fallbacks, notable-vote blurbs + grounded summaries (`grounded-summary.ts`, `openrouter-chat.ts`, `llm-json.ts`; confirmation vote-context adapter in `confirmation-vote-context.ts`)
 - `workers/senate_data_worker/src/storage/feed.ts` — feed read model
 - `wrangler.toml` (repo root) — mirrors `workers/senate_data_worker/wrangler.toml` for Cloudflare Workers Builds
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI
@@ -179,7 +213,7 @@ Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/fee
 - Inside `AnimatedSheet` panels, use `.sheet-section` / `.sheet-section-title` for section layout (the panel already supplies card chrome); shadcn `Card` is for standalone page surfaces, not nested inside sheets.
 - Default to `npm test` for verification.
 - Never commit secrets from `.dev.vars`.
-- `FEED_MAX_BILLS` and `DIGEST_MAX_NEW_REWRITES` are module constants in `workers/senate_data_worker/src/constants.ts`. `VOTE_LOOKBACK_DAYS` lives in `shared/feed-constants.ts` (worker re-exports; web imports for empty-state copy).
+- `FEED_MAX_BILLS` and the `DIGEST_*` caps are module constants in `workers/senate_data_worker/src/constants.ts`. `VOTE_LOOKBACK_DAYS` lives in `shared/feed-constants.ts` (worker re-exports; web imports for empty-state copy).
 - Always `git fetch origin` before starting work on a fresh session.
 - One fix per PR. When several PRs are in flight, use one `git worktree` per branch (recipe: `docs/LOCAL_DEVELOPMENT.md` → "Working several PRs at once").
 - After `web/` work, follow the ship checklist above (tests → `qa:web` → thermonuclear review → preview URL). Never publish a preview URL without attempting QA and review first.

@@ -128,7 +128,7 @@ export function needsTwoThirds(question: string | null, bill: DigestBillInput): 
   return TWO_THIRDS(question, bill);
 }
 
-function votesLine(bill: DigestBillInput): string {
+export function votesLine(bill: DigestBillInput): string {
   if (!bill.votes.length) return "VOTES: none recorded";
   return `VOTES:\n${bill.votes
     .map(

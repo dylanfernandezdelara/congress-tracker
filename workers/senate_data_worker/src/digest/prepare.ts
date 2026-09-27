@@ -14,7 +14,7 @@ import {
   type BillTextPart,
 } from "./bill-text-parse";
 import type { CheckableSources } from "./checks";
-import { PROMPT_VERSION, statusLabel, type DigestBillInput } from "./prompt";
+import { PROMPT_VERSION, statusLabel, votesLine, type DigestBillInput } from "./prompt";
 
 /** Everything a summary is written from, for one bill. */
 export interface PreparedBill {
@@ -136,7 +136,7 @@ export async function prepareBill(env: Env, ref: BillRef): Promise<PreparedBill>
     parts,
     totalTokens: text ? approxTokens(text) : 0,
     basis,
-    checkSources: { type: input.type, title: input.title, crsText: input.crs?.text ?? null, text, statusLabel: statusLabel(input) },
+    checkSources: { type: input.type, title: input.title, crsText: input.crs?.text ?? null, text, statusLabel: statusLabel(input), votesText: votesLine(input) },
     fingerprint: fingerprintOf([
       PROMPT_VERSION,
       input.textVersion ? `${input.textVersion.type}|${input.textVersion.date}` : null,

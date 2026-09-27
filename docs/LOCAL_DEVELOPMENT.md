@@ -89,8 +89,11 @@ Add keys to `workers/senate_data_worker/.dev.vars`:
 ```bash
 CONGRESS_API_KEY=...      # https://api.congress.gov/sign-up/
 OPENROUTER_API_KEY=...    # https://openrouter.ai/keys
-# Optional override — must be a free OpenRouter model (e.g. nvidia/nemotron-3-ultra-550b-a55b:free).
-# When unset, the worker auto-selects the highest Artificial Analysis intelligence_index free model.
+# Bill summaries use paid models (Luna batches, Sonnet rewrites; see AGENTS.md → Plain-language summaries),
+# so this key needs credits. Cap its spend in OpenRouter's key settings; the worker also caps it per day:
+# DIGEST_DAILY_BUDGET_USD=1
+# Optional override for the free-model features (blurbs, confirmations, executive links) — must be a free
+# OpenRouter model. When unset, the worker auto-selects the highest intelligence_index free model.
 # OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 ```
 
