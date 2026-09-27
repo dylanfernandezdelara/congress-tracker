@@ -30,7 +30,7 @@ describe('FeedSummarySections', () => {
           whoItAffects: ['taxpayers', 'Medicaid enrollees'],
           inside: [
             { part: 'Taxes', summary: 'Extends the 2017 tax cuts', section: 'Title VII', share: 42 },
-            { part: 'Border', summary: 'Funds detention', section: 'Title IX', share: null },
+            { part: 'Border', summary: 'Funds detention', section: 'Title IX', share: 9 },
           ],
         })}
       />,
@@ -43,9 +43,27 @@ describe('FeedSummarySections', () => {
     expect(screen.getByRole('heading', { name: 'What’s inside' })).toBeInTheDocument()
     expect(screen.getByText('42% of the bill')).toBeInTheDocument()
     const bars = document.querySelectorAll<HTMLElement>('.feed-row-inside-bar > span')
-    expect(bars).toHaveLength(1)
+    expect(bars).toHaveLength(2)
     expect(bars[0]!.style.getPropertyValue('--share')).toBe('42%')
     expect(screen.queryByText(/Early summary/)).toBeNull()
+  })
+
+  it('shows no bars unless every part has a measured share', () => {
+    render(
+      <FeedSummarySections
+        content={content({
+          whatItDoes: 'Does two things.',
+          inside: [
+            { part: 'Taxes', summary: 'Extends cuts', section: 'Title VII', share: null },
+            { part: 'Food', summary: 'Changes SNAP', section: 'Title I', share: 9 },
+          ],
+        })}
+      />,
+    )
+
+    expect(screen.getByText('Changes SNAP')).toBeInTheDocument()
+    expect(document.querySelectorAll('.feed-row-inside-bar')).toHaveLength(0)
+    expect(screen.queryByText(/of the bill/)).toBeNull()
   })
 
   it('marks a summary written from the title alone as provisional', () => {

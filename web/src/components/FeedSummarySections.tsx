@@ -52,6 +52,8 @@ function PrimarySummarySection({ primary }: { primary: FeedSummaryPrimary }) {
 }
 
 function InsideSection({ rows }: { rows: BillDigestInsideRow[] }) {
+  // Bars only when every part has a measured share; a partial set of bars would misstate the rest.
+  const sized = rows.every((row) => row.share !== null)
   return (
     <section className="feed-row-detail-section">
       <h3 className="feed-row-detail-heading">What&rsquo;s inside</h3>
@@ -60,11 +62,11 @@ function InsideSection({ rows }: { rows: BillDigestInsideRow[] }) {
           <li key={`${row.part}-${row.section ?? ''}`} className="feed-row-inside-row">
             <div className="feed-row-inside-head">
               <span className="feed-row-inside-part">{row.part}</span>
-              {row.share !== null ? (
+              {sized && row.share !== null ? (
                 <span className="feed-row-inside-share">{row.share < 1 ? '<1' : row.share}% of the bill</span>
               ) : null}
             </div>
-            {row.share !== null ? (
+            {sized && row.share !== null ? (
               <div className="feed-row-inside-bar" aria-hidden="true">
                 <span style={{ '--share': `${Math.max(row.share, 1)}%` } as CSSProperties} />
               </div>
