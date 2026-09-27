@@ -121,8 +121,6 @@ export type {
   TightnessKind,
   TightnessStatsResponse,
   VoteCohesion,
-  NotableVoteEntry,
-  NotableVotesResponse,
   MemberProfileRecentCrossVote,
   MemberProfileSponsoredBill,
   MemberProfileResponse,

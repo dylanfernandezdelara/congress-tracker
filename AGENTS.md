@@ -170,7 +170,7 @@ way they would, so summaries lead with concrete effects on people and stay stric
   committee, law, feed window, named in an executive post) → `anthropic/claude-sonnet-5` on the
   normal API (OpenRouter refuses Sonnet batches). Giant bills stay on Luna at every tier. Overrides:
   `DIGEST_NEW_MODEL`, `DIGEST_REWRITE_MODEL`. Not `OPENROUTER_MODEL`
-  (that one is for the free-model features: blurbs, confirmations, executive links).
+  (that one is for the free-model features: confirmations, executive links).
 - **Checks** `digest/checks.ts` run before anything is stored: a number the sources do not contain,
   a judging word, or an empty field blocks the summary; the writer retries once with the other model
   (Luna ↔ Sonnet; for long bills only the combine pass), and otherwise the current summary stays.
@@ -229,7 +229,7 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - `workers/senate_data_worker/src/pipeline/run-feed.ts` — ingestion orchestrator
 - `workers/senate_data_worker/src/sources/` — House/Senate vote + Congress.gov clients
 - `workers/senate_data_worker/src/digest/` — plain-language bill summaries (see above)
-- `workers/senate_data_worker/src/synthesis/` — title fallbacks, notable-vote blurbs + grounded summaries (`grounded-summary.ts`, `openrouter-chat.ts`, `llm-json.ts`; confirmation vote-context adapter in `confirmation-vote-context.ts`)
+- `workers/senate_data_worker/src/synthesis/` — title fallbacks, confirmation rewrites, executive links + grounded summaries (`grounded-summary.ts`, `openrouter-chat.ts`, `llm-json.ts`; confirmation vote-context adapter in `confirmation-vote-context.ts`)
 - `workers/senate_data_worker/src/storage/feed.ts` — feed read model
 - `wrangler.toml` (repo root) — mirrors `workers/senate_data_worker/wrangler.toml` for Cloudflare Workers Builds
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI

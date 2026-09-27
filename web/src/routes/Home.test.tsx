@@ -19,7 +19,6 @@ import { floorChipLabel } from '../utils/floorStatusCopy'
 
 const homeApi = vi.hoisted(() => ({
   fetchFeed: vi.fn(),
-  fetchNotableVotes: vi.fn(),
   fetchRecentLaws: vi.fn(),
   fetchRecentConfirmations: vi.fn(),
   fetchCommitteesLeaderboard: vi.fn(),
@@ -36,7 +35,6 @@ const homeApi = vi.hoisted(() => ({
 
 const {
   fetchFeed,
-  fetchNotableVotes,
   fetchRecentLaws,
   fetchRecentConfirmations,
   fetchCommitteesLeaderboard,
@@ -103,7 +101,6 @@ describe('Home', () => {
     expect(await screen.findByRole('region', { name: 'New laws' })).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
     expect(screen.queryByLabelText('Legislative pulse')).not.toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Notable votes' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'House passage' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Senate bills & nominees' })).toBeInTheDocument()
     expect(screen.getByText('House-passed contracting bill waiting in the Senate')).toBeInTheDocument()
@@ -846,7 +843,6 @@ describe('Home', () => {
     expect(fetchSessionStats).not.toHaveBeenCalled()
     expect(fetchTightnessStats).not.toHaveBeenCalled()
     expect(fetchDefectors).not.toHaveBeenCalled()
-    expect(fetchNotableVotes).not.toHaveBeenCalled()
     expect(fetchRecentLaws).not.toHaveBeenCalled()
     expect(fetchRecentConfirmations).not.toHaveBeenCalled()
     expect(screen.getByText('Loading control…')).toBeInTheDocument()

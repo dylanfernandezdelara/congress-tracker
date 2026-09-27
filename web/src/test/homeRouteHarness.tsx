@@ -15,7 +15,6 @@ function SearchParamsProbe() {
 
 export type HomeApiMocks = {
   fetchFeed: Mock
-  fetchNotableVotes: Mock
   fetchRecentLaws: Mock
   fetchRecentConfirmations: Mock
   fetchCommitteesLeaderboard: Mock
@@ -101,34 +100,6 @@ export function stubHomeRouteDefaults(
       }),
     ]),
   )
-  api.fetchNotableVotes.mockResolvedValue({
-    congress: 119,
-    session: 2,
-    detection_method: 'heuristic',
-    as_of: '2026-06-14T00:00:00.000Z',
-    notable: [
-      {
-        chamber: 'Senate',
-        congress: 119,
-        session: 2,
-        roll_number: 9002,
-        bill_type: 'S',
-        bill_number: 2,
-        yeas: 68,
-        nays: 32,
-        margin: 36,
-        vote_date: '2026-06-05',
-        headline: 'Notable vote headline for sidebar',
-        what_it_does: 'It does something important in plain language.',
-        key_points: ['Point one'],
-        raw_summary_text: null,
-        significance_score: 42,
-        why_it_matters: 'Bipartisan coalition carried the vote',
-        defectors: [],
-        member_votes_available: false,
-      },
-    ],
-  })
   api.fetchRecentLaws.mockResolvedValue({
     congress: 119,
     session: 2,

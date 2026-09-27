@@ -42,7 +42,7 @@ Tailwind's 4px scale).
 The Vite dev server proxies `/feed`, `/stats`, `/health`, and `/debug`
 to the worker on `:8787`, so the UI uses same-origin API URLs (matching
 production). **Both dev servers must be running** — if only `dev:web` is up,
-chamber/notable/feed requests fail with connection errors.
+stats/feed requests fail with connection errors.
 
 ## What Cursor Cloud does for you (and the local equivalent)
 
@@ -92,7 +92,7 @@ OPENROUTER_API_KEY=...    # https://openrouter.ai/keys
 # Bill summaries use paid models (Luna batches, Sonnet rewrites; see AGENTS.md → Plain-language summaries),
 # so this key needs credits. Cap its spend in OpenRouter's key settings; the worker also caps it per day:
 # DIGEST_DAILY_BUDGET_USD=1
-# Optional override for the free-model features (blurbs, confirmations, executive links) — must be a free
+# Optional override for the free-model features (confirmations, executive links) — must be a free
 # OpenRouter model. When unset, the worker auto-selects the highest intelligence_index free model.
 # OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 ```

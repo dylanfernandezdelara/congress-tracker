@@ -1,5 +1,5 @@
 import { bioguidePhotoUrl, congressGovMemberUrl } from "../../../../shared/member-photo";
-import { crossVoteLabel } from "../../../../shared/notable-votes";
+import { crossVoteLabel } from "../../../../shared/cross-vote-label";
 import type {
   MemberProfileRecentCrossVote,
   MemberProfileResponse,
