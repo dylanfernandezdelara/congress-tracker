@@ -85,8 +85,12 @@ export async function enqueueDigestJobs(
           `INSERT INTO digest_jobs (congress, bill_type, number, state, tier, attempts, queued_at, updated_at, origin)
            VALUES (?1, ?2, ?3, 'queued', ?4, 0, ?5, ?5, ?7)
            ON CONFLICT (congress, bill_type, number) DO UPDATE SET
-             -- A live reason (discovery, the feed) takes a bill out of the backfill's lane.
-             origin = CASE WHEN excluded.origin = 'live' THEN 'live' ELSE digest_jobs.origin END,
+             -- A live reason (discovery, the feed) takes a bill out of the backfill's lane; a finished job that the
+             -- backfill re-queues joins it.
+             origin = CASE
+               WHEN excluded.origin = 'live' THEN 'live'
+               WHEN digest_jobs.state IN ('queued', 'batched') THEN digest_jobs.origin
+               ELSE excluded.origin END,
              state = CASE
                WHEN digest_jobs.state = 'batched' THEN 'batched'
                WHEN digest_jobs.state = 'done' AND ?6 IS NOT NULL AND substr(digest_jobs.updated_at, 1, 10) > ?6 THEN 'done'

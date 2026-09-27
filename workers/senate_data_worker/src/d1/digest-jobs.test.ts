@@ -151,10 +151,15 @@ describe("digest jobs", () => {
     ]);
     await enqueueDigestJobs(db, [hr(2)], "new", T1);
     await enqueueDigestJobs(db, [hr(3)], "new", T1, "backfill");
+    // A finished live job that the backfill re-queues joins the backfill lane.
+    await enqueueDigestJobs(db, [hr(4)], "new", T0);
+    await settleJob(db, hr(4), "done", { nowIso: T0 });
+    await enqueueDigestJobs(db, [hr(4)], "new", T1, "backfill");
     expect((await selectQueuedJobs(db, { matters: false, limit: 10 })).map((j) => [j.number, j.origin])).toEqual([
       [2, "live"],
       [3, "live"],
       [1, "backfill"],
+      [4, "backfill"],
     ]);
   });
 
