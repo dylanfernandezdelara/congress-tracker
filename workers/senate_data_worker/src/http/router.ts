@@ -31,7 +31,7 @@ import {
   EXECUTIVE_PIPELINE_STALE_HOURS,
   EXECUTIVE_POSTS_CRON_UTC,
   SENATE_VOTE_MENU_MAX_BYTES,
-  SUMMARY_SWEEP_ADMIN_MAX_BILLS,
+  DIGEST_SWEEP_ADMIN_MAX_BILLS,
 } from "../constants";
 import {
   normalizePolicyFilter,
@@ -475,9 +475,9 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
   "/__pipeline/run/summary-sweep": ({ env, url }) => {
     const requested = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
     const limit = Number.isFinite(requested) && requested > 0
-      ? Math.min(requested, SUMMARY_SWEEP_ADMIN_MAX_BILLS)
-      : SUMMARY_SWEEP_ADMIN_MAX_BILLS;
-    return runSummarySweep(env, { limit });
+      ? Math.min(requested, DIGEST_SWEEP_ADMIN_MAX_BILLS)
+      : DIGEST_SWEEP_ADMIN_MAX_BILLS;
+    return runSummarySweep(env, { rewrites: limit, batchBills: limit });
   },
 };
 

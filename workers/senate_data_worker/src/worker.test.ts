@@ -133,7 +133,7 @@ describe("worker", () => {
       billsSelected: 3,
       digestsWritten: 1,
       digestsSkipped: 2,
-      digestsRewritten: 1,
+      digestsQueued: 1,
       digestWarnings: [],
       chamberWarnings: [],
       lifecycleRefreshed: 0,

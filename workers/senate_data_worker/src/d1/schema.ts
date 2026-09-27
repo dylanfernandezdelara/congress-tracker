@@ -280,15 +280,33 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_process_refresh_queue_pending
     ON process_refresh_queue (last_hydrated_at, queued_at)`,
-  // Last Congress.gov summary check per bill, for the hourly summary sweep
-  // (pipeline/run-summary-sweep.ts). Separate from bill_digests so a check that
-  // finds nothing new still records itself without touching the digest row.
-  `CREATE TABLE IF NOT EXISTS bill_summary_checks (
+  // Plain-language summary queue (digest/). A bill is queued when something it is summarized from may have
+  // changed; the hourly sweep re-reads it, skips it if its fingerprint is unchanged, and otherwise writes a
+  // summary now (Sonnet rewrites) or adds it to a Luna batch. `updated_at` doubles as the last check time.
+  `CREATE TABLE IF NOT EXISTS digest_jobs (
   congress INTEGER NOT NULL,
   bill_type TEXT NOT NULL,
   number INTEGER NOT NULL,
-  checked_at TEXT NOT NULL,
+  state TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  batch_id TEXT,
+  fingerprint TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  queued_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
   PRIMARY KEY (congress, bill_type, number)
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_digest_jobs_state ON digest_jobs (state, queued_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_digest_jobs_batch ON digest_jobs (batch_id)`,
+  `CREATE TABLE IF NOT EXISTS digest_batches (
+  id TEXT PRIMARY KEY,
+  model TEXT NOT NULL,
+  requests INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  submitted_at TEXT NOT NULL,
+  collected_at TEXT,
+  cost REAL
 )`,
 ];
 

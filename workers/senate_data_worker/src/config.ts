@@ -25,6 +25,21 @@ export interface Env {
   CONGRESS_API_KEY: string;
   OPENROUTER_API_KEY: string;
   OPENROUTER_MODEL?: string;
+  /**
+   * Bill summaries (digest/): model for first summaries of new bills (default GPT-6 Luna, high effort, batch) and
+   * for rewrites of bills that matter (default Claude Sonnet 5). Set to change without a deploy of code.
+   */
+  DIGEST_NEW_MODEL?: string;
+  DIGEST_REWRITE_MODEL?: string;
+  /** "1" to send rewrites through the Batch API too (OpenRouter refuses Sonnet 5 batches as of 2026-09). */
+  DIGEST_REWRITE_BATCH?: string;
+  /** Daily spend cap for bill summaries in US dollars (default 1). */
+  DIGEST_DAILY_BUDGET_USD?: string;
+  /**
+   * Base URL for OpenRouter chat calls. Default https://openrouter.ai/api/v1; set to a Cloudflare AI Gateway
+   * OpenRouter endpoint to log every call. Batch calls always go to OpenRouter directly.
+   */
+  OPENROUTER_BASE_URL?: string;
   PIPELINE_ADMIN_TOKEN?: string;
   /**
    * Cloudflare zone ID for trackcongress.org (public). Used with

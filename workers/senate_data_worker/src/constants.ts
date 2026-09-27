@@ -37,18 +37,24 @@ export const INTRO_DETAIL_FETCHES_PER_RUN = 25;
 export const EXECUTIVE_POSTS_FETCH_LIMIT = 15;
 /** Minimum LLM confidence to auto-link a bill. */
 export const EXECUTIVE_LINK_MIN_CONFIDENCE = 0.75;
-export const DIGEST_MAX_NEW_REWRITES = 20;
 export const DIGEST_REFRESH_MAX_BILLS = 25;
 /**
- * Summary sweep (hourly): bills without a CRS-backed digest are re-checked on
- * Congress.gov, oldest check first, so intros and public laws outside the feed
- * window still get a plain-language headline and pick up CRS text when it lands.
+ * Plain-language summaries (pipeline/run-summary-sweep.ts, hourly). Bills that matter are rewritten directly, a
+ * few per run; everything else goes to one Luna batch per run. Spend is also capped per day (DIGEST_DAILY_BUDGET_USD).
  */
-export const SUMMARY_SWEEP_MAX_BILLS_PER_RUN = 10;
-/** Admin `POST /__pipeline/run/summary-sweep` cap per invocation. */
-export const SUMMARY_SWEEP_ADMIN_MAX_BILLS = 40;
-/** A bill is re-checked at most once per this many hours. */
-export const SUMMARY_SWEEP_RECHECK_HOURS = 24;
+export const DIGEST_REWRITES_PER_RUN = 5;
+export const DIGEST_BATCH_BILLS_PER_RUN = 40;
+/** Admin `POST /__pipeline/run/summary-sweep` cap per invocation (?limit=, applies to both). */
+export const DIGEST_SWEEP_ADMIN_MAX_BILLS = 60;
+/** Congress.gov update-list pages (250 bills each) read per run. */
+export const DIGEST_DISCOVERY_PAGES_PER_RUN = 2;
+/** Bills still waiting on text or a CRS summary are re-checked at most this often. */
+export const DIGEST_RECHECK_HOURS = 24;
+export const DIGEST_RECHECK_PER_RUN = 20;
+/** OpenRouter batches finish within 24 hours; after this a batch is treated as expired. */
+export const DIGEST_BATCH_EXPIRE_HOURS = 26;
+/** After this many batch submissions a bill is written directly instead. */
+export const DIGEST_BATCH_MAX_ATTEMPTS = 3;
 /** Max new nomination background rewrites per feed pipeline run. */
 export const CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES = 10;
 /** Max nomination metadata fetches (Congress.gov) per feed pipeline run. */

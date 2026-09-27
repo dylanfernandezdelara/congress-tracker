@@ -29,7 +29,7 @@ const mockFetchBillSummaryBundle = vi.fn();
 const mockFetchRecentPublicLaws = vi.fn();
 const mockFetchBillLifecycleSource = vi.fn();
 const mockPersistPublicLaws = vi.fn();
-const mockRewriteSummary = vi.fn();
+const mockEnqueueDigestJobs = vi.fn(async (..._args: unknown[]) => {});
 const mockIngestPassageVotesByChamber = vi.fn();
 const mockEnsureMemberRoster = vi.fn<() => Promise<boolean>>();
 const mockGetLifecyclesForBills = vi.fn();
@@ -94,8 +94,8 @@ vi.mock("./refresh-public-laws", () => ({
     })),
 }));
 
-vi.mock("../synthesis/openrouter", () => ({
-  rewriteSummary: (...args: unknown[]) => mockRewriteSummary(...args),
+vi.mock("../d1/digest-jobs", () => ({
+  enqueueDigestJobs: (...args: unknown[]) => mockEnqueueDigestJobs(...args),
 }));
 
 vi.mock("../synthesis/model", () => ({
@@ -235,12 +235,6 @@ describe("runFeedPipeline digest retry", () => {
       titlesWritten: 0,
       warnings: [] as string[],
     });
-    mockRewriteSummary.mockResolvedValue({
-      headline: "Rewritten headline",
-      what_it_does: "Does things",
-      key_points: ["one"],
-      terms_explained: [],
-    });
     mockUpsertDigest.mockResolvedValue(undefined);
   });
 
@@ -272,7 +266,8 @@ describe("runFeedPipeline digest retry", () => {
     const result = await runFeedPipeline(createEnv());
 
     expect(mockEnsureMemberRoster).toHaveBeenCalledOnce();
-    expect(result.digestsSkipped).toBe(1);
+    // A summary from before the current writer is queued for a new one; nothing is fetched or written now.
+    expect(result.digestsQueued).toBe(1);
     expect(result.digestsWritten).toBe(0);
     expect(mockFetchBillSummaryBundle).not.toHaveBeenCalled();
     expect(mockUpsertDigest).not.toHaveBeenCalled();
@@ -293,7 +288,7 @@ describe("runFeedPipeline digest retry", () => {
 
     const result = await runFeedPipeline(createEnv());
 
-    expect(result.digestsSkipped).toBe(1);
+    expect(result.digestsQueued).toBe(1);
     expect(result.digestsWritten).toBe(0);
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
     expect(mockReplaceBillSponsors).toHaveBeenCalledWith(
@@ -314,8 +309,9 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsSkipped).toBe(0);
     expect(result.digestsWritten).toBe(1);
     expect(mockFetchBillSummaryBundle).toHaveBeenCalledOnce();
-    expect(mockRewriteSummary).toHaveBeenCalledOnce();
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
+    expect(mockUpsertDigest.mock.calls[0]![1].digest).toMatchObject({ source: DIGEST_SOURCE_TITLE_FALLBACK });
+    expect(result.digestsQueued).toBe(1);
   });
 
   it("writes digests for bills with no existing row", async () => {
@@ -337,76 +333,6 @@ describe("runFeedPipeline digest retry", () => {
 
     expect(result.digestsWritten).toBe(1);
     expect(mockUpsertDigest).toHaveBeenCalledOnce();
-  });
-
-  it("respects DIGEST_MAX_NEW_REWRITES for LLM rewrites while still storing metadata", async () => {
-    const bills = Array.from({ length: 25 }, (_, i) => ({
-      bill_congress: 119,
-      bill_type: "HR",
-      bill_number: i + 1,
-      latest_passage_date: "2026-06-01",
-    }));
-    mockSelectRecentVotedBills.mockResolvedValue(bills);
-    mockGetDigest.mockResolvedValue(tombstoneDigest);
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestsRewritten).toBe(20);
-    expect(result.digestsWritten).toBe(25);
-    expect(mockUpsertDigest).toHaveBeenCalledTimes(25);
-    expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
-    const overBudget = mockUpsertDigest.mock.calls.filter(
-      (call) => (call[1] as { digest: { source?: string } | null }).digest?.source === DIGEST_SOURCE_TITLE_FALLBACK
-    );
-    expect(overBudget).toHaveLength(5);
-    expect(result.digestWarnings).toEqual([
-      expect.stringContaining("rewrite budget (20) spent: wrote deterministic title fallback digest for 5 bill(s)"),
-    ]);
-  });
-
-  it("writes a title fallback and records a digest warning when OpenRouter returns null for an intro", async () => {
-    mockSelectRecentVotedBills.mockResolvedValue([]);
-    mockPersistRecentIntroductions.mockResolvedValue({
-      bills: [{ bill_congress: 119, bill_type: "HR", bill_number: 10239 }],
-      discovered: 1,
-      persisted: 1,
-      warnings: [],
-    });
-    mockGetDigest.mockResolvedValue(null);
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "Equal Pay for Equal Work Act",
-      policyArea: null,
-      rawSummaryText: null,
-      introducedDate: "2026-09-03",
-      sponsors: [],
-    });
-    mockRewriteSummary.mockResolvedValue(null);
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestsWritten).toBe(1);
-    expect(result.digestsRewritten).toBe(0);
-    expect(result.digestWarnings).toEqual([
-      "H.R. 10239 · 119th Congress: OpenRouter rewrite returned no digest; wrote deterministic title fallback digest",
-    ]);
-    expect(mockUpsertDigest).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        number: 10239,
-        digest: expect.objectContaining({
-          headline: "Equal Pay for Equal Work Act",
-          source: DIGEST_SOURCE_TITLE_FALLBACK,
-        }),
-      })
-    );
-    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalledWith(
-      expect.anything(),
-      "admin",
-      expect.objectContaining({
-        digestsWritten: 1,
-        digest_warnings: result.digestWarnings,
-      })
-    );
   });
 
   it("refreshes lifecycle for feed bills and skips terminal rows", async () => {
@@ -516,149 +442,6 @@ describe("runFeedPipeline digest retry", () => {
     expect(result.digestsWritten).toBe(1);
   });
 
-  it("rewrites a title-only digest when CRS text is missing", async () => {
-    mockPersistRecentIntroductions.mockResolvedValue({
-      bills: [],
-      discovered: 0,
-      persisted: 0,
-      warnings: [],
-    });
-    mockGetDigest.mockResolvedValue(null);
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "To designate a post office in Springfield",
-      policyArea: "Government Operations and Politics",
-      rawSummaryText: null,
-      introducedDate: "2026-09-01",
-      sponsors: [],
-    });
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestsRewritten).toBe(1);
-    expect(result.digestsWritten).toBe(1);
-    expect(mockRewriteSummary).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        title: "To designate a post office in Springfield",
-        policyArea: "Government Operations and Politics",
-        rawSummary: null,
-      }),
-      expect.anything()
-    );
-    expect(mockUpsertDigest).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        digest: expect.objectContaining({ headline: "Rewritten headline" }),
-        rawSummaryText: null,
-      })
-    );
-  });
-
-  it("spends the rewrite budget on bills missing digests before complete rows", async () => {
-    mockPersistRecentIntroductions.mockResolvedValue({
-      bills: [],
-      discovered: 0,
-      persisted: 0,
-      warnings: [],
-    });
-    mockSelectRecentVotedBills.mockResolvedValue([
-      { bill_congress: 119, bill_type: "HR", bill_number: 1, latest_passage_date: "2026-06-01" },
-      { bill_congress: 119, bill_type: "HRES", bill_number: 1498, latest_passage_date: "2026-06-02" },
-      { bill_congress: 119, bill_type: "HR", bill_number: 10216, latest_passage_date: "2026-06-03" },
-    ]);
-    mockGetDigest.mockImplementation(async (_db, _c, type, number) => {
-      if (type === "HR" && number === 1) {
-        return {
-          ...completeDigest,
-          digest_json: JSON.stringify({
-            headline: "Done",
-            what_it_does: "Already complete",
-          }),
-        };
-      }
-      return null;
-    });
-    mockFetchBillSummaryBundle.mockImplementation(async (_env, bill: { type: string; number: number }) => ({
-      title: `${bill.type} ${bill.number}`,
-      policyArea: "Defense",
-      rawSummaryText: null,
-      introducedDate: "2026-06-01",
-      sponsors: [],
-    }));
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestsRewritten).toBe(2);
-    expect(result.digestsSkipped).toBe(1);
-    expect(mockRewriteSummary).toHaveBeenCalledTimes(2);
-    const rewrittenLabels = mockRewriteSummary.mock.calls.map(
-      (call) => (call[1] as { billLabel: string }).billLabel
-    );
-    expect(rewrittenLabels.some((label) => label.includes("1498"))).toBe(true);
-    expect(rewrittenLabels.some((label) => label.includes("10216"))).toBe(true);
-    expect(rewrittenLabels.some((label) => /H\.R\.\s*1\b/.test(label))).toBe(false);
-  });
-
-  it("upgrades a title-only digest when CRS text later appears", async () => {
-    mockGetDigest.mockResolvedValue({
-      ...completeDigest,
-      raw_summary_text: null,
-      digest_json: JSON.stringify({
-        headline: "Names a Springfield post office",
-        what_it_does: "This bill names a post office in Springfield.",
-      }),
-    });
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "To designate a post office in Springfield",
-      policyArea: "Government Operations and Politics",
-      rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
-      introducedDate: "2026-09-01",
-      sponsors: [],
-    });
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestsRewritten).toBe(1);
-    expect(mockRewriteSummary).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        rawSummary: "This bill designates the Springfield facility as the Example Post Office.",
-      }),
-      expect.anything()
-    );
-    expect(mockUpsertDigest).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        rawSummaryText: "This bill designates the Springfield facility as the Example Post Office.",
-      })
-    );
-  });
-
-  it("does not rewrite a title-only digest when CRS is still missing", async () => {
-    mockGetDigest.mockResolvedValue({
-      ...completeDigest,
-      raw_summary_text: null,
-      digest_json: JSON.stringify({
-        headline: "Names a Springfield post office",
-        what_it_does: "This bill names a post office in Springfield.",
-      }),
-    });
-    mockFetchBillSummaryBundle.mockResolvedValue({
-      title: "To designate a post office in Springfield",
-      policyArea: "Government Operations and Politics",
-      rawSummaryText: null,
-      introducedDate: "2026-09-01",
-      sponsors: [],
-    });
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestsRewritten).toBe(0);
-    expect(result.digestsSkipped).toBe(1);
-    expect(mockRewriteSummary).not.toHaveBeenCalled();
-    expect(mockUpsertDigest).not.toHaveBeenCalled();
-  });
-
   it("keeps the feed run successful when bulk digest lookup fails", async () => {
     mockGetDigestsForBills.mockRejectedValueOnce(new Error("D1 timeout"));
     mockGetDigest.mockRejectedValue(new Error("D1 timeout"));
@@ -666,70 +449,15 @@ describe("runFeedPipeline digest retry", () => {
     const result = await runFeedPipeline(createEnv());
 
     expect(result.digestWarnings.some((warning) => warning.includes("D1 timeout"))).toBe(true);
-    expect(result.digestsRewritten).toBe(0);
+    expect(result.digestsQueued).toBe(0);
     expect(result.digestsWritten).toBe(0);
-    expect(mockRewriteSummary).not.toHaveBeenCalled();
+    expect(mockEnqueueDigestJobs.mock.calls.every(([, bills]) => (bills as unknown[]).length === 0)).toBe(true);
     expect(mockUpsertDigest).not.toHaveBeenCalled();
     expect(mockFetchBillSummaryBundle).not.toHaveBeenCalled();
     expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
   });
 
-  it("still rewrites a trusted missing row when only the bulk digest lookup fails", async () => {
-    mockGetDigestsForBills.mockRejectedValueOnce(new Error("D1 timeout"));
-    mockGetDigest.mockResolvedValue(null);
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestWarnings.some((warning) => warning.includes("bulk digest lookup failed"))).toBe(
-      true
-    );
-    expect(result.digestsRewritten).toBe(1);
-    expect(mockRewriteSummary).toHaveBeenCalledOnce();
-    expect(mockUpsertDigest).toHaveBeenCalledOnce();
-    expect(mockRecordFeedPipelineSuccess).toHaveBeenCalled();
-  });
-
-  it("spends the rewrite budget on feed-window incompletes before non-visible voted bills", async () => {
-    const voted = Array.from({ length: 20 }, (_, i) => ({
-      bill_congress: 119,
-      bill_type: "HR",
-      bill_number: i + 1,
-      latest_passage_date: "2026-06-01",
-    }));
-    mockSelectRecentVotedBills.mockResolvedValue(voted);
-    mockSelectFeedBills.mockResolvedValue([
-      {
-        bill_congress: 119,
-        bill_type: "S",
-        bill_number: 9902,
-        latest_passage_date: null,
-        latest_activity_date: "2026-09-04",
-      },
-    ]);
-    mockGetDigest.mockResolvedValue(null);
-    mockFetchBillSummaryBundle.mockImplementation(async (_env, bill: { type: string; number: number }) => ({
-      title: `${bill.type} ${bill.number}`,
-      policyArea: "Defense",
-      rawSummaryText: null,
-      introducedDate: "2026-06-01",
-      sponsors: [],
-    }));
-
-    const result = await runFeedPipeline(createEnv());
-
-    expect(result.digestsRewritten).toBe(20);
-    expect(mockRewriteSummary).toHaveBeenCalledTimes(20);
-    const rewrittenLabels = mockRewriteSummary.mock.calls.map(
-      (call) => (call[1] as { billLabel: string }).billLabel
-    );
-    expect(rewrittenLabels.some((label) => label.includes("9902"))).toBe(true);
-    expect(rewrittenLabels.some((label) => /H\.R\.\s*20\b/.test(label))).toBe(false);
-    expect(mockRewriteSummary.mock.calls[0]?.[1]).toEqual(
-      expect.objectContaining({ title: "S 9902" })
-    );
-  });
-
-  it("rewrites executive-only feed-window bills that have no passage vote", async () => {
+  it("queues executive-only feed-window bills as rewrites", async () => {
     mockSelectRecentVotedBills.mockResolvedValue([]);
     mockSelectFeedBills.mockResolvedValue([
       {
@@ -748,8 +476,13 @@ describe("runFeedPipeline digest retry", () => {
       expect.anything(),
       { congress: 119, type: "HR", number: 5555 }
     );
-    expect(result.digestsRewritten).toBe(1);
+    expect(result.digestsQueued).toBe(1);
     expect(result.digestsWritten).toBe(1);
+    expect(mockEnqueueDigestJobs).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ congress: 119, type: "HR", number: 5555 }],
+      "rewrite"
+    );
   });
 
   it("always persists intros* and intro_warnings on the success record", async () => {

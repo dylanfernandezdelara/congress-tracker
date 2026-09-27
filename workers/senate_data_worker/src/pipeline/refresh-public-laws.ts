@@ -1,5 +1,6 @@
 import { containsLocalSampleLabel, stripLocalSampleLabel } from "../../../../shared/bill-id";
 import type { Env } from "../config";
+import { enqueueDigestJobs } from "../d1/digest-jobs";
 import { getDigest, parseStoredDigest, upsertDigest } from "../d1/digests";
 import {
   getLifecyclesForBills,
@@ -8,6 +9,7 @@ import {
   type LifecycleBillRow,
 } from "../d1/lifecycle";
 import type { PublicLawRecord } from "../sources/public-laws";
+import type { BillRef } from "../types";
 import { billLabel } from "./bill-label";
 
 export interface PersistPublicLawsResult {
@@ -38,7 +40,7 @@ export function publicLawsToBillRows(laws: PublicLawRecord[]): LifecycleBillRow[
  * Write Congress.gov public-law rows that the vote-lookback refresh missed.
  * Existing enacted lifecycle rows are left intact (COALESCE cannot restore a
  * blanked `law_kind`). Titles are repaired when the digest is missing or still
- * labeled as local sample data.
+ * labeled as local sample data. Newly enacted laws are queued for a summary rewrite (the law's final text).
  */
 export async function persistPublicLaws(
   env: Env,
@@ -48,6 +50,7 @@ export async function persistPublicLaws(
   let upserted = 0;
   let titlesWritten = 0;
   const warnings: string[] = [];
+  const enacted: BillRef[] = [];
 
   const existing = await getLifecyclesForBills(
     env.DB,
@@ -62,6 +65,7 @@ export async function persistPublicLaws(
     const label = billLabel(law.billType, law.billNumber, law.congress);
     const stored = existing.get(lifecycleMapKey(law.congress, law.billType, law.billNumber));
     if (!stored?.became_law_date) {
+      enacted.push({ congress: law.congress, type: law.billType, number: law.billNumber });
       try {
         const m = law.milestones;
         await upsertLifecycle(env.DB, {
@@ -127,6 +131,12 @@ export async function persistPublicLaws(
         })
       );
     }
+  }
+
+  try {
+    await enqueueDigestJobs(env.DB, enacted, "rewrite");
+  } catch (err: unknown) {
+    warnings.push(`summary queue: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return {

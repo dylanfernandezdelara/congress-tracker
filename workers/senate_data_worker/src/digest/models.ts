@@ -1,0 +1,35 @@
+import type { Env } from "../config";
+
+export interface DigestModel {
+  id: string;
+  /** Reasoning settings passed through to the provider (Luna: high effort). */
+  reasoning?: { effort: "low" | "medium" | "high" };
+  temperature?: number;
+  /** Output budget; reasoning models spend part of it thinking before the JSON answer. */
+  maxTokens: number;
+  /** Send through OpenRouter's Batch API (about half price, results within 24 hours, usually minutes). */
+  batch: boolean;
+}
+
+/** First summaries of new bills: cheap, accurate in the evals, batched. */
+export function newBillModel(env: Env): DigestModel {
+  return { id: env.DIGEST_NEW_MODEL?.trim() || "openai/gpt-6-luna", reasoning: { effort: "high" }, maxTokens: 12_000, batch: true };
+}
+
+/**
+ * Rewrites of bills that matter (floor vote, reported by committee, law, in the feed): the writing readers
+ * preferred in the round-2 blind review. Normal API: OpenRouter refuses Sonnet 5 batches (tested 2026-09-26).
+ */
+export function rewriteModel(env: Env): DigestModel {
+  return {
+    id: env.DIGEST_REWRITE_MODEL?.trim() || "anthropic/claude-sonnet-5",
+    temperature: 0.2,
+    maxTokens: 4_000,
+    batch: env.DIGEST_REWRITE_BATCH === "1",
+  };
+}
+
+/** Giant bills stay on the new-bill model at every tier: it won the blind pick there at a fraction of the cost. */
+export function modelFor(env: Env, tier: "new" | "rewrite", long: boolean): DigestModel {
+  return tier === "rewrite" && !long ? rewriteModel(env) : newBillModel(env);
+}
