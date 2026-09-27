@@ -4,7 +4,7 @@
  * Two call sites historically used different day-count semantics:
  * - Feed / Congress.gov vote lookback subtracted `days` from today
  *   (`today - days`), which is an inclusive window of `days + 1` calendar days.
- * - Notable-votes lookback subtracted `days - 1`, which is an inclusive window
+ * - The (since removed) notable-votes lookback subtracted `days - 1`, which is an inclusive window
  *   of exactly `days` calendar days.
  *
  * Prefer {@link inclusiveLookbackStartIso} with an explicit inclusive day count.

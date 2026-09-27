@@ -3,9 +3,9 @@ import { normalizeMemberProfile } from './normalizeMemberProfile'
 import type { MemberProfileResponse } from './types'
 
 /* Session-lived cache so the member profile sheet opens with data already in
-   hand (defector profiles are prefetched when the Notable votes section
-   renders). Underlying stats change at most daily, so no invalidation is
-   needed within a page session. */
+   hand (member names prefetch on hover/focus and on sponsor picks).
+   Underlying stats change at most daily, so no invalidation is needed
+   within a page session. */
 const resolvedProfiles = new Map<string, MemberProfileResponse>()
 const inflightProfiles = new Map<string, Promise<MemberProfileResponse>>()
 

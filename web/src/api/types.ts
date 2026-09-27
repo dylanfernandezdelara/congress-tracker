@@ -39,8 +39,6 @@ export type {
   MemberProfileResponse,
   MemberSearchItem,
   MembersSearchResponse,
-  NotableVoteEntry,
-  NotableVotesResponse,
   PartySeatCount,
   PolicyAreasResponse,
   PortfolioEntry,

@@ -10,7 +10,7 @@ const VARIANT_CLASSES = {
 type MemberAvatarProps = {
   name: string
   photoUrl: string
-  /** Compact notable-vote avatar or the larger profile-sheet avatar. */
+  /** Compact defector-list avatar or the larger profile-sheet avatar. */
   variant: keyof typeof VARIANT_CLASSES
 }
 

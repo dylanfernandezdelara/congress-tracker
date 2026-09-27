@@ -162,7 +162,7 @@ Every bill summary is written by `workers/senate_data_worker/src/digest/` from t
 reader is someone deciding whether they would support the bill and whether their members voted the
 way they would, so summaries lead with concrete effects on people and stay strictly neutral.
 
-- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.2; recorded on each summary). Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. Bills over ~30k tokens are split along their
+- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.3; recorded on each summary). "Who it affects" groups must be named in the sources or be the direct subject of a provision. Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. Bills over ~30k tokens are split along their
   own divisions/titles (`bill-text-parse.ts`), summarized per part, then combined with a "What's
   inside" breakdown. Import-free, so `scripts/digest-eval` uses the same file.
 - **Models** `digest/models.ts`: new bills → `openai/gpt-6-luna` (high effort) through OpenRouter's
@@ -170,11 +170,12 @@ way they would, so summaries lead with concrete effects on people and stay stric
   committee, law, feed window, named in an executive post) → `anthropic/claude-sonnet-5` on the
   normal API (OpenRouter refuses Sonnet batches). Giant bills stay on Luna at every tier. Overrides:
   `DIGEST_NEW_MODEL`, `DIGEST_REWRITE_MODEL`. Not `OPENROUTER_MODEL`
-  (that one is for the free-model features: blurbs, confirmations, executive links).
+  (that one is for the free-model features: confirmations, executive links).
 - **Checks** `digest/checks.ts` run before anything is stored: a number the sources do not contain,
   a judging word, or an empty field blocks the summary; the writer retries once with the other model
   (Luna ↔ Sonnet; for long bills only the combine pass), and otherwise the current summary stays.
-  Warnings are kept in `generator.warnings`.
+  Warnings are kept in `generator.warnings`. A judging word passes only as a term the bill defines (bill XML's
+  `<term>`, which `billXmlToText` keeps quoted); titles and findings stay blocked.
 - **Provenance** `digest_json.generator` (worker-only, stripped from the feed): model, prompt version,
   tier, text version, `fingerprint` (hash of everything the summary was written from), `long`. The fingerprint
   carries `PROMPT_EPOCH` (v3), not the prompt version: a minor prompt change applies to new writes only; bump
@@ -222,13 +223,16 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
+  Latest round `round5.json` (v3.3, 5 voted bills, Luna + Sonnet, 2 runs, ~$0.20 with the judge): Luna 10/10
+  (v3.2: 9/10, the recurring-deadline miss is gone); Sonnet 7/10 (v3.2: 8/10), still writing "U.S. voters" for the
+  nine-justices amendment despite the groups rule; Sonnet's "House votes to…" headlines on H.J.Res. 213 are gone.
 
 ## Project structure
 
 - `workers/senate_data_worker/src/pipeline/run-feed.ts` — ingestion orchestrator
 - `workers/senate_data_worker/src/sources/` — House/Senate vote + Congress.gov clients
 - `workers/senate_data_worker/src/digest/` — plain-language bill summaries (see above)
-- `workers/senate_data_worker/src/synthesis/` — title fallbacks, notable-vote blurbs + grounded summaries (`grounded-summary.ts`, `openrouter-chat.ts`, `llm-json.ts`; confirmation vote-context adapter in `confirmation-vote-context.ts`)
+- `workers/senate_data_worker/src/synthesis/` — title fallbacks, confirmation rewrites, executive links + grounded summaries (`grounded-summary.ts`, `openrouter-chat.ts`, `llm-json.ts`; confirmation vote-context adapter in `confirmation-vote-context.ts`)
 - `workers/senate_data_worker/src/storage/feed.ts` — feed read model
 - `wrangler.toml` (repo root) — mirrors `workers/senate_data_worker/wrangler.toml` for Cloudflare Workers Builds
 - `web/src/components/FeedRow.tsx` — collapsed feed row UI

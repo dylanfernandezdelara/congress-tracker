@@ -5,7 +5,7 @@ import { daysAgoLookbackStartIso, inclusiveLookbackStartIso } from './lookback'
 describe('lookbackStartIso semantics', () => {
   const asOf = new Date('2026-07-24T15:30:00.000Z')
 
-  it('inclusiveDays counts calendar days ending on asOf (notable-votes style)', () => {
+  it('inclusiveDays counts calendar days ending on asOf (e.g. a 14-day window)', () => {
     // 14-day inclusive window: Jul 11 … Jul 24
     expect(inclusiveLookbackStartIso(14, asOf)).toBe('2026-07-11')
     expect(inclusiveLookbackStartIso(1, asOf)).toBe('2026-07-24')
@@ -20,8 +20,8 @@ describe('lookbackStartIso semantics', () => {
   })
 
   it('documents the historical semantic gap without changing effective windows', () => {
-    const notableDays = 14
-    expect(inclusiveLookbackStartIso(notableDays, asOf)).toBe('2026-07-11')
+    const inclusiveDays = 14
+    expect(inclusiveLookbackStartIso(inclusiveDays, asOf)).toBe('2026-07-11')
     expect(daysAgoLookbackStartIso(VOTE_LOOKBACK_DAYS, asOf)).toBe('2026-06-09')
   })
 })

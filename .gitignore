@@ -8,15 +8,15 @@
 !.dev.vars.example
 
 # Dependencies
-node_modules/
+node_modules
 
 # Cloudflare Wrangler
 .wrangler/
 
 # Build artifacts
 /target/
-artifacts/
-web/artifacts/
+artifacts
+web/artifacts
 web/output/
 docs/screenshots/
 senate-*.png

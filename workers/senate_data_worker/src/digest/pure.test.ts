@@ -161,6 +161,39 @@ describe("checks", () => {
     expect(checkSummary(spanning, bill).blocking).toEqual(['judging word "critical"']);
   });
 
+  it("does not read a number opening one field as a bill citation closing the last", () => {
+    const bill = sources({ text: "SEC. 2. Shrimp imports into the United States are prohibited." });
+    const s = summary({ what_it_does: "Bans shrimp imports into the U.S.", who_it_affects: ["12,000 shrimp farmers"], key_points: [{ text: "Bans imports", section: null }] });
+    expect(checkSummary(s, bill).blocking).toEqual(["number not in sources: 12000"]);
+  });
+
+  it("reads a bill XML <term> definition as the bill's own term (HR 10395, 119th)", () => {
+    // Trimmed from GovInfo BILLS-119hr10395ih.xml: definitions mark the term with <term>, not <quote>.
+    const xml =
+      '<legis-body id="H2E65B6745487400BB9382302B62D0EC0" style="OLC">' +
+      '<section id="H300BA090AB884897BF5C1149E94CE4DC"><enum>2.</enum><header>Definitions</header><text display-inline="no-display-inline">In this Act:</text> ' +
+      '<paragraph id="H5DB926A005DD4FEFAA75060A72356871"><enum>(2)</enum><header>Critical material</header><text>The term <term>critical material</term> has the meaning given the term in section 7002(a) of the Energy Act of 2020 (<external-xref legal-doc="usc" parsable-cite="usc/30/1606">30 U.S.C. 1606(a)</external-xref>).</text></paragraph> ' +
+      '<paragraph id="H072D3881A9BE45D281A558028154ACE1"><enum>(4)</enum><header display-inline="yes-display-inline">Eligible project</header><text>The term <term>eligible project</term> means a project that refines and processes or recycles raw critical materials into purified forms suitable for first-use applications.</text></paragraph></section>\n' +
+      '<section id="HD275E8BBD53A41D7AE7749397EECAAEA"><enum>4.</enum><header>Domestic critical material processing pilot program</header>\n' +
+      '<subsection id="HD46086FE551F47FEB13CC6E6FCF6CD13"><enum>(a)</enum><header>Establishment</header><text display-inline="yes-display-inline">Not later than 180 days after the date of enactment of this Act, the Secretary shall establish a pilot program, to be known as the <quote>Domestic Critical Material Processing Pilot Program</quote>, to support not fewer than 3 domestic critical material processing projects. </text></subsection></section></legis-body>';
+    const text = billXmlToText(xml);
+    expect(text).toContain("The term “critical material” has the meaning given");
+    const bill = sources({ title: "Critical Materials Future Act of 2025", text });
+    const check = (what: string, headline = "Energy Department pilot would back domestic mineral refining") =>
+      checkSummary(summary({ headline, what_it_does: what, key_points: [{ text: "Starts a pilot program", section: null }] }), bill).blocking;
+    expect(check("Would fund domestic critical material processing projects.")).toEqual([]);
+    expect(check("Funds processing.", "This critical bill would fund mineral refining")).toEqual(['judging word "critical"']);
+    // The `<term>x</term> means` form, without "The term" before it.
+    const means = billXmlToText("<paragraph><enum>(3)</enum><header>Critical material</header><text><term>Critical material</term> means a material on the list.</text></paragraph>");
+    const plural = billXmlToText("<text>The terms <term>critical material</term> and <term>critical mineral</term> have the meanings given those terms in section 2.</text>");
+    expect(checkSummary(summary({ what_it_does: "Would fund critical material and critical mineral projects.", key_points: [{ text: "Starts a pilot", section: null }] }), sources({ text: plural })).blocking).toEqual([]);
+    expect(means).toContain("“Critical material” means");
+    expect(checkSummary(summary({ what_it_does: "Funds critical materials processing.", key_points: [{ text: "Starts a pilot", section: null }] }), sources({ text: means })).blocking).toEqual([]);
+    // Without a definition, the same XML's header and pilot name do not exempt the word.
+    const undefinedTerm = billXmlToText(xml.replace(/<paragraph id="H5DB[\s\S]*?<\/paragraph>/, ""));
+    expect(checkSummary(summary({ what_it_does: "Would fund domestic critical material processing projects.", key_points: [{ text: "Starts a pilot", section: null }] }), sources({ text: undefinedTerm })).blocking).toEqual(['judging word "critical"']);
+  });
+
   it("blocks a headline about the vote, which the page already shows", () => {
     const at = (headline: string) => checkSummary(summary({ headline }), sources()).blocking;
     expect(at("House votes to cancel California's harbor boat pollution rules")).toEqual(["headline mentions the vote"]);
@@ -173,6 +206,17 @@ describe("checks", () => {
     // Bills about congressional votes are about the change.
     expect(at("Resolution would require House votes on war powers")).toEqual([]);
     expect(at("Bill would require Congress approve any new tariffs")).toEqual([]);
+  });
+
+  it("checks who_it_affects for numbers and judging words like every other field", () => {
+    const at = (who: string[]) => checkSummary(summary({ who_it_affects: who }), sources()).blocking;
+    expect(at(["airline passengers", "airlines"])).toEqual([]);
+    expect(at(["about 40 million airline passengers"])).toEqual(["number not in sources: 40000000"]);
+    expect(at(["airlines with reckless fee practices"])).toEqual(['judging word "reckless"']);
+    // A group never runs into the next field.
+    expect(checkSummary(summary({ who_it_affects: ["airline passengers facing critical"], key_points: [{ text: "materials fees rise", section: null }] }), sources()).blocking).toEqual([
+      'judging word "critical"',
+    ]);
   });
 
   it("allows fixed terms of art", () => {

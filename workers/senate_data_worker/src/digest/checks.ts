@@ -153,11 +153,16 @@ export function sectionText(fullText: string | null, sections: string[]): string
   return found.length ? found.join("\n") : null;
 }
 
-/** The reader-facing fields, one per line, so a phrase never spans two fields. */
-export function readerText(summary: CheckableSummary): string {
+/**
+ * The reader-facing fields, one per line, so a phrase never spans two fields. The groups in `who_it_affects` are
+ * shown to readers and scanned like the rest; the grade level leaves them out (`prose`), since a list of short noun
+ * phrases without sentence ends is not prose and would skew Flesch-Kincaid.
+ */
+export function readerText(summary: CheckableSummary, { prose = false }: { prose?: boolean } = {}): string {
   return [
     summary.headline,
     summary.what_it_does,
+    ...(prose ? [] : (summary.who_it_affects ?? [])),
     ...summary.key_points.map((k) => k.text),
     ...(summary.inside ?? []).map((r) => r.summary),
   ]
@@ -205,13 +210,15 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   for (const w of JUDGING) {
     if (!new RegExp(`\\b${w}\\b`).test(plain)) continue;
     // A term the bill defines is not a judgment: every use in the summary must be a two-word phrase the bill defines
-    // (the term “critical material” means; ‘…’ when nested in an amendment). Titles ("Stop Reckless Spending Act")
+    // (the term “critical material” means / has the meaning given; ‘…’ when nested in an amendment; bill XML's
+    // <term> arrives quoted from billXmlToText). Titles ("Stop Reckless Spending Act")
     // and findings ("devastating wildfires") are the sponsor's framing and stay blocked.
     const uses = [...plain.matchAll(new RegExp(`\\b${w}\\b(?:[- ]([a-z]+))?`, "g"))];
     const billTerm = (next: string | undefined) => {
       if (!next) return false;
       const phrase = `${w}[- ]${next.replace(/s$/, "")}s?`;
-      return new RegExp(`term [“"‘']${phrase}\\b[^”"’']{0,40}[”"’']|[“"‘']${phrase}\\b[^”"’']{0,40}[”"’'] means`).test(billText);
+      // "The term “x” means", "The terms “x” and “y” mean", "“x” has the meaning given", "“x” … have the meanings given".
+      return new RegExp(`terms? [“"‘']${phrase}\\b[^”"’']{0,40}[”"’']|[“"‘']${phrase}\\b[^”"’']{0,40}[”"’'] (means?|ha(s|ve) the meanings?)`).test(billText);
     };
     if (!uses.every((u) => billTerm(u[1]))) blocking.push(`judging word "${w}"`);
   }
@@ -234,11 +241,20 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
       else blocking.push(`number not in sources: ${n}`);
     }
   }
-  const rest = [summary.headline, summary.what_it_does, ...uncited, ...(summary.inside ?? []).map((r) => r.summary)].join(" ");
-  for (const n of numbersIn(withoutCitations(rest))) {
+  const rest = [
+    summary.headline,
+    summary.what_it_does,
+    ...(summary.who_it_affects ?? []),
+    ...uncited,
+    ...(summary.inside ?? []).map((r) => r.summary),
+  ]
+    // Strip citations per field: "into the U.S." ending one field must not turn "12,000 farmers" opening the next into "S. 12000".
+    .map((f) => withoutCitations(String(f ?? "")))
+    .join("\n");
+  for (const n of numbersIn(rest)) {
     if (hasSourceNumber(known, n, 3)) continue;
     // Small counts ("two groups", "3 years") are often paraphrased from words; larger unknown numbers are not.
     if (n > 12) blocking.push(`number not in sources: ${n}`);
   }
-  return { blocking, warnings, grade: gradeLevel(text) };
+  return { blocking, warnings, grade: gradeLevel(readerText(summary, { prose: true })) };
 }
