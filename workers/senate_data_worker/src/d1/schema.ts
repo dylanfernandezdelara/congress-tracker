@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -352,6 +352,11 @@ const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[]
       `DROP TABLE IF EXISTS bill_text_sections`,
       `DROP TABLE IF EXISTS bill_text_documents`,
     ],
+  },
+  {
+    // Summary queue (digest_jobs / digest_batches, in SCHEMA_DDL) replaces the sweep's per-bill check table.
+    toVersion: 12,
+    statements: [`DROP TABLE IF EXISTS bill_summary_checks`],
   },
 ];
 

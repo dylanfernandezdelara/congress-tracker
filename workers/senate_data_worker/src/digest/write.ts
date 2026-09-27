@@ -32,7 +32,7 @@ export const isLong = (prepared: PreparedBill): boolean => prepared.parts.length
 /** The model used when the first one's reply was rejected: Luna ↔ Sonnet. */
 function otherModel(env: Env, model: DigestModel): DigestModel {
   const luna = newBillModel(env);
-  return model.id === luna.id ? { ...rewriteModel(env), batch: false } : { ...luna, batch: false };
+  return model.id === luna.id ? rewriteModel(env) : luna;
 }
 
 /**
@@ -111,7 +111,7 @@ export async function combineAndStore(
   params: { tier: Tier; model: DigestModel; notes: Record<string, unknown>[]; priorCost: number }
 ): Promise<WriteOutcome> {
   if (params.notes.length === 0) return { status: "failed", cost: params.priorCost, reason: "no part notes" };
-  const model = { ...params.model, batch: false };
+  const model = params.model;
   const reply = await chatCompletion(env, model, combineMessages(prepared.input, params.notes));
   const outcome = await storeReply(env, prepared, {
     tier: params.tier,
@@ -134,7 +134,7 @@ export async function writeSummary(
   options: { model?: DigestModel; retry?: boolean } = {}
 ): Promise<WriteOutcome> {
   if ((await budgetLeft(env)) <= 0) return { status: "over_budget", cost: 0 };
-  const model = { ...(options.model ?? modelFor(env, tier, isLong(prepared))), batch: false };
+  const model = options.model ?? modelFor(env, tier, isLong(prepared));
   const retry = options.retry !== false;
   try {
     if (isLong(prepared)) {

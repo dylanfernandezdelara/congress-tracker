@@ -168,7 +168,7 @@ way they would, so summaries lead with concrete effects on people and stay stric
   **Batch API** (half price, usually minutes). Bills that matter (floor vote or action, reported by
   committee, law, feed window, named in an executive post) → `anthropic/claude-sonnet-5` on the
   normal API (OpenRouter refuses Sonnet batches). Giant bills stay on Luna at every tier. Overrides:
-  `DIGEST_NEW_MODEL`, `DIGEST_REWRITE_MODEL`, `DIGEST_REWRITE_BATCH=1`. Not `OPENROUTER_MODEL`
+  `DIGEST_NEW_MODEL`, `DIGEST_REWRITE_MODEL`. Not `OPENROUTER_MODEL`
   (that one is for the free-model features: blurbs, confirmations, executive links).
 - **Checks** `digest/checks.ts` run before anything is stored: a number the sources do not contain,
   a judging word, or an empty field blocks the summary; the writer retries once with the other model

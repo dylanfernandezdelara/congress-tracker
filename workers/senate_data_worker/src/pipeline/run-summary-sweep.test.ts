@@ -279,7 +279,7 @@ describe("runSummarySweep", () => {
       const result = await runSummarySweep(env, { now: NOW, discover: false });
 
       const [, model, requests] = mockSubmitBatch.mock.calls[0]!;
-      expect(model).toMatchObject({ id: "openai/gpt-6-luna", batch: true });
+      expect(model).toMatchObject({ id: "openai/gpt-6-luna", reasoning: { effort: "high" } });
       expect(requests.map((r: { customId: string }) => r.customId)).toEqual(["119-hr-1:single", "119-hr-2:part0", "119-hr-2:part1"]);
       expect(jobsApi.markJobsBatched.mock.calls[0]![1]).toEqual([
         { ref: { congress: 119, type: "HR", number: 1 }, fingerprint: "fp1" },

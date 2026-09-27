@@ -7,13 +7,11 @@ export interface DigestModel {
   temperature?: number;
   /** Output budget; reasoning models spend part of it thinking before the JSON answer. */
   maxTokens: number;
-  /** Send through OpenRouter's Batch API (about half price, results within 24 hours, usually minutes). */
-  batch: boolean;
 }
 
-/** First summaries of new bills: cheap, accurate in the evals, batched. */
+/** First summaries of new bills: cheap and accurate in the evals. The sweep sends them through the Batch API (half price). */
 export function newBillModel(env: Env): DigestModel {
-  return { id: env.DIGEST_NEW_MODEL?.trim() || "openai/gpt-6-luna", reasoning: { effort: "high" }, maxTokens: 12_000, batch: true };
+  return { id: env.DIGEST_NEW_MODEL?.trim() || "openai/gpt-6-luna", reasoning: { effort: "high" }, maxTokens: 12_000 };
 }
 
 /**
@@ -25,7 +23,6 @@ export function rewriteModel(env: Env): DigestModel {
     id: env.DIGEST_REWRITE_MODEL?.trim() || "anthropic/claude-sonnet-5",
     temperature: 0.2,
     maxTokens: 4_000,
-    batch: env.DIGEST_REWRITE_BATCH === "1",
   };
 }
 
