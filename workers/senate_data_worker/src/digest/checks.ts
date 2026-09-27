@@ -152,11 +152,16 @@ export function sectionText(fullText: string | null, sections: string[]): string
   return found.length ? found.join("\n") : null;
 }
 
-/** The reader-facing fields, one per line, so a phrase never spans two fields. */
-export function readerText(summary: CheckableSummary): string {
+/**
+ * The reader-facing fields, one per line, so a phrase never spans two fields. The groups in `who_it_affects` are
+ * shown to readers and scanned like the rest; the grade level leaves them out (`prose`), since a list of short noun
+ * phrases without sentence ends is not prose and would skew Flesch-Kincaid.
+ */
+export function readerText(summary: CheckableSummary, { prose = false }: { prose?: boolean } = {}): string {
   return [
     summary.headline,
     summary.what_it_does,
+    ...(prose ? [] : (summary.who_it_affects ?? [])),
     ...summary.key_points.map((k) => k.text),
     ...(summary.inside ?? []).map((r) => r.summary),
   ]
@@ -235,11 +240,20 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
       else blocking.push(`number not in sources: ${n}`);
     }
   }
-  const rest = [summary.headline, summary.what_it_does, ...uncited, ...(summary.inside ?? []).map((r) => r.summary)].join(" ");
-  for (const n of numbersIn(withoutCitations(rest))) {
+  const rest = [
+    summary.headline,
+    summary.what_it_does,
+    ...(summary.who_it_affects ?? []),
+    ...uncited,
+    ...(summary.inside ?? []).map((r) => r.summary),
+  ]
+    // Strip citations per field: "into the U.S." ending one field must not turn "12,000 farmers" opening the next into "S. 12000".
+    .map((f) => withoutCitations(String(f ?? "")))
+    .join("\n");
+  for (const n of numbersIn(rest)) {
     if (hasSourceNumber(known, n, 3)) continue;
     // Small counts ("two groups", "3 years") are often paraphrased from words; larger unknown numbers are not.
     if (n > 12) blocking.push(`number not in sources: ${n}`);
   }
-  return { blocking, warnings, grade: gradeLevel(text) };
+  return { blocking, warnings, grade: gradeLevel(readerText(summary, { prose: true })) };
 }

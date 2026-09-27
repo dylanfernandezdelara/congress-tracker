@@ -150,6 +150,12 @@ describe("checks", () => {
     expect(checkSummary(spanning, bill).blocking).toEqual(['judging word "critical"']);
   });
 
+  it("does not read a number opening one field as a bill citation closing the last", () => {
+    const bill = sources({ text: "SEC. 2. Shrimp imports into the United States are prohibited." });
+    const s = summary({ what_it_does: "Bans shrimp imports into the U.S.", who_it_affects: ["12,000 shrimp farmers"], key_points: [{ text: "Bans imports", section: null }] });
+    expect(checkSummary(s, bill).blocking).toEqual(["number not in sources: 12000"]);
+  });
+
   it("reads a bill XML <term> definition as the bill's own term (HR 10395, 119th)", () => {
     // Trimmed from GovInfo BILLS-119hr10395ih.xml: definitions mark the term with <term>, not <quote>.
     const xml =
@@ -189,6 +195,17 @@ describe("checks", () => {
     // Bills about congressional votes are about the change.
     expect(at("Resolution would require House votes on war powers")).toEqual([]);
     expect(at("Bill would require Congress approve any new tariffs")).toEqual([]);
+  });
+
+  it("checks who_it_affects for numbers and judging words like every other field", () => {
+    const at = (who: string[]) => checkSummary(summary({ who_it_affects: who }), sources()).blocking;
+    expect(at(["airline passengers", "airlines"])).toEqual([]);
+    expect(at(["about 40 million airline passengers"])).toEqual(["number not in sources: 40000000"]);
+    expect(at(["airlines with reckless fee practices"])).toEqual(['judging word "reckless"']);
+    // A group never runs into the next field.
+    expect(checkSummary(summary({ who_it_affects: ["airline passengers facing critical"], key_points: [{ text: "materials fees rise", section: null }] }), sources()).blocking).toEqual([
+      'judging word "critical"',
+    ]);
   });
 
   it("allows fixed terms of art", () => {
