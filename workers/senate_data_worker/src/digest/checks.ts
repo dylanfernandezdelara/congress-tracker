@@ -64,13 +64,15 @@ function significantDigits(n: number): number {
 
 /**
  * Whether `n` is a source number, exactly or as the readable rounding the prompt asks for: "$1.36 trillion" for
- * $1,360,279,000,000. At least two significant digits are required, so "$1 trillion" never stands in for $1.36
- * trillion, and the rounding must be the correct one ("$1.37 trillion" is not).
+ * $1,360,279,000,000. The rounding must be correct ("$1.37 trillion" is not) and keep `minSig` significant digits,
+ * so "$1 trillion" never stands in for $1.36 trillion. Against a whole bill (hundreds of figures) use 3: at 2, one
+ * random figure in five would match something. A rounding that carries to a round number ("$20 billion" for
+ * $19,960,000,000) is checked at `minSig` digits too.
  */
-export function hasSourceNumber(sources: Set<number>, n: number): boolean {
+export function hasSourceNumber(sources: Set<number>, n: number, minSig = 2): boolean {
   if (sources.has(n)) return true;
-  const sig = significantDigits(n);
-  if (n < 1e6 || sig < 2) return false;
+  if (n < 1e6) return false;
+  const sig = Math.max(significantDigits(n), minSig);
   for (const k of sources) {
     if (k < 1e6) continue;
     const digits = String(Math.round(k)).length;
@@ -189,14 +191,14 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
     }
     const local = numbersIn(cited);
     for (const n of numbersIn(withoutCitations(p.text))) {
-      if (hasSourceNumber(local, n) || hasSourceNumber(crsNumbers, n) || n <= 12) continue;
-      if (hasSourceNumber(known, n)) warnings.push(`number not in cited section (${p.section}): ${n}`);
+      if (hasSourceNumber(local, n) || hasSourceNumber(crsNumbers, n, 3) || n <= 12) continue;
+      if (hasSourceNumber(known, n, 3)) warnings.push(`number not in cited section (${p.section}): ${n}`);
       else blocking.push(`number not in sources: ${n}`);
     }
   }
   const rest = [summary.headline, summary.what_it_does, ...uncited, ...(summary.inside ?? []).map((r) => r.summary)].join(" ");
   for (const n of numbersIn(withoutCitations(rest))) {
-    if (hasSourceNumber(known, n)) continue;
+    if (hasSourceNumber(known, n, 3)) continue;
     // Small counts ("two groups", "3 years") are often paraphrased from words; larger unknown numbers are not.
     if (n > 12) blocking.push(`number not in sources: ${n}`);
   }

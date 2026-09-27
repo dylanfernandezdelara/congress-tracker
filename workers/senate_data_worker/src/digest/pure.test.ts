@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { billBodyXml, billXmlToText, splitBillParts } from "./bill-text-parse";
-import { checkSummary, citedSections, numbersIn, sectionText, type CheckableSources } from "./checks";
+import { checkSummary, citedSections, hasSourceNumber, numbersIn, sectionText, type CheckableSources } from "./checks";
 import { parseSummaryReply } from "./parse";
 import { billStatus, fingerprintOf } from "./prepare";
 import { singlePassMessages, statusLabel, type DigestBillInput } from "./prompt";
@@ -90,6 +90,27 @@ describe("checks", () => {
     expect(at("$1.4 trillion")).toEqual([]);
     expect(at("$1.37 trillion")).toEqual(["number not in sources: 1370000000000"]);
     expect(at("$1 trillion")).toEqual(["number not in sources: 1000000000000"]);
+  });
+
+  it("rounds only large amounts, at the right magnitude, and more strictly against the whole bill", () => {
+    const set = (...ns: number[]) => new Set(ns);
+    expect(hasSourceNumber(set(452_318), 450_000)).toBe(false);
+    expect(hasSourceNumber(set(1_360_279_000_000), 136_000_000_000)).toBe(false);
+    // A correct rounding that carries to a round number.
+    expect(hasSourceNumber(set(19_960_000_000), 20_000_000_000)).toBe(true);
+    expect(hasSourceNumber(set(19_960_000_000), 20_000_000_000, 3)).toBe(true); // "$20.0 billion"
+    expect(hasSourceNumber(set(19_400_000_000), 20_000_000_000)).toBe(false);
+    // Two digits pass within a cited section; the whole bill needs three.
+    expect(hasSourceNumber(set(1_360_279_000_000), 1_400_000_000_000)).toBe(true);
+    expect(hasSourceNumber(set(1_360_279_000_000), 1_400_000_000_000, 3)).toBe(false);
+    expect(hasSourceNumber(set(1_360_279_000_000), 1_360_000_000_000, 3)).toBe(true);
+  });
+
+  it("warns, not blocks, on a correct rounding of a figure outside the cited section", () => {
+    const text = "SEC. 2. Deficits\nFiscal year 2027: $1,360,279,000,000.\n\nSEC. 3. Reports\nA report.";
+    const result = checkSummary(summary({ key_points: [{ text: "Sets the deficit at $1.36 trillion", section: "Sec. 3" }] }), sources({ text }));
+    expect(result.blocking).toEqual([]);
+    expect(result.warnings).toContain("number not in cited section (Sec. 3): 1360000000000");
   });
 
   it("allows fixed terms of art", () => {
