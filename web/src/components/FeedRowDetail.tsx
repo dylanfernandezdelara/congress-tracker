@@ -115,7 +115,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
         </button>
       </div>
 
-      <FeedSummarySections content={summary} />
+      <FeedSummarySections content={summary} textUrl={`${sourceUrl}/text`} />
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 

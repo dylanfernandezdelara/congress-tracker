@@ -52,7 +52,7 @@ export function NotableBillSheet({
         ) : null}
       </header>
 
-      <FeedSummarySections content={summary} />
+      <FeedSummarySections content={summary} textUrl={`${sourceUrl}/text`} />
 
       <section className="sheet-section" aria-label="Party-line breaks">
         <h3 className="sheet-section-title">Party-line breaks</h3>

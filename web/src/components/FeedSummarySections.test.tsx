@@ -10,11 +10,50 @@ function content(overrides: Partial<FeedSummaryContent> = {}): FeedSummaryConten
     keyPoints: [],
     crsSummary: null,
     pending: false,
+    keyPointSections: [],
+    whoItAffects: [],
+    inside: [],
+    provisional: false,
     ...overrides,
   }
 }
 
 describe('FeedSummarySections', () => {
+  it('shows who the bill affects, links each key point to its section, and sizes the parts of a long bill', () => {
+    render(
+      <FeedSummarySections
+        textUrl="https://www.congress.gov/bill/119th-congress/house-bill/1/text"
+        content={content({
+          whatItDoes: 'Extends tax cuts and changes Medicaid.',
+          keyPoints: ['Extends lower tax rates', 'Adds Medicaid work rules'],
+          keyPointSections: ['Sec. 70101', null],
+          whoItAffects: ['taxpayers', 'Medicaid enrollees'],
+          inside: [
+            { part: 'Taxes', summary: 'Extends the 2017 tax cuts', section: 'Title VII', share: 42 },
+            { part: 'Border', summary: 'Funds detention', section: 'Title IX', share: null },
+          ],
+        })}
+      />,
+    )
+
+    expect(screen.getByRole('list', { name: 'Who it affects' })).toHaveTextContent('taxpayersMedicaid enrollees')
+    const ref = screen.getByRole('link', { name: 'Sec. 70101, bill text on Congress.gov' })
+    expect(ref).toHaveAttribute('href', 'https://www.congress.gov/bill/119th-congress/house-bill/1/text')
+    expect(screen.getAllByRole('link')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'What’s inside' })).toBeInTheDocument()
+    expect(screen.getByText('42% of the bill')).toBeInTheDocument()
+    const bars = document.querySelectorAll<HTMLElement>('.feed-row-inside-bar > span')
+    expect(bars).toHaveLength(1)
+    expect(bars[0]!.style.getPropertyValue('--share')).toBe('42%')
+    expect(screen.queryByText(/Early summary/)).toBeNull()
+  })
+
+  it('marks a summary written from the title alone as provisional', () => {
+    render(<FeedSummarySections content={content({ whatItDoes: 'Names a post office.', provisional: true })} />)
+
+    expect(screen.getByText('Early summary from the bill’s title. It updates when the full text is published.')).toBeInTheDocument()
+  })
+
   it('renders pending copy when no summary sources exist', () => {
     render(<FeedSummarySections content={content({ pending: true })} />)
 
