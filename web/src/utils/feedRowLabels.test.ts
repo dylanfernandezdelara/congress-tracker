@@ -595,6 +595,9 @@ describe('getPrimaryPassageVote', () => {
   })
 })
 
+const NO_V3_FIELDS = { keyPointSections: [], whoItAffects: [], inside: [], provisional: false }
+const NO_V3_MODEL = { whoItAffects: [], inside: [], provisional: false }
+
 describe('getFeedSummaryContent', () => {
   it('prefers digest what_it_does and keeps CRS for disclosure', () => {
     const item = makeFeedItem({
@@ -612,6 +615,8 @@ describe('getFeedSummaryContent', () => {
       keyPoints: ['Fallback point'],
       crsSummary: 'Official CRS summary text.',
       pending: false,
+      ...NO_V3_FIELDS,
+      keyPointSections: expect.any(Array),
     })
   })
 
@@ -645,6 +650,8 @@ describe('getFeedSummaryContent', () => {
       keyPoints: ['Requires agencies to publish contract performance data'],
       crsSummary: null,
       pending: false,
+      ...NO_V3_FIELDS,
+      keyPointSections: expect.any(Array),
     })
   })
 
@@ -654,7 +661,35 @@ describe('getFeedSummaryContent', () => {
       keyPoints: [],
       crsSummary: null,
       pending: true,
+      ...NO_V3_FIELDS,
+      keyPointSections: expect.any(Array),
     })
+  })
+
+  it('carries the v3 fields: sections parallel to key points, groups, parts, and the title-only flag', () => {
+    const inside = [{ part: 'Taxes', summary: 'Extends tax cuts', section: 'Title VII', share: 42 }]
+    const item = makeFeedItem({
+      digest: {
+        headline: 'Law extends tax cuts',
+        what_it_does: 'Extends tax cuts.',
+        key_points: ['Extends cuts', 'Adds work rules'],
+        terms_explained: [],
+        key_point_sections: ['Sec. 70101'],
+        who_it_affects: ['taxpayers', ' ', 'taxpayers', 'Medicaid enrollees', 'farmers', 'extra'],
+        inside,
+        basis: 'title_only',
+      },
+    })
+
+    const content = getFeedSummaryContent(item)
+    expect(content.keyPointSections).toEqual(['Sec. 70101', null])
+    expect(content.whoItAffects).toEqual(['taxpayers', 'Medicaid enrollees', 'farmers'])
+    expect(content.inside).toEqual(inside)
+    expect(content.provisional).toBe(true)
+    expect(getFeedSummarySectionsModel(content).keyPoints).toEqual([
+      { text: 'Extends cuts', section: 'Sec. 70101' },
+      { text: 'Adds work rules', section: null },
+    ])
   })
 
   it('keeps the full digest lead and key points for expanded display', () => {
@@ -678,6 +713,8 @@ describe('getFeedSummaryContent', () => {
       ],
       crsSummary: 'Official CRS summary text.',
       pending: false,
+      ...NO_V3_FIELDS,
+      keyPointSections: expect.any(Array),
     })
   })
 })
@@ -748,10 +785,12 @@ describe('getFeedSummarySectionsModel', () => {
         keyPoints: ['Fallback point'],
         crsSummary: 'Official CRS summary text.',
         pending: false,
+        ...NO_V3_FIELDS,
       }),
     ).toEqual({
       primary: { kind: 'what_it_does', text: 'Plain-language implications from the digest.' },
-      keyPoints: ['Fallback point'],
+      keyPoints: [{ text: 'Fallback point', section: null }],
+      ...NO_V3_MODEL,
       crsDisclosure: 'Official CRS summary text.',
     })
   })
@@ -764,6 +803,7 @@ describe('getFeedSummarySectionsModel', () => {
       keyPoints: [],
       crsSummary: crs,
       pending: false,
+      ...NO_V3_FIELDS,
     })
     expect(model.primary).toEqual({
       kind: 'crs',
@@ -782,10 +822,12 @@ describe('getFeedSummarySectionsModel', () => {
         keyPoints: [],
         crsSummary: crs,
         pending: false,
+        ...NO_V3_FIELDS,
       }),
     ).toEqual({
       primary: { kind: 'crs', text: crs },
       keyPoints: [],
+      ...NO_V3_MODEL,
       crsDisclosure: null,
     })
   })
@@ -797,10 +839,12 @@ describe('getFeedSummarySectionsModel', () => {
         keyPoints: ['Point one'],
         crsSummary: 'Official CRS summary text.',
         pending: false,
+        ...NO_V3_FIELDS,
       }),
     ).toEqual({
       primary: { kind: 'none' },
-      keyPoints: ['Point one'],
+      keyPoints: [{ text: 'Point one', section: null }],
+      ...NO_V3_MODEL,
       crsDisclosure: 'Official CRS summary text.',
     })
   })

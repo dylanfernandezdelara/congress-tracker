@@ -1,5 +1,6 @@
 import type { FeedItem, FeedPassageVote } from '../api/types'
 import { originChamberFromBillType } from '@congress-tracker/shared/bill-id'
+import type { BillDigestContent, BillDigestInsideRow } from '@congress-tracker/shared/digest-api-types'
 import {
   extractUnderlyingBillIdFromTitle,
   formatBillDocket,
@@ -29,6 +30,14 @@ export interface FeedSummaryContent {
   keyPoints: string[]
   crsSummary: string | null
   pending: boolean
+  /** Where each key point comes from in the bill ("Sec. 2"), parallel to keyPoints; empty for older summaries. */
+  keyPointSections: Array<string | null>
+  /** Groups of people the bill affects (1–3). */
+  whoItAffects: string[]
+  /** Long bills: what each major part does, with its share of the bill's text. */
+  inside: BillDigestInsideRow[]
+  /** Written from the title alone; replaced once the bill text is published. */
+  provisional: boolean
 }
 
 export type FeedSummaryPrimary =
@@ -40,7 +49,10 @@ export type FeedSummaryPrimary =
 /** Presentation slots for the expanded detail summary block. */
 export interface FeedSummarySectionsModel {
   primary: FeedSummaryPrimary
-  keyPoints: string[]
+  keyPoints: Array<{ text: string; section: string | null }>
+  whoItAffects: string[]
+  inside: BillDigestInsideRow[]
+  provisional: boolean
   crsDisclosure: string | null
 }
 
@@ -247,16 +259,28 @@ export function toFeedSummaryContent(fields: {
   what_it_does?: string | null
   key_points?: string[] | null
   raw_summary_text?: string | null
+  key_point_sections?: Array<string | null> | null
+  who_it_affects?: string[] | null
+  inside?: BillDigestInsideRow[] | null
+  basis?: BillDigestContent['basis'] | null
 }): FeedSummaryContent {
   const whatItDoes = fields.what_it_does?.trim() || null
   const keyPoints = normalizeDigestBullets(fields.key_points ?? [])
   const crsSummary = fields.raw_summary_text?.trim() || null
+  const sections = fields.key_point_sections ?? []
 
   return {
     whatItDoes,
     keyPoints,
     crsSummary,
     pending: !whatItDoes && keyPoints.length === 0 && !crsSummary,
+    // The worker stores key points already normalized (non-empty, trimmed), so indexes line up with the sections.
+    keyPointSections: keyPoints.map((_, i) => sections[i]?.trim() || null),
+    whoItAffects: [...new Set((fields.who_it_affects ?? []).map((w) => w.trim()).filter(Boolean))].slice(0, 3),
+    inside: (fields.inside ?? [])
+      .filter((row) => row.part?.trim() && row.summary?.trim())
+      .map((row) => ({ ...row, section: row.section ?? null, share: typeof row.share === 'number' ? row.share : null })),
+    provisional: fields.basis === 'title_only',
   }
 }
 
@@ -265,6 +289,10 @@ export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
     what_it_does: item.digest?.what_it_does,
     key_points: item.digest?.key_points,
     raw_summary_text: item.raw_summary_text,
+    key_point_sections: item.digest?.key_point_sections,
+    who_it_affects: item.digest?.who_it_affects,
+    inside: item.digest?.inside,
+    basis: item.digest?.basis,
   })
 }
 
@@ -283,7 +311,7 @@ export function getFeedSummarySectionsModel(
   content: FeedSummaryContent,
 ): FeedSummarySectionsModel {
   if (content.pending) {
-    return { primary: { kind: 'pending' }, keyPoints: [], crsDisclosure: null }
+    return { primary: { kind: 'pending' }, keyPoints: [], whoItAffects: [], inside: [], provisional: false, crsDisclosure: null }
   }
 
   const hasDigestSummary = Boolean(content.whatItDoes) || content.keyPoints.length > 0
@@ -306,7 +334,10 @@ export function getFeedSummarySectionsModel(
 
   return {
     primary,
-    keyPoints: content.keyPoints,
+    keyPoints: content.keyPoints.map((text, i) => ({ text, section: content.keyPointSections[i] ?? null })),
+    whoItAffects: content.whoItAffects,
+    inside: content.inside,
+    provisional: content.provisional,
     crsDisclosure,
   }
 }
