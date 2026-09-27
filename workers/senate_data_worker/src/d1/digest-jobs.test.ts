@@ -141,6 +141,23 @@ describe("digest jobs", () => {
     expect(due.map((b) => b.number).sort()).toEqual([1, 2, 7]);
   });
 
+  it("puts backfill jobs after live ones, and a live reason takes a bill out of the backfill lane", async () => {
+    await enqueueDigestJobs(db, [hr(1), hr(2)], "new", T0, "backfill");
+    await enqueueDigestJobs(db, [hr(3)], "new", T1);
+    expect((await selectQueuedJobs(db, { matters: false, limit: 10 })).map((j) => [j.number, j.origin])).toEqual([
+      [3, "live"],
+      [1, "backfill"],
+      [2, "backfill"],
+    ]);
+    await enqueueDigestJobs(db, [hr(2)], "new", T1);
+    await enqueueDigestJobs(db, [hr(3)], "new", T1, "backfill");
+    expect((await selectQueuedJobs(db, { matters: false, limit: 10 })).map((j) => [j.number, j.origin])).toEqual([
+      [2, "live"],
+      [3, "live"],
+      [1, "backfill"],
+    ]);
+  });
+
   it("finds site bills without a current summary that are not already queued, bills that matter first", async () => {
     const v3 = JSON.stringify({ headline: "h", what_it_does: "w", generator: { tier: "new", fingerprint: "f" } });
     sql(`

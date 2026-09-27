@@ -20,7 +20,11 @@ export interface DigestJob extends BillRef {
   fingerprint: string | null;
   /** Consecutive runs in which the bill could not be read at all (Congress.gov errors, a bad reference). */
   readFailures: number;
+  /** "backfill" for jobs queued only by the backfill: they go last and get a capped share of the budget. */
+  origin: JobOrigin;
 }
+
+export type JobOrigin = "live" | "backfill";
 
 interface JobRow {
   congress: number;
@@ -32,6 +36,7 @@ interface JobRow {
   batch_id: string | null;
   fingerprint: string | null;
   read_failures: number | null;
+  origin: JobOrigin | null;
 }
 
 const toJob = (row: JobRow): DigestJob => ({
@@ -44,9 +49,14 @@ const toJob = (row: JobRow): DigestJob => ({
   batchId: row.batch_id,
   fingerprint: row.fingerprint,
   readFailures: row.read_failures ?? 0,
+  origin: row.origin ?? "live",
 });
 
-/** Floor votes, floor actions, committee reports or enactment. Older rows in some tables store the type lowercase. */
+/**
+ * Floor votes, floor actions, committee reports or enactment. Older rows in some tables store the type lowercase.
+ * Refers to the outer row as `j` and reads only its congress, bill_type and number, so it works over any table with
+ * those columns (digest_jobs, bill_digests).
+ */
 const MATTERS_SQL = `(
   EXISTS (SELECT 1 FROM votes v WHERE v.bill_congress = j.congress AND v.bill_type IN (j.bill_type, lower(j.bill_type)) AND v.bill_number = j.number)
   OR EXISTS (SELECT 1 FROM bill_floor_events f WHERE f.congress = j.congress AND f.bill_type IN (j.bill_type, lower(j.bill_type)) AND f.bill_number = j.number)
@@ -63,7 +73,8 @@ export async function enqueueDigestJobs(
   db: D1Database,
   bills: Array<BillRef & { changedOn?: string | null }>,
   tier: JobTier,
-  nowIso = new Date().toISOString()
+  nowIso = new Date().toISOString(),
+  origin: JobOrigin = "live"
 ): Promise<void> {
   if (bills.length === 0) return;
   await ensureSchema(db);
@@ -71,9 +82,11 @@ export async function enqueueDigestJobs(
     bills.map((bill) =>
       db
         .prepare(
-          `INSERT INTO digest_jobs (congress, bill_type, number, state, tier, attempts, queued_at, updated_at)
-           VALUES (?1, ?2, ?3, 'queued', ?4, 0, ?5, ?5)
+          `INSERT INTO digest_jobs (congress, bill_type, number, state, tier, attempts, queued_at, updated_at, origin)
+           VALUES (?1, ?2, ?3, 'queued', ?4, 0, ?5, ?5, ?7)
            ON CONFLICT (congress, bill_type, number) DO UPDATE SET
+             -- A live reason (discovery, the feed) takes a bill out of the backfill's lane.
+             origin = CASE WHEN excluded.origin = 'live' THEN 'live' ELSE digest_jobs.origin END,
              state = CASE
                WHEN digest_jobs.state = 'batched' THEN 'batched'
                WHEN digest_jobs.state = 'done' AND ?6 IS NOT NULL AND substr(digest_jobs.updated_at, 1, 10) > ?6 THEN 'done'
@@ -84,12 +97,12 @@ export async function enqueueDigestJobs(
                WHEN digest_jobs.state = 'done' AND ?6 IS NOT NULL AND substr(digest_jobs.updated_at, 1, 10) > ?6 THEN digest_jobs.queued_at
                ELSE excluded.queued_at END`
         )
-        .bind(bill.congress, normalizeBillType(bill.type), bill.number, tier, nowIso, bill.changedOn ?? null)
+        .bind(bill.congress, normalizeBillType(bill.type), bill.number, tier, nowIso, bill.changedOn ?? null, origin)
     )
   );
 }
 
-/** Queued jobs, oldest first, split by whether they matter (so rewrites cannot starve new bills or the reverse). */
+/** Queued jobs, live before backfill, oldest first, split by whether they matter (so rewrites cannot starve new bills or the reverse). */
 export async function selectQueuedJobs(
   db: D1Database,
   params: { matters: boolean; limit: number }
@@ -99,13 +112,13 @@ export async function selectQueuedJobs(
   const { results } = await db
     .prepare(
       `SELECT * FROM (
-         SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.queued_at,
+         SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.origin, j.queued_at,
                 CASE WHEN j.tier = 'rewrite' OR ${MATTERS_SQL} THEN 1 ELSE 0 END AS matters
          FROM digest_jobs j
          WHERE j.state = 'queued'
        )
        WHERE matters = ?1
-       ORDER BY queued_at
+       ORDER BY origin = 'backfill', queued_at
        LIMIT ?2`
     )
     .bind(params.matters ? 1 : 0, params.limit)
@@ -117,7 +130,7 @@ export async function selectBatchJobs(db: D1Database, batchId: string): Promise<
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures,
+      `SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.origin,
               CASE WHEN j.tier = 'rewrite' OR ${MATTERS_SQL} THEN 1 ELSE 0 END AS matters
        FROM digest_jobs j
        WHERE j.batch_id = ?1 AND j.state = 'batched'`
@@ -298,6 +311,20 @@ export async function insertDigestStubs(
   );
 }
 
+/** Bills of the Congress already summarized by the current writer (a Congress backfill skips them for free). */
+export async function countCurrentSummaries(db: D1Database, congress: number): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(
+      `SELECT count(*) AS n FROM bill_digests
+       WHERE congress = ?1 AND CASE WHEN digest_json IS NULL OR NOT json_valid(digest_json) THEN 0
+         ELSE json_extract(digest_json, '$.generator') IS NOT NULL END`
+    )
+    .bind(congress)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
 /** Jobs waiting for a first summary (the backfill tops the queue up only when it is short). */
 export async function countQueuedJobs(db: D1Database): Promise<number> {
   await ensureSchema(db);
@@ -318,7 +345,7 @@ export async function selectBackfillSiteBills(db: D1Database, congress: number):
        LEFT JOIN digest_jobs q ON q.congress = j.congress AND q.bill_type = j.bill_type AND q.number = j.number
        WHERE j.congress = ?1
          AND (q.state IS NULL OR q.state = 'done')
-         AND (j.digest_json IS NULL OR NOT json_valid(j.digest_json) OR json_extract(j.digest_json, '$.generator') IS NULL)
+         AND CASE WHEN j.digest_json IS NULL OR NOT json_valid(j.digest_json) THEN 1 ELSE json_extract(j.digest_json, '$.generator') IS NULL END
        ORDER BY matters DESC, j.updated_at DESC`
     )
     .bind(congress)

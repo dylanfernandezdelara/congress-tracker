@@ -21,7 +21,16 @@ interface BillListResponse {
 export async function fetchUpdatedBillsPage(
   apiKey: string,
   params: { congress: number; fromIso?: string; toIso?: string; offset: number; limit: number }
-): Promise<{ bills: UpdatedBill[]; hasMore: boolean; total: number | null }> {
+): Promise<{
+  bills: UpdatedBill[];
+  hasMore: boolean;
+  total: number | null;
+  /** Rows Congress.gov returned, before any were dropped: what an offset must advance by. */
+  pageSize: number;
+  /** The last row's update day, and how many rows on the page share it (for day-by-day paging). */
+  lastDay: string | null;
+  lastDayCount: number;
+}> {
   const window =
     params.fromIso && params.toIso
       ? `&fromDateTime=${params.fromIso.slice(0, 19)}Z&toDateTime=${params.toIso.slice(0, 19)}Z`
@@ -36,9 +45,14 @@ export async function fetchUpdatedBillsPage(
     if (!b.type || !Number.isFinite(number) || b.congress !== params.congress) continue;
     bills.push({ congress: params.congress, type: normalizeBillType(b.type), number, title: b.title?.trim() || null, introducedDate: b.introducedDate ?? null, changedOn: (b.updateDateIncludingText ?? b.updateDate)?.slice(0, 10) ?? null });
   }
+  const days = (body.bills ?? []).map((b) => b.updateDate?.slice(0, 10) ?? "");
+  const lastDay = days.at(-1) || null;
   return {
     bills,
     hasMore: Boolean(nextPageUrl(body.pagination?.next, apiKey)) && (body.bills?.length ?? 0) >= params.limit,
     total: typeof body.pagination?.count === "number" ? body.pagination.count : null,
+    pageSize: body.bills?.length ?? 0,
+    lastDay,
+    lastDayCount: lastDay ? days.filter((d) => d === lastDay).length : 0,
   };
 }

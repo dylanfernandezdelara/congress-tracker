@@ -9,6 +9,7 @@ const mockFetchUpdated = vi.fn();
 
 vi.mock("../d1/digest-jobs", () => ({
   selectBackfillSiteBills: (...a: unknown[]) => mockSelectSite(...a),
+  countCurrentSummaries: async () => 1_000,
   enqueueDigestJobs: (...a: unknown[]) => mockEnqueue(...a),
 }));
 vi.mock("../d1/pipeline-state", () => ({
@@ -42,13 +43,14 @@ describe("runSummaryBackfill", () => {
     const plan = await runSummaryBackfill(env, { scope: "site", apply: true, limit: 2 });
 
     expect(plan.bills).toBe(2);
-    expect(mockEnqueue).toHaveBeenCalledWith(env.DB, [bill(1, true), bill(2)], "new");
+    expect(mockEnqueue).toHaveBeenCalledWith(env.DB, [bill(1, true), bill(2)], "new", expect.any(String), "backfill");
   });
 
   it("estimates a whole-Congress backfill from Congress.gov's count and starts the walk only with apply=1", async () => {
     const dry = await runSummaryBackfill(env, { scope: "congress", apply: false });
-    expect(dry).toMatchObject({ bills: 15_000, matters: 1 });
-    expect(dry.estimatedUsd).toBeCloseTo(14_999 * 0.0009 + 0.014, 1);
+    // 1,000 bills already have current summaries and cost nothing.
+    expect(dry).toMatchObject({ bills: 14_000, matters: 1 });
+    expect(dry.estimatedUsd).toBeCloseTo(13_999 * 0.0009 + 0.014, 1);
     // Budget-bound: ~$13.5 at half of $1/day.
     expect(dry.estimatedDays).toBeGreaterThan(20);
     expect(mockSetState).not.toHaveBeenCalled();
@@ -56,6 +58,7 @@ describe("runSummaryBackfill", () => {
     await runSummaryBackfill(env, { scope: "congress", apply: true, now: new Date("2026-09-27T04:00:00Z") });
     expect(mockSetState).toHaveBeenCalledWith(env.DB, "digest_backfill_cursor", {
       congress: 119,
+      fromDay: "2000-01-01",
       offset: 0,
       done: false,
       startedAt: "2026-09-27T04:00:00.000Z",

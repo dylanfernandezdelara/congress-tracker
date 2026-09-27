@@ -1,7 +1,7 @@
-import { DIGEST_BATCH_BILLS_PER_RUN, DIGEST_REWRITES_PER_RUN } from "../constants";
+import { DIGEST_BACKFILL_BUDGET_SHARE, DIGEST_BATCH_BILLS_PER_RUN, DIGEST_REWRITES_PER_RUN } from "../constants";
 import type { Env } from "../config";
 import { congressNumber } from "../config";
-import { enqueueDigestJobs, selectBackfillSiteBills } from "../d1/digest-jobs";
+import { countCurrentSummaries, enqueueDigestJobs, selectBackfillSiteBills } from "../d1/digest-jobs";
 import { getPipelineState, setPipelineState } from "../d1/pipeline-state";
 import { dailyBudget } from "../digest/budget";
 import { fetchUpdatedBillsPage } from "../sources/updated-bills";
@@ -11,9 +11,11 @@ export const BACKFILL_COST_PER_BILL = { luna: 0.0009, sonnet: 0.014 };
 
 export const BACKFILL_CURSOR_KEY = "digest_backfill_cursor";
 
-/** Every bill of the Congress, walked a page per sweep run until done. */
+/** Every bill of the Congress, walked a page per sweep run until done: by update day, with an offset inside the day. */
 export interface BackfillCursor {
   congress: number;
+  /** YYYY-MM-DD: the walk has passed every bill last updated before this day. */
+  fromDay: string;
   offset: number;
   done: boolean;
   startedAt: string;
@@ -26,7 +28,7 @@ export interface BackfillPlan {
   /** Bills that matter (Sonnet); the rest go to Luna batches. Unknown for bills not yet on the site. */
   matters: number | null;
   estimatedUsd: number;
-  /** At the current per-run caps and daily budget. */
+  /** At the current per-run caps and the backfill's share of the daily budget; -1 when the budget is 0. */
   estimatedDays: number;
   notes: string[];
 }
@@ -40,8 +42,8 @@ function daysFor(env: Env, luna: number, sonnet: number): number {
   const byCaps = Math.max(luna / (DIGEST_BATCH_BILLS_PER_RUN * 24), sonnet / (DIGEST_REWRITES_PER_RUN * 24));
   const perDay = dailyBudget(env);
   const cost = luna * BACKFILL_COST_PER_BILL.luna + sonnet * BACKFILL_COST_PER_BILL.sonnet;
-  // The sweep's own new bills take a share of each day's budget too; leave half for them.
-  const byBudget = perDay > 0 ? cost / (perDay / 2) : Number.POSITIVE_INFINITY;
+  if (perDay <= 0) return -1;
+  const byBudget = cost / (perDay * DIGEST_BACKFILL_BUDGET_SHARE);
   return round(Math.max(byCaps, byBudget), 1);
 }
 
@@ -63,7 +65,7 @@ export async function runSummaryBackfill(
     const chosen = site.slice(0, options.limit ?? site.length);
     const matters = chosen.filter((b) => b.matters).length;
     const luna = chosen.length - matters;
-    if (options.apply) await enqueueDigestJobs(env.DB, chosen, "new");
+    if (options.apply) await enqueueDigestJobs(env.DB, chosen, "new", (options.now ?? new Date()).toISOString(), "backfill");
     else notes.push("Dry run: nothing queued. Add apply=1 to queue these bills.");
     return {
       scope: "site",
@@ -76,16 +78,19 @@ export async function runSummaryBackfill(
     };
   }
 
+  if (options.limit !== undefined) notes.push("limit applies to scope=site only; a Congress backfill walks every bill.");
   const apiKey = env.CONGRESS_API_KEY;
   if (!apiKey?.trim()) throw new Error("CONGRESS_API_KEY is required for a Congress backfill");
   const { total } = await fetchUpdatedBillsPage(apiKey, { congress, offset: 0, limit: 1 });
-  const bills = total ?? 0;
+  // Bills already written by the current writer cost nothing.
+  const bills = Math.max(0, (total ?? 0) - (await countCurrentSummaries(env.DB, congress)));
   // Bills that matter are the ones on the site with votes or actions; the rest of the Congress is mostly first summaries.
   const matters = site.filter((b) => b.matters).length;
   const luna = Math.max(0, bills - matters);
   notes.push(
     "Bills not yet on the site get a stub row and a first summary (Luna, batched); bills that matter get Sonnet.",
-    `At ${DIGEST_BATCH_BILLS_PER_RUN} bills an hour and $${dailyBudget(env)}/day this takes the days shown; raise DIGEST_DAILY_BUDGET_USD to go faster.`
+    `Backfill jobs go after new bills and use at most ${DIGEST_BACKFILL_BUDGET_SHARE * 100}% of the $${dailyBudget(env)}/day budget; raise DIGEST_DAILY_BUDGET_USD to go faster.`,
+    "Every bill gets a title-only row on the site until its summary is written; the feed only lists recent activity."
   );
   if (options.apply) {
     const existing = await getPipelineState<BackfillCursor>(env.DB, BACKFILL_CURSOR_KEY);
@@ -94,6 +99,7 @@ export async function runSummaryBackfill(
     } else {
       await setPipelineState(env.DB, BACKFILL_CURSOR_KEY, {
         congress,
+        fromDay: "2000-01-01",
         offset: 0,
         done: false,
         startedAt: (options.now ?? new Date()).toISOString(),

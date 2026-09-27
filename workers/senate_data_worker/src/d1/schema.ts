@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -293,6 +293,7 @@ export const SCHEMA_DDL = [
   fingerprint TEXT,
   attempts INTEGER NOT NULL DEFAULT 0,
   read_failures INTEGER NOT NULL DEFAULT 0,
+  origin TEXT NOT NULL DEFAULT 'live',
   last_error TEXT,
   queued_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -382,6 +383,11 @@ export const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: s
     // the column from SCHEMA_DDL; this adds it to tables created at v12. Safe to run twice (see ensureSchema).
     toVersion: 13,
     statements: [`ALTER TABLE digest_jobs ADD COLUMN read_failures INTEGER NOT NULL DEFAULT 0`],
+  },
+  {
+    // Backfill jobs go last and get a capped share of the budget (pipeline/run-summary-sweep.ts). Safe to run twice.
+    toVersion: 15,
+    statements: [`ALTER TABLE digest_jobs ADD COLUMN origin TEXT NOT NULL DEFAULT 'live'`],
   },
 ];
 

@@ -71,6 +71,8 @@ export const DIGEST_SWEEP_ADMIN_MAX_BILLS = 60;
  * many jobs wait, so new bills never queue behind thousands of old ones.
  */
 export const DIGEST_BACKFILL_QUEUE_FLOOR = 60;
+/** Share of the daily budget backfill jobs may use; the rest stays for new bills and rewrites. */
+export const DIGEST_BACKFILL_BUDGET_SHARE = 0.5;
 export const DIGEST_BACKFILL_PAGE_SIZE = 100;
 /** Congress.gov update-list pages (250 bills each) read per run. */
 export const DIGEST_DISCOVERY_PAGES_PER_RUN = 2;
