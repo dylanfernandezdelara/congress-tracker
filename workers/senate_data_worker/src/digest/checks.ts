@@ -164,6 +164,20 @@ export function readerText(summary: CheckableSummary): string {
     .join("\n");
 }
 
+/** Style-only blocking reasons: the last model to try may still be stored with them (see STYLE_ONLY_REASONS). */
+export const VOTE_HEADLINE_REASON = "headline mentions the vote";
+export const STYLE_ONLY_REASONS: readonly string[] = [VOTE_HEADLINE_REASON];
+
+/**
+ * A headline about the vote rather than the change: "House votes to…", "…; House rejected it", "…fails in House",
+ * "House-passed bill…". Anchored to a clause start, so bills about congressional votes ("Resolution would require
+ * House votes on war powers", "Bill would require Congress approve new tariffs") are not caught.
+ */
+const VOTE_HEADLINE = [
+  /(^|[;:,]\s+)(the\s+)?(house|senate|congress|lawmakers)\s+(votes?|voted|passe[sd]|rejects?|rejected|approves?|approved|fails?|failed|clears?|cleared)\b/i,
+  /\b(passe[sd]|fails?|failed|rejected|approved|clear(s|ed)|dies)\s+(in\s+)?(the\s+)?(house|senate)\b|\b(house|senate)-passed\b/i,
+];
+
 export function checkSummary(summary: CheckableSummary, sources: CheckableSources, options: { long?: boolean } = {}): CheckResult {
   const blocking: string[] = [];
   const warnings: string[] = [];
@@ -174,6 +188,8 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   const hw = words(summary.headline);
   if (hw < 5 || hw > 13) warnings.push(`headline ${hw} words`);
   if (/^(this bill|new legislation|the bill)\b/i.test(summary.headline ?? "")) warnings.push("headline starts generic");
+  // The page shows the vote beside the headline; a headline about the vote ("House votes to…") says less.
+  if (VOTE_HEADLINE.some((re) => re.test(summary.headline ?? ""))) blocking.push(VOTE_HEADLINE_REASON);
   if (words(summary.what_it_does) > 28) warnings.push(`what_it_does ${words(summary.what_it_does)} words`);
   // Long bills, and rules for debate (one point per measure they set up), may use five.
   const maxPoints = options.long || /^(HRES|SRES)$/i.test(sources.type) ? 5 : 4;

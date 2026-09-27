@@ -162,7 +162,7 @@ Every bill summary is written by `workers/senate_data_worker/src/digest/` from t
 reader is someone deciding whether they would support the bill and whether their members voted the
 way they would, so summaries lead with concrete effects on people and stay strictly neutral.
 
-- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.1; recorded on each summary). Bills over ~30k tokens are split along their
+- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.2; recorded on each summary). Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. Bills over ~30k tokens are split along their
   own divisions/titles (`bill-text-parse.ts`), summarized per part, then combined with a "What's
   inside" breakdown. Import-free, so `scripts/digest-eval` uses the same file.
 - **Models** `digest/models.ts`: new bills → `openai/gpt-6-luna` (high effort) through OpenRouter's
