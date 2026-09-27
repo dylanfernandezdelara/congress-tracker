@@ -187,6 +187,11 @@ way they would, so summaries lead with concrete effects on people and stay stric
   and none start after 10 minutes); each paid try is counted before it is made, and after
   `DIGEST_MAX_ATTEMPTS` failed tries on the same inputs a bill is **parked** until it changes.
   Long bills that matter go to the batch too (Luna at every tier).
+- **AI Gateway**: normal-API calls (Sonnet rewrites, direct retries, long-bill parts) go through Cloudflare
+  AI Gateway `trackcongress` (`OPENROUTER_BASE_URL` in `[vars]`, production only; `CF_AIG_TOKEN` secret for the
+  authenticated gateway, sent to the gateway only). Its log id is stored as `generator.gateway_log_id`. Batch calls
+  go straight to OpenRouter and are not in the gateway logs. Gateway retries, caching, rate and spend limits stay
+  off: the worker has its own, and gateway refusals would count against bills.
 - **Budget** `DIGEST_DAILY_BUDGET_USD` (default $1; expected spend is cents a day), tracked in
   `pipeline_state` (`digest_spend:YYYY-MM-DD`). A batch's estimated cost counts when it is sent and
   the difference when it is collected. Over budget, the sweep waits for tomorrow.

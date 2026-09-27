@@ -51,6 +51,9 @@ SESSION = "2"
 ALLOWED_ORIGIN = "https://trackcongress.org,https://www.trackcongress.org"
 # Zone for edge cache purge after pipeline writes (pair with CACHE_PURGE_TOKEN secret).
 CF_ZONE_ID = "86b690387ae840600f5f3341aa154cce"
+# Summary calls (digest/) go through Cloudflare AI Gateway "trackcongress" for logs and analytics; the
+# CF_AIG_TOKEN secret authenticates them. Batches still go straight to OpenRouter. Remove to call OpenRouter directly.
+OPENROUTER_BASE_URL = "https://gateway.ai.cloudflare.com/v1/0b001ef01845353691fdc2833d96b81d/trackcongress/openrouter/v1"
 
 # Apex + www Custom Domains (Cloudflare manages DNS + certs on the zone).
 [[routes]]

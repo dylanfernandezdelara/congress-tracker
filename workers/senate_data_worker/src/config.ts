@@ -30,6 +30,8 @@ export interface Env {
    * for rewrites of bills that matter (default Claude Sonnet 5). Set to change without a deploy of code.
    */
   DIGEST_NEW_MODEL?: string;
+  /** Cloudflare AI Gateway token (Authenticated Gateway), sent only when OPENROUTER_BASE_URL is the gateway. */
+  CF_AIG_TOKEN?: string;
   /** Key for the per-day reader hash on summary feedback (http/summary-feedback.ts). */
   FEEDBACK_HASH_SECRET?: string;
   DIGEST_REWRITE_MODEL?: string;

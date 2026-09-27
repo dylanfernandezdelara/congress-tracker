@@ -45,7 +45,7 @@ export function otherModel(env: Env, model: DigestModel): DigestModel {
 export async function storeReply(
   env: Env,
   prepared: PreparedBill,
-  params: { tier: Tier; model: string; content: string | null; cost: number }
+  params: { tier: Tier; model: string; content: string | null; cost: number; gatewayLogId?: string | null }
 ): Promise<WriteOutcome> {
   const long = isLong(prepared);
   const parsed = parseSummaryReply(params.content, {
@@ -64,6 +64,7 @@ export async function storeReply(
     text_version: prepared.input.textVersion?.type ?? null,
     fingerprint: prepared.fingerprint,
     long,
+    ...(params.gatewayLogId ? { gateway_log_id: params.gatewayLogId } : {}),
     ...(check.warnings.length ? { warnings: check.warnings } : {}),
     generated_at: new Date().toISOString(),
   };
@@ -125,6 +126,7 @@ export async function combineAndStore(
     model: model.id,
     content: reply.content,
     cost: params.priorCost + reply.usage.cost,
+    gatewayLogId: reply.gatewayLogId,
   });
   await recordSpend(env, reply.usage.cost);
   return outcome;
@@ -155,7 +157,13 @@ export async function writeSummary(
     }
     const reply = await chatCompletion(env, model, singlePassMessages(prepared.input));
     await recordSpend(env, reply.usage.cost);
-    const first = await storeReply(env, prepared, { tier, model: model.id, content: reply.content, cost: reply.usage.cost });
+    const first = await storeReply(env, prepared, {
+      tier,
+      model: model.id,
+      content: reply.content,
+      cost: reply.usage.cost,
+      gatewayLogId: reply.gatewayLogId,
+    });
     if (first.status === "stored" || !retry) return first;
     const second = await writeSummary(env, prepared, tier, { model: otherModel(env, model), retry: false });
     return second.status === "stored" ? { ...second, cost: second.cost + first.cost } : first;
