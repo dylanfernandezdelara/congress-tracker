@@ -82,6 +82,16 @@ describe("checks", () => {
     expect(result.warnings).toContain("number not in cited section (Sec. 2): 270");
   });
 
+  it("accepts a correctly rounded large amount, never a wrong rounding or a single-digit one", () => {
+    const deficit = sources({ text: "SEC. 2. Deficits\nFiscal year 2027: $1,360,279,000,000." });
+    const at = (amount: string) =>
+      checkSummary(summary({ key_points: [{ text: `Sets the 2027 deficit at ${amount}`, section: "Sec. 2" }] }), deficit).blocking;
+    expect(at("$1.36 trillion")).toEqual([]);
+    expect(at("$1.4 trillion")).toEqual([]);
+    expect(at("$1.37 trillion")).toEqual(["number not in sources: 1370000000000"]);
+    expect(at("$1 trillion")).toEqual(["number not in sources: 1000000000000"]);
+  });
+
   it("allows fixed terms of art", () => {
     expect(checkSummary(summary({ what_it_does: "Funds critical minerals mapping." }), sources()).blocking).toEqual([]);
   });
