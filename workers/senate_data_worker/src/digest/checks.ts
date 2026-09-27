@@ -244,8 +244,11 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
     ...(summary.who_it_affects ?? []),
     ...uncited,
     ...(summary.inside ?? []).map((r) => r.summary),
-  ].join("\n");
-  for (const n of numbersIn(withoutCitations(rest))) {
+  ]
+    // Strip citations per field: "into the U.S." ending one field must not turn "12,000 farmers" opening the next into "S. 12000".
+    .map((f) => withoutCitations(String(f ?? "")))
+    .join("\n");
+  for (const n of numbersIn(rest)) {
     if (hasSourceNumber(known, n, 3)) continue;
     // Small counts ("two groups", "3 years") are often paraphrased from words; larger unknown numbers are not.
     if (n > 12) blocking.push(`number not in sources: ${n}`);

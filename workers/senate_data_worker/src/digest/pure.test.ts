@@ -150,6 +150,12 @@ describe("checks", () => {
     expect(checkSummary(spanning, bill).blocking).toEqual(['judging word "critical"']);
   });
 
+  it("does not read a number opening one field as a bill citation closing the last", () => {
+    const bill = sources({ text: "SEC. 2. Shrimp imports into the United States are prohibited." });
+    const s = summary({ what_it_does: "Bans shrimp imports into the U.S.", who_it_affects: ["12,000 shrimp farmers"], key_points: [{ text: "Bans imports", section: null }] });
+    expect(checkSummary(s, bill).blocking).toEqual(["number not in sources: 12000"]);
+  });
+
   it("blocks a headline about the vote, which the page already shows", () => {
     const at = (headline: string) => checkSummary(summary({ headline }), sources()).blocking;
     expect(at("House votes to cancel California's harbor boat pollution rules")).toEqual(["headline mentions the vote"]);
