@@ -113,6 +113,26 @@ describe("checks", () => {
     expect(result.warnings).toContain("number not in cited section (Sec. 3): 1360000000000");
   });
 
+  it("reads numbers the bill spells out", () => {
+    expect([...numbersIn("a workweek longer than thirty-two hours, then thirty eight, then Ninety-Nine")]).toEqual(
+      expect.arrayContaining([32, 38, 99, 30, 90])
+    );
+    const workweek = sources({ text: "SEC. 2. Workweek\nfor a workweek longer than thirty-two hours" });
+    expect(checkSummary(summary({ key_points: [{ text: "Cuts the workweek to 32 hours", section: "Sec. 2" }] }), workweek).blocking).toEqual([]);
+  });
+
+  it("allows a judging word only as the bill's own named or defined term, never its findings' framing", () => {
+    const bill = sources({
+      title: "Critical Materials Future Act of 2025",
+      text: "SEC. 2. Definitions\nThe term “harmful algal bloom” means a bloom.\n\nSEC. 3. Findings\nWildfires are devastating wildfires.",
+    });
+    const blocked = (what: string) =>
+      checkSummary(summary({ what_it_does: what, key_points: [{ text: "Starts a pilot program", section: null }] }), bill).blocking;
+    expect(blocked("Funds critical materials processing and tracks harmful algal blooms.")).toEqual([]);
+    expect(blocked("Funds critical materials processing, a critical step.")).toEqual(['judging word "critical"']);
+    expect(blocked("Responds to devastating wildfires.")).toEqual(['judging word "devastating"']);
+  });
+
   it("allows fixed terms of art", () => {
     expect(checkSummary(summary({ what_it_does: "Funds critical minerals mapping." }), sources()).blocking).toEqual([]);
   });

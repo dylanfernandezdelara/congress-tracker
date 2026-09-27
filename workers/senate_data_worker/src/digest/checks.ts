@@ -37,10 +37,14 @@ const JUDGING = [
 ];
 
 const SCALE: Record<string, number> = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
+const UNITS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
 const WORD_NUMBERS: Record<string, number> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
-  fifteen: 15, twenty: 20, thirty: 30, forty: 40, fifty: 50, hundred: 100,
+  ...UNITS, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+  eighteen: 18, nineteen: 19, ...TENS, hundred: 100,
 };
+/** "thirty-two", "ninety nine": bills spell numbers out ("a workweek longer than thirty-two hours"). */
+const COMPOUND = new RegExp(`\\b(${Object.keys(TENS).join("|")})[- ](${Object.keys(UNITS).join("|")})\\b`, "gi");
 
 /** Every numeric value in a text: "$45,000,000,000", "$45 billion", "15 percent", "three years", "2028". */
 export function numbersIn(text: string | null | undefined): Set<number> {
@@ -54,6 +58,7 @@ export function numbersIn(text: string | null | undefined): Set<number> {
   for (const [word, n] of Object.entries(WORD_NUMBERS)) {
     if (new RegExp(`\\b${word}\\b`, "i").test(s)) values.add(n);
   }
+  for (const m of s.matchAll(COMPOUND)) values.add(TENS[m[1]!.toLowerCase()]! + UNITS[m[2]!.toLowerCase()]!);
   return values;
 }
 
@@ -176,7 +181,24 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   const text = readerText(summary);
   // Fixed terms of art are not judgments ("critical minerals", "critical-mineral", "critical access hospitals").
   const plain = text.toLowerCase().replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care)\b/g, "");
-  for (const w of JUDGING) if (new RegExp(`\\b${w}\\b`).test(plain)) blocking.push(`judging word "${w}"`);
+  const title = (sources.title ?? "").toLowerCase();
+  const billText = (sources.text ?? "").toLowerCase();
+  for (const w of JUDGING) {
+    if (!new RegExp(`\\b${w}\\b`).test(plain)) continue;
+    // The bill's own term is not a judgment: every use in the summary must be a two-word phrase from the bill's title
+    // ("Critical Materials Future Act") or a term the bill defines (the term “critical material” means). Phrases
+    // from a bill's findings ("devastating wildfires") are the sponsor's framing and stay blocked.
+    const uses = [...plain.matchAll(new RegExp(`\\b${w}\\b(?:[- ]([a-z]+))?`, "g"))];
+    const billTerm = (next: string | undefined) => {
+      if (!next) return false;
+      const phrase = `${w}[- ]${next.replace(/s$/, "")}s?`;
+      return (
+        new RegExp(`\\b${phrase}\\b`).test(title) ||
+        new RegExp(`term [“"]${phrase}\\b[^”"]{0,40}[”"]|[“"]${phrase}\\b[^”"]{0,40}[”"] means`).test(billText)
+      );
+    };
+    if (!uses.every((u) => billTerm(u[1]))) blocking.push(`judging word "${w}"`);
+  }
 
   const known = numbersIn([sources.title, sources.crsText, sources.text, sources.statusLabel, sources.votesText].join("\n"));
   const crsNumbers = numbersIn([sources.title, sources.crsText].join("\n"));
