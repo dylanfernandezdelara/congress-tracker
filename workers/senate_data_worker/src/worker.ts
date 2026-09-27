@@ -10,7 +10,7 @@ import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import { runSummarySweep } from "./pipeline/run-summary-sweep";
-import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
+import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC, SUMMARY_SWEEP_CRON_UTC } from "./constants";
 
 export default {
   fetch(request: Request, env: Env, ctx?: ExecutionContext) {
@@ -23,12 +23,7 @@ export default {
 
     if (isExecutiveCron) {
       ctx.waitUntil(
-        // The summary sweep rides the hourly lease: it writes digests, so it must not overlap the feed run.
-        withPipelineLease(env.DB, async () => {
-          const executive = await runExecutivePostsPipeline(env, { trigger: "scheduled" });
-          const summarySweep = await runSummarySweep(env);
-          return { ...executive, summarySweep };
-        })
+        withPipelineLease(env.DB, () => runExecutivePostsPipeline(env, { trigger: "scheduled" }))
           .then((result) => {
             console.log(
               JSON.stringify({
@@ -59,6 +54,25 @@ export default {
                 scheduledTime: controller.scheduledTime,
                 error: message,
               }),
+            );
+          }),
+      );
+      return;
+    }
+
+    if (cron === SUMMARY_SWEEP_CRON_UTC) {
+      // Writes digests, so it takes the write lease like the feed and executive runs.
+      ctx.waitUntil(
+        withPipelineLease(env.DB, () => runSummarySweep(env))
+          .then((result) => {
+            console.log(JSON.stringify({ event: "summary_sweep_complete", scheduledTime: controller.scheduledTime, ...result }));
+            if (result.stored > 0) scheduleZoneEdgeCachePurge(env, ctx);
+          })
+          .catch((err: unknown) => {
+            const busy = isPipelineBusyError(err);
+            const message = err instanceof Error ? err.message : String(err);
+            console[busy ? "log" : "error"](
+              JSON.stringify({ event: busy ? "summary_sweep_skipped_busy" : "summary_sweep_failed", scheduledTime: controller.scheduledTime, error: message }),
             );
           }),
       );

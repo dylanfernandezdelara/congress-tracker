@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC } from "./constants";
+import { EXECUTIVE_POSTS_CRON_UTC, FEED_PIPELINE_CRON_UTC, SUMMARY_SWEEP_CRON_UTC } from "./constants";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workerPackageDir = resolve(here, "..");
@@ -16,7 +16,7 @@ const wranglerTomlPaths = [
 ] as const;
 
 /** Cron expressions the scheduled handler dispatches on. */
-const claimedCrons = [FEED_PIPELINE_CRON_UTC, EXECUTIVE_POSTS_CRON_UTC] as const;
+const claimedCrons = [FEED_PIPELINE_CRON_UTC, EXECUTIVE_POSTS_CRON_UTC, SUMMARY_SWEEP_CRON_UTC] as const;
 
 /**
  * Anchored to column 0 so a commented-out `# crons = [...]` left above the live
@@ -35,7 +35,7 @@ function parseCronsFromToml(filePath: string): string[] {
 }
 
 describe("wrangler.toml cron triggers match scheduled-handler constants", () => {
-  it.each(wranglerTomlPaths)("%s crons equal FEED + EXECUTIVE constants (bidirectional)", (tomlPath) => {
+  it.each(wranglerTomlPaths)("%s crons equal FEED + EXECUTIVE + SUMMARY_SWEEP constants (bidirectional)", (tomlPath) => {
     const deployedCrons = parseCronsFromToml(tomlPath);
 
     for (const claimed of claimedCrons) {

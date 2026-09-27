@@ -129,6 +129,21 @@ describe("writeSummary", () => {
     expect(stored.inside[0].share).toBe(50);
   });
 
+  it("will not combine a long bill missing notes for too many of its parts", async () => {
+    const parts = Array.from({ length: 5 }, (_, i) => ({ label: `Title ${i + 1} — P`, text: `SEC. ${i + 1}. P\nx`, tokens: 8_000 }));
+    const long = prepared({ parts, totalTokens: 40_000, input: { ...prepared().input, text: null } });
+    const note = JSON.stringify({ part: "P", summary: "s", changes: [] });
+    mockChat.mockImplementation(async (_env, _model, messages: { user: string }) =>
+      reply(/PART: Title [123] /.test(messages.user) ? note : null)
+    );
+
+    const outcome = await writeSummary(env, long, "new");
+
+    expect(outcome).toMatchObject({ status: "failed", reason: "notes for 3 of 5 parts" });
+    expect(mockChat).toHaveBeenCalledTimes(5);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
   it("does nothing once the day's budget is spent", async () => {
     mockBudgetLeft.mockResolvedValue(0);
 

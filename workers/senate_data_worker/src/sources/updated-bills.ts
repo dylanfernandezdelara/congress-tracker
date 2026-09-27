@@ -5,10 +5,12 @@ import type { BillRef } from "../types";
 export interface UpdatedBill extends BillRef {
   title: string | null;
   introducedDate: string | null;
+  /** Day of the bill's latest change on Congress.gov, text included (YYYY-MM-DD). */
+  changedOn: string | null;
 }
 
 interface BillListResponse {
-  bills?: Array<{ congress?: number; type?: string; number?: string | number; title?: string; introducedDate?: string }>;
+  bills?: Array<{ congress?: number; type?: string; number?: string | number; title?: string; introducedDate?: string; updateDate?: string; updateDateIncludingText?: string }>;
   pagination?: { next?: string };
 }
 
@@ -29,7 +31,7 @@ export async function fetchUpdatedBillsPage(
   for (const b of body.bills ?? []) {
     const number = Number(b.number);
     if (!b.type || !Number.isFinite(number) || b.congress !== params.congress) continue;
-    bills.push({ congress: params.congress, type: normalizeBillType(b.type), number, title: b.title?.trim() || null, introducedDate: b.introducedDate ?? null });
+    bills.push({ congress: params.congress, type: normalizeBillType(b.type), number, title: b.title?.trim() || null, introducedDate: b.introducedDate ?? null, changedOn: (b.updateDateIncludingText ?? b.updateDate)?.slice(0, 10) ?? null });
   }
   return { bills, hasMore: Boolean(nextPageUrl(body.pagination?.next, apiKey)) && (body.bills?.length ?? 0) >= params.limit };
 }

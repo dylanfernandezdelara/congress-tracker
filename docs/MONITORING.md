@@ -1,7 +1,7 @@
 # Ingest monitoring
 
-Crons (UTC): daily feed `0 10 * * *`, hourly executive `20 * * * *`. Distinct
-minutes avoid write-lease collisions.
+Crons (UTC): daily feed `0 10 * * *`, hourly executive `20 * * * *`, hourly
+summary sweep `35 * * * *`. Distinct minutes avoid write-lease collisions.
 
 Scheduled runs persist success/failure in D1. A busy lease records
 `last_skipped` (`pipeline_busy`) without changing status fields — alert when
@@ -60,16 +60,19 @@ feed strips), from the daily feed refresh or the hourly executive hydrate, so it
 leaves `missing_digest_count`. The plain-language summary replaces it from the
 hourly summary sweep (see AGENTS.md → Plain-language summaries).
 
-The sweep logs its result inside `executive_posts_pipeline_complete` as
-`summarySweep`: `collected` (batch replies processed), `discovered`, `rechecked`,
-`unchanged` (fingerprint matched, no model call), `rewritten`, `batched`,
-`stored`, `failed`, `spentUsd` and `warnings`. Things to watch:
+The sweep logs `summary_sweep_complete` (or `summary_sweep_skipped_busy` /
+`summary_sweep_failed`) with `collected` (batch replies processed), `discovered`,
+`rechecked`, `unchanged` (fingerprint matched, no model call), `parked`,
+`rewritten`, `batched`, `stored`, `failed`, `spentUsd` and `warnings`. Things to watch:
 
 - `warnings` with `rejected: number not in sources: …` — a model invented a
-  figure and the retry did too; the old summary stays and the bill is retried
-  next run. Occasional is expected; the same bill every hour is a prompt or
-  checks problem (check it with `npm run digest:regress` after adding it to the evals).
-- `daily summary budget spent` — spend hit `DIGEST_DAILY_BUDGET_USD` ($1 default).
+  figure and the retry did too; the old summary stays. Each paid try is counted
+  before it is made, and after 3 failed tries on the same inputs the bill is
+  **parked** (`parked` in the log) until the bill changes. Occasional parking is
+  expected; many is a prompt or checks problem (add a parked bill to the evals and
+  run `npm run digest:regress`). Parked bills:
+  `SELECT * FROM digest_jobs WHERE last_error LIKE 'parked%'`.
+- `daily summary budget spent` / `budget too low for a batch` — spend hit `DIGEST_DAILY_BUDGET_USD` ($1 default).
   Normal spend is cents a day; hitting it means a flood of rewrites or a price change.
 - `batch … expired|failed; N bill(s) requeued` — OpenRouter batch trouble. Bills
   go back in the queue; after `DIGEST_BATCH_MAX_ATTEMPTS` they are written directly.

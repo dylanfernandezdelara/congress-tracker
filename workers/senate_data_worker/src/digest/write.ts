@@ -24,13 +24,16 @@ export type WriteOutcome =
   | { status: "failed"; cost: number; reason: string }
   | { status: "over_budget"; cost: 0 };
 
+/** Share of a long bill's parts that must have notes before they are combined. */
+const MIN_PART_COVERAGE = 0.8;
+
 /** Parts are summarized a few at a time: fast enough for the worker, gentle on provider rate limits. */
 const PART_CONCURRENCY = 4;
 
 export const isLong = (prepared: PreparedBill): boolean => prepared.parts.length > 0;
 
 /** The model used when the first one's reply was rejected: Luna ↔ Sonnet. */
-function otherModel(env: Env, model: DigestModel): DigestModel {
+export function otherModel(env: Env, model: DigestModel): DigestModel {
   const luna = newBillModel(env);
   return model.id === luna.id ? rewriteModel(env) : luna;
 }
@@ -83,7 +86,7 @@ export function firstPassMessages(prepared: PreparedBill): Array<{ key: string; 
   return prepared.parts.map((part, i) => ({ key: `part${i}`, messages: partMessages(prepared.input, part) }));
 }
 
-/** Part notes in bill order; a part whose reply did not parse is left out rather than failing the bill. */
+/** Part notes in bill order; a part whose reply did not parse is left out (see MIN_PART_COVERAGE). */
 export function notesFrom(contents: Array<string | null>): Record<string, unknown>[] {
   return contents.map((c) => parseJsonObject(c)).filter((n): n is Record<string, unknown> => n !== null);
 }
@@ -110,7 +113,11 @@ export async function combineAndStore(
   prepared: PreparedBill,
   params: { tier: Tier; model: DigestModel; notes: Record<string, unknown>[]; priorCost: number }
 ): Promise<WriteOutcome> {
-  if (params.notes.length === 0) return { status: "failed", cost: params.priorCost, reason: "no part notes" };
+  // A summary missing big parts of the bill would be stored as current for these inputs, so require most of them.
+  const needed = Math.ceil(prepared.parts.length * MIN_PART_COVERAGE);
+  if (params.notes.length === 0 || params.notes.length < needed) {
+    return { status: "failed", cost: params.priorCost, reason: `notes for ${params.notes.length} of ${prepared.parts.length} parts` };
+  }
   const model = params.model;
   const reply = await chatCompletion(env, model, combineMessages(prepared.input, params.notes));
   const outcome = await storeReply(env, prepared, {

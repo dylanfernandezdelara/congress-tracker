@@ -133,10 +133,11 @@ URL’s feed is stale vs production, run `npm run sync:preview-db` once. Local o
 re-run `npm run seed` if the House/Senate left rail goes empty during UI work.
 
 **Daily ingest (production):** Cloudflare cron runs `runFeedWithMemberVotes` (feed then
-best-effort `member-votes`) at **10:00 UTC**, and `runExecutivePostsPipeline` hourly at **:20**
-(`20 * * * *`) — see `[triggers]` in `workers/senate_data_worker/wrangler.toml`
-(`crons = ["0 10 * * *", "20 * * * *"]`). The executive cron is off the top of the hour so it
-never shares a minute with the daily feed cron (both share one write lease).
+best-effort `member-votes`) at **10:00 UTC**, `runExecutivePostsPipeline` hourly at **:20**
+(`20 * * * *`), and the summary sweep hourly at **:35** (`35 * * * *`) — see `[triggers]` in
+`workers/senate_data_worker/wrangler.toml` (`crons = ["0 10 * * *", "20 * * * *", "35 * * * *"]`).
+All three share one write lease, so they fire on distinct minutes; a :35 sweep that runs its
+full 15 minutes still frees the lease before the 10:00 feed.
 `wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
 `workers/senate_data_worker` only after `wrangler versions upload` previews. The feed pipeline
 only upserts **new** passage votes (skips known roll-call keys). For digests it only stores sponsors,
@@ -177,14 +178,18 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - **Provenance** `digest_json.generator` (worker-only, stripped from the feed): model, prompt version,
   tier, text version, `fingerprint` (hash of everything the summary was written from), `long`.
 - **Queue** `digest_jobs` / `digest_batches` (`d1/digest-jobs.ts`). The hourly sweep
-  (`pipeline/run-summary-sweep.ts`, on the `:20` cron after executive posts) collects finished
+  (`pipeline/run-summary-sweep.ts`, its own `:35` cron) collects finished
   batches, discovers bills Congress.gov updated (all types, cursor in `pipeline_state`; only bills
   introduced in the last `DIGEST_NEW_BILL_DAYS` or already on the site), re-checks bills still waiting
   on text or CRS, rewrites a few bills that matter, and sends the rest to one Luna batch. A bill whose
   fingerprint is unchanged costs no model call. Writers elsewhere (feed, executive hydrate, public
-  laws) only queue bills.
+  laws) only queue bills. Direct (normal API) writes are capped per run (`DIGEST_SYNC_WRITES_PER_RUN`,
+  and none start after 10 minutes); each paid try is counted before it is made, and after
+  `DIGEST_MAX_ATTEMPTS` failed tries on the same inputs a bill is **parked** until it changes.
+  Long bills that matter go to the batch too (Luna at every tier).
 - **Budget** `DIGEST_DAILY_BUDGET_USD` (default $1; expected spend is cents a day), tracked in
-  `pipeline_state` (`digest_spend:YYYY-MM-DD`). Over budget, the sweep waits for tomorrow.
+  `pipeline_state` (`digest_spend:YYYY-MM-DD`). A batch's estimated cost counts when it is sent and
+  the difference when it is collected. Over budget, the sweep waits for tomorrow.
 - **Backfill**: summaries from before v3 (no `generator`) are left alone unless the bill is queued
   for another reason. A full backfill is a separate, deliberate run.
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`

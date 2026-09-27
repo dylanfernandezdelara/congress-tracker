@@ -44,6 +44,19 @@ export const DIGEST_REFRESH_MAX_BILLS = 25;
  */
 export const DIGEST_REWRITES_PER_RUN = 5;
 export const DIGEST_BATCH_BILLS_PER_RUN = 40;
+/** Queued jobs looked at per run, per queue: unchanged bills are skipped without counting against the caps above. */
+export const DIGEST_REWRITE_SCAN_PER_RUN = 15;
+export const DIGEST_BATCH_SCAN_PER_RUN = 80;
+/** A batch stops taking bills at about this many input tokens (a few giant bills can fill it). */
+export const DIGEST_BATCH_MAX_TOKENS = 1_500_000;
+/** Bills collected from finished batches per run; the rest wait in the open batch for the next run. */
+export const DIGEST_COLLECT_BILLS_PER_RUN = 40;
+/**
+ * Synchronous (normal API) writes per run, across rewrites, collect fallbacks and direct writes, and the wall time
+ * after which no new one starts. Cron invocations end at 15 minutes; a write cut off there is still counted.
+ */
+export const DIGEST_SYNC_WRITES_PER_RUN = 8;
+export const DIGEST_SWEEP_WRITE_WINDOW_MS = 10 * 60_000;
 /** Admin `POST /__pipeline/run/summary-sweep` cap per invocation (?limit=, applies to both). */
 export const DIGEST_SWEEP_ADMIN_MAX_BILLS = 60;
 /** Congress.gov update-list pages (250 bills each) read per run. */
@@ -163,6 +176,11 @@ export const FEED_PIPELINE_CRON_UTC = "0 10 * * *";
  * a collision silently skips the daily feed ingest.
  */
 export const EXECUTIVE_POSTS_CRON_UTC = "20 * * * *";
+/**
+ * Hourly summary sweep (pipeline/run-summary-sweep.ts). Its own invocation, so it has its own subrequest and
+ * wall-time budget. At :35 a sweep that runs its full ~15 minutes still frees the write lease before the 10:00 feed.
+ */
+export const SUMMARY_SWEEP_CRON_UTC = "35 * * * *";
 
 /** Alert if no successful scheduled ingest within this many hours after cron. */
 export { FEED_PIPELINE_STALE_HOURS } from "../../../shared/ingest-monitor-status";
