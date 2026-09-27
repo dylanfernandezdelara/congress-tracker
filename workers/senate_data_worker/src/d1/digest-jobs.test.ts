@@ -20,7 +20,7 @@ import {
   selectRecheckBills,
   settleJob,
 } from "./digest-jobs";
-import { SCHEMA_DDL } from "./schema";
+import { SCHEMA_DDL, SCHEMA_MIGRATIONS } from "./schema";
 
 const T0 = "2026-09-26T10:00:00.000Z";
 const T1 = "2026-09-26T11:00:00.000Z";
@@ -37,7 +37,7 @@ describe("digest jobs", () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "digest-jobs-"));
     dbPath = join(dir, "t.sqlite");
-    sql(SCHEMA_DDL.map((s) => `${s};`).join("\n"));
+    sql([...SCHEMA_DDL, ...SCHEMA_MIGRATIONS.flatMap((m) => m.statements)].map((s) => `${s};`).join("\n"));
     db = sqliteD1(dbPath);
   });
 
@@ -80,6 +80,17 @@ describe("digest jobs", () => {
     expect(row()).toEqual({ state: "queued", attempts: 2, fingerprint: "b", batch_id: null });
     await settleJob(db, hr(1), "done", { fingerprint: "b", attempts: 0 });
     expect(row()).toMatchObject({ state: "done", attempts: 0 });
+  });
+
+  it("counts unreadable runs apart, and clears them once the bill is read", async () => {
+    const failures = () =>
+      JSON.parse(execFileSync("sqlite3", ["-json", dbPath, "SELECT read_failures, attempts FROM digest_jobs"], { encoding: "utf8" }))[0];
+    await enqueueDigestJobs(db, [hr(1)], "new", T0);
+    await markJobsBatched(db, [{ ref: hr(1), fingerprint: "a" }], "b1", T0);
+    await settleJob(db, hr(1), "queued", { readFailures: 2 });
+    expect(failures()).toEqual({ read_failures: 2, attempts: 1 });
+    await settleJob(db, hr(1), "done", { fingerprint: "a", attempts: 0 });
+    expect(failures()).toEqual({ read_failures: 0, attempts: 0 });
   });
 
   it("does not re-queue a bill checked on a later day than its last Congress.gov change", async () => {

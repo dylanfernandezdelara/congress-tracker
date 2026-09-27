@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -315,7 +315,7 @@ export const SCHEMA_DDL = [
  * DDL stays in SCHEMA_DDL (IF NOT EXISTS); destructive/cleanup SQL lives here.
  * Dedup DELETE must run before the unique index is created.
  */
-const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[] }> = [
+export const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[] }> = [
   {
     toVersion: 1,
     statements: [
@@ -357,6 +357,11 @@ const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: string[]
     // Summary queue (digest_jobs / digest_batches, in SCHEMA_DDL) replaces the sweep's per-bill check table.
     toVersion: 12,
     statements: [`DROP TABLE IF EXISTS bill_summary_checks`],
+  },
+  {
+    // Bills that could not be read count separately from failed summaries (digest/ sweep parking).
+    toVersion: 13,
+    statements: [`ALTER TABLE digest_jobs ADD COLUMN read_failures INTEGER NOT NULL DEFAULT 0`],
   },
 ];
 

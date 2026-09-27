@@ -12,6 +12,7 @@ import {
   DIGEST_RECHECK_PER_RUN,
   DIGEST_REWRITE_SCAN_PER_RUN,
   DIGEST_REWRITES_PER_RUN,
+  DIGEST_SWEEP_RUN_WINDOW_MS,
   DIGEST_SWEEP_WRITE_WINDOW_MS,
   DIGEST_SYNC_WRITES_PER_RUN,
 } from "../constants";
@@ -76,8 +77,6 @@ const DISCOVERY_PAGE_SIZE = 250;
 const DISCOVERY_OVERLAP_MS = 3 * 3_600_000;
 /** Luna's reasoning plus the JSON answer, per request, for the batch estimate (high effort runs 2–5k). */
 const ESTIMATED_OUTPUT_TOKENS = 4_000;
-/** Fingerprint recorded for a job whose bill could not be read, so repeated failures park it. */
-const UNREADABLE = "unreadable";
 
 interface DiscoveryCursor {
   fromIso: string;
@@ -134,6 +133,7 @@ class Sweep {
   private syncWrites = 0;
   /** Real clock, not `now`: this bounds how long the run spends writing. */
   private readonly writeDeadline = Date.now() + DIGEST_SWEEP_WRITE_WINDOW_MS;
+  private readonly runDeadline = Date.now() + DIGEST_SWEEP_RUN_WINDOW_MS;
   /** Long bills that matter: Luna at every tier, so they go in the batch at half price instead of a slow direct write. */
   private readonly longRewrites: Array<{ job: DigestJob; prepared: PreparedBill }> = [];
 
@@ -161,7 +161,11 @@ class Sweep {
     const fingerprint = prepared.fingerprint;
     const attempts = Sweep.attemptsFor(job, fingerprint) + 1;
     await markAttempt(this.env.DB, job, fingerprint, attempts);
-    const outcome = await write();
+    // A throw after the try is counted (a timeout, a provider error) is a failed try, never an unreadable bill:
+    // that would reset the count and let the same inputs be paid for again and again.
+    const outcome = await write().catch(
+      (err: unknown): WriteOutcome => ({ status: "failed", cost: 0, reason: message(err) })
+    );
     this.result.spentUsd += outcome.cost;
     if (outcome.status === "stored") {
       this.result.stored += 1;
@@ -189,18 +193,23 @@ class Sweep {
   }
 
   /**
-   * The bill could not be read (Congress.gov down, a bad reference). Back in the queue; a bill that fails this way
-   * every time is parked like any other, so it cannot cost five requests an hour forever.
+   * The bill could not be read (Congress.gov down, a bad reference), so nothing was paid for. Back in the queue,
+   * counted apart from failed summaries so a flaky source never resets those; a bill that cannot be read run after
+   * run is parked, so it cannot cost five requests an hour forever.
    */
   private async fail(job: DigestJob, err: unknown): Promise<void> {
     this.result.failed += 1;
     this.result.warnings.push(`${label(job)}: ${message(err)}`);
-    const attempts = Sweep.attemptsFor(job, UNREADABLE) + 1;
-    await settleJob(this.env.DB, job, attempts >= DIGEST_MAX_ATTEMPTS ? "done" : "queued", {
-      error: message(err),
-      fingerprint: UNREADABLE,
-      attempts,
+    const readFailures = job.readFailures + 1;
+    await settleJob(this.env.DB, job, readFailures >= DIGEST_MAX_ATTEMPTS ? "done" : "queued", {
+      error: readFailures >= DIGEST_MAX_ATTEMPTS ? `parked: unreadable ${readFailures} times: ${message(err)}` : message(err),
+      readFailures,
     });
+  }
+
+  /** No new bill is started after this: the run must end, and free the write lease, well before 15 minutes. */
+  private pastRunDeadline(): boolean {
+    return Date.now() >= this.runDeadline;
   }
 
   // 1. Finished batches: store each reply that passes the checks; write the rest directly, within the caps.
@@ -238,7 +247,7 @@ class Sweep {
       }
       let left = jobs.length;
       for (const job of jobs) {
-        if (budget <= 0) break;
+        if (budget <= 0 || this.pastRunDeadline()) break;
         budget -= 1;
         const done = await this.collectJob(job, byBill.get(refKey(job)) ?? new Map());
         if (!done) break;
@@ -361,7 +370,7 @@ class Sweep {
   async rewrite(limit: number): Promise<void> {
     let writes = 0;
     for (const job of await selectQueuedJobs(this.env.DB, { matters: true, limit: DIGEST_REWRITE_SCAN_PER_RUN })) {
-      if (writes >= limit || !this.canWriteNow()) return;
+      if (writes >= limit || !this.canWriteNow() || this.pastRunDeadline()) return;
       try {
         const prepared = await prepareBill(this.env, job);
         if (await isCurrent(this.env, prepared, "rewrite")) {
@@ -392,7 +401,7 @@ class Sweep {
     const ready: PreparedBill[] = this.longRewrites.map(({ prepared }) => prepared);
     let tokens = ready.reduce((n, p) => n + p.totalTokens, 0);
     for (const job of await selectQueuedJobs(this.env.DB, { matters: false, limit: DIGEST_BATCH_SCAN_PER_RUN })) {
-      if (ready.length >= limit + this.longRewrites.length || tokens >= DIGEST_BATCH_MAX_TOKENS) break;
+      if (ready.length >= limit + this.longRewrites.length || tokens >= DIGEST_BATCH_MAX_TOKENS || this.pastRunDeadline()) break;
       try {
         const prepared = await prepareBill(this.env, job);
         if (await isCurrent(this.env, prepared, "new")) {
@@ -400,8 +409,9 @@ class Sweep {
           await settleJob(this.env.DB, job, "done");
         } else if (await this.parkedJob(job, prepared)) {
           continue;
-        } else if (Sweep.attemptsFor(job, prepared.fingerprint) >= DIGEST_BATCH_MAX_ATTEMPTS) {
-          // Batches keep failing for these inputs: write the bill directly, if the run has room.
+        } else if (Sweep.attemptsFor(job, prepared.fingerprint) >= DIGEST_BATCH_MAX_ATTEMPTS && !isLong(prepared)) {
+          // Batches keep failing for these inputs: write the bill directly, if the run has room. Long bills stay in
+          // batches (Luna either way, and a direct part-by-part write takes minutes); they park at DIGEST_MAX_ATTEMPTS.
           if (this.canWriteNow() && (await budgetLeft(this.env)) > 0) {
             await this.paidWrite(job, prepared, () => writeSummary(this.env, prepared, "new"));
           }

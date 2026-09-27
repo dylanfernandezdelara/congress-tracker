@@ -18,6 +18,8 @@ export interface DigestJob extends BillRef {
   attempts: number;
   batchId: string | null;
   fingerprint: string | null;
+  /** Consecutive runs in which the bill could not be read at all (Congress.gov errors, a bad reference). */
+  readFailures: number;
 }
 
 interface JobRow {
@@ -29,6 +31,7 @@ interface JobRow {
   attempts: number;
   batch_id: string | null;
   fingerprint: string | null;
+  read_failures: number | null;
 }
 
 const toJob = (row: JobRow): DigestJob => ({
@@ -40,6 +43,7 @@ const toJob = (row: JobRow): DigestJob => ({
   attempts: row.attempts,
   batchId: row.batch_id,
   fingerprint: row.fingerprint,
+  readFailures: row.read_failures ?? 0,
 });
 
 /** Floor votes, floor actions, committee reports or enactment. Older rows in some tables store the type lowercase. */
@@ -95,7 +99,7 @@ export async function selectQueuedJobs(
   const { results } = await db
     .prepare(
       `SELECT * FROM (
-         SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.queued_at,
+         SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.queued_at,
                 CASE WHEN j.tier = 'rewrite' OR ${MATTERS_SQL} THEN 1 ELSE 0 END AS matters
          FROM digest_jobs j
          WHERE j.state = 'queued'
@@ -113,7 +117,7 @@ export async function selectBatchJobs(db: D1Database, batchId: string): Promise<
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint,
+      `SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures,
               CASE WHEN j.tier = 'rewrite' OR ${MATTERS_SQL} THEN 1 ELSE 0 END AS matters
        FROM digest_jobs j
        WHERE j.batch_id = ?1 AND j.state = 'batched'`
@@ -134,7 +138,7 @@ export async function markJobsBatched(
     jobs.map(({ ref, fingerprint }) =>
       db
         .prepare(
-          `UPDATE digest_jobs SET state = 'batched', batch_id = ?4, updated_at = ?6,
+          `UPDATE digest_jobs SET state = 'batched', batch_id = ?4, updated_at = ?6, read_failures = 0,
              attempts = CASE WHEN fingerprint = ?5 THEN attempts + 1 ELSE 1 END, fingerprint = ?5
            WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
         )
@@ -151,7 +155,7 @@ export async function settleJob(
   db: D1Database,
   ref: BillRef,
   state: "done" | "queued",
-  params: { error?: string | null; nowIso?: string; fingerprint?: string; attempts?: number } = {}
+  params: { error?: string | null; nowIso?: string; fingerprint?: string; attempts?: number; readFailures?: number } = {}
 ): Promise<void> {
   const now = params.nowIso ?? new Date().toISOString();
   await db
@@ -159,7 +163,8 @@ export async function settleJob(
       `UPDATE digest_jobs SET state = ?4, batch_id = NULL, last_error = ?5, updated_at = ?6,
          queued_at = CASE WHEN ?4 = 'queued' THEN ?6 ELSE queued_at END,
          fingerprint = COALESCE(?7, fingerprint),
-         attempts = COALESCE(?8, attempts)
+         attempts = COALESCE(?8, attempts),
+         read_failures = COALESCE(?9, CASE WHEN ?7 IS NOT NULL THEN 0 ELSE read_failures END)
        WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
     )
     .bind(
@@ -170,7 +175,8 @@ export async function settleJob(
       params.error ?? null,
       now,
       params.fingerprint ?? null,
-      params.attempts ?? null
+      params.attempts ?? null,
+      params.readFailures ?? null
     )
     .run();
 }
@@ -188,7 +194,7 @@ export async function markAttempt(
 ): Promise<void> {
   await db
     .prepare(
-      `UPDATE digest_jobs SET state = 'queued', batch_id = NULL, fingerprint = ?4, attempts = ?5,
+      `UPDATE digest_jobs SET state = 'queued', batch_id = NULL, fingerprint = ?4, attempts = ?5, read_failures = 0,
          queued_at = ?6, updated_at = ?6, last_error = 'write started'
        WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
     )
