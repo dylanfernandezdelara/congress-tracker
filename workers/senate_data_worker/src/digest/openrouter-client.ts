@@ -88,7 +88,9 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
       if (!res.ok) {
         const text = body.error?.message ?? `HTTP ${res.status}`;
         if (res.status === 429 || res.status >= 500) throw new Error(text);
-        throw [401, 402, 403].includes(res.status) ? new AccountError(`OpenRouter account: ${text}`) : new PermanentError(text);
+        // A refusal from the gateway itself (missing or rotated CF_AIG_TOKEN) names the gateway, not OpenRouter.
+        const who = isGateway(base) && body.error === undefined ? "AI Gateway" : "OpenRouter account";
+        throw [401, 402, 403].includes(res.status) ? new AccountError(`${who}: ${text}`) : new PermanentError(text);
       }
       return {
         content: body.choices?.[0]?.message?.content ?? null,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
-import { chatCompletion, getBatch } from "./openrouter-client";
+import { chatCompletion, getBatch, submitBatch } from "./openrouter-client";
 
 const env = { OPENROUTER_API_KEY: "k" } as Env;
 const model = { id: "openai/gpt-6-luna", maxTokens: 100 };
@@ -47,6 +47,19 @@ describe("openrouter client", () => {
     expect(directUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect((directInit.headers as Record<string, string>)["cf-aig-authorization"]).toBeUndefined();
     expect(viaGateway.gatewayLogId).toBe("01LOG");
+  });
+
+  it("names the gateway when it refuses the token, and never sends batches through it", async () => {
+    const gatewayEnv = { ...env, OPENROUTER_BASE_URL: "https://gateway.ai.cloudflare.com/v1/acct/trackcongress/openrouter/v1", CF_AIG_TOKEN: "aig" } as Env;
+    vi.stubGlobal("fetch", vi.fn(async () => json(401, { success: false, errors: [{ code: 2009, message: "Unauthorized" }] })));
+    await expect(chatCompletion(gatewayEnv, model, messages)).rejects.toThrow("AI Gateway: HTTP 401");
+
+    const fetch = vi.fn(async () => json(200, { id: "batch-1" }));
+    vi.stubGlobal("fetch", fetch);
+    await submitBatch(gatewayEnv, model, [{ customId: "a", messages }]);
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://openrouter.ai/api/v1/batches");
+    expect((init.headers as Record<string, string>)["cf-aig-authorization"]).toBeUndefined();
   });
 
   it("sums per-request costs when a batch does not report its total", async () => {

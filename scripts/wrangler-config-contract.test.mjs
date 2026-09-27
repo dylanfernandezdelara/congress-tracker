@@ -31,6 +31,9 @@ function parseWranglerConfig(filePath) {
     : []
   const congressMatch = content.match(/^CONGRESS\s*=\s*"([^"]+)"/m)
   const sessionMatch = content.match(/^SESSION\s*=\s*"([^"]+)"/m)
+  const openrouterBaseUrlMatch = content.match(/^OPENROUTER_BASE_URL\s*=\s*"([^"]*)"/m)
+  // The [env.preview.vars] table, up to the next table header.
+  const previewVarsBlock = content.split(/^\[env\.preview\.vars\]\s*$/m)[1]?.split(/^\[/m)[0] ?? ''
   const assetsMatch = content.match(/\[assets\][\s\S]*?^directory\s*=\s*"([^"]+)"/m)
   const runWorkerFirstMatch = content.match(/^run_worker_first\s*=\s*(true|false)/m)
 
@@ -56,6 +59,8 @@ function parseWranglerConfig(filePath) {
     crons,
     congress: congressMatch?.[1],
     session: sessionMatch?.[1],
+    openrouterBaseUrl: openrouterBaseUrlMatch?.[1],
+    previewVarsSetOpenrouterBaseUrl: /^OPENROUTER_BASE_URL\s*=/m.test(previewVarsBlock),
     assetsDirectory: assetsMatch?.[1],
     runWorkerFirst: runWorkerFirstMatch?.[1] === 'true',
     observabilityEnabled: observabilitySection?.[1] === 'true',
@@ -109,6 +114,15 @@ test('root and worker wrangler.toml share deployment metadata', () => {
   assert.equal(root.previewEnvD1DatabaseId, worker.previewEnvD1DatabaseId)
   assert.equal(root.observabilityEnabled, worker.observabilityEnabled)
   assert.equal(root.observabilityHeadSamplingRate, worker.observabilityHeadSamplingRate)
+})
+
+test('production summaries go through AI Gateway; preview calls OpenRouter directly', () => {
+  const root = parseWranglerConfig(rootConfigPath)
+  const worker = parseWranglerConfig(workerConfigPath)
+  assert.equal(root.openrouterBaseUrl, worker.openrouterBaseUrl)
+  assert.match(root.openrouterBaseUrl ?? '', /^https:\/\/gateway\.ai\.cloudflare\.com\/v1\/[0-9a-f]+\/trackcongress\/openrouter\/v1$/)
+  assert.equal(root.previewVarsSetOpenrouterBaseUrl, false)
+  assert.equal(worker.previewVarsSetOpenrouterBaseUrl, false)
 })
 
 test('cron triggers keep the daily feed, hourly executive and hourly summary sweep on distinct minutes', () => {

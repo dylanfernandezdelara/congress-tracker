@@ -7,6 +7,11 @@ ALLOWED_ORIGIN=*
 # If PIPELINE_ADMIN_TOKEN is set below, it takes precedence (use Authorization: Bearer <token>).
 DEV_OPEN_PIPELINE=1
 
+# Summaries: production routes them through Cloudflare AI Gateway (wrangler.toml [vars]). Locally, the empty value
+# below calls OpenRouter directly; to use the gateway instead, remove this line and set CF_AIG_TOKEN.
+OPENROUTER_BASE_URL=
+# CF_AIG_TOKEN=
+
 # Local-only synthetic disclosure seeding (POST /__pipeline/run/disclosures). Never set in production.
 ENABLE_SAMPLE_DISCLOSURES=1
 

@@ -73,6 +73,7 @@ cd workers/senate_data_worker
 wrangler d1 create congress-tracker   # once; update database_id in wrangler.toml
 wrangler secret put CONGRESS_API_KEY
 wrangler secret put OPENROUTER_API_KEY
+wrangler secret put CF_AIG_TOKEN   # AI Gateway "trackcongress" (authenticated), see AGENTS.md
 cd ../.. && npm run deploy            # builds web/dist, then deploys the Worker
 ```
 
