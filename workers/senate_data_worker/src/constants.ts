@@ -55,8 +55,10 @@ export const DIGEST_RECHECK_HOURS = 24;
 export const DIGEST_RECHECK_PER_RUN = 20;
 /** OpenRouter batches finish within 24 hours; after this a batch is treated as expired. */
 export const DIGEST_BATCH_EXPIRE_HOURS = 26;
-/** After this many batch submissions a bill is written directly instead. */
-export const DIGEST_BATCH_MAX_ATTEMPTS = 3;
+/** After this many tries for the same inputs a bill is written directly instead of batched again. */
+export const DIGEST_BATCH_MAX_ATTEMPTS = 2;
+/** After this many failed tries for the same inputs a bill is parked until it changes (no more spend on it). */
+export const DIGEST_MAX_ATTEMPTS = 3;
 /** Max new nomination background rewrites per feed pipeline run. */
 export const CONFIRMATION_BACKGROUND_MAX_NEW_REWRITES = 10;
 /** Max nomination metadata fetches (Congress.gov) per feed pipeline run. */

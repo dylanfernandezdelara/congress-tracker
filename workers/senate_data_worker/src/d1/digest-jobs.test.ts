@@ -66,6 +66,20 @@ describe("digest jobs", () => {
     expect((await selectBatchJobs(db, "batch-1")).map((j) => [j.number, j.fingerprint])).toEqual([[1, "a"]]);
   });
 
+  it("counts failed attempts per fingerprint and starts over when the bill changes", async () => {
+    const attempts = () => jobs().map((j: { attempts: number }) => j.attempts)[0];
+    await enqueueDigestJobs(db, [hr(1)], "new", T0);
+    await markJobsBatched(db, [{ ref: hr(1), fingerprint: "a" }], "b1", T0);
+    await settleJob(db, hr(1), "queued", { attempt: { fingerprint: "a", failed: true } });
+    expect(attempts()).toBe(2);
+    await enqueueDigestJobs(db, [hr(1)], "new", T1);
+    expect(attempts()).toBe(2);
+    await markJobsBatched(db, [{ ref: hr(1), fingerprint: "b" }], "b2", T1);
+    expect(attempts()).toBe(1);
+    await settleJob(db, hr(1), "done", { attempt: { fingerprint: "c", failed: false } });
+    expect(attempts()).toBe(0);
+  });
+
   it("splits the queue by whether a bill matters: a vote, a committee report, a law, or a rewrite request", async () => {
     sql(`
       INSERT INTO votes VALUES ('House', 119, 2, 10, 119, 'HR', 2, 'On Passage', 'Passed', 300, 100, '2026-09-01', 1);

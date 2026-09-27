@@ -66,8 +66,7 @@ export async function enqueueDigestJobs(db: D1Database, bills: BillRef[], tier: 
            ON CONFLICT (congress, bill_type, number) DO UPDATE SET
              state = CASE WHEN digest_jobs.state = 'batched' THEN 'batched' ELSE 'queued' END,
              tier = CASE WHEN digest_jobs.tier = 'rewrite' THEN 'rewrite' ELSE excluded.tier END,
-             queued_at = CASE WHEN digest_jobs.state = 'queued' THEN digest_jobs.queued_at ELSE excluded.queued_at END,
-             attempts = CASE WHEN digest_jobs.state = 'done' THEN 0 ELSE digest_jobs.attempts END`
+             queued_at = CASE WHEN digest_jobs.state = 'queued' THEN digest_jobs.queued_at ELSE excluded.queued_at END`
         )
         .bind(bill.congress, normalizeBillType(bill.type), bill.number, tier, nowIso)
     )
@@ -123,7 +122,8 @@ export async function markJobsBatched(
     jobs.map(({ ref, fingerprint }) =>
       db
         .prepare(
-          `UPDATE digest_jobs SET state = 'batched', batch_id = ?4, fingerprint = ?5, attempts = attempts + 1, updated_at = ?6
+          `UPDATE digest_jobs SET state = 'batched', batch_id = ?4, updated_at = ?6,
+             attempts = CASE WHEN fingerprint = ?5 THEN attempts + 1 ELSE 1 END, fingerprint = ?5
            WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
         )
         .bind(ref.congress, normalizeBillType(ref.type), ref.number, batchId, fingerprint, nowIso)
@@ -131,21 +131,40 @@ export async function markJobsBatched(
   );
 }
 
-/** Finish a job ("done"), or put it back in the queue (a changed bill, an expired batch). */
+/**
+ * Finish a job ("done"), or put it back in the queue (a changed bill, an expired batch). `attempt` records a
+ * write for these inputs: `attempts` counts failed writes per fingerprint, so a bill whose summary keeps failing
+ * the checks is parked until the bill itself changes, instead of paying for the same failure every hour.
+ */
 export async function settleJob(
   db: D1Database,
   ref: BillRef,
   state: "done" | "queued",
-  params: { error?: string | null; nowIso?: string } = {}
+  params: { error?: string | null; nowIso?: string; attempt?: { fingerprint: string; failed: boolean } } = {}
 ): Promise<void> {
   const now = params.nowIso ?? new Date().toISOString();
+  const attempt = params.attempt ?? null;
   await db
     .prepare(
       `UPDATE digest_jobs SET state = ?4, batch_id = NULL, last_error = ?5, updated_at = ?6,
-         queued_at = CASE WHEN ?4 = 'queued' THEN ?6 ELSE queued_at END
+         queued_at = CASE WHEN ?4 = 'queued' THEN ?6 ELSE queued_at END,
+         attempts = CASE
+           WHEN ?7 IS NULL THEN attempts
+           WHEN fingerprint = ?7 THEN attempts + ?8
+           ELSE ?8 END,
+         fingerprint = COALESCE(?7, fingerprint)
        WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
     )
-    .bind(ref.congress, normalizeBillType(ref.type), ref.number, state, params.error ?? null, now)
+    .bind(
+      ref.congress,
+      normalizeBillType(ref.type),
+      ref.number,
+      state,
+      params.error ?? null,
+      now,
+      attempt?.fingerprint ?? null,
+      attempt?.failed ? 1 : 0
+    )
     .run();
 }
 

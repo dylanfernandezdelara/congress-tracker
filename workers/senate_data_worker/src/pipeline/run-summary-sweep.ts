@@ -2,6 +2,7 @@ import {
   DIGEST_BATCH_BILLS_PER_RUN,
   DIGEST_BATCH_EXPIRE_HOURS,
   DIGEST_BATCH_MAX_ATTEMPTS,
+  DIGEST_MAX_ATTEMPTS,
   DIGEST_DISCOVERY_PAGES_PER_RUN,
   DIGEST_NEW_BILL_DAYS,
   DIGEST_RECHECK_HOURS,
@@ -49,6 +50,8 @@ export interface SummarySweepResult {
   discovered: number;
   rechecked: number;
   unchanged: number;
+  /** Bills whose summaries kept failing the checks for the same inputs; retried when the bill changes. */
+  parked: number;
   rewritten: number;
   batched: number;
   stored: number;
@@ -106,6 +109,7 @@ class Sweep {
     discovered: 0,
     rechecked: 0,
     unchanged: 0,
+    parked: 0,
     rewritten: 0,
     batched: 0,
     stored: 0,
@@ -119,16 +123,31 @@ class Sweep {
     private readonly now: Date
   ) {}
 
-  private async settle(job: BillRef, outcome: WriteOutcome): Promise<void> {
+  private async settle(job: DigestJob, prepared: PreparedBill, outcome: WriteOutcome): Promise<void> {
     this.result.spentUsd += outcome.cost;
+    const fingerprint = prepared.fingerprint;
     if (outcome.status === "stored") {
       this.result.stored += 1;
-      await settleJob(this.env.DB, job, "done");
+      await settleJob(this.env.DB, job, "done", { attempt: { fingerprint, failed: false } });
       return;
     }
     this.result.failed += 1;
     this.result.warnings.push(`${label(job)}: ${describe(outcome)}`);
-    await settleJob(this.env.DB, job, "queued", { error: describe(outcome) });
+    // A spent budget is not the bill's fault; everything else counts toward parking it.
+    const failed = outcome.status !== "over_budget";
+    const attempts = (job.fingerprint === fingerprint ? job.attempts : 0) + (failed ? 1 : 0);
+    await settleJob(this.env.DB, job, attempts >= DIGEST_MAX_ATTEMPTS ? "done" : "queued", {
+      error: describe(outcome),
+      attempt: { fingerprint, failed },
+    });
+  }
+
+  /** True (and the job is closed) when this bill already failed too often with these same inputs. */
+  private async parkedJob(job: DigestJob, prepared: PreparedBill): Promise<boolean> {
+    if (job.fingerprint !== prepared.fingerprint || job.attempts < DIGEST_MAX_ATTEMPTS) return false;
+    this.result.parked += 1;
+    await settleJob(this.env.DB, job, "done", { error: `parked after ${job.attempts} failed attempts; retried when the bill changes` });
+    return true;
   }
 
   private async fail(job: BillRef, err: unknown): Promise<void> {
@@ -198,7 +217,7 @@ class Sweep {
         : await storeReply(this.env, prepared, { tier, model: model.id, content: items.get("single")?.content ?? null, cost: 0 });
       // A missing, unparseable or rejected batch reply is written directly (Luna, then Sonnet).
       if (outcome.status !== "stored") outcome = await writeSummary(this.env, prepared, tier);
-      await this.settle(job, outcome);
+      await this.settle(job, prepared, outcome);
     } catch (err) {
       await this.fail(job, err);
     }
@@ -263,13 +282,14 @@ class Sweep {
           await settleJob(this.env.DB, job, "done");
           continue;
         }
+        if (await this.parkedJob(job, prepared)) continue;
         if ((await budgetLeft(this.env)) <= 0) {
           this.result.warnings.push("daily summary budget spent; rewrites resume tomorrow");
           return;
         }
         const outcome = await writeSummary(this.env, prepared, "rewrite");
         if (outcome.status === "stored") this.result.rewritten += 1;
-        await this.settle(job, outcome);
+        await this.settle(job, prepared, outcome);
       } catch (err) {
         await this.fail(job, err);
       }
@@ -285,11 +305,11 @@ class Sweep {
         if (await isCurrent(this.env, prepared, "new")) {
           this.result.unchanged += 1;
           await settleJob(this.env.DB, job, "done");
-        } else if (job.attempts >= DIGEST_BATCH_MAX_ATTEMPTS) {
-          // Batches keep failing for this bill: write it directly, once.
-          const outcome = await writeSummary(this.env, prepared, "new");
-          await this.settle(job, outcome);
-          if (outcome.status !== "stored") await settleJob(this.env.DB, job, "done", { error: describe(outcome) });
+        } else if (await this.parkedJob(job, prepared)) {
+          continue;
+        } else if (job.fingerprint === prepared.fingerprint && job.attempts >= DIGEST_BATCH_MAX_ATTEMPTS) {
+          // Batches keep failing for these inputs: write the bill directly.
+          await this.settle(job, prepared, await writeSummary(this.env, prepared, "new"));
         } else {
           ready.push(prepared);
         }

@@ -254,6 +254,23 @@ describe("runSummarySweep", () => {
       expect(result).toMatchObject({ unchanged: 1, rewritten: 2 });
     });
 
+    it("parks a bill whose summaries keep failing the checks, until its inputs change", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) =>
+        matters ? [job(1, { matters: true, attempts: 1, fingerprint: "fp1" }), job(2, { matters: true, attempts: 2, fingerprint: "fp2" })] : []
+      );
+      mockWrite.mockResolvedValue({ status: "rejected", model: "m", cost: 0.05, reasons: ["number not in sources: 31905000000"] });
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      const calls = jobsApi.settleJob.mock.calls.map((c) => [(c[1] as DigestJob).number, c[2], c[3]?.attempt]);
+      expect(calls).toEqual([
+        [1, "queued", { fingerprint: "fp1", failed: true }],
+        [2, "done", { fingerprint: "fp2", failed: true }],
+      ]);
+      expect(result.warnings).toContain("H.R. 2 · 119th Congress: rejected: number not in sources: 31905000000");
+      expect(result.spentUsd).toBe(0.1);
+    });
+
     it("stops rewriting when the day's budget is spent", async () => {
       jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) => (matters ? [job(1, { matters: true })] : []));
       mockBudgetLeft.mockResolvedValue(0);
@@ -269,7 +286,7 @@ describe("runSummarySweep", () => {
         { label: "Title I — A", text: "a", tokens: 20_000 },
         { label: "Title II — B", text: "b", tokens: 20_000 },
       ];
-      jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) => (matters ? [] : [job(1), job(2), job(3, { attempts: 3 })]));
+      jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) => (matters ? [] : [job(1), job(2), job(3, { attempts: 2, fingerprint: "fp3" }), job(4, { attempts: 3, fingerprint: "fp4" }), job(5, { attempts: 3, fingerprint: "changed" })]));
       mockPrepare.mockImplementation(async (_e, ref: { number: number }) =>
         ref.number === 2 ? prepared(2, { parts, totalTokens: 40_000, basis: "text" }) : prepared(ref.number)
       );
@@ -280,14 +297,19 @@ describe("runSummarySweep", () => {
 
       const [, model, requests] = mockSubmitBatch.mock.calls[0]!;
       expect(model).toMatchObject({ id: "openai/gpt-6-luna", reasoning: { effort: "high" } });
-      expect(requests.map((r: { customId: string }) => r.customId)).toEqual(["119-hr-1:single", "119-hr-2:part0", "119-hr-2:part1"]);
+      // 5 failed before, but on inputs that have since changed, so it gets a fresh try.
+      expect(requests.map((r: { customId: string }) => r.customId)).toEqual(["119-hr-1:single", "119-hr-2:part0", "119-hr-2:part1", "119-hr-5:single"]);
       expect(jobsApi.markJobsBatched.mock.calls[0]![1]).toEqual([
         { ref: { congress: 119, type: "HR", number: 1 }, fingerprint: "fp1" },
         { ref: { congress: 119, type: "HR", number: 2 }, fingerprint: "fp2" },
+        { ref: { congress: 119, type: "HR", number: 5 }, fingerprint: "fp5" },
       ]);
       // A bill whose batches keep failing is written directly.
+      expect(mockWrite).toHaveBeenCalledTimes(1);
       expect(mockWrite).toHaveBeenCalledWith(env, expect.objectContaining({ fingerprint: "fp3" }), "new");
-      expect(result.batched).toBe(2);
+      // 4 failed three times on these same inputs: parked, no model call.
+      expect(result).toMatchObject({ batched: 3, parked: 1 });
+      expect(settled()).toContainEqual([4, "done"]);
     });
   });
 });
