@@ -39,7 +39,14 @@ import { getPipelineState, setPipelineState } from "../d1/pipeline-state";
 import { budgetLeft, recordSpend } from "../digest/budget";
 import { approxTokens } from "../digest/bill-text-parse";
 import { newBillModel, type DigestModel } from "../digest/models";
-import { cancelBatch, getBatch, submitBatch, type BatchResultItem, type BatchState } from "../digest/openrouter-client";
+import {
+  AccountError,
+  cancelBatch,
+  getBatch,
+  submitBatch,
+  type BatchResultItem,
+  type BatchState,
+} from "../digest/openrouter-client";
 import { prepareBill, type PreparedBill } from "../digest/prepare";
 import {
   combineAndStore,
@@ -164,7 +171,7 @@ class Sweep {
     // A throw after the try is counted (a timeout, a provider error) is a failed try, never an unreadable bill:
     // that would reset the count and let the same inputs be paid for again and again.
     const outcome = await write().catch(
-      (err: unknown): WriteOutcome => ({ status: "failed", cost: 0, reason: message(err) })
+      (err: unknown): WriteOutcome => ({ status: "failed", cost: 0, reason: message(err), account: err instanceof AccountError })
     );
     this.result.spentUsd += outcome.cost;
     if (outcome.status === "stored") {
@@ -174,8 +181,11 @@ class Sweep {
     }
     this.result.failed += 1;
     this.result.warnings.push(`${label(job)}: ${describe(outcome)}`);
-    // A spent budget is not the bill's fault: give the try back.
-    const counted = outcome.status === "over_budget" ? attempts - 1 : attempts;
+    // A spent budget or a refusing OpenRouter account (no credits, bad key) is not the bill's fault: give the try
+    // back, and make no more direct writes this run.
+    const account = outcome.status === "failed" && outcome.account === true;
+    if (account) this.syncWrites = this.maxSyncWrites;
+    const counted = outcome.status === "over_budget" || account ? attempts - 1 : attempts;
     await settleJob(this.env.DB, job, counted >= DIGEST_MAX_ATTEMPTS ? "done" : "queued", {
       error: describe(outcome),
       fingerprint,

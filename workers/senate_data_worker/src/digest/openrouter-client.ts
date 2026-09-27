@@ -58,6 +58,9 @@ function usageOf(body: ChatBody): CallUsage {
 
 class PermanentError extends Error {}
 
+/** The OpenRouter account itself is refusing (no credits, bad key): nothing to do with the bill being written. */
+export class AccountError extends PermanentError {}
+
 /**
  * One normal (non-batch) completion. Network errors, 429 and 5xx are retried once; other 4xx (a bad request, no
  * credits) are not, since a second try would fail the same way. An empty reply returns content null.
@@ -76,7 +79,8 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
       const body = (await res.json().catch(() => ({}))) as ChatBody;
       if (!res.ok) {
         const text = body.error?.message ?? `HTTP ${res.status}`;
-        throw res.status === 429 || res.status >= 500 ? new Error(text) : new PermanentError(text);
+        if (res.status === 429 || res.status >= 500) throw new Error(text);
+        throw [401, 402, 403].includes(res.status) ? new AccountError(`OpenRouter account: ${text}`) : new PermanentError(text);
       }
       return { content: body.choices?.[0]?.message?.content ?? null, usage: usageOf(body), generationId: body.id ?? null };
     } catch (err: unknown) {

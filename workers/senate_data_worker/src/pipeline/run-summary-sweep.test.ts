@@ -45,6 +45,7 @@ vi.mock("../digest/budget", () => ({
   recordSpend: (...a: unknown[]) => mockRecordSpend(...a),
 }));
 vi.mock("../digest/openrouter-client", () => ({
+  AccountError: class AccountError extends Error {},
   getBatch: (...a: unknown[]) => mockGetBatch(...a),
   submitBatch: (...a: unknown[]) => mockSubmitBatch(...a),
   cancelBatch: (...a: unknown[]) => mockCancelBatch(...a),
@@ -374,6 +375,18 @@ describe("runSummarySweep", () => {
       const [, state, params] = settledWith()[1]!;
       expect(state).toBe("done");
       expect(params).toEqual({ error: "parked: unreadable 3 times: HTTP 503", readFailures: 3 });
+    });
+
+    it("does not count a refusing OpenRouter account against the bill, and stops direct writes", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(
+        onlyMatters([job(1, { matters: true, attempts: 2, fingerprint: "fp1" }), job(2, { matters: true })])
+      );
+      mockWrite.mockResolvedValue({ status: "failed", cost: 0, reason: "OpenRouter account: Insufficient credits", account: true });
+
+      await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+      expect(settledWith()).toEqual([[1, "queued", expect.objectContaining({ fingerprint: "fp1", attempts: 2 })]]);
     });
 
     it("stops rewriting when the day's budget is spent", async () => {

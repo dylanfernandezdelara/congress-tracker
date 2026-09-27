@@ -13,7 +13,7 @@ describe("openrouter client", () => {
   it("does not retry a request error that would fail the same way (a 402 costs nothing twice)", async () => {
     const fetch = vi.fn(async () => json(402, { error: { message: "Insufficient credits" } }));
     vi.stubGlobal("fetch", fetch);
-    await expect(chatCompletion(env, model, messages)).rejects.toThrow("Insufficient credits");
+    await expect(chatCompletion(env, model, messages)).rejects.toThrow("OpenRouter account: Insufficient credits");
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

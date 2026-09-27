@@ -3,7 +3,7 @@ import { upsertDigest, type DigestGenerator, type StoredBillDigest } from "../d1
 import { budgetLeft, recordSpend } from "./budget";
 import { checkSummary } from "./checks";
 import { modelFor, newBillModel, rewriteModel, type DigestModel } from "./models";
-import { chatCompletion } from "./openrouter-client";
+import { AccountError, chatCompletion } from "./openrouter-client";
 import { parseJsonObject, parseSummaryReply } from "./parse";
 import type { PreparedBill } from "./prepare";
 import { combineMessages, partMessages, PROMPT_VERSION, singlePassMessages, type DigestMessages } from "./prompt";
@@ -21,7 +21,7 @@ export type Tier = DigestGenerator["tier"];
 export type WriteOutcome =
   | { status: "stored"; model: string; cost: number; warnings: string[] }
   | { status: "rejected"; model: string; cost: number; reasons: string[] }
-  | { status: "failed"; cost: number; reason: string }
+  | { status: "failed"; cost: number; reason: string; account?: boolean }
   | { status: "over_budget"; cost: 0 };
 
 /** Share of a long bill's parts that must have notes before they are combined. */
@@ -160,6 +160,6 @@ export async function writeSummary(
     const second = await writeSummary(env, prepared, tier, { model: otherModel(env, model), retry: false });
     return second.status === "stored" ? { ...second, cost: second.cost + first.cost } : first;
   } catch (err: unknown) {
-    return { status: "failed", cost: 0, reason: err instanceof Error ? err.message : String(err) };
+    return { status: "failed", cost: 0, reason: err instanceof Error ? err.message : String(err), account: err instanceof AccountError };
   }
 }
