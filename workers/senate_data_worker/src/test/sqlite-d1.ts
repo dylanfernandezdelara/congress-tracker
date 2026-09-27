@@ -1,12 +1,14 @@
 import { execFileSync } from "node:child_process";
 
-/** CI is Node 20 (no `node:sqlite`), so a tiny D1 stand-in runs every statement through the sqlite3 CLI. Binds are `?N`. */
+/** CI is Node 20 (no `node:sqlite`), so a tiny D1 stand-in runs every statement through the sqlite3 CLI. Binds are `?N` or positional `?`. */
 export function sqliteD1(dbPath: string): D1Database {
   const literal = (value: unknown): string =>
     value === null || value === undefined ? "NULL" :
     typeof value === "number" ? String(value) : `'${String(value).replace(/'/g, "''")}'`;
   const statement = (sql: string, binds: unknown[] = []) => {
-    const bound = sql.replace(/\?(\d+)/g, (_m, n: string) => literal(binds[Number(n) - 1]));
+    // Numbered (?1) binds by index; bare ? binds in order.
+    let next = 0;
+    const bound = sql.replace(/\?(\d+)?/g, (_m, n: string | undefined) => literal(binds[n ? Number(n) - 1 : next++]));
     const run = (json: boolean) =>
       execFileSync("sqlite3", json ? ["-json", dbPath, bound] : [dbPath, bound], { encoding: "utf8" }).trim();
     const self = {

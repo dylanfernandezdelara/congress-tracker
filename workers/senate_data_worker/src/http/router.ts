@@ -17,6 +17,7 @@ import {
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
 import { runSummarySweep } from "../pipeline/run-summary-sweep";
+import { handleSummaryFeedback } from "./summary-feedback";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedWithMemberVotes } from "../pipeline/run-feed-with-member-votes";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
@@ -867,6 +868,10 @@ export async function handlePublicFetch(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  if (pathname === "/feedback/summary") {
+    return handleSummaryFeedback(request, env, json);
+  }
+
   if (pathname === "/__pipeline/purge-cache") {
     return handlePurgeCacheRoute(request, env, json);
   }
@@ -906,6 +911,7 @@ const API_PATH_PREFIXES = [
   "/health",
   "/debug/",
   "/feed/",
+  "/feedback/",
   "/stats/",
   "/executive/",
   "/share/",
