@@ -34,6 +34,7 @@ export interface CheckResult {
 const JUDGING = [
   "landmark", "sweeping", "historic", "controversial", "common-sense", "commonsense", "radical", "extreme", "bold",
   "crucial", "critical", "harmful", "dangerous", "devastating", "unprecedented", "massive", "draconian", "reckless", "vital",
+  "dirty", "polluting",
 ];
 
 const SCALE: Record<string, number> = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
