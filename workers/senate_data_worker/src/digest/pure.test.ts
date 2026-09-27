@@ -156,6 +156,12 @@ describe("checks", () => {
     expect(at("Senate rejects plan to cap airline fees at the service cost")).toEqual(["headline mentions the vote"]);
     expect(at("Resolution would direct U.S. forces out of hostilities with Iran")).toEqual([]);
     expect(at("Bill would require House members to disclose stock trades")).toEqual([]);
+    expect(at("Amendment to fix Supreme Court at nine justices fails in House")).toEqual(["headline mentions the vote"]);
+    expect(at("House-passed bill would bar colleges from Israel boycotts")).toEqual(["headline mentions the vote"]);
+    expect(at("Amendment would fix Supreme Court at nine justices; House rejected it")).toEqual(["headline mentions the vote"]);
+    // Bills about congressional votes are about the change.
+    expect(at("Resolution would require House votes on war powers")).toEqual([]);
+    expect(at("Bill would require Congress approve any new tariffs")).toEqual([]);
   });
 
   it("allows fixed terms of art", () => {

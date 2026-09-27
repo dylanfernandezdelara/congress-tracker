@@ -1,7 +1,7 @@
 import type { Env } from "../config";
 import { upsertDigest, type DigestGenerator, type StoredBillDigest } from "../d1/digests";
 import { budgetLeft, recordSpend } from "./budget";
-import { checkSummary } from "./checks";
+import { checkSummary, STYLE_ONLY_REASONS } from "./checks";
 import { modelFor, newBillModel, rewriteModel, type DigestModel } from "./models";
 import { AccountError, chatCompletion } from "./openrouter-client";
 import { parseJsonObject, parseSummaryReply } from "./parse";
@@ -45,7 +45,15 @@ export function otherModel(env: Env, model: DigestModel): DigestModel {
 export async function storeReply(
   env: Env,
   prepared: PreparedBill,
-  params: { tier: Tier; model: string; content: string | null; cost: number; gatewayLogId?: string | null }
+  params: {
+    tier: Tier;
+    model: string;
+    content: string | null;
+    cost: number;
+    gatewayLogId?: string | null;
+    /** The last model to try: a style-only problem (a vote headline) is kept as a warning, not a reason to have no summary. */
+    lastTry?: boolean;
+  }
 ): Promise<WriteOutcome> {
   const long = isLong(prepared);
   const parsed = parseSummaryReply(params.content, {
@@ -54,7 +62,13 @@ export async function storeReply(
     totalTokens: prepared.totalTokens,
   });
   if (!parsed) return { status: "rejected", model: params.model, cost: params.cost, reasons: ["reply did not parse"] };
-  const check = checkSummary(parsed.checkable, prepared.checkSources, { long });
+  const checked = checkSummary(parsed.checkable, prepared.checkSources, { long });
+  const style = params.lastTry ? checked.blocking.filter((b) => STYLE_ONLY_REASONS.includes(b)) : [];
+  const check = {
+    ...checked,
+    blocking: checked.blocking.filter((b) => !style.includes(b)),
+    warnings: [...style, ...checked.warnings],
+  };
   if (check.blocking.length) return { status: "rejected", model: params.model, cost: params.cost, reasons: check.blocking };
 
   const generator: DigestGenerator = {
@@ -112,7 +126,7 @@ async function partNotes(env: Env, model: DigestModel, prepared: PreparedBill): 
 export async function combineAndStore(
   env: Env,
   prepared: PreparedBill,
-  params: { tier: Tier; model: DigestModel; notes: Record<string, unknown>[]; priorCost: number }
+  params: { tier: Tier; model: DigestModel; notes: Record<string, unknown>[]; priorCost: number; lastTry?: boolean }
 ): Promise<WriteOutcome> {
   // A summary missing big parts of the bill would be stored as current for these inputs, so require most of them.
   const needed = Math.ceil(prepared.parts.length * MIN_PART_COVERAGE);
@@ -127,6 +141,7 @@ export async function combineAndStore(
     content: reply.content,
     cost: params.priorCost + reply.usage.cost,
     gatewayLogId: reply.gatewayLogId,
+    lastTry: params.lastTry,
   });
   await recordSpend(env, reply.usage.cost);
   return outcome;
@@ -140,7 +155,7 @@ export async function writeSummary(
   env: Env,
   prepared: PreparedBill,
   tier: Tier,
-  options: { model?: DigestModel; retry?: boolean } = {}
+  options: { model?: DigestModel; retry?: boolean; lastTry?: boolean } = {}
 ): Promise<WriteOutcome> {
   if ((await budgetLeft(env)) <= 0) return { status: "over_budget", cost: 0 };
   const model = options.model ?? modelFor(env, tier, isLong(prepared));
@@ -152,7 +167,13 @@ export async function writeSummary(
       const first = await combineAndStore(env, prepared, { tier, model, notes, priorCost: cost });
       if (first.status !== "rejected" || !retry) return first;
       // Keep the notes; only the combine pass switches model, so a giant bill never re-reads on Sonnet.
-      const second = await combineAndStore(env, prepared, { tier, model: otherModel(env, model), notes, priorCost: first.cost });
+      const second = await combineAndStore(env, prepared, {
+        tier,
+        model: otherModel(env, model),
+        notes,
+        priorCost: first.cost,
+        lastTry: true,
+      });
       return second.status === "stored" ? second : first;
     }
     const reply = await chatCompletion(env, model, singlePassMessages(prepared.input));
@@ -163,9 +184,10 @@ export async function writeSummary(
       content: reply.content,
       cost: reply.usage.cost,
       gatewayLogId: reply.gatewayLogId,
+      lastTry: options.lastTry,
     });
     if (first.status === "stored" || !retry) return first;
-    const second = await writeSummary(env, prepared, tier, { model: otherModel(env, model), retry: false });
+    const second = await writeSummary(env, prepared, tier, { model: otherModel(env, model), retry: false, lastTry: true });
     return second.status === "stored" ? { ...second, cost: second.cost + first.cost } : first;
   } catch (err: unknown) {
     return { status: "failed", cost: 0, reason: err instanceof Error ? err.message : String(err), account: err instanceof AccountError };

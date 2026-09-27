@@ -160,6 +160,21 @@ describe("writeSummary", () => {
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 
+  it("keeps the last model's summary with a warning when its only problem is a vote headline", async () => {
+    const voteHeadline = JSON.stringify({
+      headline: "House votes to cap airline fees at what the service costs",
+      what_it_does: "Caps airline fees.",
+      key_points: [{ text: "Caps fees at $45 billion", section: "Sec. 2" }],
+    });
+    mockChat.mockResolvedValue(reply(voteHeadline));
+
+    const outcome = await writeSummary(env, prepared(), "rewrite");
+
+    expect(mockChat).toHaveBeenCalledTimes(2);
+    expect(outcome).toMatchObject({ status: "stored", model: LUNA, warnings: ["headline mentions the vote"] });
+    expect(mockUpsert.mock.calls[0]![1].digest.generator.warnings).toContain("headline mentions the vote");
+  });
+
   it("does nothing once the day's budget is spent", async () => {
     mockBudgetLeft.mockResolvedValue(0);
 

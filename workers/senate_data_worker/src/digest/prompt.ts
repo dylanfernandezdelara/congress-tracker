@@ -83,7 +83,7 @@ VOTES
 TENSE
 - Not yet law: "would" ("would ban…", "would require…").
 - Law: present tense ("bans…", "requires…").
-- Procedural measures (rules for floor debate, scheduling) and commemorative or opinion resolutions: say what kind of measure it is. For a rule, the headline names the most notable measure it sets up ("House sets rules for debating Israel boycott bill and four others"); each key point is one measure, in plain words. Opinion resolutions ("Resolution condemns…") express views and do not change law; say so.
+- Procedural measures (rules for floor debate, scheduling) and commemorative or opinion resolutions: say what kind of measure it is. For a rule, the headline names the most notable measure it sets up ("Rule sets terms for debating Israel boycott bill and four others"); each key point is one measure, in plain words. Opinion resolutions ("Resolution condemns…") express views and do not change law; say so.
 
 STYLE
 - Headline: 6–12 words. Lead with the change for people. Not the bill's name, not "This bill", not "New legislation". Don't mention the vote, the chamber, or whether it passed: the page shows the vote next to the headline. "Resolution would direct U.S. forces out of hostilities with Iran", not "House votes to direct troop pullback".

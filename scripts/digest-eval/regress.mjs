@@ -13,7 +13,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const art = join(root, 'artifacts/digest-eval')
 const round = process.argv[2] ?? 'round2'
 // Round 1 wrote candidates straight under out/; later rounds have their own folder.
-const outDir = existsSync(join(art, 'out', round)) ? join(art, 'out', round) : join(art, 'out')
+if (round !== 'round1' && !existsSync(join(art, 'out', round))) {
+  console.error(`No outputs for ${round} (folders: ${readdirSync(join(art, 'out')).filter((d) => /^round/.test(d)).join(', ')})`)
+  process.exit(2)
+}
+const outDir = round === 'round1' ? join(art, 'out') : join(art, 'out', round)
 const picksFile = join(art, `${round}-picks.json`)
 const picks = existsSync(picksFile) ? JSON.parse(readFileSync(picksFile, 'utf8')) : {}
 /** Picked candidates per bill, however the picks file spells them. */

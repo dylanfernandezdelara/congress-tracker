@@ -312,7 +312,13 @@ class Sweep {
           const first = await combineAndStore(this.env, prepared, { tier, model: luna, notes, priorCost: 0 });
           if (first.status !== "rejected") return first;
           // Only the combine switches model; the part notes are kept, never re-read at full price.
-          const second = await combineAndStore(this.env, prepared, { tier, model: otherModel(this.env, luna), notes, priorCost: first.cost });
+          const second = await combineAndStore(this.env, prepared, {
+            tier,
+            model: otherModel(this.env, luna),
+            notes,
+            priorCost: first.cost,
+            lastTry: true,
+          });
           return second.status === "stored" ? second : first;
         });
         return true;
@@ -329,7 +335,7 @@ class Sweep {
         return true;
       }
       await this.paidWrite(job, prepared, () =>
-        writeSummary(this.env, prepared, tier, { model: otherModel(this.env, luna), retry: false })
+        writeSummary(this.env, prepared, tier, { model: otherModel(this.env, luna), retry: false, lastTry: true })
       );
       return true;
     } catch (err) {
