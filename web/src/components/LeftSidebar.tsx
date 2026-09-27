@@ -1,5 +1,5 @@
 import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
-import { crossVoteLabel } from '@congress-tracker/shared/notable-votes'
+import { crossVoteLabel } from '@congress-tracker/shared/cross-vote-label'
 
 import type {
   DefectorEntry,

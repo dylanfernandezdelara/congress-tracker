@@ -21,7 +21,7 @@ type AnimatedSheetProps = {
 }
 
 /**
- * Shared sheet chrome for member profiles, notable bills, bill share and the rest, on the dfdl Sheet
+ * Shared sheet chrome for member profiles, tightness defectors, bill share and the rest, on the dfdl Sheet
  * (Base UI Drawer): docked to the bottom on phones, centered from 640px, swipe to dismiss, focus trap,
  * scroll lock, and stacking when one sheet opens another. `onClose` runs after the exit animation.
  */

@@ -66,13 +66,6 @@ vi.mock('./api/client', () => ({
       },
     },
   }),
-  fetchNotableVotes: vi.fn().mockResolvedValue({
-    congress: 119,
-    session: 2,
-    detection_method: 'heuristic',
-    as_of: '2026-06-14T00:00:00.000Z',
-    notable: [],
-  }),
   fetchRecentLaws: vi.fn().mockResolvedValue({
     congress: 119,
     session: 2,

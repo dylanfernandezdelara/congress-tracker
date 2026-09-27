@@ -50,50 +50,8 @@ export interface SessionStatsResponse {
   as_of: string
 }
 
-export type NotableVoteCrossVoteLabel = 'rare' | 'occasional' | 'frequent'
-
-export interface NotableVoteDefector {
-  bioguide_id: string
-  name: string
-  party: string
-  state: string
-  photo_url: string
-  cross_vote_count: number
-  cross_vote_label: NotableVoteCrossVoteLabel
-}
-
-export interface NotableVoteEntry {
-  chamber: StatsChamber
-  congress: number
-  session: number
-  roll_number: number
-  bill_type: string
-  bill_number: number
-  yeas: number
-  nays: number
-  margin: number
-  vote_date: string
-  headline: string | null
-  /** Plain-English lead from the bill digest, when available. */
-  what_it_does: string | null
-  /** Digest key points (may be empty). */
-  key_points: string[]
-  /** Official CRS summary text when no digest lead is available. */
-  raw_summary_text: string | null
-  significance_score: number
-  why_it_matters: string
-  defectors: NotableVoteDefector[]
-  /** False when per-member roll-call positions have not been ingested yet. */
-  member_votes_available: boolean
-}
-
-export interface NotableVotesResponse {
-  congress: number
-  session: number
-  notable: NotableVoteEntry[]
-  detection_method: 'heuristic' | 'llm'
-  as_of: string
-}
+/** Session cross-party vote frequency bucket (see `shared/cross-vote-label.ts`). */
+export type CrossVoteLabel = 'rare' | 'occasional' | 'frequent'
 
 export interface CloseVoteEntry {
   chamber: StatsChamber
@@ -339,7 +297,7 @@ export interface MemberProfileResponse {
   yea_count: number
   nay_count: number
   cross_vote_count: number
-  cross_vote_label: NotableVoteCrossVoteLabel
+  cross_vote_label: CrossVoteLabel
   recent_cross_votes: MemberProfileRecentCrossVote[]
   /** Up to 5 most recent primary-sponsored bills in this Congress. */
   sponsored_bills: MemberProfileSponsoredBill[]

@@ -69,13 +69,11 @@ import { refreshBillProcessQueue } from "../pipeline/refresh-bill-process";
 import type {
   CommitteesLeaderboardResponse,
 } from "../../../../shared/stats-api-types";
-import { buildNotableVotes } from "../analytics/notable-votes";
 import { buildSessionStats } from "../storage/session-stats";
 import type {
   Chamber,
   DefectorsResponse,
   MemberProfileResponse,
-  NotableVotesResponse,
   PortfoliosResponse,
   PulseStatsResponse,
   TightnessStatsResponse,
@@ -658,35 +656,6 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
       async (): Promise<TightnessStatsResponse> =>
         buildTightnessStats(env, congress, session, asOf),
       "tightness stats unavailable"
-    );
-  },
-  "/stats/notable.json": ({ env, url, json, ctx }) => {
-    const congress = congressNumber(env);
-    const session = sessionNumber(env);
-    const asOf = new Date().toISOString();
-    const limit = parseStatsLimit(url);
-    return handleStatsJson(
-      json,
-      async (): Promise<NotableVotesResponse> => {
-        const { notable, detection_method } = await buildNotableVotes(
-          env.DB,
-          congress,
-          session,
-          Math.min(limit, 3),
-          {
-            env,
-            waitUntil: ctx?.waitUntil.bind(ctx),
-          }
-        );
-        return {
-          congress,
-          session,
-          notable,
-          detection_method,
-          as_of: asOf,
-        };
-      },
-      "notable votes unavailable"
     );
   },
   "/stats/defectors.json": ({ env, url, json }) => {

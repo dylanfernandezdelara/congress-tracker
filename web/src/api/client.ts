@@ -8,7 +8,6 @@ import type {
   FeedPageResponse,
   MemberProfileResponse,
   MembersSearchResponse,
-  NotableVotesResponse,
   PolicyAreasResponse,
   PortfoliosResponse,
   PulseStatsResponse,
@@ -98,11 +97,6 @@ export async function fetchPolicyAreas(): Promise<PolicyAreasResponse> {
 
 export async function fetchSessionStats(): Promise<SessionStatsResponse> {
   return fetchJson<SessionStatsResponse>('/stats/session.json')
-}
-
-export async function fetchNotableVotes(limit = 3): Promise<NotableVotesResponse> {
-  const params = new URLSearchParams({ limit: String(limit) })
-  return fetchJson<NotableVotesResponse>(`/stats/notable.json?${params}`)
 }
 
 export async function fetchRecentLaws(limit = 5): Promise<RecentLawsResponse> {

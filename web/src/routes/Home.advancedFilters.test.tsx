@@ -13,7 +13,6 @@ import {
 
 const homeApi = vi.hoisted(() => ({
   fetchFeed: vi.fn(),
-  fetchNotableVotes: vi.fn(),
   fetchRecentLaws: vi.fn(),
   fetchRecentConfirmations: vi.fn(),
   fetchCommitteesLeaderboard: vi.fn(),

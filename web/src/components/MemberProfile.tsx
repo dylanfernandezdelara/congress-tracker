@@ -2,7 +2,7 @@ import { useId, useRef } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
-import { crossVoteHint } from '@congress-tracker/shared/notable-votes'
+import { crossVoteHint } from '@congress-tracker/shared/cross-vote-label'
 import { partyShortLabel } from '@congress-tracker/shared/party'
 
 import type {

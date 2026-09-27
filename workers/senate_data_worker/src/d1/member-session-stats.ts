@@ -62,30 +62,6 @@ export async function selectMemberCrossVotesForChamber(
   return results ?? [];
 }
 
-/** Session-wide cross-vote counts keyed by bioguide_id. */
-export async function selectSessionCrossVoteCounts(
-  db: D1Database,
-  congress: number,
-  session: number
-): Promise<Map<string, number>> {
-  await ensureSchema(db);
-  const { results } = await db
-    .prepare(
-      `SELECT bioguide_id, COUNT(*) AS count
-       FROM member_cross_votes
-       WHERE congress = ? AND session = ?
-       GROUP BY bioguide_id`
-    )
-    .bind(congress, session)
-    .all<{ bioguide_id: string; count: number }>();
-
-  const counts = new Map<string, number>();
-  for (const row of results ?? []) {
-    counts.set(row.bioguide_id, row.count);
-  }
-  return counts;
-}
-
 export async function getMemberSessionStats(
   db: D1Database,
   congress: number,

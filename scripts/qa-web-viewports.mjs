@@ -377,14 +377,6 @@ const MOCK_SESSION_STATS = {
   },
 }
 
-const MOCK_NOTABLE_VOTES = {
-  congress: 119,
-  session: 2,
-  detection_method: 'heuristic',
-  as_of: '2026-06-14T00:00:00.000Z',
-  notable: [],
-}
-
 function extraTightnessDots(base, percents, rollStart) {
   return percents.map((yea_pct, index) => {
     const total = 420
@@ -715,14 +707,6 @@ async function installApiMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_SESSION_STATS),
-    })
-  })
-
-  await page.route('**/stats/notable.json**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(MOCK_NOTABLE_VOTES),
     })
   })
 

@@ -254,8 +254,7 @@ export function getFeedTopic(item: FeedItem): string {
 }
 
 /** Single source of truth for digest / CRS / pending summary content. */
-/** Build canonical summary content from digest / CRS fields (feed or notable). */
-export function toFeedSummaryContent(fields: {
+function toFeedSummaryContent(fields: {
   what_it_does?: string | null
   key_points?: string[] | null
   raw_summary_text?: string | null
