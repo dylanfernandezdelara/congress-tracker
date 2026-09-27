@@ -14,8 +14,10 @@ export interface CallUsage {
 export interface ChatResult {
   content: string | null;
   usage: CallUsage;
-  /** OpenRouter generation id, for AI Gateway feedback and debugging. */
+  /** OpenRouter generation id, for debugging. */
   generationId: string | null;
+  /** AI Gateway log id (`cf-aig-log-id`) when the call went through the gateway, to attach feedback to the log. */
+  gatewayLogId: string | null;
 }
 
 interface ChatBody {
@@ -25,8 +27,14 @@ interface ChatBody {
   error?: { message?: string };
 }
 
-function headers(env: Env): Record<string, string> {
+/** Normal calls go through Cloudflare AI Gateway when OPENROUTER_BASE_URL points at it (logging, analytics). */
+const isGateway = (base: string) => base.startsWith("https://gateway.ai.cloudflare.com/");
+
+function headers(env: Env, base = OPENROUTER): Record<string, string> {
+  // The gateway token goes to the gateway only, never to OpenRouter.
+  const gatewayToken = isGateway(base) ? env.CF_AIG_TOKEN?.trim() : undefined;
   return {
+    ...(gatewayToken ? { "cf-aig-authorization": `Bearer ${gatewayToken}` } : {}),
     Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
     "Content-Type": "application/json",
     "HTTP-Referer": "https://trackcongress.org",
@@ -72,7 +80,7 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
     try {
       const res = await fetch(`${base}/chat/completions`, {
         method: "POST",
-        headers: headers(env),
+        headers: headers(env, base),
         signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
         body: JSON.stringify({ model: model.id, ...requestBody(model, messages), usage: { include: true } }),
       });
@@ -80,9 +88,16 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
       if (!res.ok) {
         const text = body.error?.message ?? `HTTP ${res.status}`;
         if (res.status === 429 || res.status >= 500) throw new Error(text);
-        throw [401, 402, 403].includes(res.status) ? new AccountError(`OpenRouter account: ${text}`) : new PermanentError(text);
+        // A refusal from the gateway itself (missing or rotated CF_AIG_TOKEN) names the gateway, not OpenRouter.
+        const who = isGateway(base) && body.error === undefined ? "AI Gateway" : "OpenRouter account";
+        throw [401, 402, 403].includes(res.status) ? new AccountError(`${who}: ${text}`) : new PermanentError(text);
       }
-      return { content: body.choices?.[0]?.message?.content ?? null, usage: usageOf(body), generationId: body.id ?? null };
+      return {
+        content: body.choices?.[0]?.message?.content ?? null,
+        usage: usageOf(body),
+        generationId: body.id ?? null,
+        gatewayLogId: res.headers.get("cf-aig-log-id"),
+      };
     } catch (err: unknown) {
       lastError = err;
       if (err instanceof PermanentError) break;

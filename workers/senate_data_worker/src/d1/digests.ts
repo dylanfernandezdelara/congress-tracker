@@ -26,6 +26,8 @@ export interface DigestGenerator {
   fingerprint: string;
   /** Written part by part (a bill too long for one pass). */
   long: boolean;
+  /** AI Gateway log of the call that wrote it (normal API calls through the gateway only). */
+  gateway_log_id?: string;
   /** Pre-store check warnings (not blocking), kept for the evals. */
   warnings?: string[];
   generated_at: string;

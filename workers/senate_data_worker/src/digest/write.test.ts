@@ -60,7 +60,12 @@ const invented = JSON.stringify({
   what_it_does: "Caps airline fees.",
   key_points: [{ text: "Caps fees", section: null }],
 });
-const reply = (content: string | null, cost = 0.01) => ({ content, usage: { cost, promptTokens: 1, completionTokens: 1 }, generationId: "g" });
+const reply = (content: string | null, cost = 0.01) => ({
+  content,
+  usage: { cost, promptTokens: 1, completionTokens: 1 },
+  generationId: "g",
+  gatewayLogId: "01LOG",
+});
 const modelOf = (call: number) => (mockChat.mock.calls[call]![1] as { id: string }).id;
 
 describe("writeSummary", () => {
@@ -78,7 +83,14 @@ describe("writeSummary", () => {
     expect(modelOf(0)).toBe(SONNET);
     const stored = mockUpsert.mock.calls[0]![1].digest;
     expect(stored.basis).toBe("text");
-    expect(stored.generator).toMatchObject({ model: SONNET, prompt_version: "v3", tier: "rewrite", fingerprint: "fp1", long: false });
+    expect(stored.generator).toMatchObject({
+      model: SONNET,
+      prompt_version: "v3",
+      tier: "rewrite",
+      fingerprint: "fp1",
+      long: false,
+      gateway_log_id: "01LOG",
+    });
     expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.01);
   });
 
