@@ -150,6 +150,14 @@ describe("checks", () => {
     expect(checkSummary(spanning, bill).blocking).toEqual(['judging word "critical"']);
   });
 
+  it("blocks a headline about the vote, which the page already shows", () => {
+    const at = (headline: string) => checkSummary(summary({ headline }), sources()).blocking;
+    expect(at("House votes to cancel California's harbor boat pollution rules")).toEqual(["headline mentions the vote"]);
+    expect(at("Senate rejects plan to cap airline fees at the service cost")).toEqual(["headline mentions the vote"]);
+    expect(at("Resolution would direct U.S. forces out of hostilities with Iran")).toEqual([]);
+    expect(at("Bill would require House members to disclose stock trades")).toEqual([]);
+  });
+
   it("allows fixed terms of art", () => {
     expect(checkSummary(summary({ what_it_does: "Funds critical minerals mapping." }), sources()).blocking).toEqual([]);
   });
