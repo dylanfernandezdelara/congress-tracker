@@ -12,6 +12,7 @@ vi.mock("./schema", async (importOriginal) => ({
 
 import {
   enqueueDigestJobs,
+  markAttempt,
   insertDigestStubs,
   markJobsBatched,
   selectBatchJobs,
@@ -66,26 +67,35 @@ describe("digest jobs", () => {
     expect((await selectBatchJobs(db, "batch-1")).map((j) => [j.number, j.fingerprint])).toEqual([[1, "a"]]);
   });
 
-  it("counts failed attempts per fingerprint and starts over when the bill changes", async () => {
-    const attempts = () => jobs().map((j: { attempts: number }) => j.attempts)[0];
+  it("counts batch tries per fingerprint, records paid tries up front, and keeps settled values", async () => {
+    const row = () => JSON.parse(execFileSync("sqlite3", ["-json", dbPath, "SELECT state, attempts, fingerprint, batch_id FROM digest_jobs"], { encoding: "utf8" }))[0];
     await enqueueDigestJobs(db, [hr(1)], "new", T0);
     await markJobsBatched(db, [{ ref: hr(1), fingerprint: "a" }], "b1", T0);
-    await settleJob(db, hr(1), "queued", { attempt: { fingerprint: "a", failed: true } });
-    expect(attempts()).toBe(2);
-    await enqueueDigestJobs(db, [hr(1)], "new", T1);
-    expect(attempts()).toBe(2);
-    await markJobsBatched(db, [{ ref: hr(1), fingerprint: "b" }], "b2", T1);
-    expect(attempts()).toBe(1);
-    await settleJob(db, hr(1), "done", { attempt: { fingerprint: "c", failed: false } });
-    expect(attempts()).toBe(0);
+    await settleJob(db, hr(1), "queued", { error: "batch expired" });
+    await markJobsBatched(db, [{ ref: hr(1), fingerprint: "a" }], "b2", T0);
+    expect(row()).toMatchObject({ state: "batched", attempts: 2, fingerprint: "a" });
+    await markJobsBatched(db, [{ ref: hr(1), fingerprint: "b" }], "b3", T0);
+    expect(row()).toMatchObject({ attempts: 1, fingerprint: "b" });
+    await markAttempt(db, hr(1), "b", 2, T1);
+    expect(row()).toEqual({ state: "queued", attempts: 2, fingerprint: "b", batch_id: null });
+    await settleJob(db, hr(1), "done", { fingerprint: "b", attempts: 0 });
+    expect(row()).toMatchObject({ state: "done", attempts: 0 });
   });
 
-  it("splits the queue by whether a bill matters: a vote, a committee report, a law, or a rewrite request", async () => {
+  it("does not re-queue a bill checked on a later day than its last Congress.gov change", async () => {
+    await enqueueDigestJobs(db, [hr(1), hr(2)], "new", T0);
+    await settleJob(db, hr(1), "done", { nowIso: "2026-09-26T09:00:00.000Z" });
+    await settleJob(db, hr(2), "done", { nowIso: "2026-09-26T09:00:00.000Z" });
+    await enqueueDigestJobs(db, [{ ...hr(1), changedOn: "2026-09-25" }, { ...hr(2), changedOn: "2026-09-26" }], "new", T1);
+    expect(jobs().map((j: { state: string }) => j.state)).toEqual(["done", "queued"]);
+  });
+
+  it("splits the queue by whether a bill matters: a vote, a committee report, a law, or a rewrite request (any type case)", async () => {
     sql(`
-      INSERT INTO votes VALUES ('House', 119, 2, 10, 119, 'HR', 2, 'On Passage', 'Passed', 300, 100, '2026-09-01', 1);
+      INSERT INTO votes VALUES ('House', 119, 2, 10, 119, 'hr', 2, 'On Passage', 'Passed', 300, 100, '2026-09-01', 1);
       INSERT INTO bill_committee_events VALUES (119, 'HR', 3, 'hsif00', 'advanced', '2026-09-01', 'House', 'Energy', NULL, 'Reported', NULL);
       INSERT INTO bill_committee_events VALUES (119, 'HR', 6, 'hsif00', 'sent', '2026-09-01', 'House', 'Energy', NULL, 'Referred', NULL);
-      INSERT INTO bill_lifecycle (congress, bill_type, bill_number, became_law_date, updated_at) VALUES (119, 'HR', 4, '2026-07-04', '${T0}');
+      INSERT INTO bill_lifecycle (congress, bill_type, bill_number, became_law_date, updated_at) VALUES (119, 'hr', 4, '2026-07-04', '${T0}');
     `);
     await enqueueDigestJobs(db, [hr(1), hr(2), hr(3), hr(4), hr(6)], "new", T0);
     await enqueueDigestJobs(db, [hr(5)], "rewrite", T1);
@@ -95,23 +105,26 @@ describe("digest jobs", () => {
     expect(await selectQueuedJobs(db, { matters: false, limit: 0 })).toEqual([]);
   });
 
-  it("re-checks bills still waiting on text, oldest check first, skipping pre-v3 summaries", async () => {
+  it("re-checks bills the queue knows that still wait on text, and leaves unknown rows to the backfill", async () => {
     const gen = (basis: string) =>
       JSON.stringify({ headline: "h", what_it_does: "w", basis, generator: { tier: "new", fingerprint: "f" } });
+    const fallback = JSON.stringify({ headline: "h", what_it_does: "w", source: "title_fallback" });
     await insertDigestStubs(db, [{ ...hr(1), title: "Stub" }, { ...hr(9), title: " " }], T0);
     sql(`
-      INSERT INTO bill_digests VALUES (119, 'HR', 2, 't', NULL, NULL, '${JSON.stringify({ headline: "h", what_it_does: "w", source: "title_fallback" })}', '${T0}', '${T0}');
+      INSERT INTO bill_digests VALUES (119, 'HR', 2, 't', NULL, NULL, '${fallback}', '${T0}', '${T0}');
       INSERT INTO bill_digests VALUES (119, 'HR', 3, 't', NULL, NULL, '${gen("title_only")}', '${T0}', '${T0}');
       INSERT INTO bill_digests VALUES (119, 'HR', 4, 't', NULL, NULL, '${gen("text")}', '${T0}', '${T0}');
       INSERT INTO bill_digests VALUES (119, 'HR', 5, 't', NULL, NULL, '{"headline":"old","what_it_does":"free model"}', '${T0}', '${T0}');
       INSERT INTO bill_digests VALUES (119, 'HR', 7, 't', NULL, NULL, '${gen("crs")}', '${T0}', '${T0}');
+      INSERT INTO bill_digests VALUES (119, 'HR', 8, 't', NULL, NULL, '${fallback}', '${T0}', '${T0}');
     `);
-    await enqueueDigestJobs(db, [hr(7)], "new", T0);
-    await settleJob(db, hr(7), "done", { nowIso: "2026-09-24T00:00:00.000Z" });
+    const checked = [1, 2, 4, 5, 7].map(hr);
+    await enqueueDigestJobs(db, checked, "new", T0);
+    for (const bill of checked) await settleJob(db, bill, "done", { nowIso: "2026-09-24T00:00:00.000Z" });
     await enqueueDigestJobs(db, [hr(3)], "new", T0);
 
     const due = await selectRecheckBills(db, { congress: 119, checkedBeforeIso: "2026-09-25T10:00:00.000Z", limit: 10 });
-    // 3 is already queued; 4 is written from text; 5 is the backfill; 9 had no title so no stub.
+    // 3 is already queued; 4 is written from text; 5 is pre-v3; 8 was never queued (backfill); 9 had no title.
     expect(due.map((b) => b.number).sort()).toEqual([1, 2, 7]);
   });
 });

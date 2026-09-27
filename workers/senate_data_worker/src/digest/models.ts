@@ -7,11 +7,13 @@ export interface DigestModel {
   temperature?: number;
   /** Output budget; reasoning models spend part of it thinking before the JSON answer. */
   maxTokens: number;
+  /** Batch API price per million tokens, for estimating a batch before it is charged. */
+  batchPrice?: { input: number; output: number };
 }
 
 /** First summaries of new bills: cheap and accurate in the evals. The sweep sends them through the Batch API (half price). */
 export function newBillModel(env: Env): DigestModel {
-  return { id: env.DIGEST_NEW_MODEL?.trim() || "openai/gpt-6-luna", reasoning: { effort: "high" }, maxTokens: 12_000 };
+  return { id: env.DIGEST_NEW_MODEL?.trim() || "openai/gpt-6-luna", reasoning: { effort: "high" }, maxTokens: 12_000, batchPrice: { input: 0.05, output: 0.25 } };
 }
 
 /**

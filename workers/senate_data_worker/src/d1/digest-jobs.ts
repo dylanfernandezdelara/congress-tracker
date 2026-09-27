@@ -42,19 +42,25 @@ const toJob = (row: JobRow): DigestJob => ({
   fingerprint: row.fingerprint,
 });
 
-/** Floor votes, floor actions, committee reports or enactment. */
+/** Floor votes, floor actions, committee reports or enactment. Older rows in some tables store the type lowercase. */
 const MATTERS_SQL = `(
-  EXISTS (SELECT 1 FROM votes v WHERE v.bill_congress = j.congress AND v.bill_type = j.bill_type AND v.bill_number = j.number)
-  OR EXISTS (SELECT 1 FROM bill_floor_events f WHERE f.congress = j.congress AND f.bill_type = j.bill_type AND f.bill_number = j.number)
-  OR EXISTS (SELECT 1 FROM bill_committee_events c WHERE c.congress = j.congress AND c.bill_type = j.bill_type AND c.bill_number = j.number AND c.activity_key = 'advanced')
-  OR EXISTS (SELECT 1 FROM bill_lifecycle l WHERE l.congress = j.congress AND l.bill_type = j.bill_type AND l.bill_number = j.number AND l.became_law_date IS NOT NULL)
+  EXISTS (SELECT 1 FROM votes v WHERE v.bill_congress = j.congress AND v.bill_type IN (j.bill_type, lower(j.bill_type)) AND v.bill_number = j.number)
+  OR EXISTS (SELECT 1 FROM bill_floor_events f WHERE f.congress = j.congress AND f.bill_type IN (j.bill_type, lower(j.bill_type)) AND f.bill_number = j.number)
+  OR EXISTS (SELECT 1 FROM bill_committee_events c WHERE c.congress = j.congress AND c.bill_type IN (j.bill_type, lower(j.bill_type)) AND c.bill_number = j.number AND c.activity_key = 'advanced')
+  OR EXISTS (SELECT 1 FROM bill_lifecycle l WHERE l.congress = j.congress AND l.bill_type IN (j.bill_type, lower(j.bill_type)) AND l.bill_number = j.number AND l.became_law_date IS NOT NULL)
 )`;
 
 /**
  * Queue bills for a summary check. A bill already in a batch stays there (collection re-checks its fingerprint);
- * the tier never goes down.
+ * the tier never goes down. `changedOn` (a bill's Congress.gov update day, YYYY-MM-DD) skips a bill already checked
+ * on a later day: nothing it is summarized from can have changed since.
  */
-export async function enqueueDigestJobs(db: D1Database, bills: BillRef[], tier: JobTier, nowIso = new Date().toISOString()): Promise<void> {
+export async function enqueueDigestJobs(
+  db: D1Database,
+  bills: Array<BillRef & { changedOn?: string | null }>,
+  tier: JobTier,
+  nowIso = new Date().toISOString()
+): Promise<void> {
   if (bills.length === 0) return;
   await ensureSchema(db);
   await db.batch(
@@ -64,11 +70,17 @@ export async function enqueueDigestJobs(db: D1Database, bills: BillRef[], tier: 
           `INSERT INTO digest_jobs (congress, bill_type, number, state, tier, attempts, queued_at, updated_at)
            VALUES (?1, ?2, ?3, 'queued', ?4, 0, ?5, ?5)
            ON CONFLICT (congress, bill_type, number) DO UPDATE SET
-             state = CASE WHEN digest_jobs.state = 'batched' THEN 'batched' ELSE 'queued' END,
+             state = CASE
+               WHEN digest_jobs.state = 'batched' THEN 'batched'
+               WHEN digest_jobs.state = 'done' AND ?6 IS NOT NULL AND substr(digest_jobs.updated_at, 1, 10) > ?6 THEN 'done'
+               ELSE 'queued' END,
              tier = CASE WHEN digest_jobs.tier = 'rewrite' THEN 'rewrite' ELSE excluded.tier END,
-             queued_at = CASE WHEN digest_jobs.state = 'queued' THEN digest_jobs.queued_at ELSE excluded.queued_at END`
+             queued_at = CASE
+               WHEN digest_jobs.state = 'queued' THEN digest_jobs.queued_at
+               WHEN digest_jobs.state = 'done' AND ?6 IS NOT NULL AND substr(digest_jobs.updated_at, 1, 10) > ?6 THEN digest_jobs.queued_at
+               ELSE excluded.queued_at END`
         )
-        .bind(bill.congress, normalizeBillType(bill.type), bill.number, tier, nowIso)
+        .bind(bill.congress, normalizeBillType(bill.type), bill.number, tier, nowIso, bill.changedOn ?? null)
     )
   );
 }
@@ -132,27 +144,22 @@ export async function markJobsBatched(
 }
 
 /**
- * Finish a job ("done"), or put it back in the queue (a changed bill, an expired batch). `attempt` records a
- * write for these inputs: `attempts` counts failed writes per fingerprint, so a bill whose summary keeps failing
- * the checks is parked until the bill itself changes, instead of paying for the same failure every hour.
+ * Finish a job ("done"), or put it back in the queue (a changed bill, an expired batch). `fingerprint` and
+ * `attempts` record what the last try was written from and how many tries those inputs have had.
  */
 export async function settleJob(
   db: D1Database,
   ref: BillRef,
   state: "done" | "queued",
-  params: { error?: string | null; nowIso?: string; attempt?: { fingerprint: string; failed: boolean } } = {}
+  params: { error?: string | null; nowIso?: string; fingerprint?: string; attempts?: number } = {}
 ): Promise<void> {
   const now = params.nowIso ?? new Date().toISOString();
-  const attempt = params.attempt ?? null;
   await db
     .prepare(
       `UPDATE digest_jobs SET state = ?4, batch_id = NULL, last_error = ?5, updated_at = ?6,
          queued_at = CASE WHEN ?4 = 'queued' THEN ?6 ELSE queued_at END,
-         attempts = CASE
-           WHEN ?7 IS NULL THEN attempts
-           WHEN fingerprint = ?7 THEN attempts + ?8
-           ELSE ?8 END,
-         fingerprint = COALESCE(?7, fingerprint)
+         fingerprint = COALESCE(?7, fingerprint),
+         attempts = COALESCE(?8, attempts)
        WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
     )
     .bind(
@@ -162,17 +169,38 @@ export async function settleJob(
       state,
       params.error ?? null,
       now,
-      attempt?.fingerprint ?? null,
-      attempt?.failed ? 1 : 0
+      params.fingerprint ?? null,
+      params.attempts ?? null
     )
+    .run();
+}
+
+/**
+ * Count a paid try before it is made, and move the job to the back of the queue. If the run dies mid-write (wall
+ * time, a dropped admin request), the try is already counted, so a bill cannot be paid for every hour unnoticed.
+ */
+export async function markAttempt(
+  db: D1Database,
+  ref: BillRef,
+  fingerprint: string,
+  attempts: number,
+  nowIso = new Date().toISOString()
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE digest_jobs SET state = 'queued', batch_id = NULL, fingerprint = ?4, attempts = ?5,
+         queued_at = ?6, updated_at = ?6, last_error = 'write started'
+       WHERE congress = ?1 AND bill_type = ?2 AND number = ?3`
+    )
+    .bind(ref.congress, normalizeBillType(ref.type), ref.number, fingerprint, attempts, nowIso)
     .run();
 }
 
 /**
  * Bills whose summary is not yet written from the bill text (no summary, a title fallback, or a CRS or title-only
  * summary) and that have not been checked since `checkedBeforeIso`. Text and CRS summaries are published without
- * always moving a bill's update date, so these are re-checked on a timer. Pre-v3 summaries (no generator) are
- * the backfill and are left alone here.
+ * always moving a bill's update date, so these are re-checked on a timer. Only bills the queue already knows
+ * (discovered, in the feed, or named elsewhere) are re-checked; the rest are the backfill's.
  */
 export async function selectRecheckBills(
   db: D1Database,
@@ -185,14 +213,14 @@ export async function selectRecheckBills(
        FROM bill_digests d
        LEFT JOIN digest_jobs j ON j.congress = d.congress AND j.bill_type = d.bill_type AND j.number = d.number
        WHERE d.congress = ?1
-         AND (j.state IS NULL OR (j.state = 'done' AND j.updated_at < ?2))
+         AND j.state = 'done' AND j.updated_at < ?2
          AND (
            d.digest_json IS NULL
            OR NOT json_valid(d.digest_json)
            OR json_extract(d.digest_json, '$.source') = ?4
            OR (json_extract(d.digest_json, '$.generator') IS NOT NULL AND json_extract(d.digest_json, '$.basis') != 'text')
          )
-       ORDER BY j.updated_at IS NOT NULL, j.updated_at, d.updated_at DESC
+       ORDER BY j.updated_at
        LIMIT ?3`
     )
     .bind(params.congress, params.checkedBeforeIso, params.limit, DIGEST_SOURCE_TITLE_FALLBACK)
@@ -205,24 +233,26 @@ export interface DigestBatchRow {
   model: string;
   requests: number;
   submitted_at: string;
+  /** While open: the estimated charge, already counted against the day's budget. After: the actual charge. */
+  cost: number | null;
 }
 
 export async function insertDigestBatch(
   db: D1Database,
-  batch: { id: string; model: string; requests: number },
+  batch: { id: string; model: string; requests: number; estimate: number },
   nowIso = new Date().toISOString()
 ): Promise<void> {
   await ensureSchema(db);
   await db
-    .prepare(`INSERT INTO digest_batches (id, model, requests, state, submitted_at) VALUES (?1, ?2, ?3, 'open', ?4)`)
-    .bind(batch.id, batch.model, batch.requests, nowIso)
+    .prepare(`INSERT INTO digest_batches (id, model, requests, state, submitted_at, cost) VALUES (?1, ?2, ?3, 'open', ?4, ?5)`)
+    .bind(batch.id, batch.model, batch.requests, nowIso, batch.estimate)
     .run();
 }
 
 export async function selectOpenBatches(db: D1Database): Promise<DigestBatchRow[]> {
   await ensureSchema(db);
   const { results } = await db
-    .prepare(`SELECT id, model, requests, submitted_at FROM digest_batches WHERE state = 'open' ORDER BY submitted_at`)
+    .prepare(`SELECT id, model, requests, submitted_at, cost FROM digest_batches WHERE state = 'open' ORDER BY submitted_at`)
     .all<DigestBatchRow>();
   return results ?? [];
 }

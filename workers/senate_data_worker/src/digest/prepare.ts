@@ -85,7 +85,9 @@ export async function prepareBill(env: Env, ref: BillRef): Promise<PreparedBill>
   const [bundle, committees, versions, votesDesc, lifecycle] = await Promise.all([
     fetchBillSummaryBundle(env, ref),
     fetchJson<CommitteesResponse>(`${base}/committees?format=json&api_key=${key}`).catch(() => ({ committees: [] })),
-    fetchJson<TextVersionsResponse>(`${base}/text?format=json&limit=250&api_key=${key}`).catch(() => ({ textVersions: [] })),
+    // No catch: a failed text lookup would look like "no text yet", change the fingerprint, and pay for a worse
+    // summary over a text-based one. The sweep re-queues the bill instead.
+    fetchJson<TextVersionsResponse>(`${base}/text?format=json&limit=250&api_key=${key}`),
     getPassageVotesForBill(env.DB, ref.congress, ref.type, ref.number),
     getLifecycle(env.DB, ref.congress, ref.type, ref.number),
   ]);

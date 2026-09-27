@@ -31,7 +31,6 @@ export interface Env {
    */
   DIGEST_NEW_MODEL?: string;
   DIGEST_REWRITE_MODEL?: string;
-  /** "1" to send rewrites through the Batch API too (OpenRouter refuses Sonnet 5 batches as of 2026-09). */
   /** Daily spend cap for bill summaries in US dollars (default 1). */
   DIGEST_DAILY_BUDGET_USD?: string;
   /**

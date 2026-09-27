@@ -122,6 +122,25 @@ describe("parseSummaryReply", () => {
     expect(parseSummaryReply(reply, { basis: "text", parts, totalTokens: 1000 })!.content.inside!.map((r) => r.share)).toEqual([75, 25]);
   });
 
+  it("gives no share to rows that cite the same part, since each would claim all of it", () => {
+    const parts = [
+      { label: "Title VII — Finance", text: "", tokens: 530 },
+      { label: "Title I — Agriculture", text: "", tokens: 90 },
+    ];
+    const reply = JSON.stringify({
+      headline: "Law extends tax cuts and changes Medicaid",
+      what_it_does: "Does things.",
+      key_points: ["Extends tax cuts"],
+      inside: [
+        { part: "Taxes", summary: "Extends cuts", section: "Title VII" },
+        { part: "Health care", summary: "Changes Medicaid", section: "Title VII / Subtitle B" },
+        { part: "Food", summary: "Changes SNAP", section: "Title I" },
+      ],
+    });
+    const rows = parseSummaryReply(reply, { basis: "text", parts, totalTokens: 1000 })!.content.inside!;
+    expect(rows.map((r) => r.share)).toEqual([null, null, 9]);
+  });
+
   it("rejects replies without a headline or JSON", () => {
     expect(parseSummaryReply("no json here", context)).toBeNull();
     expect(parseSummaryReply(JSON.stringify({ what_it_does: "x" }), context)).toBeNull();

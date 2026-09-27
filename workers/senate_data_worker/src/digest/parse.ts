@@ -80,6 +80,11 @@ export function parseSummaryReply(
     })
     .filter((r): r is BillDigestInsideRow => r !== null)
     .slice(0, 8);
+  // Two rows citing the same part ("Taxes" and "Health care" both in Title VII) would each claim its whole share.
+  const citedPart = (row: BillDigestInsideRow) => row.section?.split("/")[0]!.trim().toLowerCase() ?? "";
+  for (const row of inside) {
+    if (row.share !== null && inside.filter((other) => citedPart(other) === citedPart(row)).length > 1) row.share = null;
+  }
 
   const stored: BillDigestContent = {
     headline,

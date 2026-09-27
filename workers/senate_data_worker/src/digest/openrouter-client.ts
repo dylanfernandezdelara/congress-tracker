@@ -56,7 +56,12 @@ function usageOf(body: ChatBody): CallUsage {
   };
 }
 
-/** One normal (non-batch) completion. Throws on HTTP failure after one retry; an empty reply returns content null. */
+class PermanentError extends Error {}
+
+/**
+ * One normal (non-batch) completion. Network errors, 429 and 5xx are retried once; other 4xx (a bad request, no
+ * credits) are not, since a second try would fail the same way. An empty reply returns content null.
+ */
 export async function chatCompletion(env: Env, model: DigestModel, messages: DigestMessages): Promise<ChatResult> {
   const base = env.OPENROUTER_BASE_URL?.trim() || OPENROUTER;
   let lastError: unknown = null;
@@ -69,10 +74,14 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
         body: JSON.stringify({ model: model.id, ...requestBody(model, messages), usage: { include: true } }),
       });
       const body = (await res.json().catch(() => ({}))) as ChatBody;
-      if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
+      if (!res.ok) {
+        const text = body.error?.message ?? `HTTP ${res.status}`;
+        throw res.status === 429 || res.status >= 500 ? new Error(text) : new PermanentError(text);
+      }
       return { content: body.choices?.[0]?.message?.content ?? null, usage: usageOf(body), generationId: body.id ?? null };
     } catch (err: unknown) {
       lastError = err;
+      if (err instanceof PermanentError) break;
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
@@ -144,5 +153,12 @@ export async function getBatch(env: Env, id: string): Promise<BatchState> {
       generationId: r.response?.body?.id ?? null,
     };
   });
-  return { status, done, cost: body.usage?.cost ?? null, results };
+  // The batch total when reported, else the sum of what each request says it cost.
+  const itemCost = results.reduce((n, r) => n + r.usage.cost, 0);
+  return { status, done, cost: body.usage?.cost ?? (itemCost > 0 ? itemCost : null), results };
+}
+
+/** Best effort: stop a batch we have given up on, so it cannot charge later. */
+export async function cancelBatch(env: Env, id: string): Promise<void> {
+  await fetch(`${OPENROUTER}/batches/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: headers(env) }).catch(() => undefined);
 }

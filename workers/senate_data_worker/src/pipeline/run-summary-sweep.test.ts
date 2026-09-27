@@ -8,6 +8,7 @@ const jobsApi = vi.hoisted(() => ({
   enqueueDigestJobs: vi.fn(),
   insertDigestBatch: vi.fn(),
   insertDigestStubs: vi.fn(),
+  markAttempt: vi.fn(),
   markJobsBatched: vi.fn(),
   selectBatchJobs: vi.fn(),
   selectKnownBills: vi.fn(),
@@ -23,6 +24,7 @@ const mockBudgetLeft = vi.fn();
 const mockRecordSpend = vi.fn();
 const mockGetBatch = vi.fn();
 const mockSubmitBatch = vi.fn();
+const mockCancelBatch = vi.fn();
 const mockPrepare = vi.fn();
 const mockStoreReply = vi.fn();
 const mockCombine = vi.fn();
@@ -45,6 +47,7 @@ vi.mock("../digest/budget", () => ({
 vi.mock("../digest/openrouter-client", () => ({
   getBatch: (...a: unknown[]) => mockGetBatch(...a),
   submitBatch: (...a: unknown[]) => mockSubmitBatch(...a),
+  cancelBatch: (...a: unknown[]) => mockCancelBatch(...a),
 }));
 vi.mock("../digest/prepare", () => ({ prepareBill: (...a: unknown[]) => mockPrepare(...a) }));
 vi.mock("../digest/write", async (importOriginal) => ({
@@ -100,7 +103,25 @@ function prepared(number: number, overrides: Partial<PreparedBill> = {}): Prepar
 }
 
 const stored = { status: "stored", model: "m", cost: 0, warnings: [] };
+
+const SONNET = "anthropic/claude-sonnet-5";
 const settled = () => jobsApi.settleJob.mock.calls.map((c) => [(c[1] as DigestJob).number, c[2]]);
+const settledWith = () => jobsApi.settleJob.mock.calls.map((c) => [(c[1] as DigestJob).number, c[2], c[3]]);
+const openBatch = (overrides: Record<string, unknown> = {}) => ({
+  id: "b1",
+  model: "luna",
+  requests: 3,
+  submitted_at: "2026-09-26T11:20:00.000Z",
+  cost: 0.003,
+  ...overrides,
+});
+const item = (customId: string, content: string | null) => ({ customId, content, error: null, usage: { cost: 0 }, generationId: null });
+const onlyMatters = (jobs: DigestJob[]) => async (_db: unknown, { matters }: { matters: boolean }) => (matters ? jobs : []);
+const onlyNew = (jobs: DigestJob[]) => async (_db: unknown, { matters }: { matters: boolean }) => (matters ? [] : jobs);
+const longParts = [
+  { label: "Title I — A", text: "a", tokens: 20_000 },
+  { label: "Title II — B", text: "b", tokens: 20_000 },
+];
 
 describe("runSummarySweep", () => {
   beforeEach(() => {
@@ -108,6 +129,7 @@ describe("runSummarySweep", () => {
     for (const fn of Object.values(jobsApi)) fn.mockResolvedValue(undefined);
     jobsApi.selectOpenBatches.mockResolvedValue([]);
     jobsApi.selectQueuedJobs.mockResolvedValue([]);
+    jobsApi.selectBatchJobs.mockResolvedValue([]);
     jobsApi.selectRecheckBills.mockResolvedValue([]);
     jobsApi.selectKnownBills.mockResolvedValue(new Set());
     mockGetState.mockResolvedValue(null);
@@ -124,9 +146,7 @@ describe("runSummarySweep", () => {
   });
 
   describe("collecting batches", () => {
-    beforeEach(() => {
-      jobsApi.selectOpenBatches.mockResolvedValue([{ id: "b1", model: "luna", requests: 3, submitted_at: "2026-09-26T11:20:00.000Z" }]);
-    });
+    beforeEach(() => jobsApi.selectOpenBatches.mockResolvedValue([openBatch()]));
 
     it("waits for a batch that is still running", async () => {
       mockGetBatch.mockResolvedValue({ status: "in_progress", done: false, cost: null, results: [] });
@@ -134,14 +154,14 @@ describe("runSummarySweep", () => {
       expect(jobsApi.selectBatchJobs).not.toHaveBeenCalled();
     });
 
-    it("stores passing replies, requeues changed bills, and writes rejected ones directly", async () => {
+    it("stores passing replies, requeues changed bills, and sends rejected ones straight to the other model", async () => {
       mockGetBatch.mockResolvedValue({
         status: "completed",
         done: true,
         cost: 0.004,
-        results: [1, 2, 3].map((n) => ({ customId: `119-hr-${n}:single`, content: `reply ${n}`, error: null, usage: {}, generationId: null })),
+        results: [1, 2, 3].map((n) => item(`119-hr-${n}:single`, `reply ${n}`)),
       });
-      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1" }), job(2, { fingerprint: "stale" }), job(3, { fingerprint: "fp3" })]);
+      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1", attempts: 1 }), job(2, { fingerprint: "stale" }), job(3, { fingerprint: "fp3", attempts: 1 })]);
       mockStoreReply.mockImplementation(async (_e, p: PreparedBill) =>
         p.ref.number === 1 ? stored : { status: "rejected", model: "m", cost: 0, reasons: ["number not in sources: 99"] }
       );
@@ -153,50 +173,80 @@ describe("runSummarySweep", () => {
         [1, "reply 1"],
         [3, "reply 3"],
       ]);
-      expect(mockWrite).toHaveBeenCalledWith(env, expect.objectContaining({ fingerprint: "fp3" }), "new");
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+      expect(mockWrite.mock.calls[0]![3]).toMatchObject({ model: { id: SONNET }, retry: false });
+      // The paid try is counted before the call.
+      expect(jobsApi.markAttempt).toHaveBeenCalledWith(env.DB, expect.objectContaining({ number: 3 }), "fp3", 2);
+      expect(jobsApi.markAttempt.mock.invocationCallOrder[0]).toBeLessThan(mockWrite.mock.invocationCallOrder[0]!);
       expect(settled()).toEqual([
         [1, "done"],
         [2, "queued"],
         [3, "done"],
       ]);
-      expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.004);
+      // The $0.003 estimate was counted at submit; only the difference is recorded now.
       expect(jobsApi.closeDigestBatch).toHaveBeenCalledWith(env.DB, "b1", "collected", 0.004);
+      expect(mockRecordSpend).toHaveBeenCalledTimes(1);
+      expect(mockRecordSpend.mock.calls[0]![1]).toBeCloseTo(0.001);
       expect(result).toMatchObject({ collected: 3, stored: 2, spentUsd: 0.014 });
     });
 
-    it("combines a long bill's part notes from the batch", async () => {
-      const parts = [
-        { label: "Title I — A", text: "a", tokens: 20_000 },
-        { label: "Title II — B", text: "b", tokens: 20_000 },
-      ];
-      mockPrepare.mockResolvedValue(prepared(1, { parts, totalTokens: 40_000, basis: "text" }));
+    it("combines a long bill's batch notes, and retries only the combine with the other model", async () => {
+      mockPrepare.mockResolvedValue(prepared(1, { parts: longParts, totalTokens: 40_000, basis: "text" }));
       mockGetBatch.mockResolvedValue({
         status: "completed",
         done: true,
         cost: 0.01,
-        results: [
-          { customId: "119-hr-1:part0", content: '{"part":"A"}', error: null, usage: {}, generationId: null },
-          { customId: "119-hr-1:part1", content: "not json", error: null, usage: {}, generationId: null },
-        ],
+        results: [item("119-hr-1:part0", '{"part":"A"}'), item("119-hr-1:part1", '{"part":"B"}')],
       });
-      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1" })]);
-      mockCombine.mockResolvedValue(stored);
+      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1", attempts: 1, matters: true })]);
+      mockCombine
+        .mockResolvedValueOnce({ status: "rejected", model: "luna", cost: 0.002, reasons: ["number not in sources: 31905000000"] })
+        .mockResolvedValueOnce({ ...stored, cost: 0.02 });
 
       await runSummarySweep(env, { now: NOW, discover: false });
 
-      expect(mockCombine.mock.calls[0]![2]).toMatchObject({ tier: "new", notes: [{ part: "A" }] });
+      expect(mockCombine.mock.calls.map((c) => (c[2] as { model: { id: string } }).model.id)).toEqual(["openai/gpt-6-luna", SONNET]);
+      expect(mockCombine.mock.calls[1]![2]).toMatchObject({ tier: "rewrite", notes: [{ part: "A" }, { part: "B" }], priorCost: 0.002 });
+      expect(mockWrite).not.toHaveBeenCalled();
       expect(settled()).toEqual([[1, "done"]]);
     });
 
-    it("requeues every bill of a batch that failed or expired", async () => {
+    it("leaves bills in an open batch when the run has no write capacity left", async () => {
+      mockPrepare.mockResolvedValue(prepared(1, { parts: longParts, totalTokens: 40_000, basis: "text" }));
+      mockGetBatch.mockResolvedValue({ status: "completed", done: true, cost: 0.01, results: [] });
+      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1" })]);
+
+      await runSummarySweep(env, { now: NOW, discover: false, syncWrites: 0 });
+
+      expect(mockCombine).not.toHaveBeenCalled();
+      expect(jobsApi.settleJob).not.toHaveBeenCalled();
+      expect(jobsApi.closeDigestBatch).not.toHaveBeenCalled();
+    });
+
+    it("requeues every bill of a batch that failed or expired, cancels it, and refunds the unspent estimate", async () => {
       mockGetBatch.mockResolvedValue({ status: "in_progress", done: false, cost: null, results: [] });
-      jobsApi.selectOpenBatches.mockResolvedValue([{ id: "b1", model: "luna", requests: 1, submitted_at: "2026-09-25T08:00:00.000Z" }]);
+      jobsApi.selectOpenBatches.mockResolvedValue([openBatch({ submitted_at: "2026-09-25T08:00:00.000Z" })]);
       jobsApi.selectBatchJobs.mockResolvedValue([job(1)]);
 
       await runSummarySweep(env, { now: NOW, discover: false });
 
       expect(settled()).toEqual([[1, "queued"]]);
-      expect(jobsApi.closeDigestBatch).toHaveBeenCalledWith(env.DB, "b1", "failed", null);
+      expect(mockCancelBatch).toHaveBeenCalledWith(env, "b1");
+      expect(jobsApi.closeDigestBatch).toHaveBeenCalledWith(env.DB, "b1", "failed", 0);
+      expect(mockRecordSpend.mock.calls[0]![1]).toBeCloseTo(-0.003);
+    });
+
+    it("frees the bills of an expired batch whose status can no longer be read", async () => {
+      mockGetBatch.mockRejectedValue(new Error("batch status failed: HTTP 404"));
+      jobsApi.selectOpenBatches.mockResolvedValue([openBatch({ submitted_at: "2026-09-25T08:00:00.000Z" })]);
+      jobsApi.selectBatchJobs.mockResolvedValue([job(1)]);
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(settled()).toEqual([[1, "queued"]]);
+      // Unknown charge: the estimate stands.
+      expect(jobsApi.closeDigestBatch).toHaveBeenCalledWith(env.DB, "b1", "failed", 0.003);
+      expect(result.warnings).toContain("batch b1 unreadable; 1 bill(s) requeued");
     });
   });
 
@@ -206,9 +256,9 @@ describe("runSummarySweep", () => {
       mockFetchUpdated
         .mockResolvedValueOnce({
           bills: [
-            { congress: 119, type: "HR", number: 1, title: "New bill", introducedDate: "2026-09-24" },
-            { congress: 119, type: "HR", number: 2, title: "Known bill", introducedDate: "2025-02-01" },
-            { congress: 119, type: "HR", number: 3, title: "Old unknown bill", introducedDate: "2025-03-01" },
+            { congress: 119, type: "HR", number: 1, title: "New bill", introducedDate: "2026-09-24", changedOn: "2026-09-26" },
+            { congress: 119, type: "HR", number: 2, title: "Known bill", introducedDate: "2025-02-01", changedOn: "2026-09-25" },
+            { congress: 119, type: "HR", number: 3, title: "Old unknown bill", introducedDate: "2025-03-01", changedOn: "2026-09-26" },
           ],
           hasMore: true,
         })
@@ -217,14 +267,18 @@ describe("runSummarySweep", () => {
       const result = await runSummarySweep(env, { now: NOW });
 
       expect(jobsApi.insertDigestStubs.mock.calls[0]![1].map((b: { number: number }) => b.number)).toEqual([1]);
-      expect(jobsApi.enqueueDigestJobs.mock.calls[0]![1].map((b: { number: number }) => b.number)).toEqual([1, 2]);
+      const queued = jobsApi.enqueueDigestJobs.mock.calls[0]![1] as Array<{ number: number; changedOn: string }>;
+      expect(queued.map((b) => [b.number, b.changedOn])).toEqual([
+        [1, "2026-09-26"],
+        [2, "2026-09-25"],
+      ]);
       expect(result.discovered).toBe(2);
       const first = mockFetchUpdated.mock.calls[0]![1];
       const second = mockFetchUpdated.mock.calls[1]![1];
       expect(second).toMatchObject({ fromIso: first.fromIso, toIso: first.toIso, offset: 3 });
-      // The window is exhausted: the next one starts 36 hours before this one ended.
+      // The window is exhausted: the next one starts 3 hours before this one ended.
       expect(mockSetState).toHaveBeenCalledWith(env.DB, "digest_discovery_cursor", {
-        fromIso: "2026-09-25T00:20:00.000Z",
+        fromIso: "2026-09-26T09:20:00.000Z",
         toIso: NOW.toISOString(),
         offset: 0,
       });
@@ -232,47 +286,74 @@ describe("runSummarySweep", () => {
   });
 
   describe("the queue", () => {
-    it("rewrites bills that matter, skipping ones already current", async () => {
-      jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) =>
-        matters ? [job(1, { matters: true }), job(2, { matters: true }), job(3, { matters: true })] : []
-      );
+    it("rewrites bills that matter; unchanged ones do not use up the run's writes", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(onlyMatters([job(1, { matters: true }), job(2, { matters: true }), job(3, { matters: true })]));
       const rewritten = (fingerprint: string) => ({
         digest_json: JSON.stringify({ headline: "h", what_it_does: "w", generator: { tier: "rewrite", fingerprint, long: false } }),
       });
-      // 1 is current; 2 has no summary; 3 was rewritten from inputs that have since changed.
-      mockGetDigest.mockImplementation(async (_db, _c, _t, n: number) => (n === 1 ? rewritten("fp1") : n === 3 ? rewritten("old") : null));
+      // 1 is current; 2 was rewritten from inputs that have since changed; 3 has no summary.
+      mockGetDigest.mockImplementation(async (_db, _c, _t, n: number) => (n === 1 ? rewritten("fp1") : n === 2 ? rewritten("old") : null));
       mockWrite.mockResolvedValue({ ...stored, cost: 0.015 });
 
-      const result = await runSummarySweep(env, { now: NOW, discover: false });
+      const result = await runSummarySweep(env, { now: NOW, discover: false, rewrites: 1 });
 
-      expect(mockWrite.mock.calls.map((c) => (c[1] as PreparedBill).fingerprint)).toEqual(["fp2", "fp3"]);
+      expect(mockWrite.mock.calls.map((c) => (c[1] as PreparedBill).fingerprint)).toEqual(["fp2"]);
       expect(settled()).toEqual([
         [1, "done"],
         [2, "done"],
-        [3, "done"],
       ]);
-      expect(result).toMatchObject({ unchanged: 1, rewritten: 2 });
+      expect(result).toMatchObject({ unchanged: 1, rewritten: 1 });
     });
 
-    it("parks a bill whose summaries keep failing the checks, until its inputs change", async () => {
-      jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) =>
-        matters ? [job(1, { matters: true, attempts: 1, fingerprint: "fp1" }), job(2, { matters: true, attempts: 2, fingerprint: "fp2" })] : []
+    it("sends long bills that matter to the Luna batch instead of a slow direct write", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(onlyMatters([job(1, { matters: true })]));
+      mockPrepare.mockResolvedValue(prepared(1, { parts: longParts, totalTokens: 40_000, basis: "text" }));
+      mockSubmitBatch.mockResolvedValue("batch-2");
+
+      await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(mockWrite).not.toHaveBeenCalled();
+      expect(mockSubmitBatch.mock.calls[0]![2].map((r: { customId: string }) => r.customId)).toEqual(["119-hr-1:part0", "119-hr-1:part1"]);
+    });
+
+    it("counts a paid try before it starts, and parks the bill at the third failure", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(
+        onlyMatters([job(1, { matters: true, attempts: 0, fingerprint: "fp1" }), job(2, { matters: true, attempts: 2, fingerprint: "fp2" })])
       );
       mockWrite.mockResolvedValue({ status: "rejected", model: "m", cost: 0.05, reasons: ["number not in sources: 31905000000"] });
 
       const result = await runSummarySweep(env, { now: NOW, discover: false });
 
-      const calls = jobsApi.settleJob.mock.calls.map((c) => [(c[1] as DigestJob).number, c[2], c[3]?.attempt]);
-      expect(calls).toEqual([
-        [1, "queued", { fingerprint: "fp1", failed: true }],
-        [2, "done", { fingerprint: "fp2", failed: true }],
+      expect(jobsApi.markAttempt.mock.calls.map((c) => [(c[1] as DigestJob).number, c[2], c[3]])).toEqual([
+        [1, "fp1", 1],
+        [2, "fp2", 3],
+      ]);
+      expect(settledWith().map(([n, state, p]) => [n, state, (p as { attempts: number }).attempts])).toEqual([
+        [1, "queued", 1],
+        [2, "done", 3],
       ]);
       expect(result.warnings).toContain("H.R. 2 · 119th Congress: rejected: number not in sources: 31905000000");
       expect(result.spentUsd).toBe(0.1);
     });
 
+    it("skips a parked bill without paying, and gives an unreadable bill a counted try", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(
+        onlyMatters([job(1, { matters: true, attempts: 3, fingerprint: "fp1" }), job(2, { matters: true, attempts: 2, fingerprint: "unreadable" })])
+      );
+      mockPrepare.mockImplementation(async (_e, ref: { number: number }) => {
+        if (ref.number === 2) throw new Error("HTTP 503");
+        return prepared(ref.number);
+      });
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(mockWrite).not.toHaveBeenCalled();
+      expect(result.parked).toBe(1);
+      expect(settledWith()[1]).toEqual([2, "done", expect.objectContaining({ fingerprint: "unreadable", attempts: 3 })]);
+    });
+
     it("stops rewriting when the day's budget is spent", async () => {
-      jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) => (matters ? [job(1, { matters: true })] : []));
+      jobsApi.selectQueuedJobs.mockImplementation(onlyMatters([job(1, { matters: true })]));
       mockBudgetLeft.mockResolvedValue(0);
 
       const result = await runSummarySweep(env, { now: NOW, discover: false });
@@ -281,14 +362,18 @@ describe("runSummarySweep", () => {
       expect(result.warnings).toContain("daily summary budget spent; rewrites resume tomorrow");
     });
 
-    it("sends other bills to one Luna batch, one request per bill or part", async () => {
-      const parts = [
-        { label: "Title I — A", text: "a", tokens: 20_000 },
-        { label: "Title II — B", text: "b", tokens: 20_000 },
-      ];
-      jobsApi.selectQueuedJobs.mockImplementation(async (_db, { matters }: { matters: boolean }) => (matters ? [] : [job(1), job(2), job(3, { attempts: 2, fingerprint: "fp3" }), job(4, { attempts: 3, fingerprint: "fp4" }), job(5, { attempts: 3, fingerprint: "changed" })]));
+    it("sends other bills to one Luna batch and counts its estimated cost now", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(
+        onlyNew([
+          job(1),
+          job(2),
+          job(3, { attempts: 2, fingerprint: "fp3" }),
+          job(4, { attempts: 3, fingerprint: "fp4" }),
+          job(5, { attempts: 3, fingerprint: "changed" }),
+        ])
+      );
       mockPrepare.mockImplementation(async (_e, ref: { number: number }) =>
-        ref.number === 2 ? prepared(2, { parts, totalTokens: 40_000, basis: "text" }) : prepared(ref.number)
+        ref.number === 2 ? prepared(2, { parts: longParts, totalTokens: 40_000, basis: "text" }) : prepared(ref.number)
       );
       mockSubmitBatch.mockResolvedValue("batch-9");
       mockWrite.mockResolvedValue(stored);
@@ -299,17 +384,24 @@ describe("runSummarySweep", () => {
       expect(model).toMatchObject({ id: "openai/gpt-6-luna", reasoning: { effort: "high" } });
       // 5 failed before, but on inputs that have since changed, so it gets a fresh try.
       expect(requests.map((r: { customId: string }) => r.customId)).toEqual(["119-hr-1:single", "119-hr-2:part0", "119-hr-2:part1", "119-hr-5:single"]);
-      expect(jobsApi.markJobsBatched.mock.calls[0]![1]).toEqual([
-        { ref: { congress: 119, type: "HR", number: 1 }, fingerprint: "fp1" },
-        { ref: { congress: 119, type: "HR", number: 2 }, fingerprint: "fp2" },
-        { ref: { congress: 119, type: "HR", number: 5 }, fingerprint: "fp5" },
-      ]);
-      // A bill whose batches keep failing is written directly.
+      expect(jobsApi.markJobsBatched.mock.calls[0]![1].map((j: { fingerprint: string }) => j.fingerprint)).toEqual(["fp1", "fp2", "fp5"]);
+      const estimate = jobsApi.insertDigestBatch.mock.calls[0]![1].estimate as number;
+      expect(estimate).toBeGreaterThan(0.001);
+      expect(mockRecordSpend).toHaveBeenCalledWith(env, estimate);
+      // A bill whose batches keep failing is written directly; 4 failed three times on these inputs and is parked.
       expect(mockWrite).toHaveBeenCalledTimes(1);
       expect(mockWrite).toHaveBeenCalledWith(env, expect.objectContaining({ fingerprint: "fp3" }), "new");
-      // 4 failed three times on these same inputs: parked, no model call.
       expect(result).toMatchObject({ batched: 3, parked: 1 });
-      expect(settled()).toContainEqual([4, "done"]);
+    });
+
+    it("holds the batch when the day's remaining budget cannot cover its estimate", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(onlyNew([job(1)]));
+      mockBudgetLeft.mockResolvedValue(0.0001);
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(mockSubmitBatch).not.toHaveBeenCalled();
+      expect(result.warnings.some((w) => w.startsWith("daily summary budget too low for a batch"))).toBe(true);
     });
   });
 });
