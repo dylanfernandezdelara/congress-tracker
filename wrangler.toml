@@ -49,6 +49,9 @@ CF_ZONE_ID = "86b690387ae840600f5f3341aa154cce"
 # Summary calls (digest/) go through Cloudflare AI Gateway "trackcongress" for logs and analytics; the
 # CF_AIG_TOKEN secret authenticates them. Batches still go straight to OpenRouter. Remove to call OpenRouter directly.
 OPENROUTER_BASE_URL = "https://gateway.ai.cloudflare.com/v1/0b001ef01845353691fdc2833d96b81d/trackcongress/openrouter/v1"
+# Daily cap on summary spend (digest/budget.ts; default $1 when unset). Raised to $2 on 2026-10-03 so the live lane
+# (200+ new bills a day while the floor is quiet) stops starving the site backfill, which gets at most half of it.
+DIGEST_DAILY_BUDGET_USD = "2"
 
 [[routes]]
 pattern = "trackcongress.org"
