@@ -22,6 +22,8 @@ export interface DigestJob extends BillRef {
   readFailures: number;
   /** "backfill" for jobs queued only by the backfill: they go last and get a capped share of the budget. */
   origin: JobOrigin;
+  /** Why the last try failed (a rejection, a model error), or the parked message once the bill is parked. */
+  lastError: string | null;
 }
 
 export type JobOrigin = "live" | "backfill";
@@ -37,6 +39,7 @@ interface JobRow {
   fingerprint: string | null;
   read_failures: number | null;
   origin: JobOrigin | null;
+  last_error: string | null;
 }
 
 const toJob = (row: JobRow): DigestJob => ({
@@ -50,6 +53,7 @@ const toJob = (row: JobRow): DigestJob => ({
   fingerprint: row.fingerprint,
   readFailures: row.read_failures ?? 0,
   origin: row.origin ?? "live",
+  lastError: row.last_error ?? null,
 });
 
 /**
@@ -116,7 +120,7 @@ export async function selectQueuedJobs(
   const { results } = await db
     .prepare(
       `SELECT * FROM (
-         SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.origin, j.queued_at,
+         SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.origin, j.last_error, j.queued_at,
                 CASE WHEN j.tier = 'rewrite' OR ${MATTERS_SQL} THEN 1 ELSE 0 END AS matters
          FROM digest_jobs j
          WHERE j.state = 'queued'
@@ -134,7 +138,7 @@ export async function selectBatchJobs(db: D1Database, batchId: string): Promise<
   await ensureSchema(db);
   const { results } = await db
     .prepare(
-      `SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.origin,
+      `SELECT j.congress, j.bill_type, j.number, j.tier, j.attempts, j.batch_id, j.fingerprint, j.read_failures, j.origin, j.last_error,
               CASE WHEN j.tier = 'rewrite' OR ${MATTERS_SQL} THEN 1 ELSE 0 END AS matters
        FROM digest_jobs j
        WHERE j.batch_id = ?1 AND j.state = 'batched'`

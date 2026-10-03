@@ -75,7 +75,11 @@ export interface SummarySweepResult {
   backfilled: number;
   rechecked: number;
   unchanged: number;
-  /** Bills whose summaries kept failing the checks for the same inputs; retried when the bill changes. */
+  /**
+   * Parked bills this run encountered, including bills already parked that were queued again (each re-encounter
+   * counts): summaries that kept failing for the same inputs (retried when the bill changes), or bills that could not
+   * be read run after run. `last_error` keeps the last failure's reason.
+   */
   parked: number;
   rewritten: number;
   batched: number;
@@ -128,6 +132,25 @@ function describe(outcome: WriteOutcome): string {
     default:
       return "";
   }
+}
+
+/** Longest last-failure reason carried into a parked message. */
+const PARK_REASON_MAX = 200;
+
+/**
+ * The `last_error` of a parked bill: how many tries it had, and why the last one failed, so a parked bill can be
+ * diagnosed from the queue alone. A reason that is already a parked message is kept as it is, never nested.
+ */
+export function parkedMessage(
+  tries: number,
+  reason: string | null | undefined,
+  what = "failed attempts",
+  retried = "when the bill changes"
+): string {
+  const last = reason?.trim() ?? "";
+  if (last.startsWith("parked")) return last;
+  const shown = last.length > PARK_REASON_MAX ? `${last.slice(0, PARK_REASON_MAX - 1)}…` : last;
+  return `parked after ${tries} ${what}${shown ? ` (last: ${shown})` : ""}; retried ${retried}`;
 }
 
 class Sweep {
@@ -194,8 +217,10 @@ class Sweep {
     const account = outcome.status === "failed" && outcome.account === true;
     if (account) this.syncWrites = this.maxSyncWrites;
     const counted = outcome.status === "over_budget" || account ? attempts - 1 : attempts;
-    await settleJob(this.env.DB, job, counted >= DIGEST_MAX_ATTEMPTS ? "done" : "queued", {
-      error: describe(outcome),
+    const parked = counted >= DIGEST_MAX_ATTEMPTS;
+    if (parked) this.result.parked += 1;
+    await settleJob(this.env.DB, job, parked ? "done" : "queued", {
+      error: parked ? parkedMessage(counted, describe(outcome)) : describe(outcome),
       fingerprint,
       attempts: counted,
     });
@@ -207,7 +232,8 @@ class Sweep {
     if (Sweep.attemptsFor(job, prepared.fingerprint) < DIGEST_MAX_ATTEMPTS) return false;
     this.result.parked += 1;
     await settleJob(this.env.DB, job, "done", {
-      error: `parked after ${job.attempts} failed attempts; retried when the bill changes`,
+      // Keeps the last failure's reason (or the message of an earlier parking) rather than overwriting it.
+      error: parkedMessage(job.attempts, job.lastError),
       readFailures: 0,
     });
     return true;
@@ -222,8 +248,12 @@ class Sweep {
     this.result.failed += 1;
     this.result.warnings.push(`${label(job)}: ${message(err)}`);
     const readFailures = job.readFailures + 1;
-    await settleJob(this.env.DB, job, readFailures >= DIGEST_MAX_ATTEMPTS ? "done" : "queued", {
-      error: readFailures >= DIGEST_MAX_ATTEMPTS ? `parked: unreadable ${readFailures} times: ${message(err)}` : message(err),
+    const parked = readFailures >= DIGEST_MAX_ATTEMPTS;
+    if (parked) this.result.parked += 1;
+    // A bill already parked for failed summaries keeps that reason through a passing outage; it is the one to act on.
+    const keep = job.attempts >= DIGEST_MAX_ATTEMPTS && job.lastError?.startsWith("parked") ? job.lastError : null;
+    await settleJob(this.env.DB, job, parked ? "done" : "queued", {
+      error: keep ?? (parked ? parkedMessage(readFailures, message(err), "unreadable runs", "when the bill is queued again") : message(err)),
       readFailures,
     });
   }
