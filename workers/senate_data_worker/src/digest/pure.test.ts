@@ -138,6 +138,21 @@ describe("checks", () => {
     expect(checkSummary(summary({ key_points: [{ text: "Cuts the workweek to 32 hours", section: "Sec. 2" }] }), workweek).blocking).toEqual([]);
   });
 
+  it("reads ordinals, spelled out and in digits", () => {
+    // HR 10422: "the fourteenth consecutive day … the thirtieth consecutive day".
+    expect([...numbersIn("the fourteenth consecutive day and the thirtieth consecutive day")]).toEqual(
+      expect.arrayContaining([14, 30])
+    );
+    const century = [...numbersIn("the twenty-first century, the thirty second time, the eighth and twelfth")];
+    expect(century).toEqual(expect.arrayContaining([21, 32, 8, 12]));
+    expect(century).not.toEqual(expect.arrayContaining([20]));
+    expect([...numbersIn("the 14th day, the 1st, 2nd and 3rd")]).toEqual(expect.arrayContaining([14, 1, 2, 3]));
+    const diesel = sources({ text: "SEC. 2. Suspension\nending on the thirtieth consecutive day after the fourteenth consecutive day" });
+    const straight = summary({ key_points: [{ text: "Ends after 30 straight days, starting from 14 straight days", section: "Sec. 2" }] });
+    expect(checkSummary(straight, diesel).blocking).toEqual([]);
+    expect(checkSummary(summary({ what_it_does: "Suspends the tax for 30 straight days.", key_points: [{ text: "Suspends the tax", section: null }] }), diesel).blocking).toEqual([]);
+  });
+
   it("allows a judging word only as the bill's own named or defined term, never its findings' framing", () => {
     const bill = sources({
       title: "Critical Materials Future Act of 2025",

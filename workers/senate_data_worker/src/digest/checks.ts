@@ -44,8 +44,21 @@ const WORD_NUMBERS: Record<string, number> = {
   ...UNITS, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
   eighteen: 18, nineteen: 19, ...TENS, hundred: 100,
 };
-/** "thirty-two", "ninety nine": bills spell numbers out ("a workweek longer than thirty-two hours"). */
-const COMPOUND = new RegExp(`\\b(${Object.keys(TENS).join("|")})[- ](${Object.keys(UNITS).join("|")})\\b`, "gi");
+/** "first" … "ninth": the units' ordinals, which also end a compound ("twenty-first"). */
+const UNIT_ORDINALS: Record<string, number> = {
+  first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9,
+};
+/** Bills count days in ordinals ("the thirtieth consecutive day"); summaries say "30 straight days". */
+const ORDINALS: Record<string, number> = {
+  ...UNIT_ORDINALS, tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16,
+  seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20, thirtieth: 30, fortieth: 40, fiftieth: 50,
+  sixtieth: 60, seventieth: 70, eightieth: 80, ninetieth: 90, hundredth: 100,
+};
+/** "thirty-two", "ninety nine", "twenty-first": bills spell numbers out ("a workweek longer than thirty-two hours"). */
+const COMPOUND = new RegExp(
+  `\\b(${Object.keys(TENS).join("|")})[- ](${[...Object.keys(UNITS), ...Object.keys(UNIT_ORDINALS)].join("|")})\\b`,
+  "gi"
+);
 
 /** Every numeric value in a text: "$45,000,000,000", "$45 billion", "15 percent", "three years", "2028". */
 export function numbersIn(text: string | null | undefined): Set<number> {
@@ -57,9 +70,13 @@ export function numbersIn(text: string | null | undefined): Set<number> {
     values.add(m[2] ? Math.round(n * SCALE[m[2].toLowerCase()]!) : n);
   }
   // Compounds first, then removed: "twenty-one" is 21, not also 20 and 1.
-  for (const m of s.matchAll(COMPOUND)) values.add(TENS[m[1]!.toLowerCase()]! + UNITS[m[2]!.toLowerCase()]!);
+  for (const m of s.matchAll(COMPOUND)) {
+    const unit = m[2]!.toLowerCase();
+    values.add(TENS[m[1]!.toLowerCase()]! + (UNITS[unit] ?? UNIT_ORDINALS[unit]!));
+  }
   const rest = s.replace(COMPOUND, " ");
-  for (const [word, n] of Object.entries(WORD_NUMBERS)) {
+  // Ordinals too ("fourteenth"). "second" the unit of time reads as 2, which never blocks: counts up to 12 pass.
+  for (const [word, n] of Object.entries({ ...WORD_NUMBERS, ...ORDINALS })) {
     if (new RegExp(`\\b${word}\\b`, "i").test(rest)) values.add(n);
   }
   return values;
