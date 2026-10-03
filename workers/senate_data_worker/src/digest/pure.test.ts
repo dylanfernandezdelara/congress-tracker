@@ -147,6 +147,8 @@ describe("checks", () => {
     expect(century).toEqual(expect.arrayContaining([21, 32, 8, 12]));
     expect(century).not.toEqual(expect.arrayContaining([20]));
     expect([...numbersIn("the 14th day, the 1st, 2nd and 3rd")]).toEqual(expect.arrayContaining([14, 1, 2, 3]));
+    // "-second" is a duration as often as an ordinal: "thirty-second announcement" supports both 30 and 32.
+    expect([...numbersIn("a thirty-second public service announcement")]).toEqual(expect.arrayContaining([30, 32]));
     const diesel = sources({ text: "SEC. 2. Suspension\nending on the thirtieth consecutive day after the fourteenth consecutive day" });
     const straight = summary({ key_points: [{ text: "Ends after 30 straight days, starting from 14 straight days", section: "Sec. 2" }] });
     expect(checkSummary(straight, diesel).blocking).toEqual([]);

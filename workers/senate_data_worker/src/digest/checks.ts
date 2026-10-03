@@ -72,7 +72,10 @@ export function numbersIn(text: string | null | undefined): Set<number> {
   // Compounds first, then removed: "twenty-one" is 21, not also 20 and 1.
   for (const m of s.matchAll(COMPOUND)) {
     const unit = m[2]!.toLowerCase();
-    values.add(TENS[m[1]!.toLowerCase()]! + (UNITS[unit] ?? UNIT_ORDINALS[unit]!));
+    const tens = TENS[m[1]!.toLowerCase()]!;
+    values.add(tens + (UNITS[unit] ?? UNIT_ORDINALS[unit]!));
+    // "thirty-second announcement" is a 30-second duration as often as the 32nd item: keep the tens value too.
+    if (unit === "second") values.add(tens);
   }
   const rest = s.replace(COMPOUND, " ");
   // Ordinals too ("fourteenth"). "second" the unit of time reads as 2, which never blocks: counts up to 12 pass.
