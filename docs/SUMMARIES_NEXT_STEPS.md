@@ -46,7 +46,7 @@ Also: stale PRs #184, #188–#191 closed. Nine merged worktrees removed. HR 1039
 
 ## Current state (2026-09-27 ~16:40 UTC)
 
-- **Production:** trackcongress.org on main `2532cdd`. Prompt v3.3. Budget `DIGEST_DAILY_BUDGET_USD` $1/day; today's spend ~$0.89 before the blocked refreshes.
+- **Production:** trackcongress.org on main `2532cdd`. Prompt v3.3. Budget `DIGEST_DAILY_BUDGET_USD` $2/day since 2026-10-03 (#217; was the $1 default).
 - **OpenRouter key:** limit $15, usage $0.20, $14.80 remaining (`GET https://openrouter.ai/api/v1/key`). Not close to running out.
 - **Site backfill:** 78 of 300 done, 222 queued; resumes 00:00 UTC. **Do not start `scope=congress`** without Dylan.
 - **Rejected/parked:** HR5366 (attempt 1, correct block: "2015" not in bill), S5384 (attempt 2, fixed by #206, gets its last try tonight), HR10395 (now rewritten, done).
