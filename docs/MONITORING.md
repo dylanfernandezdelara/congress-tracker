@@ -72,7 +72,7 @@ The sweep logs `summary_sweep_complete` (or `summary_sweep_skipped_busy` /
   expected; many is a prompt or checks problem (add a parked bill to the evals and
   run `npm run digest:regress`). Parked bills:
   `SELECT * FROM digest_jobs WHERE last_error LIKE 'parked%'`.
-- `daily summary budget spent` / `budget too low for a batch` — spend hit `DIGEST_DAILY_BUDGET_USD` ($1 default).
+- `daily summary budget spent` / `budget too low for a batch` — spend hit `DIGEST_DAILY_BUDGET_USD` ($2 in `[vars]`; $1 default when unset).
   Normal spend is cents a day; hitting it means a flood of rewrites or a price change.
 - `batch … expired|failed; N bill(s) requeued` — OpenRouter batch trouble. Bills
   go back in the queue; after `DIGEST_BATCH_MAX_ATTEMPTS` they are written directly.
