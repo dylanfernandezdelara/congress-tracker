@@ -175,7 +175,7 @@ way they would, so summaries lead with concrete effects on people and stay stric
   a judging word, or an empty field blocks the summary; the writer retries once with the other model
   (Luna ↔ Sonnet; for long bills only the combine pass), and otherwise the current summary stays.
   Warnings are kept in `generator.warnings`. A judging word passes only as a term the bill defines (bill XML's
-  `<term>`, which `billXmlToText` keeps quoted); titles and findings stay blocked.
+  `<term>`, which `billXmlToText` keeps quoted), a fixed term of art ("critical health care personnel", "historic preservation"), or a capitalized proper name or short title the sources spell the same way; the same words in the summary's own voice, and findings, stay blocked.
 - **Provenance** `digest_json.generator` (worker-only, stripped from the feed): model, prompt version,
   tier, text version, `fingerprint` (hash of everything the summary was written from), `long`. The fingerprint
   carries `PROMPT_EPOCH` (v3), not the prompt version: a minor prompt change applies to new writes only; bump

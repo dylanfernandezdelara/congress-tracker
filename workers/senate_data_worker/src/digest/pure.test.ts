@@ -156,9 +156,38 @@ describe("checks", () => {
     expect(
       checkSummary(summary({ what_it_does: "Ends reckless spending.", key_points: [{ text: "Limits spending", section: null }] }), titled).blocking
     ).toEqual(['judging word "reckless"']);
+    // The same title used as a name is a name.
+    expect(
+      checkSummary(summary({ what_it_does: "The Stop Reckless Spending Act limits spending.", key_points: [{ text: "Limits spending", section: null }] }), titled).blocking
+    ).toEqual([]);
+    expect(
+      checkSummary(summary({ what_it_does: "Called the “Stop Reckless Spending Act,” it limits spending.", key_points: [{ text: "Limits spending", section: null }] }), titled).blocking
+    ).toEqual([]);
     // A phrase never spans two fields.
     const spanning = summary({ headline: "Bill would make funding critical", what_it_does: "Materials processing gets funds.", key_points: [{ text: "Starts a pilot", section: null }] });
     expect(checkSummary(spanning, bill).blocking).toEqual(['judging word "critical"']);
+  });
+
+  it("lets terms of art and proper names through, not the summary's own judgments (S.5406, S.790, HR 7618)", () => {
+    const check = (bill: CheckableSources, what: string) =>
+      checkSummary(summary({ what_it_does: what, key_points: [{ text: "Changes the program", section: null }] }), bill).blocking;
+    const s5406 = sources({
+      title: "VA Salary Cap Waiver Adjustment Act",
+      text: "SEC. 2. Modification of limitation on waiver for pay of critical health care personnel\n\nSection 7431(e)(6) of title 38, United States Code, is amended—",
+    });
+    expect(check(s5406, "Would let VA waive pay caps for critical health care personnel longer")).toEqual([]);
+    expect(check(s5406, "Would let VA waive pay caps for critical staff")).toEqual(['judging word "critical"']);
+    const s790 = sources({
+      title: "A bill to designate the National Historic Trails Interpretive Center as the Barbara L. Cubin Center.",
+      text: "The National Historic Trails Interpretive Center in Casper, Wyoming, shall be known and designated as the “Barbara L. Cubin National Historic Trails Interpretive Center”.",
+    });
+    expect(check(s790, "Renames the National Historic Trails Interpretive Center for Barbara Cubin")).toEqual([]);
+    expect(check(s790, "Renames a historic Wyoming trails center")).toEqual(['judging word "historic"']);
+    // Capitalized, but not a name the sources hold.
+    expect(check(s790, "Historic Wyoming center gets a new name")).toEqual(['judging word "historic"']);
+    const hr7618 = sources({ title: "Wildfire Recovery Act", text: "SEC. 2. Findings\nWildfires are devastating wildfires." });
+    expect(check(hr7618, "Funds historic preservation organizations and historic sites hit by wildfires")).toEqual([]);
+    expect(check(hr7618, "Responds to devastating wildfires")).toEqual(['judging word "devastating"']);
   });
 
   it("does not read a number opening one field as a bill citation closing the last", () => {

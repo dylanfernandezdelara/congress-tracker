@@ -184,6 +184,42 @@ const VOTE_HEADLINE = [
   /\b(passe[sd]|fails?|failed|rejected|approved|clear(s|ed)|dies)\s+(in\s+)?(the\s+)?(house|senate)\b|\b(house|senate)-passed\b/i,
 ];
 
+const JUDGING_WORD = new RegExp(`^(${JUDGING.join("|")})$`, "i");
+const NAME_RUN = /\b[A-Z][A-Za-z'’-]*(?:\s+(?:(?:of|the|and|for)\s+)*[A-Z][A-Za-z'’-]*)+/g;
+const NAME_CONNECTOR = /^(of|the|and|for)$/;
+
+/**
+ * Proper names are not judgments: a run of Capitalized Words (with "of", "the", "and", "for" inside) that holds a
+ * judging word and appears verbatim, case-sensitive, in the title or text ("National Historic Trails Interpretive
+ * Center", "Stop Reckless Spending Act"), or a quoted string that is the bill's short title, is removed before the scan.
+ * Lowercase uses ("a historic trails center", "reckless spending") are the summary's own voice and still count.
+ */
+export function withoutProperNames(text: string, sources: Pick<CheckableSources, "title" | "text">): string {
+  const source = [sources.title ?? "", sources.text ?? ""].join("\n").replace(/\s+/g, " ");
+  const norm = (t: string) => t.replace(/\s+/g, " ").trim();
+  const shortTitles = new Set([norm(sources.title ?? ""), ...[...source.matchAll(/cited as the [“"]([^”"]{3,200})[”"]/g)].map((m) => norm(m[1]))]);
+  const quoted = text.replace(/[“"]([^”"\n]{3,200})[”"]/g, (m, inner: string) => (shortTitles.has(norm(inner)) ? "" : m));
+  return quoted.replace(NAME_RUN, (run) => {
+    const tokens = run.split(/\s+/);
+    const capital = (i: number) => /^[A-Z]/.test(tokens[i]) && !(i === 0 && tokens[i] === "The");
+    const keep = tokens.map(() => true);
+    tokens.forEach((t, i) => {
+      if (!JUDGING_WORD.test(t)) return;
+      // Longest span around the word that starts and ends on a capitalized word, has two or more words, and the sources hold.
+      for (let len = tokens.length; len >= 2; len--) {
+        for (let a = Math.max(0, i - len + 1); a <= i && a + len <= tokens.length; a++) {
+          const b = a + len - 1;
+          if (!capital(a) || !capital(b) || NAME_CONNECTOR.test(tokens[a]) || NAME_CONNECTOR.test(tokens[b])) continue;
+          if (!source.includes(tokens.slice(a, b + 1).join(" "))) continue;
+          for (let k = a; k <= b; k++) keep[k] = false;
+          return;
+        }
+      }
+    });
+    return tokens.filter((_, i) => keep[i]).join(" ");
+  });
+}
+
 export function checkSummary(summary: CheckableSummary, sources: CheckableSources, options: { long?: boolean } = {}): CheckResult {
   const blocking: string[] = [];
   const warnings: string[] = [];
@@ -203,16 +239,21 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   for (const p of summary.key_points) if (words(p.text) > 24) warnings.push(`key point ${words(p.text)} words`);
   if ((summary.who_it_affects?.length ?? 0) > 3) warnings.push(`${summary.who_it_affects!.length} groups affected`);
 
-  const text = readerText(summary);
-  // Fixed terms of art are not judgments ("critical minerals", "critical-mineral", "critical access hospitals").
-  const plain = text.toLowerCase().replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care)\b/g, "");
+  const text = withoutProperNames(readerText(summary), sources);
+  // Fixed terms of art are not judgments ("critical minerals", "critical-mineral", "critical access hospitals",
+  // "critical health care personnel" in 38 U.S.C. 7431, "historic preservation", "historic sites").
+  const plain = text
+    .toLowerCase()
+    .replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care|health[- ]care personnel)\b/g, "")
+    .replace(/\bhistoric[- ](preservation|sites?|propert(y|ies)|districts?|records?|trails?|landmarks?|resources|structures|buildings|places)\b/g, "");
   const billText = (sources.text ?? "").toLowerCase();
   for (const w of JUDGING) {
     if (!new RegExp(`\\b${w}\\b`).test(plain)) continue;
     // A term the bill defines is not a judgment: every use in the summary must be a two-word phrase the bill defines
     // (the term “critical material” means / has the meaning given; ‘…’ when nested in an amendment; bill XML's
-    // <term> arrives quoted from billXmlToText). Titles ("Stop Reckless Spending Act")
-    // and findings ("devastating wildfires") are the sponsor's framing and stay blocked.
+    // <term> arrives quoted from billXmlToText). Proper names the sources spell the same way ("National Historic
+    // Trails Interpretive Center", "Stop Reckless Spending Act") were stripped above; the sponsor's framing in the
+    // summary's own voice ("reckless spending") and findings ("devastating wildfires") stay blocked.
     const uses = [...plain.matchAll(new RegExp(`\\b${w}\\b(?:[- ]([a-z]+))?`, "g"))];
     const billTerm = (next: string | undefined) => {
       if (!next) return false;
