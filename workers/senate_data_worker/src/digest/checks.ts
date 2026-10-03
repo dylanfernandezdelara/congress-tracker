@@ -219,7 +219,9 @@ export function withoutProperNames(text: string, sources: Pick<CheckableSources,
     if (!source.includes(span)) return false;
     const e = escapeRegExp(span);
     if (!opensOnJudging) return new RegExp(`${e}(?![A-Za-z'’-])`).test(source);
-    return bareTitles.has(withoutYear(span)) || new RegExp(`(?:(?<![A-Za-z'’-])[a-z]+,? |[“"‘])${e}(?![A-Za-z'’-])`).test(source);
+    // Mid-sentence, and the whole name: a prefix of a longer Title Case run ("Unprecedented Border Crisis" out of
+    // "…cited as the “Unprecedented Border Crisis Response Act”") is the sponsor's framing, not a name.
+    return bareTitles.has(withoutYear(span)) || new RegExp(`(?:(?<![A-Za-z'’-])[a-z]+,? |[“"‘])${e}(?![A-Za-z'’-])(?! (?:(?:of|the|and|for) )*[A-Z])`).test(source);
   };
   return quoted.replace(NAME_RUN, (run) => {
     const tokens = run.split(/[^\S\n]+/);

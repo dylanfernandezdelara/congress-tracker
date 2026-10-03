@@ -189,6 +189,10 @@ describe("checks", () => {
     // mid-sentence or it is the whole short title.
     const opens = (text: string, title: string | null = "Some Act") => (what: string) => check(sources({ title, text }), what);
     expect(opens("SEC. 2. Critical Federal programs")("Critical Federal programs keep funding.")).toEqual(['judging word "critical"']);
+    // A prefix of the short title, reached through its "cited as" clause, is still the sponsor's framing.
+    expect(opens("This Act may be cited as the “Unprecedented Border Crisis Response Act”.", "To respond.")("Responds to the Unprecedented Border Crisis.")).toEqual(['judging word "unprecedented"']);
+    expect(opens("This Act may be cited as the “Protecting Americans from Dangerous Drones Act”.", "To protect.")("Bans Dangerous Drones at federal sites.")).toEqual(['judging word "dangerous"']);
+    expect(opens("This Act may be cited as the “Unprecedented Border Crisis Response Act”.", "To respond.")("Unprecedented Border Crisis Response Act funds agents.")).toEqual([]);
     expect(opens("SEC. 2. Findings\n(1) Massive Federal spending has driven inflation.")("Massive Federal spending is cut.")).toEqual(['judging word "massive"']);
     expect(opens("SEC. 2. Findings\n(2) Dangerous Chinese drones threaten security.")("Bans Dangerous Chinese drones.")).toEqual(['judging word "dangerous"']);
     expect(opens("TITLE I — Historic Investment in Rural Broadband")("Historic Investment in Rural Broadband funds towers.")).toEqual(['judging word "historic"']);
