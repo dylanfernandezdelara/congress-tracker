@@ -185,6 +185,22 @@ describe("checks", () => {
     expect(check(s790, "Renames a historic Wyoming trails center")).toEqual(['judging word "historic"']);
     // Capitalized, but not a name the sources hold.
     expect(check(s790, "Historic Wyoming center gets a new name")).toEqual(['judging word "historic"']);
+    // A span opening on the judging word is a sentence start, findings line or header unless the source has it
+    // mid-sentence or it is the whole short title.
+    const opens = (text: string, title: string | null = "Some Act") => (what: string) => check(sources({ title, text }), what);
+    expect(opens("SEC. 2. Critical Federal programs")("Critical Federal programs keep funding.")).toEqual(['judging word "critical"']);
+    expect(opens("SEC. 2. Findings\n(1) Massive Federal spending has driven inflation.")("Massive Federal spending is cut.")).toEqual(['judging word "massive"']);
+    expect(opens("SEC. 2. Findings\n(2) Dangerous Chinese drones threaten security.")("Bans Dangerous Chinese drones.")).toEqual(['judging word "dangerous"']);
+    expect(opens("TITLE I — Historic Investment in Rural Broadband")("Historic Investment in Rural Broadband funds towers.")).toEqual(['judging word "historic"']);
+    expect(
+      checkSummary(summary({ headline: "Historic Wildfires in California get aid", key_points: [{ text: "Funds recovery", section: null }] }), sources({ text: "Historic Wildfires in California burned." })).blocking
+    ).toEqual(['judging word "historic"']);
+    const crisis = opens("SEC. 2. Response\nFunds the border.", "Unprecedented Border Crisis Response Act");
+    expect(crisis("Responds to the Unprecedented Border Crisis.")).toEqual(['judging word "unprecedented"']);
+    expect(crisis("The Unprecedented Border Crisis Response Act funds the border.")).toEqual([]);
+    // Whole words only: a substring of a longer name in the source is not that name.
+    expect(opens("the National Historic Riverfront Centers program")("Funds the Historic Riverfront Center.")).toEqual(['judging word "historic"']);
+    expect(opens("funds the Historic Riverfront Center in Casper")("Funds the Historic Riverfront Center.")).toEqual([]);
     const hr7618 = sources({ title: "Wildfire Recovery Act", text: "SEC. 2. Findings\nWildfires are devastating wildfires." });
     expect(check(hr7618, "Funds historic preservation organizations and historic sites hit by wildfires")).toEqual([]);
     expect(check(hr7618, "Responds to devastating wildfires")).toEqual(['judging word "devastating"']);
