@@ -195,7 +195,7 @@ way they would, so summaries lead with concrete effects on people and stay stric
   authenticated gateway, sent to the gateway only). Its log id is stored as `generator.gateway_log_id`. Batch calls
   go straight to OpenRouter and are not in the gateway logs. Gateway retries, caching, rate and spend limits stay
   off: the worker has its own, and gateway refusals would count against bills.
-- **Budget** `DIGEST_DAILY_BUDGET_USD` (default $1; expected spend is cents a day), tracked in
+- **Budget** `DIGEST_DAILY_BUDGET_USD` (set to $2 in `[vars]` since 2026-10-03; default $1 when unset), tracked in
   `pipeline_state` (`digest_spend:YYYY-MM-DD`). A batch's estimated cost counts when it is sent and
   the difference when it is collected. Over budget, the sweep waits for tomorrow.
 - **Backfill** `POST /__pipeline/run/summary-backfill` (admin; **dry run unless `apply=1`**): returns
