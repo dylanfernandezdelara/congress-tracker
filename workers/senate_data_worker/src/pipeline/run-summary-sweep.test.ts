@@ -63,7 +63,7 @@ vi.mock("../digest/write", async (importOriginal) => ({
 }));
 vi.mock("../sources/updated-bills", () => ({ fetchUpdatedBillsPage: (...a: unknown[]) => mockFetchUpdated(...a) }));
 
-import { runSummarySweep } from "./run-summary-sweep";
+import { parkedMessage, runSummarySweep } from "./run-summary-sweep";
 
 const NOW = new Date("2026-09-26T12:20:00.000Z");
 const env = { CONGRESS: "119", SESSION: "2", DB: {} as D1Database, CONGRESS_API_KEY: "k", OPENROUTER_API_KEY: "k" } as Env;
@@ -79,6 +79,7 @@ const job = (number: number, overrides: Partial<DigestJob> = {}): DigestJob => (
   fingerprint: null,
   readFailures: 0,
   origin: "live",
+  lastError: null,
   ...overrides,
 });
 
@@ -234,9 +235,38 @@ describe("runSummarySweep", () => {
 
       expect(jobsApi.markAttempt).toHaveBeenCalledWith(env.DB, expect.objectContaining({ number: 1 }), "fp1", 3);
       expect(settledWith()).toEqual([
-        [1, "done", expect.objectContaining({ fingerprint: "fp1", attempts: 3, error: "The operation was aborted due to timeout" })],
+        [
+          1,
+          "done",
+          expect.objectContaining({
+            fingerprint: "fp1",
+            attempts: 3,
+            error: "parked after 3 failed attempts (last: The operation was aborted due to timeout); retried when the bill changes",
+          }),
+        ],
       ]);
-      expect(result.failed).toBe(1);
+      expect(result).toMatchObject({ failed: 1, parked: 1 });
+    });
+
+    it("parks a bill whose batch reply and direct retry are both rejected on its last try, keeping the reason", async () => {
+      mockGetBatch.mockResolvedValue({ status: "completed", done: true, cost: 0.001, results: [item("119-hr-1:single", "reply")] });
+      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1", attempts: 2 })]);
+      mockStoreReply.mockResolvedValue({ status: "rejected", model: "luna", cost: 0, reasons: ['judging word "critical"'] });
+      mockWrite.mockResolvedValue({ status: "rejected", model: "m", cost: 0.01, reasons: ['judging word "critical"'] });
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(settledWith()).toEqual([
+        [
+          1,
+          "done",
+          expect.objectContaining({
+            attempts: 3,
+            error: 'parked after 3 failed attempts (last: rejected: judging word "critical"); retried when the bill changes',
+          }),
+        ],
+      ]);
+      expect(result).toMatchObject({ failed: 1, parked: 1 });
     });
 
     it("leaves bills in an open batch when the run has no write capacity left", async () => {
@@ -423,13 +453,22 @@ describe("runSummarySweep", () => {
         [1, "queued", 1],
         [2, "done", 3],
       ]);
+      const errors = settledWith().map(([, , p]) => (p as { error: string }).error);
+      expect(errors).toEqual([
+        "rejected: number not in sources: 31905000000",
+        "parked after 3 failed attempts (last: rejected: number not in sources: 31905000000); retried when the bill changes",
+      ]);
+      expect(result.parked).toBe(1);
       expect(result.warnings).toContain("H.R. 2 · 119th Congress: rejected: number not in sources: 31905000000");
       expect(result.spentUsd).toBe(0.1);
     });
 
     it("skips a parked bill without paying, and counts unreadable bills apart from failed summaries", async () => {
       jobsApi.selectQueuedJobs.mockImplementation(
-        onlyMatters([job(1, { matters: true, attempts: 3, fingerprint: "fp1" }), job(2, { matters: true, attempts: 2, fingerprint: "fp2", readFailures: 2 })])
+        onlyMatters([
+          job(1, { matters: true, attempts: 3, fingerprint: "fp1", lastError: 'rejected: judging word "critical"' }),
+          job(2, { matters: true, attempts: 2, fingerprint: "fp2", readFailures: 2 }),
+        ])
       );
       mockPrepare.mockImplementation(async (_e, ref: { number: number }) => {
         if (ref.number === 2) throw new Error("HTTP 503");
@@ -439,11 +478,28 @@ describe("runSummarySweep", () => {
       const result = await runSummarySweep(env, { now: NOW, discover: false });
 
       expect(mockWrite).not.toHaveBeenCalled();
-      expect(result.parked).toBe(1);
+      expect(result.parked).toBe(2);
+      // The last failure's reason survives the parking.
+      expect(settledWith()[0]).toEqual([
+        1,
+        "done",
+        { error: 'parked after 3 failed attempts (last: rejected: judging word "critical"); retried when the bill changes', readFailures: 0 },
+      ]);
       // The third unreadable run parks it; its summary attempts and fingerprint are left as they were.
       const [, state, params] = settledWith()[1]!;
       expect(state).toBe("done");
-      expect(params).toEqual({ error: "parked: unreadable 3 times: HTTP 503", readFailures: 3 });
+      expect(params).toEqual({ error: "parked after 3 unreadable runs (last: HTTP 503); retried when the bill is queued again", readFailures: 3 });
+    });
+
+    it("does not nest a parked message when a parked bill is queued again with the same inputs", async () => {
+      const before = 'parked after 3 failed attempts (last: rejected: judging word "critical"); retried when the bill changes';
+      jobsApi.selectQueuedJobs.mockImplementation(onlyNew([job(1, { attempts: 3, fingerprint: "fp1", lastError: before })]));
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(settledWith()).toEqual([[1, "done", { error: before, readFailures: 0 }]]);
+      expect(result.parked).toBe(1);
+      expect(mockSubmitBatch).not.toHaveBeenCalled();
     });
 
     it("does not count a refusing OpenRouter account against the bill, and stops direct writes", async () => {
@@ -474,7 +530,7 @@ describe("runSummarySweep", () => {
           job(1),
           job(2),
           job(3, { attempts: 2, fingerprint: "fp3" }),
-          job(4, { attempts: 3, fingerprint: "fp4" }),
+          job(4, { attempts: 3, fingerprint: "fp4", lastError: "rejected: number not in sources: 2015" }),
           job(5, { attempts: 3, fingerprint: "changed" }),
         ])
       );
@@ -498,6 +554,9 @@ describe("runSummarySweep", () => {
       expect(mockWrite).toHaveBeenCalledTimes(1);
       expect(mockWrite).toHaveBeenCalledWith(env, expect.objectContaining({ fingerprint: "fp3" }), "new");
       expect(result).toMatchObject({ batched: 3, parked: 1 });
+      expect(settledWith().find(([n]) => n === 4)![2]).toMatchObject({
+        error: "parked after 3 failed attempts (last: rejected: number not in sources: 2015); retried when the bill changes",
+      });
     });
 
     it("holds the batch when the day's remaining budget cannot cover its estimate", async () => {
@@ -509,5 +568,15 @@ describe("runSummarySweep", () => {
       expect(mockSubmitBatch).not.toHaveBeenCalled();
       expect(result.warnings.some((w) => w.startsWith("daily summary budget too low for a batch"))).toBe(true);
     });
+  });
+});
+
+describe("parkedMessage", () => {
+  it("embeds the last reason, truncated, and never nests a parked message", () => {
+    expect(parkedMessage(3, null)).toBe("parked after 3 failed attempts; retried when the bill changes");
+    const long = parkedMessage(3, `model error: ${"x".repeat(500)}`);
+    expect(long).toMatch(/^parked after 3 failed attempts \(last: model error: x+…\); retried when the bill changes$/);
+    expect(long.length).toBeLessThanOrEqual(280);
+    expect(parkedMessage(4, long)).toBe(long);
   });
 });

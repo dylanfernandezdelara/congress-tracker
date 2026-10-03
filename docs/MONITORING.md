@@ -70,8 +70,9 @@ The sweep logs `summary_sweep_complete` (or `summary_sweep_skipped_busy` /
   before it is made, and after 3 failed tries on the same inputs the bill is
   **parked** (`parked` in the log) until the bill changes. Occasional parking is
   expected; many is a prompt or checks problem (add a parked bill to the evals and
-  run `npm run digest:regress`). Parked bills:
-  `SELECT * FROM digest_jobs WHERE last_error LIKE 'parked%'`.
+  run `npm run digest:regress`). A bill unreadable 3 runs in a row is parked too. Parked bills, with
+  the last failure's reason embedded (`parked after 3 failed attempts (last: rejected: …); …`):
+  `SELECT bill_type||number, attempts, last_error FROM digest_jobs WHERE last_error LIKE 'parked%'`.
 - `daily summary budget spent` / `budget too low for a batch` — spend hit `DIGEST_DAILY_BUDGET_USD` ($1 default).
   Normal spend is cents a day; hitting it means a flood of rewrites or a price change.
 - `batch … expired|failed; N bill(s) requeued` — OpenRouter batch trouble. Bills
