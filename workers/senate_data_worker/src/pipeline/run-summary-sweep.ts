@@ -76,8 +76,9 @@ export interface SummarySweepResult {
   rechecked: number;
   unchanged: number;
   /**
-   * Bills parked this run: summaries that kept failing for the same inputs (retried when the bill changes), or bills
-   * that could not be read run after run. `last_error` keeps the last failure's reason.
+   * Parked bills this run encountered, including bills already parked that were queued again (each re-encounter
+   * counts): summaries that kept failing for the same inputs (retried when the bill changes), or bills that could not
+   * be read run after run. `last_error` keeps the last failure's reason.
    */
   parked: number;
   rewritten: number;
@@ -249,8 +250,10 @@ class Sweep {
     const readFailures = job.readFailures + 1;
     const parked = readFailures >= DIGEST_MAX_ATTEMPTS;
     if (parked) this.result.parked += 1;
+    // A bill already parked for failed summaries keeps that reason through a passing outage; it is the one to act on.
+    const keep = job.attempts >= DIGEST_MAX_ATTEMPTS && job.lastError?.startsWith("parked") ? job.lastError : null;
     await settleJob(this.env.DB, job, parked ? "done" : "queued", {
-      error: parked ? parkedMessage(readFailures, message(err), "unreadable runs", "when the bill is queued again") : message(err),
+      error: keep ?? (parked ? parkedMessage(readFailures, message(err), "unreadable runs", "when the bill is queued again") : message(err)),
       readFailures,
     });
   }

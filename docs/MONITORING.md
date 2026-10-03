@@ -68,7 +68,8 @@ The sweep logs `summary_sweep_complete` (or `summary_sweep_skipped_busy` /
 - `warnings` with `rejected: number not in sources: …` — a model invented a
   figure and the retry did too; the old summary stays. Each paid try is counted
   before it is made, and after 3 failed tries on the same inputs the bill is
-  **parked** (`parked` in the log) until the bill changes. Occasional parking is
+  **parked** (`parked` in the log) until the bill changes. `parked` counts parked bills the run met,
+  including ones already parked that were queued again, so it is not a count of new parkings. Occasional parking is
   expected; many is a prompt or checks problem (add a parked bill to the evals and
   run `npm run digest:regress`). A bill unreadable 3 runs in a row is parked too. Parked bills, with
   the last failure's reason embedded (`parked after 3 failed attempts (last: rejected: …); …`):

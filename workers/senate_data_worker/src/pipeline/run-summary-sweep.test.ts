@@ -491,6 +491,18 @@ describe("runSummarySweep", () => {
       expect(params).toEqual({ error: "parked after 3 unreadable runs (last: HTTP 503); retried when the bill is queued again", readFailures: 3 });
     });
 
+    it("keeps a parked bill's reason through a passing read failure", async () => {
+      const before = 'parked after 3 failed attempts (last: rejected: judging word "critical"); retried when the bill changes';
+      jobsApi.selectQueuedJobs.mockImplementation(onlyNew([job(1, { attempts: 3, fingerprint: "fp1", lastError: before })]));
+      mockPrepare.mockRejectedValue(new Error("HTTP 503"));
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(settledWith()).toEqual([[1, "queued", { error: before, readFailures: 1 }]]);
+      expect(result).toMatchObject({ failed: 1, parked: 0 });
+      expect(result.warnings).toContain("H.R. 1 · 119th Congress: HTTP 503");
+    });
+
     it("does not nest a parked message when a parked bill is queued again with the same inputs", async () => {
       const before = 'parked after 3 failed attempts (last: rejected: judging word "critical"); retried when the bill changes';
       jobsApi.selectQueuedJobs.mockImplementation(onlyNew([job(1, { attempts: 3, fingerprint: "fp1", lastError: before })]));
