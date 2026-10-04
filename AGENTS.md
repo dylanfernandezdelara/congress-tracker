@@ -212,22 +212,21 @@ way they would, so summaries lead with concrete effects on people and stay stric
   `SELECT kind, count(*) FROM digest_feedback GROUP BY kind` or the mistakes with their notes.
 - **Judge** (eval rounds only, never production): Gemini 3.8 Flash, calibrated against Dylan's picks. Try
   another with `DIGEST_JUDGE_MODEL=<openrouter id>` (and `DIGEST_JUDGE_EFFORT=high|max` for reasoning models);
-  results are written per model and never overwrite Gemini's. Since v3.4 the judge fails a "who it affects" group unless the sources name it or it is the direct subject of a provision (the implementing agency and indirectly affected groups fail), matching the prompt; before, it failed a group only when the sources gave no reason it would be affected, so round 6 and earlier judge numbers are not directly comparable on `supported`. Tried 2026-09-27 on the same calibration set:
+  results are written per model and never overwrite Gemini's. Tried 2026-09-27 on the same calibration set:
   DeepSeek V4.1 Flash ($0.18 vs $0.96) caught 1 of 8 planted "consider"→"require" errors and gave no verdict
   on 40% of calls. Muse Spark 1.3 max ($0.21) caught every planted number, vote and neutrality error and 6 of 8
   strength errors, but passed only 3 of Dylan's 5 round-2 picks on the run he reviewed (1 of 5 across all three
   runs; Gemini 5 of 5 either way): stricter on inferred wording ("stricter rules", "who it affects"). Use it as a
-  second opinion on factual support.
+  second opinion on factual support. A stricter groups rule (fail a group unless the sources name it or it is the direct subject of a provision) was tried on round 6 (2026-10-04; `judge/round6-v3.4-judge-strict-groups.json`) and not adopted: it fails "California regulators", a group in Dylan's round-2 pick.
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
-  Latest round `round6.json` (v3.4 before the preamble clause, round 5's bills plus H.R. 10217, a county-list
-  heritage area; Luna + Sonnet, 2 runs, $0.27 with the stricter judge): Luna 10/12 (10/10 on round 5's bills; both
-  H.R. 10217 runs name no county total, failed only for "residents of listed counties"); Sonnet 4/12 (round 5, old
-  judge: 7/10), still totaling the counties ("35 Kentucky counties", blocked by the checks in both runs; in production
-  the retry goes to Luna), "Interior Department" once as a group; the EPA is gone from H.R. 2140. Most of Sonnet's new
-  fails are the stricter judge ("California regulators", "study abroad programs" passed before). Calibration against
-  Dylan's round-2 picks was not re-run under the stricter judge (his H.J.Res. 213 pick lists "California regulators").
+  Latest round `round6.json` (v3.4 before the preamble clause; round 5's bills plus H.R. 10217, a county-list
+  heritage area; Luna + Sonnet, 2 runs, $0.27). Judged only with the stricter groups rule above, so the numbers are
+  not comparable with earlier rounds: Luna 10/10 on round 5's bills (10/12 with H.R. 10217, where the trial judge
+  failed "residents of listed counties"), with no county total and no agency as a group. Sonnet scored 4/12, but its
+  drop is confounded with the judge change. It still totaled the counties ("35 Kentucky counties"; the checks block it
+  and the retry goes to Luna), and the EPA is gone from H.R. 2140.
 
 ## Project structure
 
