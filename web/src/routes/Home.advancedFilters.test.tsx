@@ -15,7 +15,6 @@ const homeApi = vi.hoisted(() => ({
   fetchFeed: vi.fn(),
   fetchRecentLaws: vi.fn(),
   fetchRecentConfirmations: vi.fn(),
-  fetchCommitteesLeaderboard: vi.fn(),
   fetchDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
   fetchMembersSearch: vi.fn(),

@@ -27,8 +27,6 @@ export type {
 export type {
   ChamberComposition,
   ChamberStats,
-  CommitteeLeaderboardRow,
-  CommitteesLeaderboardResponse,
   DateRange,
   DefectorEntry,
   DefectorsResponse,
