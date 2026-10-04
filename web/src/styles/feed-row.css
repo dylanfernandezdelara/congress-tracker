@@ -438,13 +438,13 @@
     color: hsl(var(--twc-secondary));
   }
 
-  /* Summary feedback: quiet text buttons, like the defector toggle. The thanks and the buttons share a line. */
+  /* Summary feedback: quiet text buttons, like the defector toggle, on 32px tap lines and the 8px grid. */
   .feed-row-feedback-block {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 0.75rem;
-    row-gap: 0.5rem;
+    column-gap: var(--space-16);
+    row-gap: var(--space-8);
   }
 
   .feed-row-feedback-block > .feed-row-feedback-form {
@@ -460,14 +460,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 0.75rem;
-    row-gap: 0.25rem;
+    column-gap: var(--space-16);
     font-size: 12px;
     line-height: 1.4;
     color: hsl(var(--twc-secondary));
   }
 
   .feed-row-feedback-button {
+    display: inline-flex;
+    align-items: center;
+    /* A 32px tap height without looking like a button: the text stays a quiet underlined link. */
+    min-height: 32px;
     padding: 0;
     border: 0;
     background: none;
@@ -481,6 +484,68 @@
 
   .feed-row-feedback-button:hover {
     color: hsl(var(--twc-foreground));
+  }
+
+  .feed-row-feedback-button:focus-visible,
+  .feed-row-feedback-choice:focus-visible {
+    outline: 2px solid hsl(var(--twc-foreground));
+    outline-offset: 2px;
+  }
+
+  /* "Was this clear? Yes / No" under "What it does": one 32px line, 8px below the summary text. */
+  .feed-row-feedback-ask {
+    display: grid;
+    gap: var(--space-8);
+    margin-top: var(--space-8);
+  }
+
+  /* After the provisional caption the ask is a panel child; the panel's 16px gap already spaces it. */
+  .feed-row-feedback-ask--after-caption {
+    margin-top: 0;
+  }
+
+  .feed-row-feedback-ask-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  .feed-row-feedback-ask-text {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .feed-row-feedback-ask-text:focus {
+    outline: none;
+  }
+
+  /* Visible but quiet: a hairline outline, no fill, the share button's radius. */
+  .feed-row-feedback-choice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    height: 32px;
+    padding: 0 var(--space-16);
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: 8px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--twc-secondary));
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .feed-row-feedback-choice:hover {
+      color: hsl(var(--twc-foreground));
+      border-color: hsl(var(--twc-border-hover));
+    }
   }
 
   .feed-row-feedback-button:disabled {
@@ -515,7 +580,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
+    column-gap: var(--space-16);
     font-size: 12px;
   }
 

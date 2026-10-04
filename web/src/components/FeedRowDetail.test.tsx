@@ -14,9 +14,10 @@ import { FeedRowDetail } from './FeedRowDetail'
 vi.mock('../api/client', () => ({
   fetchVoteDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
+  sendSummaryFeedback: vi.fn(),
 }))
 
-import { fetchMemberProfile, fetchVoteDefectors } from '../api/client'
+import { fetchMemberProfile, fetchVoteDefectors, sendSummaryFeedback } from '../api/client'
 import { renderWithMemberProfile } from '../test/memberProfileHarness'
 
 beforeEach(() => {
@@ -88,6 +89,49 @@ describe('FeedRowDetail', () => {
     expect(screen.getByRole('heading', { name: 'Key points' })).toBeInTheDocument()
     expect(screen.getByText('Point one')).toBeInTheDocument()
     expect(screen.getByText('Official CRS summary')).toBeInTheDocument()
+  })
+
+  it('asks "Was this clear?" inside "What it does", before key points, and keeps "Report a mistake" at the end', () => {
+    window.localStorage.clear()
+    vi.mocked(sendSummaryFeedback).mockResolvedValue(true)
+    render(<FeedRowDetail item={makeFeedItem()} />)
+
+    const whatItDoes = screen.getByRole('heading', { name: 'What it does' }).closest('section') as HTMLElement
+    const ask = whatItDoes.querySelector('.feed-row-feedback-ask') as HTMLElement
+    expect(ask).toHaveTextContent('Was this clear?')
+    const keyPoints = screen.getByRole('heading', { name: 'Key points' })
+    expect(ask.compareDocumentPosition(keyPoints) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const report = screen.getByRole('button', { name: 'Report a mistake' })
+    expect(keyPoints.compareDocumentPosition(report) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(whatItDoes).not.toContainElement(report)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
+    expect(sendSummaryFeedback).toHaveBeenCalledWith({ bill: expect.stringMatching(/^\d+-[a-z]+-\d+$/), kind: 'helpful' })
+    expect(ask).toHaveTextContent('Thanks.')
+    expect(screen.getAllByRole('button', { name: 'Report a mistake' })).toHaveLength(2)
+    window.localStorage.clear()
+  })
+
+  it('asks after the provisional caption on a title-only summary, keeping the caption attached to the text', () => {
+    window.localStorage.clear()
+    const base = makeFeedItem()
+    render(<FeedRowDetail item={makeFeedItem({ digest: { ...base.digest!, basis: 'title_only' } })} />)
+
+    const whatItDoes = screen.getByRole('heading', { name: 'What it does' }).closest('section') as HTMLElement
+    const body = whatItDoes.querySelector('.feed-row-summary-body') as HTMLElement
+    const caption = screen.getByText(/^Early summary from the bill/)
+    const ask = screen.getByText('Was this clear?').closest('.feed-row-feedback-ask') as HTMLElement
+    expect(whatItDoes).not.toContainElement(ask)
+    expect(body.compareDocumentPosition(caption) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(caption.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(ask.compareDocumentPosition(screen.getByRole('heading', { name: 'Key points' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('does not ask for feedback on a CRS-only summary', () => {
+    render(<FeedRowDetail item={makeFeedItem({ digest: null, raw_summary_text: 'Official CRS summary text.' })} />)
+    expect(screen.queryByText('Was this clear?')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Report a mistake' })).not.toBeInTheDocument()
   })
 
   it('shows a short complete CRS sentence when no digest exists and keeps the full CRS in disclosure', () => {
