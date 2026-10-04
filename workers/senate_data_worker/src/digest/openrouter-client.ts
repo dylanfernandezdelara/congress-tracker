@@ -84,21 +84,21 @@ export interface SpendHook {
  *
  * With a spend hook, each attempt's estimate is recorded before the request goes out. A provider can bill a request
  * whose reply never reached us (our 180s timeout, a dropped connection, a worker killed mid-call), so the estimate
- * stands for every attempt that got no reply. An attempt the provider answered with an error status was not
- * generated, so its estimate is taken back. A reply settles the whole call: what was recorded becomes its actual
- * charge (or one estimate when the reply carries no cost).
+ * stands for every attempt that got no reply, and for 408 and every 5xx (a gateway 502/524 can arrive while the
+ * provider finishes and bills). Only a refusal that means nothing was generated (REFUSED_UNBILLED) takes its estimate
+ * back. A reply settles only its own attempt: that attempt's estimate becomes its actual charge (or stays, when the
+ * reply carries no cost); earlier attempts keep theirs.
  */
+/** Error statuses that mean the request was refused before any generation, so it cannot have been billed. */
+const REFUSED_UNBILLED = new Set([400, 401, 402, 403, 404, 413, 422, 429]);
+
 export async function chatCompletion(env: Env, model: DigestModel, messages: DigestMessages, spend?: SpendHook): Promise<ChatResult> {
   const base = env.OPENROUTER_BASE_URL?.trim() || OPENROUTER;
   let lastError: unknown = null;
-  let recorded = 0;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     // Outside the try: if the spend cannot be recorded, nothing is sent.
-    if (spend) {
-      await spend.record(spend.estimate);
-      recorded += spend.estimate;
-    }
-    let answered = false;
+    if (spend) await spend.record(spend.estimate);
+    let refused = false;
     let result: { chat: ChatResult; cost: number | null };
     try {
       const res = await fetch(`${base}/chat/completions`, {
@@ -109,7 +109,7 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
       });
       const body = (await res.json().catch(() => ({}))) as ChatBody;
       if (!res.ok) {
-        answered = true;
+        refused = REFUSED_UNBILLED.has(res.status);
         const text = body.error?.message ?? `HTTP ${res.status}`;
         if (res.status === 429 || res.status >= 500) throw new Error(text);
         // A refusal from the gateway itself (missing or rotated CF_AIG_TOKEN) names the gateway, not OpenRouter.
@@ -127,15 +127,12 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
       };
     } catch (err: unknown) {
       lastError = err;
-      if (spend && answered) {
-        await spend.record(-spend.estimate);
-        recorded -= spend.estimate;
-      }
+      if (spend && refused) await spend.record(-spend.estimate);
       if (err instanceof PermanentError) break;
       continue;
     }
     // After the try, so a failure to record can never trigger a second paid request.
-    if (spend) await spend.record((result.cost ?? spend.estimate) - recorded);
+    if (spend) await spend.record((result.cost ?? spend.estimate) - spend.estimate);
     return result.chat;
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));

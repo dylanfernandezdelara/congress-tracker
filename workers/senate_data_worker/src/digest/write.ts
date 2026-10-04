@@ -120,14 +120,16 @@ interface Spent {
 /**
  * One paid direct call, its spend recorded through chatCompletion's hook: the estimate before each attempt goes out
  * (so a billed timeout, or a worker killed mid-call, is never left unrecorded), corrected to the actual charge when a
- * reply arrives. `spent`, when given, follows everything recorded for the write's own outcome.
+ * reply arrives. Every record of the call goes to the UTC day the call started, so a correction after midnight lands
+ * on the day its estimate was charged. `spent`, when given, follows everything recorded for the write's own outcome.
  */
 function paidChat(env: Env, model: DigestModel, messages: DigestMessages, spent?: { usd: number }): Promise<ChatResult> {
+  const day = new Date();
   return chatCompletion(env, model, messages, {
     estimate: estimateCost(model, [messages], "direct"),
     record: async (usd) => {
       if (spent) spent.usd += usd;
-      await recordSpend(env, usd);
+      await recordSpend(env, usd, day);
     },
   });
 }

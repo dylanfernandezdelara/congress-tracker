@@ -76,6 +76,26 @@ export async function setPipelineState(
   await upsertPipelineState(db, key, value, new Date().toISOString());
 }
 
+/**
+ * Add `delta` to a `{ usd }` row in one statement (never below zero, rounded to 6 places). Atomic in D1, so records
+ * from parallel calls or other isolates never overwrite each other.
+ */
+export async function addPipelineStateUsd(db: D1Database, key: string, delta: number): Promise<void> {
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `INSERT INTO pipeline_state (key, value_json, updated_at)
+         VALUES (?1, json_object('usd', max(0, round(?2, 6))), ?3)
+         ON CONFLICT(key) DO UPDATE SET
+           value_json = json_object('usd', max(0, round(coalesce(
+             CASE WHEN json_valid(pipeline_state.value_json) THEN json_extract(pipeline_state.value_json, '$.usd') END, 0
+           ) + ?2, 6))),
+           updated_at = excluded.updated_at`
+    )
+    .bind(key, delta, new Date().toISOString())
+    .run();
+}
+
 const SENATE_BIOGUIDE_LOOKUP_KEY = "senate_bioguide_lookup";
 
 export async function storeSenateBioguideLookup(
