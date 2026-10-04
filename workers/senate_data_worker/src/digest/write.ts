@@ -1,10 +1,10 @@
 import type { Env } from "../config";
 import { upsertDigest, type DigestGenerator, type StoredBillDigest } from "../d1/digests";
 import { recordSpend } from "./budget";
-import { BudgetShort, ensureBudget } from "./cost";
+import { BudgetShort, ensureBudget, estimateCost } from "./cost";
 import { checkSummary, STYLE_ONLY_REASONS } from "./checks";
 import { modelFor, newBillModel, rewriteModel, type DigestModel } from "./models";
-import { AccountError, chatCompletion } from "./openrouter-client";
+import { AccountError, chatCompletion, type ChatResult } from "./openrouter-client";
 import { parseJsonObject, parseSummaryReply } from "./parse";
 import type { PreparedBill } from "./prepare";
 import { combineMessages, partMessages, PROMPT_VERSION, singlePassMessages, type DigestMessages } from "./prompt";
@@ -109,8 +109,23 @@ export function notesFrom(contents: Array<string | null>): Record<string, unknow
 }
 
 /**
+ * One paid direct call, its spend recorded through chatCompletion's hook: the estimate before each attempt goes out
+ * (so a billed timeout, or a worker killed mid-call, is never left unrecorded), corrected to the actual charge when a
+ * reply arrives. `spent`, when given, follows everything recorded for the write's own outcome.
+ */
+function paidChat(env: Env, model: DigestModel, messages: DigestMessages, spent?: { usd: number }): Promise<ChatResult> {
+  return chatCompletion(env, model, messages, {
+    estimate: estimateCost(model, [messages], "direct"),
+    record: async (usd) => {
+      if (spent) spent.usd += usd;
+      await recordSpend(env, usd);
+    },
+  });
+}
+
+/**
  * Part notes for a long bill, a slice of parts at a time. The budget is checked before each slice (the slice's calls
- * go out together), and each slice's spend is recorded as it lands, so a budget stop mid-bill loses no charge.
+ * go out together), and every part call records its own spend (`paidChat`), so a budget stop mid-bill loses no charge.
  */
 async function partNotes(env: Env, model: DigestModel, prepared: PreparedBill, spent: { usd: number }): Promise<Record<string, unknown>[]> {
   const requests = firstPassMessages(prepared);
@@ -118,15 +133,10 @@ async function partNotes(env: Env, model: DigestModel, prepared: PreparedBill, s
   for (let i = 0; i < requests.length; i += PART_CONCURRENCY) {
     const slice = requests.slice(i, i + PART_CONCURRENCY);
     await ensureBudget(env, model, slice.map((r) => r.messages));
-    const results = await Promise.allSettled(slice.map((r) => chatCompletion(env, model, r.messages)));
-    let cost = 0;
+    const results = await Promise.allSettled(slice.map((r) => paidChat(env, model, r.messages, spent)));
     results.forEach((r, j) => {
-      if (r.status !== "fulfilled") return;
-      cost += r.value.usage.cost;
-      contents[i + j] = r.value.content;
+      if (r.status === "fulfilled") contents[i + j] = r.value.content;
     });
-    spent.usd += cost;
-    await recordSpend(env, cost);
   }
   return notesFrom(contents);
 }
@@ -145,7 +155,7 @@ export async function combineAndStore(
   const model = params.model;
   const messages = combineMessages(prepared.input, params.notes);
   await ensureBudget(env, model, [messages]);
-  const reply = await chatCompletion(env, model, messages);
+  const reply = await paidChat(env, model, messages);
   const outcome = await storeReply(env, prepared, {
     tier: params.tier,
     model: model.id,
@@ -154,7 +164,6 @@ export async function combineAndStore(
     gatewayLogId: reply.gatewayLogId,
     lastTry: params.lastTry,
   });
-  await recordSpend(env, reply.usage.cost);
   return outcome;
 }
 
@@ -210,9 +219,7 @@ export async function writeSummary(
     }
     const messages = singlePassMessages(prepared.input);
     await ensureBudget(env, model, [messages]);
-    const reply = await chatCompletion(env, model, messages);
-    spent.usd += reply.usage.cost;
-    await recordSpend(env, reply.usage.cost);
+    const reply = await paidChat(env, model, messages, spent);
     const first = await storeReply(env, prepared, {
       tier,
       model: model.id,

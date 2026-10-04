@@ -201,7 +201,9 @@ way they would, so summaries lead with concrete effects on people and stay stric
   the other model's retry, each slice of long-bill parts, each combine) is checked against its estimate first
   (`digest/cost.ts`, same formula as the batch estimate at normal-API prices); a write the budget cannot finish goes
   back to the queue with `last_error` "budget: $x left, needs ~$y", its try given back (attempts count the model's
-  failures, not ours), never parked.
+  failures, not ours), never parked. A direct call records its estimate before each attempt goes out (the client's
+  spend hook) and settles to the actual charge when a reply arrives, so a timed-out retry the provider bills, or a
+  worker killed mid-call, still counts; an attempt answered with an error status is taken back.
 - **Backfill** `POST /__pipeline/run/summary-backfill` (admin; **dry run unless `apply=1`**): returns
   bills, how many matter, estimated cost and days. `scope=site` queues the bills on the site without a
   current summary; `scope=congress` starts a walk over every bill of the Congress (cursor

@@ -20,4 +20,10 @@ describe("daily summary budget", () => {
     await recordSpend(env, -1, day);
     expect(await budgetLeft(env, day)).toBe(1);
   });
+
+  it("keeps every record when several land at once (a long bill's parts are called in parallel)", async () => {
+    const other = new Date("2026-09-27T12:00:00Z");
+    await Promise.all([0.01, 0.02, 0.03, 0.04].map((usd) => recordSpend(env, usd, other)));
+    expect(await budgetLeft(env, other)).toBeCloseTo(0.9, 6);
+  });
 });
