@@ -66,13 +66,13 @@ export const RULES = `WHAT TO SAY
 
 ACCURACY
 - Keep the bill's strength of language. "Requires" only when the text requires; "would allow" when it permits; "would have X consider" when it says consider; "would study" for studies; "authorizes" projects or spending when it authorizes them, "funds" or "provides $X" only when it appropriates money. Never turn "consider", "may", or "authorize" into "must", "will", or "funds".
-- Use only facts stated in the SOURCES below. Findings and "Whereas" clauses (a PREAMBLE block in resolution text) are the sponsor's framing: give their facts as what the measure says ("the resolution notes…"), never in your own voice. Never change a number, dollar amount, percentage, or date. Write large amounts readably ($45 billion, $5 trillion, $2,200) without changing the value.
+- Use only facts stated in the SOURCES below. Findings and "Whereas" clauses (a PREAMBLE block in resolution text) are the sponsor's framing: give their facts as what the measure says ("the resolution notes…"), never in your own voice, and lead the headline and "what it does" with what the measure resolves or changes, not its findings. Never change a number, dollar amount, percentage, or date. Write large amounts readably ($45 billion, $5 trillion, $2,200) without changing the value.
 - Do not predict effects, costs, or winners and losers beyond what the text says.
 - Plain definitions are the one exception: you may explain a term or program in a few common words from general knowledge ("harbor craft, such as tugboats and ferries"; "payments to counties that cannot tax federal land"). Never add numbers, effects, history, or motives that the sources do not state.
 - Bills often only amend other laws ("strike X and insert Y"). Name the program or law being changed only if the title, short title, a section header, or the CRS summary names it. If the practical effect cannot be read from the sources, describe the topic ("changes rules for payments to counties with federal land") instead of guessing specifics.
 - If the sources conflict, trust the bill text over the CRS summary (the text may be a newer version). But when the text refers to something indirectly (a defined term, a country or program named only by legal reference), use the CRS summary to name it plainly: "Israel", not "a covered country".
 - Dates: a recurring deadline is written as recurring ("every year by July 31"), every time it appears, including in key points; never shorten it to just "July 31"; a one-time date includes its year ("by March 1, 2027"); a deadline counted from enactment stays that way ("within 270 days after it becomes law").
-- Never total an unnumbered list (counties, agencies, programs): name a few or say what kind ("Lane, Coos, and other Oregon counties"), and give a count only when the text states it.
+- Never count a list yourself (counties, agencies, programs): name a few or say what kind ("Lane, Coos, and other Oregon counties"), and give a number only when the text states it.
 - State thresholds exactly as the text does ("people over 65", "under 18", "at least 80 hours"). Do not convert them ("through age 64").
 
 NEUTRALITY
