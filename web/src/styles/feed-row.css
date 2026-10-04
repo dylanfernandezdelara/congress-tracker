@@ -499,6 +499,11 @@
     margin-top: var(--space-8);
   }
 
+  /* After the provisional caption the ask is a panel child; the panel's 16px gap already spaces it. */
+  .feed-row-feedback-ask--after-caption {
+    margin-top: 0;
+  }
+
   .feed-row-feedback-ask-line {
     display: flex;
     flex-wrap: wrap;

@@ -97,13 +97,16 @@ export function FeedSummarySections({ content, textUrl = null, feedbackBill = nu
 
   return (
     <>
-      <PrimarySummarySection primary={primary} ask={feedback ? <SummaryFeedbackAsk feedback={feedback} /> : null} />
+      {/* The provisional caption qualifies the text, so it stays attached to it and the ask follows the caption. */}
+      <PrimarySummarySection primary={primary} ask={feedback && !provisional ? <SummaryFeedbackAsk feedback={feedback} /> : null} />
 
       {provisional ? (
         <p className="feed-row-summary-provisional">
           Early summary from the bill&rsquo;s title. It updates when the full text is published.
         </p>
       ) : null}
+
+      {feedback && provisional ? <SummaryFeedbackAsk feedback={feedback} afterCaption /> : null}
 
       {whoItAffects.length > 0 ? (
         <section className="feed-row-detail-section">

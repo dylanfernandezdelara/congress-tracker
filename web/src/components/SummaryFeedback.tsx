@@ -169,7 +169,14 @@ const REPORTED = 'Thanks. We’ll check this summary.'
  * "Was this clear? Yes / No" right under the summary, where readers are. After a vote it becomes a quiet "Thanks."
  * with "Report a mistake" beside it. Hidden once a vote from an earlier visit is on record.
  */
-export function SummaryFeedbackAsk({ feedback }: { feedback: SummaryFeedbackState }) {
+export function SummaryFeedbackAsk({
+  feedback,
+  afterCaption = false,
+}: {
+  feedback: SummaryFeedbackState
+  /** Placed after the provisional caption, outside the section: the panel's gap spaces it, not its own margin. */
+  afterCaption?: boolean
+}) {
   const { voted, justVoted, report, vote } = feedback
   const { openerRef, statusRef, formOpen, reportedHere, cancel, sent } = useSlotFocus(feedback, 'ask')
   const announcement = reportedHere ? REPORTED : voted ? 'Thanks.' : ''
@@ -182,7 +189,7 @@ export function SummaryFeedbackAsk({ feedback }: { feedback: SummaryFeedbackStat
   if (voted && !justVoted) return null
 
   return (
-    <div className="feed-row-feedback-ask">
+    <div className={afterCaption ? 'feed-row-feedback-ask feed-row-feedback-ask--after-caption' : 'feed-row-feedback-ask'}>
       <div className="feed-row-feedback-ask-line">
         <p
           ref={statusRef}

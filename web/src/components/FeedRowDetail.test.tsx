@@ -113,6 +113,21 @@ describe('FeedRowDetail', () => {
     window.localStorage.clear()
   })
 
+  it('asks after the provisional caption on a title-only summary, keeping the caption attached to the text', () => {
+    window.localStorage.clear()
+    const base = makeFeedItem()
+    render(<FeedRowDetail item={makeFeedItem({ digest: { ...base.digest!, basis: 'title_only' } })} />)
+
+    const whatItDoes = screen.getByRole('heading', { name: 'What it does' }).closest('section') as HTMLElement
+    const body = whatItDoes.querySelector('.feed-row-summary-body') as HTMLElement
+    const caption = screen.getByText(/^Early summary from the bill/)
+    const ask = screen.getByText('Was this clear?').closest('.feed-row-feedback-ask') as HTMLElement
+    expect(whatItDoes).not.toContainElement(ask)
+    expect(body.compareDocumentPosition(caption) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(caption.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(ask.compareDocumentPosition(screen.getByRole('heading', { name: 'Key points' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('does not ask for feedback on a CRS-only summary', () => {
     render(<FeedRowDetail item={makeFeedItem({ digest: null, raw_summary_text: 'Official CRS summary text.' })} />)
     expect(screen.queryByText('Was this clear?')).not.toBeInTheDocument()
