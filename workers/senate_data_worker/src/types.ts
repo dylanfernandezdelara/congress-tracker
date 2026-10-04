@@ -103,9 +103,7 @@ export type {
 } from "../../../shared/feed-api-types";
 
 export type {
-  ChamberPulse,
   ChamberStats,
-  CloseVoteEntry,
   DateRange,
   DefectorEntry,
   DefectorsResponse,
@@ -114,8 +112,6 @@ export type {
   PortfolioEntry,
   PortfolioMovers,
   PortfoliosResponse,
-  PolicyHeatEntry,
-  PulseStatsResponse,
   SenateWaitingBill,
   TightnessDot,
   TightnessKind,
@@ -128,7 +124,6 @@ export type {
   ChamberComposition,
   SessionStatsResponse,
   StatsChamber,
-  ThisWeekSummary,
 } from "../../../shared/stats-api-types";
 
 export type {

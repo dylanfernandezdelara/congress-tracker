@@ -37,8 +37,8 @@ D_TODAY="$(days_ago 0)"
 D_RECENT="$(days_ago 1)"
 D_MID="$(days_ago 4)"
 D_OLDER="$(days_ago 9)"
-# Referrals older than PROCESS_STUCK_DAYS (90) so the pulse "Waiting in
-# committee" widget has standing-committee rows to show.
+# Referrals older than PROCESS_STUCK_DAYS (90) so /stats/committees.json has
+# standing-committee waiting rows to show.
 D_STUCK="$(days_ago 100)"
 
 # Schema mirrors workers/senate_data_worker/src/d1/schema.ts so seeding works

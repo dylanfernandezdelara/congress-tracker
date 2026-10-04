@@ -27,7 +27,6 @@ const homeApi = vi.hoisted(() => ({
   fetchMembersSearch: vi.fn(),
   fetchPolicyAreas: vi.fn(),
   fetchSessionStats: vi.fn(),
-  fetchPulseStats: vi.fn(),
   fetchTightnessStats: vi.fn(),
   fetchVoteDefectors: vi.fn(),
   fetchPortfolioStats: vi.fn(),
@@ -100,7 +99,6 @@ describe('Home', () => {
     ).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'New laws' })).toBeInTheDocument()
     expect(screen.getByLabelText('Members in Congress')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Legislative pulse')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'House passage' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Senate bills & nominees' })).toBeInTheDocument()
     expect(screen.getByText('House-passed contracting bill waiting in the Senate')).toBeInTheDocument()

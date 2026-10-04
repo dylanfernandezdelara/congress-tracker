@@ -170,7 +170,7 @@ test('seed includes knife-edge, Senate-waiting, and text-grew fixtures', () => {
   assert.match(sql, /9010, 'LOCAL:H001', 'Yea'/)
 })
 
-test('seed includes long-waiting committee referrals for the pulse widget', () => {
+test('seed includes long-waiting committee referrals for the committees leaderboard', () => {
   const sql = printSql()
   assert.match(sql, /HR', 9001, 'hsif00', 'sent'/)
   assert.match(sql, /HR', 9003, 'hsba00', 'sent'/)

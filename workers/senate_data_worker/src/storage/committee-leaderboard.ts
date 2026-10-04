@@ -8,8 +8,6 @@ import type { Env } from "../config";
 import { ensureSchema } from "../d1/schema";
 import { lookbackStartIso } from "../sources/congress-client";
 
-const PULSE_WAITING_LIMIT = 5;
-
 interface WaitingSqlRow {
   system_code: string;
   name: string;
@@ -59,17 +57,6 @@ export async function selectStandingWaitingRows(
     chamber,
     waiting: Number(row.waiting) || 0,
   }));
-}
-
-export async function waitingInCommitteeForPulse(
-  db: D1Database,
-  congress: number,
-  chamber: StatsChamber,
-  asOf: string = new Date().toISOString()
-): Promise<CommitteeLeaderboardRow[]> {
-  const stuckSince = `${lookbackStartIso(PROCESS_STUCK_DAYS, new Date(asOf))}T00:00:00.000Z`;
-  const rows = await selectStandingWaitingRows(db, congress, chamber, stuckSince);
-  return rows.filter((row) => row.waiting > 0).slice(0, PULSE_WAITING_LIMIT);
 }
 
 export async function buildCommitteesLeaderboard(

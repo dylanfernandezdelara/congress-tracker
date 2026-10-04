@@ -23,7 +23,6 @@ export type HomeApiMocks = {
   fetchMembersSearch: Mock
   fetchPolicyAreas: Mock
   fetchSessionStats: Mock
-  fetchPulseStats: Mock
   fetchTightnessStats: Mock
   fetchVoteDefectors: Mock
   fetchPortfolioStats: Mock
@@ -215,20 +214,6 @@ export function stubHomeRouteDefaults(
       closest_margin: 1,
       date_range: { first: '2026-01-01', last: senateLast },
       coverage_days: 120,
-    },
-  })
-  api.fetchPulseStats.mockResolvedValue({
-    house: {
-      close_votes: [],
-      policy_heat: [],
-      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
-      waiting_in_committee: [],
-    },
-    senate: {
-      close_votes: [],
-      policy_heat: [],
-      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
-      waiting_in_committee: [],
     },
   })
   api.fetchTightnessStats?.mockResolvedValue(makeTightnessStats())

@@ -26,9 +26,7 @@ export type {
 
 export type {
   ChamberComposition,
-  ChamberPulse,
   ChamberStats,
-  CloseVoteEntry,
   CommitteeLeaderboardRow,
   CommitteesLeaderboardResponse,
   DateRange,
@@ -44,8 +42,6 @@ export type {
   PortfolioEntry,
   PortfolioMovers,
   PortfoliosResponse,
-  PolicyHeatEntry,
-  PulseStatsResponse,
   SenateWaitingBill,
   TightnessDot,
   TightnessKind,
@@ -54,7 +50,6 @@ export type {
   RollPartySplit,
   SessionStatsResponse,
   StatsChamber,
-  ThisWeekSummary,
   VoteDefectorEntry,
   VoteDefectorsResponse,
 } from '../../../shared/stats-api-types'

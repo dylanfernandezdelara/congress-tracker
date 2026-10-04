@@ -10,7 +10,6 @@ import type {
   MembersSearchResponse,
   PolicyAreasResponse,
   PortfoliosResponse,
-  PulseStatsResponse,
   TightnessStatsResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
@@ -116,10 +115,6 @@ export async function fetchCommitteesLeaderboard(
 ): Promise<CommitteesLeaderboardResponse> {
   const params = new URLSearchParams({ chamber })
   return fetchJson<CommitteesLeaderboardResponse>(`/stats/committees.json?${params}`)
-}
-
-export async function fetchPulseStats(): Promise<PulseStatsResponse> {
-  return fetchJson<PulseStatsResponse>('/stats/pulse.json')
 }
 
 export async function fetchTightnessStats(): Promise<TightnessStatsResponse> {
