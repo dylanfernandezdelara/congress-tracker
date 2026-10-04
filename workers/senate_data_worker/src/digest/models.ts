@@ -9,6 +9,8 @@ export interface DigestModel {
   maxTokens: number;
   /** Batch API price per million tokens, for estimating a batch before it is charged. */
   batchPrice?: { input: number; output: number };
+  /** Normal-API price per million tokens, for checking the budget before a direct call (default: twice batchPrice). */
+  price?: { input: number; output: number };
 }
 
 /** First summaries of new bills: cheap and accurate in the evals. The sweep sends them through the Batch API (half price). */
@@ -25,6 +27,7 @@ export function rewriteModel(env: Env): DigestModel {
     id: env.DIGEST_REWRITE_MODEL?.trim() || "anthropic/claude-sonnet-5",
     temperature: 0.2,
     maxTokens: 4_000,
+    price: { input: 3, output: 15 },
   };
 }
 

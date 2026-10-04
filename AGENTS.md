@@ -197,7 +197,11 @@ way they would, so summaries lead with concrete effects on people and stay stric
   off: the worker has its own, and gateway refusals would count against bills.
 - **Budget** `DIGEST_DAILY_BUDGET_USD` (set to $2 in `[vars]` since 2026-10-03; default $1 when unset), tracked in
   `pipeline_state` (`digest_spend:YYYY-MM-DD`). A batch's estimated cost counts when it is sent and
-  the difference when it is collected. Over budget, the sweep waits for tomorrow.
+  the difference when it is collected. Over budget, the sweep waits for tomorrow. Every direct paid call (first try,
+  the other model's retry, each slice of long-bill parts, each combine) is checked against its estimate first
+  (`digest/cost.ts`, same formula as the batch estimate at normal-API prices); a write the budget cannot finish goes
+  back to the queue with `last_error` "budget: $x left, needs ~$y", its try given back (attempts count the model's
+  failures, not ours), never parked.
 - **Backfill** `POST /__pipeline/run/summary-backfill` (admin; **dry run unless `apply=1`**): returns
   bills, how many matter, estimated cost and days. `scope=site` queues the bills on the site without a
   current summary; `scope=congress` starts a walk over every bill of the Congress (cursor

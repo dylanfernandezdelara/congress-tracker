@@ -18,7 +18,7 @@ vi.mock("./budget", () => ({
 }));
 
 import { PROMPT_VERSION } from "./prompt";
-import { writeSummary } from "./write";
+import { combineWithFallback, writeSummary } from "./write";
 
 const env = { DB: {} as D1Database } as Env;
 const SONNET = "anthropic/claude-sonnet-5";
@@ -178,8 +178,47 @@ describe("writeSummary", () => {
   it("does nothing once the day's budget is spent", async () => {
     mockBudgetLeft.mockResolvedValue(0);
 
-    expect(await writeSummary(env, prepared(), "rewrite")).toEqual({ status: "over_budget", cost: 0 });
+    expect(await writeSummary(env, prepared(), "rewrite")).toEqual({
+      status: "over_budget",
+      cost: 0,
+      reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$0\.0\d\d$/),
+    });
     expect(mockChat).not.toHaveBeenCalled();
+  });
+
+  it("checks the budget again before the fallback, and stops without calling it when the first try used it up", async () => {
+    mockBudgetLeft.mockResolvedValueOnce(1).mockResolvedValueOnce(0.0001);
+    mockChat.mockResolvedValueOnce(reply(invented, 0.02));
+
+    const outcome = await writeSummary(env, prepared(), "rewrite");
+
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.02, reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$/) });
+    expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.02);
+  });
+
+  it("reports both models' charges when both replies are rejected", async () => {
+    mockChat.mockResolvedValueOnce(reply(invented, 0.02)).mockResolvedValueOnce(reply(invented, 0.003));
+
+    const outcome = await writeSummary(env, prepared(), "rewrite");
+
+    expect(outcome).toMatchObject({ status: "rejected", model: SONNET });
+    expect(outcome.cost).toBeCloseTo(0.023, 6);
+  });
+
+  it("stops a long bill's parts when the budget runs short, keeping what the sent slices cost", async () => {
+    const parts = Array.from({ length: 5 }, (_, i) => ({ label: `Title ${i + 1} — P`, text: `SEC. ${i + 1}. P\nx`, tokens: 8_000 }));
+    const long = prepared({ parts, totalTokens: 40_000, input: { ...prepared().input, text: null } });
+    mockBudgetLeft.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    mockChat.mockResolvedValue(reply(JSON.stringify({ part: "P", summary: "s", changes: [] }), 0.001));
+
+    const outcome = await writeSummary(env, long, "new");
+
+    // The first slice (four parts) went out; the fifth part was never sent, and nothing was combined.
+    expect(mockChat).toHaveBeenCalledTimes(4);
+    expect(outcome).toMatchObject({ status: "over_budget" });
+    expect(outcome.cost).toBeCloseTo(0.004, 6);
+    expect(mockUpsert).not.toHaveBeenCalled();
   });
 
   it("reports a provider failure without storing anything", async () => {
@@ -187,5 +226,56 @@ describe("writeSummary", () => {
 
     expect(await writeSummary(env, prepared(), "new")).toEqual({ status: "failed", cost: 0, reason: "HTTP 502", account: false });
     expect(mockUpsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("combineWithFallback", () => {
+  const parts = [
+    { label: "Title I — Fees", text: "SEC. 101. Fees\nCaps fees at $45,000,000,000.", tokens: 20_000 },
+    { label: "Title II — Reports", text: "SEC. 201. Reports\nA report.", tokens: 20_000 },
+  ];
+  const long = () =>
+    prepared({
+      parts,
+      totalTokens: 40_000,
+      input: { ...prepared().input, text: null },
+      checkSources: { ...prepared().checkSources, text: parts.map((p) => p.text).join("\n\n") },
+    });
+  const notes = [{ part: "Fees" }, { part: "Reports" }];
+  const luna = { id: LUNA, maxTokens: 12_000, batchPrice: { input: 0.05, output: 0.25 } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockBudgetLeft.mockResolvedValue(1);
+  });
+
+  it("skips the combine when the budget cannot cover it, without calling the model", async () => {
+    mockBudgetLeft.mockResolvedValue(0);
+
+    const outcome = await combineWithFallback(env, long(), { tier: "new", model: luna, notes, priorCost: 0.01 });
+
+    expect(mockChat).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.01, reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$/) });
+  });
+
+  it("checks the budget again before the other model's combine", async () => {
+    mockBudgetLeft.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    mockChat.mockResolvedValueOnce(reply(invented, 0.002));
+
+    const outcome = await combineWithFallback(env, long(), { tier: "new", model: luna, notes, priorCost: 0 });
+
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.002 });
+  });
+
+  it("retries a rejected combine with the other model on the same notes, and reports both charges if it is rejected too", async () => {
+    mockChat.mockResolvedValueOnce(reply(invented, 0.002)).mockResolvedValueOnce(reply(invented, 0.03));
+
+    const outcome = await combineWithFallback(env, long(), { tier: "rewrite", model: luna, notes, priorCost: 0.01 });
+
+    expect([modelOf(0), modelOf(1)]).toEqual([LUNA, SONNET]);
+    expect(outcome).toMatchObject({ status: "rejected", model: LUNA });
+    expect(outcome.cost).toBeCloseTo(0.042, 6);
+    expect(mockRecordSpend.mock.calls.map((c) => c[1])).toEqual([0.002, 0.03]);
   });
 });

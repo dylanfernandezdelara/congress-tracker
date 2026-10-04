@@ -41,7 +41,7 @@ import {
 import { getDigest, storedGenerator } from "../d1/digests";
 import { getPipelineState, setPipelineState } from "../d1/pipeline-state";
 import { budgetLeft, dailyBudget, recordSpend, spentToday } from "../digest/budget";
-import { approxTokens } from "../digest/bill-text-parse";
+import { estimateCost } from "../digest/cost";
 import { newBillModel, type DigestModel } from "../digest/models";
 import {
   AccountError,
@@ -53,7 +53,7 @@ import {
 } from "../digest/openrouter-client";
 import { prepareBill, type PreparedBill } from "../digest/prepare";
 import {
-  combineAndStore,
+  combineWithFallback,
   firstPassMessages,
   isLong,
   notesFrom,
@@ -93,8 +93,6 @@ export const DISCOVERY_CURSOR_KEY = "digest_discovery_cursor";
 const DISCOVERY_PAGE_SIZE = 250;
 /** The list filters by exact update time; a small overlap covers updates recorded late. */
 const DISCOVERY_OVERLAP_MS = 3 * 3_600_000;
-/** Luna's reasoning plus the JSON answer, per request, for the batch estimate (high effort runs 2–5k). */
-const ESTIMATED_OUTPUT_TOKENS = 4_000;
 
 interface DiscoveryCursor {
   fromIso: string;
@@ -128,7 +126,7 @@ function describe(outcome: WriteOutcome): string {
     case "failed":
       return outcome.reason;
     case "over_budget":
-      return "daily budget spent";
+      return outcome.reason ?? "daily budget spent";
     default:
       return "";
   }
@@ -193,6 +191,13 @@ class Sweep {
   /**
    * A paid synchronous write. The try is counted before any money is spent, so a run cut off mid-write still moves
    * the bill toward parking. Stored → done; otherwise back in the queue, or parked after DIGEST_MAX_ATTEMPTS.
+   *
+   * What `attempts` counts: the model's failures on these inputs (rejected replies, provider errors, timeouts), the
+   * things that would fail the same way again. Our own limits are not the bill's fault, so they give the try back:
+   * a short budget (`over_budget`, checked before every paid call, including the fallback and the long-bill combine)
+   * and a refusing account. Such a job goes back to the queue with the reason in `last_error`, unparked, and waits for
+   * tomorrow's budget. A first model's rejected reply whose fallback the budget stopped is given back too: the bill
+   * never got its second model, and parking it on half a try would leave it without a summary for no fault of its own.
    */
   private async paidWrite(job: DigestJob, prepared: PreparedBill, write: () => Promise<WriteOutcome>): Promise<WriteOutcome> {
     this.syncWrites += 1;
@@ -214,9 +219,9 @@ class Sweep {
     this.result.warnings.push(`${label(job)}: ${describe(outcome)}`);
     // A spent budget or a refusing OpenRouter account (no credits, bad key) is not the bill's fault: give the try
     // back, and make no more direct writes this run.
-    const account = outcome.status === "failed" && outcome.account === true;
-    if (account) this.syncWrites = this.maxSyncWrites;
-    const counted = outcome.status === "over_budget" || account ? attempts - 1 : attempts;
+    const ourLimit = outcome.status === "over_budget" || (outcome.status === "failed" && outcome.account === true);
+    if (ourLimit) this.syncWrites = this.maxSyncWrites;
+    const counted = ourLimit ? attempts - 1 : attempts;
     const parked = counted >= DIGEST_MAX_ATTEMPTS;
     if (parked) this.result.parked += 1;
     await settleJob(this.env.DB, job, parked ? "done" : "queued", {
@@ -338,19 +343,9 @@ class Sweep {
         // The combine pass is a paid direct call either way.
         if (!this.canWriteNow()) return false;
         const notes = notesFrom(firstPassMessages(prepared).map(({ key }) => items.get(key)?.content ?? null));
-        await this.paidWrite(job, prepared, async () => {
-          const first = await combineAndStore(this.env, prepared, { tier, model: luna, notes, priorCost: 0 });
-          if (first.status !== "rejected") return first;
-          // Only the combine switches model; the part notes are kept, never re-read at full price.
-          const second = await combineAndStore(this.env, prepared, {
-            tier,
-            model: otherModel(this.env, luna),
-            notes,
-            priorCost: first.cost,
-            lastTry: true,
-          });
-          return second.status === "stored" ? second : first;
-        });
+        // Only the combine switches model; the part notes are kept, never re-read at full price. Each combine checks
+        // the budget before it is sent.
+        await this.paidWrite(job, prepared, () => combineWithFallback(this.env, prepared, { tier, model: luna, notes, priorCost: 0 }));
         return true;
       }
       const stored = await storeReply(this.env, prepared, { tier, model: luna.id, content: items.get("single")?.content ?? null, cost: 0 });
@@ -544,10 +539,7 @@ class Sweep {
 
 /** Upper-end estimate of a batch's charge: every prompt token, plus a full reasoning-and-answer budget per request. */
 export function estimateBatchCost(model: DigestModel, requests: Array<{ messages: { system: string; user: string } }>): number {
-  const price = model.batchPrice ?? { input: 0.05, output: 0.25 };
-  const input = requests.reduce((n, r) => n + approxTokens(r.messages.system) + approxTokens(r.messages.user), 0);
-  const output = requests.length * ESTIMATED_OUTPUT_TOKENS;
-  return Math.round(((input * price.input + output * price.output) / 1e6) * 1e6) / 1e6;
+  return estimateCost(model, requests.map((r) => r.messages), "batch");
 }
 
 /**
