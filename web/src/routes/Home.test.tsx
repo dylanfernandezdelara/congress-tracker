@@ -21,7 +21,6 @@ const homeApi = vi.hoisted(() => ({
   fetchFeed: vi.fn(),
   fetchRecentLaws: vi.fn(),
   fetchRecentConfirmations: vi.fn(),
-  fetchCommitteesLeaderboard: vi.fn(),
   fetchDefectors: vi.fn(),
   fetchMemberProfile: vi.fn(),
   fetchMembersSearch: vi.fn(),
@@ -36,7 +35,6 @@ const {
   fetchFeed,
   fetchRecentLaws,
   fetchRecentConfirmations,
-  fetchCommitteesLeaderboard,
   fetchDefectors,
   fetchMemberProfile,
   fetchSessionStats,
@@ -102,7 +100,6 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: 'House passage' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Senate bills & nominees' })).toBeInTheDocument()
     expect(screen.getByText('House-passed contracting bill waiting in the Senate')).toBeInTheDocument()
-    expect(fetchCommitteesLeaderboard).not.toHaveBeenCalled()
     expect(fetchTightnessStats).toHaveBeenCalled()
     expect(screen.getByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Recent confirmations' })).toBeInTheDocument()

@@ -53,13 +53,6 @@ export interface SessionStatsResponse {
 /** Session cross-party vote frequency bucket (see `shared/cross-vote-label.ts`). */
 export type CrossVoteLabel = 'rare' | 'occasional' | 'frequent'
 
-export interface CommitteeLeaderboardRow {
-  system_code: string
-  name: string
-  chamber: StatsChamber
-  waiting: number
-}
-
 /** How the two major parties lined up on one roll. */
 export type VoteCohesion = 'party-line' | 'bipartisan' | 'unknown'
 
@@ -283,12 +276,4 @@ export interface MembersSearchResponse {
 /** Distinct digest policy areas for feed filter dropdowns. */
 export interface PolicyAreasResponse {
   items: string[]
-}
-
-export interface CommitteesLeaderboardResponse {
-  congress: number
-  session: number
-  chamber: StatsChamber
-  items: CommitteeLeaderboardRow[]
-  as_of: string
 }

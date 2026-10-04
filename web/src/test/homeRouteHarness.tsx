@@ -17,7 +17,6 @@ export type HomeApiMocks = {
   fetchFeed: Mock
   fetchRecentLaws: Mock
   fetchRecentConfirmations: Mock
-  fetchCommitteesLeaderboard: Mock
   fetchDefectors: Mock
   fetchMemberProfile: Mock
   fetchMembersSearch: Mock
@@ -159,13 +158,6 @@ export function stubHomeRouteDefaults(
         ],
       },
     ],
-  })
-  api.fetchCommitteesLeaderboard.mockResolvedValue({
-    congress: 119,
-    session: 2,
-    chamber: 'House',
-    as_of: '2026-06-14T00:00:00.000Z',
-    items: [],
   })
   api.fetchSessionStats.mockResolvedValue({
     congress: 119,

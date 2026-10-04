@@ -646,21 +646,6 @@ const MOCK_RECENT_LAWS = {
   ],
 }
 
-const MOCK_COMMITTEES = {
-  congress: 119,
-  session: 2,
-  chamber: 'House',
-  as_of: '2026-06-14T00:00:00.000Z',
-  items: [
-    {
-      system_code: 'hsif00',
-      name: 'Energy and Commerce Committee',
-      chamber: 'House',
-      waiting: 2,
-    },
-  ],
-}
-
 async function installApiMocks(page) {
   await page.route('**/feed/latest.json**', async (route) => {
     await route.fulfill({
@@ -691,27 +676,6 @@ async function installApiMocks(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_RECENT_CONFIRMATIONS),
-    })
-  })
-
-  await page.route('**/stats/committees.json**', async (route) => {
-    const url = new URL(route.request().url())
-    const chamber = url.searchParams.get('chamber') === 'Senate' ? 'Senate' : 'House'
-    const items =
-      chamber === 'Senate'
-        ? [
-            {
-              system_code: 'sshr00',
-              name: 'HELP Committee',
-              chamber: 'Senate',
-              waiting: 1,
-            },
-          ]
-        : MOCK_COMMITTEES.items
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ...MOCK_COMMITTEES, chamber, items }),
     })
   })
 
