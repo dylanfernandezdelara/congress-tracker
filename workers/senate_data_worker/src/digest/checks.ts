@@ -204,6 +204,68 @@ const VOTE_HEADLINE = [
   /\b(passe[sd]|fails?|failed|rejected|approved|clear(s|ed)|dies)\s+(in\s+)?(the\s+)?(house|senate)\b|\b(house|senate)-passed\b/i,
 ];
 
+const JUDGING_WORD = new RegExp(`^(${JUDGING.join("|")})$`, "i");
+// Spaces only, never "\n": a name never spans two fields (see readerText).
+const NAME_RUN = /\b[A-Z][A-Za-z'’-]*(?:[^\S\n]+(?:(?:of|the|and|for)[^\S\n]+)*[A-Z][A-Za-z'’-]*)+/g;
+const NAME_CONNECTOR = /^(of|the|and|for)$/;
+const MAX_NAME_SPAN = 12;
+const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const withoutYear = (t: string) => t.replace(/ of \d{4}$/, "");
+
+/**
+ * Proper names are not judgments: a span of Capitalized Words (with "of", "the", "and", "for" inside) that holds a
+ * judging word and appears verbatim, case-sensitive and as whole words, in the title or text ("National Historic
+ * Trails Interpretive Center", "Stop Reckless Spending Act"), or a quoted string that is the bill's short title, is
+ * removed before the scan. A span that opens on the judging word could be a sentence start, a findings line or a
+ * Title Case header ("Massive Federal spending…", "TITLE I — Historic Investment…"), so it passes only as a whole
+ * short title or where the source has it mid-sentence (after a lowercase word or an opening quote).
+ * Lowercase uses ("a historic trails center", "reckless spending") are the summary's own voice and still count.
+ */
+export function withoutProperNames(text: string, sources: Pick<CheckableSources, "title" | "text">): string {
+  // Line breaks kept: a title or line ending in a lowercase word must not make the next line's start look mid-sentence.
+  const source = [sources.title ?? "", sources.text ?? ""].join("\n").replace(/[^\S\n]+/g, " ");
+  const norm = (t: string) => t.replace(/\s+/g, " ").trim();
+  const titles = [norm(sources.title ?? ""), ...[...source.matchAll(/cited as the [“"]([^”"]{3,200})[”"]/g)].map((m) => norm(m[1]))];
+  const shortTitles = new Set(titles);
+  const bareTitles = new Set(titles.map((t) => withoutYear(t.replace(/\.$/, ""))));
+  const quoted = text.replace(/[“"]([^”"\n]{3,200})[”"]/g, (m, inner: string) => (shortTitles.has(norm(inner)) ? "" : m));
+  const seen = new Map<string, boolean>();
+  const named = (span: string, opensOnJudging: boolean) => {
+    const key = `${opensOnJudging ? 1 : 0}${span}`;
+    if (!seen.has(key)) seen.set(key, sourceHolds(span, opensOnJudging));
+    return seen.get(key)!;
+  };
+  const sourceHolds = (span: string, opensOnJudging: boolean) => {
+    if (!source.includes(span)) return false;
+    const e = escapeRegExp(span);
+    if (!opensOnJudging) return new RegExp(`${e}(?![A-Za-z'’-])`).test(source);
+    // Mid-sentence, and the whole name: a prefix of a longer Title Case run ("Unprecedented Border Crisis" out of
+    // "…cited as the “Unprecedented Border Crisis Response Act”") is the sponsor's framing, not a name.
+    return bareTitles.has(withoutYear(span)) || new RegExp(`(?:(?<![A-Za-z'’-])[a-z]+,? |[“"‘])${e}(?![A-Za-z'’-])(?! (?:(?:of|the|and|for) )*[A-Z])`).test(source);
+  };
+  return quoted.replace(NAME_RUN, (run) => {
+    const tokens = run.split(/[^\S\n]+/);
+    const capital = (i: number) => /^[A-Z]/.test(tokens[i]) && !(i === 0 && tokens[i] === "The");
+    const keep = tokens.map(() => true);
+    tokens.forEach((t, i) => {
+      if (!JUDGING_WORD.test(t)) return;
+      // Every longer span holds the word and a neighbour; skip the search when the sources hold neither pair.
+      if (!(i > 0 && source.includes(`${tokens[i - 1]} ${t}`)) && !(i + 1 < tokens.length && source.includes(`${t} ${tokens[i + 1]}`))) return;
+      // Longest span around the word (2 to MAX_NAME_SPAN words) that starts and ends on a capitalized word and the sources hold.
+      for (let len = Math.min(tokens.length, MAX_NAME_SPAN); len >= 2; len--) {
+        for (let a = Math.max(0, i - len + 1); a <= i && a + len <= tokens.length; a++) {
+          const b = a + len - 1;
+          if (!capital(a) || !capital(b) || NAME_CONNECTOR.test(tokens[a]) || NAME_CONNECTOR.test(tokens[b])) continue;
+          if (!named(tokens.slice(a, b + 1).join(" "), a === i)) continue;
+          for (let k = a; k <= b; k++) keep[k] = false;
+          return;
+        }
+      }
+    });
+    return tokens.filter((_, i) => keep[i]).join(" ");
+  });
+}
+
 export function checkSummary(summary: CheckableSummary, sources: CheckableSources, options: { long?: boolean } = {}): CheckResult {
   const blocking: string[] = [];
   const warnings: string[] = [];
@@ -223,16 +285,21 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   for (const p of summary.key_points) if (words(p.text) > 24) warnings.push(`key point ${words(p.text)} words`);
   if ((summary.who_it_affects?.length ?? 0) > 3) warnings.push(`${summary.who_it_affects!.length} groups affected`);
 
-  const text = readerText(summary);
-  // Fixed terms of art are not judgments ("critical minerals", "critical-mineral", "critical access hospitals").
-  const plain = text.toLowerCase().replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care)\b/g, "");
+  const text = withoutProperNames(readerText(summary), sources);
+  // Fixed terms of art are not judgments ("critical minerals", "critical-mineral", "critical access hospitals",
+  // "critical health care personnel" in 38 U.S.C. 7431, "historic preservation", "historic sites").
+  const plain = text
+    .toLowerCase()
+    .replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care|health[- ]care personnel)\b/g, "")
+    .replace(/\bhistoric[- ](preservation|sites?|propert(y|ies)|districts?|records?|trails?|landmarks?|resources|structures|buildings|places)\b/g, "");
   const billText = (sources.text ?? "").toLowerCase();
   for (const w of JUDGING) {
     if (!new RegExp(`\\b${w}\\b`).test(plain)) continue;
     // A term the bill defines is not a judgment: every use in the summary must be a two-word phrase the bill defines
     // (the term “critical material” means / has the meaning given; ‘…’ when nested in an amendment; bill XML's
-    // <term> arrives quoted from billXmlToText). Titles ("Stop Reckless Spending Act")
-    // and findings ("devastating wildfires") are the sponsor's framing and stay blocked.
+    // <term> arrives quoted from billXmlToText). Proper names the sources spell the same way ("National Historic
+    // Trails Interpretive Center", "Stop Reckless Spending Act") were stripped above; the sponsor's framing in the
+    // summary's own voice ("reckless spending") and findings ("devastating wildfires") stay blocked.
     const uses = [...plain.matchAll(new RegExp(`\\b${w}\\b(?:[- ]([a-z]+))?`, "g"))];
     const billTerm = (next: string | undefined) => {
       if (!next) return false;
