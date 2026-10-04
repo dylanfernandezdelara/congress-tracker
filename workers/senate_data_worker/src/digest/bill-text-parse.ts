@@ -31,12 +31,16 @@ function decode(text: string): string {
 /**
  * Bill XML → readable text that keeps section numbers ("SEC. 2. HEADER") on their own lines and quoted text quoted.
  * A defined term (`The term <term>critical material</term> means`) is quoted too, which the checks read as the bill's
- * own term.
+ * own term. A resolution's preamble (its "Whereas …" clauses, rarely a bill's) comes first under a PREAMBLE line,
+ * one clause per line, so the writer can tell the sponsor's framing from what the measure does; no line in it can
+ * read as a "SEC. n." heading.
  */
 export function billXmlToText(xml: string): string {
   return decode(
     xml
       .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<preamble\b[^>]*>/g, "\n\nPREAMBLE\n")
+      .replace(/<\/preamble>/g, "\n\nEND OF PREAMBLE\n\n")
       .replace(/<(quote|term)\b[^>]*>/g, "“")
       .replace(/<\/(quote|term)>/g, "”")
       .replace(/<section\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g, "\n\nSEC. $1 $2\n")
@@ -44,7 +48,7 @@ export function billXmlToText(xml: string): string {
         /<(subtitle|title|division|part|chapter)\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g,
         (_m, tag: string, e: string, h: string) => `\n\n${tag.toUpperCase()} ${e} — ${h}\n`
       )
-      .replace(/<\/?(subsection|paragraph|subparagraph|clause|quoted-block|p|text)\b[^>]*>/g, "\n")
+      .replace(/<\/?(subsection|paragraph|subparagraph|clause|quoted-block|p|text|whereas)\b[^>]*>/g, "\n")
       .replace(/<[^>]+>/g, " ")
   )
     .replace(/[ \t]+/g, " ")
@@ -53,9 +57,12 @@ export function billXmlToText(xml: string): string {
     .trim();
 }
 
-/** The bill's own body (legislation or resolution), without the front matter. */
+/**
+ * The bill's own body (legislation or resolution), without the front matter. A preamble before the body is kept:
+ * a resolution's "Whereas" clauses carry its dates and figures (H.Res. 1585's "September 26, 2026").
+ */
 export function billBodyXml(xml: string): string {
-  const start = xml.search(/<(legis-body|resolution-body)\b/);
+  const start = xml.search(/<(preamble|legis-body|resolution-body)\b/);
   return start >= 0 ? xml.slice(start) : xml;
 }
 
