@@ -69,4 +69,74 @@ describe("openrouter client", () => {
     expect(state.done).toBe(true);
     expect(state.cost).toBeCloseTo(0.003);
   });
+
+  describe("spend hook", () => {
+    const timeout = () => Promise.reject(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+    const ok = (cost?: number) => json(200, { id: "g1", choices: [{ message: { content: "{}" } }], ...(cost === undefined ? {} : { usage: { cost } }) });
+    const hook = (estimate = 0.05) => {
+      const records: number[] = [];
+      return { records, total: () => records.reduce((n, r) => n + r, 0), spend: { estimate, record: async (usd: number) => void records.push(usd) } };
+    };
+
+    it("keeps a timed-out attempt's estimate, and settles only the attempt that answered to its actual charge", async () => {
+      const fetch = vi.fn().mockImplementationOnce(timeout).mockResolvedValueOnce(ok(0.012));
+      vi.stubGlobal("fetch", fetch);
+      const { records, total, spend } = hook();
+
+      await expect(chatCompletion(env, model, messages, spend)).resolves.toMatchObject({ usage: { cost: 0.012 } });
+
+      expect(fetch).toHaveBeenCalledTimes(2);
+      // An estimate before each attempt, then the answered attempt's correction: the timeout may have been billed.
+      expect(records.slice(0, 2)).toEqual([0.05, 0.05]);
+      expect(records).toHaveLength(3);
+      expect(total()).toBeCloseTo(0.05 + 0.012, 9);
+    });
+
+    it("keeps one estimate per attempt when every attempt times out, since the provider may bill each", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(timeout));
+      const { records, spend } = hook();
+
+      await expect(chatCompletion(env, model, messages, spend)).rejects.toThrow("timeout");
+
+      expect(records).toEqual([0.05, 0.05]);
+    });
+
+    it("keeps the estimate of a 5xx (the provider may finish and bill), and takes back a refusal that generated nothing", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(json(503, {})).mockResolvedValueOnce(ok(0.002)));
+      const serverError = hook();
+      await chatCompletion(env, model, messages, serverError.spend);
+      expect(serverError.total()).toBeCloseTo(0.05 + 0.002, 9);
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(json(524, {})).mockImplementationOnce(timeout));
+      const gatewayTimeout = hook();
+      await expect(chatCompletion(env, model, messages, gatewayTimeout.spend)).rejects.toThrow();
+      expect(gatewayTimeout.records).toEqual([0.05, 0.05]);
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(json(429, {})).mockResolvedValueOnce(ok(0.002)));
+      const rateLimited = hook();
+      await chatCompletion(env, model, messages, rateLimited.spend);
+      expect(rateLimited.records.slice(0, 2)).toEqual([0.05, -0.05]);
+      expect(rateLimited.total()).toBeCloseTo(0.002, 9);
+
+      vi.stubGlobal("fetch", vi.fn(async () => json(402, { error: { message: "Insufficient credits" } })));
+      const refused = hook();
+      await expect(chatCompletion(env, model, messages, refused.spend)).rejects.toThrow("Insufficient credits");
+      expect(refused.records).toEqual([0.05, -0.05]);
+    });
+
+    it("keeps one estimate when a reply carries no cost", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => ok()));
+      const { total, spend } = hook();
+      await chatCompletion(env, model, messages, spend);
+      expect(total()).toBeCloseTo(0.05, 9);
+    });
+
+    it("sends nothing when the estimate cannot be recorded", async () => {
+      const fetch = vi.fn(async () => ok(0.01));
+      vi.stubGlobal("fetch", fetch);
+      const spend = { estimate: 0.05, record: async () => Promise.reject(new Error("D1 down")) };
+      await expect(chatCompletion(env, model, messages, spend)).rejects.toThrow("D1 down");
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
 });

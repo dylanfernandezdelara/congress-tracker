@@ -7,9 +7,16 @@ const mockUpsert = vi.fn();
 const mockBudgetLeft = vi.fn();
 const mockRecordSpend = vi.fn();
 
+// The real client records an estimate before each attempt and settles to the actual charge on a reply
+// (openrouter-client.test.ts); here a reply records its actual cost through the hook, which nets the same.
 vi.mock("./openrouter-client", () => ({
   AccountError: class AccountError extends Error {},
-  chatCompletion: (...args: unknown[]) => mockChat(...args),
+  chatCompletion: async (...args: unknown[]) => {
+    const result = await mockChat(...args);
+    const spend = args[3] as { record: (usd: number) => Promise<void> } | undefined;
+    if (spend && result) await spend.record(result.usage.cost);
+    return result;
+  },
 }));
 vi.mock("../d1/digests", () => ({ upsertDigest: (...args: unknown[]) => mockUpsert(...args) }));
 vi.mock("./budget", () => ({
@@ -92,7 +99,10 @@ describe("writeSummary", () => {
       long: false,
       gateway_log_id: "01LOG",
     });
-    expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.01);
+    expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.01, expect.any(Date));
+    // Every paid call carries its estimate, recorded before the request goes out.
+    expect(mockChat.mock.calls[0]![3]).toMatchObject({ estimate: expect.any(Number) });
+    expect((mockChat.mock.calls[0]![3] as { estimate: number }).estimate).toBeGreaterThan(0);
   });
 
   it("retries a reply the checks reject with the other model, and keeps the bill's summary if both fail", async () => {
@@ -195,7 +205,28 @@ describe("writeSummary", () => {
 
     expect(mockChat).toHaveBeenCalledTimes(1);
     expect(outcome).toMatchObject({ status: "over_budget", cost: 0.02, sent: true, reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$/) });
-    expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.02);
+    expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.02, expect.any(Date));
+  });
+
+  it("records a call's correction on the day its estimate was charged, even after midnight", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-10-04T23:59:59.000Z"));
+      mockChat.mockImplementationOnce(async (_env, _model, _messages, spend: { estimate: number; record: (usd: number) => Promise<void> }) => {
+        await spend.record(spend.estimate);
+        vi.setSystemTime(new Date("2026-10-05T00:00:30.000Z"));
+        await spend.record(0.01 - spend.estimate);
+        return reply(good, 0);
+      });
+
+      await writeSummary(env, prepared(), "rewrite");
+
+      // The estimate and its correction (the test mock's own zero-cost record rides along on the same day).
+      const days = mockRecordSpend.mock.calls.filter((c) => c[1] !== 0).map((c) => (c[2] as Date).toISOString().slice(0, 10));
+      expect(days).toEqual(["2026-10-04", "2026-10-04"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reports both models' charges when both replies are rejected", async () => {

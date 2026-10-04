@@ -70,13 +70,36 @@ class PermanentError extends Error {}
 export class AccountError extends PermanentError {}
 
 /**
- * One normal (non-batch) completion. Network errors, 429 and 5xx are retried once; other 4xx (a bad request, no
- * credits) are not, since a second try would fail the same way. An empty reply returns content null.
+ * How a caller keeps the day's spend honest for one paid call. `record` adds to (or, negative, corrects) the
+ * recorded spend; `estimate` is what one attempt is assumed to cost until the provider says otherwise.
  */
-export async function chatCompletion(env: Env, model: DigestModel, messages: DigestMessages): Promise<ChatResult> {
+export interface SpendHook {
+  estimate: number;
+  record: (usd: number) => Promise<void>;
+}
+
+/**
+ * One normal (non-batch) completion. Network errors, timeouts, 429 and 5xx are retried once; other 4xx (a bad
+ * request, no credits) are not, since a second try would fail the same way. An empty reply returns content null.
+ *
+ * With a spend hook, each attempt's estimate is recorded before the request goes out. A provider can bill a request
+ * whose reply never reached us (our 180s timeout, a dropped connection, a worker killed mid-call), so the estimate
+ * stands for every attempt that got no reply, and for 408 and every 5xx (a gateway 502/524 can arrive while the
+ * provider finishes and bills). Only a refusal that means nothing was generated (REFUSED_UNBILLED) takes its estimate
+ * back. A reply settles only its own attempt: that attempt's estimate becomes its actual charge (or stays, when the
+ * reply carries no cost); earlier attempts keep theirs.
+ */
+/** Error statuses that mean the request was refused before any generation, so it cannot have been billed. */
+const REFUSED_UNBILLED = new Set([400, 401, 402, 403, 404, 413, 422, 429]);
+
+export async function chatCompletion(env: Env, model: DigestModel, messages: DigestMessages, spend?: SpendHook): Promise<ChatResult> {
   const base = env.OPENROUTER_BASE_URL?.trim() || OPENROUTER;
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
+    // Outside the try: if the spend cannot be recorded, nothing is sent.
+    if (spend) await spend.record(spend.estimate);
+    let refused = false;
+    let result: { chat: ChatResult; cost: number | null };
     try {
       const res = await fetch(`${base}/chat/completions`, {
         method: "POST",
@@ -86,22 +109,31 @@ export async function chatCompletion(env: Env, model: DigestModel, messages: Dig
       });
       const body = (await res.json().catch(() => ({}))) as ChatBody;
       if (!res.ok) {
+        refused = REFUSED_UNBILLED.has(res.status);
         const text = body.error?.message ?? `HTTP ${res.status}`;
         if (res.status === 429 || res.status >= 500) throw new Error(text);
         // A refusal from the gateway itself (missing or rotated CF_AIG_TOKEN) names the gateway, not OpenRouter.
         const who = isGateway(base) && body.error === undefined ? "AI Gateway" : "OpenRouter account";
         throw [401, 402, 403].includes(res.status) ? new AccountError(`${who}: ${text}`) : new PermanentError(text);
       }
-      return {
-        content: body.choices?.[0]?.message?.content ?? null,
-        usage: usageOf(body),
-        generationId: body.id ?? null,
-        gatewayLogId: res.headers.get("cf-aig-log-id"),
+      result = {
+        chat: {
+          content: body.choices?.[0]?.message?.content ?? null,
+          usage: usageOf(body),
+          generationId: body.id ?? null,
+          gatewayLogId: res.headers.get("cf-aig-log-id"),
+        },
+        cost: typeof body.usage?.cost === "number" ? body.usage.cost : null,
       };
     } catch (err: unknown) {
       lastError = err;
+      if (spend && refused) await spend.record(-spend.estimate);
       if (err instanceof PermanentError) break;
+      continue;
     }
+    // After the try, so a failure to record can never trigger a second paid request.
+    if (spend) await spend.record((result.cost ?? spend.estimate) - spend.estimate);
+    return result.chat;
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }

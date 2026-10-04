@@ -200,6 +200,11 @@ way they would, so summaries lead with concrete effects on people and stay stric
   (`digest/cost.ts`, same formula as the batch estimate at normal-API prices); a write the budget cannot finish goes
   back to the queue with `last_error` "budget: $x left, needs ~$y", never parked. Its try is given back when nothing
   was sent; a paid first try whose fallback the budget blocked still counts (attempts count the model's failures).
+  A direct call records its estimate before each attempt goes out (the client's spend hook) and settles the attempt
+  that answered to its actual charge, so a timed-out retry the provider bills, or a worker killed mid-call, still
+  counts; only a refusal that generated nothing (400/401/402/403/404/413/422/429) is taken back, never 408 or a 5xx.
+  Records are one atomic upsert, on the UTC day the call started. A retry inside `chatCompletion` is not
+  budget-checked again, so overshoot is bounded at one estimate per call.
 - **Backfill** `POST /__pipeline/run/summary-backfill` (admin; **dry run unless `apply=1`**): returns
   bills, how many matter, estimated cost and days. `scope=site` queues the bills on the site without a
   current summary; `scope=congress` starts a walk over every bill of the Congress (cursor
