@@ -291,7 +291,10 @@ export function checkSummary(summary: CheckableSummary, sources: CheckableSource
   const plain = text
     .toLowerCase()
     .replace(/\bcritical[- ](minerals?|infrastructure|access|habitat|care|health[- ]care personnel)\b/g, "")
-    .replace(/\bhistoric[- ](preservation|sites?|propert(y|ies)|districts?|records?|trails?|landmarks?|resources|structures|buildings|places)\b/g, "");
+    .replace(/\bhistoric[- ](preservation|sites?|propert(y|ies)|districts?|records?|trails?|landmarks?|resources|structures|buildings|places)\b/g, "")
+    // Weather terms of art (the National Weather Service issues "Extreme Cold" and "Extreme Heat" warnings; HR 3106 is about an
+    // extreme cold weather event). "Extreme" as the summary's own judgment ("an extreme approach") still blocks.
+    .replace(/\bextreme[- ](cold|heat|weather|temperatures?|wind[- ]chills?)\b/g, "");
   const billText = (sources.text ?? "").toLowerCase();
   for (const w of JUDGING) {
     if (!new RegExp(`\\b${w}\\b`).test(plain)) continue;

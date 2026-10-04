@@ -322,6 +322,19 @@ describe("checks", () => {
     ]);
   });
 
+  it("lets weather terms of art through, not 'extreme' as the summary's own judgment (HR 3106)", () => {
+    const hr3106 = sources({
+      title: "Weatherizing Infrastructure in the North and Terrorism Emergency Readiness Act of 2025",
+      text: "SEC. 2. Exercise on terrorist attack during extreme cold\n(b) Exercise requirements\n(1)\nAn extreme cold weather event, such as an event caused by a polar vortex, with respect to access to critical services.",
+    });
+    const check = (what: string) =>
+      checkSummary(summary({ headline: "DHS would rehearse a terror attack during a polar vortex", what_it_does: what, key_points: [{ text: "Runs one exercise", section: null }] }), hr3106).blocking;
+    expect(check("Requires an exercise on a terrorist attack during an extreme cold weather event.")).toEqual([]);
+    expect(check("Requires planning for extreme heat and extreme weather.")).toEqual([]);
+    expect(check("Responds to extreme threats from terrorists.")).toEqual(['judging word "extreme"']);
+    expect(check("Takes an extreme approach to cold-weather drills.")).toEqual(['judging word "extreme"']);
+  });
+
   it("allows fixed terms of art", () => {
     expect(checkSummary(summary({ what_it_does: "Funds critical minerals mapping." }), sources()).blocking).toEqual([]);
   });
