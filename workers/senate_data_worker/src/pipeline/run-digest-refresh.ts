@@ -60,7 +60,7 @@ export async function runDigestRefreshPipeline(env: Env, bills: BillRef[]): Prom
             ? `rejected: ${outcome.reasons.join("; ")}`
             : outcome.status === "failed"
               ? outcome.reason
-              : "daily budget spent",
+              : (outcome.reason ?? "daily budget spent"),
       });
     } catch (err) {
       skipped += 1;

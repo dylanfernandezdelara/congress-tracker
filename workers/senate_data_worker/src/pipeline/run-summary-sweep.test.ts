@@ -58,7 +58,7 @@ vi.mock("../digest/prepare", () => ({ prepareBill: (...a: unknown[]) => mockPrep
 vi.mock("../digest/write", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../digest/write")>()),
   storeReply: (...a: unknown[]) => mockStoreReply(...a),
-  combineAndStore: (...a: unknown[]) => mockCombine(...a),
+  combineWithFallback: (...a: unknown[]) => mockCombine(...a),
   writeSummary: (...a: unknown[]) => mockWrite(...a),
 }));
 vi.mock("../sources/updated-bills", () => ({ fetchUpdatedBillsPage: (...a: unknown[]) => mockFetchUpdated(...a) }));
@@ -199,7 +199,7 @@ describe("runSummarySweep", () => {
       expect(result).toMatchObject({ collected: 3, stored: 2, spentUsd: 0.014 });
     });
 
-    it("combines a long bill's batch notes, and retries only the combine with the other model", async () => {
+    it("combines a long bill's batch notes with Luna as one paid try (the fallback lives in combineWithFallback)", async () => {
       mockPrepare.mockResolvedValue(prepared(1, { parts: longParts, totalTokens: 40_000, basis: "text" }));
       mockGetBatch.mockResolvedValue({
         status: "completed",
@@ -208,16 +208,40 @@ describe("runSummarySweep", () => {
         results: [item("119-hr-1:part0", '{"part":"A"}'), item("119-hr-1:part1", '{"part":"B"}')],
       });
       jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1", attempts: 1, matters: true })]);
-      mockCombine
-        .mockResolvedValueOnce({ status: "rejected", model: "luna", cost: 0.002, reasons: ["number not in sources: 31905000000"] })
-        .mockResolvedValueOnce({ ...stored, cost: 0.02 });
+      mockCombine.mockResolvedValueOnce({ ...stored, cost: 0.022 });
 
-      await runSummarySweep(env, { now: NOW, discover: false });
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
 
-      expect(mockCombine.mock.calls.map((c) => (c[2] as { model: { id: string } }).model.id)).toEqual(["openai/gpt-6-luna", SONNET]);
-      expect(mockCombine.mock.calls[1]![2]).toMatchObject({ tier: "rewrite", notes: [{ part: "A" }, { part: "B" }], priorCost: 0.002 });
+      expect(mockCombine).toHaveBeenCalledTimes(1);
+      expect(mockCombine.mock.calls[0]![2]).toMatchObject({
+        tier: "rewrite",
+        model: { id: "openai/gpt-6-luna" },
+        notes: [{ part: "A" }, { part: "B" }],
+        priorCost: 0,
+      });
+      expect(jobsApi.markAttempt).toHaveBeenCalledWith(env.DB, expect.objectContaining({ number: 1 }), "fp1", 2);
       expect(mockWrite).not.toHaveBeenCalled();
       expect(settled()).toEqual([[1, "done"]]);
+      expect(result.spentUsd).toBeCloseTo(0.032, 6);
+    });
+
+    it("leaves a long bill queued, unparked and with its tries unchanged when the budget cannot cover the combine", async () => {
+      mockPrepare.mockResolvedValue(prepared(1, { parts: longParts, totalTokens: 40_000, basis: "text" }));
+      mockGetBatch.mockResolvedValue({
+        status: "completed",
+        done: true,
+        cost: 0.01,
+        results: [item("119-hr-1:part0", '{"part":"A"}'), item("119-hr-1:part1", '{"part":"B"}')],
+      });
+      jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1", attempts: 2 })]);
+      mockCombine.mockResolvedValue({ status: "over_budget", cost: 0, sent: false, reason: "budget: $0.001 left, needs ~$0.020" });
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      // Counted before the call (it might have gone out), then given back: the budget is ours, not the model's.
+      expect(jobsApi.markAttempt).toHaveBeenCalledWith(env.DB, expect.objectContaining({ number: 1 }), "fp1", 3);
+      expect(settledWith()).toEqual([[1, "queued", { error: "budget: $0.001 left, needs ~$0.020", fingerprint: "fp1", attempts: 2 }]]);
+      expect(result).toMatchObject({ parked: 0 });
     });
 
     it("counts a combine that throws as a failed try on the bill's own inputs, so repeats still park it", async () => {
@@ -524,6 +548,29 @@ describe("runSummarySweep", () => {
 
       expect(mockWrite).toHaveBeenCalledTimes(1);
       expect(settledWith()).toEqual([[1, "queued", expect.objectContaining({ fingerprint: "fp1", attempts: 2 })]]);
+    });
+
+    it("counts a paid first try whose fallback the budget blocked, but requeues the bill instead of parking it", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(
+        onlyMatters([job(1, { matters: true, attempts: 2, fingerprint: "fp1" }), job(2, { matters: true })])
+      );
+      mockWrite.mockResolvedValue({ status: "over_budget", cost: 0.05, sent: true, reason: "budget: $0.004 left, needs ~$0.010" });
+
+      const result = await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+      // Third try counted (a real rejection), yet not parked: the budget, not the model, stopped the fallback.
+      expect(settledWith()).toEqual([[1, "queued", { error: "budget: $0.004 left, needs ~$0.010", fingerprint: "fp1", attempts: 3 }]]);
+      expect(result).toMatchObject({ parked: 0, spentUsd: 0.05 });
+    });
+
+    it("gives the try back when the budget stopped a write before anything was sent", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(onlyMatters([job(1, { matters: true, attempts: 1, fingerprint: "fp1" })]));
+      mockWrite.mockResolvedValue({ status: "over_budget", cost: 0, sent: false, reason: "budget: $0.004 left, needs ~$0.010" });
+
+      await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(settledWith()).toEqual([[1, "queued", { error: "budget: $0.004 left, needs ~$0.010", fingerprint: "fp1", attempts: 1 }]]);
     });
 
     it("stops rewriting when the day's budget is spent", async () => {
