@@ -1,6 +1,6 @@
 # Plain-language summaries: handoff and next steps
 
-Updated 2026-09-27 ~16:40 UTC at the end of the session that shipped PRs #210–#216 (all merged, all deployed). The earlier version of this file (from the session that built the pipeline, #200–#209) was corrected where it was wrong; see "Corrections" below.
+Updated 2026-10-03 (second session, PRs #217–#220) on top of the 2026-09-27 handoff at the end of the session that shipped PRs #210–#216 (all merged, all deployed). The earlier version of this file (from the session that built the pipeline, #200–#209) was corrected where it was wrong; see "Corrections" below.
 **First: `git fetch && git pull` on `main`.**
 
 ## Read first
@@ -37,6 +37,22 @@ Updated 2026-09-27 ~16:40 UTC at the end of the session that shipped PRs #210–
 
 Also: stale PRs #184, #188–#191 closed. Nine merged worktrees removed. HR 10395 rewritten on v3.3 (Sonnet, $0.02): "Pilot program tests funding tools for mineral processing plants", groups "critical mineral processing companies…" — the exemption works in production.
 
+## Shipped 2026-10-03 (all merged, Opus 5.5 reviewed, deployed)
+
+| PR | What | Why |
+| --- | --- | --- |
+| #217 | `DIGEST_DAILY_BUDGET_USD = "2"` in `[vars]` (was the $1 default) | Spend hit $1 on four of seven days; the live lane writes 200+ new bills a day while the floor is quiet and starved the backfill. |
+| #218 | Parked bills keep their last rejection reason: `parked after 3 failed attempts (last: rejected: …)`; all three parking paths consistent and counted | Nine bills parked in the week with the reason overwritten; nobody could tell checker bugs from real blocks. |
+| #219 | Terms of art ("critical health care personnel", "historic preservation/sites/records/trails/…") and proper names that appear verbatim in the bill are not judging words | S.5406 (statutory category from 38 U.S.C. 7431), S.790 ("National Historic Trails Interpretive Center"), HR 7618, S.5579 all parked on these. Two review rounds closed real holes; see the PR body for the exact rule. |
+| #220 | `numbersIn` reads spelled-out ordinals ("thirtieth consecutive day" → 30) | HR 10422 parked because "30 straight days" had no support. |
+
+### Parked bills, triaged (read-only investigation 2026-10-03)
+
+- Fixed by #219/#220, **need a refresh to un-park** (parking waits for the bill to change): S5406, HR7618, S790, HR10422, S5579.
+- Still correctly blocked: HR5366 ("2015" not in bill), S5648 (title-only, "critical decisions" is the sponsor's framing), HRES1585 (bare "historic," in the resolving clause; also the preamble is dropped, see next steps).
+- Number counts the writer derived (HR10217 "35 counties", S5422 "17 counties"): a prompt problem, not a checker one; see next steps.
+- HR10367 (28k tokens, no CRS): cause unknown; the next parking will carry the reason thanks to #218.
+
 ## Corrections to the previous handoff
 
 - **Step 3 (notable-bill sheet) was wrong.** Nothing mounted it since #163. Deleted instead (#214).
@@ -48,8 +64,8 @@ Also: stale PRs #184, #188–#191 closed. Nine merged worktrees removed. HR 1039
 
 - **Production:** trackcongress.org on main `2532cdd`. Prompt v3.3. Budget `DIGEST_DAILY_BUDGET_USD` $2/day since 2026-10-03 (#217; was the $1 default).
 - **OpenRouter key:** limit $15, usage $0.20, $14.80 remaining (`GET https://openrouter.ai/api/v1/key`). Not close to running out.
-- **Site backfill:** 78 of 300 done, 222 queued; resumes 00:00 UTC. **Do not start `scope=congress`** without Dylan.
-- **Rejected/parked:** HR5366 (attempt 1, correct block: "2015" not in bill), S5384 (attempt 2, fixed by #206, gets its last try tonight), HR10395 (now rewritten, done).
+- **Site backfill (2026-10-03):** 173 done, 61 queued; the live lane wrote 200–275 summaries a day this week (624 v3.3 new-tier summaries). **Do not start `scope=congress`** without Dylan.
+- **Rejected/parked:** see the triage above. HR10395 and S5384 were rewritten on 2026-09-27.
 - **Ingest health is "degraded":** `Intro discovery soft-failed: Intro list failed: Unexpected end of JSON input` on the 10:00 UTC run (Congress.gov returned an empty body; everything else succeeded). Watch whether it repeats tomorrow.
 - **Local:** `/Users/dylanfdl/Projects/ct-toolbar` is a deregistered, half-removed worktree directory (source files and `node_modules`; nothing uncommitted). Delete it by hand: `rm -rf /Users/dylanfdl/Projects/ct-toolbar`. The main checkout's old `artifacts/` (Sep 1 QA screenshots) was overwritten by the symlink pull; the eval artifacts are intact and now live in `congress-tracker/artifacts/digest-eval`.
 
@@ -69,27 +85,28 @@ Run from `workers/senate_data_worker`. `PIPELINE_ADMIN_TOKEN` is in `.dev.vars`.
 curl -X POST -H "Authorization: Bearer $TOKEN" "https://congress-tracker-api.fernandezdelaradylan.workers.dev/__pipeline/run/digest-refresh?bill=HR4795"
 ```
 
-## Blocked: needs Dylan to run
+## Needs Dylan to run (agent permissions refuse batches of admin POSTs)
 
-**Refresh the voted-bill summaries to v3.3.** Dylan approved the spend; the agent's tool permissions refused the batch of admin POSTs. Each call is one Sonnet write, ~$0.02. Today's budget is nearly used ($0.89 of $1), so the refresh may refuse after a few bills until 00:00 UTC; run the six vote-headline bills first, the rest tomorrow.
+Budget is $2/day now, so both loops fit in one day with headroom. Each call is one Sonnet write, ~$0.01–0.02.
 
 ```bash
 cd workers/senate_data_worker && TOKEN=$(grep PIPELINE_ADMIN_TOKEN .dev.vars | cut -d= -f2-)
-# Vote-style headlines (Dylan's ruling), plus S.5384 which sits on a title fallback:
-for b in S5384 HJRES213 HJRES210 HCONRES89 HCONRES93 HRES1498 HJRES1; do curl -s -X POST -H "Authorization: Bearer $TOKEN" "https://congress-tracker-api.fernandezdelaradylan.workers.dev/__pipeline/run/digest-refresh?bill=$b"; echo; done
-# The other 32 rewrite-tier summaries still on v3 (tomorrow, ~$0.65):
-for b in HR1276 HR1501 HR2069 HR2140 HR2196 HR2978 HR3276 HR4219 HR4646 HR4795 HR8278 HR9340 HR9436 HR9497 HR9500 HR9576 HR10326 HR10511 HR10516 HR10517 HR10593 HRES1490 HRES1499 HRES1530 S32 S307 S723 S2403 S5447 S5449 S5483 S5490 S5493; do curl -s -X POST -H "Authorization: Bearer $TOKEN" "https://congress-tracker-api.fernandezdelaradylan.workers.dev/__pipeline/run/digest-refresh?bill=$b"; echo; done
+# Un-park the bills #219/#220 fixed:
+for b in S5406 HR7618 S790 HR10422 S5579; do curl -s -X POST -H "Authorization: Bearer $TOKEN" "https://congress-tracker-api.fernandezdelaradylan.workers.dev/__pipeline/run/digest-refresh?bill=$b"; echo; done
+# The 30 rewrite-tier summaries still on prompt v3 (list them live, then loop):
+./node_modules/.bin/wrangler d1 execute congress-tracker --remote --command "SELECT bill_type||number FROM bill_digests WHERE json_extract(digest_json,'$.generator.tier')='rewrite' AND json_extract(digest_json,'$.generator.prompt_version')='v3'"
+# plus HRES518 (pre-v3, headline "House Votes on Support for Ukraine").
 ```
 
 ## Next steps
 
-1. **Run the blocked refresh above** and spot-check the six new headlines.
-2. **Prompt v3.4 candidates** (from the #215 review; not applied because they weren't in the eval round): "the people or businesses it requires…, never the agency that carries it out" (Sonnet listed "the EPA" once); the disapproval-resolution headline example should follow the TENSE rule for enacted ones ("Law cancels…"); Sonnet still writes "U.S. voters" for H.J.Res. 1 (a constitutional-amendment rule would fix one bill; probably not worth it). The judge is more lenient on groups than the prompt now is (`judge.mjs:67`), so it under-counts violations.
-3. **Budget robustness** (cents, from the audit): `writeSummary` checks the budget once before up to two calls; the long-bill combine never checks it; the batch estimate assumes 4k output tokens while Luna's max is 12k; a timeout retry in `openrouter-client.ts` can be billed twice and recorded never; the reported `costUsd` drops the second model's charge on a double rejection.
-4. **Retry semantics:** consider re-queuing parked bills once when the checker changes (today they wait for the bill to change or an epoch bump).
-5. **Reader feedback** is live but buried (12px links under an expanded row, fire-and-forget POST with no error surfaced). Zero rows so far. If you want signal, make it visible or log client failures.
-6. **`/stats/pulse.json`** (and `close_votes`) has been unused by web since #163. Delete it the way #214 deleted notable.
-7. **Check production daily:** backfill progress and spend, rejections (read the bill before calling a block false), feedback rows, the intro-discovery warning. When the site backfill finishes, ask Dylan about `scope=congress` (19,171 bills, ~$20; needs the key cap raised).
+1. **Run the two loops above**, then check `SELECT bill_type||number, attempts, last_error FROM digest_jobs WHERE last_error LIKE 'parked%'` the next day: with #218 every new parking says why.
+2. **Resolutions lose their preamble.** `billBodyXml` starts at `<resolution-body>` and drops `<preamble>`, so the writer never sees the whereas clauses (HRES1585 saw 59 tokens and no date). Keep the preamble as findings context. Sources change, not prompt; the fingerprint ignores text, so no rewrites. One PR.
+3. **Prompt v3.4 candidates** (need an eval round, ~$0.20): "don't total an unnumbered list (counties, agencies) unless the text gives the number" (HR10217, S5422); "the people or businesses it requires…, never the agency that carries it out"; the enacted disapproval-resolution tense example. The judge is more lenient on groups than the prompt (`judge.mjs:67`).
+4. **Budget robustness** (cents): `writeSummary` checks the budget once before up to two calls; the long-bill combine never checks; batch estimate assumes 4k output tokens vs Luna's 12k max; a timeout retry in `openrouter-client.ts` can bill twice and record never; `costUsd` drops the second model's charge on a double rejection.
+5. **Reader feedback** is still zero after a week. Make the row visible on the collapsed card or drop it; test the endpoint end to end once.
+6. **`/stats/pulse.json`** (and `close_votes`) unused by web since #163. Delete like #214.
+7. **Daily check:** spend against $2, backfill (61 queued on 2026-10-03), parked reasons, feedback. When the site backfill finishes, ask Dylan about `scope=congress` (~$20, key cap $15 today).
 
 ### Later
 
