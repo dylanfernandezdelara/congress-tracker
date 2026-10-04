@@ -320,13 +320,15 @@ class Sweep {
 
   /**
    * Close a batch and settle its charge: the estimate was counted when it was sent, so only the difference is
-   * recorded now, once. An unknown charge keeps the estimate.
+   * recorded now, once. An unknown charge keeps the estimate. The difference goes to the UTC day the batch was
+   * submitted (its estimate's day), so a batch collected after midnight corrects the day it was charged to.
    */
   private async closeBatch(batch: DigestBatchRow, state: "collected" | "failed", actual: number | null): Promise<void> {
     const estimate = batch.cost ?? 0;
     const charged = actual ?? estimate;
     await closeDigestBatch(this.env.DB, batch.id, state, charged);
-    await recordSpend(this.env, charged - estimate);
+    const submitted = new Date(batch.submitted_at);
+    await recordSpend(this.env, charged - estimate, Number.isNaN(submitted.getTime()) ? undefined : submitted);
     this.result.spentUsd += charged;
   }
 
@@ -518,16 +520,17 @@ class Sweep {
     const requests = ready.flatMap((prepared) =>
       firstPassMessages(prepared).map(({ key, messages }) => ({ customId: `${refKey(prepared.ref)}:${key}`, messages }))
     );
-    // Counted against the day's budget now; the difference is settled when the batch is collected.
+    // Counted against the budget of the day the batch is submitted (its submitted_at, this.now); the difference is
+    // settled on that same day when the batch is collected.
     const estimate = estimateBatchCost(model, requests);
-    if ((await budgetLeft(this.env)) < estimate) {
+    if ((await budgetLeft(this.env, this.now)) < estimate) {
       this.result.warnings.push(`daily summary budget too low for a batch (~$${estimate.toFixed(3)}); new bills wait for tomorrow`);
       return;
     }
     try {
       const id = await submitBatch(this.env, model, requests);
       await insertDigestBatch(this.env.DB, { id, model: model.id, requests: requests.length, estimate }, this.now.toISOString());
-      await recordSpend(this.env, estimate);
+      await recordSpend(this.env, estimate, this.now);
       await markJobsBatched(
         this.env.DB,
         ready.map((prepared) => ({ ref: prepared.ref, fingerprint: prepared.fingerprint })),

@@ -608,7 +608,7 @@ describe("runSummarySweep", () => {
       expect(jobsApi.markJobsBatched.mock.calls[0]![1].map((j: { fingerprint: string }) => j.fingerprint)).toEqual(["fp1", "fp2", "fp5"]);
       const estimate = jobsApi.insertDigestBatch.mock.calls[0]![1].estimate as number;
       expect(estimate).toBeGreaterThan(0.001);
-      expect(mockRecordSpend).toHaveBeenCalledWith(env, estimate);
+      expect(mockRecordSpend).toHaveBeenCalledWith(env, estimate, NOW);
       // A bill whose batches keep failing is written directly; 4 failed three times on these inputs and is parked.
       expect(mockWrite).toHaveBeenCalledTimes(1);
       expect(mockWrite).toHaveBeenCalledWith(env, expect.objectContaining({ fingerprint: "fp3" }), "new");
@@ -616,6 +616,36 @@ describe("runSummarySweep", () => {
       expect(settledWith().find(([n]) => n === 4)![2]).toMatchObject({
         error: "parked after 3 failed attempts (last: rejected: number not in sources: 2015); retried when the bill changes",
       });
+    });
+
+    it("records a batch's estimate and its correction on the submit day, even when collected after midnight", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        // Submitted at 23:59:59Z, with no `now` passed (the cron path).
+        vi.setSystemTime(new Date("2026-10-04T23:59:59.000Z"));
+        jobsApi.selectQueuedJobs.mockImplementation(onlyNew([job(1)]));
+        mockSubmitBatch.mockResolvedValue("batch-late");
+        await runSummarySweep(env, { discover: false });
+        const [, row, submittedAt] = jobsApi.insertDigestBatch.mock.calls[0]!;
+        expect(submittedAt).toBe("2026-10-04T23:59:59.000Z");
+
+        // Collected 31 seconds later, on the next UTC day, at a lower actual charge.
+        vi.setSystemTime(new Date("2026-10-05T00:00:30.000Z"));
+        jobsApi.selectQueuedJobs.mockResolvedValue([]);
+        jobsApi.selectOpenBatches.mockResolvedValue([
+          openBatch({ id: "batch-late", requests: 1, submitted_at: submittedAt, cost: row.estimate }),
+        ]);
+        mockGetBatch.mockResolvedValue({ status: "completed", done: true, cost: row.estimate / 2, results: [] });
+        jobsApi.selectBatchJobs.mockResolvedValue([]);
+        await runSummarySweep(env, { discover: false });
+
+        expect(mockRecordSpend.mock.calls.map((c) => [c[1], (c[2] as Date).toISOString().slice(0, 10)])).toEqual([
+          [row.estimate, "2026-10-04"],
+          [-row.estimate / 2, "2026-10-04"],
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("holds the batch when the day's remaining budget cannot cover its estimate", async () => {
