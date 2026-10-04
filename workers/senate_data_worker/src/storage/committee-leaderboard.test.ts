@@ -2,10 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { SCHEMA_VERSION, resetSchemaFlag } from "../d1/schema";
 import { PROCESS_STUCK_DAYS } from "../constants";
 import type { Env } from "../config";
-import {
-  buildCommitteesLeaderboard,
-  waitingInCommitteeForPulse,
-} from "./committee-leaderboard";
+import { buildCommitteesLeaderboard } from "./committee-leaderboard";
 
 type StandingRow = {
   congress: number;
@@ -182,26 +179,6 @@ describe("buildCommitteesLeaderboard", () => {
         name: "Financial Services Committee",
         chamber: "House",
         waiting: 0,
-      },
-    ]);
-  });
-});
-
-describe("waitingInCommitteeForPulse", () => {
-  beforeEach(() => {
-    resetSchemaFlag();
-  });
-
-  it("omits zero-waiting committees and keeps the top five", async () => {
-    const asOf = "2026-08-12T00:00:00.000Z";
-    const db = createCommitteeDb(standingHouse, waitingEvents);
-    const rows = await waitingInCommitteeForPulse(db, 119, "House", asOf);
-    expect(rows).toEqual([
-      {
-        system_code: "hsif00",
-        name: "Energy and Commerce Committee",
-        chamber: "House",
-        waiting: 2,
       },
     ]);
   });

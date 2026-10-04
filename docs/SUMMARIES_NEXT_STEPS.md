@@ -105,8 +105,7 @@ for b in S5406 HR7618 S790 HR10422 S5579; do curl -s -X POST -H "Authorization: 
 3. **Prompt v3.4 candidates** (need an eval round, ~$0.20): "don't total an unnumbered list (counties, agencies) unless the text gives the number" (HR10217, S5422); "the people or businesses it requires…, never the agency that carries it out"; the enacted disapproval-resolution tense example. The judge is more lenient on groups than the prompt (`judge.mjs:67`).
 4. **Budget robustness** (cents): `writeSummary` checks the budget once before up to two calls; the long-bill combine never checks; batch estimate assumes 4k output tokens vs Luna's 12k max; a timeout retry in `openrouter-client.ts` can bill twice and record never; `costUsd` drops the second model's charge on a double rejection.
 5. **Reader feedback** is still zero after a week. Make the row visible on the collapsed card or drop it; test the endpoint end to end once.
-6. **`/stats/pulse.json`** (and `close_votes`) unused by web since #163. Delete like #214.
-7. **Daily check:** spend against $2, backfill (61 queued on 2026-10-03), parked reasons, feedback. When the site backfill finishes, ask Dylan about `scope=congress` (~$20, key cap $15 today).
+6. **Daily check:** spend against $2, backfill (61 queued on 2026-10-03), parked reasons, feedback. When the site backfill finishes, ask Dylan about `scope=congress` (~$20, key cap $15 today).
 
 ### Later
 

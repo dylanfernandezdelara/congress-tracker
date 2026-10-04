@@ -59,7 +59,6 @@ import { handleOgImageRoute, parseOgImagePath } from "./og-image";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
 import { buildExecutiveAlerts } from "../storage/executive";
-import { buildPulseStats } from "../storage/pulse-stats";
 import { buildTightnessStats } from "../storage/tightness-stats";
 import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
@@ -75,7 +74,6 @@ import type {
   DefectorsResponse,
   MemberProfileResponse,
   PortfoliosResponse,
-  PulseStatsResponse,
   TightnessStatsResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
@@ -632,19 +630,6 @@ const GET_ROUTES: Record<string, (ctx: RouteContext) => Promise<Response>> = {
         return { congress, session, ...stats, as_of: asOf };
       },
       "session stats unavailable"
-    );
-  },
-  "/stats/pulse.json": ({ env, json }) => {
-    const congress = congressNumber(env);
-    const session = sessionNumber(env);
-    const asOf = new Date().toISOString();
-    return handleStatsJson(
-      json,
-      async (): Promise<PulseStatsResponse> => {
-        const pulse = await buildPulseStats(env.DB, congress, session);
-        return { congress, session, ...pulse, as_of: asOf };
-      },
-      "pulse stats unavailable"
     );
   },
   "/stats/tightness.json": ({ env, json }) => {

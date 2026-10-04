@@ -85,20 +85,6 @@ vi.mock('./api/client', () => ({
     as_of: '2026-06-14T00:00:00.000Z',
     items: [],
   }),
-  fetchPulseStats: vi.fn().mockResolvedValue({
-    house: {
-      close_votes: [],
-      policy_heat: [],
-      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
-      waiting_in_committee: [],
-    },
-    senate: {
-      close_votes: [],
-      policy_heat: [],
-      this_week: { count: 0, headline: null, bill_type: null, bill_number: null, congress: null },
-      waiting_in_committee: [],
-    },
-  }),
   fetchTightnessStats: vi.fn().mockResolvedValue({
     congress: 119,
     session: 2,
