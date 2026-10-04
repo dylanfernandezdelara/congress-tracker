@@ -1,6 +1,6 @@
 # Plain-language summaries: handoff and next steps
 
-Updated 2026-10-03 (second session, PRs #217–#220) on top of the 2026-09-27 handoff at the end of the session that shipped PRs #210–#216 (all merged, all deployed). The earlier version of this file (from the session that built the pipeline, #200–#209) was corrected where it was wrong; see "Corrections" below.
+Updated 2026-10-04 (third session, PRs #221–#227; second session #217–#220) on top of the 2026-09-27 handoff at the end of the session that shipped PRs #210–#216 (all merged, all deployed). The earlier version of this file (from the session that built the pipeline, #200–#209) was corrected where it was wrong; see "Corrections" below.
 **First: `git fetch && git pull` on `main`.**
 
 ## Read first
@@ -36,6 +36,19 @@ Updated 2026-10-03 (second session, PRs #217–#220) on top of the 2026-09-27 ha
 | #216 | Untracked three symlinks committed by mistake in #211; `.gitignore` fixed | Pulling main had replaced the main checkout's real `node_modules` with self-links. |
 
 Also: stale PRs #184, #188–#191 closed. Nine merged worktrees removed. HR 10395 rewritten on v3.3 (Sonnet, $0.02): "Pilot program tests funding tools for mineral processing plants", groups "critical mineral processing companies…" — the exemption works in production.
+
+## Shipped 2026-10-04 (all merged, Opus 5.5 reviewed, deployed)
+
+| PR | What | Why |
+| --- | --- | --- |
+| #221 | Resolution preambles (whereas clauses) reach the writer and the checks, as a PREAMBLE block | HRES1585 saw 59 tokens and no date. Parser only; the prompt clause went into v3.4. |
+| #222, #223 | `/stats/pulse.json` and `/stats/committees.json` removed with their types, analytics and seed rows (−965 lines) | Unused by web since #163. |
+| #224 | "Was this clear? Yes / No" under "What it does" (below the caption on title-only summaries), 32px targets, failed posts logged once per session and counted in sessionStorage; Yes/No grouped and labelled | Zero feedback rows in a week; the row was below the fold of an expanded row. Preview accepted a real vote with 200. Decide on the data in two weeks. |
+| #225 | Prompt v3.4: never count a list yourself; affected groups are people or businesses, never the implementing agency; "Law cancels…" for enacted disapproval resolutions; findings and whereas clauses attributed and never leading the headline | Round 6 ($0.27): Luna 10/10, no county totals, no agencies. Sonnet's county totals are blocked by the checks and the retry goes to Luna. A stricter groups judge was tried and NOT adopted: it fails "California regulators", a group in Dylan's round-2 pick. |
+| #226 | Budget checked before every paid call (first try, fallback, each long-bill part slice, each combine); over budget leaves the job queued with "budget: $x left, needs ~$y", never parked; a try is handed back only when nothing was sent; `costUsd` reports both charges on a double rejection; Sonnet direct price $2/$10 | Audit items from 2026-09-27. |
+| #227 | Every direct call records its estimate before it goes out; the answering attempt settles to actual; estimates are taken back only on 4xx refusals, never 408 or 5xx; `recordSpend` is one atomic upsert; the UTC day is pinned per call | A billed timeout retry and a worker kill mid-call were never recorded. |
+
+Still for Dylan to run: the v3 → v3.4 refresh loop for the 30 voted-bill summaries plus HRES518 (see "Needs Dylan to run"). Open from the reviews: the `idx_bill_committee_events_committee` index has lost its query; a batch collected after midnight corrects on the collect day; the feedback cap of 30/day is per egress IP.
 
 ## Shipped 2026-10-03 (all merged, Opus 5.5 reviewed, deployed)
 
@@ -100,12 +113,12 @@ for b in S5406 HR7618 S790 HR10422 S5579; do curl -s -X POST -H "Authorization: 
 
 ## Next steps
 
-1. **Run the two loops above**, then check `SELECT bill_type||number, attempts, last_error FROM digest_jobs WHERE last_error LIKE 'parked%'` the next day: with #218 every new parking says why.
-2. **Resolutions lose their preamble.** `billBodyXml` starts at `<resolution-body>` and drops `<preamble>`, so the writer never sees the whereas clauses (HRES1585 saw 59 tokens and no date). Keep the preamble as findings context. Sources change, not prompt; the fingerprint ignores text, so no rewrites. One PR.
-3. **Prompt v3.4 candidates** (need an eval round, ~$0.20): "don't total an unnumbered list (counties, agencies) unless the text gives the number" (HR10217, S5422); "the people or businesses it requires…, never the agency that carries it out"; the enacted disapproval-resolution tense example. The judge is more lenient on groups than the prompt (`judge.mjs:67`).
-4. **Budget robustness** (cents): `writeSummary` checks the budget once before up to two calls; the long-bill combine never checks; batch estimate assumes 4k output tokens vs Luna's 12k max; a timeout retry in `openrouter-client.ts` can bill twice and record never; `costUsd` drops the second model's charge on a double rejection.
-5. **Reader feedback** is still zero after a week. Make the row visible on the collapsed card or drop it; test the endpoint end to end once.
-6. **Daily check:** spend against $2, backfill (61 queued on 2026-10-03), parked reasons, feedback. When the site backfill finishes, ask Dylan about `scope=congress` (~$20, key cap $15 today).
+1. **Run the refresh loop** (30 voted bills + HRES518) and the daily check: spend against $2, parked reasons (`last_error LIKE 'parked%'` now carries the cause), feedback rows (`SELECT kind, count(*) FROM digest_feedback GROUP BY kind`).
+2. **Feedback decision, ~2026-10-18:** two weeks after #224. Keep, move, or remove based on rows.
+3. **Prompt v3.5 only with evidence.** Rule 4 (preambles) and the two v3.4 wording tightenings were added after round 6 ran; spot-check a whereas-heavy resolution in the next round. Known Sonnet quirks: "U.S. voters" on H.J.Res. 1, one tense miss ("Creates Kentucky Wildlands…").
+4. **Judge:** keep the calibrated Gemini judge. If groups need stricter judging, re-calibrate against Dylan's picks first (~$0.05 to re-judge the five picks).
+5. **Small follow-ups:** drop the orphaned `idx_bill_committee_events_committee` index; pin the batch day at submit; the proper-name exemption (#219) also applies to Title Case framing in preambles (lowercase framing still blocks).
+6. When the site backfill finishes, ask Dylan about `scope=congress` (~$20; key cap $15). He declined it on 2026-10-04 for now.
 
 ### Later
 
