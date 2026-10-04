@@ -22,6 +22,43 @@ describe("bill text", () => {
     expect(billBodyXml("<bill><form>x</form><legis-body>y</legis-body></bill>")).toBe("<legis-body>y</legis-body></bill>");
   });
 
+  // H.Res. 1585 (119th), trimmed from GovInfo BILLS-119hres1585ih.xml: the date and figures live in the preamble.
+  const hres1585 =
+    '<resolution resolution-stage="Introduced-in-House" resolution-type="house-resolution"><form><legis-num display="yes">H. RES. 1585</legis-num><action display="yes"><action-date date="20260924">September 24, 2026</action-date></action><legis-type>RESOLUTION</legis-type><official-title display="yes">Expressing support for <quote>National Public Lands Day</quote> and encouraging the people of the United States to visit public lands on this fee-free day.</official-title></form><preamble> \n' +
+    '<whereas><text>Whereas there are over 618,000,000 acres of public lands across the United States;</text></whereas> <whereas><text>Whereas outdoor recreation contributed $696,700,000,000 to the economy of the United States in 2024;</text></whereas>\n' +
+    '<whereas><text>Whereas September 26, 2026, marks <quote>National Public Lands Day</quote>: Now, therefore, be it</text></whereas></preamble><resolution-body style="traditional" id="H09D37CFE1E8E49A9BC96E785CB41919F"> \n' +
+    '<section display-inline="yes-display-inline" section-type="undesignated-section" id="H8B1F857E5A98427997EE694FB4358A21"><text>That the House of Representatives supports <quote>National Public Lands Day</quote> and encourages the people of the United States to visit public lands on this fee-free day and recognize the historic, cultural, and economic impact of public lands.</text></section> </resolution-body></resolution>';
+
+  it("keeps a resolution's preamble, one whereas clause per line, before its resolving clause", () => {
+    const text = billXmlToText(billBodyXml(hres1585));
+    const lines = text.split("\n").filter(Boolean);
+    expect(lines[0]).toBe("PREAMBLE");
+    expect(lines).toContain("Whereas September 26, 2026, marks “National Public Lands Day”: Now, therefore, be it");
+    expect(lines).toContain("Whereas there are over 618,000,000 acres of public lands across the United States;");
+    expect(lines.indexOf("END OF PREAMBLE")).toBeLessThan(lines.findIndex((l) => l.startsWith("That the House")));
+    expect(text).not.toContain("September 24, 2026"); // front matter still dropped
+    expect(lines.some((l) => /^SEC\. /.test(l))).toBe(false);
+    expect(sectionText(text, ["1"])).toBeNull();
+  });
+
+  it("keeps a preamble before a bill's legis-body too", () => {
+    const text = billXmlToText(billBodyXml(`<bill><form>x</form><preamble><whereas><text>Whereas a thing;</text></whereas></preamble><legis-body>${section(1, "A", "b")}</legis-body></bill>`));
+    expect(text.split("\n").filter(Boolean)).toEqual(["PREAMBLE", "Whereas a thing;", "END OF PREAMBLE", "SEC. 1. A", "b"]);
+    expect(sectionText(text, ["1"])).toMatch(/^SEC. 1. A\n+b$/);
+  });
+
+  it("lets a summary cite a date only the preamble holds (H.Res. 1585)", () => {
+    const cite = summary({
+      headline: "Resolution backs National Public Lands Day, a fee-free day",
+      what_it_does: "Supports National Public Lands Day on September 26, 2026, and urges people to visit public lands.",
+      key_points: [{ text: "Notes that September 26, 2026, marks National Public Lands Day", section: null }],
+    });
+    const src = (text: string) => sources({ type: "HRES", title: "Expressing support for “National Public Lands Day”", text });
+    const bodyOnly = billXmlToText(hres1585.slice(hres1585.indexOf("<resolution-body")));
+    expect(checkSummary(cite, src(bodyOnly)).blocking).toContain("number not in sources: 2026");
+    expect(checkSummary(cite, src(billXmlToText(billBodyXml(hres1585)))).blocking).toEqual([]);
+  });
+
   it("splits long bills along their titles, leading sections first", () => {
     const lead = section(1, "Short title", "This Act may be cited as the Big Act. ".repeat(10));
     const body = `<legis-body>${lead}${title("I", "Taxes", section(101, "Rates", "a"))}${title("II", "Health", section(201, "Care", "b"))}</legis-body>`;

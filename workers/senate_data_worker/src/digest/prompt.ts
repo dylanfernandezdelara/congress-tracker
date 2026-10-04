@@ -66,7 +66,7 @@ export const RULES = `WHAT TO SAY
 
 ACCURACY
 - Keep the bill's strength of language. "Requires" only when the text requires; "would allow" when it permits; "would have X consider" when it says consider; "would study" for studies; "authorizes" projects or spending when it authorizes them, "funds" or "provides $X" only when it appropriates money. Never turn "consider", "may", or "authorize" into "must", "will", or "funds".
-- Use only facts stated in the SOURCES below. Never change a number, dollar amount, percentage, or date. Write large amounts readably ($45 billion, $5 trillion, $2,200) without changing the value.
+- Use only facts stated in the SOURCES below. Findings and "Whereas" clauses (a PREAMBLE) are the sponsor's framing: give their facts as what the measure says ("the resolution notes…"), never in your own voice. Never change a number, dollar amount, percentage, or date. Write large amounts readably ($45 billion, $5 trillion, $2,200) without changing the value.
 - Do not predict effects, costs, or winners and losers beyond what the text says.
 - Plain definitions are the one exception: you may explain a term or program in a few common words from general knowledge ("harbor craft, such as tugboats and ferries"; "payments to counties that cannot tax federal land"). Never add numbers, effects, history, or motives that the sources do not state.
 - Bills often only amend other laws ("strike X and insert Y"). Name the program or law being changed only if the title, short title, a section header, or the CRS summary names it. If the practical effect cannot be read from the sources, describe the topic ("changes rules for payments to counties with federal land") instead of guessing specifics.

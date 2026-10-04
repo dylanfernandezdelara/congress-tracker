@@ -51,11 +51,13 @@ export function xmlToText(xml) {
   return decode(
     xml
       .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<preamble\b[^>]*>/g, '\n\nPREAMBLE\n')
+      .replace(/<\/preamble>/g, '\n\nEND OF PREAMBLE\n\n')
       .replace(/<(quote|term)\b[^>]*>/g, '“')
       .replace(/<\/(quote|term)>/g, '”')
       .replace(/<section\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g, '\n\nSEC. $1 $2\n')
       .replace(/<(subtitle|title|division|part|chapter)\b[^>]*>\s*<enum>([^<]*)<\/enum>\s*<header>([\s\S]*?)<\/header>/g, (_m, tag, e, h) => `\n\n${tag.toUpperCase()} ${e} — ${h}\n`)
-      .replace(/<\/?(subsection|paragraph|subparagraph|clause|quoted-block|p|text)\b[^>]*>/g, '\n')
+      .replace(/<\/?(subsection|paragraph|subparagraph|clause|quoted-block|p|text|whereas)\b[^>]*>/g, '\n')
       .replace(/<[^>]+>/g, ' '),
   )
     .replace(/[ \t]+/g, ' ')
@@ -154,7 +156,7 @@ async function fetchBill(id) {
   if (version) {
     const url = version.formats.find((f) => f.type === 'Formatted XML').url
     const xml = await (await fetch(url, { headers: UA })).text()
-    const bodyStart = xml.search(/<(legis-body|resolution-body)\b/)
+    const bodyStart = xml.search(/<(preamble|legis-body|resolution-body)\b/) // a preamble before the body is kept
     const bodyXml = bodyStart >= 0 ? xml.slice(bodyStart) : xml
     text = xmlToText(bodyXml)
     if (approxTokens(text) > SINGLE_PASS_MAX_TOKENS) parts = splitParts(bodyXml)
