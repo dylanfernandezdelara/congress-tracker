@@ -180,6 +180,7 @@ export function SummaryFeedbackAsk({
   const { voted, justVoted, report, vote } = feedback
   const { openerRef, statusRef, formOpen, reportedHere, cancel, sent } = useSlotFocus(feedback, 'ask')
   const announcement = reportedHere ? REPORTED : voted ? 'Thanks.' : ''
+  const questionId = useId()
 
   // The pressed button is gone after a vote; keep focus on the thanks rather than the page body.
   useEffect(() => {
@@ -211,15 +212,17 @@ export function SummaryFeedbackAsk({
             </button>
           ) : null
         ) : (
-          <>
-            <span className="feed-row-feedback-ask-text">Was this clear?</span>
+          <div role="group" aria-labelledby={questionId} className="feed-row-feedback-ask-line">
+            <span id={questionId} className="feed-row-feedback-ask-text">
+              Was this clear?
+            </span>
             <button type="button" className="feed-row-feedback-choice" onClick={() => vote('helpful')}>
               Yes
             </button>
             <button type="button" className="feed-row-feedback-choice" onClick={() => vote('unhelpful')}>
               No
             </button>
-          </>
+          </div>
         )}
       </div>
       {formOpen ? <ReportForm feedback={feedback} onCancel={cancel} onSent={sent} /> : null}

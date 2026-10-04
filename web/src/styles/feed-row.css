@@ -541,12 +541,9 @@
     touch-action: manipulation;
   }
 
-  .feed-row-feedback-choice:hover {
-    color: hsl(var(--twc-foreground));
-  }
-
   @media (hover: hover) and (pointer: fine) {
     .feed-row-feedback-choice:hover {
+      color: hsl(var(--twc-foreground));
       border-color: hsl(var(--twc-border-hover));
     }
   }
