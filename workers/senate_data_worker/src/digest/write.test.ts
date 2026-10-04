@@ -181,6 +181,7 @@ describe("writeSummary", () => {
     expect(await writeSummary(env, prepared(), "rewrite")).toEqual({
       status: "over_budget",
       cost: 0,
+      sent: false,
       reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$0\.0\d\d$/),
     });
     expect(mockChat).not.toHaveBeenCalled();
@@ -193,7 +194,7 @@ describe("writeSummary", () => {
     const outcome = await writeSummary(env, prepared(), "rewrite");
 
     expect(mockChat).toHaveBeenCalledTimes(1);
-    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.02, reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$/) });
+    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.02, sent: true, reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$/) });
     expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.02);
   });
 
@@ -216,7 +217,7 @@ describe("writeSummary", () => {
 
     // The first slice (four parts) went out; the fifth part was never sent, and nothing was combined.
     expect(mockChat).toHaveBeenCalledTimes(4);
-    expect(outcome).toMatchObject({ status: "over_budget" });
+    expect(outcome).toMatchObject({ status: "over_budget", sent: true });
     expect(outcome.cost).toBeCloseTo(0.004, 6);
     expect(mockUpsert).not.toHaveBeenCalled();
   });
@@ -255,7 +256,7 @@ describe("combineWithFallback", () => {
     const outcome = await combineWithFallback(env, long(), { tier: "new", model: luna, notes, priorCost: 0.01 });
 
     expect(mockChat).not.toHaveBeenCalled();
-    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.01, reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$/) });
+    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.01, sent: false, reason: expect.stringMatching(/^budget: \$0\.000 left, needs ~\$/) });
   });
 
   it("checks the budget again before the other model's combine", async () => {
@@ -265,7 +266,7 @@ describe("combineWithFallback", () => {
     const outcome = await combineWithFallback(env, long(), { tier: "new", model: luna, notes, priorCost: 0 });
 
     expect(mockChat).toHaveBeenCalledTimes(1);
-    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.002 });
+    expect(outcome).toMatchObject({ status: "over_budget", cost: 0.002, sent: true });
   });
 
   it("retries a rejected combine with the other model on the same notes, and reports both charges if it is rejected too", async () => {

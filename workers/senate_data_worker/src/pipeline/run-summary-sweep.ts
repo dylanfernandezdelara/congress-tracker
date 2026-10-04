@@ -193,11 +193,12 @@ class Sweep {
    * the bill toward parking. Stored → done; otherwise back in the queue, or parked after DIGEST_MAX_ATTEMPTS.
    *
    * What `attempts` counts: the model's failures on these inputs (rejected replies, provider errors, timeouts), the
-   * things that would fail the same way again. Our own limits are not the bill's fault, so they give the try back:
-   * a short budget (`over_budget`, checked before every paid call, including the fallback and the long-bill combine)
-   * and a refusing account. Such a job goes back to the queue with the reason in `last_error`, unparked, and waits for
-   * tomorrow's budget. A first model's rejected reply whose fallback the budget stopped is given back too: the bill
-   * never got its second model, and parking it on half a try would leave it without a summary for no fault of its own.
+   * things that would fail the same way again. Our own limits are not the bill's fault: a refusing account, and a
+   * short budget (`over_budget`, checked before every paid call, including the fallback and the long-bill combine).
+   * - Nothing was sent (`sent: false`, or a refusing account): the try is given back.
+   * - The first model was paid and rejected, then the budget blocked the fallback (`sent: true`): the try counts, since
+   *   that rejection was a real model failure, but the job is never parked on it; it is requeued with the budget reason.
+   * Either way the job waits in the queue for tomorrow's budget, and no more direct writes start this run.
    */
   private async paidWrite(job: DigestJob, prepared: PreparedBill, write: () => Promise<WriteOutcome>): Promise<WriteOutcome> {
     this.syncWrites += 1;
@@ -219,10 +220,12 @@ class Sweep {
     this.result.warnings.push(`${label(job)}: ${describe(outcome)}`);
     // A spent budget or a refusing OpenRouter account (no credits, bad key) is not the bill's fault: give the try
     // back, and make no more direct writes this run.
-    const ourLimit = outcome.status === "over_budget" || (outcome.status === "failed" && outcome.account === true);
-    if (ourLimit) this.syncWrites = this.maxSyncWrites;
-    const counted = ourLimit ? attempts - 1 : attempts;
-    const parked = counted >= DIGEST_MAX_ATTEMPTS;
+    const overBudget = outcome.status === "over_budget";
+    const account = outcome.status === "failed" && outcome.account === true;
+    if (overBudget || account) this.syncWrites = this.maxSyncWrites;
+    const nothingSent = account || (overBudget && !outcome.sent);
+    const counted = nothingSent ? attempts - 1 : attempts;
+    const parked = !overBudget && counted >= DIGEST_MAX_ATTEMPTS;
     if (parked) this.result.parked += 1;
     await settleJob(this.env.DB, job, parked ? "done" : "queued", {
       error: parked ? parkedMessage(counted, describe(outcome)) : describe(outcome),
