@@ -160,7 +160,7 @@ Every bill summary is written by `workers/senate_data_worker/src/digest/` from t
 reader is someone deciding whether they would support the bill and whether their members voted the
 way they would, so summaries lead with concrete effects on people and stay strictly neutral.
 
-- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.3; recorded on each summary). "Who it affects" groups must be named in the sources or be the direct subject of a provision. Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. A resolution's preamble ("Whereas" clauses) is kept in the text the writer and the checks read, under a PREAMBLE line (the prompt rule that treats it like findings ships with v3.4). Bills over ~30k tokens are split along their
+- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.4; recorded on each summary). "Who it affects" groups must be named in the sources or be the direct subject of a provision, never the agency that carries the bill out. An unnumbered list (counties, agencies, programs) is never totaled: the writer names a few or says what kind, and gives a count only when the text states one. Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. A resolution's preamble ("Whereas" clauses) is kept in the text the writer and the checks read, under a PREAMBLE line, and the prompt treats it like findings: the sponsor's framing, attributed ("the resolution notes…"), never stated in the summary's own voice. Bills over ~30k tokens are split along their
   own divisions/titles (`bill-text-parse.ts`), summarized per part, then combined with a "What's
   inside" breakdown. Import-free, so `scripts/digest-eval` uses the same file.
 - **Models** `digest/models.ts`: new bills → `openai/gpt-6-luna` (high effort) through OpenRouter's
@@ -212,7 +212,7 @@ way they would, so summaries lead with concrete effects on people and stay stric
   `SELECT kind, count(*) FROM digest_feedback GROUP BY kind` or the mistakes with their notes.
 - **Judge** (eval rounds only, never production): Gemini 3.8 Flash, calibrated against Dylan's picks. Try
   another with `DIGEST_JUDGE_MODEL=<openrouter id>` (and `DIGEST_JUDGE_EFFORT=high|max` for reasoning models);
-  results are written per model and never overwrite Gemini's. Tried 2026-09-27 on the same calibration set:
+  results are written per model and never overwrite Gemini's. Since v3.4 the judge fails a "who it affects" group unless the sources name it or it is the direct subject of a provision (the implementing agency and indirectly affected groups fail), matching the prompt; before, it failed a group only when the sources gave no reason it would be affected, so round 6 and earlier judge numbers are not directly comparable on `supported`. Tried 2026-09-27 on the same calibration set:
   DeepSeek V4.1 Flash ($0.18 vs $0.96) caught 1 of 8 planted "consider"→"require" errors and gave no verdict
   on 40% of calls. Muse Spark 1.3 max ($0.21) caught every planted number, vote and neutrality error and 6 of 8
   strength errors, but passed only 3 of Dylan's 5 round-2 picks on the run he reviewed (1 of 5 across all three
@@ -221,9 +221,13 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
-  Latest round `round5.json` (v3.3, 5 voted bills, Luna + Sonnet, 2 runs, ~$0.20 with the judge): Luna 10/10
-  (v3.2: 9/10, the recurring-deadline miss is gone); Sonnet 7/10 (v3.2: 8/10), still writing "U.S. voters" for the
-  nine-justices amendment despite the groups rule; Sonnet's "House votes to…" headlines on H.J.Res. 213 are gone.
+  Latest round `round6.json` (v3.4 before the preamble clause, round 5's bills plus H.R. 10217, a county-list
+  heritage area; Luna + Sonnet, 2 runs, $0.27 with the stricter judge): Luna 10/12 (10/10 on round 5's bills; both
+  H.R. 10217 runs name no county total, failed only for "residents of listed counties"); Sonnet 4/12 (round 5, old
+  judge: 7/10), still totaling the counties ("35 Kentucky counties", blocked by the checks in both runs; in production
+  the retry goes to Luna), "Interior Department" once as a group; the EPA is gone from H.R. 2140. Most of Sonnet's new
+  fails are the stricter judge ("California regulators", "study abroad programs" passed before). Calibration against
+  Dylan's round-2 picks was not re-run under the stricter judge (his H.J.Res. 213 pick lists "California regulators").
 
 ## Project structure
 
