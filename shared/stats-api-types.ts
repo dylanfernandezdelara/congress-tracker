@@ -53,56 +53,6 @@ export interface SessionStatsResponse {
 /** Session cross-party vote frequency bucket (see `shared/cross-vote-label.ts`). */
 export type CrossVoteLabel = 'rare' | 'occasional' | 'frequent'
 
-export interface CloseVoteEntry {
-  chamber: StatsChamber
-  congress: number
-  session: number
-  roll_number: number
-  bill_type: string
-  bill_number: number
-  yeas: number
-  nays: number
-  margin: number
-  vote_date: string
-  headline: string | null
-}
-
-export interface PolicyHeatEntry {
-  policy_area: string
-  bill_count: number
-}
-
-export interface ThisWeekSummary {
-  count: number
-  headline: string | null
-  bill_type: string | null
-  bill_number: number | null
-  congress: number | null
-}
-
-export interface CommitteeLeaderboardRow {
-  system_code: string
-  name: string
-  chamber: StatsChamber
-  waiting: number
-}
-
-export interface ChamberPulse {
-  close_votes: CloseVoteEntry[]
-  policy_heat: PolicyHeatEntry[]
-  this_week: ThisWeekSummary
-  /** Standing committees with long-waiting referrals, highest count first. */
-  waiting_in_committee: CommitteeLeaderboardRow[]
-}
-
-export interface PulseStatsResponse {
-  congress: number
-  session: number
-  house: ChamberPulse
-  senate: ChamberPulse
-  as_of: string
-}
-
 /** How the two major parties lined up on one roll. */
 export type VoteCohesion = 'party-line' | 'bipartisan' | 'unknown'
 
@@ -326,12 +276,4 @@ export interface MembersSearchResponse {
 /** Distinct digest policy areas for feed filter dropdowns. */
 export interface PolicyAreasResponse {
   items: string[]
-}
-
-export interface CommitteesLeaderboardResponse {
-  congress: number
-  session: number
-  chamber: StatsChamber
-  items: CommitteeLeaderboardRow[]
-  as_of: string
 }

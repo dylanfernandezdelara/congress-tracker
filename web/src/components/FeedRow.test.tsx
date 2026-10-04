@@ -22,6 +22,12 @@ describe('FeedRow', () => {
     expect(container.querySelector('.feed-row-date-wrap')).toBeNull()
   })
 
+  it('keeps summary feedback off the collapsed card (a list, not a place for reactions)', () => {
+    render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
+    expect(screen.queryByText('Was this clear?')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Report a mistake' })).not.toBeInTheDocument()
+  })
+
   it('shows topic, policy area, and digest lead without expanding; bullets wait for detail', () => {
     const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
 

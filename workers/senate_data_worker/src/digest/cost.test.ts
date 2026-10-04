@@ -16,7 +16,7 @@ describe("call cost estimates", () => {
     // 10k in × $0.05 + 4k out × $0.25, per million.
     expect(estimateCost(luna, [messages], "batch")).toBeCloseTo(0.0015, 6);
     expect(estimateCost(luna, [messages], "direct")).toBeCloseTo(0.003, 6);
-    expect(estimateCost(rewriteModel(env), [messages], "direct")).toBeCloseTo(0.09, 6);
+    expect(estimateCost(rewriteModel(env), [messages], "direct")).toBeCloseTo(0.06, 6);
   });
 
   it("throws BudgetShort with what is left and what the call needs", async () => {

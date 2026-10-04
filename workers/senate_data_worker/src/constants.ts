@@ -136,15 +136,13 @@ export const PUBLIC_LAWS_PAGE_SIZE = 250;
 export const PROCESS_MAX_HYDRATIONS_PER_RUN = 40;
 /** Standing-committee bill-list pages to walk per process-backfill run. */
 export const PROCESS_MAX_COMMITTEE_LIST_PAGES_PER_RUN = 8;
-/** Referred with no advance/release for this many days counts as waiting/stuck. */
-export const PROCESS_STUCK_DAYS = 90;
 /** Refresh Congress.gov committee roster when last fetch is older than this. */
 export const PROCESS_ROSTER_REFRESH_DAYS = 7;
 /** Stop a process run early when Congress.gov rate-limit remaining falls below this. */
 export const PROCESS_RATELIMIT_STOP_REMAINING = 200;
 /**
  * Re-queue committee hydrations this many days after the last success so
- * waiting/leaderboard bills do not freeze after the first crawl.
+ * waiting bills do not freeze after the first crawl.
  */
 export const PROCESS_REHYDRATE_DAYS = 7;
 

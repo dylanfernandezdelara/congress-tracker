@@ -103,10 +103,8 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `GET /stats/member.json?bioguide=` (also `bioguide_id=`) — one member's session tallies, recent party-line breaks (`recent_cross_votes` includes `bill_id` `119-hr-1`, `title`, `headline`, `in_feed`), and up to 5 primary-sponsored bills in this Congress (`sponsored_bills` with `latest_action_text` + `in_feed`, `sponsored_bills_total`). `in_feed` uses the same membership predicate as `/feed/latest`.
 - `GET /stats/policy-areas.json` — distinct digest policy areas for the topic filter (`{ items: string[] }`)
 - `GET /stats/session.json` — per-chamber passage vote aggregates
-- `GET /stats/pulse.json` — close votes, policy heat, this-week activity, and standing-committee waiting counts (`waiting_in_committee`)
 - `GET /stats/tightness.json` — recent-lookback House passage + Senate passage/nomination dots with `party_splits` / cohesion, plus House-passed bills still `in_second_chamber_committee` (`senate_waiting`). One round trip for the right-rail tightness strip. Read-only SELECT over existing tables.
 - `GET /stats/recent-laws.json?limit=` — recently enacted bills (default 5, cap 10); each law embeds its full feed `item` (`FeedItem | null`) for expand-in-place detail. Daily feed ingest lists Congress.gov `/v3/law/{congress}/pub` so enactment is not limited to bills still inside the passage-vote lookback.
-- `GET /stats/committees.json?chamber=House|Senate` — full standing-committee waiting counts (including zeros); pulse embeds the top waiting rows as `waiting_in_committee`
 - `GET /stats/recent-confirmations.json?limit=` — recent Senate nomination confirmations (default 5, cap 10); each item includes nominee, position/org, tally, plain-English background, named cross-party voters (`cross_party_votes`), and a grounded Wikipedia-sourced `vote_context` ("why it was contested") when available. Vote-context uses the shared grounded-summary helpers in `synthesis/grounded-summary.ts` (confirmation adapter: `confirmation-vote-context.ts`); bill adapters can reuse the same prompt/parse/OpenRouter loop with a different source.
 - `GET /stats/defectors.json?chamber=House|Senate&limit=5` — party cross-vote rankings (needs `member_votes`)
 - `GET /stats/portfolios.json?chamber=House|Senate&limit=5` — disclosure-based portfolio movers
@@ -162,7 +160,7 @@ Every bill summary is written by `workers/senate_data_worker/src/digest/` from t
 reader is someone deciding whether they would support the bill and whether their members voted the
 way they would, so summaries lead with concrete effects on people and stay strictly neutral.
 
-- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.3; recorded on each summary). "Who it affects" groups must be named in the sources or be the direct subject of a provision. Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. Bills over ~30k tokens are split along their
+- **Prompt** `digest/prompt.ts` (`PROMPT_VERSION`, v3.4; recorded on each summary). "Who it affects" groups must be named in the sources or be the direct subject of a provision, never the agency that carries the bill out. An unnumbered list (counties, agencies, programs) is never totaled: the writer names a few or says what kind, and gives a count only when the text states one. Headlines are about the change, never the vote (the page shows it beside the headline); the checks block "House votes to…"-style headlines. A resolution's preamble ("Whereas" clauses) is kept in the text the writer and the checks read, under a PREAMBLE line, and the prompt treats it like findings: the sponsor's framing, attributed ("the resolution notes…"), never stated in the summary's own voice. Bills over ~30k tokens are split along their
   own divisions/titles (`bill-text-parse.ts`), summarized per part, then combined with a "What's
   inside" breakdown. Import-free, so `scripts/digest-eval` uses the same file.
 - **Models** `digest/models.ts`: new bills → `openai/gpt-6-luna` (high effort) through OpenRouter's
@@ -200,10 +198,11 @@ way they would, so summaries lead with concrete effects on people and stay stric
   the difference when it is collected. Over budget, the sweep waits for tomorrow. Every direct paid call (first try,
   the other model's retry, each slice of long-bill parts, each combine) is checked against its estimate first
   (`digest/cost.ts`, same formula as the batch estimate at normal-API prices); a write the budget cannot finish goes
-  back to the queue with `last_error` "budget: $x left, needs ~$y", its try given back (attempts count the model's
-  failures, not ours), never parked. A direct call records its estimate before each attempt goes out (the client's
-  spend hook) and settles to the actual charge when a reply arrives, so a timed-out retry the provider bills, or a
-  worker killed mid-call, still counts; an attempt answered with an error status is taken back.
+  back to the queue with `last_error` "budget: $x left, needs ~$y", never parked. Its try is given back when nothing
+  was sent; a paid first try whose fallback the budget blocked still counts (attempts count the model's failures).
+  A direct call records its estimate before each attempt goes out (the client's spend hook) and settles to the actual
+  charge when a reply arrives, so a timed-out retry the provider bills, or a worker killed mid-call, still counts; an
+  attempt answered with an error status is taken back.
 - **Backfill** `POST /__pipeline/run/summary-backfill` (admin; **dry run unless `apply=1`**): returns
   bills, how many matter, estimated cost and days. `scope=site` queues the bills on the site without a
   current summary; `scope=congress` starts a walk over every bill of the Congress (cursor
@@ -225,13 +224,16 @@ way they would, so summaries lead with concrete effects on people and stay stric
   on 40% of calls. Muse Spark 1.3 max ($0.21) caught every planted number, vote and neutrality error and 6 of 8
   strength errors, but passed only 3 of Dylan's 5 round-2 picks on the run he reviewed (1 of 5 across all three
   runs; Gemini 5 of 5 either way): stricter on inferred wording ("stricter rules", "who it affects"). Use it as a
-  second opinion on factual support.
+  second opinion on factual support. A stricter groups rule (fail a group unless the sources name it or it is the direct subject of a provision) was tried on round 6 (2026-10-04; `judge/round6-v3.4-judge-strict-groups.json`) and not adopted: it fails "California regulators", a group in Dylan's round-2 pick.
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
-  Latest round `round5.json` (v3.3, 5 voted bills, Luna + Sonnet, 2 runs, ~$0.20 with the judge): Luna 10/10
-  (v3.2: 9/10, the recurring-deadline miss is gone); Sonnet 7/10 (v3.2: 8/10), still writing "U.S. voters" for the
-  nine-justices amendment despite the groups rule; Sonnet's "House votes to…" headlines on H.J.Res. 213 are gone.
+  Latest round `round6.json` (v3.4 before the preamble clause; round 5's bills plus H.R. 10217, a county-list
+  heritage area; Luna + Sonnet, 2 runs, $0.27). Judged only with the stricter groups rule above, so the numbers are
+  not comparable with earlier rounds: Luna 10/10 on round 5's bills (10/12 with H.R. 10217, where the trial judge
+  failed "residents of listed counties"), with no county total and no agency as a group. Sonnet scored 4/12, but its
+  drop is confounded with the judge change. It still totaled the counties ("35 Kentucky counties"; the checks block it
+  and the retry goes to Luna), and the EPA is gone from H.R. 2140.
 
 ## Project structure
 

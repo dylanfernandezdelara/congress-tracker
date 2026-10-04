@@ -234,7 +234,7 @@ describe("runSummarySweep", () => {
         results: [item("119-hr-1:part0", '{"part":"A"}'), item("119-hr-1:part1", '{"part":"B"}')],
       });
       jobsApi.selectBatchJobs.mockResolvedValue([job(1, { fingerprint: "fp1", attempts: 2 })]);
-      mockCombine.mockResolvedValue({ status: "over_budget", cost: 0, reason: "budget: $0.001 left, needs ~$0.020" });
+      mockCombine.mockResolvedValue({ status: "over_budget", cost: 0, sent: false, reason: "budget: $0.001 left, needs ~$0.020" });
 
       const result = await runSummarySweep(env, { now: NOW, discover: false });
 
@@ -550,17 +550,27 @@ describe("runSummarySweep", () => {
       expect(settledWith()).toEqual([[1, "queued", expect.objectContaining({ fingerprint: "fp1", attempts: 2 })]]);
     });
 
-    it("requeues a write the budget stopped before its fallback, with its tries unchanged, and stops direct writes", async () => {
+    it("counts a paid first try whose fallback the budget blocked, but requeues the bill instead of parking it", async () => {
       jobsApi.selectQueuedJobs.mockImplementation(
-        onlyMatters([job(1, { matters: true, attempts: 1, fingerprint: "fp1" }), job(2, { matters: true })])
+        onlyMatters([job(1, { matters: true, attempts: 2, fingerprint: "fp1" }), job(2, { matters: true })])
       );
-      mockWrite.mockResolvedValue({ status: "over_budget", cost: 0.05, reason: "budget: $0.010 left, needs ~$0.004" });
+      mockWrite.mockResolvedValue({ status: "over_budget", cost: 0.05, sent: true, reason: "budget: $0.004 left, needs ~$0.010" });
 
       const result = await runSummarySweep(env, { now: NOW, discover: false });
 
       expect(mockWrite).toHaveBeenCalledTimes(1);
-      expect(settledWith()).toEqual([[1, "queued", { error: "budget: $0.010 left, needs ~$0.004", fingerprint: "fp1", attempts: 1 }]]);
+      // Third try counted (a real rejection), yet not parked: the budget, not the model, stopped the fallback.
+      expect(settledWith()).toEqual([[1, "queued", { error: "budget: $0.004 left, needs ~$0.010", fingerprint: "fp1", attempts: 3 }]]);
       expect(result).toMatchObject({ parked: 0, spentUsd: 0.05 });
+    });
+
+    it("gives the try back when the budget stopped a write before anything was sent", async () => {
+      jobsApi.selectQueuedJobs.mockImplementation(onlyMatters([job(1, { matters: true, attempts: 1, fingerprint: "fp1" })]));
+      mockWrite.mockResolvedValue({ status: "over_budget", cost: 0, sent: false, reason: "budget: $0.004 left, needs ~$0.010" });
+
+      await runSummarySweep(env, { now: NOW, discover: false });
+
+      expect(settledWith()).toEqual([[1, "queued", { error: "budget: $0.004 left, needs ~$0.010", fingerprint: "fp1", attempts: 1 }]]);
     });
 
     it("stops rewriting when the day's budget is spent", async () => {

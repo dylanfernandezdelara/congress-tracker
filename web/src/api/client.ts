@@ -3,19 +3,16 @@ import { applyAdvancedFeedParams, type AdvancedFeedFilters } from '../utils/feed
 import { getApiBaseUrl } from './config'
 import { fetchJson } from './fetchJson'
 import type {
-  CommitteesLeaderboardResponse,
   DefectorsResponse,
   FeedPageResponse,
   MemberProfileResponse,
   MembersSearchResponse,
   PolicyAreasResponse,
   PortfoliosResponse,
-  PulseStatsResponse,
   TightnessStatsResponse,
   RecentConfirmationsResponse,
   RecentLawsResponse,
   SessionStatsResponse,
-  StatsChamber,
   VoteDefectorsResponse,
 } from './types'
 
@@ -111,17 +108,6 @@ export async function fetchRecentConfirmations(
   return fetchJson<RecentConfirmationsResponse>(`/stats/recent-confirmations.json?${params}`)
 }
 
-export async function fetchCommitteesLeaderboard(
-  chamber: StatsChamber,
-): Promise<CommitteesLeaderboardResponse> {
-  const params = new URLSearchParams({ chamber })
-  return fetchJson<CommitteesLeaderboardResponse>(`/stats/committees.json?${params}`)
-}
-
-export async function fetchPulseStats(): Promise<PulseStatsResponse> {
-  return fetchJson<PulseStatsResponse>('/stats/pulse.json')
-}
-
 export async function fetchTightnessStats(): Promise<TightnessStatsResponse> {
   return fetchJson<TightnessStatsResponse>('/stats/tightness.json')
 }
@@ -156,16 +142,47 @@ export async function fetchMemberProfile(bioguideId: string): Promise<MemberProf
 
 export type SummaryFeedbackKind = 'helpful' | 'unhelpful' | 'mistake'
 
-/** Reader feedback on a bill's summary. Resolves false when the worker refuses it (rate limit, no summary). */
+/** sessionStorage key counting failed feedback posts this session, for testers (readers never see a failure). */
+export const SUMMARY_FEEDBACK_FAILURES_KEY = 'summary-feedback:failures'
+
+let failuresWithoutStorage = 0
+
+/** Count a failed post and warn on the first one of the session, so a broken endpoint is not mistaken for silence. */
+function noteSummaryFeedbackFailure(detail: string): void {
+  let count: number
+  try {
+    count = Number(window.sessionStorage.getItem(SUMMARY_FEEDBACK_FAILURES_KEY) ?? '0') + 1
+    window.sessionStorage.setItem(SUMMARY_FEEDBACK_FAILURES_KEY, String(count))
+  } catch {
+    count = ++failuresWithoutStorage
+  }
+  if (count === 1) {
+    console.warn(
+      `[summary feedback] POST /feedback/summary failed (${detail}). Failures this session: sessionStorage["${SUMMARY_FEEDBACK_FAILURES_KEY}"].`,
+    )
+  }
+}
+
+/**
+ * Reader feedback on a bill's summary. Resolves false when the worker refuses it (rate limit, no summary) or the
+ * network fails; never rejects. Failures are counted and logged once per session.
+ */
 export async function sendSummaryFeedback(feedback: {
   bill: string
   kind: SummaryFeedbackKind
   note?: string
 }): Promise<boolean> {
-  const response = await fetch(`${getApiBaseUrl()}/feedback/summary`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(feedback),
-  })
+  let response: Response
+  try {
+    response = await fetch(`${getApiBaseUrl()}/feedback/summary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(feedback),
+    })
+  } catch (error) {
+    noteSummaryFeedbackFailure(`network error: ${error instanceof Error ? error.message : String(error)}`)
+    return false
+  }
+  if (!response.ok) noteSummaryFeedbackFailure(`HTTP ${response.status}`)
   return response.ok
 }

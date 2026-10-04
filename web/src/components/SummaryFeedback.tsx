@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { sendSummaryFeedback, type SummaryFeedbackKind } from '../api/client'
 
-type Status = 'idle' | 'voted' | 'reporting' | 'sending' | 'reported' | 'error'
+type Report = 'closed' | 'open' | 'reported'
+type Slot = 'ask' | 'end'
 
 const storageKey = (bill: string) => `summary-feedback:${bill}`
 
@@ -21,49 +22,222 @@ function rememberVote(bill: string, kind: SummaryFeedbackKind): void {
   }
 }
 
-const ANNOUNCEMENTS: Partial<Record<Status, string>> = {
-  voted: 'Thanks for the feedback.',
-  reported: 'Thanks. We’ll check this summary.',
+export type SummaryFeedbackState = {
+  bill: string
+  /** A vote is on record for this bill (this visit or an earlier one). */
+  voted: boolean
+  /** A vote cast in this view, so the thanks shows once rather than on every visit. */
+  justVoted: boolean
+  report: Report
+  /** Where the report form opened: under the ask, or in the row at the end. */
+  reportAt: Slot
+  vote: (kind: 'helpful' | 'unhelpful') => void
+  openReport: (at: Slot) => void
+  closeReport: () => void
+  reported: () => void
 }
 
-/** "Was this summary helpful?" plus a way to report a mistake, under a bill's plain-language summary. */
-export function SummaryFeedback({ bill }: { bill: string }) {
-  const [status, setStatus] = useState<Status>(() => (rememberedVote(bill) ? 'voted' : 'idle'))
+/**
+ * One feedback state per summary, shared by the ask under "What it does" and the row at the end, so a vote in one
+ * place is not asked for again in the other and only one report form is ever open.
+ */
+export function useSummaryFeedback(bill: string | null): SummaryFeedbackState | null {
+  const [seenBill, setSeenBill] = useState(bill)
+  const [voted, setVoted] = useState(() => (bill ? rememberedVote(bill) : false))
+  const [justVoted, setJustVoted] = useState(false)
+  const [report, setReport] = useState<Report>('closed')
+  const [reportAt, setReportAt] = useState<Slot>('end')
+  if (seenBill !== bill) {
+    setSeenBill(bill)
+    setVoted(bill ? rememberedVote(bill) : false)
+    setJustVoted(false)
+    setReport('closed')
+  }
+
+  const vote = useCallback(
+    (kind: 'helpful' | 'unhelpful') => {
+      if (!bill) return
+      setVoted(true)
+      setJustVoted(true)
+      rememberVote(bill, kind)
+      // Optimistic: a lost vote is not worth interrupting the reader for. The client logs failures for testers.
+      void sendSummaryFeedback({ bill, kind })
+    },
+    [bill],
+  )
+  const openReport = useCallback((at: Slot) => {
+    setReportAt(at)
+    setReport('open')
+  }, [])
+  const closeReport = useCallback(() => setReport('closed'), [])
+  const reported = useCallback(() => setReport('reported'), [])
+
+  if (!bill) return null
+  return { bill, voted, justVoted, report, reportAt, vote, openReport, closeReport, reported }
+}
+
+/** The note form for "Report a mistake". Focuses the note on open; keeps it when a send fails. */
+function ReportForm({ feedback, onCancel, onSent }: { feedback: SummaryFeedbackState; onCancel: () => void; onSent: () => void }) {
   const [note, setNote] = useState('')
+  const [sending, setSending] = useState(false)
+  const [failed, setFailed] = useState(false)
   const noteId = useId()
   const noteRef = useRef<HTMLTextAreaElement>(null)
-  const reportRef = useRef<HTMLButtonElement>(null)
-  const statusRef = useRef<HTMLParagraphElement>(null)
-  const returnFocus = useRef<'report' | 'status' | null>(null)
-  const formOpen = status === 'reporting' || status === 'sending' || status === 'error'
 
-  // Keep keyboard and screen-reader users in place as the row changes shape.
   useEffect(() => {
-    if (status === 'reporting') noteRef.current?.focus()
-    else if (returnFocus.current === 'report') reportRef.current?.focus()
-    else if (returnFocus.current === 'status') statusRef.current?.focus()
-    returnFocus.current = null
-  }, [status])
+    noteRef.current?.focus()
+  }, [])
 
-  const vote = (kind: 'helpful' | 'unhelpful') => {
-    setStatus('voted')
-    rememberVote(bill, kind)
-    // Optimistic: a lost vote is not worth interrupting the reader for.
-    void sendSummaryFeedback({ bill, kind }).catch(() => undefined)
+  const send = async () => {
+    setSending(true)
+    const ok = await sendSummaryFeedback({ bill: feedback.bill, kind: 'mistake', note })
+    setSending(false)
+    if (ok) onSent()
+    else setFailed(true)
   }
 
-  const report = async () => {
-    setStatus('sending')
-    const ok = await sendSummaryFeedback({ bill, kind: 'mistake', note }).catch(() => false)
-    if (ok) returnFocus.current = 'status'
-    setStatus(ok ? 'reported' : 'error')
-  }
+  return (
+    <form
+      className="feed-row-feedback-form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        void send()
+      }}
+    >
+      <label htmlFor={noteId} className="feed-row-feedback-label">
+        What&rsquo;s wrong with this summary?
+      </label>
+      <textarea
+        ref={noteRef}
+        id={noteId}
+        className="feed-row-feedback-note"
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+        maxLength={500}
+        rows={3}
+        placeholder="Optional: what it gets wrong or leaves out"
+      />
+      <div className="feed-row-feedback-actions">
+        <button type="submit" className="feed-row-feedback-button" disabled={sending}>
+          {sending ? 'Sending…' : 'Send report'}
+        </button>
+        <button type="button" className="feed-row-feedback-button" onClick={onCancel}>
+          Cancel
+        </button>
+        <span className="feed-row-feedback-error" role="alert">
+          {failed ? 'Couldn’t send. Try again.' : ''}
+        </span>
+      </div>
+    </form>
+  )
+}
 
-  const announcement = ANNOUNCEMENTS[status] ?? ''
+/**
+ * Keeps keyboard and screen-reader users in place as a slot changes shape: back to the opener on Cancel, onto the
+ * thanks after a send.
+ */
+function useSlotFocus(feedback: SummaryFeedbackState, slot: Slot) {
+  const openerRef = useRef<HTMLButtonElement>(null)
+  const statusRef = useRef<HTMLParagraphElement>(null)
+  const pending = useRef<'opener' | 'status' | null>(null)
+  const { report } = feedback
+  useEffect(() => {
+    if (pending.current === 'opener') openerRef.current?.focus()
+    else if (pending.current === 'status') statusRef.current?.focus()
+    pending.current = null
+  }, [report])
+  const here = feedback.reportAt === slot
+  return {
+    openerRef,
+    statusRef,
+    formOpen: report === 'open' && here,
+    reportedHere: report === 'reported' && here,
+    cancel: () => {
+      pending.current = 'opener'
+      feedback.closeReport()
+    },
+    sent: () => {
+      pending.current = 'status'
+      feedback.reported()
+    },
+  }
+}
+
+const REPORTED = 'Thanks. We’ll check this summary.'
+
+/**
+ * "Was this clear? Yes / No" right under the summary, where readers are. After a vote it becomes a quiet "Thanks."
+ * with "Report a mistake" beside it. Hidden once a vote from an earlier visit is on record.
+ */
+export function SummaryFeedbackAsk({
+  feedback,
+  afterCaption = false,
+}: {
+  feedback: SummaryFeedbackState
+  /** Placed after the provisional caption, outside the section: the panel's gap spaces it, not its own margin. */
+  afterCaption?: boolean
+}) {
+  const { voted, justVoted, report, vote } = feedback
+  const { openerRef, statusRef, formOpen, reportedHere, cancel, sent } = useSlotFocus(feedback, 'ask')
+  const announcement = reportedHere ? REPORTED : voted ? 'Thanks.' : ''
+  const questionId = useId()
+
+  // The pressed button is gone after a vote; keep focus on the thanks rather than the page body.
+  useEffect(() => {
+    if (justVoted) statusRef.current?.focus()
+  }, [justVoted, statusRef])
+
+  if (voted && !justVoted) return null
+
+  return (
+    <div className={afterCaption ? 'feed-row-feedback-ask feed-row-feedback-ask--after-caption' : 'feed-row-feedback-ask'}>
+      <div className="feed-row-feedback-ask-line">
+        <p
+          ref={statusRef}
+          role="status"
+          tabIndex={-1}
+          className={announcement ? 'feed-row-feedback-ask-text' : 'sr-only'}
+        >
+          {announcement}
+        </p>
+        {voted ? (
+          report === 'closed' ? (
+            <button
+              ref={openerRef}
+              type="button"
+              className="feed-row-feedback-button"
+              onClick={() => feedback.openReport('ask')}
+            >
+              Report a mistake
+            </button>
+          ) : null
+        ) : (
+          <div role="group" aria-labelledby={questionId} className="feed-row-feedback-ask-line">
+            <span id={questionId} className="feed-row-feedback-ask-text">
+              Was this clear?
+            </span>
+            <button type="button" className="feed-row-feedback-choice" onClick={() => vote('helpful')}>
+              Yes
+            </button>
+            <button type="button" className="feed-row-feedback-choice" onClick={() => vote('unhelpful')}>
+              No
+            </button>
+          </div>
+        )}
+      </div>
+      {formOpen ? <ReportForm feedback={feedback} onCancel={cancel} onSent={sent} /> : null}
+    </div>
+  )
+}
+
+/** "Report a mistake" at the end of a bill's plain-language summary. */
+export function SummaryFeedback({ feedback }: { feedback: SummaryFeedbackState }) {
+  const { openerRef, statusRef, formOpen, reportedHere, cancel, sent } = useSlotFocus(feedback, 'end')
+  const announcement = reportedHere ? REPORTED : ''
 
   return (
     <div className="feed-row-feedback-block">
-      {/* One live region that stays mounted, so each change of its text is announced. */}
+      {/* One live region that stays mounted, so the thanks is announced. */}
       <p
         ref={statusRef}
         className={announcement ? 'feed-row-feedback' : 'sr-only'}
@@ -72,67 +246,14 @@ export function SummaryFeedback({ bill }: { bill: string }) {
       >
         {announcement}
       </p>
-
-      {formOpen ? (
-        <form
-          className="feed-row-feedback-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void report()
-          }}
-        >
-          <label htmlFor={noteId} className="feed-row-feedback-label">
-            What&rsquo;s wrong with this summary?
-          </label>
-          <textarea
-            ref={noteRef}
-            id={noteId}
-            className="feed-row-feedback-note"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            maxLength={500}
-            rows={3}
-            placeholder="Optional: what it gets wrong or leaves out"
-          />
-          <div className="feed-row-feedback-actions">
-            <button type="submit" className="feed-row-feedback-button" disabled={status === 'sending'}>
-              {status === 'sending' ? 'Sending…' : 'Send report'}
-            </button>
-            <button
-              type="button"
-              className="feed-row-feedback-button"
-              onClick={() => {
-                returnFocus.current = 'report'
-                setStatus(rememberedVote(bill) ? 'voted' : 'idle')
-              }}
-            >
-              Cancel
-            </button>
-            <span className="feed-row-feedback-error" role="alert">
-              {status === 'error' ? 'Couldn’t send. Try again.' : ''}
-            </span>
-          </div>
-        </form>
-      ) : null}
-
-      {status === 'idle' || status === 'voted' ? (
+      {formOpen ? <ReportForm feedback={feedback} onCancel={cancel} onSent={sent} /> : null}
+      {feedback.report === 'closed' ? (
         <p className="feed-row-feedback">
-          {status === 'idle' ? (
-            <>
-              <span>Was this summary helpful?</span>
-              <button type="button" className="feed-row-feedback-button" onClick={() => vote('helpful')}>
-                Yes
-              </button>
-              <button type="button" className="feed-row-feedback-button" onClick={() => vote('unhelpful')}>
-                No
-              </button>
-            </>
-          ) : null}
           <button
-            ref={reportRef}
+            ref={openerRef}
             type="button"
             className="feed-row-feedback-button"
-            onClick={() => setStatus('reporting')}
+            onClick={() => feedback.openReport('end')}
           >
             Report a mistake
           </button>

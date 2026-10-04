@@ -1,6 +1,6 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { BillDigestInsideRow } from '@congress-tracker/shared/digest-api-types'
-import { SummaryFeedback } from './SummaryFeedback'
+import { SummaryFeedback, SummaryFeedbackAsk, useSummaryFeedback } from './SummaryFeedback'
 import {
   FEED_SUMMARY_PENDING,
   getFeedSummarySectionsModel,
@@ -21,7 +21,8 @@ function ScrollableCrsBody({ text, label }: { text: string; label: string }) {
   )
 }
 
-function PrimarySummarySection({ primary }: { primary: FeedSummaryPrimary }) {
+/** `ask` renders inside "What it does", under its text: the end of the expanded row's first screen. */
+function PrimarySummarySection({ primary, ask }: { primary: FeedSummaryPrimary; ask?: ReactNode }) {
   switch (primary.kind) {
     case 'pending':
       return (
@@ -34,6 +35,7 @@ function PrimarySummarySection({ primary }: { primary: FeedSummaryPrimary }) {
         <section className="feed-row-detail-section">
           <h3 className="feed-row-detail-heading">What it does</h3>
           <p className="feed-row-summary-body">{primary.text}</p>
+          {ask}
         </section>
       )
     case 'crs':
@@ -84,22 +86,27 @@ type FeedSummarySectionsProps = {
   content: FeedSummaryContent
   /** The bill's text on Congress.gov; key points link their section there. */
   textUrl?: string | null
-  /** The bill (`119-hr-1`) for "Was this summary helpful?"; omit to hide the feedback row. */
+  /** The bill (`119-hr-1`) for "Was this clear?" and "Report a mistake"; omit to hide both. */
   feedbackBill?: string | null
 }
 
 export function FeedSummarySections({ content, textUrl = null, feedbackBill = null }: FeedSummarySectionsProps) {
   const { primary, keyPoints, whoItAffects, inside, provisional, crsDisclosure } = getFeedSummarySectionsModel(content)
+  // Feedback is about the plain-language summary only, not the CRS text or a pending placeholder.
+  const feedback = useSummaryFeedback(primary.kind === 'what_it_does' ? feedbackBill : null)
 
   return (
     <>
-      <PrimarySummarySection primary={primary} />
+      {/* The provisional caption qualifies the text, so it stays attached to it and the ask follows the caption. */}
+      <PrimarySummarySection primary={primary} ask={feedback && !provisional ? <SummaryFeedbackAsk feedback={feedback} /> : null} />
 
       {provisional ? (
         <p className="feed-row-summary-provisional">
           Early summary from the bill&rsquo;s title. It updates when the full text is published.
         </p>
       ) : null}
+
+      {feedback && provisional ? <SummaryFeedbackAsk feedback={feedback} afterCaption /> : null}
 
       {whoItAffects.length > 0 ? (
         <section className="feed-row-detail-section">
@@ -147,7 +154,7 @@ export function FeedSummarySections({ content, textUrl = null, feedbackBill = nu
 
       {inside.length > 0 ? <InsideSection rows={inside} /> : null}
 
-      {feedbackBill && primary.kind === 'what_it_does' ? <SummaryFeedback bill={feedbackBill} /> : null}
+      {feedback ? <SummaryFeedback feedback={feedback} /> : null}
 
       {crsDisclosure ? (
         <details className="feed-row-crs-details">

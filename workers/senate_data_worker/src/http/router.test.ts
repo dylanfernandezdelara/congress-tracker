@@ -672,16 +672,6 @@ describe("HTTP API", () => {
     expect(runMembersRosterPipeline).not.toHaveBeenCalled();
   });
 
-  it("returns pulse stats", async () => {
-    const response = await handlePublicFetch(
-      new Request("https://worker.example.com/stats/pulse.json"),
-      createMockEnv() as any
-    );
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({ congress: 119, session: 2, house: { close_votes: [] } });
-  });
-
   it("returns tightness stats", async () => {
     const response = await handlePublicFetch(
       new Request("https://worker.example.com/stats/tightness.json"),
