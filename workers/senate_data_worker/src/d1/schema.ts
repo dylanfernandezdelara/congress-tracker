@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -240,8 +240,6 @@ export const SCHEMA_DDL = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_bill
     ON bill_committee_events (congress, bill_type, bill_number, activity_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_committee
-    ON bill_committee_events (congress, system_code, activity_key)`,
   `CREATE INDEX IF NOT EXISTS idx_bill_committee_events_advance
     ON bill_committee_events (activity_key, activity_at DESC)`,
   `CREATE TABLE IF NOT EXISTS bill_floor_events (
@@ -388,6 +386,11 @@ export const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: s
     // Backfill jobs go last and get a capped share of the budget (pipeline/run-summary-sweep.ts). Safe to run twice.
     toVersion: 15,
     statements: [`ALTER TABLE digest_jobs ADD COLUMN origin TEXT NOT NULL DEFAULT 'live'`],
+  },
+  {
+    // The committees leaderboard (#223) was its only query; the remaining readers filter by bill.
+    toVersion: 16,
+    statements: [`DROP INDEX IF EXISTS idx_bill_committee_events_committee`],
   },
 ];
 
