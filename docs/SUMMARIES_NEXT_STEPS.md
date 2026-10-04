@@ -1,6 +1,6 @@
 # Plain-language summaries: handoff and next steps
 
-Updated 2026-10-04 (third session, PRs #221–#227; second session #217–#220) on top of the 2026-09-27 handoff at the end of the session that shipped PRs #210–#216 (all merged, all deployed). The earlier version of this file (from the session that built the pipeline, #200–#209) was corrected where it was wrong; see "Corrections" below.
+Updated 2026-10-04 late (PRs #217–#230 across three sessions) on top of the 2026-09-27 handoff at the end of the session that shipped PRs #210–#216 (all merged, all deployed). The earlier version of this file (from the session that built the pipeline, #200–#209) was corrected where it was wrong; see "Corrections" below.
 **First: `git fetch && git pull` on `main`.**
 
 ## Read first
@@ -36,6 +36,27 @@ Updated 2026-10-04 (third session, PRs #221–#227; second session #217–#220) 
 | #216 | Untracked three symlinks committed by mistake in #211; `.gitignore` fixed | Pulling main had replaced the main checkout's real `node_modules` with self-links. |
 
 Also: stale PRs #184, #188–#191 closed. Nine merged worktrees removed. HR 10395 rewritten on v3.3 (Sonnet, $0.02): "Pilot program tests funding tools for mineral processing plants", groups "critical mineral processing companies…" — the exemption works in production.
+
+## Also shipped 2026-10-04, later
+
+| PR | What |
+| --- | --- |
+| #228 | Dropped the orphaned `idx_bill_committee_events_committee` index (schema v16 with a migration and a real-sqlite test). |
+| #229 | "extreme cold / heat / weather / temperatures / wind chill" are weather terms of art, not judging words. HR 3106 had parked three times on it. Refreshed on v3.4 afterwards: "Bill would require drill for terrorist attack during extreme cold". |
+| #230 | Batch spend is charged to the submit day, so a batch collected after midnight corrects the right day. |
+
+The refresh loop ran: all 33 voted-bill summaries still on v3 (plus HRES518) are on v3.4 now, ~$0.52, no failures. Every rewrite-tier summary on the site is v3.3 or v3.4; every bill on the site has a summary; the site backfill is finished (234 done, 0 queued).
+
+## Tracker (keep this current)
+
+| When | What | Who |
+| --- | --- | --- |
+| Daily, 2 min | Spend vs $2; `SELECT bill_type||number, last_error FROM digest_jobs WHERE last_error LIKE 'parked%'` (new parkings carry the reason); `SELECT kind, count(*) FROM digest_feedback GROUP BY kind` | Dylan or agent |
+| ~2026-10-18 | Feedback decision: two weeks after #224. Keep, move, or remove based on rows. | Dylan |
+| Next eval round | Spot-check a whereas-heavy resolution (rule 4 and the two v3.4 wording tightenings were added after round 6). Evidence collected for v3.5: one Title Case headline (HR 9340), inconsistent capitalization in who_it_affects, Sonnet "U.S. voters" on HJRES1, one tense miss. | agent, ~$0.25, needs Dylan's yes |
+| When Dylan says | Full-Congress backfill, ~$20, key cap $15. Declined for now. | Dylan |
+| Open parked bills | HR10217, S5422 (county totals: v3.4 rule, un-park by refresh when a text change re-queues them, or refresh by hand ~$0.02 each), HR10367 (unknown; next parking carries the reason), S5579, S5648, HRES1585 (title-only or correctly blocked; the sweep re-checks them when text arrives). | sweep |
+| Small follow-ups | `backfillHasBudget` reads the wall clock (share can drift one run across midnight); feedback cap 30/day is per egress IP; proper-name rule also admits Title Case framing in preambles. | agent, when convenient |
 
 ## Shipped 2026-10-04 (all merged, Opus 5.5 reviewed, deployed)
 
@@ -98,18 +119,9 @@ Run from `workers/senate_data_worker`. `PIPELINE_ADMIN_TOKEN` is in `.dev.vars`.
 curl -X POST -H "Authorization: Bearer $TOKEN" "https://congress-tracker-api.fernandezdelaradylan.workers.dev/__pipeline/run/digest-refresh?bill=HR4795"
 ```
 
-## Needs Dylan to run (agent permissions refuse batches of admin POSTs)
+## Needs Dylan to run
 
-Budget is $2/day now, so both loops fit in one day with headroom. Each call is one Sonnet write, ~$0.01–0.02.
-
-```bash
-cd workers/senate_data_worker && TOKEN=$(grep PIPELINE_ADMIN_TOKEN .dev.vars | cut -d= -f2-)
-# Un-park the bills #219/#220 fixed:
-for b in S5406 HR7618 S790 HR10422 S5579; do curl -s -X POST -H "Authorization: Bearer $TOKEN" "https://congress-tracker-api.fernandezdelaradylan.workers.dev/__pipeline/run/digest-refresh?bill=$b"; echo; done
-# The 30 rewrite-tier summaries still on prompt v3 (list them live, then loop):
-./node_modules/.bin/wrangler d1 execute congress-tracker --remote --command "SELECT bill_type||number FROM bill_digests WHERE json_extract(digest_json,'$.generator.tier')='rewrite' AND json_extract(digest_json,'$.generator.prompt_version')='v3'"
-# plus HRES518 (pre-v3, headline "House Votes on Support for Ukraine").
-```
+Nothing right now. Both refresh loops have run (2026-10-04). Agent permissions sometimes refuse batches of admin POSTs; when that happens the command is written here for Dylan to paste with `!`.
 
 ## Next steps
 
