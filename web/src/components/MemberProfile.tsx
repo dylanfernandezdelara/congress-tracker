@@ -10,8 +10,8 @@ import type {
   MemberProfileResponse,
   MemberProfileSponsoredBill,
 } from '../api/types'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/dfdl/badge'
+import { buttonVariants } from '@/components/dfdl/button'
 import { Separator } from '@/components/dfdl/separator'
 import { congressOrdinal, formatShortBillId, formatVoteDate } from '../utils/billLabels'
 import { useMemberProfile } from '../hooks/useMemberProfile'
@@ -142,8 +142,8 @@ function SponsoredBillItem({
         </p>
       ) : null}
       {bill.policy_area ? (
-        <Badge variant="outline" className="mt-1 max-w-full truncate font-medium" title={bill.policy_area}>
-          {bill.policy_area}
+        <Badge className="mt-1 max-w-full" title={bill.policy_area}>
+          <span className="truncate">{bill.policy_area}</span>
         </Badge>
       ) : null}
     </li>
@@ -222,8 +222,8 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
           </h2>
           <div className="flex flex-wrap items-center gap-1.5">
             <PartyBadge party={party} />
-            <Badge variant="outline">{seatBadge(profile, seed)}</Badge>
-            {profile ? <Badge variant="outline">{profile.chamber}</Badge> : null}
+            <Badge>{seatBadge(profile, seed)}</Badge>
+            {profile ? <Badge>{profile.chamber}</Badge> : null}
           </div>
         </div>
       </div>
@@ -286,12 +286,15 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
       {profile ? <SponsoredBillsSection profile={profile} onAfterNavigate={closeAfterNavigate} /> : null}
 
       {profile?.congress_gov_url ? (
-        <Button asChild variant="outline" size="sm" className="self-start">
-          <a href={profile.congress_gov_url} target="_blank" rel="noopener noreferrer">
-            View on Congress.gov
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-          </a>
-        </Button>
+        <a
+          href={profile.congress_gov_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'self-start' })}
+        >
+          View on Congress.gov
+          <ExternalLink aria-hidden="true" />
+        </a>
       ) : null}
     </AnimatedSheet>
   )
