@@ -90,9 +90,8 @@ describe('FeedRowDetail', () => {
     const noVote = render(<FeedRowDetail item={makeFeedItem({ passage_votes: [] })} />)
     const laterHeading = screen.getByRole('heading', { name: 'Vote history' })
     const laterPipeline = noVote.container.querySelector('.bill-pipeline')
-    if (laterPipeline) {
-      expect(laterHeading.compareDocumentPosition(laterPipeline) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
-    }
+    expect(laterPipeline).not.toBeNull()
+    expect(laterHeading.compareDocumentPosition(laterPipeline!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
     expect(screen.getByText('No floor vote yet.')).toBeInTheDocument()
   })
 

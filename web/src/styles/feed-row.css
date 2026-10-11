@@ -641,7 +641,7 @@
   }
 
   .feed-row-crs-details-summary::before {
-    content: '▸';
+    content: '▸' / '';
     display: inline-block;
     /* A trailing space in content collapses inside inline-block; use a margin for the gap. */
     margin-right: 0.35rem;
@@ -650,14 +650,6 @@
 
   details[open] > .feed-row-crs-details-summary::before {
     transform: rotate(90deg);
-  }
-
-  .feed-row-crs-details-summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .bill-pipeline-path-details > .bill-pipeline-path-chapters {
-    margin-top: 0.5rem;
   }
 
   .feed-row-crs-details .feed-row-summary-body {

@@ -6,9 +6,13 @@
   }
 
   /* Under the vote history the stepper starts a new topic; rule it off like the other sections. */
-  .feed-row-detail-section + .bill-pipeline {
-    padding-top: 1rem;
+  .feed-row-detail-section--votes + .bill-pipeline {
+    padding-top: var(--space-16);
     border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  .bill-pipeline-path-details > .bill-pipeline-path-chapters {
+    margin-top: var(--space-8);
   }
 
   .bill-pipeline-steps {

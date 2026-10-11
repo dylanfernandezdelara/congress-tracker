@@ -95,7 +95,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
   const hasVotes = item.passage_votes.length > 0
   const voteHistory = (
-    <section className="feed-row-detail-section">
+    <section className="feed-row-detail-section feed-row-detail-section--votes">
       <h3 className="feed-row-detail-heading">Vote history</h3>
       <PassageVoteDetails
         votes={item.passage_votes}
@@ -136,7 +136,7 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 
       {/* The vote and who crossed party lines come before the journey: it's what readers open a passed bill for.
-          Without a vote, "No floor vote yet" stays after the stepper, which already shows where the bill is. */}
+          Without a vote, "No floor vote yet" keeps its old place at the end, which already shows where the bill is. */}
       {hasVotes ? voteHistory : null}
 
       <BillPipeline
@@ -154,9 +154,9 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
         </div>
       ) : null}
 
-      {hasVotes ? null : voteHistory}
-
       <ExecutiveContextSection item={item} />
+
+      {hasVotes ? null : voteHistory}
 
       <footer className="feed-row-detail-footer">
         <a
