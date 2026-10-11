@@ -11,7 +11,6 @@ import {
   tightnessBarMeta,
   tightnessBarTitle,
   tightnessBarWidth,
-  tightnessDotAriaLabel,
   tightnessDotKey,
   tightnessDotLabel,
 } from './tightnessLabels'
@@ -37,21 +36,19 @@ describe('tightnessLabels', () => {
     expect(tightnessBarMeta(nominee)).toBe('confirmed 58–40 · party-line')
     expect(tightnessBarTitle(makeTightnessDot({ headline: null }))).toBe('H.R. 88')
     expect(tightnessBarMeta(makeTightnessDot({ cohesion: 'unknown' }))).toBe('H.R. 88 · passed 210–208')
-    expect(tightnessDotAriaLabel(makeTightnessDot())).toMatch(/House bill H\.R\. 88, 210–208, party-line$/)
-    expect(
-      tightnessDotAriaLabel(
-        makeTightnessDot({
-          kind: 'nominee',
-          chamber: 'Senate',
-          yeas: 51,
-          nays: 49,
-          yea_pct: 51 / 100,
-          nominee_name: 'Pam Bondi',
-          bill_type: null,
-          bill_number: null,
-        }),
-      ),
-    ).toMatch(/Senate nominee Pam Bondi, 51–49/)
+    expect(tightnessBarMeta(makeTightnessDot({ headline: null }))).toBe('passed 210–208 · party-line')
+    const rejected = makeTightnessDot({
+      kind: 'nominee',
+      chamber: 'Senate',
+      yeas: 49,
+      nays: 51,
+      result: 'Rejected',
+      nominee_name: 'Pam Bondi',
+      bill_type: null,
+      bill_number: null,
+    })
+    expect(tightnessBarTitle(rejected)).toBe('Pam Bondi')
+    expect(tightnessBarMeta(rejected)).toBe('rejected 49–51 · party-line')
   })
 
   it('says failed from the official roll result', () => {
@@ -63,7 +60,6 @@ describe('tightnessLabels', () => {
       yea_pct: 212 / 418,
     })
     expect(tightnessBarMeta(failed)).toBe('H.R. 88 · failed 212–206 · party-line')
-    expect(tightnessDotAriaLabel(failed)).toMatch(/212–206, party-line, failed$/)
   })
 
   it('keeps cohesion labels for party-line vs bipartisan', () => {

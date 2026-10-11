@@ -8,7 +8,6 @@ import {
   tightnessBarMeta,
   tightnessBarTitle,
   tightnessBarWidth,
-  tightnessDotAriaLabel,
   tightnessDotKey,
 } from '../utils/tightnessLabels'
 
@@ -100,17 +99,19 @@ function TightnessChamber({
           const key = tightnessDotKey(dot)
           const selected = selectedKey === key
           const width = tightnessBarWidth(dot, cap)
+          const title = tightnessBarTitle(dot)
           return (
             <li key={key}>
               <button
                 type="button"
                 className={`tightness-bar-row${selected ? ' is-selected' : ''}`}
                 style={{ ['--tightness-bar' as string]: String(width) }}
-                aria-label={tightnessDotAriaLabel(dot)}
                 aria-pressed={selected}
                 onClick={() => onSelect(dot)}
               >
-                <span className="tightness-bar-title">{tightnessBarTitle(dot)}</span>
+                <span className="tightness-bar-title" title={title}>
+                  {title}
+                </span>{' '}
                 <span className="tightness-bar-meta">{tightnessBarMeta(dot)}</span>
                 <span className="tightness-bar-track" aria-hidden="true">
                   <span className={`tightness-bar-fill tightness-bar-fill--${dot.cohesion}`} />

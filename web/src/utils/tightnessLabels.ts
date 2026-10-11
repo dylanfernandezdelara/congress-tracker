@@ -42,7 +42,7 @@ export function tightnessDotLabel(dot: TightnessDot): string {
 /** First line of a closest-vote row: what was voted on, in words (headline or nominee), not a docket. */
 export function tightnessBarTitle(dot: TightnessDot): string {
   if (dot.kind === 'nominee') {
-    const name = dot.nominee_name?.trim() || 'Senate nominee'
+    const name = tightnessDotLabel(dot)
     const position = dot.position_title?.trim()
     return position ? `${name}, ${position}` : name
   }
@@ -55,17 +55,12 @@ export function tightnessBarMeta(dot: TightnessDot): string {
   const verb =
     dot.kind === 'nominee' ? (failed ? 'rejected' : 'confirmed') : failed ? 'failed' : 'passed'
   const parts = [`${verb} ${dot.yeas}–${dot.nays}`]
-  if (dot.kind !== 'nominee' && dot.bill_type && dot.bill_number != null) {
+  // A bill with no headline is already titled by its number.
+  if (dot.kind !== 'nominee' && dot.bill_type && dot.bill_number != null && dot.headline?.trim()) {
     parts.unshift(formatShortBillId(dot.bill_type, dot.bill_number))
   }
   if (dot.cohesion !== 'unknown') parts.push(cohesionLabel(dot.cohesion))
   return parts.join(' · ')
-}
-
-export function tightnessDotAriaLabel(dot: TightnessDot): string {
-  const kind = dot.kind === 'nominee' ? 'nominee' : 'bill'
-  const failed = voteIndicatesFailure(dot.result) ? ', failed' : ''
-  return `${dot.chamber} ${kind} ${tightnessDotLabel(dot)}, ${dot.yeas}–${dot.nays}, ${cohesionLabel(dot.cohesion)}${failed}`
 }
 
 /** Share of the chamber track. Scale is |yeas−nays|, never yea%. */

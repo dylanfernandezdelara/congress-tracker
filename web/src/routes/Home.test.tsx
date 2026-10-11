@@ -451,7 +451,7 @@ describe('Home', () => {
 
     expect(await screen.findByText("Couldn't load the feed.")).toBeInTheDocument()
     expect(
-      await screen.findByRole('button', { name: /House bill H\.R\. 88, 210–208, party-line/ }),
+      await screen.findByRole('button', { name: /H\.R\. 88 · passed 210–208 · party-line/ }),
     ).toBeInTheDocument()
     const tightnessMobile = container.querySelector('.home-tightness-mobile')
     expect(tightnessMobile).not.toBeNull()
@@ -810,7 +810,7 @@ describe('Home', () => {
     renderHome()
 
     const knifeEdge = await screen.findByRole('button', {
-      name: /House bill H\.R\. 88, 210–208, party-line/,
+      name: /H\.R\. 88 · passed 210–208 · party-line/,
     })
     fireEvent.click(knifeEdge)
 

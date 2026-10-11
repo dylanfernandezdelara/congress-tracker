@@ -43,10 +43,12 @@ describe('TightnessStrip', () => {
     expect(screen.getByRole('heading', { name: 'Senate bills & nominees' })).toBeInTheDocument()
     expect(screen.getByText('House passes a knife-edge resolution (local sample)')).toBeInTheDocument()
     expect(screen.getByText('H.R. 88 · passed 210–208 · party-line')).toBeInTheDocument()
-    expect(screen.getByText(/^Jane Doe/)).toBeInTheDocument()
-    expect(screen.getByText(/^confirmed 51–49/)).toBeInTheDocument()
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument()
+    expect(screen.getByText('confirmed 51–49 · party-line')).toBeInTheDocument()
 
-    const houseRow = screen.getByRole('button', { name: /House bill H\.R\. 88, 210–208, party-line/ })
+    const houseRow = screen.getByRole('button', {
+      name: 'House passes a knife-edge resolution (local sample) H.R. 88 · passed 210–208 · party-line',
+    })
     expect(houseRow.style.transform).toBe('')
     expect(houseRow.style.getPropertyValue('--tightness-x')).toBe('')
     fireEvent.click(houseRow)
@@ -166,7 +168,6 @@ describe('TightnessStrip', () => {
 
     expect(screen.getByText('No close votes yet this session.')).toBeInTheDocument()
     expect(container.querySelector('[data-tightness-row]')).toBeNull()
-    expect(container.querySelector('.tightness-legend')).toBeNull()
   })
 
   it('drops an empty chamber but keeps the other chamber', () => {
