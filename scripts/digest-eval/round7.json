@@ -1,0 +1,58 @@
+{
+  "round": "round7-anthropic",
+  "bills": [
+    "119-hjres-1",
+    "119-hr-4795",
+    "119-hr-2140",
+    "119-hjres-213",
+    "119-hconres-89",
+    "119-hr-10217"
+  ],
+  "runs": 2,
+  "singleRunBills": [],
+  "candidates": [
+    {
+      "key": "claude-sonnet-5",
+      "name": "Claude Sonnet 5 via OpenRouter (production rewrite model, baseline)",
+      "model": "anthropic/claude-sonnet-5",
+      "batch": false,
+      "temperature": 0.2
+    },
+    {
+      "key": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5, Anthropic API, medium effort",
+      "api": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "maxTokens": 16000,
+      "price": {
+        "input": 2,
+        "output": 10
+      }
+    },
+    {
+      "key": "claude-opus-5-5",
+      "name": "Claude Opus 5.5, Anthropic API, medium effort",
+      "api": "anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "medium",
+      "maxTokens": 16000,
+      "price": {
+        "input": 4,
+        "output": 20
+      }
+    },
+    {
+      "key": "claude-haiku-5-5",
+      "name": "Claude Haiku 5.5, Anthropic API, medium effort",
+      "api": "anthropic",
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "maxTokens": 16000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      }
+    }
+  ]
+}

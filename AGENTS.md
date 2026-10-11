@@ -230,6 +230,9 @@ way they would, so summaries lead with concrete effects on people and stay stric
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
+  A candidate with `api: "anthropic"` calls the Anthropic Messages API directly (`ANTHROPIC_API_KEY`, normal API,
+  cost from its `price`); `round7.json` compares Sonnet 5 on OpenRouter with Sonnet 5.5, Opus 5.5 and Haiku 5.5 on
+  Anthropic (not yet run).
   Latest round `round6.json` (v3.4 before the preamble clause; round 5's bills plus H.R. 10217, a county-list
   heritage area; Luna + Sonnet, 2 runs, $0.27). Judged only with the stricter groups rule above, so the numbers are
   not comparable with earlier rounds: Luna 10/10 on round 5's bills (10/12 with H.R. 10217, where the trial judge

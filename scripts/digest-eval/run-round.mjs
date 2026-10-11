@@ -3,7 +3,9 @@
  * Digest eval, a configured round (e.g. round2.json): every candidate summarizes every bill `runs` times (once
  * for bills in `singleRunBills`, the giants), so consistency can be measured. Candidates marked `batch` submit all
  * their single-pass and per-part requests as one OpenRouter batch (about half price, results usually within
- * minutes, at most 24 hours); the one combine call per long bill then runs on the normal API. Results go to
+ * minutes, at most 24 hours); the one combine call per long bill then runs on the normal API. Candidates marked
+ * `api: "anthropic"` call the Anthropic Messages API directly with ANTHROPIC_API_KEY (normal API only; cost is
+ * computed from the candidate's `price` per million tokens). Results go to
  * artifacts/digest-eval/out/<round>/<candidate>/<bill>-r<n>.json; existing files are kept (RERUN=1 redoes).
  *
  * Usage: node scripts/digest-eval/run-round.mjs scripts/digest-eval/round2.json [candidate-key ...]
@@ -11,6 +13,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import Anthropic from '@anthropic-ai/sdk'
 
 import { combineMessages, partMessages, PROMPT_VERSION, singlePassMessages } from './prompts.mjs'
 import { parseJsonReply } from './run.mjs'
@@ -28,6 +32,40 @@ const KEY = devVar('OPENROUTER_API_KEY')
 const API = 'https://openrouter.ai/api/v1'
 const headers = { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', 'X-Title': 'trackcongress digest eval' }
 const CALL_TIMEOUT_MS = 240_000
+let anthropicClient = null
+
+/**
+ * One call on the Anthropic Messages API. These models take no temperature (a non-default value is a 400); depth is
+ * set with `effort`. The output cap leaves room for thinking before the JSON answer. A refusal counts as a failure.
+ */
+async function anthropicChat(candidate, messages) {
+  anthropicClient ??= new Anthropic({ apiKey: devVar('ANTHROPIC_API_KEY'), timeout: CALL_TIMEOUT_MS, maxRetries: 2 })
+  const started = Date.now()
+  const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n')
+  const res = await anthropicClient.messages
+    .stream({
+      model: candidate.model,
+      max_tokens: candidate.maxTokens ?? 16_000,
+      ...(candidate.effort ? { output_config: { effort: candidate.effort } } : {}),
+      system,
+      messages: messages.filter((m) => m.role !== 'system').map((m) => ({ role: m.role, content: m.content })),
+    })
+    .finalMessage()
+  if (res.stop_reason === 'refusal') throw new Error(`refused (${res.stop_details?.category ?? 'no category'})`)
+  if (res.stop_reason === 'max_tokens') throw new Error('hit max_tokens before the answer finished')
+  const text = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('')
+  const tokensIn = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0)
+  const tokensOut = res.usage.output_tokens
+  return {
+    json: parseJsonReply(text),
+    cost: (tokensIn * candidate.price.input + tokensOut * candidate.price.output) / 1e6,
+    tokensIn,
+    tokensOut,
+    ms: Date.now() - started,
+    attempts: 1,
+    provider: 'anthropic',
+  }
+}
 
 /** Request body for one call, shaped by the candidate (reasoning effort, temperature, token cap). */
 function body(candidate, messages, fallbackMax) {
@@ -39,6 +77,7 @@ function body(candidate, messages, fallbackMax) {
 }
 
 export async function chat(candidate, messages, fallbackMax) {
+  if (candidate.api === 'anthropic') return anthropicChat(candidate, messages)
   const started = Date.now()
   let lastError = null
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -152,6 +191,7 @@ async function runCandidate(config, candidate) {
   const results = new Map()
   let batchInfo = null
   const started = Date.now()
+  if (candidate.batch && candidate.api === 'anthropic') throw new Error('batch is not wired for api: "anthropic" candidates')
   if (candidate.batch) {
     const batch = await runBatch(candidate, requests.map((r) => ({ custom_id: r.custom_id, body: body(candidate, r.messages, r.max) })))
     batchInfo = { id: batch.id, status: batch.status, minutes: Math.round(batch.minutes * 10) / 10, cost: batch.usage?.cost ?? null }
