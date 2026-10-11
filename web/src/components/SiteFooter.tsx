@@ -21,8 +21,14 @@ export function SiteFooter({ supportUrl = SUPPORT_URL }: { supportUrl?: string |
         <p className="site-footer-disclaimer">
           Track Congress is free, has no ads, and is run by one person. If it&rsquo;s useful to
           you,{' '}
-          <a className="site-footer-link" href={supportUrl} target="_blank" rel="noopener noreferrer">
+          <a
+            className="site-footer-link"
+            href={supportUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             chip in to cover hosting and summaries
+            <span className="sr-only"> (opens in a new tab)</span>
           </a>
           . Contributions are not tax-deductible.
         </p>
