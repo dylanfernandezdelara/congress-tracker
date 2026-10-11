@@ -9,7 +9,8 @@ import type {
 } from '../api/types'
 import type { UseAsyncDataResult } from '../hooks/useAsyncData'
 import type { ChamberPair } from '../hooks/useStatsData'
-import { formatBillDocket, formatCoverageDate } from '../utils/billLabels'
+import { formatShortBillId } from '@congress-tracker/shared/bill-id'
+
 import type { MemberProfileSeed } from './MemberProfile'
 import { MemberProfileTrigger } from './MemberProfileTrigger'
 
@@ -33,7 +34,7 @@ type MemberSpotlight = {
 const MAX_SPOTLIGHTS = 3
 
 function formatPartyState(party: string | null, state: string | null): string {
-  if (party && state) return `${party} · ${state}`
+  if (party && state) return `${party}-${state}`
   return party ?? state ?? ''
 }
 
@@ -44,16 +45,12 @@ function defectorHook(entry: DefectorEntry): string {
       : `${entry.cross_vote_count} cross-party votes`
 
   if (entry.recent_example) {
-    const bill = formatBillDocket(
-      entry.recent_example.bill_type,
-      entry.recent_example.bill_number,
-      entry.recent_example.congress,
-    )
-    const margin =
-      entry.recent_example.margin === 1
-        ? 'a one-vote margin'
-        : `a ${entry.recent_example.margin}-vote margin`
-    return `Broke with party on ${bill} (${margin}) · ${votes} total`
+    const bill = formatShortBillId(entry.recent_example.bill_type, entry.recent_example.bill_number)
+    const margin = `${entry.recent_example.margin}-vote margin`
+    // A single break is the example itself; only count when there are more.
+    return entry.cross_vote_count > 1
+      ? `Broke with party on ${bill} · ${margin} · ${votes}`
+      : `Broke with party on ${bill} · ${margin}`
   }
 
   return `Most often voted against party caucus · ${votes}`
@@ -62,9 +59,9 @@ function defectorHook(entry: DefectorEntry): string {
 function portfolioHook(entry: PortfolioEntry, direction: 'gain' | 'loss'): string {
   const pct = Math.abs(entry.session_return_pct).toFixed(1)
   if (direction === 'gain') {
-    return `Disclosed holdings estimated up ${pct}% this session`
+    return `Disclosed holdings est. +${pct}% this session`
   }
-  return `Disclosed holdings estimated down ${pct}% this session`
+  return `Disclosed holdings est. −${pct}% this session`
 }
 
 function buildSpotlights(
@@ -204,7 +201,7 @@ function ChamberSection({
 export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSidebarProps) {
   const coverage =
     session.data && session.data.house.date_range.last
-      ? `${session.data.congress}th Congress, ${session.data.session}${ordinal(session.data.session)} session · through ${formatCoverageDate(session.data.house.date_range.last)}`
+      ? `${session.data.congress}th Congress, ${session.data.session}${ordinal(session.data.session)} session`
       : null
 
   const disclaimer = portfolios.data?.house.disclaimer ?? portfolios.data?.senate.disclaimer

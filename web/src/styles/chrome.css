@@ -288,8 +288,9 @@
 
   .member-spotlight-header {
     display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.4rem;
   }
 
   .member-spotlight-name {
