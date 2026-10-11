@@ -359,6 +359,13 @@
     color: hsl(var(--twc-faint));
   }
 
+  .site-footer-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--twc-link-decoration));
+    text-underline-offset: 2px;
+  }
+
   .site-footer-disclaimer + .site-footer-disclaimer {
     margin-top: var(--space-8);
   }
