@@ -35,6 +35,8 @@ export interface Env {
   /** Key for the per-day reader hash on summary feedback (http/summary-feedback.ts). */
   FEEDBACK_HASH_SECRET?: string;
   DIGEST_REWRITE_MODEL?: string;
+  /** Anthropic API key, used only when DIGEST_REWRITE_MODEL names an Anthropic model id (digest/models.ts). */
+  ANTHROPIC_API_KEY?: string;
   /** Daily spend cap for bill summaries in US dollars (default 1). */
   DIGEST_DAILY_BUDGET_USD?: string;
   /**

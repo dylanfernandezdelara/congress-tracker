@@ -4,6 +4,7 @@ import { recordSpend } from "./budget";
 import { BudgetShort, ensureBudget, estimateCost } from "./cost";
 import { checkSummary, STYLE_ONLY_REASONS } from "./checks";
 import { modelFor, newBillModel, rewriteModel, type DigestModel } from "./models";
+import { anthropicCompletion } from "./anthropic-client";
 import { AccountError, chatCompletion, type ChatResult } from "./openrouter-client";
 import { parseJsonObject, parseSummaryReply } from "./parse";
 import type { PreparedBill } from "./prepare";
@@ -125,7 +126,8 @@ interface Spent {
  */
 function paidChat(env: Env, model: DigestModel, messages: DigestMessages, spent?: { usd: number }): Promise<ChatResult> {
   const day = new Date();
-  return chatCompletion(env, model, messages, {
+  const complete = model.provider === "anthropic" ? anthropicCompletion : chatCompletion;
+  return complete(env, model, messages, {
     estimate: estimateCost(model, [messages], "direct"),
     record: async (usd) => {
       if (spent) spent.usd += usd;

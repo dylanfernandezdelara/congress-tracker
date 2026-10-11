@@ -2,6 +2,10 @@ import type { Env } from "../config";
 
 export interface DigestModel {
   id: string;
+  /** Who serves the model: OpenRouter (default), or the Anthropic API directly (`anthropic-client.ts`). */
+  provider?: "openrouter" | "anthropic";
+  /** Anthropic models: thinking depth (they take no temperature). */
+  effort?: "low" | "medium" | "high";
   /** Reasoning settings passed through to the provider (Luna: high effort). */
   reasoning?: { effort: "low" | "medium" | "high" };
   temperature?: number;
@@ -19,12 +23,25 @@ export function newBillModel(env: Env): DigestModel {
 }
 
 /**
+ * Anthropic API prices per million tokens (normal API). DIGEST_REWRITE_MODEL set to one of these ids sends rewrites to
+ * the Anthropic API with ANTHROPIC_API_KEY instead of OpenRouter. The output cap leaves room for thinking.
+ */
+const ANTHROPIC_PRICES: Record<string, { input: number; output: number }> = {
+  "claude-sonnet-5-5": { input: 2, output: 10 },
+  "claude-opus-5-5": { input: 4, output: 20 },
+  "claude-haiku-5-5": { input: 0.1, output: 0.5 },
+};
+
+/**
  * Rewrites of bills that matter (floor vote, reported by committee, law, in the feed): the writing readers
  * preferred in the round-2 blind review. Normal API: OpenRouter refuses Sonnet 5 batches (tested 2026-09-26).
  */
 export function rewriteModel(env: Env): DigestModel {
+  const id = env.DIGEST_REWRITE_MODEL?.trim() || "anthropic/claude-sonnet-5";
+  const anthropicPrice = ANTHROPIC_PRICES[id];
+  if (anthropicPrice) return { id, provider: "anthropic", effort: "medium", maxTokens: 16_000, price: anthropicPrice };
   return {
-    id: env.DIGEST_REWRITE_MODEL?.trim() || "anthropic/claude-sonnet-5",
+    id,
     temperature: 0.2,
     maxTokens: 4_000,
     // OpenRouter's normal-API price (free /api/v1/models endpoint, fetched 2026-10-04). The 4k-output assumption in
