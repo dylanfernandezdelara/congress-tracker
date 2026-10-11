@@ -64,7 +64,7 @@ function usageOf(body: ChatBody): CallUsage {
   };
 }
 
-class PermanentError extends Error {}
+export class PermanentError extends Error {}
 
 /** The OpenRouter account itself is refusing (no credits, bad key): nothing to do with the bill being written. */
 export class AccountError extends PermanentError {}
@@ -90,7 +90,7 @@ export interface SpendHook {
  * reply carries no cost); earlier attempts keep theirs.
  */
 /** Error statuses that mean the request was refused before any generation, so it cannot have been billed. */
-const REFUSED_UNBILLED = new Set([400, 401, 402, 403, 404, 413, 422, 429]);
+export const REFUSED_UNBILLED = new Set([400, 401, 402, 403, 404, 413, 422, 429]);
 
 export async function chatCompletion(env: Env, model: DigestModel, messages: DigestMessages, spend?: SpendHook): Promise<ChatResult> {
   const base = env.OPENROUTER_BASE_URL?.trim() || OPENROUTER;

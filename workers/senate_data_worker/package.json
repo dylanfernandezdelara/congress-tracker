@@ -19,6 +19,7 @@
     "wrangler": "^4.54.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "workers-og": "^0.0.27"
   }
 }

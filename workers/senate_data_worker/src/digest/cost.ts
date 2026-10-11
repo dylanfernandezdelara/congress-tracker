@@ -24,7 +24,9 @@ function priceOf(model: DigestModel, api: "batch" | "direct"): { input: number; 
 export function estimateCost(model: DigestModel, requests: DigestMessages[], api: "batch" | "direct"): number {
   const price = priceOf(model, api);
   const input = requests.reduce((n, r) => n + approxTokens(r.system) + approxTokens(r.user), 0);
-  const output = requests.length * Math.min(ESTIMATED_OUTPUT_TOKENS, model.maxTokens);
+  // Anthropic models always think, and thinking is billed as output: assume the full cap so overshoot stays bounded.
+  const perRequest = model.provider === "anthropic" ? model.maxTokens : Math.min(ESTIMATED_OUTPUT_TOKENS, model.maxTokens);
+  const output = requests.length * perRequest;
   return Math.round(((input * price.input + output * price.output) / 1e6) * 1e6) / 1e6;
 }
 
