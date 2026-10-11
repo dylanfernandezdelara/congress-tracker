@@ -5,6 +5,12 @@
     gap: 1rem;
   }
 
+  /* Under the vote history the stepper starts a new topic; rule it off like the other sections. */
+  .feed-row-detail-section + .bill-pipeline {
+    padding-top: 1rem;
+    border-top: 1px solid hsl(var(--twc-border));
+  }
+
   .bill-pipeline-steps {
     display: flex;
     flex-wrap: wrap;

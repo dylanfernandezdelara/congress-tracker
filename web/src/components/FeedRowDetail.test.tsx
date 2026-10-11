@@ -79,6 +79,23 @@ describe('FeedRowDetail', () => {
     expect(screen.getByText('R 52–1 · D 0–46')).toBeInTheDocument()
   })
 
+  it('puts the vote before the journey when the bill has a floor vote, and after it when it does not', () => {
+    const { container, unmount } = render(<FeedRowDetail item={makeFeedItem()} />)
+    const voteHeading = screen.getByRole('heading', { name: 'Vote history' })
+    const pipeline = container.querySelector('.bill-pipeline')
+    expect(pipeline).not.toBeNull()
+    expect(voteHeading.compareDocumentPosition(pipeline!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+
+    const noVote = render(<FeedRowDetail item={makeFeedItem({ passage_votes: [] })} />)
+    const laterHeading = screen.getByRole('heading', { name: 'Vote history' })
+    const laterPipeline = noVote.container.querySelector('.bill-pipeline')
+    if (laterPipeline) {
+      expect(laterHeading.compareDocumentPosition(laterPipeline) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+    }
+    expect(screen.getByText('No floor vote yet.')).toBeInTheDocument()
+  })
+
   it('shows the full digest summary and key points in the detail panel', () => {
     render(<FeedRowDetail item={makeFeedItem()} />)
 

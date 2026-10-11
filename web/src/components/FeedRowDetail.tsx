@@ -93,6 +93,17 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
       : null
   const defectorsByRoll = useRollDefectors(item.passage_votes)
   const sponsorDisplay = primarySponsorDisplay(item.primary_sponsor)
+  const hasVotes = item.passage_votes.length > 0
+  const voteHistory = (
+    <section className="feed-row-detail-section">
+      <h3 className="feed-row-detail-heading">Vote history</h3>
+      <PassageVoteDetails
+        votes={item.passage_votes}
+        defectorsByRoll={defectorsByRoll}
+        companionVotes={item.companion_votes ?? []}
+      />
+    </section>
+  )
 
   return (
     <div className="feed-row-detail">
@@ -124,6 +135,10 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}
 
+      {/* The vote and who crossed party lines come before the journey: it's what readers open a passed bill for.
+          Without a vote, "No floor vote yet" stays after the stepper, which already shows where the bill is. */}
+      {hasVotes ? voteHistory : null}
+
       <BillPipeline
         stages={stages}
         detail={pipelineDetail}
@@ -139,16 +154,9 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
         </div>
       ) : null}
 
-      <ExecutiveContextSection item={item} />
+      {hasVotes ? null : voteHistory}
 
-      <section className="feed-row-detail-section">
-        <h3 className="feed-row-detail-heading">Vote history</h3>
-        <PassageVoteDetails
-          votes={item.passage_votes}
-          defectorsByRoll={defectorsByRoll}
-          companionVotes={item.companion_votes ?? []}
-        />
-      </section>
+      <ExecutiveContextSection item={item} />
 
       <footer className="feed-row-detail-footer">
         <a
