@@ -23,6 +23,7 @@
     "public:scan:internal-refs": "./scripts/scan-internal-references.sh"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "playwright": "^1.52.0"
   }
 }
