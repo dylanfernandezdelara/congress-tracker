@@ -74,6 +74,8 @@ export interface FeedPageOptions {
    * to 7-day introductions.
    */
   includeIntros?: boolean;
+  /** Skip the party-line/bipartisan label (callers that load party splits themselves). */
+  skipCohesion?: boolean;
 }
 
 type ExecutivePostLinks = Awaited<ReturnType<typeof getExecutivePostBillsForPosts>>;
@@ -311,7 +313,7 @@ function assembleFeedItem(
 export async function buildFeedItemsForBills(
   env: Env,
   rows: FeedBillRow[],
-  options: { now: Date | string; executiveSince: string }
+  options: { now: Date | string; executiveSince: string; skipCohesion?: boolean }
 ): Promise<FeedItem[]> {
   if (rows.length === 0) return [];
 
@@ -322,7 +324,7 @@ export async function buildFeedItemsForBills(
   }));
   const ctx = await loadFeedItemAssemblyContext(env, billKeys, options.executiveSince);
   const items = rows.map((row) => assembleFeedItem(row, ctx, options.now));
-  await annotatePassageCohesion(env.DB, items);
+  if (!options.skipCohesion) await annotatePassageCohesion(env.DB, items);
   return items;
 }
 
@@ -389,7 +391,11 @@ export async function buildFeedPage(
   ]);
   const cappedTotal = Math.min(total, FEED_MAX_BILLS);
 
-  const items = await buildFeedItemsForBills(env, bills, { now, executiveSince });
+  const items = await buildFeedItemsForBills(env, bills, {
+    now,
+    executiveSince,
+    skipCohesion: options.skipCohesion,
+  });
 
   return {
     items,

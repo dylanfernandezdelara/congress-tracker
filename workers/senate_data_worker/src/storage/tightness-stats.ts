@@ -101,7 +101,13 @@ export async function buildTightnessStats(
 ): Promise<TightnessStatsResponse> {
   await ensureSchema(env.DB);
   const [feed, confirmations] = await Promise.all([
-    buildFeedPage(env, { limit: FEED_MAX_BILLS, offset: 0, includeIntros: false }),
+    buildFeedPage(env, {
+      limit: FEED_MAX_BILLS,
+      offset: 0,
+      includeIntros: false,
+      // Splits are loaded below for the same rolls; the feed's own label would load them twice.
+      skipCohesion: true,
+    }),
     buildRecentConfirmations(env, congress, session, TIGHTNESS_CONFIRMATION_LIMIT, asOf),
   ]);
 

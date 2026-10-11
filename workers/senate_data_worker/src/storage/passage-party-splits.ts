@@ -1,7 +1,6 @@
 import type { RollPartySplit } from "../../../../shared/stats-api-types";
-import { isLocalSampleMemberId } from "../../../../shared/member-id";
-import { rollPartySplits } from "../analytics/roll-party-stats";
-import { selectMemberVotesForRollKeys } from "../d1/member-votes";
+import { rollPartySplits, type RollPartyPosition } from "../analytics/roll-party-stats";
+import { selectPartyPositionCountsForRollKeys } from "../d1/member-votes";
 import { hasRealMemberRoster } from "../d1/members";
 
 export function rollIdentityKey(
@@ -33,18 +32,18 @@ export async function loadPassagePartySplits(
 
   for (const group of groups.values()) {
     const first = group[0]!;
-    const rows = await selectMemberVotesForRollKeys(
+    const rows = await selectPartyPositionCountsForRollKeys(
       db,
       first.congress,
       first.session,
-      group.map((roll) => ({ chamber: roll.chamber, roll_number: roll.roll_number }))
+      group.map((roll) => ({ chamber: roll.chamber, roll_number: roll.roll_number })),
+      { excludeLocalSample }
     );
-    const byRoll = new Map<string, Array<{ party: string | null; position: string }>>();
+    const byRoll = new Map<string, RollPartyPosition[]>();
     for (const row of rows) {
-      if (excludeLocalSample && isLocalSampleMemberId(row.bioguide_id)) continue;
       const key = rollIdentityKey(row.chamber, row.congress, row.session, row.roll_number);
       const list = byRoll.get(key) ?? [];
-      list.push({ party: row.party, position: row.position });
+      list.push({ party: row.party, position: row.position, count: Number(row.n) });
       byRoll.set(key, list);
     }
     for (const roll of group) {
@@ -59,4 +58,3 @@ export async function loadPassagePartySplits(
 
   return out;
 }
-
