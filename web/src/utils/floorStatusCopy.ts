@@ -13,7 +13,7 @@ function chipStatusPhrase(status: FloorWorkStatus): string {
   return FLOOR_STATUS_LABEL[status].toLowerCase()
 }
 
-/**
+ * Floor-status chip on the feed count line. Names each chamber so
  * Timeline chip next to “Chronological timeline”. Names each chamber so
  * “working” is never ambiguous about House vs Senate.
  */

@@ -77,7 +77,14 @@ export const FeedRow = memo(function FeedRow({
           <FeedRowDate
             dateTime={displayDate.iso}
             primary={formatVoteDate(displayDate.iso)}
-            secondary={displayDate.kind === 'signal' ? `${PRESIDENT_LAST_NAME} post` : undefined}
+            secondary={
+              displayDate.kind === 'signal'
+                ? `${PRESIDENT_LAST_NAME} post`
+                : // An Introduced badge already says it; other badges still need the date explained.
+                  displayDate.kind === 'intro' && meta.kind !== 'introduced'
+                  ? 'Introduced'
+                  : undefined
+            }
           />
 
           <div className="feed-row-main">
