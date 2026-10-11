@@ -1,6 +1,6 @@
 # Congress Tracker
 
-Cloudflare-native app that surfaces **recent U.S. Congress bills with official passage roll-call votes**, rewritten into plain English from official CRS summaries.
+Cloudflare-native app behind [trackcongress.org](https://trackcongress.org): **recent U.S. Congress bills with their House and Senate passage roll-call votes**, each summarized in plain English from the bill's own text. Independent and unofficial; not a U.S. government website.
 
 ## Developer quick start
 
@@ -38,17 +38,19 @@ Local ↔ Cursor Cloud parity details: [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_
 ## Architecture
 
 ```text
-Cloudflare Worker
-  cron + POST /__pipeline/run/feed  -> ingest House/Senate passage votes, CRS summaries, LLM digest
-  GET /feed/latest.json              -> paginated feed (digest + votes + raw CRS)
-  GET /health                        -> liveness
+Cloudflare Worker (API + bundled React app, one origin)
+  cron 0 10 * * *   -> ingest passage votes, introductions, laws, confirmations, member votes
+  cron 20 * * * *   -> executive posts
+  cron 35 * * * *   -> summary sweep: write plain-language summaries from bill text (OpenRouter)
+  GET /feed/latest.json, /stats/*, /og/*  -> feed, sidebars, share cards
+  GET /health                              -> liveness + ingest freshness
         |
         v
-Vite + React (letterpress UI)
-  scrollable action-row feed
+Vite + React feed UI (web/), built on dfdl components
 ```
 
-D1 (`DB`) stores `votes` and `bill_digests`.
+D1 (`DB`) stores votes, members, bill summaries and pipeline state. How summaries are written,
+checked and budgeted is in [`AGENTS.md`](AGENTS.md) → **Plain-language summaries**.
 
 ## Testing
 
@@ -73,13 +75,15 @@ cd workers/senate_data_worker
 wrangler d1 create congress-tracker   # once; update database_id in wrangler.toml
 wrangler secret put CONGRESS_API_KEY
 wrangler secret put OPENROUTER_API_KEY
+wrangler secret put PIPELINE_ADMIN_TOKEN
 wrangler secret put CF_AIG_TOKEN   # AI Gateway "trackcongress" (authenticated), see AGENTS.md
 cd ../.. && npm run deploy            # builds web/dist, then deploys the Worker
 ```
 
-Production cron (`0 10 * * *` in `workers/senate_data_worker/wrangler.toml`) runs the feed
-pipeline daily via the Worker's `scheduled` handler. The pipeline only upserts **new** passage
-votes and writes digests for bills missing one. Ingest health is recorded in D1 and exposed on
+Production crons (`[triggers]` in `workers/senate_data_worker/wrangler.toml`) run the feed
+pipeline daily at 10:00 UTC, executive posts hourly at :20 and the summary sweep hourly at :35.
+The feed pipeline only upserts **new** passage votes and queues bills without a summary for the
+sweep. Ingest health is recorded in D1 and exposed on
 `GET /health` (`data.ingest`) and `GET /debug/ingest.json`; see [`docs/MONITORING.md`](docs/MONITORING.md).
 The web app has a temporary ops page at `/debug` (not linked in navigation). To manually trigger
 production ingestion, POST to `/__pipeline/run/feed` on the deployed Worker with
@@ -99,10 +103,16 @@ safety notes.
 
 ## HTTP API
 
-- `GET /health` — worker liveness plus `data.ingest` freshness (`ok` | `stale` | `failed` | `unknown`)
-- `GET /debug/ingest.json` — detailed ingest monitor payload (same status logic as `/health`)
-- `GET /feed/latest.json` — paginated recent bills with passage votes and digests
-  - Query: `limit` (1–50, default 50), `offset` (default 0; clamped to the 50-bill feed window)
-  - Response: `{ items, total, limit, offset, has_more }` where `items` is the bill array and `total` is capped at 50
-  - **Breaking change:** this endpoint no longer returns a bare JSON array; consumers must read `items`
-- `POST /__pipeline/run/feed` — trigger ingestion (`PIPELINE_ADMIN_TOKEN` required in production; local dev may use `DEV_OPEN_PIPELINE=1` on non-production hosts)
+Public, read-only:
+
+- `GET /health` — worker liveness plus `data.ingest` freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`)
+- `GET /debug/ingest.json` — detailed ingest monitor payload (same status logic as `/health`; error text is sanitized)
+- `GET /feed/latest.json` — paginated recent bills with passage votes and summaries
+  (`{ items, total, limit, offset, has_more }`; `limit` 1–50, `offset`, plus optional filters)
+- `GET /stats/*.json` — sidebar data (members, recent laws, confirmations, tightness, defectors)
+- `GET /og/bill/:bill.png` — 1200×630 share card
+
+Admin (`Authorization: Bearer <PIPELINE_ADMIN_TOKEN>` in production): `POST /__pipeline/run/*`
+triggers ingestion, summary refreshes and backfills.
+
+The full endpoint reference, with every query parameter, is in [`AGENTS.md`](AGENTS.md) → **API**.
