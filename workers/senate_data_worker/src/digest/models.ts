@@ -24,7 +24,8 @@ export function newBillModel(env: Env): DigestModel {
 
 /**
  * Anthropic API prices per million tokens (normal API). DIGEST_REWRITE_MODEL set to one of these ids sends rewrites to
- * the Anthropic API with ANTHROPIC_API_KEY instead of OpenRouter. The output cap leaves room for thinking.
+ * the Anthropic API with ANTHROPIC_API_KEY instead of OpenRouter. The output cap leaves room for thinking (billed as
+ * output; round 7 replies used well under 2k) and is what the budget estimate assumes per call.
  */
 const ANTHROPIC_PRICES: Record<string, { input: number; output: number }> = {
   "claude-sonnet-5-5": { input: 2, output: 10 },
@@ -39,7 +40,8 @@ const ANTHROPIC_PRICES: Record<string, { input: number; output: number }> = {
 export function rewriteModel(env: Env): DigestModel {
   const id = env.DIGEST_REWRITE_MODEL?.trim() || "anthropic/claude-sonnet-5";
   const anthropicPrice = ANTHROPIC_PRICES[id];
-  if (anthropicPrice) return { id, provider: "anthropic", effort: "medium", maxTokens: 16_000, price: anthropicPrice };
+  // Without the key, rewrites stay on OpenRouter rather than failing every hour as an account error.
+  if (anthropicPrice && env.ANTHROPIC_API_KEY?.trim()) return { id, provider: "anthropic", effort: "medium", maxTokens: 8_000, price: anthropicPrice };
   return {
     id,
     temperature: 0.2,

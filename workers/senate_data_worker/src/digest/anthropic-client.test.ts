@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
 import { anthropicCompletion } from "./anthropic-client";
+import { estimateCost } from "./cost";
 import { rewriteModel } from "./models";
 import { AccountError } from "./openrouter-client";
 
@@ -24,10 +25,19 @@ describe("anthropic client", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("is chosen by an Anthropic id in DIGEST_REWRITE_MODEL, with effort instead of temperature", () => {
-    expect(model).toMatchObject({ id: "claude-sonnet-5-5", provider: "anthropic", effort: "medium", price: { input: 2, output: 10 } });
+    expect(model).toMatchObject({ id: "claude-sonnet-5-5", provider: "anthropic", effort: "medium", maxTokens: 8_000, price: { input: 2, output: 10 } });
+    // Without the key the rewrite stays on OpenRouter instead of failing every run.
+    expect(rewriteModel({ ...env, ANTHROPIC_API_KEY: " " } as Env).provider).toBeUndefined();
     expect(model.temperature).toBeUndefined();
     expect(rewriteModel({} as Env)).toMatchObject({ id: "anthropic/claude-sonnet-5", temperature: 0.2 });
     expect(rewriteModel({} as Env).provider).toBeUndefined();
+  });
+
+  it("budgets the full output cap, since thinking is billed as output", () => {
+    // 5k-character prompt ≈ 1.25k tokens × $2 + 8k out × $10, per million.
+    const est = estimateCost(model, [{ system: "", user: "u".repeat(5_000) }], "direct");
+    expect(est).toBeGreaterThanOrEqual(0.08);
+    expect(est).toBeLessThan(0.09);
   });
 
   it("sends the key, model, effort and system prompt, and prices the reply from its usage", async () => {
@@ -41,7 +51,7 @@ describe("anthropic client", () => {
     expect(String(url)).toBe("https://api.anthropic.com/v1/messages");
     expect(new Headers(init.headers).get("x-api-key")).toBe("ak");
     const body = JSON.parse(String(init.body));
-    expect(body).toMatchObject({ model: "claude-sonnet-5-5", max_tokens: 16_000, output_config: { effort: "medium" }, system: "s" });
+    expect(body).toMatchObject({ model: "claude-sonnet-5-5", max_tokens: 8_000, output_config: { effort: "medium" }, system: "s" });
     expect(body.messages).toEqual([{ role: "user", content: "u" }]);
     expect(body.temperature).toBeUndefined();
   });
