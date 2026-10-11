@@ -1,5 +1,7 @@
 import { memo, useId } from 'react'
 
+import { originChamberFromBillType } from '@congress-tracker/shared/bill-id'
+
 import type { FeedItem } from '../api/types'
 import { CURRENT_PRESIDENT } from '../constants/president'
 import { feedRowKey } from '../utils/billDeepLink'
@@ -36,7 +38,6 @@ export const FeedRow = memo(function FeedRow({
 }: FeedRowProps) {
   const badgeId = useId()
   const topicId = useId()
-  const policyAreaId = useId()
   const marginId = useId()
   const deskChipId = useId()
   const textGrewId = useId()
@@ -49,8 +50,10 @@ export const FeedRow = memo(function FeedRow({
   const { meta, eventDisplay, badgeToneClass, showMarginChip, showEventLine, eventToneClass } =
     getFeedRowView(item)
   const displayDate = getFeedRowDisplayDate(item)
-  const policyArea = item.policy_area
-  const isProcedural = meta.kind === 'procedural'
+  // The docket prefix (H.R., S.) already names the origin chamber; only show the
+  // chamber when the vote happened in the other one.
+  const showChamberChip =
+    Boolean(meta.chamber) && meta.chamber !== originChamberFromBillType(item.bill.type)
   const executiveSignal = item.executive_signals?.[0]
   const textGrew = feedItemTextGrew(item)
 
@@ -67,20 +70,14 @@ export const FeedRow = memo(function FeedRow({
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${badgeId} ${topicId}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
           <FeedRowDate
             dateTime={displayDate.iso}
             primary={formatVoteDate(displayDate.iso)}
-            secondary={
-              displayDate.kind === 'signal'
-                ? `${PRESIDENT_LAST_NAME} post`
-                : displayDate.kind === 'intro'
-                  ? 'Introduced'
-                  : undefined
-            }
+            secondary={displayDate.kind === 'signal' ? `${PRESIDENT_LAST_NAME} post` : undefined}
           />
 
           <div className="feed-row-main">
@@ -103,7 +100,7 @@ export const FeedRow = memo(function FeedRow({
                   {meta.margin}
                 </span>
               ) : null}
-              {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
+              {showChamberChip ? <span className="feed-row-chip">{meta.chamber}</span> : null}
               <BillIdChip type={item.bill.type} number={item.bill.number} />
               {meta.sponsorName ? (
                 <span className="feed-row-chip feed-row-chip--sponsor">{meta.sponsorName}</span>
@@ -125,16 +122,6 @@ export const FeedRow = memo(function FeedRow({
                 </span>
               ) : null}
             </div>
-
-            {policyArea && !isProcedural ? (
-              <p
-                id={policyAreaId}
-                data-feed-policy-area
-                className="feed-row-policy-area"
-              >
-                {policyArea}
-              </p>
-            ) : null}
 
             <p
               id={eventId}

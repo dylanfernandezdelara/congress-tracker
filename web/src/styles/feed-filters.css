@@ -21,23 +21,32 @@
     border-bottom: 1px solid transparent;
     background: transparent;
     font: inherit;
-    font-size: 12px;
-    font-weight: 400;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 13px;
+    font-weight: 500;
     letter-spacing: -0.1px;
-    color: hsl(var(--twc-faint));
+    color: hsl(var(--twc-secondary));
     cursor: pointer;
     white-space: nowrap;
     touch-action: manipulation;
   }
 
+  .feed-advanced-filters-toggle svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+
   .feed-advanced-filters.is-active .feed-advanced-filters-toggle,
   .feed-advanced-filters.is-open .feed-advanced-filters-toggle {
-    color: hsl(var(--twc-secondary));
+    color: hsl(var(--twc-foreground));
     border-bottom-color: hsl(var(--twc-border));
   }
 
   .feed-advanced-filters-toggle:hover {
-    color: hsl(var(--twc-secondary));
+    color: hsl(var(--twc-foreground));
   }
 
   .feed-advanced-filters-toggle:focus-visible {

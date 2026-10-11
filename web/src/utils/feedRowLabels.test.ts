@@ -135,7 +135,7 @@ describe('getFeedRowView', () => {
       eventDisplay: 'Introduced in the Senate',
       badgeToneClass: '',
       showMarginChip: false,
-      showEventLine: true,
+      showEventLine: false,
       eventToneClass: '',
     })
   })
@@ -316,7 +316,7 @@ describe('getFeedRowView', () => {
       eventDisplay: "Became law without the President's signature",
       badgeToneClass: ' text-law',
       showMarginChip: true,
-      showEventLine: true,
+      showEventLine: false,
       eventToneClass: ' feed-row-event--law',
     })
   })
