@@ -246,7 +246,7 @@
     }
   }
 
-  /* 12px meta kicker — uppercase section labels in side rails. */
+  /* Caption-size meta kicker — uppercase section labels in side rails. */
   .sidebar-kicker {
     margin: 0;
     font-size: var(--type-caption-size);

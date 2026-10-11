@@ -1022,7 +1022,7 @@
     height: 32px;
     margin: 0;
     margin-left: auto;
-    /* Centers the 18px glyph inside the 32px control on the 13px/1.4 sponsor line. */
+    /* Centers the 18px glyph inside the 32px control on the sponsor line. */
     margin-top: -6px;
     padding: 0;
     border: 1px solid transparent;

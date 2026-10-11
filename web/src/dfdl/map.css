@@ -2,7 +2,7 @@
   dfdl design tokens for Track Congress, applied through a mapping layer. The app's own --twc-* HSL channels
   point at dfdl semantics (tokens.hsl.css, generated from the same source as tokens.css), so components keep
   their classes. Track Congress runs in dfdl quiet mode (data-quiet on <html>): titles in sans and the accent
-  collapsed into the neutrals, because party colors already carry meaning here. Type sizes stay the app's own.
+  collapsed into the neutrals, because party colors already carry meaning here. Text sizes use dfdl's type roles (--type-*-size).
   Source of truth: https://github.com/dylanfernandezdelara/dfdl-ui (tokens are copied; do not edit them here).
 */
 @import './tokens.css';

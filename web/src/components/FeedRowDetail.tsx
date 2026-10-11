@@ -75,7 +75,7 @@ function ExecutiveContextSection({ item }: { item: FeedItem }) {
           </li>
         ))}
       </ul>
-      <p className="feed-row-executive-disclaimer text-ui text-faint">
+      <p className="feed-row-executive-disclaimer text-ui font-normal text-faint">
         Informal presidential statement — not recorded on Congress.gov.
       </p>
     </section>

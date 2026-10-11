@@ -165,7 +165,7 @@ function SponsoredBillsSection({
       <div className="flex min-w-0 items-baseline justify-between gap-2">
         <h3 className="sheet-section-title">Sponsored bills</h3>
         {bills.length > 0 && profile.sponsored_bills_total > bills.length ? (
-          <p className="m-0 text-caption text-faint">
+          <p className="m-0 text-caption font-normal text-faint">
             {bills.length} of {profile.sponsored_bills_total}
           </p>
         ) : null}
@@ -236,19 +236,19 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
         {phase.kind === 'ready' ? (
           <dl className="mt-1.5 grid grid-cols-3 gap-2">
             <div className="flex flex-col gap-0.5">
-              <dt className="text-caption text-faint">Passage votes</dt>
+              <dt className="text-caption font-normal text-faint">Passage votes</dt>
               <dd className="m-0 text-reading font-semibold tabular-nums">
                 {phase.profile.votes_cast}
               </dd>
             </div>
             <div className="flex flex-col gap-0.5">
-              <dt className="text-caption text-faint">Yea · Nay</dt>
+              <dt className="text-caption font-normal text-faint">Yea · Nay</dt>
               <dd className="m-0 text-reading font-semibold tabular-nums">
                 {phase.profile.yea_count} / {phase.profile.nay_count}
               </dd>
             </div>
             <div className="flex flex-col gap-0.5">
-              <dt className="text-caption text-faint">Party-line breaks</dt>
+              <dt className="text-caption font-normal text-faint">Party-line breaks</dt>
               <dd className="m-0 text-reading font-semibold tabular-nums">
                 {phase.profile.cross_vote_count}
               </dd>
