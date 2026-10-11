@@ -59,9 +59,9 @@ function defectorHook(entry: DefectorEntry): string {
 function portfolioHook(entry: PortfolioEntry, direction: 'gain' | 'loss'): string {
   const pct = Math.abs(entry.session_return_pct).toFixed(1)
   if (direction === 'gain') {
-    return `Disclosed holdings est. +${pct}% this session`
+    return `Disclosed holdings est. up ${pct}% this session`
   }
-  return `Disclosed holdings est. −${pct}% this session`
+  return `Disclosed holdings est. down ${pct}% this session`
 }
 
 function buildSpotlights(
