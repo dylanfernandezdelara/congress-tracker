@@ -5,6 +5,7 @@ import type { BillTextChanges } from './bill-text-api-types'
 import type { BillDigestContent } from './digest-api-types'
 import type { ExecutiveSignal, RelatedExecutiveBill } from './executive-api-types'
 import type { BillLifecycle } from './lifecycle-api-types'
+import type { VoteCohesion } from './stats-api-types'
 
 export type FeedChamber = 'House' | 'Senate'
 
@@ -26,6 +27,8 @@ export interface FeedPassageVote {
   yeas: number
   nays: number
   date: string
+  /** Whether the R and D majorities voted together; omitted until member votes are ingested. */
+  cohesion?: Exclude<VoteCohesion, 'unknown'>
 }
 
 /**

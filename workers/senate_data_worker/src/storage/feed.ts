@@ -1,4 +1,6 @@
 import { EXECUTIVE_SIGNAL_LOOKBACK_DAYS, FEED_MAX_BILLS, VOTE_LOOKBACK_DAYS } from "../constants";
+import { voteCohesion } from "../../../../shared/vote-cohesion";
+import { loadPassagePartySplits, rollIdentityKey } from "./passage-party-splits";
 import {
   getPrimarySponsorsForBills,
   type PrimarySponsorRow,
@@ -319,7 +321,32 @@ export async function buildFeedItemsForBills(
     billNumber: row.bill_number,
   }));
   const ctx = await loadFeedItemAssemblyContext(env, billKeys, options.executiveSince);
-  return rows.map((row) => assembleFeedItem(row, ctx, options.now));
+  const items = rows.map((row) => assembleFeedItem(row, ctx, options.now));
+  await annotatePassageCohesion(env.DB, items);
+  return items;
+}
+
+/**
+ * Mark each passage vote party-line or bipartisan from member votes, so a row can say how
+ * lopsided the vote was without a per-roll fetch. Left unset while member votes are missing.
+ */
+async function annotatePassageCohesion(db: D1Database, items: FeedItem[]): Promise<void> {
+  const rolls = items.flatMap((item) => item.passage_votes);
+  if (rolls.length === 0) return;
+  let splits: Awaited<ReturnType<typeof loadPassagePartySplits>>;
+  try {
+    splits = await loadPassagePartySplits(db, rolls);
+  } catch (err) {
+    // The label is optional context; a member-votes read failure must not take down the feed.
+    console.warn("feed_cohesion_unavailable", err);
+    return;
+  }
+  for (const vote of rolls) {
+    const entry = splits.get(rollIdentityKey(vote.chamber, vote.congress, vote.session, vote.roll_number));
+    if (!entry?.available) continue;
+    const cohesion = voteCohesion(entry.splits);
+    if (cohesion !== "unknown") vote.cohesion = cohesion;
+  }
 }
 
 export async function buildFeedPage(
