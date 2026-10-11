@@ -54,7 +54,7 @@
   }
 
   .member-profile-trigger-name {
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     font-weight: 500;
     line-height: 1.2;
   }

@@ -38,7 +38,7 @@ export function ProfileBillRow({
   })
   const headlineEl = (
     <span
-      className="line-clamp-2 text-[0.8125rem] font-semibold text-foreground"
+      className="line-clamp-2 text-ui font-semibold text-foreground"
       title={displayTitle}
     >
       {displayTitle}

@@ -122,7 +122,7 @@
     color: hsl(var(--twc-foreground));
     background-color: hsl(var(--twc-background));
     letter-spacing: -0.15px;
-    font-size: 13px;
+    font-size: var(--type-body-size);
     font-weight: 400;
     line-height: 1.45;
   }

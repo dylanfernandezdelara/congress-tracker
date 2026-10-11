@@ -293,7 +293,7 @@ export default function Home() {
 
         {feedError && items.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-card border border-border bg-card px-6 py-8 text-center">
-            <p className="text-[13px] text-muted-foreground">{feedError}</p>
+            <p className="text-ui text-muted-foreground">{feedError}</p>
             <button type="button" className="ghost-button" onClick={reloadAll}>
               Retry
             </button>
@@ -303,7 +303,7 @@ export default function Home() {
         {!showSkeleton && !feedError && !showFeed && !inFlight ? (
           <div className="home-feed-empty">
             <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
-            <p className="text-[13px] text-faint">{emptyCopy}</p>
+            <p className="text-ui text-faint">{emptyCopy}</p>
             {searchQuery ? (
               <button type="button" className="ghost-button" onClick={clearSearch}>
                 Clear search
