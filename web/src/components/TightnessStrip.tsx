@@ -5,7 +5,8 @@ import {
   SENATE_CLOSEST_LIMIT,
   SENATE_MARGIN_CAP,
   selectClosestVotes,
-  tightnessBarLabel,
+  tightnessBarMeta,
+  tightnessBarTitle,
   tightnessBarWidth,
   tightnessDotAriaLabel,
   tightnessDotKey,
@@ -67,12 +68,6 @@ export function TightnessStrip({
             selectedKey={selectedKey}
             onSelect={onSelect}
           />
-          <p className="tightness-legend">
-            <span className="tightness-legend-swatch tightness-bar-fill--party-line" aria-hidden="true" />
-            Party-line
-            <span className="tightness-legend-swatch tightness-bar-fill--bipartisan" aria-hidden="true" />
-            Bipartisan
-          </p>
         </>
       ) : null}
     </section>
@@ -115,7 +110,8 @@ function TightnessChamber({
                 aria-pressed={selected}
                 onClick={() => onSelect(dot)}
               >
-                <span className="tightness-bar-label">{tightnessBarLabel(dot)}</span>
+                <span className="tightness-bar-title">{tightnessBarTitle(dot)}</span>
+                <span className="tightness-bar-meta">{tightnessBarMeta(dot)}</span>
                 <span className="tightness-bar-track" aria-hidden="true">
                   <span className={`tightness-bar-fill tightness-bar-fill--${dot.cohesion}`} />
                 </span>

@@ -583,11 +583,20 @@
     outline-offset: 2px;
   }
 
-  .tightness-bar-label {
+  .tightness-bar-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: -0.15px;
+    color: hsl(var(--twc-foreground));
+    overflow-wrap: anywhere;
+  }
+
+  .tightness-bar-meta {
     font-size: 12px;
     line-height: 1.3;
     font-variant-numeric: tabular-nums;
-    color: hsl(var(--twc-foreground));
+    color: hsl(var(--twc-faint));
     overflow-wrap: anywhere;
   }
 

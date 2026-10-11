@@ -8,7 +8,8 @@ import {
   SENATE_MARGIN_CAP,
   cohesionLabel,
   selectClosestVotes,
-  tightnessBarLabel,
+  tightnessBarMeta,
+  tightnessBarTitle,
   tightnessBarWidth,
   tightnessDotAriaLabel,
   tightnessDotKey,
@@ -18,22 +19,24 @@ import {
 describe('tightnessLabels', () => {
   it('labels bills vs nominees so a confirm is not read as a bill id', () => {
     expect(tightnessDotLabel(makeTightnessDot())).toBe('H.R. 88')
-    expect(tightnessBarLabel(makeTightnessDot({ bill_type: 'HRES', bill_number: 1499 }))).toBe(
-      'H.Res. 1499 · 210–208',
-    )
-    expect(
-      tightnessBarLabel(
-        makeTightnessDot({
-          kind: 'nominee',
-          chamber: 'Senate',
-          yeas: 58,
-          nays: 40,
-          nominee_name: 'Jane Doe',
-          bill_type: null,
-          bill_number: null,
-        }),
-      ),
-    ).toBe('PN · Jane Doe · 58–40')
+    const resolution = makeTightnessDot({ bill_type: 'HRES', bill_number: 1499 })
+    expect(tightnessBarTitle(resolution)).toBe('House passes a knife-edge resolution (local sample)')
+    expect(tightnessBarMeta(resolution)).toBe('H.Res. 1499 · passed 210–208 · party-line')
+    const nominee = makeTightnessDot({
+      kind: 'nominee',
+      chamber: 'Senate',
+      yeas: 58,
+      nays: 40,
+      nominee_name: 'Jane Doe',
+      position_title: 'Secretary of Labor',
+      headline: null,
+      bill_type: null,
+      bill_number: null,
+    })
+    expect(tightnessBarTitle(nominee)).toBe('Jane Doe, Secretary of Labor')
+    expect(tightnessBarMeta(nominee)).toBe('confirmed 58–40 · party-line')
+    expect(tightnessBarTitle(makeTightnessDot({ headline: null }))).toBe('H.R. 88')
+    expect(tightnessBarMeta(makeTightnessDot({ cohesion: 'unknown' }))).toBe('H.R. 88 · passed 210–208')
     expect(tightnessDotAriaLabel(makeTightnessDot())).toMatch(/House bill H\.R\. 88, 210–208, party-line$/)
     expect(
       tightnessDotAriaLabel(
@@ -51,7 +54,7 @@ describe('tightnessLabels', () => {
     ).toMatch(/Senate nominee Pam Bondi, 51–49/)
   })
 
-  it('appends failed from the official roll result', () => {
+  it('says failed from the official roll result', () => {
     const failed = makeTightnessDot({
       roll_number: 9013,
       yeas: 212,
@@ -59,7 +62,7 @@ describe('tightnessLabels', () => {
       result: 'Failed',
       yea_pct: 212 / 418,
     })
-    expect(tightnessBarLabel(failed)).toBe('H.R. 88 · 212–206 failed')
+    expect(tightnessBarMeta(failed)).toBe('H.R. 88 · failed 212–206 · party-line')
     expect(tightnessDotAriaLabel(failed)).toMatch(/212–206, party-line, failed$/)
   })
 

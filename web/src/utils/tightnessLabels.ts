@@ -39,15 +39,27 @@ export function tightnessDotLabel(dot: TightnessDot): string {
   return dot.headline?.trim() || 'Bill'
 }
 
-/** Visible bar label: `H.Res. 1499 · 210–208` / `PN · Name · 58–40`. */
-export function tightnessBarLabel(dot: TightnessDot): string {
-  const tally = `${dot.yeas}–${dot.nays}`
-  const failed = voteIndicatesFailure(dot.result) ? ' failed' : ''
+/** First line of a closest-vote row: what was voted on, in words (headline or nominee), not a docket. */
+export function tightnessBarTitle(dot: TightnessDot): string {
   if (dot.kind === 'nominee') {
     const name = dot.nominee_name?.trim() || 'Senate nominee'
-    return `PN · ${name} · ${tally}${failed}`
+    const position = dot.position_title?.trim()
+    return position ? `${name}, ${position}` : name
   }
-  return `${tightnessDotLabel(dot)} · ${tally}${failed}`
+  return dot.headline?.trim() || tightnessDotLabel(dot)
+}
+
+/** Second line: `H.R. 88 · passed 210–208 · party-line` / `confirmed 58–40 · bipartisan`. */
+export function tightnessBarMeta(dot: TightnessDot): string {
+  const failed = voteIndicatesFailure(dot.result)
+  const verb =
+    dot.kind === 'nominee' ? (failed ? 'rejected' : 'confirmed') : failed ? 'failed' : 'passed'
+  const parts = [`${verb} ${dot.yeas}–${dot.nays}`]
+  if (dot.kind !== 'nominee' && dot.bill_type && dot.bill_number != null) {
+    parts.unshift(formatShortBillId(dot.bill_type, dot.bill_number))
+  }
+  if (dot.cohesion !== 'unknown') parts.push(cohesionLabel(dot.cohesion))
+  return parts.join(' · ')
 }
 
 export function tightnessDotAriaLabel(dot: TightnessDot): string {
