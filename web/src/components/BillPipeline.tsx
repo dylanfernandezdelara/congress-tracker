@@ -140,6 +140,9 @@ export function BillPipeline({
               <p className="bill-pipeline-process-status">{processStatus}</p>
             ) : null}
           </header>
+          {/* Committee sub-steps and procedural beats are detail most readers skip; the stepper above carries the headline journey. */}
+          <details className="bill-pipeline-path-details">
+            <summary className="feed-row-crs-details-summary">Full history</summary>
           <ol className="bill-pipeline-path-chapters" aria-label="Path through Congress">
             {chapters.map((chapter) => (
               <li key={chapter.key} className="bill-pipeline-path-chapter">
@@ -157,6 +160,7 @@ export function BillPipeline({
               </li>
             ))}
           </ol>
+          </details>
         </section>
       ) : null}
 

@@ -121,6 +121,10 @@ describe('BillPipeline', () => {
       screen.getByText('In House Administration · waiting for the committee to act'),
     ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Path through Congress' })).toBeInTheDocument()
+    // The step-by-step chapters start folded under "Full history"; the status line stays visible.
+    const fullHistory = screen.getByText('Full history').closest('details')
+    expect(fullHistory).not.toHaveAttribute('open')
+    expect(fullHistory).toContainElement(screen.getByLabelText('Path through Congress'))
     expect(screen.getByRole('heading', { name: 'House' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Senate' })).toBeInTheDocument()
     expect(screen.getByText('House Administration')).toBeInTheDocument()
