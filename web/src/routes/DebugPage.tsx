@@ -361,7 +361,7 @@ export default function DebugPage() {
 
           {ingest.executive && <ExecutiveMonitorSection executive={ingest.executive} />}
 
-          <section className="rounded-card border border-border bg-card p-5 text-[13px] text-muted-foreground">
+          <section className="rounded-card border border-border bg-card p-5 text-ui font-normal text-muted-foreground">
             <h2 className="text-base font-medium text-foreground">Alerting options</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>

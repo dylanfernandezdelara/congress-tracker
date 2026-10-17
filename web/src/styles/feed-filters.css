@@ -24,7 +24,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     font-weight: 500;
     letter-spacing: -0.1px;
     color: hsl(var(--twc-secondary));
@@ -60,7 +60,7 @@
     border: none;
     background: transparent;
     font: inherit;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     color: hsl(var(--twc-faint));
     cursor: pointer;
     text-decoration: underline;
@@ -93,7 +93,7 @@
     border-radius: 6px;
     background: hsl(var(--twc-surface-subtle));
     font: inherit;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     line-height: 1.2;
     color: hsl(var(--twc-secondary));
     cursor: pointer;
@@ -150,7 +150,7 @@
   }
 
   .feed-filter-field-label {
-    font-size: 11px;
+    font-size: var(--type-caption-size);
     font-weight: 400;
     letter-spacing: -0.05px;
     color: hsl(var(--twc-faint));
@@ -168,7 +168,7 @@
     border-radius: 0;
     background: transparent;
     font: inherit;
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     font-weight: 400;
     letter-spacing: -0.15px;
     line-height: 1.3;
@@ -311,12 +311,12 @@
   }
 
   .feed-member-suggestion-name {
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     color: hsl(var(--twc-foreground));
   }
 
   .feed-member-suggestion-meta {
-    font-size: 11px;
+    font-size: var(--type-caption-size);
     color: hsl(var(--twc-faint));
   }
 
@@ -334,7 +334,7 @@
 
   .feed-filters-sheet-title {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: var(--type-heading-size);
     font-weight: 600;
     letter-spacing: -0.02em;
     color: hsl(var(--twc-foreground));

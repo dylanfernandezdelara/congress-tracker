@@ -20,7 +20,7 @@ function App() {
           <Route
             path="/debug"
             element={
-              <Suspense fallback={<p className="text-[13px] text-faint">Loading…</p>}>
+              <Suspense fallback={<p className="text-ui font-normal text-faint">Loading…</p>}>
                 <DebugPage />
               </Suspense>
             }

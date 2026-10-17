@@ -144,7 +144,7 @@ function RecentLawItemRow({ law, isExpanded, onToggle }: RecentLawItemRowProps) 
               </>
             ) : (
               <div className="recent-laws-detail-fallback">
-                <p className="text-[13px] text-muted-foreground">Couldn&apos;t find bill details.</p>
+                <p className="text-ui font-normal text-muted-foreground">Couldn&apos;t find bill details.</p>
                 <a
                   href={sourceUrl}
                   target="_blank"
@@ -177,7 +177,7 @@ export function RecentLawsSection({
   if (error) {
     return (
       <section className="recent-laws" aria-label="New laws">
-        <p className="text-[13px] text-muted-foreground">{error}</p>
+        <p className="text-ui font-normal text-muted-foreground">{error}</p>
         {onRetry ? (
           <button type="button" className="ghost-button" onClick={onRetry}>
             Retry
@@ -190,7 +190,7 @@ export function RecentLawsSection({
   if (loading && !laws) {
     return (
       <section className="recent-laws" aria-label="New laws">
-        <p className="text-[12px] text-faint">Loading new laws…</p>
+        <p className="text-caption font-normal text-faint">Loading new laws…</p>
       </section>
     )
   }

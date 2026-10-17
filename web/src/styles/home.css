@@ -103,7 +103,7 @@
 
   .home-feed-notice-text {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--type-body-size);
     color: hsl(var(--twc-secondary));
   }
 
@@ -113,7 +113,7 @@
     border: none;
     background: transparent;
     font: inherit;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     font-weight: 500;
     color: hsl(var(--twc-faint));
     cursor: pointer;
@@ -189,7 +189,7 @@
 
   .recent-confirmations-detail-label {
     margin: 0;
-    font-size: 11px;
+    font-size: var(--type-caption-size);
     font-weight: 600;
     letter-spacing: 0.02em;
     text-transform: uppercase;
@@ -198,7 +198,7 @@
 
   .recent-confirmations-detail-text {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--type-body-size);
     line-height: 1.45;
     color: hsl(var(--twc-foreground));
   }
@@ -206,7 +206,7 @@
   .recent-confirmations-detail-points {
     margin: 0;
     padding-left: 1.1rem;
-    font-size: 13px;
+    font-size: var(--type-body-size);
     line-height: 1.4;
     color: hsl(var(--twc-secondary));
   }
@@ -217,7 +217,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.35rem;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     line-height: 1.3;
     color: hsl(var(--twc-faint));
   }
@@ -241,7 +241,7 @@
 
   .recent-confirmations-detail-source {
     margin: 0.15rem 0 0;
-    font-size: 11px;
+    font-size: var(--type-caption-size);
     line-height: 1.3;
     color: hsl(var(--twc-faint));
   }
@@ -254,7 +254,7 @@
 
   .recent-laws-timeline-link {
     margin: 0.25rem 0 0;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     font-weight: 500;
   }
 
@@ -284,7 +284,7 @@
     border: 1px solid hsl(var(--twc-border));
     border-radius: 4px;
     background: hsl(var(--twc-surface-subtle));
-    font-size: 11px;
+    font-size: var(--type-caption-size);
     font-weight: 500;
     letter-spacing: -0.1px;
     line-height: 1.2;
@@ -309,7 +309,7 @@
 
   .floor-status-sheet-title {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--type-heading-size);
     font-weight: 650;
     letter-spacing: -0.3px;
     color: hsl(var(--twc-foreground));
@@ -327,7 +327,7 @@
 
   .floor-status-chamber-name {
     margin: 0;
-    font-size: 0.6875rem;
+    font-size: var(--type-caption-size);
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -336,21 +336,21 @@
 
   .floor-status-chamber-status {
     margin: 0;
-    font-size: 0.9375rem;
+    font-size: var(--type-reading-size);
     font-weight: 650;
     color: hsl(var(--twc-foreground));
   }
 
   .floor-status-chamber-back {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--type-ui-size);
     font-weight: 600;
     color: hsl(var(--twc-foreground));
   }
 
   .floor-status-chamber-meta {
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: var(--type-ui-size);
     line-height: 1.4;
     color: hsl(var(--twc-faint));
   }
@@ -361,7 +361,7 @@
 
   .home-feed-count {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
     color: hsl(var(--twc-faint));
@@ -369,7 +369,7 @@
 
   .home-feed-quiet {
     margin: -0.25rem 0 0.75rem;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     font-weight: 400;
     color: hsl(var(--twc-faint));
   }
@@ -403,7 +403,7 @@
   .recent-confirmations-title,
   .sidebar-section-title {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--type-ui-size);
     font-weight: 500;
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
@@ -433,7 +433,7 @@
 
   .federal-compact-label {
     flex-shrink: 0;
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     font-weight: 500;
     color: hsl(var(--twc-foreground));
   }
@@ -452,7 +452,7 @@
 
   .federal-compact-seats {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     font-variant-numeric: tabular-nums;
     text-align: right;
     color: hsl(var(--twc-secondary));
@@ -489,7 +489,7 @@
     justify-content: flex-end;
     gap: 0.35rem;
     min-width: 0;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
@@ -524,7 +524,7 @@
 
   .tightness-row-label {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     font-weight: 500;
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
@@ -568,7 +568,7 @@
   }
 
   .tightness-bar-title {
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     font-weight: 500;
     line-height: 1.35;
     letter-spacing: -0.15px;
@@ -582,7 +582,7 @@
   }
 
   .tightness-bar-meta {
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     line-height: 1.3;
     font-variant-numeric: tabular-nums;
     color: hsl(var(--twc-secondary));
@@ -620,7 +620,7 @@
 
   .tightness-empty {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     line-height: 1.4;
     color: hsl(var(--twc-faint));
   }
@@ -658,13 +658,13 @@
   }
 
   .senate-waiting-bill {
-    font-size: 11px;
+    font-size: var(--type-caption-size);
     font-variant-numeric: tabular-nums;
     color: hsl(var(--twc-faint));
   }
 
   .senate-waiting-title {
-    font-size: 13px;
+    font-size: var(--type-ui-size);
     font-weight: 500;
     line-height: 1.35;
     letter-spacing: -0.15px;
@@ -687,7 +687,7 @@
 
   .senate-waiting-meta {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--type-caption-size);
     line-height: 1.4;
     color: hsl(var(--twc-faint));
   }
@@ -701,7 +701,7 @@
   }
 
   .senate-waiting--compact .senate-waiting-title {
-    font-size: 12px;
+    font-size: var(--type-caption-size);
   }
 
   /* Below the desktop rail breakpoint, rail content stacks under the feed. */
