@@ -22,4 +22,20 @@ describe('SiteFooter', () => {
     expect(note).toHaveTextContent(/screened for numbers and wording/i)
     expect(note).toHaveTextContent(/official CRS summary/i)
   })
+
+  it('hides the support note until a payment link is configured', () => {
+    render(<SiteFooter supportUrl={null} />)
+
+    expect(screen.queryByText(/chip in/i)).not.toBeInTheDocument()
+  })
+
+  it('links the support note to the payment link in a new tab', () => {
+    render(<SiteFooter supportUrl="https://buy.stripe.com/test_123" />)
+
+    const link = screen.getByRole('link', { name: /chip in/i })
+    expect(link).toHaveAttribute('href', 'https://buy.stripe.com/test_123')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(screen.getByText(/not tax-deductible/i)).toBeInTheDocument()
+  })
 })
