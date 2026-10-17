@@ -170,7 +170,8 @@ way they would, so summaries lead with concrete effects on people and stay stric
   `DIGEST_NEW_MODEL`, `DIGEST_REWRITE_MODEL`. `DIGEST_REWRITE_MODEL` set to an Anthropic id (`claude-sonnet-5-5`,
   `claude-opus-5-5`, `claude-haiku-5-5`) sends rewrites to the Anthropic API directly (`digest/anthropic-client.ts`,
   `ANTHROPIC_API_KEY` secret, medium effort, no temperature, 8k output cap that the budget estimate assumes in full,
-  priced from usage; not through AI Gateway). Without the key, rewrites stay on OpenRouter. Off by default. Not `OPENROUTER_MODEL`
+  priced from usage; not through AI Gateway). Without the key, rewrites stay on OpenRouter. Production sets
+  `DIGEST_REWRITE_MODEL = "claude-sonnet-5-5"` in `[vars]` since 2026-10-17 (Dylan's pick after round 7). Not `OPENROUTER_MODEL`
   (that one is for the free-model features: confirmations, executive links).
 - **Checks** `digest/checks.ts` run before anything is stored: a number the sources do not contain,
   a judging word, or an empty field blocks the summary; the writer retries once with the other model
@@ -235,7 +236,8 @@ way they would, so summaries lead with concrete effects on people and stay stric
   blocked. Model rounds and the calibrated judge are in the same folder.
   A candidate with `api: "anthropic"` calls the Anthropic Messages API directly (`ANTHROPIC_API_KEY`, normal API,
   cost from its `price`); `round7.json` compares Sonnet 5 on OpenRouter with Sonnet 5.5, Opus 5.5 and Haiku 5.5 on
-  Anthropic (not yet run).
+  Anthropic. Ran 2026-10-11 (judged by Gemini): Sonnet 5.5 12/12, Opus 5.5 12/12 at ~3.7x the cost, Haiku 5.5 11/12,
+  Sonnet 5 9/12 (each failure claimed something the bill doesn't say). Sonnet 5.5 often runs past the length guidance (warnings only).
   Latest round `round6.json` (v3.4 before the preamble clause; round 5's bills plus H.R. 10217, a county-list
   heritage area; Luna + Sonnet, 2 runs, $0.27). Judged only with the stricter groups rule above, so the numbers are
   not comparable with earlier rounds: Luna 10/10 on round 5's bills (10/12 with H.R. 10217, where the trial judge
