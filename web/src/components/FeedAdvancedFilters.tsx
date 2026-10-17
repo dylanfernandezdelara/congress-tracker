@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -244,6 +245,7 @@ export function FeedAdvancedFilters({
         aria-haspopup={inlinePanel ? undefined : 'dialog'}
         onClick={toggleFilters}
       >
+        <SlidersHorizontal aria-hidden="true" />
         Filters{activeCount > 0 ? ` · ${activeCount}` : ''}
       </button>
       {activeCount > 0 ? (

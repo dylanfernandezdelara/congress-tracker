@@ -97,12 +97,19 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
   return (
     <div className="feed-row-detail">
       <div className="feed-row-detail-topbar">
-        {sponsorDisplay && item.primary_sponsor ? (
-          <p className="feed-row-sponsor">
-            <span className="feed-row-sponsor-label">Sponsored by</span>{' '}
-            <SponsorLine sponsor={item.primary_sponsor} />
-          </p>
-        ) : null}
+        <div className="feed-row-detail-byline">
+          {sponsorDisplay && item.primary_sponsor ? (
+            <p className="feed-row-sponsor">
+              <span className="feed-row-sponsor-label">Sponsored by</span>{' '}
+              <SponsorLine sponsor={item.primary_sponsor} />
+            </p>
+          ) : null}
+          {item.policy_area && !isProcedural ? (
+            <p data-feed-policy-area className="feed-row-policy-area">
+              {item.policy_area}
+            </p>
+          ) : null}
+        </div>
         <button
           type="button"
           className="feed-row-share"

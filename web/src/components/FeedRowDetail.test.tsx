@@ -397,8 +397,11 @@ describe('FeedRowDetail', () => {
     )
     const shareButton = screen.getByRole('button', { name: 'Share' })
     const sponsor = document.querySelector('.feed-row-sponsor')
-    expect(shareButton.parentElement).toBe(sponsor?.parentElement)
+    expect(sponsor?.parentElement).toHaveClass('feed-row-detail-byline')
+    expect(shareButton.parentElement).toBe(sponsor?.parentElement?.parentElement)
     expect(shareButton.parentElement).toHaveClass('feed-row-detail-topbar')
+    // The policy area moved here from the collapsed row.
+    expect(document.querySelector('.feed-row-detail-byline .feed-row-policy-area')).toHaveTextContent('Defense')
     await waitFor(() => {
       expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
     })

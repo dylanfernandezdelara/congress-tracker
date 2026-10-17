@@ -128,7 +128,7 @@ const FEED_KIND_UI: Record<FeedStatusKind, FeedKindUi> = {
     badgeToneClass: ' text-law',
     eventToneClass: ' feed-row-event--law',
     showMarginWhenPresent: true,
-    showEventLine: true,
+    showEventLine: false,
   },
   procedural: {
     badgeToneClass: '',
@@ -140,13 +140,13 @@ const FEED_KIND_UI: Record<FeedStatusKind, FeedKindUi> = {
     badgeToneClass: '',
     eventToneClass: ' feed-row-event--muted',
     showMarginWhenPresent: false,
-    showEventLine: true,
+    showEventLine: false,
   },
   introduced: {
     badgeToneClass: '',
     eventToneClass: '',
     showMarginWhenPresent: false,
-    showEventLine: true,
+    showEventLine: false,
   },
 }
 

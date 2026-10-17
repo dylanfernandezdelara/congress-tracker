@@ -278,22 +278,6 @@
     margin-bottom: 0.75rem;
   }
 
-  .home-feed-heading {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem 0.55rem;
-    min-width: 0;
-  }
-
-  .home-feed-title {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: -0.15px;
-    color: hsl(var(--twc-foreground));
-  }
-
   .home-feed-floor-status {
     margin: 0;
     padding: 0.12rem 0.4rem;
