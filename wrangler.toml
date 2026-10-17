@@ -52,6 +52,9 @@ OPENROUTER_BASE_URL = "https://gateway.ai.cloudflare.com/v1/0b001ef01845353691fd
 # Daily cap on summary spend (digest/budget.ts; default $1 when unset). Raised to $2 on 2026-10-03 so the live lane
 # (200+ new bills a day while the floor is quiet) stops starving the site backfill, which gets at most half of it.
 DIGEST_DAILY_BUDGET_USD = "2"
+# Rewrites of bills that matter on the Anthropic API (round 7: 12/12 judged vs 9/12 for Sonnet 5, ~$0.011 a summary).
+# Needs the ANTHROPIC_API_KEY secret; without it rewrites stay on OpenRouter Sonnet 5 (digest/models.ts).
+DIGEST_REWRITE_MODEL = "claude-sonnet-5-5"
 
 [[routes]]
 pattern = "trackcongress.org"
