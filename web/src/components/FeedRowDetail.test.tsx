@@ -79,6 +79,22 @@ describe('FeedRowDetail', () => {
     expect(screen.getByText('R 52–1 · D 0–46')).toBeInTheDocument()
   })
 
+  it('puts the vote before the journey when the bill has a floor vote, and after it when it does not', () => {
+    const { container, unmount } = render(<FeedRowDetail item={makeFeedItem()} />)
+    const voteHeading = screen.getByRole('heading', { name: 'Vote history' })
+    const pipeline = container.querySelector('.bill-pipeline')
+    expect(pipeline).not.toBeNull()
+    expect(voteHeading.compareDocumentPosition(pipeline!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+
+    const noVote = render(<FeedRowDetail item={makeFeedItem({ passage_votes: [] })} />)
+    const laterHeading = screen.getByRole('heading', { name: 'Vote history' })
+    const laterPipeline = noVote.container.querySelector('.bill-pipeline')
+    expect(laterPipeline).not.toBeNull()
+    expect(laterHeading.compareDocumentPosition(laterPipeline!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+    expect(screen.getByText('No floor vote yet.')).toBeInTheDocument()
+  })
+
   it('shows the full digest summary and key points in the detail panel', () => {
     render(<FeedRowDetail item={makeFeedItem()} />)
 
@@ -397,8 +413,11 @@ describe('FeedRowDetail', () => {
     )
     const shareButton = screen.getByRole('button', { name: 'Share' })
     const sponsor = document.querySelector('.feed-row-sponsor')
-    expect(shareButton.parentElement).toBe(sponsor?.parentElement)
+    expect(sponsor?.parentElement).toHaveClass('feed-row-detail-byline')
+    expect(shareButton.parentElement).toBe(sponsor?.parentElement?.parentElement)
     expect(shareButton.parentElement).toHaveClass('feed-row-detail-topbar')
+    // The policy area moved here from the collapsed row.
+    expect(document.querySelector('.feed-row-detail-byline .feed-row-policy-area')).toHaveTextContent('Defense')
     await waitFor(() => {
       expect(screen.getByText('Member-level votes not available yet.')).toBeInTheDocument()
     })

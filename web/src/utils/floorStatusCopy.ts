@@ -14,7 +14,7 @@ function chipStatusPhrase(status: FloorWorkStatus): string {
 }
 
 /**
- * Timeline chip next to “Chronological timeline”. Names each chamber so
+ * Floor-status chip on the feed count line. Names each chamber so
  * “working” is never ambiguous about House vs Senate.
  */
 export function floorChipLabel(house: ChamberChipStatus, senate: ChamberChipStatus): string | null {

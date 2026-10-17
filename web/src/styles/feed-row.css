@@ -641,12 +641,14 @@
   }
 
   .feed-row-crs-details-summary::before {
-    content: '▸ ';
+    content: '▸' / '';
     display: inline-block;
+    /* A trailing space in content collapses inside inline-block; use a margin for the gap. */
+    margin-right: 0.35rem;
     transition: transform 0.15s ease;
   }
 
-  .feed-row-crs-details[open] .feed-row-crs-details-summary::before {
+  details[open] > .feed-row-crs-details-summary::before {
     transform: rotate(90deg);
   }
 
@@ -990,6 +992,14 @@
     gap: 0.75rem;
   }
 
+  .feed-row-detail-byline {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
   .feed-row-sponsor {
     margin: 0;
     flex: 1 1 auto;
@@ -1084,10 +1094,22 @@
     }
   }
 
-  @media (max-width: 379px) {
+  /* Phones: the date sits on its own line above the headline so the headline
+     gets the full row width instead of sharing it with a date column. */
+  @media (max-width: 639px) {
     .feed-list {
-      --feed-date-rail: calc(var(--grid) * 7);
-      --feed-date-gap: var(--space-8);
+      --feed-date-rail: 0px;
+      --feed-date-gap: 0px;
+    }
+
+    .feed-row-toggle {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--space-4);
+    }
+
+    .feed-row-date {
+      flex-direction: row;
+      gap: 0.4rem;
     }
   }
 

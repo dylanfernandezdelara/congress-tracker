@@ -1,5 +1,7 @@
 import { memo, useId } from 'react'
 
+import { originChamberFromBillType } from '@congress-tracker/shared/bill-id'
+
 import type { FeedItem } from '../api/types'
 import { CURRENT_PRESIDENT } from '../constants/president'
 import { feedRowKey } from '../utils/billDeepLink'
@@ -10,6 +12,7 @@ import {
   getFeedRowView,
   getFeedSummaryContent,
   getFeedTopic,
+  getPrimaryPassageVote,
 } from '../utils/feedRowLabels'
 import { feedItemTextGrew } from '../utils/textGrew'
 import { BillIdChip } from './BillIdChip'
@@ -36,8 +39,8 @@ export const FeedRow = memo(function FeedRow({
 }: FeedRowProps) {
   const badgeId = useId()
   const topicId = useId()
-  const policyAreaId = useId()
   const marginId = useId()
+  const cohesionId = useId()
   const deskChipId = useId()
   const textGrewId = useId()
   const eventId = useId()
@@ -49,8 +52,12 @@ export const FeedRow = memo(function FeedRow({
   const { meta, eventDisplay, badgeToneClass, showMarginChip, showEventLine, eventToneClass } =
     getFeedRowView(item)
   const displayDate = getFeedRowDisplayDate(item)
-  const policyArea = item.policy_area
-  const isProcedural = meta.kind === 'procedural'
+  // The docket prefix (H.R., S.) already names the origin chamber; only show the
+  // chamber when the vote happened in the other one.
+  // Party-line vs bipartisan says more about a tally than the numbers alone; only for the vote the margin shows.
+  const cohesion = showMarginChip ? getPrimaryPassageVote(item)?.cohesion : undefined
+  const showChamberChip =
+    Boolean(meta.chamber) && meta.chamber !== originChamberFromBillType(item.bill.type)
   const executiveSignal = item.executive_signals?.[0]
   const textGrew = feedItemTextGrew(item)
 
@@ -67,7 +74,7 @@ export const FeedRow = memo(function FeedRow({
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${policyArea && !isProcedural ? ` ${policyAreaId}` : ''}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${badgeId} ${topicId}${showMarginChip ? ` ${marginId}` : ''}${cohesion ? ` ${cohesionId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
@@ -77,7 +84,8 @@ export const FeedRow = memo(function FeedRow({
             secondary={
               displayDate.kind === 'signal'
                 ? `${PRESIDENT_LAST_NAME} post`
-                : displayDate.kind === 'intro'
+                : // An Introduced badge already says it; other badges still need the date explained.
+                  displayDate.kind === 'intro' && meta.kind !== 'introduced'
                   ? 'Introduced'
                   : undefined
             }
@@ -103,7 +111,15 @@ export const FeedRow = memo(function FeedRow({
                   {meta.margin}
                 </span>
               ) : null}
-              {meta.chamber ? <span className="feed-row-chip">{meta.chamber}</span> : null}
+              {cohesion ? (
+                <span
+                  id={cohesionId}
+                  className={`feed-row-chip feed-row-chip--cohesion feed-row-chip--${cohesion}`}
+                >
+                  {cohesion === 'party-line' ? 'Party-line' : 'Bipartisan'}
+                </span>
+              ) : null}
+              {showChamberChip ? <span className="feed-row-chip">{meta.chamber}</span> : null}
               <BillIdChip type={item.bill.type} number={item.bill.number} />
               {meta.sponsorName ? (
                 <span className="feed-row-chip feed-row-chip--sponsor">{meta.sponsorName}</span>
@@ -125,16 +141,6 @@ export const FeedRow = memo(function FeedRow({
                 </span>
               ) : null}
             </div>
-
-            {policyArea && !isProcedural ? (
-              <p
-                id={policyAreaId}
-                data-feed-policy-area
-                className="feed-row-policy-area"
-              >
-                {policyArea}
-              </p>
-            ) : null}
 
             <p
               id={eventId}

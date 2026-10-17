@@ -240,6 +240,64 @@ export async function selectMemberVotesForRollKeys(
   return out;
 }
 
+export type PartyPositionCountRow = {
+  chamber: string;
+  congress: number;
+  session: number;
+  roll_number: number;
+  party: string | null;
+  position: string;
+  n: number;
+};
+
+/**
+ * Member counts per party and position for a set of rolls: a handful of rows per roll
+ * instead of one per member, for callers that only need party splits.
+ */
+export async function selectPartyPositionCountsForRollKeys(
+  db: D1Database,
+  congress: number,
+  session: number,
+  rolls: Array<{ chamber: string; roll_number: number }>,
+  options: { excludeLocalSample: boolean }
+): Promise<PartyPositionCountRow[]> {
+  await ensureSchema(db);
+  if (rolls.length === 0) return [];
+
+  const unique = new Map<string, { chamber: string; roll_number: number }>();
+  for (const roll of rolls) {
+    unique.set(`${roll.chamber}:${roll.roll_number}`, roll);
+  }
+  const list = [...unique.values()];
+  const out: PartyPositionCountRow[] = [];
+
+  for (let i = 0; i < list.length; i += ROLL_IDENTITY_CHUNK) {
+    const chunk = list.slice(i, i + ROLL_IDENTITY_CHUNK);
+    const clauses = chunk
+      .map(() => "(mv.chamber = ? AND mv.roll_number = ?)")
+      .join(" OR ");
+    const binds: Array<string | number> = [congress, session, options.excludeLocalSample ? 1 : 0];
+    for (const roll of chunk) {
+      binds.push(roll.chamber, roll.roll_number);
+    }
+    const { results } = await db
+      .prepare(
+        `SELECT mv.chamber, mv.congress, mv.session, mv.roll_number,
+                m.party, mv.position, COUNT(*) AS n
+         FROM member_votes mv
+         JOIN members m ON m.bioguide_id = mv.bioguide_id
+         WHERE mv.congress = ? AND mv.session = ?
+           AND (? = 0 OR mv.bioguide_id NOT LIKE 'LOCAL:%')
+           AND (${clauses})
+         GROUP BY mv.chamber, mv.congress, mv.session, mv.roll_number, m.party, mv.position`
+      )
+      .bind(...binds)
+      .all<PartyPositionCountRow>();
+    out.push(...(results ?? []));
+  }
+  return out;
+}
+
 /** Passage votes for one member in a congress/session (newest first). */
 export async function selectMemberVotesForBioguide(
   db: D1Database,

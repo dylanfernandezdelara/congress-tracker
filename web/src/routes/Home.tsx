@@ -329,15 +329,14 @@ export default function Home() {
         {showFeed ? (
           <section id="feed-top" aria-busy={listRefreshing || undefined}>
             <div className="home-feed-header">
-              <div className="home-feed-heading">
-                <h2 className="home-feed-title">Chronological timeline</h2>
-                <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
-              </div>
+              {/* The feed is the page; the heading is for screen readers and outline only. */}
+              <h2 className="sr-only">Chronological timeline</h2>
               <p className="home-feed-count">
                 {items.length} of {total} {total === 1 ? 'bill' : 'bills'}
                 {floorChrome.throughLabel ? ` · through ${floorChrome.throughLabel}` : ''}
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
+              <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
             </div>
             {floorChrome.notice ? (
               <p className="home-feed-quiet" role="status">

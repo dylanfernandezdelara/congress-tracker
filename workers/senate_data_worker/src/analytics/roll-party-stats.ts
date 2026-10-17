@@ -5,6 +5,8 @@ import { normalizeVotePosition } from "../../../../shared/vote-positions";
 export type RollPartyPosition = {
   party: string | null;
   position: string;
+  /** Members this row stands for (aggregated reads); one when omitted. */
+  count?: number;
 };
 
 export type PartyTally = { yea: number; nay: number };
@@ -17,14 +19,14 @@ export function partyTalliesForRoll(
   positions: RollPartyPosition[]
 ): Map<string, PartyTally> {
   const tallies = new Map<string, PartyTally>();
-  for (const { party, position } of positions) {
+  for (const { party, position, count } of positions) {
     if (!party) continue;
     const partyKey = normalizePartyCode(party);
     if (partyKey === "Other") continue;
     const norm = normalizeVotePosition(position);
     if (norm === "other") continue;
     const tally = tallies.get(partyKey) ?? { yea: 0, nay: 0 };
-    tally[norm] += 1;
+    tally[norm] += count ?? 1;
     tallies.set(partyKey, tally);
   }
   return tallies;

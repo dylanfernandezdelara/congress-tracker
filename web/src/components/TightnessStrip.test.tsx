@@ -41,10 +41,14 @@ describe('TightnessStrip', () => {
     expect(container.querySelector('[data-tightness-row="house"]')).not.toBeNull()
     expect(container.querySelector('[data-tightness-row="senate"]')).not.toBeNull()
     expect(screen.getByRole('heading', { name: 'Senate bills & nominees' })).toBeInTheDocument()
-    expect(screen.getByText('H.R. 88 · 210–208')).toBeInTheDocument()
-    expect(screen.getByText('PN · Jane Doe · 51–49')).toBeInTheDocument()
+    expect(screen.getByText('House passes a knife-edge resolution (local sample)')).toBeInTheDocument()
+    expect(screen.getByText('H.R. 88 · passed 210–208 · party-line')).toBeInTheDocument()
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument()
+    expect(screen.getByText('confirmed 51–49 · party-line')).toBeInTheDocument()
 
-    const houseRow = screen.getByRole('button', { name: /House bill H\.R\. 88, 210–208, party-line/ })
+    const houseRow = screen.getByRole('button', {
+      name: 'House passes a knife-edge resolution (local sample) H.R. 88 · passed 210–208 · party-line',
+    })
     expect(houseRow.style.transform).toBe('')
     expect(houseRow.style.getPropertyValue('--tightness-x')).toBe('')
     fireEvent.click(houseRow)
@@ -90,9 +94,9 @@ describe('TightnessStrip', () => {
       ...container.querySelectorAll('[data-tightness-row="house"] .tightness-bar-row'),
     ] as HTMLElement[]
     expect(buttons).toHaveLength(3)
-    expect(screen.getByText('H.R. 88 · 210–208')).toBeInTheDocument()
-    expect(screen.getByText('H.R. 99 · 212–206 failed')).toBeInTheDocument()
-    expect(screen.getByText('H.R. 1 · 218–201')).toBeInTheDocument()
+    expect(screen.getByText('H.R. 88 · passed 210–208 · party-line')).toBeInTheDocument()
+    expect(screen.getByText(/^H\.R\. 99 · failed 212–206/)).toBeInTheDocument()
+    expect(screen.getByText(/^H\.R\. 1 · passed 218–201/)).toBeInTheDocument()
     expect(screen.queryByText(/421–1/)).not.toBeInTheDocument()
 
     const widths = buttons.map((button) => barWidth(button))
@@ -131,8 +135,8 @@ describe('TightnessStrip', () => {
     )
     expect(container.querySelectorAll('[data-tightness-row="house"] .tightness-bar-row')).toHaveLength(4)
     expect(container.querySelectorAll('[data-tightness-row="senate"] .tightness-bar-row')).toHaveLength(3)
-    expect(screen.getByText('PN · Nominee 0 · 51–49')).toBeInTheDocument()
-    expect(screen.queryByText(/H\.R\. \d+ · 51–49/)).not.toBeInTheDocument()
+    expect(screen.getByText(/^Nominee 0/)).toBeInTheDocument()
+    expect(screen.queryByText(/H\.R\. \d+ · passed 51–49/)).not.toBeInTheDocument()
   })
 
   it('hides empty closest-vote rows when a load error is set', () => {
@@ -155,6 +159,26 @@ describe('TightnessStrip', () => {
     expect(screen.queryByText('No close Senate votes.')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(onRetry).toHaveBeenCalled()
+  })
+
+  it('shows one empty line when neither chamber has a close vote', () => {
+    const { container } = render(
+      <TightnessStrip house={[]} senate={[]} selectedKey={null} onSelect={vi.fn()} />,
+    )
+
+    expect(screen.getByText('No close votes yet this session.')).toBeInTheDocument()
+    expect(container.querySelector('[data-tightness-row]')).toBeNull()
+  })
+
+  it('drops an empty chamber but keeps the other chamber', () => {
+    const { container } = render(
+      <TightnessStrip house={[makeTightnessDot()]} senate={[]} selectedKey={null} onSelect={vi.fn()} />,
+    )
+
+    expect(container.querySelector('[data-tightness-row="house"]')).not.toBeNull()
+    expect(container.querySelector('[data-tightness-row="senate"]')).toBeNull()
+    expect(screen.getByText('H.R. 88 · passed 210–208 · party-line')).toBeInTheDocument()
+    expect(screen.queryByText('No close votes yet this session.')).not.toBeInTheDocument()
   })
 
   it('marks the selected row without stacking z-index tricks', () => {
