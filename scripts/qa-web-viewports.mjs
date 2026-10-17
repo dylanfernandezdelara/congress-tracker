@@ -150,11 +150,12 @@ async function auditHomePage(page) {
           issues.push(`${prefix} ${rowName} tightness bars empty without a fallback`)
         }
         for (const button of buttons) {
-          const label = button.querySelector('.tightness-bar-label')
+          const title = button.querySelector('.tightness-bar-title')
+          const meta = button.querySelector('.tightness-bar-meta')
           const track = button.querySelector('.tightness-bar-track')
           const fill = button.querySelector('.tightness-bar-fill')
-          const text = label?.textContent ?? ''
-          if (!text.trim()) {
+          const text = `${title?.textContent ?? ''} ${meta?.textContent ?? ''}`
+          if (!title?.textContent?.trim() || !meta?.textContent?.trim()) {
             issues.push(`${prefix} ${rowName} tightness bar label missing`)
           }
           if (text.includes('421–1') || text.includes('421-1')) {
