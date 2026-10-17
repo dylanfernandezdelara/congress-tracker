@@ -672,14 +672,15 @@
     line-height: 1.35;
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
-    text-decoration: underline;
-    text-decoration-color: hsl(var(--twc-link-decoration));
+    text-decoration: none;
     overflow-wrap: anywhere;
   }
 
+  /* Plain title like the feed rows; the underline only appears on hover/focus. */
   .senate-waiting-item:hover .senate-waiting-title,
   .senate-waiting-item:focus-visible .senate-waiting-title {
-    color: hsl(var(--twc-secondary));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--twc-link-decoration));
   }
 
   .senate-waiting-item:focus-visible {

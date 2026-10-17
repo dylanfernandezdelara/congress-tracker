@@ -157,6 +157,27 @@ describe('TightnessStrip', () => {
     expect(onRetry).toHaveBeenCalled()
   })
 
+  it('shows one empty line and no legend when neither chamber has a close vote', () => {
+    const { container } = render(
+      <TightnessStrip house={[]} senate={[]} selectedKey={null} onSelect={vi.fn()} />,
+    )
+
+    expect(screen.getByText('No close votes yet this session.')).toBeInTheDocument()
+    expect(container.querySelector('[data-tightness-row]')).toBeNull()
+    expect(container.querySelector('.tightness-legend')).toBeNull()
+  })
+
+  it('drops an empty chamber but keeps the other chamber and the legend', () => {
+    const { container } = render(
+      <TightnessStrip house={[makeTightnessDot()]} senate={[]} selectedKey={null} onSelect={vi.fn()} />,
+    )
+
+    expect(container.querySelector('[data-tightness-row="house"]')).not.toBeNull()
+    expect(container.querySelector('[data-tightness-row="senate"]')).toBeNull()
+    expect(container.querySelector('.tightness-legend')).not.toBeNull()
+    expect(screen.queryByText('No close votes yet this session.')).not.toBeInTheDocument()
+  })
+
   it('marks the selected row without stacking z-index tricks', () => {
     const house = [makeTightnessDot(), makeTightnessDot({ roll_number: 9005, bill_number: 1, yeas: 218, nays: 210 })]
     const { container } = render(
