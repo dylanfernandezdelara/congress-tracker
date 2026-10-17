@@ -5,7 +5,7 @@ import { senateWaitingFromFeed } from "./tightness-stats";
 
 const mockBuildFeedPage = vi.fn();
 const mockBuildRecentConfirmations = vi.fn();
-const mockSelectMemberVotesForRollKeys = vi.fn();
+const mockSelectPartyPositionCounts = vi.fn();
 const mockHasRealMemberRoster = vi.fn();
 
 vi.mock("./feed", () => ({
@@ -17,7 +17,7 @@ vi.mock("./recent-confirmations", () => ({
 }));
 
 vi.mock("../d1/member-votes", () => ({
-  selectMemberVotesForRollKeys: (...args: unknown[]) => mockSelectMemberVotesForRollKeys(...args),
+  selectPartyPositionCountsForRollKeys: (...args: unknown[]) => mockSelectPartyPositionCounts(...args),
 }));
 
 vi.mock("../d1/members", () => ({
@@ -157,7 +157,7 @@ describe("buildTightnessStats", () => {
   beforeEach(() => {
     mockBuildFeedPage.mockReset();
     mockBuildRecentConfirmations.mockReset();
-    mockSelectMemberVotesForRollKeys.mockReset();
+    mockSelectPartyPositionCounts.mockReset();
     mockHasRealMemberRoster.mockReset();
     mockHasRealMemberRoster.mockResolvedValue(false);
   });
@@ -249,15 +249,13 @@ describe("buildTightnessStats", () => {
         },
       ],
     });
-    mockSelectMemberVotesForRollKeys.mockResolvedValue([
-      { chamber: "House", congress: 119, session: 2, roll_number: 288, bioguide_id: "R1", party: "R", position: "Yea" },
-      { chamber: "House", congress: 119, session: 2, roll_number: 288, bioguide_id: "R2", party: "R", position: "Yea" },
-      { chamber: "House", congress: 119, session: 2, roll_number: 288, bioguide_id: "D1", party: "D", position: "Nay" },
-      { chamber: "House", congress: 119, session: 2, roll_number: 288, bioguide_id: "D2", party: "D", position: "Nay" },
-      { chamber: "House", congress: 119, session: 2, roll_number: 252, bioguide_id: "R1", party: "R", position: "Yea" },
-      { chamber: "House", congress: 119, session: 2, roll_number: 252, bioguide_id: "D1", party: "D", position: "Yea" },
-      { chamber: "Senate", congress: 119, session: 2, roll_number: 9002, bioguide_id: "S1", party: "R", position: "Yea" },
-      { chamber: "Senate", congress: 119, session: 2, roll_number: 9002, bioguide_id: "S2", party: "D", position: "Yea" },
+    mockSelectPartyPositionCounts.mockResolvedValue([
+      { chamber: "House", congress: 119, session: 2, roll_number: 288, party: "R", position: "Yea", n: 2 },
+      { chamber: "House", congress: 119, session: 2, roll_number: 288, party: "D", position: "Nay", n: 2 },
+      { chamber: "House", congress: 119, session: 2, roll_number: 252, party: "R", position: "Yea", n: 1 },
+      { chamber: "House", congress: 119, session: 2, roll_number: 252, party: "D", position: "Yea", n: 1 },
+      { chamber: "Senate", congress: 119, session: 2, roll_number: 9002, party: "R", position: "Yea", n: 1 },
+      { chamber: "Senate", congress: 119, session: 2, roll_number: 9002, party: "D", position: "Yea", n: 1 },
     ]);
 
     const body = await buildTightnessStats(
@@ -278,10 +276,10 @@ describe("buildTightnessStats", () => {
     const nominee = body.senate.find((dot) => dot.kind === "nominee");
     expect(nominee?.nominee_name).toBe("Pam Bondi");
     expect(nominee?.cohesion).toBe("party-line");
-    expect(mockSelectMemberVotesForRollKeys).toHaveBeenCalledTimes(1);
+    expect(mockSelectPartyPositionCounts).toHaveBeenCalledTimes(1);
     expect(mockBuildFeedPage).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ includeIntros: false })
+      expect.objectContaining({ includeIntros: false, skipCohesion: true })
     );
   });
 });

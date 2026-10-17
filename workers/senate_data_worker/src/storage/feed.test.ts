@@ -14,6 +14,8 @@ const mockGetCompanionVotesForBills = vi.fn();
 const mockGetBillTextChangesForBills = vi.fn();
 const mockGetProcessSummariesForBills = vi.fn();
 const mockGetPrimarySponsorsForBills = vi.fn();
+const mockSelectPartyPositionCounts = vi.fn();
+const mockHasRealMemberRoster = vi.fn();
 const mockLookbackStartIso = vi.fn((days: number) => `lookback-${days}`);
 
 vi.mock("../d1/schema", () => ({
@@ -80,6 +82,19 @@ vi.mock("../d1/bill-process", async (importOriginal) => {
     ...actual,
     getProcessSummariesForBills: (...args: unknown[]) =>
       mockGetProcessSummariesForBills(...args),
+  };
+});
+
+vi.mock("../d1/member-votes", () => ({
+  selectPartyPositionCountsForRollKeys: (...args: unknown[]) =>
+    mockSelectPartyPositionCounts(...args),
+}));
+
+vi.mock("../d1/members", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../d1/members")>();
+  return {
+    ...actual,
+    hasRealMemberRoster: (...args: unknown[]) => mockHasRealMemberRoster(...args),
   };
 });
 
@@ -155,6 +170,8 @@ describe("buildFeedPage lifecycle attachment", () => {
     mockGetBillTextChangesForBills.mockResolvedValue(new Map());
     mockGetProcessSummariesForBills.mockResolvedValue(new Map());
     mockGetPrimarySponsorsForBills.mockResolvedValue(new Map());
+    mockSelectPartyPositionCounts.mockResolvedValue([]);
+    mockHasRealMemberRoster.mockResolvedValue(false);
   });
 
   it("forwards optional chamber to feed bill select and count", async () => {
@@ -592,6 +609,90 @@ describe("buildFeedPage lifecycle attachment", () => {
       latest_passage_date: null,
       latest_activity_date: "2026-06-24T14:26:00.000Z",
       passage_votes: [],
+    });
+  });
+
+  describe("passage vote cohesion", () => {
+    const roll = (roll_number: number) => ({
+      chamber: "House",
+      congress: 119,
+      session: 2,
+      roll_number,
+      question: "On Passage",
+      result: "Passed",
+      yeas: 220,
+      nays: 200,
+      vote_date: "2026-06-22",
+    });
+    const count = (roll_number: number, party: string, position: string, n: number) => ({
+      chamber: "House",
+      congress: 119,
+      session: 2,
+      roll_number,
+      party,
+      position,
+      n,
+    });
+
+    beforeEach(() => {
+      mockGetPassageVotesForBills.mockResolvedValue(
+        new Map([["119:HR:6644", [roll(10), roll(11), roll(12), roll(13)]]])
+      );
+    });
+
+    it("labels opposed majorities party-line and agreeing ones bipartisan", async () => {
+      mockSelectPartyPositionCounts.mockResolvedValue([
+        count(10, "R", "Yea", 210),
+        count(10, "D", "Nay", 200),
+        count(10, "D", "Yea", 10),
+        count(11, "R", "Yea", 200),
+        count(11, "D", "Aye", 190),
+        // Only Republicans recorded: no comparison to make.
+        count(12, "R", "Yea", 200),
+      ]);
+
+      const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
+      const votes = page.items[0]!.passage_votes;
+
+      expect(votes.map((vote) => vote.cohesion)).toEqual([
+        "party-line",
+        "bipartisan",
+        undefined,
+        undefined,
+      ]);
+      expect(votes[3]).not.toHaveProperty("cohesion");
+    });
+
+    it("drops local sample members once a real roster exists", async () => {
+      mockHasRealMemberRoster.mockResolvedValue(true);
+
+      await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
+
+      expect(mockSelectPartyPositionCounts).toHaveBeenCalledWith(
+        expect.anything(),
+        119,
+        2,
+        expect.arrayContaining([{ chamber: "House", roll_number: 10 }]),
+        { excludeLocalSample: true }
+      );
+    });
+
+    it("still serves the feed when member votes cannot be read", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      mockSelectPartyPositionCounts.mockRejectedValue(new Error("D1 down"));
+
+      const page = await buildFeedPage(createEnv(), { limit: 50, offset: 0 });
+
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]!.passage_votes.every((vote) => vote.cohesion === undefined)).toBe(true);
+      expect(warn).toHaveBeenCalledWith("feed_cohesion_unavailable", expect.any(Error));
+      warn.mockRestore();
+    });
+
+    it("skips the member-vote read when the caller asks", async () => {
+      await buildFeedPage(createEnv(), { limit: 50, offset: 0, skipCohesion: true });
+
+      expect(mockSelectPartyPositionCounts).not.toHaveBeenCalled();
     });
   });
 });

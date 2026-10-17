@@ -45,6 +45,23 @@ describe('FeedRow', () => {
     expect(hiddenEvent?.textContent).toContain('52–47 in the Senate')
   })
 
+  it('labels the tally party-line or bipartisan when member votes are known', () => {
+    const base = makeFeedItem()
+    const vote = base.passage_votes[0]!
+    const { container, rerender } = render(
+      <FeedRow item={{ ...base, passage_votes: [{ ...vote, cohesion: 'party-line' }] }} isExpanded={false} onToggle={() => {}} />,
+    )
+    expect(container.querySelector('.feed-row-chip--cohesion')?.textContent).toBe('Party-line')
+
+    rerender(
+      <FeedRow item={{ ...base, passage_votes: [{ ...vote, cohesion: 'bipartisan' }] }} isExpanded={false} onToggle={() => {}} />,
+    )
+    expect(container.querySelector('.feed-row-chip--cohesion')?.textContent).toBe('Bipartisan')
+
+    rerender(<FeedRow item={base} isExpanded={false} onToggle={() => {}} />)
+    expect(container.querySelector('.feed-row-chip--cohesion')).toBeNull()
+  })
+
   it('shows digest bullets in the expanded detail panel', () => {
     render(<FeedRow item={makeFeedItem()} isExpanded={true} onToggle={() => {}} />)
 

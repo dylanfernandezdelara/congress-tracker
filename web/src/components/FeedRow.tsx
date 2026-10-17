@@ -12,6 +12,7 @@ import {
   getFeedRowView,
   getFeedSummaryContent,
   getFeedTopic,
+  getPrimaryPassageVote,
 } from '../utils/feedRowLabels'
 import { feedItemTextGrew } from '../utils/textGrew'
 import { BillIdChip } from './BillIdChip'
@@ -39,6 +40,7 @@ export const FeedRow = memo(function FeedRow({
   const badgeId = useId()
   const topicId = useId()
   const marginId = useId()
+  const cohesionId = useId()
   const deskChipId = useId()
   const textGrewId = useId()
   const eventId = useId()
@@ -52,6 +54,8 @@ export const FeedRow = memo(function FeedRow({
   const displayDate = getFeedRowDisplayDate(item)
   // The docket prefix (H.R., S.) already names the origin chamber; only show the
   // chamber when the vote happened in the other one.
+  // Party-line vs bipartisan says more about a tally than the numbers alone; only for the vote the margin shows.
+  const cohesion = showMarginChip ? getPrimaryPassageVote(item)?.cohesion : undefined
   const showChamberChip =
     Boolean(meta.chamber) && meta.chamber !== originChamberFromBillType(item.bill.type)
   const executiveSignal = item.executive_signals?.[0]
@@ -70,7 +74,7 @@ export const FeedRow = memo(function FeedRow({
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${showMarginChip ? ` ${marginId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${badgeId} ${topicId}${showMarginChip ? ` ${marginId}` : ''}${cohesion ? ` ${cohesionId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
           aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
@@ -105,6 +109,14 @@ export const FeedRow = memo(function FeedRow({
               {showMarginChip ? (
                 <span id={marginId} className="feed-row-chip feed-row-chip--margin">
                   {meta.margin}
+                </span>
+              ) : null}
+              {cohesion ? (
+                <span
+                  id={cohesionId}
+                  className={`feed-row-chip feed-row-chip--cohesion feed-row-chip--${cohesion}`}
+                >
+                  {cohesion === 'party-line' ? 'Party-line' : 'Bipartisan'}
                 </span>
               ) : null}
               {showChamberChip ? <span className="feed-row-chip">{meta.chamber}</span> : null}
