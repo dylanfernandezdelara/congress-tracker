@@ -33,3 +33,7 @@ senate-*.png
 Thumbs.db
 .qa/
 filter-screenshots/
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json

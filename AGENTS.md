@@ -61,6 +61,25 @@ Whenever you change the UI (`web/`), always share the preview URL in your reply 
 
 Agent context lives in this file and `.cursor/rules/` (`pr-viewport-qa.mdc`, `pr-thermonuclear-review.mdc`) so any Cursor session picks up the same workflow without depending on GitHub.
 
+### Merging PRs: high confidence merges, low confidence waits for Dylan
+
+Every PR gets a subagent review first; fix what it finds and record the review in the PR body. Then sort it by confidence. A push to `main` deploys production, so when in doubt it is low.
+
+**High confidence: merge it yourself** (`gh pr merge --merge`; Dylan pre-approves the command in his Claude settings). All of these hold:
+
+- Tests and type checks pass; for `web/` changes the ship checklist above is done and the preview URL is in the PR.
+- The review is clean after fixes: no open CRITICAL or WARNING.
+- The change is one of: docs, tests, dead-code removal, a bug fix with a test, a UI change matching an agreed plan, or election data whose second verify pass agrees with the first on every name, party and incumbent flag.
+
+**Low confidence: label `needs-dylan`, leave it open, say why in the PR and in chat.** Any of these:
+
+- Spends money or raises a budget (paid API calls, backfills, `DIGEST_DAILY_BUDGET_USD`, new paid services).
+- Changes what summaries say (prompt, models, checks), or rewrites stored summaries.
+- D1 schema migrations, or deleting production data.
+- Secrets, auth, security headers, deploy or Cloudflare config, `wrangler.toml` triggers.
+- Election data with any unresolved source disagreement or a field left null for lack of a source.
+- A new product direction nobody agreed on, or anything the reviewer and you disagree about.
+
 ### Production deploys (Cloudflare Workers Builds, not GitHub Actions)
 
 Pushes to `main` should deploy production via Cloudflare Workers Builds
