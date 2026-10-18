@@ -36,7 +36,6 @@ export const JUDGE_SUFFIX =
 
 const lists = JSON.parse(readFileSync(join(here, 'bills.json'), 'utf8'))
 const ids = [...lists.practice, ...lists.test].map((b) => b.id)
-const picks = JSON.parse(readFileSync(join(evalDir, 'round1-picks.json'), 'utf8'))
 const SOURCES = ['baseline_production', 'openai_gpt-6-luna', 'z-ai_glm-5.3-flash', 'deepseek_deepseek-v4.1-flash', 'meta_muse-spark-1.3-contributor']
 
 const bill = (id) => JSON.parse(readFileSync(join(evalDir, 'bills', `${id}.json`), 'utf8'))
@@ -114,6 +113,8 @@ async function judge(b, s) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // Human picks are only needed to calibrate; judge-round imports JUDGE from this file without them.
+  const picks = JSON.parse(readFileSync(join(evalDir, 'round1-picks.json'), 'utf8'))
   const outDir = join(evalDir, 'judge')
   mkdirSync(outDir, { recursive: true })
 
