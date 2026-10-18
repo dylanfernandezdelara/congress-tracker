@@ -2,6 +2,8 @@
 
 Cloudflare-native app: ingest House + Senate **passage** roll-call votes, summarize bills in plain English from their text via OpenRouter (`digest/`), serve an action-row feed.
 
+**Launch priorities live in [`docs/LAUNCH.md`](docs/LAUNCH.md).** Read it first and update it when an item lands. The 2026 midterms guide (the launch feature) is in [`docs/MIDTERMS_2026.md`](docs/MIDTERMS_2026.md).
+
 ## Runtime surfaces
 
 - `workers/senate_data_worker/wrangler.toml` — Cloudflare Worker (ingestion + API)
