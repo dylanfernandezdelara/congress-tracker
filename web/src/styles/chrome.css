@@ -207,6 +207,8 @@
     letter-spacing: -0.15px;
     color: hsl(var(--twc-foreground));
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   a.site-header-brand {

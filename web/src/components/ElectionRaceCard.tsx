@@ -8,15 +8,6 @@ import {
 import { formatVoteDate } from '../utils/billLabels'
 import { MemberProfileTrigger } from './MemberProfileTrigger'
 
-const PARTY_TONE: Record<ElectionCandidate['party_code'], string> = {
-  D: 'election-party--d',
-  R: 'election-party--r',
-  I: 'election-party--i',
-  L: 'election-party--other',
-  G: 'election-party--other',
-  Other: 'election-party--other',
-}
-
 const BALLOT_STATUS_LABEL: Record<ElectionCandidate['ballot_status'], string | null> = {
   active: null,
   withdrawn: 'Withdrew; still on the ballot',
@@ -39,7 +30,7 @@ function CandidateRow({ candidate, state }: { candidate: ElectionCandidate; stat
     <li className="election-candidate">
       <div className="election-candidate-head">
         <span className="election-candidate-name">{candidate.name}</span>
-        <span className={`election-party ${PARTY_TONE[candidate.party_code]}`}>
+        <span className="election-party">
           {candidate.parties.join(' · ')}
         </span>
       </div>
@@ -73,6 +64,11 @@ function CandidateRow({ candidate, state }: { candidate: ElectionCandidate; stat
   )
 }
 
+/** Alphabetical by last name, whatever order the data arrives in. */
+function sortedCandidates(race: ElectionRace): ElectionCandidate[] {
+  return [...race.candidates].sort((a, b) => a.sort_name.localeCompare(b.sort_name, 'en', { sensitivity: 'base' }))
+}
+
 export function ElectionRaceCard({ race }: { race: ElectionRace }) {
   const competitive = isCompetitiveRace(race)
   const tags = [race.open_seat ? 'Open seat' : null, race.special ? 'Special election' : null].filter(
@@ -104,7 +100,7 @@ export function ElectionRaceCard({ race }: { race: ElectionRace }) {
       {race.note ? <p className="election-race-note">{race.note}</p> : null}
 
       <ul className="election-candidates">
-        {race.candidates.map((candidate) => (
+        {sortedCandidates(race).map((candidate) => (
           <CandidateRow key={candidate.sort_name} candidate={candidate} state={race.state} />
         ))}
       </ul>

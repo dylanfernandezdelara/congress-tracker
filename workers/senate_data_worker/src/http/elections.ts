@@ -29,7 +29,7 @@ function buildIndex(): ElectionsIndexResponse {
   return { election_day: ELECTION_DAY_2026, states };
 }
 
-/** Cloudflare's IP geolocation; never stored or logged. */
+/** Cloudflare's IP geolocation. This code never stores or logs it; the response is never cached. */
 export function locateState(request: Request): string | null {
   const cf = (request as Request & { cf?: { country?: string; regionCode?: string } }).cf;
   if (cf?.country !== "US" || !cf.regionCode) return null;

@@ -1,5 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ElectionsIndexResponse } from '@congress-tracker/shared/elections-2026/api-types'
@@ -86,7 +86,12 @@ const api = vi.hoisted(() => ({
 vi.mock('../api/elections', () => api)
 
 function Where() {
-  return <span data-testid="path">{useLocation().pathname}</span>
+  return (
+    <>
+      <span data-testid="path">{useLocation().pathname}</span>
+      <Link to="/midterms">Midterms home</Link>
+    </>
+  )
 }
 
 function renderAt(path: string) {
@@ -152,5 +157,50 @@ describe('Midterms', () => {
     renderAt('/midterms')
     expect(await screen.findByRole('option', { name: 'Pick your state' })).toBeTruthy()
     expect(screen.getByTestId('path').textContent).toBe('/midterms')
+  })
+
+  it('prefers a choice made this visit when returning to /midterms', async () => {
+    api.fetchElectionsLocate.mockResolvedValue({ state: 'PA' })
+    renderAt('/midterms')
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/midterms/PA'))
+
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'OH' } })
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/midterms/OH'))
+
+    fireEvent.click(screen.getByRole('link', { name: 'Midterms home' }))
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/midterms/OH'))
+    expect(screen.queryByText('Based on your location')).toBeNull()
+  })
+
+  it('never shows the previous state\'s races while the next state loads', async () => {
+    renderAt('/midterms/PA')
+    await screen.findByRole('region', { name: 'Competitive races' })
+
+    let finish: (g: StateElectionGuide) => void = () => {}
+    api.fetchStateGuide.mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'OH' } })
+
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/midterms/OH'))
+    expect(screen.queryByText('Casey Brook')).toBeNull()
+    expect(screen.getByText('Loading Ohio…')).toBeTruthy()
+    finish({ state: 'OH', status: 'pending', election_office: null, ballot_lookup_url: null, races: [], updated: null })
+    expect(await screen.findByText(/still checking every candidate in Ohio/)).toBeTruthy()
+  })
+
+  it('ignores a saved state it has no guide for', async () => {
+    localStorage.setItem('midterms_state', 'ZZ')
+    renderAt('/midterms')
+    expect(await screen.findByRole('option', { name: 'Pick your state' })).toBeTruthy()
+    expect(api.fetchElectionsLocate).toHaveBeenCalled()
+    expect(screen.getByTestId('path').textContent).toBe('/midterms')
+  })
+
+  it('lists candidates alphabetically even when the data is out of order', async () => {
+    const shuffled = { ...guide, races: guide.races.map((r) => ({ ...r, candidates: [...r.candidates].reverse() })) }
+    api.fetchStateGuide.mockResolvedValue(shuffled)
+    renderAt('/midterms/PA')
+    const race = await screen.findByRole('article', { name: 'U.S. House · District 7' })
+    const names = within(race).getAllByText(/^(Casey Brook|Drew Cole)$/).map((el) => el.textContent)
+    expect(names).toEqual(['Casey Brook', 'Drew Cole'])
   })
 })

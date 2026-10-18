@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import type { ElectionsIndexState } from '@congress-tracker/shared/elections-2026/api-types'
@@ -42,29 +42,6 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'Something went wrong. Please try again.'
 }
 
-/** Resolve the state to show when the URL has none: saved choice, then IP guess. */
-function useDefaultState(enabled: boolean) {
-  const [result, setResult] = useState<{ code: string | null; fromLocation: boolean } | null>(null)
-
-  useEffect(() => {
-    if (!enabled) return
-    const saved = readSavedState()
-    if (saved) {
-      setResult({ code: saved, fromLocation: false })
-      return
-    }
-    let cancelled = false
-    fetchElectionsLocate()
-      .then(({ state }) => !cancelled && setResult({ code: state, fromLocation: state != null }))
-      .catch(() => !cancelled && setResult({ code: null, fromLocation: false }))
-    return () => {
-      cancelled = true
-    }
-  }, [enabled])
-
-  return result
-}
-
 function StatePicker({
   states,
   value,
@@ -98,11 +75,12 @@ function StatePicker({
 }
 
 function RaceSection({ title, races }: { title: string; races: ElectionRace[] }) {
+  const headingId = useId()
   if (races.length === 0) return null
   return (
-    <section className="midterms-section" aria-label={title}>
+    <section className="midterms-section" aria-labelledby={headingId}>
       <h2 className="midterms-section-title">
-        {title} <span className="midterms-section-count">{races.length}</span>
+        <span id={headingId}>{title}</span> <span className="midterms-section-count">{races.length}</span>
       </h2>
       <div className="midterms-race-list">
         {races.map((race) => (
@@ -141,13 +119,13 @@ function StateGuide({ code, stateName }: { code: string; stateName: string }) {
     mapError: errorMessage,
   })
 
-  if (isLoading && !guide) return <p className="midterms-status">Loading {stateName}…</p>
-  if (error) return <p className="midterms-status">{error}</p>
+  if (isLoading && !guide) return <p className="midterms-status" role="status">Loading {stateName}…</p>
+  if (error) return <p className="midterms-status" role="status">{error}</p>
   if (!guide) return null
 
   if (guide.status === 'pending') {
     return (
-      <p className="midterms-status">
+      <p className="midterms-status" role="status">
         We’re still checking every candidate in {stateName} against official sources. Until then,{' '}
         <a href={VOTE_GOV_URL} target="_blank" rel="noreferrer">
           vote.gov
@@ -184,14 +162,33 @@ export default function Midterms() {
     load: fetchElectionsIndex,
     mapError: errorMessage,
   })
-  const fallback = useDefaultState(code == null)
   const [fromLocation, setFromLocation] = useState(false)
 
+  // No state in the URL: a saved choice wins, then the IP guess, else the picker waits.
+  // Resolved fresh on every visit to bare /midterms, so an older guess never overrides a newer choice.
   useEffect(() => {
-    if (code != null || !fallback?.code) return
-    setFromLocation(fallback.fromLocation)
-    navigate(`/midterms/${fallback.code}`, { replace: true })
-  }, [code, fallback, navigate])
+    if (code != null || !index) return
+    const known = new Set(index.states.map((s) => s.code))
+    const saved = readSavedState()
+    if (saved && known.has(saved)) {
+      setFromLocation(false)
+      navigate(`/midterms/${saved}`, { replace: true })
+      return
+    }
+    let cancelled = false
+    fetchElectionsLocate()
+      .then(({ state }) => {
+        if (cancelled || !state || !known.has(state)) return
+        setFromLocation(true)
+        navigate(`/midterms/${state}`, { replace: true })
+      })
+      .catch(() => {
+        // No guess: the picker asks.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [code, index, navigate])
 
   const chooseState = (next: string) => {
     saveState(next)
@@ -208,12 +205,12 @@ export default function Midterms() {
           <h1 className="midterms-title">2026 midterm elections</h1>
           <p className="midterms-lede">
             {index ? `Election day is ${formatElectionDay(index.election_day)}. ` : ''}
-            Every race for Congress and governor on your ballot, with the facts on each candidate.
-            Members of Congress link to their voting record.
+            Every race for Congress and governor in your state, with the same facts on each
+            candidate. Members of Congress link to their voting record.
           </p>
         </header>
 
-        {indexError ? <p className="midterms-status">{indexError}</p> : null}
+        {indexError ? <p className="midterms-status" role="status">{indexError}</p> : null}
 
         {index ? (
           <div className="midterms-picker-row">
@@ -224,9 +221,9 @@ export default function Midterms() {
           </div>
         ) : null}
 
-        {current ? <StateGuide code={current.code} stateName={current.name} /> : null}
+        {current ? <StateGuide key={current.code} code={current.code} stateName={current.name} /> : null}
         {index && code != null && !current ? (
-          <p className="midterms-status">We don’t have a guide for “{rawState}”. Pick a state above.</p>
+          <p className="midterms-status" role="status">We don’t have a guide for “{rawState}”. Pick a state above.</p>
         ) : null}
       </main>
     </MemberProfileProvider>
