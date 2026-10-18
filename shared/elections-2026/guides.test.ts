@@ -12,12 +12,12 @@ const HOUSE_SEATS: Record<string, number> = {
 }
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
-const SUFFIXES = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv'])
+const PARTY_CODES = new Set(['D', 'R', 'I', 'L', 'G', 'Other'])
+const BALLOT_STATUSES = new Set(['active', 'withdrawn', 'deceased'])
+const RATINGS = new Set(['Toss-up', 'Lean D', 'Lean R', 'Likely D', 'Likely R', 'Safe D', 'Safe R'])
+const OFFICES = new Set(['senate', 'house', 'governor'])
 
-function lastName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter((p) => !SUFFIXES.has(p.toLowerCase().replace(/,$/, '')))
-  return (parts[parts.length - 1] ?? '').toLowerCase()
-}
+const bySortName = (a: string, b: string) => a.localeCompare(b, 'en', { sensitivity: 'base' })
 
 function expectSources(sources: ElectionSource[], where: string) {
   expect(sources.length, `${where}: needs a source`).toBeGreaterThan(0)
@@ -28,22 +28,36 @@ function expectSources(sources: ElectionSource[], where: string) {
 }
 
 function expectRaceId(race: ElectionRace) {
+  expect(OFFICES.has(race.office), `${race.id}: office`).toBe(true)
   if (race.office === 'house') {
     const d = String(race.district ?? -1).padStart(2, '0')
-    expect(race.id).toBe(`${race.state}-H-${d}`)
+    expect(race.id).toBe(`${race.state}-H-${d}${race.special ? '-SPECIAL' : ''}`)
   } else if (race.office === 'senate') {
     expect(race.id).toBe(race.special ? `${race.state}-S-SPECIAL` : `${race.state}-S`)
     expect(race.district).toBeNull()
   } else {
     expect(race.id).toBe(`${race.state}-GOV`)
     expect(race.district).toBeNull()
+    expect(race.special).toBe(false)
   }
 }
 
-function expectCandidate(c: ElectionCandidate, where: string) {
+function expectCandidate(c: ElectionCandidate, race: ElectionRace, where: string) {
   expect(c.name.trim(), `${where}: name`).not.toBe('')
+  expect(c.sort_name, `${where}: sort_name is "Last, First"`).toMatch(/^[^,]+, .+/)
+  expect(c.parties.length, `${where}: parties`).toBeGreaterThan(0)
+  expect(PARTY_CODES.has(c.party_code), `${where}: party_code ${c.party_code}`).toBe(true)
+  expect(BALLOT_STATUSES.has(c.ballot_status), `${where}: ballot_status ${c.ballot_status}`).toBe(true)
   if (c.bioguide_id != null) expect(c.bioguide_id, `${where}: bioguide`).toMatch(/^[A-Z]\d{6}$/)
-  if (c.fec_candidate_id != null) expect(c.fec_candidate_id, `${where}: FEC id`).toMatch(/^[HSP]\d[A-Z0-9]{7}$/)
+  if (race.office === 'governor') {
+    expect(c.fec_candidate_id, `${where}: no FEC id for governor`).toBeNull()
+  } else if (c.fec_candidate_id != null) {
+    const prefix = race.office === 'house' ? 'H' : 'S'
+    // House ids carry the state; Senate ids do too (e.g. S6OH00163).
+    expect(c.fec_candidate_id, `${where}: FEC id for this office and state`).toMatch(
+      new RegExp(`^${prefix}\\d${race.state}[A-Z0-9]{5}$`)
+    )
+  }
   if (c.website != null) expect(c.website, `${where}: website`).toMatch(/^https?:\/\//)
   expectSources(c.sources, where)
 }
@@ -65,7 +79,7 @@ describe('2026 state election guides', () => {
       })
 
       it('lists every House seat exactly once', () => {
-        const districts = guide.races.filter((r) => r.office === 'house').map((r) => r.district)
+        const districts = guide.races.filter((r) => r.office === 'house' && !r.special).map((r) => r.district)
         const seats = HOUSE_SEATS[code]
         const expected = seats === 1 ? [0] : Array.from({ length: seats }, (_, i) => i + 1)
         expect([...districts].sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual(expected)
@@ -78,14 +92,18 @@ describe('2026 state election guides', () => {
           expect(race.state).toBe(code)
           expectRaceId(race)
           expectSources(race.sources, race.id)
-          if (race.rating) expectSources([race.rating.source], `${race.id} rating`)
+          if (race.rating) {
+            expect(RATINGS.has(race.rating.label), `${race.id}: rating ${race.rating.label}`).toBe(true)
+            expect(race.rating.rated_on, `${race.id}: rated_on`).toMatch(ISO_DAY)
+            expectSources([race.rating.source], `${race.id} rating`)
+          }
           expect(race.candidates.length, `${race.id}: candidates`).toBeGreaterThan(0)
           const incumbents = race.candidates.filter((c) => c.incumbent).length
           expect(incumbents, `${race.id}: incumbents`).toBeLessThanOrEqual(race.office === 'house' ? 2 : 1)
           expect(race.open_seat, `${race.id}: open_seat vs incumbents`).toBe(incumbents === 0)
-          race.candidates.forEach((c) => expectCandidate(c, `${race.id} ${c.name}`))
-          const names = race.candidates.map((c) => lastName(c.name))
-          expect(names, `${race.id}: candidates sorted by last name`).toEqual([...names].sort())
+          race.candidates.forEach((c) => expectCandidate(c, race, `${race.id} ${c.name}`))
+          const names = race.candidates.map((c) => c.sort_name)
+          expect(names, `${race.id}: candidates sorted by sort_name`).toEqual([...names].sort(bySortName))
         }
       })
     })

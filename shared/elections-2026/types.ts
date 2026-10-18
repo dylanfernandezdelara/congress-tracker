@@ -19,18 +19,29 @@ export interface ElectionSource {
 
 export type CandidatePartyCode = 'D' | 'R' | 'I' | 'L' | 'G' | 'Other'
 
+export type CandidateBallotStatus = 'active' | 'withdrawn' | 'deceased'
+
 export interface ElectionCandidate {
+  /** Name as printed on the ballot. */
   name: string
-  /** Party label as the state prints it ("Democratic", "Republican", "Independent", …). */
-  party: string
+  /** Sort key, last name first: "Van Drew, Jeff", "Luján Grisham, Michelle". */
+  sort_name: string
+  /** Every party line the candidate appears on, as the state prints them. Fusion states (NY, CT) can list several; the first is the main party. */
+  parties: string[]
+  /** Main party. */
   party_code: CandidatePartyCode
-  /** Holds this exact seat now. */
+  /** Still printed on the ballot after withdrawing or dying: shown, not hidden. */
+  ballot_status: CandidateBallotStatus
+  /**
+   * A sitting member of this office running for this seat. House: any sitting House member from
+   * the state running in this district (after redistricting a district can have two, or none).
+   */
   incumbent: boolean
   /** Sitting member of Congress (any seat) → links to their record on trackcongress. */
   bioguide_id: string | null
   /** Public office held now, e.g. "Pennsylvania State Treasurer". Null when none. */
   current_office: string | null
-  /** FEC candidate id (federal races only), e.g. "H6PA07123". */
+  /** FEC id for this race's office (H… for House, S… for Senate), e.g. "H8PA07150". Null for governor. */
   fec_candidate_id: string | null
   /** Official campaign site, linked as "Campaign site" and never quoted. */
   website: string | null
@@ -48,22 +59,25 @@ export type RaceRatingLabel =
 
 export interface RaceRating {
   label: RaceRatingLabel
-  /** Sabato's Crystal Ball; the source records the date of the rating. */
+  /** ISO day Crystal Ball published or last changed this rating. */
+  rated_on: string
+  /** Sabato's Crystal Ball page the rating is on. */
   source: ElectionSource
 }
 
 export interface ElectionRace {
-  /** `PA-H-07`, `PA-H-00` (at-large), `GA-S`, `OH-S-SPECIAL`, `PA-GOV`. */
+  /** `PA-H-07`, `AK-H-00` (at-large), `TX-H-18-SPECIAL`, `GA-S`, `OH-S-SPECIAL`, `PA-GOV`. */
   id: string
   state: string
   office: ElectionOffice
   /** House district; 0 for at-large; null for statewide races. */
   district: number | null
+  /** Special election for the rest of a vacated term (a House special can share the ballot with the regular race for the same seat). */
   special: boolean
-  /** No incumbent on the ballot for this seat. */
+  /** No incumbent running for this seat. */
   open_seat: boolean
   rating: RaceRating | null
-  /** Sorted by last name. Never by party or rating. */
+  /** Sorted by `sort_name`. Never by party or rating. */
   candidates: ElectionCandidate[]
   /** One factual line when the format is unusual, e.g. "Top-two general: both candidates are Democrats." */
   note: string | null
