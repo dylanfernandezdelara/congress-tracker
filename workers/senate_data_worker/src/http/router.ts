@@ -55,6 +55,7 @@ import { normalizeFeedSearchQuery } from "../d1/feed-search";
 import { searchMembers } from "../d1/members";
 import { listPolicyAreas } from "../d1/policy-areas";
 import { tryRewriteBillOg } from "./bill-og";
+import { handleElectionsRoute } from "./elections";
 import { handleOgImageRoute, parseOgImagePath } from "./og-image";
 import { buildIngestMonitorPayload, isIngestMonitorHealthy } from "./ingest-health";
 import { buildFeedPage } from "../storage/feed";
@@ -835,6 +836,9 @@ export async function handlePublicFetch(
     return getRoute(routeCtx);
   }
 
+  const elections = handleElectionsRoute(request, pathname, json);
+  if (elections) return elections;
+
   if (parseOgImagePath(pathname)) {
     return handleOgImageRoute({ request, env, url, ctx });
   }
@@ -855,6 +859,7 @@ const API_PATH_PREFIXES = [
   "/feedback/",
   "/stats/",
   "/executive/",
+  "/elections/",
   "/share/",
   "/og/",
   "/__pipeline/",
