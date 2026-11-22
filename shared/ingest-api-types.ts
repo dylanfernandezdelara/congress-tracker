@@ -75,6 +75,8 @@ export interface IngestMonitorPayload {
   floor_quiet_days: number | null;
   /** Feed-visible bills (passage ∪ executive ∪ intros) lacking a complete digest. */
   missing_digest_count: number;
+  /** Feed bills with a CRS summary still showing the title-fallback placeholder. */
+  placeholder_summary_count?: number;
   last_success: FeedPipelineRunRecord | null;
   last_failure: FeedPipelineFailureRecord | null;
   last_scheduled_success: FeedPipelineRunRecord | null;

@@ -28,6 +28,8 @@ describe("anthropic client", () => {
     expect(model).toMatchObject({ id: "claude-sonnet-5-5", provider: "anthropic", effort: "medium", maxTokens: 8_000, price: { input: 2, output: 10 } });
     // Without the key the rewrite stays on OpenRouter instead of failing every run.
     expect(rewriteModel({ ...env, ANTHROPIC_API_KEY: " " } as Env).provider).toBeUndefined();
+    // ...and with a model id OpenRouter knows: the Anthropic API id is not one.
+    expect(rewriteModel({ ...env, ANTHROPIC_API_KEY: " " } as Env).id).toBe("anthropic/claude-sonnet-5");
     expect(model.temperature).toBeUndefined();
     expect(rewriteModel({} as Env)).toMatchObject({ id: "anthropic/claude-sonnet-5", temperature: 0.2 });
     expect(rewriteModel({} as Env).provider).toBeUndefined();

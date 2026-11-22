@@ -13,6 +13,7 @@ import {
   getFeedPipelineSuccess,
   getLatestPassageVoteDate,
   getMissingDigestCount,
+  getPlaceholderSummaryCount,
 } from "../d1/pipeline-state";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
@@ -111,6 +112,7 @@ async function loadIngestMonitor(env: Env) {
   const [
     latestPassageVoteDate,
     missingDigestCount,
+    placeholderSummaryCount,
     lastSuccess,
     lastScheduledSuccess,
     lastFailure,
@@ -122,6 +124,7 @@ async function loadIngestMonitor(env: Env) {
   ] = await Promise.all([
     getLatestPassageVoteDate(env),
     getMissingDigestCount(env),
+    getPlaceholderSummaryCount(env),
     getFeedPipelineSuccess(env.DB),
     getFeedPipelineScheduledSuccess(env.DB),
     getFeedPipelineFailure(env.DB),
@@ -138,6 +141,7 @@ async function loadIngestMonitor(env: Env) {
     dailyCronUtc: FEED_PIPELINE_CRON_UTC,
     latestPassageVoteDate,
     missingDigestCount,
+    placeholderSummaryCount,
     lastSuccess,
     lastScheduledSuccess,
     lastFailure,

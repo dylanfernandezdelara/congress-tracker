@@ -156,8 +156,17 @@ export function evaluateIngestMonitorStatus(params) {
     : "";
 
   const missingDigestCount = Number(params.missingDigestCount) || 0;
-  const missingDigestNote =
-    missingDigestCount > 0 ? `${missingDigestCount} feed bill(s) missing digests.` : "";
+  const placeholderSummaryCount = Number(params.placeholderSummaryCount) || 0;
+  // A placeholder (title fallback) on a bill that has a CRS summary means the
+  // rewrite never landed: the feed shows CRS text, not plain English.
+  const missingDigestNote = [
+    missingDigestCount > 0 ? `${missingDigestCount} feed bill(s) missing digests.` : "",
+    placeholderSummaryCount > 0
+      ? `${placeholderSummaryCount} feed bill(s) show a placeholder instead of a plain-language summary; check the summary sweep.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   if (warningSeverity === "degraded" || introSoftFail) {
     const parts = [];
