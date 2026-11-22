@@ -3,7 +3,6 @@ import { partyCssClass, partyDisplayName, partyShortLabel } from '@congress-trac
 import type { ChamberComposition, PartySeatCount, SessionStatsResponse } from '../api/types'
 import { sortPartySeatCounts } from '../utils/chamberSeats'
 import { CURRENT_PRESIDENT } from '../constants/president'
-import { Button } from '@astryxdesign/core/Button'
 
 type FederalControlCompactProps = {
   composition: SessionStatsResponse['composition'] | null
@@ -75,7 +74,9 @@ export function FederalControlCompact({
       <section className="federal-compact" aria-label="Federal Control">
         <p className="text-ui font-normal text-muted-foreground">{error}</p>
         {onRetry ? (
-          <Button variant="ghost" size="sm" label="Retry" onClick={onRetry} />
+          <button type="button" className="ghost-button" onClick={onRetry}>
+            Retry
+          </button>
         ) : null}
       </section>
     )

@@ -157,6 +157,12 @@
     color: hsl(var(--twc-foreground));
   }
 
+  /* The Astryx Theme wrapper must not become a grid item: the fields lay out in the panel's own grid. */
+  .feed-advanced-filters-panel > [data-astryx-theme],
+  .feed-filters-sheet-fields > [data-astryx-theme] {
+    display: contents;
+  }
+
   .feed-filter-field-note {
     margin: 0.35rem 0 0;
     font-size: var(--type-caption-size);

@@ -784,11 +784,11 @@ describe('Home', () => {
     renderHome('/?bill=119-hr-999')
 
     expect(
-      await screen.findByText(/That bill isn’t in the last 45 days/),
+      await screen.findByText(/That bill has had no floor action/),
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(
-      screen.queryByText(/That bill isn’t in the last 45 days/),
+      screen.queryByText(/That bill has had no floor action/),
     ).not.toBeInTheDocument()
   })
 
@@ -1070,7 +1070,7 @@ describe('Home', () => {
       })
     })
     expect(
-      await screen.findByText(/That bill isn’t in the last 45 days/),
+      await screen.findByText(/That bill has had no floor action/),
     ).toBeInTheDocument()
 
     const params = screen.getByTestId('search-params').textContent ?? ''
@@ -1135,7 +1135,7 @@ describe('Home', () => {
       offset: 0,
       q: 'H.R. 1',
     })
-    expect(screen.queryByText(/That bill isn’t in the last 45 days/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/That bill has had no floor action/)).not.toBeInTheDocument()
     expect(screen.queryByText(/No Senate passage votes/i)).not.toBeInTheDocument()
     expect(screen.getByText(/1 bill/)).toBeInTheDocument()
   })

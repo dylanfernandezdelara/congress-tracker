@@ -35,7 +35,7 @@ vi.mock('../api/client', () => homeApi)
 
 /** Open an Astryx Selector by its label and click an option. */
 async function pickOption(label: string, option: string) {
-  fireEvent.click(screen.getByLabelText(label, { selector: 'button' }))
+  fireEvent.click(await screen.findByLabelText(label, { selector: 'button' }))
   fireEvent.click(await screen.findByRole('option', { name: new RegExp(option) }))
 }
 
@@ -91,7 +91,7 @@ describe('Home advanced filters', () => {
     expect(screen.getByText(/1 bill/)).toBeInTheDocument()
     expect(screen.getByText(/1 bill · through .+ · New York/)).toBeInTheDocument()
     expect(screen.getByTestId('search-params')).toHaveTextContent('state=NY')
-    expect(screen.getByLabelText('State', { selector: 'button' })).toHaveTextContent('New York')
+    expect((await screen.findByLabelText('State', { selector: 'button' }))).toHaveTextContent('New York')
   })
 
   it('filters by sponsor chamber, party, member name, and topic together', async () => {
@@ -141,7 +141,7 @@ describe('Home advanced filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     fireEvent.click(
-      within(screen.getByRole('radiogroup', { name: 'Sponsor chamber' })).getByRole('radio', {
+      within(await screen.findByRole('radiogroup', { name: 'Sponsor chamber' })).getByRole('radio', {
         name: 'House',
       }),
     )
@@ -149,7 +149,7 @@ describe('Home advanced filters', () => {
     await pickOption('Party', 'Democrat')
     await pickOption('Topic', 'Energy')
 
-    const memberInput = screen.getByPlaceholderText('Name or last name')
+    const memberInput = (await screen.findByPlaceholderText('Name or last name'))
     fireEvent.change(memberInput, { target: { value: 'Loyal' } })
     expect(await screen.findByRole('option', { name: /Rep\. Sample Loyal/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('option', { name: /Rep\. Sample Loyal/ }))
@@ -191,7 +191,7 @@ describe('Home advanced filters', () => {
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(fetchFeed).toHaveBeenCalledWith({ limit: 30, offset: 0 })
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
-    expect(screen.getByLabelText('State', { selector: 'button' })).toHaveTextContent('Any state')
+    expect((await screen.findByLabelText('State', { selector: 'button' }))).toHaveTextContent('Any state')
   })
 
   it('keeps the filter sheet and the open bill when Escape dismisses member suggestions', async () => {
@@ -216,7 +216,7 @@ describe('Home advanced filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     const dialog = await screen.findByRole('dialog', { name: 'Filters' })
-    const memberInput = within(dialog).getByPlaceholderText('Name or last name')
+    const memberInput = (await within(dialog).findByPlaceholderText('Name or last name'))
     fireEvent.change(memberInput, { target: { value: 'Loyal' } })
     expect(await within(dialog).findByRole('option', { name: /Sample Loyal/ })).toBeInTheDocument()
 
@@ -245,7 +245,7 @@ describe('Home advanced filters', () => {
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Done' })).toBeInTheDocument()
 
-    expect(within(dialog).getByPlaceholderText('Name or last name')).toBeInTheDocument()
+    expect((await within(dialog).findByPlaceholderText('Name or last name'))).toBeInTheDocument()
   })
 
   it('shows the selected sponsor in the picker', async () => {
@@ -298,8 +298,8 @@ describe('Home advanced filters', () => {
   it('shows removable chips for active advanced filters', async () => {
     renderHome('/?state=NY&sponsor_chamber=House')
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Remove New York' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove House sponsors' }))
+    expect(screen.getByRole('button', { name: 'Remove New York filter' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove House sponsors filter' }))
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, state: 'NY' })
     })

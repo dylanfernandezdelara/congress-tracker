@@ -76,9 +76,21 @@ const checks = [
     name: 'stacked sheets close from the top',
     viewport: { width: 1280, height: 800 },
     async run(page) {
-      await page.locator('.tightness-bar-row').first().click()
-      await waitForDialogs(page, 1)
-      const name = page.locator('[role=dialog] .member-profile-trigger').first()
+      // Open the first close vote whose sheet names a member (a party-line vote with no crossovers names nobody).
+      const bars = page.locator('.tightness-bar-row')
+      let name = null
+      for (let i = 0; i < (await bars.count()); i++) {
+        await bars.nth(i).click()
+        await waitForDialogs(page, 1)
+        const candidate = page.locator('[role=dialog] .member-profile-trigger').first()
+        if (await candidate.count()) {
+          name = candidate
+          break
+        }
+        await page.keyboard.press('Escape')
+        await waitForDialogs(page, 0)
+      }
+      if (!name) throw new Error('no close vote names a member to stack a second sheet')
       await name.click()
       await waitForDialogs(page, 2)
       await page.waitForFunction(() => {
@@ -95,7 +107,7 @@ const checks = [
     },
   },
   {
-    name: 'phone: filter field keeps Escape until it is empty; sheet is bottom-docked',
+    name: 'phone: Escape closes member suggestions before the sheet; sheet is bottom-docked',
     viewport: { width: 390, height: 844 },
     async run(page) {
       await page.getByRole('button', { name: 'Filters' }).click()
@@ -103,11 +115,12 @@ const checks = [
       await waitForSheetsToSettle(page)
       const box = await page.locator('[role=dialog]').boundingBox()
       if (Math.abs(box.y + box.height - 844) > 1) throw new Error(`sheet bottom at ${box.y + box.height}, expected 844`)
-      const field = page.locator('[role=dialog]').getByPlaceholder('Name or last name')
+      const field = page.locator('[data-slot=sheet]').getByPlaceholder('Name or last name')
       await field.fill('Sand')
+      await page.locator('.astryx-typeahead-option').first().waitFor({ timeout: 5000 })
       await page.keyboard.press('Escape')
       await page.waitForTimeout(600)
-      if ((await field.inputValue()) !== '') throw new Error('Escape did not clear the member field')
+      if (await page.locator('.astryx-typeahead-option').first().isVisible()) throw new Error('Escape left the member suggestions open')
       if ((await openDialogs(page)).length !== 1) throw new Error('Escape in the member field closed the sheet')
       await page.keyboard.press('Escape')
       await waitForDialogs(page, 0)
@@ -156,10 +169,10 @@ const checks = [
         return el && !el.hasAttribute('data-moving') && getComputedStyle(el).overflow === 'visible'
       }, null, { timeout: 3000 })
       await page.locator('[data-slot=collapsible-content]').getByPlaceholder('Name or last name').fill('Sa')
-      const option = page.locator('.feed-member-suggestions [role=option]').first()
+      const option = page.locator('.astryx-typeahead-option').first()
       await option.waitFor({ timeout: 3000 })
       const box = await option.boundingBox()
-      const hit = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.feed-member-suggestions'), { x: box.x + box.width / 2, y: box.y + box.height / 2 })
+      const hit = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.astryx-typeahead-option'), { x: box.x + box.width / 2, y: box.y + box.height / 2 })
       if (!hit) throw new Error('member suggestions are hidden or clipped')
       await page.keyboard.press('Escape')
       await page.locator('.feed-advanced-filters-toggle').click()

@@ -38,8 +38,6 @@ import {
   advancedFilterSummary,
   type AdvancedFeedFilters,
 } from '../utils/feedAdvancedFilters'
-import { Banner } from '@astryxdesign/core/Banner'
-import { Button } from '@astryxdesign/core/Button'
 import { timelineFloorChrome } from '../utils/feedQuiet'
 
 const DESKTOP_RAIL_QUERY = '(min-width: 1024px)'
@@ -321,26 +319,24 @@ export default function Home() {
 
         {billMissingNotice ? (
           <div className="home-feed-notice" role="status">
-            <Banner
-              status="info"
-              title={`That bill isn’t in the last ${VOTE_LOOKBACK_DAYS} days`}
-              description={
+            <p className="home-feed-notice-text">
+              That bill has had no floor action in the last {VOTE_LOOKBACK_DAYS} days, so it isn&rsquo;t listed here.
+              {missingBillUrl ? (
                 <>
-                  It has had no floor action since then, so it isn&rsquo;t listed here.
-                  {missingBillUrl ? (
-                    <>
-                      {' '}
-                      <a href={missingBillUrl} target="_blank" rel="noopener noreferrer" className="congress-link">
-                        Read it on congress.gov ↗
-                      </a>
-                    </>
-                  ) : null}
+                  {' '}
+                  <a href={missingBillUrl} target="_blank" rel="noopener noreferrer" className="congress-link">
+                    Read it on congress.gov ↗
+                  </a>
                 </>
-              }
-              isDismissable
-              dismissLabel="Dismiss"
-              onDismiss={dismissBillMissingNotice}
-            />
+              ) : null}
+            </p>
+            <button
+              type="button"
+              className="home-feed-notice-dismiss"
+              onClick={dismissBillMissingNotice}
+            >
+              Dismiss
+            </button>
           </div>
         ) : null}
 
@@ -349,7 +345,9 @@ export default function Home() {
         {feedError && items.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-card border border-border bg-card px-6 py-8 text-center">
             <p className="text-ui font-normal text-muted-foreground">{feedError}</p>
-            <Button variant="ghost" size="sm" label="Retry" onClick={reloadAll} />
+            <button type="button" className="ghost-button" onClick={reloadAll}>
+              Retry
+            </button>
           </div>
         ) : null}
 
@@ -358,13 +356,23 @@ export default function Home() {
             <FloorStatusChip house={floorChrome.house} senate={floorChrome.senate} />
             <p className="text-ui font-normal text-faint">{emptyCopy}</p>
             {searchQuery ? (
-              <Button variant="ghost" size="sm" label="Clear search" onClick={clearSearch} />
+              <button type="button" className="ghost-button" onClick={clearSearch}>
+                Clear search
+              </button>
             ) : null}
             {chamber && !searchQuery ? (
-              <Button variant="ghost" size="sm" label="Show all chambers" onClick={() => setChamberFilter(null)} />
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setChamberFilter(null)}
+              >
+                Show all chambers
+              </button>
             ) : null}
             {advancedCount > 0 && !searchQuery ? (
-              <Button variant="ghost" size="sm" label="Clear filters" onClick={clearAdvancedFilters} />
+              <button type="button" className="ghost-button" onClick={clearAdvancedFilters}>
+                Clear filters
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -412,10 +420,9 @@ export default function Home() {
             {feedError ? (
               <p className="feed-pagination-status" role="alert">
                 {feedError}{' '}
-<Button
-                  variant="ghost"
-                  size="sm"
-                  label="Retry"
+                <button
+                  type="button"
+                  className="ghost-button"
                   onClick={() => {
                     if (lastFeedModeRef.current === 'append' && hasMore) {
                       loadMore()
@@ -423,19 +430,23 @@ export default function Home() {
                       handleReloadFeed()
                     }
                   }}
-                />
+                >
+                  Retry
+                </button>
               </p>
             ) : null}
 
             {hasMore || isLoadingMore ? (
               <nav className="feed-pagination" aria-label="Feed pages">
-<Button
-                  variant="secondary"
-                  label="Load more"
+                <button
+                  type="button"
+                  className="feed-pagination-button"
                   onClick={loadMore}
-                  isLoading={isLoadingMore}
-                  isDisabled={!hasMore || (inFlight && !isLoadingMore)}
-                />
+                  disabled={!hasMore || inFlight}
+                  aria-label="Load more"
+                >
+                  {isLoadingMore ? 'Loading…' : 'Load more'}
+                </button>
                 <p className="feed-pagination-status">
                   Showing {items.length} of {total}
                 </p>

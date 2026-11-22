@@ -14,7 +14,6 @@ import { BillIdChip } from './BillIdChip'
 import { ExpandChevron } from './ExpandChevron'
 import { FeedRowDate } from './FeedRowDate'
 import { FeedRowDetail } from './FeedRowDetail'
-import { Button } from '@astryxdesign/core/Button'
 
 type RecentLawsSectionProps = {
   laws: RecentLawItem[] | null
@@ -180,7 +179,9 @@ export function RecentLawsSection({
       <section className="recent-laws" aria-label="New laws">
         <p className="text-ui font-normal text-muted-foreground">{error}</p>
         {onRetry ? (
-          <Button variant="ghost" size="sm" label="Retry" onClick={onRetry} />
+          <button type="button" className="ghost-button" onClick={onRetry}>
+            Retry
+          </button>
         ) : null}
       </section>
     )
