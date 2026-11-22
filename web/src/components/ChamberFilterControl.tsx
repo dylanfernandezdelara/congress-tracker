@@ -1,5 +1,6 @@
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
+
 import type { ChamberFilter, ChamberFilterOption } from '../utils/chamberFilter'
-import { SegmentedControl, SegmentedControlItem } from './dfdl/segmented-control'
 
 type ChamberFilterControlProps = {
   value: ChamberFilter | null
@@ -11,15 +12,13 @@ const OPTIONS: ChamberFilterOption[] = ['All', 'House', 'Senate']
 export function ChamberFilterControl({ value, onChange }: ChamberFilterControlProps) {
   return (
     <SegmentedControl
-      variant="underline"
-      aria-label="Filter by chamber"
+      label="Filter by chamber"
+      size="sm"
       value={value ?? 'All'}
-      onValueChange={(next) => onChange(next === 'All' ? null : (next as ChamberFilter))}
+      onChange={(next) => onChange(next === 'All' ? null : (next as ChamberFilter))}
     >
       {OPTIONS.map((option) => (
-        <SegmentedControlItem key={option} value={option}>
-          {option}
-        </SegmentedControlItem>
+        <SegmentedControlItem key={option} value={option} label={option} />
       ))}
     </SegmentedControl>
   )

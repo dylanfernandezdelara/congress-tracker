@@ -1,16 +1,11 @@
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useId,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from 'react'
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { Typeahead } from '@astryxdesign/core/Typeahead'
+import type { SearchSource, SearchableItem } from '@astryxdesign/core/Typeahead'
 
 import { fetchMembersSearch } from '../api/client'
 import { prefetchMemberProfile } from '../api/memberProfileCache'
 import type { MemberSearchItem } from '../api/types'
+import { readableMemberName } from '../utils/sponsorLabels'
 
 export type MemberSponsorCommit = {
   sponsor: string | null
@@ -18,289 +13,144 @@ export type MemberSponsorCommit = {
 }
 
 export type MemberSponsorComboboxHandle = {
-  /** Flush the local draft into the parent filter (blur / panel close). */
+  /** Kept for the filter panel's close path; picking commits at once, so there is no draft to flush. */
   flush: () => void
 }
 
 type MemberSponsorComboboxProps = {
   sponsor: string | null
+  /** Name substring from an older link (`sponsor_q=`); the picker itself only selects one member. */
   sponsorQ: string
   /** Resolved display name for the selected sponsor (from useMemberProfile). */
   selectedName?: string | null
   chamber: 'House' | 'Senate' | null
   state: string | null
-  /** Stack suggestions in document flow (e.g. inside a scrollable sheet). */
+  /** Unused since the Astryx Typeahead positions its own menu; kept so callers don't change. */
   suggestionsInline?: boolean
   onCommit: (next: MemberSponsorCommit) => void
 }
 
-const MEMBER_SEARCH_DEBOUNCE_MS = 220
+type MemberOption = SearchableItem<MemberSearchItem>
 
-function displayValue(
-  sponsor: string | null,
-  sponsorQ: string,
-  selectedName: string | null | undefined,
-  pickedName: string | null,
-): string {
-  if (!sponsor) return sponsorQ
-  return selectedName?.trim() || pickedName || sponsor
+function memberMeta(item: MemberSearchItem): string {
+  const seat = item.district != null ? `${item.state}-${item.district}` : item.state
+  return [item.party, seat].filter(Boolean).join('-') + ` · ${item.chamber}`
 }
 
+function toOption(item: MemberSearchItem): MemberOption {
+  const { name } = readableMemberName(item.name)
+  return { id: item.bioguide_id, label: name ?? item.name, auxiliaryData: item }
+}
+
+/**
+ * Pick one member to filter bills by primary sponsor. Built on Astryx's Typeahead,
+ * which owns the listbox, keyboard navigation, debounce and screen-reader wiring.
+ */
 export const MemberSponsorCombobox = forwardRef<
   MemberSponsorComboboxHandle,
   MemberSponsorComboboxProps
 >(function MemberSponsorCombobox(
-  {
-    sponsor,
-    sponsorQ,
-    selectedName = null,
-    chamber,
-    state,
-    suggestionsInline = false,
-    onCommit,
-  },
+  { sponsor, sponsorQ, selectedName = null, chamber, state, onCommit },
   ref,
 ) {
-  const listboxId = useId()
-  const inputId = useId()
-  const focusedRef = useRef(false)
-  const blurTimerRef = useRef<number | null>(null)
-  const draftRef = useRef('')
-  /** Name from the most recent pick, until parent selectedName catches up. */
+  useImperativeHandle(ref, () => ({ flush: () => {} }), [])
+
+  /** Name from the most recent pick, until the parent's resolved name catches up. */
   const [pickedName, setPickedName] = useState<string | null>(null)
-  const [memberDraft, setMemberDraft] = useState(() =>
-    displayValue(sponsor, sponsorQ, selectedName, null),
-  )
-  const [suggestions, setSuggestions] = useState<MemberSearchItem[]>([])
-  const [suggestOpen, setSuggestOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(-1)
+  const controllerRef = useRef<AbortController | null>(null)
+  const menuOpenRef = useRef(false)
+  /** Whether the suggestion menu was open when this Escape started (the Typeahead closes it before we see it bubble). */
+  const escapeClosesMenuRef = useRef(false)
 
-  draftRef.current = memberDraft
-
-  const resolvedLabel = selectedName?.trim() || pickedName || (sponsor ? sponsor : '')
-
-  useEffect(() => {
-    if (sponsor && selectedName?.trim() && pickedName && selectedName.trim() === pickedName) {
-      setPickedName(null)
-    }
-    if (focusedRef.current) return
-    setMemberDraft(displayValue(sponsor, sponsorQ, selectedName, pickedName))
-  }, [sponsor, sponsorQ, selectedName, pickedName])
-
-  useEffect(() => {
-    const q = memberDraft.trim()
-    const editingAway =
-      Boolean(sponsor) && q.length > 0 && q !== resolvedLabel && q !== sponsor
-    if (sponsor && !editingAway) {
-      setSuggestions([])
-      return
-    }
-    if (q.length < 2) {
-      setSuggestions([])
-      return
-    }
-    let cancelled = false
-    const handle = window.setTimeout(() => {
-      void fetchMembersSearch({
-        q,
-        chamber: chamber ?? undefined,
-        state: state ?? undefined,
-        limit: 8,
-      })
-        .then((res) => {
-          if (!cancelled) {
-            setSuggestions(res.items)
-            setActiveIndex(-1)
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setSuggestions([])
-        })
-    }, MEMBER_SEARCH_DEBOUNCE_MS)
-    return () => {
-      cancelled = true
-      window.clearTimeout(handle)
-    }
-  }, [memberDraft, sponsor, chamber, state, resolvedLabel])
-
-  const commitDraft = useCallback(() => {
-    const next = draftRef.current.trim()
-    const label = selectedName?.trim() || pickedName || ''
-    if (sponsor) {
-      if (!next) {
-        // Keep an exact sponsor selection while the display name is still resolving.
-        if (!label) {
-          setMemberDraft(sponsor)
-          return
+  const searchSource = useMemo<SearchSource<MemberOption>>(
+    () => ({
+      async search(query) {
+        const q = query.trim()
+        if (q.length < 2) return []
+        controllerRef.current?.abort()
+        const controller = new AbortController()
+        controllerRef.current = controller
+        try {
+          const res = await fetchMembersSearch({
+            q,
+            chamber: chamber ?? undefined,
+            state: state ?? undefined,
+            limit: 8,
+          })
+          if (controller.signal.aborted) return []
+          return res.items.map(toOption)
+        } catch {
+          return []
         }
-        setPickedName(null)
-        onCommit({ sponsor: null, sponsorQ: '' })
-        return
-      }
-      if (next === label || next === sponsor) return
-    }
-    if (!next) {
-      if (!sponsor && !sponsorQ) return
-      setPickedName(null)
-      onCommit({ sponsor: null, sponsorQ: '' })
-      return
-    }
-    if (!sponsor && next === sponsorQ) return
-    setPickedName(null)
-    onCommit({ sponsor: null, sponsorQ: next })
-  }, [onCommit, pickedName, selectedName, sponsor, sponsorQ])
+      },
+      bootstrap: () => [],
+      cancel: () => controllerRef.current?.abort(),
+    }),
+    [chamber, state],
+  )
 
-  const commitDraftRef = useRef(commitDraft)
-  commitDraftRef.current = commitDraft
-
-  useImperativeHandle(ref, () => ({ flush: () => commitDraftRef.current() }), [])
-
-  // Unmount-only: do not rebind when commitDraft identity churns (that raced picks).
-  useEffect(() => {
-    return () => {
-      if (blurTimerRef.current != null) {
-        window.clearTimeout(blurTimerRef.current)
-        blurTimerRef.current = null
-      }
-      // Panel/sheet unmount (Done / toggle close) must not drop a typed sponsor_q.
-      if (focusedRef.current) commitDraftRef.current()
-    }
-  }, [])
-
-  const pickMember = (item: { bioguideId: string; name: string }) => {
-    setPickedName(item.name)
-    prefetchMemberProfile(item.bioguideId)
-    onCommit({ sponsor: item.bioguideId, sponsorQ: '' })
-    setMemberDraft(item.name)
-    setSuggestOpen(false)
-  }
-
-  const clearMember = () => {
-    setMemberDraft('')
-    setSuggestions([])
-    setPickedName(null)
-    // A typed name that was never committed is only local state. An empty
-    // commit still goes through the filter writer, which drops ?bill= and
-    // collapses the open row.
-    if (!sponsor && !sponsorQ) return
-    onCommit({ sponsor: null, sponsorQ: '' })
-  }
+  const value: MemberOption | null = sponsor
+    ? { id: sponsor, label: readableMemberName(selectedName ?? pickedName ?? sponsor).name ?? sponsor }
+    : null
 
   return (
-    <div className="feed-filter-field feed-filter-field--member">
-      <label className="feed-filter-field-label" htmlFor={inputId}>
-        Member
-      </label>
-      <div
-        className={`feed-member-combobox${suggestionsInline ? ' feed-member-combobox--inline' : ''}`}
-      >
-        <div className="feed-member-combobox-input-row">
-          <input
-            id={inputId}
-            type="search"
-            className="feed-filter-input"
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={suggestOpen && suggestions.length > 0}
-            aria-controls={listboxId}
-            aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
-            placeholder="Name or last name"
-            autoComplete="off"
-            spellCheck={false}
-            value={memberDraft}
-            onChange={(event) => {
-              setMemberDraft(event.target.value)
-              setSuggestOpen(true)
-            }}
-            onFocus={() => {
-              focusedRef.current = true
-              setSuggestOpen(true)
-            }}
-            onBlur={() => {
-              focusedRef.current = false
-              blurTimerRef.current = window.setTimeout(() => {
-                blurTimerRef.current = null
-                setSuggestOpen(false)
-                commitDraft()
-              }, 120)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'ArrowDown' && suggestions.length > 0) {
-                event.preventDefault()
-                setSuggestOpen(true)
-                setActiveIndex((idx) => Math.min(idx + 1, suggestions.length - 1))
-                return
-              }
-              if (event.key === 'ArrowUp' && suggestions.length > 0) {
-                event.preventDefault()
-                setActiveIndex((idx) => Math.max(idx - 1, 0))
-                return
-              }
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                if (activeIndex >= 0 && suggestions[activeIndex]) {
-                  const pick = suggestions[activeIndex]
-                  pickMember({ bioguideId: pick.bioguide_id, name: pick.name })
-                  return
-                }
-                commitDraft()
-                setSuggestOpen(false)
-                return
-              }
-              if (event.key === 'Escape') {
-                if (suggestOpen && suggestions.length > 0) {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  setSuggestOpen(false)
-                  return
-                }
-                if (memberDraft) {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  setSuggestOpen(false)
-                  clearMember()
-                }
-              }
-            }}
-          />
-          {memberDraft ? (
-            <button
-              type="button"
-              className="feed-member-combobox-clear"
-              aria-label="Clear member filter"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={clearMember}
-            >
-              ×
-            </button>
-          ) : null}
-        </div>
-        {suggestOpen && suggestions.length > 0 ? (
-          <ul className="feed-member-suggestions" id={listboxId} role="listbox">
-            {suggestions.map((item, index) => (
-              <li key={item.bioguide_id} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  id={`${listboxId}-${index}`}
-                  aria-selected={index === activeIndex}
-                  className={`feed-member-suggestion${index === activeIndex ? ' is-active' : ''}`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    pickMember({ bioguideId: item.bioguide_id, name: item.name })
-                  }}
-                >
-                  <span className="feed-member-suggestion-name">{item.name}</span>
-                  <span className="feed-member-suggestion-meta">
-                    {item.chamber} · {item.party}
-                    {item.state ? ` · ${item.state}` : ''}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
+    <div
+      className="feed-filter-field feed-filter-field--member"
+      onKeyDownCapture={(event) => {
+        escapeClosesMenuRef.current = event.key === 'Escape' && menuOpenRef.current
+      }}
+      onKeyDown={(event) => {
+        // Escape closes the suggestions only; the filter sheet stays open for the next pick.
+        if (event.key === 'Escape' && escapeClosesMenuRef.current) {
+          event.stopPropagation()
+          event.nativeEvent.stopImmediatePropagation()
+        }
+      }}
+    >
+      <Typeahead<MemberOption>
+        onOpenChange={(open) => {
+          menuOpenRef.current = open
+        }}
+        label="Member"
+        placeholder="Name or last name"
+        searchSource={searchSource}
+        value={value}
+        minQueryLength={2}
+        debounceMs={220}
+        emptySearchText="No members match"
+        width="100%"
+        size="sm"
+        onChange={(item) => {
+          if (item) {
+            setPickedName(item.label)
+            prefetchMemberProfile(item.id)
+            onCommit({ sponsor: item.id, sponsorQ: '' })
+          } else {
+            setPickedName(null)
+            onCommit({ sponsor: null, sponsorQ: '' })
+          }
+        }}
+        renderItem={(item) => (
+          <span className="feed-member-suggestion">
+            <span className="feed-member-suggestion-name">{item.label}</span>
+            {item.auxiliaryData ? (
+              <span className="feed-member-suggestion-meta">{memberMeta(item.auxiliaryData)}</span>
+            ) : null}
+          </span>
+        )}
+      />
+      {!sponsor && sponsorQ ? (
+        <p className="feed-filter-field-note">
+          Sponsor name contains &ldquo;{sponsorQ}&rdquo;{' '}
+          <button
+            type="button"
+            className="congress-link"
+            onClick={() => onCommit({ sponsor: null, sponsorQ: '' })}
+          >
+            Clear
+          </button>
+        </p>
+      ) : null}
     </div>
   )
 })

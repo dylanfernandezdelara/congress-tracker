@@ -12,6 +12,7 @@ import { formatVoteDate } from '../utils/billLabels'
 import { formatPartySplits } from '../utils/partySplit'
 import { ExpandChevron } from './ExpandChevron'
 import { FeedRowDate } from './FeedRowDate'
+import { Button } from '@astryxdesign/core/Button'
 
 type RecentConfirmationsSectionProps = {
   confirmations: RecentConfirmationItem[] | null
@@ -180,9 +181,7 @@ export function RecentConfirmationsSection({
       <section className="recent-confirmations" aria-label="Recent confirmations">
         <p className="text-ui font-normal text-muted-foreground">{error}</p>
         {onRetry ? (
-          <button type="button" className="ghost-button" onClick={onRetry}>
-            Retry
-          </button>
+          <Button variant="ghost" size="sm" label="Retry" onClick={onRetry} />
         ) : null}
       </section>
     )

@@ -9,6 +9,10 @@ import {
   type Ref,
 } from 'react'
 
+import { Button } from '@astryxdesign/core/Button'
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
+import { Selector } from '@astryxdesign/core/Selector'
+import { Token } from '@astryxdesign/core/Token'
 import { parseFeedPartyParam } from '@congress-tracker/shared/feed-filter-params'
 import { US_STATE_OPTIONS } from '@congress-tracker/shared/us-states'
 
@@ -21,7 +25,6 @@ import {
 } from '../utils/feedAdvancedFilters'
 import { AnimatedSheet } from './AnimatedSheet'
 import { Collapsible, CollapsibleContent } from './dfdl/collapsible'
-import { SegmentedControl, SegmentedControlItem } from './dfdl/segmented-control'
 import {
   MemberSponsorCombobox,
   type MemberSponsorComboboxHandle,
@@ -79,62 +82,61 @@ function FilterFields({
     [onChange],
   )
 
+  const ANY = 'any'
+  const topicOptions = [
+    { value: ANY, label: 'Any topic' },
+    ...(filters.policy && !policyAreas.includes(filters.policy) ? [{ value: filters.policy, label: filters.policy }] : []),
+    ...policyAreas.map((area) => ({ value: area, label: area })),
+  ]
+
   return (
     <>
-      <label className="feed-filter-field">
-        <span className="feed-filter-field-label">State</span>
-        <select
-          className="feed-filter-select"
-          aria-label="Filter by sponsor state"
-          value={filters.state ?? ''}
-          onChange={(event) => {
-            const next = event.target.value
-            onChange({ state: next === '' ? null : next })
-          }}
-        >
-          <option value="">Any state</option>
-          {US_STATE_OPTIONS.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="feed-filter-field">
+        <Selector
+          label="State"
+          size="sm"
+          width="100%"
+          hasSearch
+          searchPlaceholder="Search states"
+          presentation="adaptive"
+          options={[{ value: ANY, label: 'Any state' }, ...US_STATE_OPTIONS.map((o) => ({ value: o.code, label: o.name }))]}
+          value={filters.state ?? ANY}
+          onChange={(next) => onChange({ state: !next || next === ANY ? null : next })}
+        />
+      </div>
 
-      <fieldset className="feed-filter-field feed-filter-field--segment">
-        <legend className="feed-filter-field-label">Proposed by</legend>
+      <div className="feed-filter-field feed-filter-field--segment">
+        <span className="feed-filter-field-label" aria-hidden="true">
+          Proposed by
+        </span>
         <SegmentedControl
-          variant="underline"
-          aria-label="Sponsor chamber"
-          className="w-full"
-          value={filters.sponsorChamber ?? ''}
-          onValueChange={(next) => onChange({ sponsorChamber: next === '' ? null : (next as NonNullable<AdvancedFeedFilters['sponsorChamber']>) })}
+          label="Sponsor chamber"
+          size="sm"
+          layout="fill"
+          value={filters.sponsorChamber ?? ANY}
+          onChange={(next) =>
+            onChange({
+              sponsorChamber: next === ANY ? null : (next as NonNullable<AdvancedFeedFilters['sponsorChamber']>),
+            })
+          }
         >
           {SPONSOR_CHAMBER_OPTIONS.map((option) => (
-            <SegmentedControlItem key={option.label} value={option.value} className="flex-1 justify-center">
-              {option.label}
-            </SegmentedControlItem>
+            <SegmentedControlItem key={option.label} value={option.value || ANY} label={option.label} />
           ))}
         </SegmentedControl>
-      </fieldset>
+      </div>
 
-      <label className="feed-filter-field">
-        <span className="feed-filter-field-label">Party</span>
-        <select
-          className="feed-filter-select"
-          aria-label="Filter by sponsor party"
-          value={filters.party ?? ''}
-          onChange={(event) => {
-            onChange({ party: parseFeedPartyParam(event.target.value) })
-          }}
-        >
-          {PARTY_OPTIONS.map((option) => (
-            <option key={option.label} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="feed-filter-field">
+        <Selector
+          label="Party"
+          size="sm"
+          width="100%"
+          presentation="adaptive"
+          options={PARTY_OPTIONS.map((o) => ({ value: o.value || ANY, label: o.label }))}
+          value={filters.party ?? ANY}
+          onChange={(next) => onChange({ party: parseFeedPartyParam(!next || next === ANY ? '' : next) })}
+        />
+      </div>
 
       <MemberSponsorCombobox
         ref={memberRef}
@@ -147,28 +149,19 @@ function FilterFields({
         onCommit={onMemberCommit}
       />
 
-      <label className="feed-filter-field">
-        <span className="feed-filter-field-label">Topic</span>
-        <select
-          className="feed-filter-select"
-          aria-label="Filter by policy topic"
-          value={filters.policy ?? ''}
-          onChange={(event) => {
-            const next = event.target.value
-            onChange({ policy: next === '' ? null : next })
-          }}
-        >
-          <option value="">Any topic</option>
-          {filters.policy && !policyAreas.includes(filters.policy) ? (
-            <option value={filters.policy}>{filters.policy}</option>
-          ) : null}
-          {policyAreas.map((area) => (
-            <option key={area} value={area}>
-              {area}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="feed-filter-field">
+        <Selector
+          label="Topic"
+          size="sm"
+          width="100%"
+          hasSearch
+          searchPlaceholder="Search topics"
+          presentation="adaptive"
+          options={topicOptions}
+          value={filters.policy ?? ANY}
+          onChange={(next) => onChange({ policy: !next || next === ANY ? null : next })}
+        />
+      </div>
     </>
   )
 }
@@ -237,28 +230,26 @@ export function FeedAdvancedFilters({
 
   const actions = (
     <div className="feed-advanced-filters-actions">
-      <button
-        type="button"
-        className="feed-advanced-filters-toggle"
+      <Button
+        variant="ghost"
+        size="sm"
+        label={`Filters${activeCount > 0 ? ` · ${activeCount}` : ''}`}
+        icon={<SlidersHorizontal aria-hidden="true" size={14} />}
         aria-expanded={open}
         aria-controls={inlinePanel ? panelId : undefined}
         aria-haspopup={inlinePanel ? undefined : 'dialog'}
         onClick={toggleFilters}
-      >
-        <SlidersHorizontal aria-hidden="true" />
-        Filters{activeCount > 0 ? ` · ${activeCount}` : ''}
-      </button>
+      />
       {activeCount > 0 ? (
-        <button
-          type="button"
-          className="feed-advanced-filters-clear"
+        <Button
+          variant="ghost"
+          size="sm"
+          label="Clear"
           onClick={() => {
             flushMemberDraft()
             onClear()
           }}
-        >
-          Clear
-        </button>
+        />
       ) : null}
     </div>
   )
@@ -273,17 +264,12 @@ export function FeedAdvancedFilters({
         <ul className="feed-filter-chips" aria-label="Active filters">
           {chips.map((chip) => (
             <li key={chip.id}>
-              <button
-                type="button"
-                className="feed-filter-chip"
-                onClick={() => onChange(chip.clear)}
-                aria-label={`Remove ${chip.label} filter`}
-              >
-                <span className="feed-filter-chip-label">{chip.label}</span>
-                <span className="feed-filter-chip-remove" aria-hidden="true">
-                  ×
-                </span>
-              </button>
+              <Token
+                size="sm"
+                label={chip.label}
+                onRemove={() => onChange(chip.clear)}
+                description={`Remove ${chip.label} filter`}
+              />
             </li>
           ))}
         </ul>
@@ -312,16 +298,15 @@ export function FeedAdvancedFilters({
               Filters
             </h2>
             {activeCount > 0 ? (
-              <button
-                type="button"
-                className="feed-advanced-filters-clear"
+              <Button
+                variant="ghost"
+                size="sm"
+                label="Clear all"
                 onClick={() => {
                   flushMemberDraft()
                   onClear()
                 }}
-              >
-                Clear all
-              </button>
+              />
             ) : null}
           </header>
           <div className="feed-filters-sheet-fields">{fields}</div>

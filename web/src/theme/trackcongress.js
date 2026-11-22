@@ -135,14 +135,14 @@ export const trackcongressTheme = {
     "--color-on-success": "light-dark(#ffffff, #111111)",
     "--color-on-error": "light-dark(#ffffff, #111111)",
     "--color-on-warning": "#111111",
-    "--color-info": "light-dark(#0074e2, #6d9cfe)",
-    "--color-info-muted": "light-dark(#b9d7ff, #88bcff3D)",
-    "--color-on-info": "light-dark(#ffffff, #111111)",
-    "--color-text-info": "light-dark(#0067ce, #a1caff)",
+    "--color-info": "hsl(var(--twc-foreground, 0 0% 16%))",
+    "--color-info-muted": "hsl(var(--twc-surface-secondary, 0 0% 93%))",
+    "--color-on-info": "hsl(var(--twc-background, 0 0% 98%))",
+    "--color-text-info": "hsl(var(--twc-secondary, 0 0% 36%))",
     "--color-text-success": "hsl(var(--twc-pass, 151 40% 36%))",
     "--color-text-warning": "hsl(var(--twc-law, 38 63% 36%))",
     "--color-text-error": "hsl(var(--twc-fail, 0 50% 48%))",
-    "--color-on-info-muted": "light-dark(#003978, #a1caff)",
+    "--color-on-info-muted": "hsl(var(--twc-foreground, 0 0% 16%))",
     "--color-on-success-muted": "light-dark(#00490b, #90ca90)",
     "--color-on-warning-muted": "light-dark(#4b3900, #eec448)",
     "--color-on-error-muted": "light-dark(#76000c, #ffaea7)",
@@ -217,7 +217,11 @@ export const trackcongressTheme = {
     "--shadow-inset-warning": "inset 0px 0px 0px 2px #f8d36a4D",
     "--shadow-inset-error": "inset 0px 0px 0px 2px #de47454D",
     "--color-background-inverted": "hsl(var(--twc-foreground, 0 0% 16%))",
-    "--color-track": "hsl(var(--twc-border, 0 0% 90%))"
+    "--color-track": "hsl(var(--twc-border, 0 0% 90%))",
+    "--color-icon-info": "hsl(var(--twc-secondary, 0 0% 36%))",
+    "--color-border-info": "hsl(var(--twc-border, 0 0% 90%))",
+    "--font-weight-semibold": "500",
+    "--font-weight-bold": "500"
   },
   localTokens: {
     "--astryx-theme-neutral-color-status-fill-accent": "light-dark(#0074e2, #6d9cfe)"

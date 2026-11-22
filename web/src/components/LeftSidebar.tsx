@@ -13,6 +13,7 @@ import { formatShortBillId } from '@congress-tracker/shared/bill-id'
 
 import type { MemberProfileSeed } from './MemberProfile'
 import { MemberProfileTrigger } from './MemberProfileTrigger'
+import { Button } from '@astryxdesign/core/Button'
 
 type LeftSidebarProps = {
   session: UseAsyncDataResult<SessionStatsResponse>
@@ -220,14 +221,10 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
         <p className="sidebar-coverage">{coverage}</p>
       ) : null}
       {session.error && onRetry ? (
-        <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-          Retry sidebar
-        </button>
+        <Button variant="ghost" size="sm" label="Retry sidebar" onClick={onRetry} />
       ) : null}
       {!session.error && hasMemberDataError && onRetry ? (
-        <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-          Retry member data
-        </button>
+        <Button variant="ghost" size="sm" label="Retry member data" onClick={onRetry} />
       ) : null}
       <ChamberSection
         title="House"

@@ -17,6 +17,7 @@ const LIGHT: Record<string, string> = {
   border: '0 0% 90%',
   'border-hover': '0 0% 80%',
   'surface-subtle': '0 0% 0% / 0.04',
+  'surface-secondary': '0 0% 93%',
   skeleton: '0 0% 0% / 0.05',
   'row-hover': '0 0% 0% / 0.03',
   'row-active': '0 0% 0% / 0.05',
@@ -78,6 +79,19 @@ export const trackcongressTheme = defineTheme({
     '--color-text-error': c('fail'),
     '--color-warning': c('law'),
     '--color-text-warning': c('law'),
+
+    // Info is gray: notices are part of the page, not alerts ("Prefer gray hierarchy over chip-soup color").
+    '--color-info': c('foreground'),
+    '--color-on-info': c('background'),
+    '--color-info-muted': c('surface-secondary'),
+    '--color-on-info-muted': c('foreground'),
+    '--color-text-info': c('secondary'),
+    '--color-icon-info': c('secondary'),
+    '--color-border-info': c('border'),
+
+    // Two weights only (400 / 500).
+    '--font-weight-semibold': '500',
+    '--font-weight-bold': '500',
 
     // Radii: 8px controls, 16px cards (DESIGN_LANGUAGE.md).
     '--radius-element': '8px',

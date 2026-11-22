@@ -10,6 +10,7 @@ import {
   tightnessBarWidth,
   tightnessDotKey,
 } from '../utils/tightnessLabels'
+import { Button } from '@astryxdesign/core/Button'
 
 type TightnessStripProps = {
   house: TightnessDot[]
@@ -42,9 +43,7 @@ export function TightnessStrip({
         <div className="space-y-2">
           <p className="text-xs text-fail">{error}</p>
           {onRetry ? (
-            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-              Retry
-            </button>
+            <Button variant="ghost" size="sm" label="Retry" onClick={onRetry} />
           ) : null}
         </div>
       ) : !loading && !hasRows ? (

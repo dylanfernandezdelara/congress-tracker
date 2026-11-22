@@ -3,6 +3,7 @@ import { trimDisplayTitle } from '@congress-tracker/shared/feed-content'
 import { formatBillQueryParam } from '../utils/billDeepLink'
 import { formatSenateWaitingSince, formatShortBillId } from '../utils/billLabels'
 import type { SenateWaitingBill } from '../api/types'
+import { Button } from '@astryxdesign/core/Button'
 
 type SenateWaitingListProps = {
   items: SenateWaitingBill[]
@@ -33,9 +34,7 @@ export function SenateWaitingList({
         <div className="space-y-2">
           <p className="text-xs text-fail">{error}</p>
           {onRetry ? (
-            <button type="button" className="ghost-button text-xs" onClick={onRetry}>
-              Retry
-            </button>
+            <Button variant="ghost" size="sm" label="Retry" onClick={onRetry} />
           ) : null}
         </div>
       ) : null}
