@@ -420,3 +420,25 @@ describe('getBillLifecycleStages', () => {
     ])
   })
 })
+
+describe('origin chamber passed without a roll call', () => {
+  it('marks the House done when the Senate received an H.R. bill, keeping House before Senate', () => {
+    const item = makeFeedItem({
+      bill: { congress: 119, type: 'HR', number: 2347, title: 'Survivor Justice Tax Prevention Act' },
+      passage_votes: [{ ...hr6644Votes[1]!, date: '2026-11-19', yeas: 62, nays: 33 }],
+      lifecycle: makeLifecycle({ introduced_date: '2025-03-25' }),
+      process: {
+        current_status: 'cleared_committee',
+        current_label: 'Cleared Ways and Means Committee',
+        stages: [],
+        floor_actions: [
+          { date: '2026-04-28', key: 'received', label: 'Received in the Senate', chamber: 'Senate', tally_text: null },
+        ],
+      },
+    })
+    const { stages } = getBillLifecycleStages(item)
+    expect(stages.map((s) => s.key)).toEqual(['introduced', 'house', 'senate', 'to_president', 'outcome'])
+    expect(stages[1]).toMatchObject({ key: 'house', state: 'done', date: null })
+    expect(stages[2]).toMatchObject({ key: 'senate', state: 'done', date: '2026-11-19' })
+  })
+})

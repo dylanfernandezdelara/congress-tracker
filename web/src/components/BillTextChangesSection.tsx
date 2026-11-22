@@ -5,7 +5,9 @@ import { TEXT_CHANGES_MAX_LISTED_PROVISIONS } from '@congress-tracker/shared/bil
 import type { BillTextChanges } from '../api/types'
 import {
   billTextChangesExplanation,
+  dedupeQuotedProvisions,
   formatProvisionLabel,
+  textLargelyReplaced,
 } from '../utils/billTextVersions'
 
 /**
@@ -19,14 +21,13 @@ export function BillTextChangesSection({ changes }: { changes: BillTextChanges }
 
   if (changes.added_provisions.length === 0) return null
 
-  const collapsible = changes.added_provisions.length > TEXT_CHANGES_MAX_LISTED_PROVISIONS
+  const provisions = dedupeQuotedProvisions(changes.added_provisions)
+  const replaced = textLargelyReplaced(changes)
+  const collapsible = provisions.length > TEXT_CHANGES_MAX_LISTED_PROVISIONS
   const visible =
-    collapsible && !expanded
-      ? changes.added_provisions.slice(0, TEXT_CHANGES_MAX_LISTED_PROVISIONS)
-      : changes.added_provisions
+    collapsible && !expanded ? provisions.slice(0, TEXT_CHANGES_MAX_LISTED_PROVISIONS) : provisions
   // Unshown stored rows plus payload overflow — the true remaining total.
-  const remainingNotShown =
-    changes.added_provisions.length - visible.length + changes.more_added_count
+  const remainingNotShown = provisions.length - visible.length + changes.more_added_count
   const showOverflow = (!collapsible || expanded) && changes.more_added_count > 0
 
   return (
@@ -34,7 +35,15 @@ export function BillTextChangesSection({ changes }: { changes: BillTextChanges }
       className="feed-row-detail-section feed-row-added-provisions"
       data-feed-added-provisions
     >
-      <h3 className="feed-row-detail-heading">Added after this summary</h3>
+      <h3 className="feed-row-detail-heading">
+        {replaced ? 'The text changed after this summary' : 'Added after this summary'}
+      </h3>
+      {replaced ? (
+        <p className="feed-row-added-provisions-warning">
+          The newest version adds {provisions.length + changes.more_added_count} sections, so the summary above may not describe what
+          was voted on.
+        </p>
+      ) : null}
       <p className="feed-row-added-provisions-lede">{billTextChangesExplanation(changes)}</p>
       <ul className="feed-row-added-provisions-list">
         {visible.map((provision) => (
@@ -53,7 +62,7 @@ export function BillTextChangesSection({ changes }: { changes: BillTextChanges }
           aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
-          {expanded ? 'Show fewer' : `Show all ${changes.added_provisions.length}`}
+          {expanded ? 'Show fewer' : `Show all ${provisions.length}`}
         </button>
       ) : null}
       {collapsible && !expanded && remainingNotShown > 0 ? (

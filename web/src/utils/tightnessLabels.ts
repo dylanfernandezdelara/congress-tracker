@@ -1,3 +1,4 @@
+import { proceduralHeadline } from '@congress-tracker/shared/procedural-titles'
 import {
   HOUSE_CLOSEST_LIMIT,
   HOUSE_MARGIN_CAP,
@@ -46,7 +47,10 @@ export function tightnessBarTitle(dot: TightnessDot): string {
     const position = dot.position_title?.trim()
     return position ? `${name}, ${position}` : name
   }
-  return dot.headline?.trim() || tightnessDotLabel(dot)
+  const headline = dot.headline?.trim()
+  // Rules and other procedural resolutions carry clerk titles ("Providing for consideration of
+  // the bill (H.R. 1013) to amend..."); say what the vote did instead.
+  return (headline && proceduralHeadline(headline)) || headline || tightnessDotLabel(dot)
 }
 
 /** Second line: `H.R. 88 · passed 210–208 · party-line` / `confirmed 58–40 · bipartisan`. */

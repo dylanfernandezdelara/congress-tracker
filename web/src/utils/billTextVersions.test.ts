@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { BillTextChanges } from '../api/types'
 import {
+  dedupeQuotedProvisions,
   billTextChangesExplanation,
   billVersionPhrase,
   formatProvisionLabel,
@@ -55,5 +56,19 @@ describe('billTextChangesExplanation', () => {
     expect(
       billTextChangesExplanation({ ...changes, summary_version_date: null }),
     ).toContain('describes this bill reported by committee.')
+  })
+})
+
+describe('dedupeQuotedProvisions', () => {
+  it('drops a quoted section that repeats the heading just before it', () => {
+    expect(
+      dedupeQuotedProvisions([
+        { label: '1101.', heading: 'Purposes; procedure; savings provision' },
+        { label: '2.', heading: 'Purposes; procedure; savings provision' },
+        { label: '1102.', heading: 'Definitions' },
+        { label: '3.', heading: 'Definitions' },
+        { label: '1131.', heading: 'Definitions' },
+      ]).map((p) => p.label),
+    ).toEqual(['1101.', '1102.', '1131.'])
   })
 })

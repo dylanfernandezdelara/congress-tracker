@@ -21,6 +21,12 @@ describe('tightnessLabels', () => {
     const resolution = makeTightnessDot({ bill_type: 'HRES', bill_number: 1499 })
     expect(tightnessBarTitle(resolution)).toBe('House passes a knife-edge resolution (local sample)')
     expect(tightnessBarMeta(resolution)).toBe('H.Res. 1499 · passed 210–208 · party-line')
+    const rule = makeTightnessDot({
+      bill_type: 'HRES',
+      bill_number: 1650,
+      headline: 'Providing for consideration of the bill (H.R. 1013) to amend the Federal securities laws to enhance 403(b) plans, and for other purposes.',
+    })
+    expect(tightnessBarTitle(rule)).toMatch(/^Sets up House debate on H\.R\. 1013/)
     const nominee = makeTightnessDot({
       kind: 'nominee',
       chamber: 'Senate',
