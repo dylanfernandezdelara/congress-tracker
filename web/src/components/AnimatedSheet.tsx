@@ -97,7 +97,7 @@ export function AnimatedSheet({
         initialFocus={closeRef}
         finalFocus={returnFocusRef}
         // A departing sheet is inert: unfocusable and hidden from assistive tech while it animates out.
-        {...((open && closing) || !open ? { inert: '' } : {})}
+        {...((open && closing) || !open ? { inert: true } : {})}
       >
         {footerDismiss ? null : <div className="sheet-toolbar">{dismissButton}</div>}
         {children}
