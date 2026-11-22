@@ -95,4 +95,14 @@ describe('voteCohesion', () => {
     )
     expect(voteCohesion([])).toBe('unknown')
   })
+
+  it('calls a vote bipartisan when a real bloc of one caucus crossed', () => {
+    // H.R. 2347, Senate 62–33: 14 of 44 Democrats joined Republicans.
+    expect(
+      voteCohesion([
+        { party: 'R', yeas: 47, nays: 2, party_line: 'yea' },
+        { party: 'D', yeas: 14, nays: 30, party_line: 'nay' },
+      ]),
+    ).toBe('bipartisan')
+  })
 })

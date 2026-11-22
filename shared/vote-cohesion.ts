@@ -43,10 +43,21 @@ export function selectClosestVotes<T extends ClosestVoteRoll>(
     .slice(0, limit)
 }
 
+/** Share of a caucus that may cross before a roll stops reading as party-line. */
+export const PARTY_LINE_MAX_CROSSOVER_SHARE = 0.1
+
+function crossoverShare(split: RollPartySplit): number {
+  const total = split.yeas + split.nays
+  if (total <= 0) return 0
+  return (split.party_line === 'yea' ? split.nays : split.yeas) / total
+}
+
 /**
- * Party-line when R and D majorities opposed each other; bipartisan when they
- * agreed. A handful of defectors does not flip a party-line roll (HRES 1499
- * R 207–5 / D 2–203 stays party-line). Unknown when either caucus is missing.
+ * Party-line when R and D majorities opposed each other and each caucus held
+ * together (no more than 10% crossed). A handful of defectors does not flip a
+ * party-line roll (HRES 1499 R 207–5 / D 2–203 stays party-line), but a real
+ * bloc does: 14 of 44 Democrats joining Republicans (H.R. 2347, 62–33) is
+ * bipartisan passage. Unknown when either caucus is missing.
  */
 export function voteCohesion(splits: RollPartySplit[]): VoteCohesion {
   let republican: RollPartySplit | undefined
@@ -57,5 +68,9 @@ export function voteCohesion(splits: RollPartySplit[]): VoteCohesion {
     else if (code === 'D') democrat = split
   }
   if (!republican || !democrat) return 'unknown'
-  return republican.party_line === democrat.party_line ? 'bipartisan' : 'party-line'
+  if (republican.party_line === democrat.party_line) return 'bipartisan'
+  return crossoverShare(republican) > PARTY_LINE_MAX_CROSSOVER_SHARE ||
+    crossoverShare(democrat) > PARTY_LINE_MAX_CROSSOVER_SHARE
+    ? 'bipartisan'
+    : 'party-line'
 }
