@@ -283,9 +283,27 @@ function toFeedSummaryContent(fields: {
   }
 }
 
+/**
+ * Older placeholder summaries were built from CRS text whose title heading got
+ * glued onto the first sentence ("Earth MRI Act of 2026 This bill..."). Drop a
+ * leading copy of the title or headline when a sentence follows it.
+ */
+export function stripGluedTitle(text: string | null | undefined, ...titles: Array<string | null | undefined>): string | null | undefined {
+  if (!text) return text
+  for (const raw of titles) {
+    const title = raw?.trim().replace(/[.;,:]+$/, '')
+    if (!title || title.length >= text.length) continue
+    if (text.startsWith(title)) {
+      const rest = text.slice(title.length)
+      if (/^\s+(This|The|These|It|Under)\b/.test(rest)) return rest.trim()
+    }
+  }
+  return text
+}
+
 export function getFeedSummaryContent(item: FeedItem): FeedSummaryContent {
   return toFeedSummaryContent({
-    what_it_does: item.digest?.what_it_does,
+    what_it_does: stripGluedTitle(item.digest?.what_it_does, item.digest?.headline, item.bill.title),
     key_points: item.digest?.key_points,
     raw_summary_text: item.raw_summary_text,
     key_point_sections: item.digest?.key_point_sections,

@@ -281,6 +281,34 @@
     color: hsl(var(--twc-faint));
   }
 
+  /* One plain phrase under the headline: what happened, the tally, and the party split. */
+  /* Deep links scroll a row to the top; keep it clear of the sticky site header. */
+  .feed-row {
+    scroll-margin-top: 4.5rem;
+  }
+
+  .feed-row-added-provisions-warning {
+    margin: 0 0 0.5rem;
+    font-size: var(--type-ui-size);
+    line-height: 1.45;
+    color: hsl(var(--twc-primary));
+  }
+
+  .feed-row-status {
+    margin: 0;
+    font-size: var(--type-caption-size);
+    font-weight: 400;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--twc-secondary));
+    overflow-wrap: anywhere;
+  }
+
+  .feed-row-status-split,
+  .feed-row-status-note {
+    color: hsl(var(--twc-faint));
+  }
+
   .feed-row-event {
     margin: 0;
     font-size: var(--type-caption-size);
