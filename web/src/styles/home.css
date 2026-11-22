@@ -359,6 +359,66 @@
     gap: 0.45rem;
   }
 
+  .home-lede {
+    margin: 0 0 1rem;
+    font-size: var(--type-body-size, 14px);
+    font-weight: 400;
+    line-height: 1.45;
+    color: hsl(var(--twc-secondary));
+    text-wrap: pretty;
+  }
+
+  .home-intro-group {
+    border-bottom: 1px solid hsl(var(--twc-border));
+  }
+
+  .home-intro-group-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-height: 44px;
+    padding: 1rem 0;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .home-intro-group-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .home-intro-group-title {
+    font-size: var(--type-ui-size, 14px);
+    font-weight: 500;
+    color: hsl(var(--twc-primary));
+  }
+
+  .home-intro-group-title::after {
+    content: ' ›';
+    color: hsl(var(--twc-faint));
+  }
+
+  .home-intro-group[open] .home-intro-group-title::after {
+    content: ' ⌄';
+  }
+
+  .home-intro-group-meta {
+    font-size: var(--type-caption-size);
+    color: hsl(var(--twc-faint));
+  }
+
+  .home-glance-heading {
+    margin: 0;
+    padding: 2rem 0 0.5rem;
+    border-top: 1px solid hsl(var(--twc-border));
+    font-size: var(--type-ui-size, 14px);
+    font-weight: 500;
+    color: hsl(var(--twc-primary));
+  }
+
+  .home-feed-secondary > .home-glance-control {
+    padding: 0.5rem 0 1.5rem;
+  }
+
   .home-feed-count {
     margin: 0;
     font-size: var(--type-caption-size);
