@@ -96,7 +96,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 
 ## API
 
-- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`); top-level `status` is `ok` only when ingest is healthy. Ingest is `degraded` when any feed-visible bill lacks a complete digest (`missing_digest_count` matches `/feed/latest`, including intros)
+- `GET /health` — liveness plus `data.ingest` scheduled-run freshness (`ok` | `degraded` | `stale` | `failed` | `unknown`); top-level `status` is `ok` only when ingest is healthy. Ingest is `degraded` when any feed-visible bill lacks a complete digest (`missing_digest_count` matches `/feed/latest`, including intros) or a feed bill with a CRS summary still shows the title-fallback placeholder (`placeholder_summary_count`: the rewrite never landed)
 - `GET /debug/ingest.json` — detailed ingest monitor payload
 - `GET /` (document navigation, `Accept` prefers HTML) with `?bill=` — Worker fetches the SPA `index.html` from ASSETS and rewrites `og:title` / `og:description` / `og:url` plus matching Twitter tags from the bill digest (canonical URL `https://trackcongress.org/?bill=...`). Requires `[assets] run_worker_first = true` so asset-first routing does not serve the static shell before the rewrite (a path include-list disables SPA `Sec-Fetch-Mode` routing and would HTML-fallback `/feed/*.json`). Missing bill/digest keeps the static site meta. Not a `/bill/:id` page.
 - `GET /og/bill/:billParam.png?v=` — 1200×630 share card PNG: wordmark and bill number, the headline, and on the right the outcome (`Passed House`, `Became law` + date, `In committee`) with yes and no counts, each over a bar colored by the parties that cast those votes, and a 2/3 tick when the vote needed two-thirds. Rendered with `workers-og` (satori + resvg WASM) and cached in the Cache API under a key built from the bill + the **server-computed** content version (`ogImageCacheKey`; the request query string never reaches the key, so junk params — including old `quote=` links — cannot force re-renders); falls back to the static `/og-image.png` when the bill is unknown or rendering fails (`x-og-card: rendered|fallback`). `/?bill=` document navigations point `og:image` / `twitter:image` here with `v` = content version (`shared/og-card.ts`, which also holds `OG_CARD_DESIGN`; bump it when the look changes so link previews refetch). The worker builds the model (`og-card-model.ts`) and the HTML (`og-card-html.ts`); the web app has no preview twin
@@ -219,12 +219,7 @@ way they would, so summaries lead with concrete effects on people and stay stric
   go after live ones, and may use at most half the day's budget (`DIGEST_BACKFILL_BUDGET_SHARE`), so new
   bills keep their summaries; raise `DIGEST_DAILY_BUDGET_USD` for the duration to go faster. Without it, summaries
   from before v3 are left alone unless the bill is queued for another reason.
-- **Reader feedback** `POST /feedback/summary` `{bill:"119-hr-1", kind:"helpful"|"unhelpful"|"mistake", note?}`
-  (the "Was this summary helpful? / Report a mistake" row under a summary). Stored in `digest_feedback` with the
-  summary's headline, model, prompt version and fingerprint; site origin only. A keyed per-day hash of the
-  reader's address (`FEEDBACK_HASH_SECRET`; never the IP, erased the next day) caps each reader at 30 a day
-  and 3 mistake reports per bill per day. Read it with
-  `SELECT kind, count(*) FROM digest_feedback GROUP BY kind` or the mistakes with their notes.
+- **Reader feedback**: removed before launch (no users yet). The `digest_feedback` table stays; nothing writes to it.
 - **Judge** (eval rounds only, never production): Gemini 3.8 Flash, calibrated against Dylan's picks. Try
   another with `DIGEST_JUDGE_MODEL=<openrouter id>` (and `DIGEST_JUDGE_EFFORT=high|max` for reasoning models);
   results are written per model and never overwrite Gemini's. Tried 2026-09-27 on the same calibration set:
