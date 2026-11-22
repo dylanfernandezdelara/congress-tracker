@@ -239,7 +239,8 @@ export function isProceduralFeedItem(item: FeedItem): boolean {
 export function getFeedTopic(item: FeedItem): string {
   // Full title/headline — never ellipsis-truncate. CSS must not line-clamp.
   if (item.digest?.headline) {
-    return trimDisplayTitle(item.digest.headline)
+    // A placeholder digest copies the clerk's title; a rule still reads better as what it does.
+    return proceduralHeadline(item.digest.headline) ?? trimDisplayTitle(item.digest.headline)
   }
 
   const title = item.bill.title ?? ''
