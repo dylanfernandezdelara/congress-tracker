@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { settleSheets } from '../test/sheetExit'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
@@ -40,6 +40,12 @@ async function pickOption(label: string, option: string) {
 }
 
 describe('Home advanced filters', () => {
+  // The filter fields are lazy-loaded with Astryx. Load the chunk once up front so a cold import on a slow CI
+  // runner doesn't outlast the queries' default wait.
+  beforeAll(async () => {
+    await import('../components/FeedFilterFields')
+  }, 30_000)
+
   beforeEach(() => {
     stubHomeRouteDefaults(homeApi)
   })
