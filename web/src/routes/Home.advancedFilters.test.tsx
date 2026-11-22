@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { settleSheets } from '../test/sheetExit'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearMemberProfileCache } from '../api/memberProfileCache'
 import { makeFeedItem } from '../test/feedItemFixtures'
@@ -33,7 +33,19 @@ const {
 
 vi.mock('../api/client', () => homeApi)
 
+/** Open an Astryx Selector by its label and click an option. */
+async function pickOption(label: string, option: string) {
+  fireEvent.click(await screen.findByLabelText(label, { selector: 'button' }))
+  fireEvent.click(await screen.findByRole('option', { name: new RegExp(option) }))
+}
+
 describe('Home advanced filters', () => {
+  // The filter fields are lazy-loaded with Astryx. Load the chunk once up front so a cold import on a slow CI
+  // runner doesn't outlast the queries' default wait.
+  beforeAll(async () => {
+    await import('../components/FeedFilterFields')
+  }, 30_000)
+
   beforeEach(() => {
     stubHomeRouteDefaults(homeApi)
   })
@@ -75,9 +87,7 @@ describe('Home advanced filters', () => {
     expect(screen.getByText('Texas sponsor headline')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
-    fireEvent.change(screen.getByLabelText('Filter by sponsor state'), {
-      target: { value: 'NY' },
-    })
+    await pickOption('State', 'New York')
 
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, state: 'NY' })
@@ -87,7 +97,7 @@ describe('Home advanced filters', () => {
     expect(screen.getByText(/1 bill/)).toBeInTheDocument()
     expect(screen.getByText(/1 bill · through .+ · New York/)).toBeInTheDocument()
     expect(screen.getByTestId('search-params')).toHaveTextContent('state=NY')
-    expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('NY')
+    expect((await screen.findByLabelText('State', { selector: 'button' }))).toHaveTextContent('New York')
   })
 
   it('filters by sponsor chamber, party, member name, and topic together', async () => {
@@ -137,19 +147,15 @@ describe('Home advanced filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     fireEvent.click(
-      within(screen.getByRole('radiogroup', { name: 'Sponsor chamber' })).getByRole('radio', {
+      within(await screen.findByRole('radiogroup', { name: 'Sponsor chamber' })).getByRole('radio', {
         name: 'House',
       }),
     )
 
-    fireEvent.change(screen.getByLabelText('Filter by sponsor party'), {
-      target: { value: 'D' },
-    })
-    fireEvent.change(screen.getByLabelText('Filter by policy topic'), {
-      target: { value: 'Energy' },
-    })
+    await pickOption('Party', 'Democrat')
+    await pickOption('Topic', 'Energy')
 
-    const memberInput = screen.getByPlaceholderText('Name or last name')
+    const memberInput = (await screen.findByPlaceholderText('Name or last name'))
     fireEvent.change(memberInput, { target: { value: 'Loyal' } })
     expect(await screen.findByRole('option', { name: /Rep\. Sample Loyal/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('option', { name: /Rep\. Sample Loyal/ }))
@@ -191,7 +197,7 @@ describe('Home advanced filters', () => {
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(fetchFeed).toHaveBeenCalledWith({ limit: 30, offset: 0 })
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
-    expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('')
+    expect((await screen.findByLabelText('State', { selector: 'button' }))).toHaveTextContent('Any state')
   })
 
   it('keeps the filter sheet and the open bill when Escape dismisses member suggestions', async () => {
@@ -216,7 +222,7 @@ describe('Home advanced filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     const dialog = await screen.findByRole('dialog', { name: 'Filters' })
-    const memberInput = within(dialog).getByPlaceholderText('Name or last name')
+    const memberInput = (await within(dialog).findByPlaceholderText('Name or last name'))
     fireEvent.change(memberInput, { target: { value: 'Loyal' } })
     expect(await within(dialog).findByRole('option', { name: /Sample Loyal/ })).toBeInTheDocument()
 
@@ -229,14 +235,13 @@ describe('Home advanced filters', () => {
     expect(memberInput).toHaveValue('Loyal')
     expect(screen.getByTestId('search-params').textContent ?? '').not.toContain('sponsor_q=')
 
+    // With the suggestions closed, the next Escape belongs to the sheet; the open bill survives it.
     fireEvent.keyDown(memberInput, { key: 'Escape' })
     await settleSheets()
-    expect(memberInput).toHaveValue('')
-    expect((await screen.findByRole('dialog', { name: 'Filters' }))).not.toHaveAttribute('inert')
     expect(screen.getByTestId('search-params').textContent ?? '').toContain('bill=')
   })
 
-  it('opens filters in a bottom sheet on narrow viewports and Escape clears member draft first', async () => {
+  it('opens filters in a bottom sheet on narrow viewports with a member picker', async () => {
     mockViewport(false)
     renderHome()
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
@@ -246,42 +251,10 @@ describe('Home advanced filters', () => {
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Done' })).toBeInTheDocument()
 
-    const memberInput = within(dialog).getByPlaceholderText('Name or last name')
-    fireEvent.change(memberInput, { target: { value: 'Schumer' } })
-    fireEvent.keyDown(memberInput, { key: 'Escape' })
-    await settleSheets()
-
-    expect(memberInput).toHaveValue('')
-    expect((await screen.findByRole('dialog', { name: 'Filters' }))).not.toHaveAttribute('inert')
+    expect((await within(dialog).findByPlaceholderText('Name or last name'))).toBeInTheDocument()
   })
 
-  it('commits a typed member name when Done closes the filter sheet', async () => {
-    mockViewport(false)
-    fetchFeed
-      .mockResolvedValueOnce(pageResponse([makeFeedItem()], { total: 1 }))
-      .mockResolvedValue(pageResponse([makeFeedItem()], { total: 1 }))
-
-    renderHome()
-    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Filters' })
-    const memberInput = within(dialog).getByPlaceholderText('Name or last name')
-    fireEvent.change(memberInput, { target: { value: 'Schumer' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
-
-    await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({
-        limit: 30,
-        offset: 0,
-        sponsorQ: 'Schumer',
-      })
-    })
-    expect(screen.getByTestId('search-params').textContent).toContain('sponsor_q=Schumer')
-    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument()
-  })
-
-  it('keeps an exact sponsor selection while typing until the draft is committed', async () => {
+  it('shows the selected sponsor in the picker', async () => {
     fetchMemberProfile.mockResolvedValue({
       bioguide_id: 'LOCAL:H002',
       name: 'Rep. Sample Loyal (local)',
@@ -315,24 +288,17 @@ describe('Home advanced filters', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: /Filters/ }))
-    const memberInput = screen.getByPlaceholderText('Name or last name')
-    fireEvent.change(memberInput, { target: { value: 'Schumer' } })
-
-    expect(fetchFeed).toHaveBeenLastCalledWith({
-      limit: 30,
-      offset: 0,
-      sponsor: 'LOCAL:H002',
-    })
+    // The picker shows the chosen member instead of an empty field.
+    expect((await screen.findAllByText(/Sample Loyal/)).length).toBeGreaterThan(1)
     expect(screen.getByTestId('search-params').textContent).toContain('sponsor=LOCAL%3AH002')
+  })
 
-    fireEvent.blur(memberInput)
-    await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({
-        limit: 30,
-        offset: 0,
-        sponsorQ: 'Schumer',
-      })
-    })
+  it('keeps old sponsor_q links working and offers to clear them', async () => {
+    renderHome('/?sponsor_q=Schumer')
+    expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
+    expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, sponsorQ: 'Schumer' })
+    fireEvent.click(screen.getByRole('button', { name: /Filters/ }))
+    expect(await screen.findByText(/Sponsor name contains/)).toBeInTheDocument()
   })
 
   it('shows removable chips for active advanced filters', async () => {

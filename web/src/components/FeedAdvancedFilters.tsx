@@ -1,16 +1,13 @@
 import { SlidersHorizontal } from 'lucide-react'
 import {
-  useCallback,
+  lazy,
+  Suspense,
   useEffect,
   useId,
   useRef,
   useState,
   type ReactNode,
-  type Ref,
 } from 'react'
-
-import { parseFeedPartyParam } from '@congress-tracker/shared/feed-filter-params'
-import { US_STATE_OPTIONS } from '@congress-tracker/shared/us-states'
 
 import { fetchPolicyAreas } from '../api/client'
 import { useMediaQuery } from '../hooks/useMediaQuery'
@@ -21,12 +18,25 @@ import {
 } from '../utils/feedAdvancedFilters'
 import { AnimatedSheet } from './AnimatedSheet'
 import { Collapsible, CollapsibleContent } from './dfdl/collapsible'
-import { SegmentedControl, SegmentedControlItem } from './dfdl/segmented-control'
-import {
-  MemberSponsorCombobox,
-  type MemberSponsorComboboxHandle,
-  type MemberSponsorCommit,
-} from './MemberSponsorCombobox'
+import type { MemberSponsorComboboxHandle } from './MemberSponsorCombobox'
+
+// Astryx and its stylesheet arrive with the panel, not with the page.
+const loadFeedFilterFields = () => import('./FeedFilterFields')
+const FeedFilterFields = lazy(loadFeedFilterFields)
+
+/** Fetch the panel once the page is idle, so opening Filters on a slow phone doesn't wait on the download. */
+function usePrefetchFilterFields() {
+  useEffect(() => {
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number })
+      .requestIdleCallback
+    if (idle) {
+      const handle = idle(() => void loadFeedFilterFields(), { timeout: 4000 })
+      return () => window.cancelIdleCallback?.(handle)
+    }
+    const timer = window.setTimeout(() => void loadFeedFilterFields(), 2500)
+    return () => window.clearTimeout(timer)
+  }, [])
+}
 
 type FeedAdvancedFiltersProps = {
   filters: AdvancedFeedFilters
@@ -39,140 +49,6 @@ type FeedAdvancedFiltersProps = {
 
 const FILTERS_INLINE_QUERY = '(min-width: 640px)'
 
-const SPONSOR_CHAMBER_OPTIONS: Array<{
-  value: '' | NonNullable<AdvancedFeedFilters['sponsorChamber']>
-  label: string
-}> = [
-  { value: '', label: 'Any' },
-  { value: 'House', label: 'House' },
-  { value: 'Senate', label: 'Senate' },
-]
-
-const PARTY_OPTIONS = [
-  { value: '', label: 'Any' },
-  { value: 'D', label: 'Democrat' },
-  { value: 'R', label: 'Republican' },
-  { value: 'I', label: 'Independent' },
-] as const
-
-type FilterFieldsProps = {
-  filters: AdvancedFeedFilters
-  onChange: (patch: Partial<AdvancedFeedFilters>) => void
-  policyAreas: string[]
-  selectedSponsorName: string | null
-  memberRef: Ref<MemberSponsorComboboxHandle>
-  suggestionsInline?: boolean
-}
-
-function FilterFields({
-  filters,
-  onChange,
-  policyAreas,
-  selectedSponsorName,
-  memberRef,
-  suggestionsInline = false,
-}: FilterFieldsProps) {
-  const onMemberCommit = useCallback(
-    (next: MemberSponsorCommit) => {
-      onChange(next)
-    },
-    [onChange],
-  )
-
-  return (
-    <>
-      <label className="feed-filter-field">
-        <span className="feed-filter-field-label">State</span>
-        <select
-          className="feed-filter-select"
-          aria-label="Filter by sponsor state"
-          value={filters.state ?? ''}
-          onChange={(event) => {
-            const next = event.target.value
-            onChange({ state: next === '' ? null : next })
-          }}
-        >
-          <option value="">Any state</option>
-          {US_STATE_OPTIONS.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <fieldset className="feed-filter-field feed-filter-field--segment">
-        <legend className="feed-filter-field-label">Proposed by</legend>
-        <SegmentedControl
-          variant="underline"
-          aria-label="Sponsor chamber"
-          className="w-full"
-          value={filters.sponsorChamber ?? ''}
-          onValueChange={(next) => onChange({ sponsorChamber: next === '' ? null : (next as NonNullable<AdvancedFeedFilters['sponsorChamber']>) })}
-        >
-          {SPONSOR_CHAMBER_OPTIONS.map((option) => (
-            <SegmentedControlItem key={option.label} value={option.value} className="flex-1 justify-center">
-              {option.label}
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
-      </fieldset>
-
-      <label className="feed-filter-field">
-        <span className="feed-filter-field-label">Party</span>
-        <select
-          className="feed-filter-select"
-          aria-label="Filter by sponsor party"
-          value={filters.party ?? ''}
-          onChange={(event) => {
-            onChange({ party: parseFeedPartyParam(event.target.value) })
-          }}
-        >
-          {PARTY_OPTIONS.map((option) => (
-            <option key={option.label} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <MemberSponsorCombobox
-        ref={memberRef}
-        sponsor={filters.sponsor}
-        sponsorQ={filters.sponsorQ}
-        selectedName={selectedSponsorName}
-        chamber={filters.sponsorChamber}
-        state={filters.state}
-        suggestionsInline={suggestionsInline}
-        onCommit={onMemberCommit}
-      />
-
-      <label className="feed-filter-field">
-        <span className="feed-filter-field-label">Topic</span>
-        <select
-          className="feed-filter-select"
-          aria-label="Filter by policy topic"
-          value={filters.policy ?? ''}
-          onChange={(event) => {
-            const next = event.target.value
-            onChange({ policy: next === '' ? null : next })
-          }}
-        >
-          <option value="">Any topic</option>
-          {filters.policy && !policyAreas.includes(filters.policy) ? (
-            <option value={filters.policy}>{filters.policy}</option>
-          ) : null}
-          {policyAreas.map((area) => (
-            <option key={area} value={area}>
-              {area}
-            </option>
-          ))}
-        </select>
-      </label>
-    </>
-  )
-}
-
 export function FeedAdvancedFilters({
   filters,
   sponsorName = null,
@@ -180,6 +56,7 @@ export function FeedAdvancedFilters({
   onClear,
   renderToolbar,
 }: FeedAdvancedFiltersProps) {
+  usePrefetchFilterFields()
   const panelId = useId()
   const sheetTitleId = useId()
   const memberRef = useRef<MemberSponsorComboboxHandle | null>(null)
@@ -225,14 +102,16 @@ export function FeedAdvancedFilters({
   }
 
   const fields = (
-    <FilterFields
+    <Suspense fallback={<p className="feed-filter-field-note">Loading filters…</p>}>
+      <FeedFilterFields
       filters={filters}
       onChange={onChange}
       policyAreas={policyAreas}
       selectedSponsorName={sponsorName}
       memberRef={memberRef}
       suggestionsInline={!inlinePanel}
-    />
+      />
+    </Suspense>
   )
 
   const actions = (

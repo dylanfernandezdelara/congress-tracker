@@ -135,14 +135,12 @@ function SponsoredBillItem({
         </span>
       </ProfileBillRow>
       {bill.latest_action_text ? (
-        <p className="m-0 truncate text-xs text-faint" title={bill.latest_action_text}>
+        <p className="m-0 text-xs text-faint">
           {bill.latest_action_text}
         </p>
       ) : null}
       {bill.policy_area ? (
-        <Badge className="mt-1 max-w-full" title={bill.policy_area}>
-          <span className="truncate">{bill.policy_area}</span>
-        </Badge>
+        <Badge className="mt-1 max-w-full whitespace-normal">{bill.policy_area}</Badge>
       ) : null}
     </li>
   )

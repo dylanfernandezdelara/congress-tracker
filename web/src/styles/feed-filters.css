@@ -149,11 +149,24 @@
     border: none;
   }
 
+  /* Matches the labels Astryx fields draw (State, Party, Member, Topic). */
   .feed-filter-field-label {
+    font-size: var(--text-label-size, var(--type-ui-size));
+    font-weight: var(--text-label-weight, 500);
+    line-height: var(--text-label-leading, 1.4);
+    color: hsl(var(--twc-foreground));
+  }
+
+  /* The Astryx Theme wrapper must not become a grid item: the fields lay out in the panel's own grid. */
+  .feed-advanced-filters-panel > [data-astryx-theme],
+  .feed-filters-sheet-fields > [data-astryx-theme] {
+    display: contents;
+  }
+
+  .feed-filter-field-note {
+    margin: 0.35rem 0 0;
     font-size: var(--type-caption-size);
-    font-weight: 400;
-    letter-spacing: -0.05px;
-    color: hsl(var(--twc-faint));
+    color: hsl(var(--twc-secondary));
   }
 
   .feed-filter-select,

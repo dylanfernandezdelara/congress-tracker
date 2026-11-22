@@ -444,7 +444,10 @@ describe('Home', () => {
     expect(tightnessMobile).not.toBeNull()
     expect(container.querySelector('.home-feed-empty')?.contains(tightnessMobile)).toBe(false)
     expect(container.querySelector('.home-feed-secondary')?.contains(tightnessMobile)).toBe(true)
-    expect(tightnessMobile!.querySelector('[data-tightness-row="house"]')).not.toBeNull()
+    // Stats load after the feed settles; wait for them rather than racing the fetch.
+    await waitFor(() => {
+      expect(tightnessMobile!.querySelector('[data-tightness-row="house"]')).not.toBeNull()
+    })
     expect(tightnessMobile!.querySelector('[data-tightness-row="senate"]')).not.toBeNull()
   })
 
