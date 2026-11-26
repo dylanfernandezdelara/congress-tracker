@@ -30,7 +30,24 @@ export interface DigestGenerator {
   gateway_log_id?: string;
   /** Pre-store check warnings (not blocking), kept for the evals. */
   warnings?: string[];
+  /**
+   * The facts the model was given, minus the bill and CRS text (both re-fetchable from Congress.gov by the versions
+   * named here). Lets a summary be traced to its sources and the evals rerun on exactly what production sent.
+   */
+  inputs?: DigestInputsRecord;
   generated_at: string;
+}
+
+export interface DigestInputsRecord {
+  title: string | null;
+  sponsor: string | null;
+  status: { stage: string; label: string };
+  votes: Array<{ chamber: string; vote_date: string | null; result: string; yeas: number | null; nays: number | null; how?: string }>;
+  committees: string[];
+  policy_area: string | null;
+  text_version: { type: string; date: string } | null;
+  crs_version: string | null;
+  basis: "text" | "crs" | "title_only";
 }
 
 /** `digest_json` shape: public content plus worker-only markers. */
