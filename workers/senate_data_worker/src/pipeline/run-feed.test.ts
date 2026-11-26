@@ -75,6 +75,7 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
     selectPresentedPendingLifecycleBills: (...args: unknown[]) =>
       mockSelectPresentedPendingLifecycleBills(...args),
     selectLawsUpdatedBefore: async () => [],
+    clearLifecycleEnactment: async () => undefined,
   };
 });
 

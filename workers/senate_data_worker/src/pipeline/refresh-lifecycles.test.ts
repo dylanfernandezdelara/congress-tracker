@@ -11,6 +11,7 @@ const mockSelectPresentedPending = vi.fn();
 const mockGetLifecyclesForBills = vi.fn();
 const mockUpsertLifecycle = vi.fn();
 const mockSelectLawsUpdatedBefore = vi.fn();
+const mockClearLifecycleEnactment = vi.fn();
 const mockFetchBillLifecycleSource = vi.fn();
 
 vi.mock("../d1/lifecycle", async (importOriginal) => {
@@ -20,6 +21,7 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
     selectPresentedPendingLifecycleBills: (...args: unknown[]) =>
       mockSelectPresentedPending(...args),
     selectLawsUpdatedBefore: (...args: unknown[]) => mockSelectLawsUpdatedBefore(...args),
+    clearLifecycleEnactment: (...args: unknown[]) => mockClearLifecycleEnactment(...args),
     getLifecyclesForBills: (...args: unknown[]) => mockGetLifecyclesForBills(...args),
     upsertLifecycle: (...args: unknown[]) => mockUpsertLifecycle(...args),
   };
@@ -105,6 +107,8 @@ describe("refreshBillLifecycles", () => {
     mockFetchBillLifecycleSource.mockReset();
     mockSelectLawsUpdatedBefore.mockReset();
     mockSelectLawsUpdatedBefore.mockResolvedValue([]);
+    mockClearLifecycleEnactment.mockReset();
+    mockClearLifecycleEnactment.mockResolvedValue(undefined);
   });
 
   it("refreshes a presented-not-terminal bill outside the vote lookback", async () => {
@@ -260,5 +264,74 @@ describe("refreshBillLifecycles", () => {
 
     expect(result.refreshed).toBe(1);
     expect(mockUpsertLifecycle).toHaveBeenCalledWith({}, expect.objectContaining({ billNumber: 5334, lawKind: "signed" }));
+  });
+
+  it("clears a stored law that Congress.gov's own record does not show (H.R. 766)", async () => {
+    mockSelectPresentedPending.mockResolvedValue([]);
+    mockSelectLawsUpdatedBefore.mockResolvedValue([{ bill_congress: 119, bill_type: "HR", bill_number: 766 }]);
+    mockGetLifecyclesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:766",
+          row({
+            bill_number: 766,
+            became_law_date: "2025-01-28",
+            public_law: "119-120",
+            updated_at: "2026-10-09T10:03:10.913Z",
+          }),
+        ],
+      ])
+    );
+    mockFetchBillLifecycleSource.mockResolvedValue({
+      introducedDate: "2025-01-28",
+      milestones: {
+        presented_date: null,
+        signed_date: null,
+        vetoed_date: null,
+        became_law_date: null,
+        law_kind: null,
+        public_law: null,
+        latest_action_date: "2025-01-28",
+        latest_action_text: "Referred to the House Committee on Energy and Commerce.",
+        unrecognized: [],
+      },
+    });
+    mockUpsertLifecycle.mockResolvedValue(undefined);
+
+    await refreshBillLifecycles({ DB: {} as D1Database, CONGRESS: "119", SESSION: "2" } as never, [], "test");
+
+    expect(mockClearLifecycleEnactment).toHaveBeenCalledWith({}, { congress: 119, billType: "HR", billNumber: 766 });
+  });
+
+  it("keeps a stored law when the refresh confirms it", async () => {
+    mockSelectPresentedPending.mockResolvedValue([]);
+    mockSelectLawsUpdatedBefore.mockResolvedValue([{ bill_congress: 119, bill_type: "S", bill_number: 766 }]);
+    mockGetLifecyclesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:S:766",
+          row({ bill_type: "S", bill_number: 766, became_law_date: "2026-10-07", public_law: "119-120", updated_at: "2026-10-10T00:00:00.000Z" }),
+        ],
+      ])
+    );
+    mockFetchBillLifecycleSource.mockResolvedValue({
+      introducedDate: null,
+      milestones: {
+        presented_date: null,
+        signed_date: "2026-10-07",
+        vetoed_date: null,
+        became_law_date: "2026-10-07",
+        law_kind: "signed",
+        public_law: "119-120",
+        latest_action_date: "2026-10-07",
+        latest_action_text: "Became Public Law No: 119-120.",
+        unrecognized: [],
+      },
+    });
+    mockUpsertLifecycle.mockResolvedValue(undefined);
+
+    await refreshBillLifecycles({ DB: {} as D1Database, CONGRESS: "119", SESSION: "2" } as never, [], "test");
+
+    expect(mockClearLifecycleEnactment).not.toHaveBeenCalled();
   });
 });

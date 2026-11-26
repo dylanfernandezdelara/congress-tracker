@@ -85,18 +85,23 @@ export function parsePublicLawBill(raw: unknown): PublicLawRecord | null {
       text: actionText,
     },
   ]);
+  // The row's own latest action must say it became law. On 2026-10-09 the list briefly put Public Law 119-120
+  // (S. 766) on H.R. 766, whose latest action was a 2025 committee referral; trusting `laws` alone stored H.R. 766
+  // as a law. A skipped row is still caught by the lifecycle refresh once the list is consistent.
+  if (!milestones.became_law_date) return null;
+  if (milestones.public_law && milestones.public_law !== publicLaw) return null;
 
   return {
     congress,
     billType: normalizeBillType(typeRaw),
     billNumber,
     title: asString(bill.title),
-    becameLawDate: milestones.became_law_date ?? actionDate,
+    becameLawDate: milestones.became_law_date,
     publicLaw: milestones.public_law ?? publicLaw,
     latestActionText: actionText,
     milestones: {
       ...milestones,
-      became_law_date: milestones.became_law_date ?? actionDate,
+      became_law_date: milestones.became_law_date,
       public_law: milestones.public_law ?? publicLaw,
       latest_action_date: milestones.latest_action_date ?? actionDate,
       latest_action_text: milestones.latest_action_text ?? actionText,

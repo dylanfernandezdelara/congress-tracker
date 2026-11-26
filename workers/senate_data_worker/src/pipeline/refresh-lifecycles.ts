@@ -5,6 +5,7 @@ import {
 } from "../constants";
 import { congressNumber, type Env } from "../config";
 import {
+  clearLifecycleEnactment,
   getLifecyclesForBills,
   lifecycleMapKey,
   selectLawsUpdatedBefore,
@@ -154,6 +155,22 @@ export async function refreshBillLifecycles(
         latestActionDate: m.latest_action_date,
         latestActionText: m.latest_action_text,
       });
+      if (stored?.became_law_date && !m.became_law_date && !m.public_law) {
+        // Congress.gov's own record (laws list and actions) shows no enactment: the stored law came from bad data.
+        await clearLifecycleEnactment(env.DB, {
+          congress: row.bill_congress,
+          billType: row.bill_type,
+          billNumber: row.bill_number,
+        });
+        console.warn(
+          JSON.stringify({
+            event: "lifecycle_enactment_cleared",
+            trigger,
+            bill: billLabel(row.bill_type, row.bill_number, row.bill_congress),
+            stored_public_law: stored.public_law,
+          })
+        );
+      }
       refreshed += 1;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

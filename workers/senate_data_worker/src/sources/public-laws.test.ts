@@ -48,6 +48,34 @@ describe("parsePublicLawBill", () => {
     });
   });
 
+  it("skips a row whose own latest action does not say it became law (H.R. 766, 2026-10-09)", () => {
+    expect(
+      parsePublicLawBill({
+        congress: 119,
+        type: "HR",
+        number: "766",
+        title: "SEWER Act",
+        latestAction: {
+          actionDate: "2025-01-28",
+          text: "Referred to the House Committee on Energy and Commerce.",
+        },
+        laws: [{ number: "119-120", type: "Public Law" }],
+      })
+    ).toBeNull();
+  });
+
+  it("skips a row whose action names a different law number than laws[]", () => {
+    expect(
+      parsePublicLawBill({
+        congress: 119,
+        type: "S",
+        number: "766",
+        latestAction: { actionDate: "2026-10-07", text: "Became Public Law No: 119-121." },
+        laws: [{ number: "119-120", type: "Public Law" }],
+      })
+    ).toBeNull();
+  });
+
   it("skips rows without an enactment date or public-law number", () => {
     expect(
       parsePublicLawBill({
