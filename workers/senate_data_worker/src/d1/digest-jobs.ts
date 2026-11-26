@@ -1,3 +1,4 @@
+import type { SummaryQueueMonitor } from "../../../../shared/ingest-api-types";
 import { ensureSchema } from "./schema";
 import { normalizeBillType } from "../sources/bill-type";
 import type { BillRef } from "../types";
@@ -371,4 +372,52 @@ export async function selectKnownBills(db: D1Database, congress: number, bills: 
     .bind(congress)
     .all<{ bill_type: string; number: number }>();
   return new Set((results ?? []).map((r) => `${normalizeBillType(r.bill_type)}-${r.number}`));
+}
+
+/** Hours a queued summary may wait, with nothing written meanwhile, before health calls the queue stalled. */
+export const SUMMARY_QUEUE_STALL_HOURS = 24;
+
+/** Account or configuration failures: they block every bill, not one. */
+const CONFIG_ERROR_SQL = `(last_error LIKE '%OpenRouter account%' OR last_error LIKE '%not a valid model%' OR last_error LIKE '%Key limit%' OR last_error LIKE '%API key%')`;
+
+export async function getSummaryQueueHealth(
+  db: D1Database,
+  now: Date = new Date()
+): Promise<SummaryQueueMonitor> {
+  const [queue, written] = await Promise.all([
+    db
+      .prepare(
+        `SELECT COUNT(*) AS queued, MIN(queued_at) AS oldest,
+                SUM(CASE WHEN ${CONFIG_ERROR_SQL} THEN 1 ELSE 0 END) AS blocked
+         FROM digest_jobs WHERE state = 'queued'`
+      )
+      .first<{ queued: number; oldest: string | null; blocked: number | null }>(),
+    db
+      .prepare(
+        `SELECT MAX(json_extract(digest_json, '$.generator.generated_at')) AS last
+         FROM bill_digests WHERE json_valid(digest_json)`
+      )
+      .first<{ last: string | null }>(),
+  ]);
+  return summaryQueueMonitor(
+    { queued: queue?.queued ?? 0, oldest: queue?.oldest ?? null, blocked: queue?.blocked ?? 0, lastWritten: written?.last ?? null },
+    now
+  );
+}
+
+/** Stalled: something has waited past the limit and nothing was written in that time, or config errors block jobs. */
+export function summaryQueueMonitor(
+  q: { queued: number; oldest: string | null; blocked: number; lastWritten: string | null },
+  now: Date
+): SummaryQueueMonitor {
+  const limitMs = SUMMARY_QUEUE_STALL_HOURS * 3_600_000;
+  const waitedTooLong = q.oldest != null && now.getTime() - Date.parse(q.oldest) > limitMs;
+  const nothingWritten = q.lastWritten == null || now.getTime() - Date.parse(q.lastWritten) > limitMs;
+  return {
+    queued: q.queued,
+    oldest_queued_at: q.oldest,
+    last_written_at: q.lastWritten,
+    blocked_by_config: q.blocked,
+    stalled: q.blocked > 0 || (q.queued > 0 && waitedTooLong && nothingWritten),
+  };
 }
