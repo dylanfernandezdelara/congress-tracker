@@ -137,7 +137,7 @@ describe("parseLifecycleActions", () => {
     });
   });
 
-  it("treats Archivist-unsigned (E30000) as law_unsigned enactment", () => {
+  it("treats Sent to Archivist unsigned as law_unsigned enactment", () => {
     const result = parseLifecycleActions([
       {
         actionCode: "28000",
@@ -230,6 +230,7 @@ describe("parseLifecycleActions", () => {
       public_law: null,
       latest_action_date: "2026-06-29",
       latest_action_text: "Presented to President.",
+      unrecognized: [],
     });
   });
 
@@ -245,6 +246,94 @@ describe("parseLifecycleActions", () => {
         { actionDate: "2026-01-10", text: "Pocket Vetoed by President." },
       ]).law_kind
     ).toBe("pocket_vetoed");
+  });
+});
+
+// Real Congress.gov action lists (newest first, as the API returns them), trimmed to the presidential steps.
+describe("parseLifecycleActions on real Congress.gov actions", () => {
+  it("H.R. 5334 (119th): signed, though the House system codes the signature E30000 and the Library 36000", () => {
+    const actions: CongressAction[] = [
+      { actionDate: "2026-09-18", actionCode: "E40000", text: "Became Public Law No: 119-111." },
+      { actionDate: "2026-09-18", actionCode: "36000", text: "Became Public Law No: 119-111." },
+      { actionDate: "2026-09-18", actionCode: "E30000", text: "Signed by President." },
+      { actionDate: "2026-09-18", actionCode: "36000", text: "Signed by President." },
+      { actionDate: "2026-09-17", actionCode: "E20000", text: "Presented to President." },
+      { actionDate: "2026-09-17", actionCode: "28000", text: "Presented to President." },
+      {
+        actionDate: "2026-09-16",
+        actionCode: "H41610",
+        text: "On motion that the House agree to the Senate amendments Agreed to by the Yeas and Nays: 262 - 159 (Roll no. 301).",
+      },
+    ];
+
+    expect(parseLifecycleActions(actions, [{ number: "119-111", type: "Public Law" }])).toMatchObject({
+      presented_date: "2026-09-17",
+      signed_date: "2026-09-18",
+      became_law_date: "2026-09-18",
+      law_kind: "signed",
+      public_law: "119-111",
+      unrecognized: [],
+    });
+  });
+
+  it("S. 629 (119th): became law unsigned after the ten days", () => {
+    const actions: CongressAction[] = [
+      { actionDate: "2026-07-12", actionCode: "E30000", text: "Sent to Archivist of the United States unsigned." },
+      { actionDate: "2026-06-30", actionCode: "28000", text: "Presented to President." },
+    ];
+
+    expect(parseLifecycleActions(actions, [{ number: "119-102", type: "Public Law" }])).toMatchObject({
+      became_law_date: "2026-07-12",
+      law_kind: "law_unsigned",
+      public_law: "119-102",
+      signed_date: null,
+    });
+  });
+});
+
+describe("parseLifecycleActions safeguards", () => {
+  it("takes enactment and the law number from the structured laws list", () => {
+    const result = parseLifecycleActions(
+      [{ actionDate: "2026-07-11", text: "Presented to President." }],
+      [{ number: "119-140", type: "Public Law" }]
+    );
+    expect(result).toMatchObject({ became_law_date: "2026-07-11", public_law: "119-140", law_kind: null });
+  });
+
+  it("calls a law passed after a veto enacted over veto", () => {
+    const result = parseLifecycleActions([
+      { actionDate: "2026-05-01", text: "Vetoed by President." },
+      { actionDate: "2026-05-20", text: "Passed Senate over veto by Yea-Nay Vote. 70 - 28." },
+      { actionDate: "2026-05-21", text: "Became Public Law No: 119-77." },
+    ]);
+    expect(result).toMatchObject({ law_kind: "enacted_over_veto", vetoed_date: "2026-05-01", unrecognized: [] });
+  });
+
+  it("does not treat floor actions about a veto as a veto", () => {
+    const result = parseLifecycleActions([
+      { actionDate: "2026-05-02", text: "Veto message received in the House." },
+      { actionDate: "2026-05-03", text: "Motion to refer the bill and the veto message to committee agreed to." },
+    ]);
+    expect(result).toMatchObject({ vetoed_date: null, law_kind: null, unrecognized: [] });
+  });
+
+  it("flags presidential wording it does not know instead of guessing", () => {
+    const result = parseLifecycleActions([
+      { actionDate: "2026-07-01", text: "Presented to President." },
+      { actionDate: "2026-07-05", text: "President returned the bill without action." },
+    ]);
+    expect(result.law_kind).toBeNull();
+    expect(result.unrecognized).toEqual(["2026-07-05: President returned the bill without action."]);
+  });
+
+  it("states no kind when signed and unsigned wording conflict", () => {
+    const result = parseLifecycleActions([
+      { actionDate: "2026-07-11", text: "Signed by President." },
+      { actionDate: "2026-07-11", text: "Sent to Archivist of the United States unsigned." },
+    ]);
+    expect(result.law_kind).toBeNull();
+    expect(result.became_law_date).toBe("2026-07-11");
+    expect(result.unrecognized).toHaveLength(1);
   });
 });
 

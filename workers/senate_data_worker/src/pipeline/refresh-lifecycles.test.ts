@@ -129,6 +129,7 @@ describe("refreshBillLifecycles", () => {
         public_law: "119-42",
         latest_action_date: "2026-01-12",
         latest_action_text: "Became Public Law No: 119-42.",
+        unrecognized: [],
       },
     });
     mockUpsertLifecycle.mockResolvedValue(undefined);
@@ -196,6 +197,7 @@ describe("refreshBillLifecycles", () => {
         public_law: null,
         latest_action_date: "2026-02-01",
         latest_action_text: "Presented to President.",
+        unrecognized: [],
       },
     });
     mockUpsertLifecycle.mockResolvedValue(undefined);
