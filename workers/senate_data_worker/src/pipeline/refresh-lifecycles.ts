@@ -1,8 +1,13 @@
-import { LIFECYCLE_MAX_REFRESHES_PER_RUN } from "../constants";
+import {
+  LIFECYCLE_MAX_REFRESHES_PER_RUN,
+  LIFECYCLE_RECHECK_LAWS_UPDATED_BEFORE,
+  LIFECYCLE_RECHECKS_PER_RUN,
+} from "../constants";
 import { congressNumber, type Env } from "../config";
 import {
   getLifecyclesForBills,
   lifecycleMapKey,
+  selectLawsUpdatedBefore,
   selectPresentedPendingLifecycleBills,
   upsertLifecycle,
   type LifecycleBillRow,
@@ -71,7 +76,13 @@ export async function refreshBillLifecycles(
     congressNumber(env),
     LIFECYCLE_MAX_REFRESHES_PER_RUN
   );
-  const candidates = mergeLifecycleRefreshCandidates(bills, presentedPending);
+  const staleLaws = await selectLawsUpdatedBefore(
+    env.DB,
+    congressNumber(env),
+    LIFECYCLE_RECHECK_LAWS_UPDATED_BEFORE,
+    LIFECYCLE_RECHECKS_PER_RUN
+  );
+  const candidates = mergeLifecycleRefreshCandidates(bills, presentedPending, staleLaws);
 
   const existing = await getLifecyclesForBills(
     env.DB,
@@ -91,8 +102,10 @@ export async function refreshBillLifecycles(
     .sort((a, b) => a.priority - b.priority || a.index - b.index);
 
   for (const { row, stored } of ranked) {
+    const needsRecheck = Boolean(stored && stored.updated_at < LIFECYCLE_RECHECK_LAWS_UPDATED_BEFORE);
     if (
       stored &&
+      !needsRecheck &&
       isTerminalLifecycle({
         law_kind: stored.law_kind,
         signed_date: stored.signed_date,

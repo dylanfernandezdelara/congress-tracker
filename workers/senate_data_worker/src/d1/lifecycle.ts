@@ -330,6 +330,29 @@ export async function selectRecentlyEnactedBills(
  * Used so enactment can be recorded after the passage-vote lookback expires.
  * Scoped to one congress and capped so the set cannot grow across sessions.
  */
+/** Enacted rows last written before `beforeIso`, oldest first: laws stored by an earlier parser. */
+export async function selectLawsUpdatedBefore(
+  db: D1Database,
+  congress: number,
+  beforeIso: string,
+  limit: number
+): Promise<LifecycleBillRow[]> {
+  await ensureSchema(db);
+  const capped = Math.max(0, Math.floor(limit));
+  if (capped === 0) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT congress AS bill_congress, bill_type, bill_number
+       FROM bill_lifecycle
+       WHERE congress = ? AND became_law_date IS NOT NULL AND updated_at < ?
+       ORDER BY updated_at ASC
+       LIMIT ?`
+    )
+    .bind(congress, beforeIso, capped)
+    .all<LifecycleBillRow>();
+  return results ?? [];
+}
+
 export async function selectPresentedPendingLifecycleBills(
   db: D1Database,
   congress: number,

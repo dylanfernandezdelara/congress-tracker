@@ -124,6 +124,13 @@ export const HOUSE_VOTE_DETAIL_FETCHES_PER_RUN = 200;
 export const LIFECYCLE_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 
 /**
+ * Laws stored before the status parser read Congress.gov's wording (instead of action codes) are re-checked once,
+ * a few per run. A re-check rewrites `updated_at`, so each law leaves the queue after one pass.
+ */
+export const LIFECYCLE_RECHECK_LAWS_UPDATED_BEFORE = "2026-11-28T00:00:00.000Z";
+export const LIFECYCLE_RECHECKS_PER_RUN = 20;
+
+/**
  * Congress.gov public-law list page size. One page covers a typical congress
  * (~100 public laws); the ingest walks `pagination.next` if a session exceeds it.
  */

@@ -74,6 +74,7 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
     upsertLifecycle: (...args: unknown[]) => mockUpsertLifecycle(...args),
     selectPresentedPendingLifecycleBills: (...args: unknown[]) =>
       mockSelectPresentedPendingLifecycleBills(...args),
+    selectLawsUpdatedBefore: async () => [],
   };
 });
 
@@ -354,7 +355,7 @@ describe("runFeedPipeline digest retry", () => {
             public_law: "119-1",
             latest_action_date: "2026-01-10",
             latest_action_text: "Became Public Law No: 119-1.",
-            updated_at: "2026-01-10T00:00:00.000Z",
+            updated_at: "2026-12-01T00:00:00.000Z",
           },
         ],
       ])
