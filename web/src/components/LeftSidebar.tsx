@@ -39,21 +39,13 @@ function formatPartyState(party: string | null, state: string | null): string {
 }
 
 function defectorHook(entry: DefectorEntry): string {
-  const votes =
-    entry.cross_vote_count === 1
-      ? '1 cross-party vote'
-      : `${entry.cross_vote_count} cross-party votes`
-
+  const times = entry.cross_vote_count === 1 ? 'once' : `${entry.cross_vote_count} times`
+  const lead = `Voted against their party ${times} this session`
   if (entry.recent_example) {
     const bill = formatShortBillId(entry.recent_example.bill_type, entry.recent_example.bill_number)
-    const margin = `${entry.recent_example.margin}-vote margin`
-    // A single break is the example itself; only count when there are more.
-    return entry.cross_vote_count > 1
-      ? `Broke with party on ${bill} · ${margin} · ${votes}`
-      : `Broke with party on ${bill} · ${margin}`
+    return entry.cross_vote_count > 1 ? `${lead} · latest on ${bill}` : `${lead}, on ${bill}`
   }
-
-  return `Most often voted against party caucus · ${votes}`
+  return lead
 }
 
 function portfolioHook(entry: PortfolioEntry, direction: 'gain' | 'loss'): string {
@@ -204,7 +196,15 @@ export function LeftSidebar({ session, defectors, portfolios, onRetry }: LeftSid
       ? `${session.data.congress}th Congress, ${session.data.session}${ordinal(session.data.session)} session`
       : null
 
-  const disclaimer = portfolios.data?.house.disclaimer ?? portfolios.data?.senate.disclaimer
+  // The disclosure caveat belongs to portfolio spotlights; with only party-vote spotlights it explains nothing.
+  const showsPortfolio = (['house', 'senate'] as const).some((chamber) =>
+    buildSpotlights(defectors.data?.[chamber] ?? [], portfolios.data?.[chamber]).some(
+      (member) => member.tone !== 'neutral',
+    ),
+  )
+  const disclaimer = showsPortfolio
+    ? (portfolios.data?.house.disclaimer ?? portfolios.data?.senate.disclaimer)
+    : null
   const hasMemberDataError = Boolean(
     defectors.error ||
       portfolios.error ||

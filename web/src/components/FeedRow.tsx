@@ -1,7 +1,5 @@
 import { memo, useId } from 'react'
 
-import { originChamberFromBillType } from '@congress-tracker/shared/bill-id'
-
 import type { FeedItem } from '../api/types'
 import { CURRENT_PRESIDENT } from '../constants/president'
 import { feedRowKey } from '../utils/billDeepLink'
@@ -9,13 +7,10 @@ import { formatVoteDate } from '../utils/billLabels'
 import {
   getCollapsedSummaryLead,
   getFeedRowDisplayDate,
-  getFeedRowView,
   getFeedSummaryContent,
   getFeedTopic,
-  getPrimaryPassageVote,
 } from '../utils/feedRowLabels'
-import { feedItemTextGrew } from '../utils/textGrew'
-import { BillIdChip } from './BillIdChip'
+import { getFeedRowStatus } from '../utils/feedRowStatus'
 import { ExpandChevron } from './ExpandChevron'
 import { FeedRowDate } from './FeedRowDate'
 import { Collapsible, CollapsibleContent } from './dfdl/collapsible'
@@ -37,35 +32,22 @@ export const FeedRow = memo(function FeedRow({
   isExpanded,
   onToggle,
 }: FeedRowProps) {
-  const badgeId = useId()
+  const statusId = useId()
   const topicId = useId()
-  const marginId = useId()
-  const cohesionId = useId()
-  const deskChipId = useId()
-  const textGrewId = useId()
-  const eventId = useId()
   const summaryId = useId()
   const detailId = useId()
   const topic = getFeedTopic(item)
   const summary = getFeedSummaryContent(item)
   const summaryLead = getCollapsedSummaryLead(summary)
-  const { meta, eventDisplay, badgeToneClass, showMarginChip, showEventLine, eventToneClass } =
-    getFeedRowView(item)
+  const status = getFeedRowStatus(item)
   const displayDate = getFeedRowDisplayDate(item)
-  // The docket prefix (H.R., S.) already names the origin chamber; only show the
-  // chamber when the vote happened in the other one.
-  // Party-line vs bipartisan says more about a tally than the numbers alone; only for the vote the margin shows.
-  const cohesion = showMarginChip ? getPrimaryPassageVote(item)?.cohesion : undefined
-  const showChamberChip =
-    Boolean(meta.chamber) && meta.chamber !== originChamberFromBillType(item.bill.type)
   const executiveSignal = item.executive_signals?.[0]
-  const textGrew = feedItemTextGrew(item)
 
   const rowKey = feedRowKey(item)
 
   return (
     <li
-      className={`feed-row feed-row--${meta.kind}${isExpanded ? ' is-expanded' : ''}`}
+      className={`feed-row feed-row--${status.kind}${isExpanded ? ' is-expanded' : ''}`}
       data-feed-row-key={rowKey}
     >
       <article className="feed-row-article" aria-labelledby={topicId}>
@@ -74,7 +56,7 @@ export const FeedRow = memo(function FeedRow({
           className="feed-row-toggle"
           aria-expanded={isExpanded}
           aria-controls={detailId}
-          aria-labelledby={`${badgeId} ${topicId}${showMarginChip ? ` ${marginId}` : ''}${cohesion ? ` ${cohesionId}` : ''}${meta.presidentDeskChip ? ` ${deskChipId}` : ''}${textGrew ? ` ${textGrewId}` : ''}${showEventLine ? ` ${eventId}` : ''}`}
+          aria-labelledby={`${topicId} ${statusId}`}
           aria-describedby={isExpanded ? undefined : summaryId}
           onClick={() => onToggle(item)}
         >
@@ -84,8 +66,7 @@ export const FeedRow = memo(function FeedRow({
             secondary={
               displayDate.kind === 'signal'
                 ? `${PRESIDENT_LAST_NAME} post`
-                : // An Introduced badge already says it; other badges still need the date explained.
-                  displayDate.kind === 'intro' && meta.kind !== 'introduced'
+                : displayDate.kind === 'intro' && status.kind !== 'introduced'
                   ? 'Introduced'
                   : undefined
             }
@@ -99,55 +80,15 @@ export const FeedRow = memo(function FeedRow({
               <ExpandChevron />
             </div>
 
-            <div className="feed-row-meta-row">
-              <span
-                id={badgeId}
-                className={`feed-row-badge feed-row-badge--${meta.kind}${badgeToneClass}`}
-              >
-                {meta.outcomeLabel}
+            <p id={statusId} className="feed-row-status" data-feed-status>
+              <span className={`feed-row-badge feed-row-badge--${status.kind}${status.toneClass}`}>
+                {status.lead}
               </span>
-              {showMarginChip ? (
-                <span id={marginId} className="feed-row-chip feed-row-chip--margin">
-                  {meta.margin}
-                </span>
+              {status.rest}
+              {status.partySplit ? (
+                <span className="feed-row-status-split"> · {status.partySplit}</span>
               ) : null}
-              {cohesion ? (
-                <span
-                  id={cohesionId}
-                  className={`feed-row-chip feed-row-chip--cohesion feed-row-chip--${cohesion}`}
-                >
-                  {cohesion === 'party-line' ? 'Party-line' : 'Bipartisan'}
-                </span>
-              ) : null}
-              {showChamberChip ? <span className="feed-row-chip">{meta.chamber}</span> : null}
-              <BillIdChip type={item.bill.type} number={item.bill.number} />
-              {meta.sponsorName ? (
-                <span className="feed-row-chip feed-row-chip--sponsor">{meta.sponsorName}</span>
-              ) : null}
-              {meta.presidentDeskChip ? (
-                <span id={deskChipId} className="feed-row-chip feed-row-chip--president-desk">
-                  {meta.presidentDeskChip}
-                </span>
-              ) : null}
-              {meta.processChip ? (
-                <span className="feed-row-chip feed-row-chip--process">{meta.processChip}</span>
-              ) : null}
-              {executiveSignal ? (
-                <span className="feed-row-chip feed-row-chip--executive">Executive</span>
-              ) : null}
-              {textGrew ? (
-                <span id={textGrewId} className="feed-row-chip feed-row-chip--text-grew">
-                  Text grew
-                </span>
-              ) : null}
-            </div>
-
-            <p
-              id={eventId}
-              className={`feed-row-event${eventToneClass}`}
-              hidden={!showEventLine}
-            >
-              {eventDisplay}
+              {status.note ? <span className="feed-row-status-note"> · {status.note}</span> : null}
             </p>
 
             {!isExpanded ? (

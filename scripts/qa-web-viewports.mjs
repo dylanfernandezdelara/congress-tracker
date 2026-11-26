@@ -107,7 +107,7 @@ async function auditHomePage(page) {
     const feedRow = document.querySelector('#feed-top .feed-row')
     const topic = document.querySelector('#feed-top [data-feed-topic]')
     const policyArea = document.querySelector('#feed-top [data-feed-policy-area]')
-    const eventLine = document.querySelector('#feed-top .feed-row-event:not([hidden])')
+    const statusLine = document.querySelector('#feed-top [data-feed-status]')
     const summary = document.querySelector('#feed-top [data-feed-summary]')
     const issues = []
 
@@ -246,9 +246,6 @@ async function auditHomePage(page) {
       }
     }
     if (!feedRow) issues.push('feed row missing')
-    if (!document.querySelector('.feed-row-chip--text-grew')) {
-      issues.push('Text grew mark missing on a feed row with added_provisions')
-    }
 
     if (heading) collectFullClipping(heading.getBoundingClientRect(), 'page heading')
 
@@ -273,19 +270,15 @@ async function auditHomePage(page) {
       issues.push('feed topic missing')
     }
 
-    if (eventLine) {
-      const eventRect = eventLine.getBoundingClientRect()
-      collectHorizontalClipping(eventRect, 'feed event line')
-      if (eventRect.bottom <= 0 || eventRect.top >= viewportHeight) {
-        issues.push('feed event line not visible in viewport')
+    // One status phrase per row ("Passed the Senate 62–33 · R 47–2 · D 14–30").
+    if (statusLine) {
+      const statusRect = statusLine.getBoundingClientRect()
+      collectHorizontalClipping(statusRect, 'feed status line')
+      if (statusRect.bottom <= 0 || statusRect.top >= viewportHeight) {
+        issues.push('feed status line not visible in viewport')
       }
     } else {
-      const marginChip = document.querySelector('#feed-top .feed-row-chip--margin')
-      if (marginChip) {
-        collectHorizontalClipping(marginChip.getBoundingClientRect(), 'feed vote margin')
-      } else {
-        issues.push('feed event line or vote margin missing')
-      }
+      issues.push('feed status line missing')
     }
 
     if (policyArea) {

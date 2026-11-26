@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import { congressGovBillUrl, parseBillQueryParam } from '@congress-tracker/shared/bill-id'
 import { VOTE_LOOKBACK_DAYS } from '@congress-tracker/shared/feed-constants'
 
 import { fetchRecentConfirmations, fetchRecentLaws } from '../api/client'
@@ -30,6 +31,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useMemberProfile } from '../hooks/useMemberProfile'
 import { useStatsData } from '../hooks/useStatsData'
 import { feedRowKey } from '../utils/billDeepLink'
+import { getFeedRowStatus } from '../utils/feedRowStatus'
 import { tightnessDotKey } from '../utils/tightnessLabels'
 import {
   advancedFilterCount,
@@ -104,7 +106,7 @@ export default function Home() {
   const { reload: reloadStats, session, tightness, defectors, portfolios } = useStatsData({
     enabled: feedSettled,
   })
-  const [, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedDot, setSelectedDot] = useState<TightnessDot | null>(null)
   const [defectorSheetKey, setDefectorSheetKey] = useState(0)
 
@@ -242,6 +244,41 @@ export default function Home() {
     through: searchQuery || advancedCount > 0 ? 'page' : 'session',
   })
 
+  const missingBill = billMissingNotice ? parseBillQueryParam(searchParams.get('bill')) : null
+  const missingBillUrl = missingBill
+    ? congressGovBillUrl(missingBill.congress, missingBill.type, missingBill.number)
+    : null
+
+  // Decided vs proposed: votes, laws and other floor action lead; bills that were only
+  // introduced (most with no summary yet) fold into one group so they don't bury them.
+  // With a search or filter the reader asked for these bills, so nothing is folded.
+  const groupIntroductions = !searchQuery && advancedCount === 0
+  const decidedItems = groupIntroductions
+    ? items.filter((item) => getFeedRowStatus(item).kind !== 'introduced')
+    : items
+  const introducedItems = groupIntroductions
+    ? items.filter((item) => getFeedRowStatus(item).kind === 'introduced')
+    : []
+  const expandedIsIntroduced =
+    expandedRowKey != null && introducedItems.some((item) => feedRowKey(item) === expandedRowKey)
+  const [introOpen, setIntroOpen] = useState(false)
+  useEffect(() => {
+    if (expandedIsIntroduced) setIntroOpen(true)
+  }, [expandedIsIntroduced])
+
+  const renderRows = (rows: typeof items) =>
+    rows.map((item) => {
+      const rowKey = feedRowKey(item)
+      return (
+        <FeedRow
+          key={rowKey}
+          item={item}
+          isExpanded={expandedRowKey === rowKey}
+          onToggle={toggleRow}
+        />
+      )
+    })
+
   return (
     <MemberProfileProvider>
       <div className="home-shell">
@@ -255,6 +292,10 @@ export default function Home() {
       ) : null}
 
       <main id="content" className="home-feed-column feed-main">
+        <p className="home-lede">
+          What Congress voted on and passed in the last {VOTE_LOOKBACK_DAYS} days, in plain English, and how
+          each party voted.
+        </p>
         <div className="home-feed-toolbar">
           <FeedAdvancedFilters
             filters={advancedFilters}
@@ -278,7 +319,17 @@ export default function Home() {
 
         {billMissingNotice ? (
           <div className="home-feed-notice" role="status">
-            <p className="home-feed-notice-text">That bill is no longer in the recent feed.</p>
+            <p className="home-feed-notice-text">
+              That bill has had no floor action in the last {VOTE_LOOKBACK_DAYS} days, so it isn&rsquo;t listed here.
+              {missingBillUrl ? (
+                <>
+                  {' '}
+                  <a href={missingBillUrl} target="_blank" rel="noopener noreferrer" className="congress-link">
+                    Read it on congress.gov ↗
+                  </a>
+                </>
+              ) : null}
+            </p>
             <button
               type="button"
               className="home-feed-notice-dismiss"
@@ -332,7 +383,7 @@ export default function Home() {
               {/* The feed is the page; the heading is for screen readers and outline only. */}
               <h2 className="sr-only">Chronological timeline</h2>
               <p className="home-feed-count">
-                {items.length} of {total} {total === 1 ? 'bill' : 'bills'}
+                {total} {total === 1 ? 'bill' : 'bills'}
                 {floorChrome.throughLabel ? ` · through ${floorChrome.throughLabel}` : ''}
                 {countSuffix ? ` · ${countSuffix}` : ''}
               </p>
@@ -345,18 +396,26 @@ export default function Home() {
             ) : null}
 
             <ul className={`feed-list${listRefreshing ? ' is-refreshing' : ''}`}>
-              {items.map((item) => {
-                const rowKey = feedRowKey(item)
-                return (
-                  <FeedRow
-                    key={rowKey}
-                    item={item}
-                    isExpanded={expandedRowKey === rowKey}
-                    onToggle={toggleRow}
-                  />
-                )
-              })}
+              {renderRows(decidedItems)}
             </ul>
+
+            {introducedItems.length > 0 ? (
+              <details
+                className="home-intro-group"
+                open={introOpen}
+                onToggle={(event) => setIntroOpen((event.currentTarget as HTMLDetailsElement).open)}
+              >
+                <summary className="home-intro-group-summary">
+                  <span className="home-intro-group-title">
+                    {introducedItems.length} new {introducedItems.length === 1 ? 'bill' : 'bills'} introduced
+                  </span>
+                  <span className="home-intro-group-meta">
+                    No floor vote yet
+                  </span>
+                </summary>
+                <ul className="feed-list">{renderRows(introducedItems)}</ul>
+              </details>
+            ) : null}
 
             {feedError ? (
               <p className="feed-pagination-status" role="alert">
@@ -389,7 +448,7 @@ export default function Home() {
                   {isLoadingMore ? 'Loading…' : 'Load more'}
                 </button>
                 <p className="feed-pagination-status">
-                  {items.length} of {total} {total === 1 ? 'bill' : 'bills'}
+                  Showing {items.length} of {total}
                 </p>
               </nav>
             ) : null}
@@ -397,25 +456,28 @@ export default function Home() {
         ) : null}
 
         <div className="home-feed-secondary">
-          {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
-          {!isDesktop ? senateWaitingList : null}
-          <RecentConfirmationsSection
-            confirmations={recentConfirmations.data?.confirmations ?? null}
-            loading={recentConfirmationsLoading}
-            error={recentConfirmations.error}
-            onRetry={handleReloadFeed}
-          />
           <RecentLawsSection
             laws={recentLaws.data?.laws ?? null}
             loading={recentLawsLoading}
             error={recentLaws.error}
             onRetry={handleReloadFeed}
           />
+          <RecentConfirmationsSection
+            confirmations={recentConfirmations.data?.confirmations ?? null}
+            loading={recentConfirmationsLoading}
+            error={recentConfirmations.error}
+            onRetry={handleReloadFeed}
+          />
+          {!isDesktop ? (
+            <h2 className="home-glance-heading">Congress at a glance</h2>
+          ) : null}
+          {!isDesktop ? <div className="home-glance-control">{federalControl}</div> : null}
+          {!isDesktop ? <div className="home-tightness-mobile">{tightnessStrip}</div> : null}
+          {!isDesktop ? senateWaitingList : null}
         </div>
 
         {!isDesktop ? (
           <div className="home-mobile-rails">
-            <div className="home-mobile-rail-section">{federalControl}</div>
             <section className="home-mobile-rail-section" aria-label="Members in Congress">
               {memberSpotlights}
             </section>

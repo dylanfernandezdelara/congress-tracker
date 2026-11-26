@@ -49,6 +49,8 @@ export function evaluateIngestMonitorStatus<
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
   introWarnings?: readonly string[] | null;
   missingDigestCount?: number;
+  /** Feed bills with CRS text whose digest is still the title fallback (rewrite never landed). */
+  placeholderSummaryCount?: number;
   sanitizeFailureError?: (error: string) => string;
 }): {
   status: IngestMonitorStatus;

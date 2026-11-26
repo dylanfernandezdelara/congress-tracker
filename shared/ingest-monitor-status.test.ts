@@ -147,6 +147,19 @@ describe("evaluateIngestMonitorStatus intro discovery", () => {
     expect(result.message).toBe("14 feed bill(s) missing digests.");
   });
 
+  it("marks degraded when feed bills with CRS text still show placeholders", () => {
+    const result = evaluateIngestMonitorStatus({
+      now,
+      staleAfterHours: 26,
+      scheduledSuccess,
+      lastFailure: null,
+      missingDigestCount: 0,
+      placeholderSummaryCount: 7,
+    });
+    expect(result.status).toBe("degraded");
+    expect(result.message).toContain("7 feed bill(s) show a placeholder");
+  });
+
   it("marks degraded on Intro list failed: prefix", () => {
     const result = evaluateIngestMonitorStatus({
       now,

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type { FeedItem, FeedPrimarySponsor } from '../api/types'
-import { formatBillQueryParam } from '@congress-tracker/shared/bill-id'
+import { formatShortBillId } from '@congress-tracker/shared/bill-id'
 import { shareBill } from '../utils/billDeepLink'
 import { congressGovBillUrl } from '../utils/billLabels'
 import { buildBillJourney } from '../utils/billJourney'
@@ -43,7 +43,7 @@ function SponsorLine({ sponsor }: { sponsor: FeedPrimarySponsor }) {
   const metaEl = display.meta ? (
     <>
       {nameEl ? ' · ' : null}
-      {display.meta}
+      <span className="whitespace-nowrap">{display.meta}</span>
     </>
   ) : null
 
@@ -115,11 +115,11 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
               <SponsorLine sponsor={item.primary_sponsor} />
             </p>
           ) : null}
-          {item.policy_area && !isProcedural ? (
-            <p data-feed-policy-area className="feed-row-policy-area">
-              {item.policy_area}
-            </p>
-          ) : null}
+          <p data-feed-policy-area className="feed-row-policy-area">
+            {[formatShortBillId(item.bill.type, item.bill.number), !isProcedural ? item.policy_area : null]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         </div>
         <button
           type="button"
@@ -137,7 +137,6 @@ export function FeedRowDetail({ item, shareUrl }: FeedRowDetailProps) {
       <FeedSummarySections
         content={summary}
         textUrl={`${sourceUrl}/text`}
-        feedbackBill={formatBillQueryParam(item.bill)}
       />
 
       {item.text_changes ? <BillTextChangesSection changes={item.text_changes} /> : null}

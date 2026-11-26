@@ -288,6 +288,24 @@ export function getBillLifecycleStages(item: FeedItem): BillLifecycleStagesResul
     }
   }
 
+  // A bill "received" by the second chamber already passed its origin chamber, often by voice
+  // vote, which leaves no roll call to ingest. Without this the origin stage stays open and a
+  // later second-chamber vote is drawn before it.
+  const origin = originChamberFromBillType(item.bill.type)
+  if (origin) {
+    const other = origin === 'House' ? 'Senate' : 'House'
+    const received = (item.process?.floor_actions ?? []).find(
+      (action) => action.key === 'received' && action.chamber === other,
+    )
+    const originStage = origin === 'House' ? house : senate
+    if (received && originStage.state === 'pending') {
+      // The receipt date is not the passage date, so show no date rather than a wrong one.
+      const passed = { date: null, state: 'done' as const }
+      if (origin === 'House') house = passed
+      else senate = passed
+    }
+  }
+
   const introducedDate = lifecycle?.introduced_date ?? null
   const introducedDone =
     introducedDate !== null ||

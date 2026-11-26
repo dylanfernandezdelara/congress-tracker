@@ -41,6 +41,8 @@ Out of scope until after launch: anything that needs users to exist (feedback, c
 
 ### 2026 midterms (election day Tuesday 2026-11-03)
 
+> 2026-11-22: the election has passed and the guide UI never merged (`claude/midterms-guide-ui`). Decide whether to drop it or turn it into results / incoming members.
+
 Added 2026-10-17; this is the launch feature. Mail ballots are already out, so it ships within the week. Rules and data format: `docs/MIDTERMS_2026.md`.
 
 - [ ] **Data:** every House race, Senate race and governor race for all 50 states and DC, hand-compiled with sources (`shared/elections-2026/states/`).
@@ -49,7 +51,7 @@ Added 2026-10-17; this is the launch feature. Mail ballots are already out, so i
 
 ### Cleanup
 
-- [ ] **Remove summary feedback** ("Was this clear? Yes / No"): `SummaryFeedback.tsx`, `/feedback/summary`, its logging and tests. Keep the `digest_feedback` table (no migration needed before launch). Decided 2026-10-17: no users yet.
+- [x] ~~**Remove summary feedback**~~ (site audit branch) ("Was this clear? Yes / No"): `SummaryFeedback.tsx`, `/feedback/summary`, its logging and tests. Keep the `digest_feedback` table (no migration needed before launch). Decided 2026-10-17: no users yet.
 
 ## After launch
 

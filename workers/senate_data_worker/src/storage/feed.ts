@@ -348,6 +348,7 @@ async function annotatePassageCohesion(db: D1Database, items: FeedItem[]): Promi
     if (!entry?.available) continue;
     const cohesion = voteCohesion(entry.splits);
     if (cohesion !== "unknown") vote.cohesion = cohesion;
+    if (entry.splits.length > 0) vote.party_splits = entry.splits;
   }
 }
 

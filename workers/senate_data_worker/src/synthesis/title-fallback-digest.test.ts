@@ -5,7 +5,7 @@ import {
   isTitleFallbackDigest,
   parseStoredDigest,
 } from "../d1/digests";
-import { buildTitleFallbackDigest } from "./title-fallback-digest";
+import { buildTitleFallbackDigest, stripLeadingTitle } from "./title-fallback-digest";
 
 describe("buildTitleFallbackDigest", () => {
   it("restates a title-only bill without inventing CRS content", () => {
@@ -80,5 +80,22 @@ describe("buildTitleFallbackDigest", () => {
 
     expect(digest?.headline).toBe("This resolution honors the 2026 champions.");
     expect(digest?.what_it_does).toBe("This resolution honors the 2026 champions.");
+  });
+});
+
+describe("stripLeadingTitle", () => {
+  it("drops the CRS title heading so it is not glued onto the first sentence", () => {
+    const digest = buildTitleFallbackDigest({
+      title: "Survivor Justice Tax Prevention Act",
+      rawSummary:
+        "Survivor Justice Tax Prevention Act\nThis bill excludes from gross income certain damages.",
+    });
+    expect(digest?.what_it_does).toBe("This bill excludes from gross income certain damages.");
+  });
+
+  it("keeps a first line that is a sentence", () => {
+    expect(stripLeadingTitle("This bill does X.\nMore detail.", "Some Act")).toBe(
+      "This bill does X.\nMore detail."
+    );
   });
 });

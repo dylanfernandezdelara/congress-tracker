@@ -147,7 +147,7 @@ describe('Home', () => {
       await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 1 bill · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`1 bill · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: new RegExp(chip) })).toHaveTextContent(chip)
   })
@@ -200,7 +200,7 @@ describe('Home', () => {
       screen.queryByText(/No new House or Senate passage votes since/),
     ).not.toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 1 bill · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`1 bill · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: new RegExp(chip) })).toHaveTextContent(chip)
     expect(screen.queryByText(/in recess/i)).not.toBeInTheDocument()
@@ -224,7 +224,7 @@ describe('Home', () => {
       await screen.findByText(`No new House or Senate passage votes since ${formatVoteDate(latest)}.`),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 2 bills · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`2 bills · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
     expect(screen.queryByText(/through Apr 10/)).not.toBeInTheDocument()
@@ -264,7 +264,7 @@ describe('Home', () => {
     renderHome('/?q=housing')
     expect(await screen.findByRole('heading', { name: 'Chronological timeline' })).toBeInTheDocument()
     expect(
-      screen.getByText(new RegExp(`of 1 bill · through ${formatVoteDate(latest)}`)),
+      screen.getByText(new RegExp(`1 bill · through ${formatVoteDate(latest)}`)),
     ).toBeInTheDocument()
     expect(screen.queryByText(/No new .+ passage votes since/)).not.toBeInTheDocument()
   })
@@ -328,7 +328,7 @@ describe('Home', () => {
     expect(
       await screen.findByText('No new House passage votes since Jun 5.'),
     ).toBeInTheDocument()
-    expect(screen.getByText(/1 of 1 bill · through Jun 5 · House/)).toBeInTheDocument()
+    expect(screen.getByText(/1 bill · through Jun 5 · House/)).toBeInTheDocument()
     expect(screen.queryByText(/since Aug 8/)).not.toBeInTheDocument()
     const houseFilteredChip = expectedFloorChip('2026-06-05', '2026-06-05')
     expect(houseFilteredChip).toBe('House & Senate in recess')
@@ -408,10 +408,14 @@ describe('Home', () => {
       }),
     ).toBeInTheDocument()
 
+    // Laws and confirmations lead; party control opens "Congress at a glance" above the vote context.
+    expect(within(secondary as HTMLElement).getByRole('heading', { name: 'Congress at a glance' })).toBeInTheDocument()
+    expect(
+      within(secondary as HTMLElement).getByRole('region', { name: 'Federal Control' }),
+    ).toBeInTheDocument()
     const sections = mobileRails!.querySelectorAll(':scope > .home-mobile-rail-section')
-    expect(sections).toHaveLength(2)
-    expect(within(sections[0] as HTMLElement).getByRole('region', { name: 'Federal Control' })).toBeInTheDocument()
-    expect(sections[1]).toHaveAttribute('aria-label', 'Members in Congress')
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toHaveAttribute('aria-label', 'Members in Congress')
 
     fireEvent.click(
       within(secondary as HTMLElement).getByRole('button', {
@@ -552,16 +556,16 @@ describe('Home', () => {
 
     expect(await screen.findByText('Senate headline')).toBeInTheDocument()
     expect(screen.getByText('House headline')).toBeInTheDocument()
-    expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0 })
+    expect(fetchFeed).toHaveBeenCalledWith({ limit: 30, offset: 0 })
 
     fireEvent.click(screen.getByRole('radio', { name: 'House' }))
 
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, chamber: 'House' })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, chamber: 'House' })
     })
     expect(await screen.findByText('House headline')).toBeInTheDocument()
     expect(screen.queryByText('Senate headline')).not.toBeInTheDocument()
-    expect(screen.getByText(/1 of 1 bill/)).toBeInTheDocument()
+    expect(screen.getByText(/1 bill/)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'House' })).toHaveAttribute('aria-checked', 'true')
     const params = screen.getByTestId('search-params').textContent ?? ''
     expect(params).toContain('chamber=House')
@@ -571,7 +575,7 @@ describe('Home', () => {
     // Choosing All again clears the chamber filter.
     fireEvent.click(screen.getByRole('radio', { name: 'All' }))
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0 })
     })
     expect(await screen.findByText('Senate headline')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'All' })).toHaveAttribute('aria-checked', 'true')
@@ -581,7 +585,7 @@ describe('Home', () => {
   it('treats invalid chamber query values as All', async () => {
     renderHome('/?chamber=Committee')
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-    expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0 })
+    expect(fetchFeed).toHaveBeenCalledWith({ limit: 30, offset: 0 })
     expect(screen.getByRole('radio', { name: 'All' })).toHaveAttribute('aria-checked', 'true')
   })
 
@@ -595,7 +599,7 @@ describe('Home', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show all chambers' }))
 
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0 })
     })
   })
 
@@ -712,7 +716,7 @@ describe('Home', () => {
     )
 
     expect(await screen.findByText('House-only headline')).toBeInTheDocument()
-    expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0, chamber: 'House' })
+    expect(fetchFeed).toHaveBeenCalledWith({ limit: 30, offset: 0, chamber: 'House' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Open senate bill' }))
 
@@ -720,7 +724,7 @@ describe('Home', () => {
       expect(releaseUnfiltered).toBeDefined()
     })
     const callsAfterNavigate = fetchFeed.mock.calls.slice(1)
-    expect(callsAfterNavigate).toEqual([[{ limit: 15, offset: 0 }]])
+    expect(callsAfterNavigate).toEqual([[{ limit: 30, offset: 0 }]])
 
     await act(async () => {
       releaseUnfiltered?.(pageResponse([senateBill], { total: 1, has_more: false }))
@@ -731,7 +735,7 @@ describe('Home', () => {
       expect(toggle).toHaveAttribute('aria-expanded', 'true')
     })
     expect(screen.queryByText('House-only headline')).not.toBeInTheDocument()
-    expect(fetchFeed.mock.calls.slice(1)).toEqual([[{ limit: 15, offset: 0 }]])
+    expect(fetchFeed.mock.calls.slice(1)).toEqual([[{ limit: 30, offset: 0 }]])
   })
 
   it('expands a bill when ?bill= is set after the feed already loaded', async () => {
@@ -777,11 +781,11 @@ describe('Home', () => {
     renderHome('/?bill=119-hr-999')
 
     expect(
-      await screen.findByText('That bill is no longer in the recent feed.'),
+      await screen.findByText(/That bill has had no floor action/),
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(
-      screen.queryByText('That bill is no longer in the recent feed.'),
+      screen.queryByText(/That bill has had no floor action/),
     ).not.toBeInTheDocument()
   })
 
@@ -979,7 +983,7 @@ describe('Home', () => {
     vi.useRealTimers()
 
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, q: 'defense' })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, q: 'defense' })
     })
     expect(screen.getByTestId('search-params')).toHaveTextContent('q=defense')
     expect(await screen.findByText('Defense match')).toBeInTheDocument()
@@ -998,12 +1002,12 @@ describe('Home', () => {
     // Immediately: flush pending React work without letting any timer run, so the 300ms typing debounce
     // cannot be what fetched. Only Enter can make this pass.
     await act(async () => {})
-    expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, q: 'hr1' })
+    expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, q: 'hr1' })
     expect(screen.getByTestId('search-params')).toHaveTextContent('q=hr1')
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0 })
     })
     expect(screen.getByTestId('search-params').textContent).not.toContain('q=')
   })
@@ -1018,7 +1022,7 @@ describe('Home', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
 
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0 })
     })
     expect(screen.getByTestId('search-params').textContent).not.toContain('q=')
     expect(input).toHaveValue('')
@@ -1030,7 +1034,7 @@ describe('Home', () => {
 
     expect(await screen.findByText('No House matches for “xyz”.')).toBeInTheDocument()
     expect(fetchFeed).toHaveBeenCalledWith({
-      limit: 15,
+      limit: 30,
       offset: 0,
       chamber: 'House',
       q: 'xyz',
@@ -1041,7 +1045,7 @@ describe('Home', () => {
     fireEvent.click(clearActions[clearActions.length - 1]!)
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenLastCalledWith({
-        limit: 15,
+        limit: 30,
         offset: 0,
         chamber: 'House',
       })
@@ -1056,14 +1060,14 @@ describe('Home', () => {
 
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenCalledWith({
-        limit: 15,
+        limit: 30,
         offset: 0,
         chamber: 'Senate',
         q: 'sample',
       })
     })
     expect(
-      await screen.findByText('That bill is no longer in the recent feed.'),
+      await screen.findByText(/That bill has had no floor action/),
     ).toBeInTheDocument()
 
     const params = screen.getByTestId('search-params').textContent ?? ''
@@ -1128,8 +1132,8 @@ describe('Home', () => {
       offset: 0,
       q: 'H.R. 1',
     })
-    expect(screen.queryByText('That bill is no longer in the recent feed.')).not.toBeInTheDocument()
+    expect(screen.queryByText(/That bill has had no floor action/)).not.toBeInTheDocument()
     expect(screen.queryByText(/No Senate passage votes/i)).not.toBeInTheDocument()
-    expect(screen.getByText(/1 of 1 bill/)).toBeInTheDocument()
+    expect(screen.getByText(/1 bill/)).toBeInTheDocument()
   })
 })

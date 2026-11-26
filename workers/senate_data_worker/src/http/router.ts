@@ -13,12 +13,12 @@ import {
   getFeedPipelineSuccess,
   getLatestPassageVoteDate,
   getMissingDigestCount,
+  getPlaceholderSummaryCount,
 } from "../d1/pipeline-state";
 import { runDisclosuresPipeline } from "../pipeline/run-disclosures";
 import { runExecutivePostsPipeline } from "../pipeline/run-executive-posts";
 import { runSummarySweep } from "../pipeline/run-summary-sweep";
 import { runSummaryBackfill } from "../pipeline/run-summary-backfill";
-import { handleSummaryFeedback } from "./summary-feedback";
 import { runDigestRefreshPipeline, parseDigestRefreshRequest } from "../pipeline/run-digest-refresh";
 import { runFeedWithMemberVotes } from "../pipeline/run-feed-with-member-votes";
 import { runMemberVotesPipeline } from "../pipeline/run-member-votes";
@@ -111,6 +111,7 @@ async function loadIngestMonitor(env: Env) {
   const [
     latestPassageVoteDate,
     missingDigestCount,
+    placeholderSummaryCount,
     lastSuccess,
     lastScheduledSuccess,
     lastFailure,
@@ -122,6 +123,7 @@ async function loadIngestMonitor(env: Env) {
   ] = await Promise.all([
     getLatestPassageVoteDate(env),
     getMissingDigestCount(env),
+    getPlaceholderSummaryCount(env),
     getFeedPipelineSuccess(env.DB),
     getFeedPipelineScheduledSuccess(env.DB),
     getFeedPipelineFailure(env.DB),
@@ -138,6 +140,7 @@ async function loadIngestMonitor(env: Env) {
     dailyCronUtc: FEED_PIPELINE_CRON_UTC,
     latestPassageVoteDate,
     missingDigestCount,
+    placeholderSummaryCount,
     lastSuccess,
     lastScheduledSuccess,
     lastFailure,
@@ -809,10 +812,6 @@ export async function handlePublicFetch(
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  if (pathname === "/feedback/summary") {
-    return handleSummaryFeedback(request, env, json);
-  }
-
   if (pathname === "/__pipeline/purge-cache") {
     return handlePurgeCacheRoute(request, env, json);
   }
@@ -852,7 +851,6 @@ const API_PATH_PREFIXES = [
   "/health",
   "/debug/",
   "/feed/",
-  "/feedback/",
   "/stats/",
   "/executive/",
   "/share/",

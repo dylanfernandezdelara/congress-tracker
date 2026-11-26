@@ -68,6 +68,7 @@ export function evaluateIngestMonitorStatus<
   senateVoteMenuCache?: SenateVoteMenuCacheMonitor | null;
   introWarnings?: readonly string[] | null;
   missingDigestCount?: number;
+  placeholderSummaryCount?: number;
 }): {
   status: IngestMonitorStatus;
   message: string;
@@ -90,6 +91,7 @@ export function buildIngestMonitorPayload(params: {
   dailyCronUtc: string;
   latestPassageVoteDate: string | null;
   missingDigestCount: number;
+  placeholderSummaryCount?: number;
   lastSuccess: FeedPipelineRunRecord | null;
   lastScheduledSuccess: FeedPipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
@@ -122,6 +124,7 @@ export function buildIngestMonitorPayload(params: {
     senateVoteMenuCache: params.senateVoteMenuCache ?? null,
     introWarnings: publicIntroWarnings,
     missingDigestCount: params.missingDigestCount,
+    placeholderSummaryCount: params.placeholderSummaryCount,
   });
 
   const quietDays = floorQuietDays(params.latestPassageVoteDate, params.now);
@@ -157,6 +160,7 @@ export function buildIngestMonitorPayload(params: {
     latest_passage_vote_date: params.latestPassageVoteDate,
     floor_quiet_days: quietDays,
     missing_digest_count: params.missingDigestCount,
+    placeholder_summary_count: params.placeholderSummaryCount ?? 0,
     last_success: sanitizeRunRecord(params.lastSuccess),
     last_failure: sanitizeFailureRecord(params.lastFailure),
     last_scheduled_success: sanitizeRunRecord(evaluated.last_scheduled_success),

@@ -1,3 +1,4 @@
+import { DIGEST_SOURCE_TITLE_FALLBACK } from "./digests";
 import { ensureSchema } from "./schema";
 import { congressNumber, type Env } from "../config";
 import { FEED_MAX_BILLS } from "../constants";
@@ -336,4 +337,40 @@ export async function getMissingDigestCount(
     .bind(...feedMembershipWindowBinds(asOf, true), FEED_MAX_BILLS)
     .first<{ missing_count: number }>();
   return row?.missing_count ?? 0;
+}
+
+/**
+ * Feed bills that have a CRS summary to work from but still carry the
+ * deterministic title-fallback digest: the plain-language rewrite never landed,
+ * so the feed shows CRS text verbatim. Intro-only bills with no CRS yet are
+ * expected to sit on the fallback and are not counted.
+ */
+export async function getPlaceholderSummaryCount(
+  env: Env,
+  asOf: Date = new Date()
+): Promise<number> {
+  await ensureSchema(env.DB);
+  const row = await env.DB
+    .prepare(
+      `${feedMembershipCteSql(true)}
+       SELECT COUNT(*) AS placeholder_count
+       FROM (
+         SELECT bill_congress, bill_type, bill_number,
+                MAX(sort_date) AS latest_activity_date
+         FROM combined
+         GROUP BY bill_congress, bill_type, bill_number
+         ORDER BY latest_activity_date DESC
+         LIMIT ?
+       ) f
+       JOIN bill_digests d
+         ON d.congress = f.bill_congress
+        AND UPPER(d.bill_type) = UPPER(f.bill_type)
+        AND d.number = f.bill_number
+       WHERE TRIM(COALESCE(d.raw_summary_text, '')) <> ''
+         AND json_valid(d.digest_json) = 1
+         AND json_extract(d.digest_json, '$.source') = ?`
+    )
+    .bind(...feedMembershipWindowBinds(asOf, true), FEED_MAX_BILLS, DIGEST_SOURCE_TITLE_FALLBACK)
+    .first<{ placeholder_count: number }>();
+  return row?.placeholder_count ?? 0;
 }

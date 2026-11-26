@@ -2,7 +2,6 @@ import { useId, useRef } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import { bioguidePhotoUrl } from '@congress-tracker/shared/member-photo'
-import { crossVoteHint } from '@congress-tracker/shared/cross-vote-label'
 import { partyShortLabel } from '@congress-tracker/shared/party'
 
 import type {
@@ -103,8 +102,7 @@ function CrossVoteItem({
         onAfterNavigate={onAfterNavigate}
       >
         <span className="text-xs text-muted-foreground">
-          {shortId} · {formatVoteDate(vote.vote_date)} · {againstPartyLabel(vote.position)} ·
-          margin {vote.margin}
+          {shortId} · {formatVoteDate(vote.vote_date)} · {againstPartyLabel(vote.position)}
         </span>
       </ProfileBillRow>
     </li>
@@ -199,8 +197,6 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
   const party = profile?.party ?? seed.party
   const seedPhoto = seed.photo_url ?? bioguidePhotoUrl(seed.bioguide_id) ?? ''
   const photoUrl = profile?.photo_url || seedPhoto
-  const hintLabel = profile?.cross_vote_label ?? seed.cross_vote_label
-  const hint = hintLabel ? crossVoteHint(hintLabel) : null
   const phase = statsPhase(profile, isPending, error)
   const closeAfterNavigate = () => {
     requestCloseRef.current?.()
@@ -232,7 +228,6 @@ export function MemberProfile({ open, seed, selectionKey, onClose }: MemberProfi
 
       <section className="sheet-section" aria-label="Voting record">
         <h3 className="sheet-section-title">{votingRecordTitle(profile)}</h3>
-        {hint ? <p className="sheet-muted">{hint}</p> : null}
         {phase.kind === 'ready' ? (
           <dl className="mt-1.5 grid grid-cols-3 gap-2">
             <div className="flex flex-col gap-0.5">

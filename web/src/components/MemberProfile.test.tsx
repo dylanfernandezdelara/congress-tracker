@@ -135,7 +135,8 @@ describe('MemberProfile', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Brian Fitzpatrick' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Voting record' })).toBeInTheDocument()
-    expect(screen.getByText('Frequent cross-voter')).toBeInTheDocument()
+    // Counts carry the record; no characterizing label.
+    expect(screen.queryByText('Frequent cross-voter')).not.toBeInTheDocument()
     expect(screen.getByText('BF')).toBeInTheDocument()
     expect(screen.getByText('Republican')).toBeInTheDocument()
     expect(screen.getByText('R-PA')).toBeInTheDocument()
@@ -151,7 +152,7 @@ describe('MemberProfile', () => {
     expect(screen.getByText('Senate passes a public lands conservation and access bill')).toBeInTheDocument()
     expect(screen.getByText(/S\. 2 · /)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Recent party-line breaks' })).toBeInTheDocument()
-    expect(screen.getByText(/Voted yea against party · margin 2/)).toBeInTheDocument()
+    expect(screen.getByText(/Voted yea against party/)).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: /Senate passes a public lands conservation and access bill/ }),
     ).toHaveAttribute('href', '/?bill=119-s-2')
@@ -233,9 +234,9 @@ describe('MemberProfile', () => {
     expect(screen.queryByText('Rare party-line break')).not.toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getByText('Rare party-line break')).toBeInTheDocument()
+      expect(screen.getByText('PA-1')).toBeInTheDocument()
     })
-    expect(screen.getByText('PA-1')).toBeInTheDocument()
+    expect(screen.queryByText('Rare party-line break')).not.toBeInTheDocument()
   })
 
   it('shows the unavailable message when member votes are missing', async () => {

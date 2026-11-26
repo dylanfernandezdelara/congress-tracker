@@ -109,7 +109,7 @@ function TightnessChamber({
                 aria-pressed={selected}
                 onClick={() => onSelect(dot)}
               >
-                <span className="tightness-bar-title" title={title}>
+                <span className="tightness-bar-title">
                   {title}
                 </span>{' '}
                 <span className="tightness-bar-meta">{tightnessBarMeta(dot)}</span>

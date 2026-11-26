@@ -41,25 +41,38 @@ describe('FeedRow', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('Point one')).not.toBeInTheDocument()
     expect(screen.queryByText(longCrsSummary)).not.toBeInTheDocument()
-    const hiddenEvent = document.querySelector('.feed-row-event[hidden]')
-    expect(hiddenEvent?.textContent).toContain('52–47 in the Senate')
+    // One plain status phrase replaces the chip row.
+    expect(document.querySelector('[data-feed-status]')?.textContent).toBe('Passed the Senate 52–47')
   })
 
-  it('labels the tally party-line or bipartisan when member votes are known', () => {
+  it('states the party split from member votes instead of a party-line label', () => {
     const base = makeFeedItem()
     const vote = base.passage_votes[0]!
     const { container, rerender } = render(
-      <FeedRow item={{ ...base, passage_votes: [{ ...vote, cohesion: 'party-line' }] }} isExpanded={false} onToggle={() => {}} />,
+      <FeedRow
+        item={{
+          ...base,
+          passage_votes: [
+            {
+              ...vote,
+              cohesion: 'bipartisan',
+              party_splits: [
+                { party: 'D', yeas: 14, nays: 30, party_line: 'nay' },
+                { party: 'R', yeas: 47, nays: 2, party_line: 'yea' },
+                { party: 'I', yeas: 1, nays: 1, party_line: 'yea' },
+              ],
+            },
+          ],
+        }}
+        isExpanded={false}
+        onToggle={() => {}}
+      />,
     )
-    expect(container.querySelector('.feed-row-chip--cohesion')?.textContent).toBe('Party-line')
-
-    rerender(
-      <FeedRow item={{ ...base, passage_votes: [{ ...vote, cohesion: 'bipartisan' }] }} isExpanded={false} onToggle={() => {}} />,
-    )
-    expect(container.querySelector('.feed-row-chip--cohesion')?.textContent).toBe('Bipartisan')
+    expect(container.querySelector('.feed-row-status-split')?.textContent).toBe(' · R 47–2 · D 14–30 · I 1–1')
+    expect(screen.queryByText('Party-line')).not.toBeInTheDocument()
 
     rerender(<FeedRow item={base} isExpanded={false} onToggle={() => {}} />)
-    expect(container.querySelector('.feed-row-chip--cohesion')).toBeNull()
+    expect(container.querySelector('.feed-row-status-split')).toBeNull()
   })
 
   it('shows digest bullets in the expanded detail panel', () => {
@@ -77,14 +90,9 @@ describe('FeedRow', () => {
     ).toBeInTheDocument()
   })
 
-  it('explains Senate bill prefix with an accessible tooltip', () => {
+  it('keeps the bill number, committee and text changes out of the collapsed row', () => {
     const { container } = render(<FeedRow item={makeFeedItem()} isExpanded={false} onToggle={() => {}} />)
-
-    const chip = container.querySelector('.feed-row-chip--bill')
-    expect(chip).toHaveAttribute('aria-label', 'Senate bill 2')
-    const prefix = container.querySelector('abbr.feed-row-bill-prefix')
-    expect(prefix).toHaveAttribute('title', 'Senate bill')
-    expect(prefix?.textContent).toBe('S.')
+    expect(container.querySelector('.feed-row-chip')).toBeNull()
   })
 
   it('includes outcome and margin in the toggle accessible name', () => {
@@ -117,28 +125,6 @@ describe('FeedRow', () => {
     expect(screen.getByText('Failed')).toBeInTheDocument()
     expect(screen.getByText('Failed')).toHaveClass('text-fail')
     expect(screen.getByRole('button', { name: /198–230/ })).toBeInTheDocument()
-  })
-
-  it('shows a Text grew mark when added_provisions exist', () => {
-    render(
-      <FeedRow
-        item={makeFeedItem({
-          text_changes: {
-            summary_version: 'Introduced',
-            summary_version_date: '2026-06-01',
-            latest_version: 'Engrossed',
-            latest_version_date: '2026-06-04',
-            added_provisions: [{ label: 'Sec. 4.', heading: 'Public spending dashboard details' }],
-            more_added_count: 0,
-          },
-        })}
-        isExpanded={false}
-        onToggle={() => {}}
-      />,
-    )
-
-    expect(screen.getByText('Text grew')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Text grew/ })).toBeInTheDocument()
   })
 
   it('includes the summary in the toggle accessible description', () => {
@@ -308,9 +294,8 @@ describe('FeedRow', () => {
 
     const { container } = render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
-    const eventLine = container.querySelector('.feed-row-event')
-    expect(screen.getByText('Procedural')).toBeInTheDocument()
-    expect(eventLine?.textContent).toContain('agreed 218–210')
+    expect(screen.getByText('Procedural vote')).toBeInTheDocument()
+    expect(container.querySelector('[data-feed-status]')?.textContent).toContain('agreed 218–210')
   })
 
   it('shows LAW — UNSIGNED badge without repeating it in an event line', () => {
@@ -349,8 +334,7 @@ describe('FeedRow', () => {
     const badge = screen.getByText('Law — unsigned')
     expect(badge).toHaveClass('feed-row-badge--law_unsigned')
     expect(badge).toHaveClass('text-law')
-    const eventLine = container.querySelector('.feed-row-event')
-    expect(eventLine).toHaveAttribute('hidden')
+    expect(container.querySelector('[data-feed-status]')?.textContent).toBe('Law — unsigned · 85–5 in the Senate')
   })
 
   it('shows a President desk chip while pending signature', () => {
@@ -377,7 +361,7 @@ describe('FeedRow', () => {
     render(<FeedRow item={item} isExpanded={false} onToggle={() => {}} />)
 
     expect(screen.getByText('Passed')).toBeInTheDocument()
-    expect(screen.getByText("President's desk · day 4/10")).toBeInTheDocument()
+    expect(document.querySelector('[data-feed-status]')?.textContent).toContain("President's desk · day 4/10")
   })
 
   it('shows a direct Truth Social quote when the bill has an executive signal', () => {
@@ -492,12 +476,13 @@ describe('FeedRow', () => {
 
     const badge = container.querySelector('.feed-row-badge--introduced')
     expect(badge?.textContent).toBe('Introduced')
-    expect(container.querySelector('.feed-row-event')).toHaveAttribute('hidden')
-    expect(screen.getByText('Sen. Bernard Sanders (local)')).toBeInTheDocument()
+    expect(container.querySelector('[data-feed-status]')?.textContent).toBe(
+      'Introduced in the Senate by Sen. Bernard Sanders (local)',
+    )
     expect(screen.getByText('Sanders introduces a ban on artificial superintelligence')).toBeInTheDocument()
     expect(screen.queryByText('No vote recorded')).not.toBeInTheDocument()
     // The badge already says Introduced; the date rail and chamber chip don't repeat it.
     expect(container.querySelector('.feed-row-date-secondary')).toBeNull()
-    expect(screen.queryByText('Senate', { selector: '.feed-row-chip' })).not.toBeInTheDocument()
+    expect(container.querySelector('.feed-row-chip')).toBeNull()
   })
 })

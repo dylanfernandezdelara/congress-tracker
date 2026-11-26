@@ -80,12 +80,12 @@ describe('Home advanced filters', () => {
     })
 
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, state: 'NY' })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, state: 'NY' })
     })
     expect(await screen.findByText('New York sponsor headline')).toBeInTheDocument()
     expect(screen.queryByText('Texas sponsor headline')).not.toBeInTheDocument()
-    expect(screen.getByText(/1 of 1 bill/)).toBeInTheDocument()
-    expect(screen.getByText(/1 of 1 bill · through .+ · New York/)).toBeInTheDocument()
+    expect(screen.getByText(/1 bill/)).toBeInTheDocument()
+    expect(screen.getByText(/1 bill · through .+ · New York/)).toBeInTheDocument()
     expect(screen.getByTestId('search-params')).toHaveTextContent('state=NY')
     expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('NY')
   })
@@ -156,7 +156,7 @@ describe('Home advanced filters', () => {
 
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenLastCalledWith({
-        limit: 15,
+        limit: 30,
         offset: 0,
         sponsorChamber: 'House',
         party: 'D',
@@ -182,14 +182,14 @@ describe('Home advanced filters', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
 
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0 })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0 })
     })
   })
 
   it('treats invalid state query values as All states', async () => {
     renderHome('/?state=New%20York')
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
-    expect(fetchFeed).toHaveBeenCalledWith({ limit: 15, offset: 0 })
+    expect(fetchFeed).toHaveBeenCalledWith({ limit: 30, offset: 0 })
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
     expect(screen.getByLabelText('Filter by sponsor state')).toHaveValue('')
   })
@@ -272,7 +272,7 @@ describe('Home advanced filters', () => {
 
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenLastCalledWith({
-        limit: 15,
+        limit: 30,
         offset: 0,
         sponsorQ: 'Schumer',
       })
@@ -309,7 +309,7 @@ describe('Home advanced filters', () => {
     renderHome('/?sponsor=LOCAL%3AH002')
     expect(await screen.findByText('Plain headline for readers')).toBeInTheDocument()
     expect(fetchFeed).toHaveBeenLastCalledWith({
-      limit: 15,
+      limit: 30,
       offset: 0,
       sponsor: 'LOCAL:H002',
     })
@@ -319,7 +319,7 @@ describe('Home advanced filters', () => {
     fireEvent.change(memberInput, { target: { value: 'Schumer' } })
 
     expect(fetchFeed).toHaveBeenLastCalledWith({
-      limit: 15,
+      limit: 30,
       offset: 0,
       sponsor: 'LOCAL:H002',
     })
@@ -328,7 +328,7 @@ describe('Home advanced filters', () => {
     fireEvent.blur(memberInput)
     await waitFor(() => {
       expect(fetchFeed).toHaveBeenLastCalledWith({
-        limit: 15,
+        limit: 30,
         offset: 0,
         sponsorQ: 'Schumer',
       })
@@ -341,7 +341,7 @@ describe('Home advanced filters', () => {
     expect(screen.getByRole('button', { name: 'Remove New York filter' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Remove House sponsors filter' }))
     await waitFor(() => {
-      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 15, offset: 0, state: 'NY' })
+      expect(fetchFeed).toHaveBeenLastCalledWith({ limit: 30, offset: 0, state: 'NY' })
     })
   })
 
