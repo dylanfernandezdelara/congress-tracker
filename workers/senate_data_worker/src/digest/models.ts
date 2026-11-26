@@ -37,11 +37,17 @@ const ANTHROPIC_PRICES: Record<string, { input: number; output: number }> = {
  * Rewrites of bills that matter (floor vote, reported by committee, law, in the feed): the writing readers
  * preferred in the round-2 blind review. Normal API: OpenRouter refuses Sonnet 5 batches (tested 2026-09-26).
  */
+const OPENROUTER_REWRITE_DEFAULT = "anthropic/claude-sonnet-5";
+
 export function rewriteModel(env: Env): DigestModel {
-  const id = env.DIGEST_REWRITE_MODEL?.trim() || "anthropic/claude-sonnet-5";
-  const anthropicPrice = ANTHROPIC_PRICES[id];
-  // Without the key, rewrites stay on OpenRouter rather than failing every hour as an account error.
-  if (anthropicPrice && env.ANTHROPIC_API_KEY?.trim()) return { id, provider: "anthropic", effort: "medium", maxTokens: 8_000, price: anthropicPrice };
+  const configured = env.DIGEST_REWRITE_MODEL?.trim() || OPENROUTER_REWRITE_DEFAULT;
+  const anthropicPrice = ANTHROPIC_PRICES[configured];
+  if (anthropicPrice && env.ANTHROPIC_API_KEY?.trim()) {
+    return { id: configured, provider: "anthropic", effort: "medium", maxTokens: 8_000, price: anthropicPrice };
+  }
+  // Without the key, rewrites stay on OpenRouter rather than failing every hour as an account error. An Anthropic API
+  // id ("claude-sonnet-5-5") is not an OpenRouter model id: sending it failed every rewrite from 2026-10-17 on.
+  const id = anthropicPrice ? OPENROUTER_REWRITE_DEFAULT : configured;
   return {
     id,
     temperature: 0.2,
