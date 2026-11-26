@@ -1,32 +1,20 @@
 import type { BillRef } from "../types";
 
-const ISSUE_BILL = /^([HS])\.?\s*([A-Z]*)\s*\.?\s*(\d+)/i;
-const ISSUE_HOUSE = /^H\.?\s*R\.?\s*(\d+)/i;
+/**
+ * Senate vote_menu issue, compacted: "H.Con.Res. 93" -> "HCONRES93". Longest types first so "S.J.Res." is not read
+ * as "S.". Without this, every joint and concurrent resolution ("S.J.Res. 197", "H.Con.Res. 93") was dropped.
+ */
+const ISSUE_COMPACT = /^(HCONRES|SCONRES|HJRES|SJRES|HRES|SRES|HR|S)(\d+)/;
 
-/** Parse Senate vote_menu issue field (e.g. "S. 1318", "H.R. 1234"). */
+/** Parse Senate vote_menu issue field (e.g. "S. 1318", "H.R. 1234", "S.J.Res. 197", "H.Con.Res. 93"). */
 export function parseSenateIssue(issue: string, congress: number): BillRef | null {
   const trimmed = issue.trim();
   if (/^PN/i.test(trimmed)) return null;
-
-  const hr = trimmed.match(ISSUE_HOUSE);
-  if (hr) {
-    return { congress, type: "HR", number: Number.parseInt(hr[1], 10) };
-  }
-
-  const m = trimmed.match(ISSUE_BILL);
+  const m = trimmed.toUpperCase().replace(/[.\s]/g, "").match(ISSUE_COMPACT);
   if (!m) return null;
-
-  const chamber = m[1].toUpperCase();
-  const subtype = (m[2] ?? "").toUpperCase();
-  const num = Number.parseInt(m[3], 10);
+  const num = Number.parseInt(m[2], 10);
   if (Number.isNaN(num)) return null;
-
-  if (chamber === "H") {
-    const type = subtype === "JRES" || subtype === "JR" ? "HJRES" : subtype === "RES" ? "HRES" : "HR";
-    return { congress, type, number: num };
-  }
-  const type = subtype === "JRES" || subtype === "JR" ? "SJRES" : subtype === "RES" ? "SRES" : "S";
-  return { congress, type, number: num };
+  return { congress, type: m[1], number: num };
 }
 
 /** Normalize congress.gov legislationType (e.g. HRES, HR, S). */

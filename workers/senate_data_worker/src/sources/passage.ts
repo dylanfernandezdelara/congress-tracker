@@ -2,6 +2,8 @@ const PASSAGE_PATTERNS = [
   /^on passage of the bill/i,
   /^on passage/i,
   /^on motion to suspend the rules and pass/i,
+  // House resolutions under suspension ("…and Agree") and final agreement to Senate amendments ("…and Concur").
+  /^on motion to suspend the rules and (agree|concur)/i,
   /^on agreeing to the resolution/i,
   // Senate LIS wording (House uses "On Agreeing to the Resolution").
   /^on the concurrent resolution/i,
