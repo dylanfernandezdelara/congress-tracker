@@ -74,6 +74,16 @@ describe("billFactsFromActions", () => {
     expect(facts.votes[0]).toMatchObject({ yeas: 92, nays: 324 });
   });
 
+  it("never reads a Congressional Record page range as a tally", () => {
+    const facts = billFactsFromActions({ congress: 119, type: "SRES", number: 905 }, [
+      {
+        actionDate: "2026-09-24",
+        text: "Passed/agreed to in Senate: Submitted in the Senate, considered, and agreed to without amendment and with a preamble by Unanimous Consent. (consideration: CR S8-500)",
+      },
+    ]);
+    expect(facts.votes[0]).toMatchObject({ yeas: null, nays: null, how: "unanimous_consent" });
+  });
+
   it("a bill that passed one chamber by voice vote", () => {
     const facts = billFactsFromActions({ congress: 119, type: "S", number: 100 }, [
       { actionDate: "2026-03-03", text: "Passed/agreed to in Senate: Passed Senate without amendment by Voice Vote." },

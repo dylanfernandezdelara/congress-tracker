@@ -13,8 +13,12 @@ import type { DigestBillInput, DigestVote } from "./prompt";
 
 const OUTCOME_RE = /^(Passed\/agreed to|Failed of passage\/not agreed to) in (House|Senate):?\s*(.*)$/i;
 const RESOLVING_RE = /^Resolving differences -- (House|Senate) actions:\s*(.*)$/i;
-/** House "… 262 - 159 (Roll no. 308)", Senate "… Yea-Nay Vote. 61 - 37. Record Vote Number: 224." */
-const TALLY_RE = /(\d{1,3})\s*-\s*(\d{1,3})/;
+/**
+ * Tallies only in their exact vote wording, never any "N - N" (Congressional Record pages read "CR S8-500"):
+ * House "by the Yeas and Nays: (2/3 required): 378 - 10 (Roll no. 290)" or "by recorded vote: 215 - 210 (Roll no. 99)";
+ * Senate "by Yea-Nay Vote. 61 - 37. Record Vote Number: 224."
+ */
+const TALLY_RE = /(?:by the Yeas and Nays|by recorded vote|Yea-Nay Vote)[.:]?\s*(?:\(2\/3 required\):\s*)?(\d{1,3})\s*-\s*(\d{1,3})/i;
 const UNANIMOUS_RE = /unanimous consent|without objection/i;
 const VOICE_RE = /voice vote/i;
 
