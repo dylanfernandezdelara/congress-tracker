@@ -9,6 +9,12 @@ export interface CongressAction {
   committees?: Array<{ name?: string | null; systemCode?: string | null }> | null;
 }
 
+/** The bill detail's structured `laws` list: `[{ number: "119-111", type: "Public Law" }]`. */
+export interface CongressLaw {
+  number?: string | null;
+  type?: string | null;
+}
+
 export interface ParsedLifecycleMilestones {
   presented_date: string | null;
   signed_date: string | null;
@@ -18,19 +24,30 @@ export interface ParsedLifecycleMilestones {
   public_law: string | null;
   latest_action_date: string | null;
   latest_action_text: string | null;
+  /**
+   * Presidential or enactment actions whose wording matched none of the known phrases. They are never guessed at:
+   * the outcome they would decide stays null, and callers log them for review.
+   */
+  unrecognized: string[];
 }
 
-const PUBLIC_LAW_RE = /Became Public Law No:\s*([\d-]+)/i;
-// Lookbehind excludes "unsigned by President" (e.g. the 38000 action text).
-const SIGNED_TEXT_RE = /(?<!un)signed by president/i;
-const BECAME_LAW_TEXT_RE = /became public law/i;
-const VETOED_TEXT_RE = /vetoed/i;
-const POCKET_VETO_RE = /pocket/i;
-const PRESENTED_TEXT_RE = /Presented to President/i;
-const LAW_UNSIGNED_TEXT_RE = /became public law.*unsigned|without.*signature/i;
-/** Live congress.gov path before formal 38000/36000 (e.g. H.R. 6644). */
-const ARCHIVIST_UNSIGNED_RE = /sent to archivist.*unsigned|archivist of the united states unsigned/i;
-const OVER_VETO_TEXT_RE = /enacted over veto|over.*veto/i;
+/*
+ * Status is read from the Library of Congress's standard action wording, not from action codes. Codes differ by the
+ * system that recorded the action: the House system tags "Signed by President." E30000, and the Library tags it
+ * 36000, the same code it gives "Became Public Law No: …". Reading the codes labeled signed laws as unsigned.
+ */
+const PRESENTED_RE = /^presented to (the )?president\b/i;
+const SIGNED_RE = /^(public law )?signed by (the )?president\b/i;
+const POCKET_VETO_RE = /^pocket vetoed by (the )?president\b/i;
+const VETOED_RE = /^vetoed by (the )?president\b/i;
+const BECAME_LAW_RE = /^became public law no:\s*([\d-]+)/i;
+const ENACTED_OVER_VETO_RE = /^public law enacted over (the )?veto\b/i;
+/** The ten-day lapse (Article I §7): "Sent to Archivist of the United States unsigned.", "Public Law unsigned by President.", "Became Public Law No: 119-200 without signature." */
+const UNSIGNED_RE = /^sent to (the )?archivist of the united states unsigned\b|^public law unsigned by (the )?president\b|^became public law no:\s*[\d-]+\s+without (the president's )?signature\b/i;
+/** Wording that concerns the President's action or enactment: anything here that matches no phrase above is flagged. */
+const PRESIDENTIAL_RE = /\bpresident\b|\bpublic law\b|\barchivist\b|\bvetoe?d?\b/i;
+/** Floor and committee actions that mention the President or a veto without being the presidential action itself. */
+const NOT_PRESIDENTIAL_ACTION_RE = /\bveto message\b|\bover (the )?veto\b|objections of the president|\bmotion\b|\bcommittee\b|\breferred\b|\bconsidered\b|\breceived\b|\bheld at the desk\b|\bpassed\b|\bagreed to\b|\bmessage on\b|\bpresident pro tempore\b|\bpresident of the senate\b/i;
 
 function actionDate(action: CongressAction): string | null {
   const raw = action.actionDate?.trim();
@@ -42,42 +59,36 @@ function actionText(action: CongressAction): string {
   return action.text?.trim() ?? "";
 }
 
-function codeOf(action: CongressAction): string | null {
-  const code = action.actionCode;
-  if (code == null || code === "") return null;
-  return String(code);
-}
-
-function extractPublicLaw(text: string): string | null {
-  const match = text.match(PUBLIC_LAW_RE);
-  return match?.[1] ?? null;
-}
-
 function pickLatestDate(current: string | null, next: string | null): string | null {
   if (!next) return current;
   if (!current) return next;
   return next > current ? next : current;
 }
 
+function publicLawFromLaws(laws: CongressLaw[] | null | undefined): string | null {
+  const law = (laws ?? []).find((l) => /public/i.test(l.type ?? "") && /^\d+-\d+$/.test(l.number?.trim() ?? ""));
+  return law?.number?.trim() ?? null;
+}
+
 /**
- * Parse congress.gov bill actions into presidential / enactment milestones.
- * Prefer actionCode when present; fall back to text matching when code is null.
+ * Parse congress.gov bill actions (plus the bill's structured `laws` list, when the caller has it) into presidential
+ * and enactment milestones. Enactment and the law number come from `laws` when present; signed, vetoed and unsigned
+ * come only from the standard action wording. Enacted over a veto is a veto followed by enactment.
  */
-export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycleMilestones {
+export function parseLifecycleActions(
+  actions: CongressAction[],
+  laws?: CongressLaw[] | null
+): ParsedLifecycleMilestones {
   let presented_date: string | null = null;
   let signed_date: string | null = null;
   let vetoed_date: string | null = null;
   let became_law_date: string | null = null;
-  let public_law: string | null = null;
+  let public_law: string | null = publicLawFromLaws(laws);
   let pocket = false;
-  let law_unsigned = false;
-  let enacted_over_veto = false;
+  let unsigned = false;
+  const unrecognized: string[] = [];
 
-  const sorted = [...actions].sort((a, b) => {
-    const da = actionDate(a) ?? "";
-    const db = actionDate(b) ?? "";
-    return da.localeCompare(db);
-  });
+  const sorted = [...actions].sort((a, b) => (actionDate(a) ?? "").localeCompare(actionDate(b) ?? ""));
 
   let latest_action_date: string | null = null;
   let latest_action_text: string | null = null;
@@ -88,79 +99,59 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
       latest_action_date = date;
       latest_action_text = text || latest_action_text;
     }
+    if (!date || !text) continue;
 
-    const code = codeOf(action);
-
-    const isPresented = code === "28000" || PRESENTED_TEXT_RE.test(text);
-    if (isPresented && date) {
+    if (PRESENTED_RE.test(text)) {
       presented_date = pickLatestDate(presented_date, date);
+      continue;
     }
-
-    // LOC action codes: 29000 "Signed by President", 37000 "Public Law signed
-    // by President". 36000 "Became Public Law" is generic (every enacted bill
-    // carries it) and is NOT evidence of a signature.
-    const isSigned =
-      code === "29000" ||
-      code === "37000" ||
-      (SIGNED_TEXT_RE.test(text) && !VETOED_TEXT_RE.test(text));
-    if (isSigned && date) {
+    if (SIGNED_RE.test(text)) {
       signed_date = pickLatestDate(signed_date, date);
+      continue;
     }
-
-    const isBecameLaw =
-      code === "36000" ||
-      code === "37000" ||
-      code === "38000" ||
-      code === "39000" ||
-      BECAME_LAW_TEXT_RE.test(text);
-    if (isBecameLaw && date) {
+    if (UNSIGNED_RE.test(text)) {
+      unsigned = true;
       became_law_date = pickLatestDate(became_law_date, date);
-      const pl = extractPublicLaw(text);
-      if (pl) public_law = pl;
+      const lapsed = text.match(BECAME_LAW_RE);
+      if (lapsed && !public_law) public_law = lapsed[1];
+      continue;
     }
-
-    // 39000 "Public Law enacted over veto" / veto-override text.
-    if ((code === "39000" || OVER_VETO_TEXT_RE.test(text)) && date) {
-      enacted_over_veto = true;
+    const becameLaw = text.match(BECAME_LAW_RE);
+    if (becameLaw) {
+      became_law_date = pickLatestDate(became_law_date, date);
+      if (!public_law) public_law = becameLaw[1];
+      continue;
     }
-
-    // LOC action codes: 30000 "Pocket vetoed by President", 31000 "Vetoed by President".
-    const isVetoed = code === "30000" || code === "31000" || VETOED_TEXT_RE.test(text);
-    if (isVetoed && date) {
+    if (ENACTED_OVER_VETO_RE.test(text)) {
+      became_law_date = pickLatestDate(became_law_date, date);
+      continue;
+    }
+    if (POCKET_VETO_RE.test(text)) {
+      pocket = true;
       vetoed_date = pickLatestDate(vetoed_date, date);
-      if (code === "30000" || POCKET_VETO_RE.test(text)) {
-        pocket = true;
-      }
+      continue;
     }
-
-    // 38000 "Public Law unsigned by President" (Article I §7 ten-day lapse).
-    // Also "Sent to Archivist … unsigned" (often coded E30000) which appears
-    // before formal Became Public Law / 38000 on some bills.
-    const isArchivistUnsigned =
-      code === "E30000" || ARCHIVIST_UNSIGNED_RE.test(text);
-    if ((code === "38000" || LAW_UNSIGNED_TEXT_RE.test(text) || isArchivistUnsigned) && date) {
-      law_unsigned = true;
-      if (isArchivistUnsigned) {
-        became_law_date = pickLatestDate(became_law_date, date);
-      }
+    if (VETOED_RE.test(text)) {
+      vetoed_date = pickLatestDate(vetoed_date, date);
+      continue;
+    }
+    if (PRESIDENTIAL_RE.test(text) && !NOT_PRESIDENTIAL_ACTION_RE.test(text)) {
+      unrecognized.push(`${date}: ${text}`);
     }
   }
 
+  // The structured law list is authoritative for enactment; date it from the latest action when no action says so.
+  if (public_law && !became_law_date) became_law_date = latest_action_date;
+
   let law_kind: BillLawKind | null = null;
   if (became_law_date) {
-    if (enacted_over_veto) {
-      law_kind = "enacted_over_veto";
-    } else if (law_unsigned) {
-      law_kind = "law_unsigned";
-    } else if (signed_date) {
-      law_kind = "signed";
-    } else {
-      // Enacted with no explicit signature or ten-day-lapse evidence; the
-      // overwhelmingly common path is a signed law whose 29000/37000 action
-      // is absent from the page, but we cannot assert it, so leave kind null
-      // and let the UI show a generic "Law" outcome.
-      law_kind = null;
-    }
+    if (vetoed_date && vetoed_date <= became_law_date) law_kind = "enacted_over_veto";
+    else if (signed_date && unsigned) {
+      // Conflicting wording: say only that it became law, and flag it.
+      unrecognized.push(`${became_law_date}: both signed and unsigned wording`);
+    } else if (signed_date) law_kind = "signed";
+    else if (unsigned) law_kind = "law_unsigned";
+    // Otherwise enacted with no signature or lapse wording on the page yet: leave kind null (the UI shows "Law").
   } else if (vetoed_date) {
     law_kind = pocket ? "pocket_vetoed" : "vetoed";
   } else if (signed_date) {
@@ -176,6 +167,7 @@ export function parseLifecycleActions(actions: CongressAction[]): ParsedLifecycl
     public_law,
     latest_action_date,
     latest_action_text,
+    unrecognized,
   };
 }
 

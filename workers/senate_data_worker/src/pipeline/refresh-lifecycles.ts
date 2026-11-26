@@ -117,6 +117,16 @@ export async function refreshBillLifecycles(
         number: row.bill_number,
       });
       const m = source.milestones;
+      if (m.unrecognized.length) {
+        console.warn(
+          JSON.stringify({
+            event: "lifecycle_unrecognized_actions",
+            trigger,
+            bill: billLabel(row.bill_type, row.bill_number, row.bill_congress),
+            actions: m.unrecognized,
+          })
+        );
+      }
       await upsertLifecycle(env.DB, {
         congress: row.bill_congress,
         billType: row.bill_type,

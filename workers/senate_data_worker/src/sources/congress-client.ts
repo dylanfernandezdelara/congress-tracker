@@ -5,6 +5,7 @@ import { PUBLIC_LAWS_PAGE_SIZE } from "../constants";
 import {
   parseLifecycleActions,
   type CongressAction,
+  type CongressLaw,
   type ParsedLifecycleMilestones,
 } from "../lifecycle/parse-actions";
 import type { BillRef, BillSponsorRecord } from "../types";
@@ -37,6 +38,7 @@ interface BillDetail {
   policyArea?: { name?: string };
   introducedDate?: string;
   sponsors?: CongressBillSponsor[];
+  laws?: CongressLaw[];
 }
 
 interface BillDetailResponse {
@@ -150,7 +152,7 @@ export async function fetchBillLifecycleSource(
 
   return {
     introducedDate: detailRes.bill?.introducedDate?.slice(0, 10) ?? null,
-    milestones: parseLifecycleActions(actionsRes.actions ?? []),
+    milestones: parseLifecycleActions(actionsRes.actions ?? [], detailRes.bill?.laws),
   };
 }
 

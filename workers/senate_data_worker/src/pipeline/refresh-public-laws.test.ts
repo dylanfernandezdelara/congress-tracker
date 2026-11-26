@@ -44,6 +44,7 @@ function law(partial: Partial<PublicLawRecord> = {}): PublicLawRecord {
       public_law: "119-100",
       latest_action_date: "2026-06-26",
       latest_action_text: "Became Public Law No: 119-100.",
+      unrecognized: [],
     },
     ...partial,
   };
