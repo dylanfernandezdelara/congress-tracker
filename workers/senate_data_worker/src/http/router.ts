@@ -1,3 +1,4 @@
+import { getSummaryQueueHealth } from "../d1/digest-jobs";
 import { type Env } from "../config";
 import { congressNumber, sessionNumber } from "../config";
 import { computeDefectors, computeRollDefectors } from "../analytics/defectors";
@@ -119,6 +120,7 @@ async function loadIngestMonitor(env: Env) {
     executiveLastScheduledSuccess,
     executiveLastFailure,
     senateVoteMenuCache,
+    summaryQueue,
   ] = await Promise.all([
     getLatestPassageVoteDate(env),
     getMissingDigestCount(env),
@@ -130,6 +132,7 @@ async function loadIngestMonitor(env: Env) {
     getExecutivePostsPipelineScheduledSuccess(env.DB),
     getExecutivePostsPipelineFailure(env.DB),
     getSenateVoteMenuCacheMeta(env.DB, congress, session),
+    getSummaryQueueHealth(env.DB).catch(() => undefined),
   ]);
 
   return buildIngestMonitorPayload({
@@ -138,6 +141,7 @@ async function loadIngestMonitor(env: Env) {
     dailyCronUtc: FEED_PIPELINE_CRON_UTC,
     latestPassageVoteDate,
     missingDigestCount,
+    summaryQueue,
     lastSuccess,
     lastScheduledSuccess,
     lastFailure,

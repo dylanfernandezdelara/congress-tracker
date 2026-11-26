@@ -719,3 +719,31 @@ describe("buildIngestMonitorPayload", () => {
     expect(payload.last_success).not.toHaveProperty("intro_warnings");
   });
 });
+
+describe("buildIngestMonitorPayload summary queue", () => {
+  it("degrades an otherwise healthy feed when summaries are stalled", () => {
+    const now = new Date("2026-11-26T21:00:00.000Z");
+    const payload = buildIngestMonitorPayload({
+      now,
+      staleAfterHours: 26,
+      dailyCronUtc: "0 10 * * *",
+      latestPassageVoteDate: "2026-11-19",
+      missingDigestCount: 0,
+      summaryQueue: {
+        queued: 572,
+        oldest_queued_at: "2026-10-23T09:38:54.740Z",
+        last_written_at: "2026-11-10T06:35:52.772Z",
+        blocked_by_config: 0,
+        stalled: true,
+      },
+      lastSuccess: { trigger: "scheduled", completed_at: "2026-11-26T10:03:15.636Z" } as never,
+      lastScheduledSuccess: { trigger: "scheduled", completed_at: "2026-11-26T10:03:15.636Z" } as never,
+      lastFailure: null,
+      lastSkipped: null,
+    });
+    expect(payload.status).not.toBe("ok");
+    expect(payload.message).toContain("Summaries stalled: 572 queued since 2026-10-23, none written since 2026-11-10.");
+    expect(payload.summary_queue?.stalled).toBe(true);
+  });
+});
+

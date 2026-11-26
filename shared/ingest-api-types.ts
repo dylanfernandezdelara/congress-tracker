@@ -61,6 +61,16 @@ export interface SenateVoteMenuCacheMonitor {
   expired: boolean;
 }
 
+export interface SummaryQueueMonitor {
+  queued: number;
+  oldest_queued_at: string | null;
+  /** When the newest stored summary was written. */
+  last_written_at: string | null;
+  /** Jobs whose last failure was the account or configuration, not the bill (spent key, invalid model id). */
+  blocked_by_config: number;
+  stalled: boolean;
+}
+
 export interface IngestMonitorPayload {
   status: IngestMonitorStatus;
   message: string;
@@ -75,6 +85,8 @@ export interface IngestMonitorPayload {
   floor_quiet_days: number | null;
   /** Feed-visible bills (passage ∪ executive ∪ intros) lacking a complete digest. */
   missing_digest_count: number;
+  /** The summary queue: catches a stall (spent key, bad model id) that the feed-only count above cannot. */
+  summary_queue?: SummaryQueueMonitor;
   last_success: FeedPipelineRunRecord | null;
   last_failure: FeedPipelineFailureRecord | null;
   last_scheduled_success: FeedPipelineRunRecord | null;

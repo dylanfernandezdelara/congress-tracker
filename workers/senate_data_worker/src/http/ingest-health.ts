@@ -10,6 +10,7 @@ import type {
   IngestMonitorPayload,
   IngestMonitorStatus,
   SenateVoteMenuCacheMonitor,
+  SummaryQueueMonitor,
 } from "../../../../shared/ingest-api-types";
 import {
   evaluateIngestMonitorStatus as evaluateIngestMonitorStatusShared,
@@ -90,6 +91,7 @@ export function buildIngestMonitorPayload(params: {
   dailyCronUtc: string;
   latestPassageVoteDate: string | null;
   missingDigestCount: number;
+  summaryQueue?: SummaryQueueMonitor;
   lastSuccess: FeedPipelineRunRecord | null;
   lastScheduledSuccess: FeedPipelineRunRecord | null;
   lastFailure: FeedPipelineFailureRecord | null;
@@ -133,6 +135,16 @@ export function buildIngestMonitorPayload(params: {
     );
   }
   const canAnnotate = evaluated.status === "ok" || evaluated.status === "degraded";
+  const queue = params.summaryQueue;
+  let status = evaluated.status;
+  if (queue?.stalled) {
+    if (status === "ok") status = "degraded";
+    annotations.unshift(
+      queue.blocked_by_config > 0
+        ? `Summaries blocked: ${queue.blocked_by_config} job(s) failing on the AI account or model setting.`
+        : `Summaries stalled: ${queue.queued} queued since ${queue.oldest_queued_at?.slice(0, 10)}, none written since ${queue.last_written_at?.slice(0, 10) ?? "ever"}.`
+    );
+  }
   const message =
     canAnnotate && annotations.length > 0
       ? [evaluated.message, ...annotations].join(" ")
@@ -150,13 +162,14 @@ export function buildIngestMonitorPayload(params: {
     : undefined;
 
   return {
-    status: evaluated.status,
+    status,
     message,
     daily_cron_utc: params.dailyCronUtc,
     stale_after_hours: params.staleAfterHours,
     latest_passage_vote_date: params.latestPassageVoteDate,
     floor_quiet_days: quietDays,
     missing_digest_count: params.missingDigestCount,
+    ...(queue ? { summary_queue: queue } : {}),
     last_success: sanitizeRunRecord(params.lastSuccess),
     last_failure: sanitizeFailureRecord(params.lastFailure),
     last_scheduled_success: sanitizeRunRecord(evaluated.last_scheduled_success),
