@@ -7,6 +7,8 @@ export interface CongressAction {
   type?: string | null;
   sourceSystem?: { name?: string | null; code?: number | null } | null;
   committees?: Array<{ name?: string | null; systemCode?: string | null }> | null;
+  /** Roll calls behind this action, linked to the House Clerk or senate.gov record. */
+  recordedVotes?: Array<{ chamber?: string | null; rollNumber?: number | null; sessionNumber?: number | null; url?: string | null }> | null;
 }
 
 /** The bill detail's structured `laws` list: `[{ number: "119-111", type: "Public Law" }]`. */

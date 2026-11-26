@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { billBodyXml, billXmlToText, splitBillParts } from "./bill-text-parse";
 import { checkSummary, citedSections, hasSourceNumber, numbersIn, sectionText, type CheckableSources } from "./checks";
 import { parseSummaryReply } from "./parse";
-import { billStatus, fingerprintOf } from "./prepare";
+import { fingerprintOf } from "./prepare";
+import { billFactsFromActions } from "./bill-facts";
 import { singlePassMessages, statusLabel, type DigestBillInput } from "./prompt";
 
 const section = (n: number, header: string, body: string) =>
@@ -418,20 +419,26 @@ describe("bill status for the prompt", () => {
   });
 
   it("reads enactment, passage and failure from the record", () => {
-    expect(billStatus(ref, [], [], { became_law_date: "2026-07-04", vetoed_date: null, public_law: "119-21" })).toEqual({
-      stage: "law",
-      label: "Became law (Public Law 119-21)",
-    });
-    expect(billStatus(ref, ["Introduced in House", "Engrossed in House"], [], null).stage).toBe("passed_chamber");
-    expect(billStatus(ref, ["Enrolled Bill"], [], null).stage).toBe("passed_both");
-    expect(billStatus(ref, ["Introduced in House"], [], null).stage).toBe("introduced");
+    expect(
+      billFactsFromActions(ref, [{ actionDate: "2026-07-04", text: "Became Public Law No: 119-21." }], [{ number: "119-21", type: "Public Law" }]).status
+    ).toEqual({ stage: "law", label: "Became law (Public Law 119-21)" });
+    expect(
+      billFactsFromActions(ref, [
+        { actionDate: "2026-05-01", text: "Passed/agreed to in House: On passage Passed by the Yeas and Nays: 230 - 190 (Roll no. 150)." },
+      ]).status.stage
+    ).toBe("passed_chamber");
+    expect(billFactsFromActions(ref, [{ actionDate: "2026-01-02", text: "Introduced in House" }]).status.stage).toBe("introduced");
   });
 
   it("never lets the status contradict a failed vote, and marks two-thirds votes", () => {
-    const failed = bill({ stage: "introduced", label: "Introduced" }, [
-      { chamber: "House", vote_date: "2026-09-10", question: "On Passage", result: "Failed", yeas: 212, nays: 206 },
+    const facts = billFactsFromActions({ congress: 119, type: "HJRES", number: 1 }, [
+      {
+        actionDate: "2026-09-10",
+        text: "Failed of passage/not agreed to in House: On passage Failed by the Yeas and Nays: (2/3 required): 212 - 206 (Roll no. 250).",
+      },
     ]);
-    expect(statusLabel(failed)).toBe("Failed a vote in the House (212–206) — not law");
+    const failed = bill(facts.status, facts.votes);
+    expect(statusLabel(failed)).toBe("Failed in the House — not law");
     expect(singlePassMessages(failed).user).toContain("Failed 212–206 (needed two-thirds of those voting)");
   });
 
