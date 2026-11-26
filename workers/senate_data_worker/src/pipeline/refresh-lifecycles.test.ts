@@ -10,6 +10,7 @@ import {
 const mockSelectPresentedPending = vi.fn();
 const mockGetLifecyclesForBills = vi.fn();
 const mockUpsertLifecycle = vi.fn();
+const mockSelectLawsUpdatedBefore = vi.fn();
 const mockFetchBillLifecycleSource = vi.fn();
 
 vi.mock("../d1/lifecycle", async (importOriginal) => {
@@ -18,6 +19,7 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
     ...actual,
     selectPresentedPendingLifecycleBills: (...args: unknown[]) =>
       mockSelectPresentedPending(...args),
+    selectLawsUpdatedBefore: (...args: unknown[]) => mockSelectLawsUpdatedBefore(...args),
     getLifecyclesForBills: (...args: unknown[]) => mockGetLifecyclesForBills(...args),
     upsertLifecycle: (...args: unknown[]) => mockUpsertLifecycle(...args),
   };
@@ -49,7 +51,8 @@ function row(partial: Partial<LifecycleRow>): LifecycleRow {
     public_law: null,
     latest_action_date: null,
     latest_action_text: null,
-    updated_at: "2026-07-01T00:00:00.000Z",
+    // After the one-time law re-check cutoff, so rows are judged on their content alone.
+    updated_at: "2026-12-01T00:00:00.000Z",
     ...partial,
   };
 }
@@ -100,6 +103,8 @@ describe("refreshBillLifecycles", () => {
     mockGetLifecyclesForBills.mockReset();
     mockUpsertLifecycle.mockReset();
     mockFetchBillLifecycleSource.mockReset();
+    mockSelectLawsUpdatedBefore.mockReset();
+    mockSelectLawsUpdatedBefore.mockResolvedValue([]);
   });
 
   it("refreshes a presented-not-terminal bill outside the vote lookback", async () => {
@@ -212,5 +217,48 @@ describe("refreshBillLifecycles", () => {
     expect(mockFetchBillLifecycleSource).toHaveBeenCalledTimes(1);
     expect(result.refreshed).toBe(1);
     expect(result.skipped).toBe(2);
+  });
+
+  it("re-checks a law stored before the parser fix once, even though it is terminal", async () => {
+    mockSelectPresentedPending.mockResolvedValue([]);
+    mockSelectLawsUpdatedBefore.mockResolvedValue([{ bill_congress: 119, bill_type: "HR", bill_number: 5334 }]);
+    mockGetLifecyclesForBills.mockResolvedValue(
+      new Map([
+        [
+          "119:HR:5334",
+          row({
+            bill_number: 5334,
+            became_law_date: "2026-09-18",
+            law_kind: "law_unsigned",
+            public_law: "119-111",
+            updated_at: "2026-10-01T00:00:00.000Z",
+          }),
+        ],
+      ])
+    );
+    mockFetchBillLifecycleSource.mockResolvedValue({
+      introducedDate: null,
+      milestones: {
+        presented_date: "2026-09-17",
+        signed_date: "2026-09-18",
+        vetoed_date: null,
+        became_law_date: "2026-09-18",
+        law_kind: "signed",
+        public_law: "119-111",
+        latest_action_date: "2026-09-18",
+        latest_action_text: "Became Public Law No: 119-111.",
+        unrecognized: [],
+      },
+    });
+    mockUpsertLifecycle.mockResolvedValue(undefined);
+
+    const result = await refreshBillLifecycles(
+      { DB: {} as D1Database, CONGRESS: "119", SESSION: "2" } as never,
+      [],
+      "test"
+    );
+
+    expect(result.refreshed).toBe(1);
+    expect(mockUpsertLifecycle).toHaveBeenCalledWith({}, expect.objectContaining({ billNumber: 5334, lawKind: "signed" }));
   });
 });
