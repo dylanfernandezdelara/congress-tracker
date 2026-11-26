@@ -1,5 +1,5 @@
 import type { Env } from "../config";
-import { upsertDigest, type DigestGenerator, type StoredBillDigest } from "../d1/digests";
+import { upsertDigest, type DigestGenerator, type DigestInputsRecord, type StoredBillDigest } from "../d1/digests";
 import { recordSpend } from "./budget";
 import { BudgetShort, ensureBudget, estimateCost } from "./cost";
 import { checkSummary, STYLE_ONLY_REASONS } from "./checks";
@@ -9,6 +9,22 @@ import { AccountError, chatCompletion, type ChatResult } from "./openrouter-clie
 import { parseJsonObject, parseSummaryReply } from "./parse";
 import type { PreparedBill } from "./prepare";
 import { combineMessages, partMessages, PROMPT_VERSION, singlePassMessages, type DigestMessages } from "./prompt";
+
+/** What the model was given, for tracing and evals (texts left out: re-fetchable by version). */
+export function inputsRecord(prepared: PreparedBill): DigestInputsRecord {
+  const input = prepared.input;
+  return {
+    title: input.title,
+    sponsor: input.sponsorName,
+    status: input.status,
+    votes: input.votes.map((v) => ({ chamber: v.chamber, vote_date: v.vote_date, result: v.result, yeas: v.yeas, nays: v.nays, ...(v.how ? { how: v.how } : {}) })),
+    committees: input.committees,
+    policy_area: input.policyArea,
+    text_version: input.textVersion,
+    crs_version: input.crs?.version ?? null,
+    basis: prepared.basis,
+  };
+}
 
 /**
  * The one place bill summaries are written. Both paths end here: the hourly batch (Luna, collected replies go
@@ -86,6 +102,7 @@ export async function storeReply(
     long,
     ...(params.gatewayLogId ? { gateway_log_id: params.gatewayLogId } : {}),
     ...(check.warnings.length ? { warnings: check.warnings } : {}),
+    inputs: inputsRecord(prepared),
     generated_at: new Date().toISOString(),
   };
   const digest: StoredBillDigest = { ...parsed.content, generator };

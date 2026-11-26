@@ -99,6 +99,9 @@ describe("writeSummary", () => {
       long: false,
       gateway_log_id: "01LOG",
     });
+    // The facts the model was given are kept with the summary, without the bill text.
+    expect(stored.generator.inputs).toMatchObject({ title: "Airline Fee Fairness Act", basis: "text" });
+    expect(JSON.stringify(stored.generator.inputs)).not.toContain("Caps fees");
     expect(mockRecordSpend).toHaveBeenCalledWith(env, 0.01, expect.any(Date));
     // Every paid call carries its estimate, recorded before the request goes out.
     expect(mockChat.mock.calls[0]![3]).toMatchObject({ estimate: expect.any(Number) });
