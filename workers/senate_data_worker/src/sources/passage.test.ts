@@ -6,6 +6,8 @@ describe("isPassageVote", () => {
     expect(isPassageVote("On Passage of the Bill")).toBe(true);
     expect(isPassageVote("On Passage")).toBe(true);
     expect(isPassageVote("On Motion to Suspend the Rules and Pass")).toBe(true);
+    expect(isPassageVote("On Motion to Suspend the Rules and Agree")).toBe(true);
+    expect(isPassageVote("On Motion to Suspend the Rules and Concur in the Senate Amendment")).toBe(true);
     expect(isPassageVote("On Agreeing to the Resolution")).toBe(true);
     expect(isPassageVote("On the Resolution")).toBe(true);
     expect(isPassageVote("On the Concurrent Resolution")).toBe(true);
