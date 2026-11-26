@@ -113,6 +113,25 @@ export async function upsertLifecycle(
     .run();
 }
 
+/**
+ * Clear a stored enactment that Congress.gov no longer shows. The upsert keeps old values when a refresh has none
+ * (COALESCE), so a law stored from bad source data can only be removed explicitly.
+ */
+export async function clearLifecycleEnactment(
+  db: D1Database,
+  key: { congress: number; billType: string; billNumber: number }
+): Promise<void> {
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `UPDATE bill_lifecycle
+       SET became_law_date = NULL, public_law = NULL, law_kind = NULL, signed_date = NULL, updated_at = ?
+       WHERE congress = ? AND bill_type = ? AND bill_number = ?`
+    )
+    .bind(new Date().toISOString(), key.congress, normalizeBillType(key.billType), key.billNumber)
+    .run();
+}
+
 export async function getLifecycle(
   db: D1Database,
   congress: number,
