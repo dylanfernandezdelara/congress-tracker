@@ -25,8 +25,11 @@ export interface DigestVote {
   vote_date: string | null;
   question: string | null;
   result: string;
-  yeas: number;
-  nays: number;
+  /** Null when the chamber decided without a roll call (voice vote, unanimous consent). */
+  yeas: number | null;
+  nays: number | null;
+  /** How the chamber decided. Absent on older saved inputs, which were roll calls. */
+  how?: "roll_call" | "voice" | "unanimous_consent" | "other";
 }
 
 export interface DigestBillInput {
@@ -35,7 +38,7 @@ export interface DigestBillInput {
   number: number;
   title: string | null;
   sponsorName: string | null;
-  status: { stage: "introduced" | "passed_chamber" | "passed_both" | "law" | "vetoed"; label: string };
+  status: { stage: "introduced" | "passed_chamber" | "passed_both" | "failed" | "law" | "vetoed"; label: string };
   committees: string[];
   policyArea: string | null;
   votes: DigestVote[];
@@ -128,29 +131,33 @@ const PART_OUTPUT = `Return ONLY this JSON:
 - List the 3–6 changes that matter most to ordinary people, biggest first. Skip technical and conforming amendments.`;
 
 const TWO_THIRDS = (question: string | null, bill: DigestBillInput): boolean =>
-  /suspend the rules|overrid/i.test(question ?? "") ||
+  /suspend the rules|overrid|2\/3 required/i.test(question ?? "") ||
   (/^(HJRES|SJRES)$/.test(bill.type.toUpperCase()) && /^\s*proposing an amendment to the constitution/i.test(bill.title ?? ""));
 
 export function needsTwoThirds(question: string | null, bill: DigestBillInput): boolean {
   return TWO_THIRDS(question, bill);
 }
 
+function outcome(v: DigestVote): string {
+  const verb = v.result === "Passed" ? "Passed" : v.result === "Failed" ? "Failed" : v.result;
+  if (v.yeas != null && v.nays != null) return `${verb} ${v.yeas}–${v.nays}`;
+  if (v.how === "unanimous_consent") return `${verb} by unanimous consent (no recorded vote)`;
+  if (v.how === "voice") return `${verb} by voice vote (no recorded vote)`;
+  return `${verb} (no recorded vote)`;
+}
+
 export function votesLine(bill: DigestBillInput): string {
-  if (!bill.votes.length) return "VOTES: none recorded";
+  if (!bill.votes.length) return "VOTES: none (no floor action)";
   return `VOTES:\n${bill.votes
     .map(
       (v) =>
-        `- ${v.chamber}, ${v.vote_date ?? "date unknown"}: ${v.question ?? "vote"} — ${v.result} ${v.yeas}–${v.nays}${TWO_THIRDS(v.question, bill) ? " (needed two-thirds of those voting)" : ""}`
+        `- ${v.chamber}, ${v.vote_date ?? "date unknown"}: ${v.question ?? "vote"} — ${outcome(v)}${TWO_THIRDS(v.question, bill) ? " (needed two-thirds of those voting)" : ""}`
     )
     .join("\n")}`;
 }
 
-/** Status for the prompt: text versions say what passed; a recorded vote also says what failed. */
+/** Status for the prompt, from the bill's own Congress.gov actions. */
 export function statusLabel(bill: DigestBillInput): string {
-  const last = bill.votes.at(-1);
-  if (bill.status.stage === "introduced" && last) {
-    return `${last.result === "Passed" ? "Passed" : "Failed a vote in"} the ${last.chamber} (${last.yeas}–${last.nays}) — not law`;
-  }
   return `${bill.status.label}${bill.status.stage === "law" ? " — this is law" : " — not law"}`;
 }
 

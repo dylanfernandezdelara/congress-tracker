@@ -58,6 +58,8 @@ export interface BillSummaryBundle {
   introducedDate: string | null;
   /** Primary sponsors from the bill detail payload (state denormalized). */
   sponsors: BillSponsorRecord[];
+  /** The bill detail's structured law list (empty until it becomes law). */
+  laws?: CongressLaw[];
 }
 
 export function parseBillSponsors(
@@ -129,7 +131,21 @@ export async function fetchBillSummaryBundle(
     rawSummaryVersion: latest?.actionDesc ?? null,
     introducedDate: detailRes.bill?.introducedDate?.slice(0, 10) ?? null,
     sponsors: parseBillSponsors(detailRes.bill?.sponsors),
+    laws: detailRes.bill?.laws ?? [],
   };
+}
+
+/** Every action on a bill, newest first, following pagination (large bills can have well over 250). */
+export async function fetchAllBillActions(env: Env, bill: BillRef, maxPages = 8): Promise<CongressAction[]> {
+  const apiKey = env.CONGRESS_API_KEY;
+  const out: CongressAction[] = [];
+  let url: string | null = `${billApiBase(bill)}/actions?format=json&limit=250&api_key=${apiKey}`;
+  for (let page = 0; url && page < maxPages; page += 1) {
+    const res: BillActionsResponse & { pagination?: { next?: string } } = await fetchJson(url);
+    out.push(...(res.actions ?? []));
+    url = nextPageUrl(res.pagination?.next, apiKey);
+  }
+  return out;
 }
 
 /**
