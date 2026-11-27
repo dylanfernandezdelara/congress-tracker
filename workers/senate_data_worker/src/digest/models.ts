@@ -35,6 +35,13 @@ const ANTHROPIC_PRICES: Record<string, { input: number; output: number }> = {
   "claude-haiku-5-5": { input: 0.1, output: 0.5 },
 };
 
+/** The same models' OpenRouter ids, used when ANTHROPIC_API_KEY is not set. */
+const OPENROUTER_IDS: Record<string, string> = {
+  "claude-sonnet-5-5": "anthropic/claude-sonnet-5.5",
+  "claude-opus-5-5": "anthropic/claude-opus-5.5",
+  "claude-haiku-5-5": "anthropic/claude-haiku-5.5",
+};
+
 /**
  * Rewrites of bills that matter (floor vote, reported by committee, law, in the feed): the writing readers
  * preferred in the round-2 blind review. Normal API: OpenRouter refuses Sonnet 5 batches (tested 2026-09-26).
@@ -47,9 +54,14 @@ export function rewriteModel(env: Env): DigestModel {
   if (anthropicPrice && env.ANTHROPIC_API_KEY?.trim()) {
     return { id: configured, provider: "anthropic", effort: "medium", maxTokens: 8_000, price: anthropicPrice };
   }
-  // Without the key, rewrites stay on OpenRouter rather than failing every hour as an account error. An Anthropic API
-  // id ("claude-sonnet-5-5") is not an OpenRouter model id: sending it failed every rewrite from 2026-10-17 on.
-  const id = anthropicPrice ? OPENROUTER_REWRITE_DEFAULT : configured;
+  // Without the key, the same model runs on OpenRouter under its OpenRouter id, with the same thinking depth and output
+  // cap, at the same price. (An Anthropic API id is not an OpenRouter id: sending it failed every rewrite from
+  // 2026-10-17; until 2026-11-27 the fallback then used Sonnet 5, not the Sonnet 5.5 Dylan picked after round 7.)
+  const onOpenRouter = OPENROUTER_IDS[configured];
+  if (onOpenRouter) {
+    return { id: onOpenRouter, reasoning: { effort: "medium" }, maxTokens: 8_000, price: anthropicPrice! };
+  }
+  const id = configured;
   return {
     id,
     temperature: 0.2,
