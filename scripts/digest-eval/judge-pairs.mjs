@@ -185,6 +185,25 @@ if (cmd === 'calibrate') {
   console.log(`position flips (the two orders disagreed): ${flips} of ${both}; calls without a verdict: ${failed}`)
   console.log(`Dylan's favorite has the judge's most wins (ties count) on ${topMatch} of ${Object.keys(ratings).length} bills`)
   console.log(JSON.stringify(perBill, null, 1))
+} else if (cmd === 'score-rankings') {
+  // Rating-page rankings → pairwise results (each ranking of n gives n(n-1)/2), ranked overall, by model and by prompt.
+  const results = []
+  for (const f of args) {
+    for (const [bill, a] of Object.entries(read(f).answers)) {
+      const r = a.ranking ?? []
+      for (let i = 0; i < r.length; i += 1) for (let j = i + 1; j < r.length; j += 1) {
+        const [x, y] = [r[i], r[j]].sort()
+        results.push({ bill: `${f}|${bill}`, x, y, winner: r[i] })
+      }
+    }
+  }
+  const group = (fn) => results.map((r) => ({ ...r, x: fn(r.x), y: fn(r.y), winner: fn(r.winner) })).filter((r) => r.x !== r.y)
+  const model = (k) => k.replace(/-(v34|v4|v4-plan|v4-facts)$/, '')
+  const prompt = (k) => (/-(v34|v4|v4-plan|v4-facts)$/.exec(k) ?? [, k])[1]
+  console.log(`${results.length} pairwise results from ${args.length} rater file(s)`)
+  console.log('by contender:'); console.table(rankTable(results))
+  console.log('by model (prompts pooled):'); console.table(rankTable(group(model)))
+  console.log('by prompt (models pooled):'); console.table(rankTable(group(prompt)))
 } else if (cmd === 'score') {
   const { verdicts } = read(args[0])
   const { results, flips, both } = settle(verdicts)

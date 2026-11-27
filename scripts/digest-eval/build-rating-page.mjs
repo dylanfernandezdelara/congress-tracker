@@ -13,8 +13,8 @@
  *
  * Reads artifacts/digest-eval/out/<round>/<candidate>/<bill>-r1.json (remote.mjs fetch) and the bill files.
  * Only summaries that passed the checks are shown: a blocked one would never reach the site.
- * Each bill's comparison is the CRS summary plus `--compare` models, rotated so every model is compared about
- * equally often; the summary read first rotates over every contestant, CRS included.
+ * Each bill's comparison is the CRS summary plus `--compare` models, chosen so every model is compared about equally
+ * often against varied partners; the summary read first rotates over every contestant, CRS included.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -54,8 +54,9 @@ const NAMES = {
 const PROMPTS = { v34: 'current prompt', v4: 'v4: reader focus', 'v4-plan': 'v4 + answer reader questions first', 'v4-facts': 'v4 + list facts first' }
 for (const c of spec.candidates) {
   if (NAMES[c.key]) continue
-  const m = /^(luna|muse-ember)-(v34|v4|v4-plan|v4-facts)$/.exec(c.key)
-  if (m) NAMES[c.key] = `${m[1] === 'luna' ? 'GPT-6 Luna' : 'Meta Muse Ember'}, ${PROMPTS[m[2]]}`
+  const m = /^(luna|muse-ember|sonnet-5-5|haiku-5-5)-(v34|v4|v4-plan|v4-facts)$/.exec(c.key)
+  const MODELS = { luna: 'GPT-6 Luna', 'muse-ember': 'Meta Muse Ember', 'sonnet-5-5': 'Claude Sonnet 5.5', 'haiku-5-5': 'Claude Haiku 5.5' }
+  if (m) NAMES[c.key] = `${MODELS[m[1]]}, ${PROMPTS[m[2]]}`
 }
 
 const label = (b) =>
@@ -63,6 +64,8 @@ const label = (b) =>
 
 const models = spec.candidates.map((c) => c.key)
 const skipped = []
+const shown = {}
+const met = {}
 const bills = spec.bills.map((id, i) => {
   if (!rank && !questions[id]) throw new Error(`no question for ${id}`)
   const run = (i % runs) + 1
@@ -87,14 +90,22 @@ const bills = spec.bills.map((id, i) => {
   }
   // Models for this bill's comparison: a window that slides one model per bill, skipping ones without a summary.
   const has = (m) => entries.some((e) => e.src === m)
-  // Windows over every model step by `perBill` (each model equally often) and shift one place every second bill
-  // (varied partners). A model with no usable summary here gives its place to the next model after the window.
-  const start = (i * perBill + Math.floor(i / 2)) % models.length
+  // Balanced design: each bill shows the models shown least so far, preferring pairs that have met least, so every
+  // model is compared about equally often against varied partners. A model with no usable summary here is skipped.
   const picked = []
-  for (let k = 0; k < models.length && picked.length < perBill; k += 1) {
-    const m = models[(start + k) % models.length]
-    if (has(m)) picked.push(m)
+  while (picked.length < perBill) {
+    const options = models.filter((m) => has(m) && !picked.includes(m))
+    if (!options.length) break
+    const score = (m) => [shown[m] ?? 0, picked.reduce((n, p) => n + (met[[m, p].sort().join('|')] ?? 0), 0), models.indexOf(m)]
+    options.sort((x, y) => {
+      const a = score(x)
+      const b = score(y)
+      return a[0] - b[0] || a[1] - b[1] || ((a[2] + i * 5) % models.length) - ((b[2] + i * 5) % models.length)
+    })
+    picked.push(options[0])
   }
+  for (const m of picked) shown[m] = (shown[m] ?? 0) + 1
+  for (const x of picked) for (const y of picked) if (x < y) met[`${x}|${y}`] = (met[`${x}|${y}`] ?? 0) + 1
   const compare = [...picked, ...(withCrs ? ['crs'] : [])].map((src) => entries.findIndex((e) => e.src === src))
   return { id, label: label(bill), title: bill.title, run, entries, compare }
 })

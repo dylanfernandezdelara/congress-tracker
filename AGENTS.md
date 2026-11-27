@@ -273,6 +273,11 @@ way they would, so summaries lead with concrete effects on people and stay stric
   blind page (read one summary and answer the bill's question, then pick a favorite among CRS plus 3 rotated models;
   only summaries that passed the checks) to publish as an Artifact with the `db` capability; answers land in its
   `ratings` collection. Round 8 (6-model screen, $0.48): https://claude.ai/artifact/PmLURJ2y3SjUXu6FvRA3hB
+  Round 9 (2026-11-27; 4 models × prompt versions, ranked by Dylan, `judge-pairs.mjs score-rankings`):
+  https://claude.ai/artifact/PqSzMSmwwPguRKjE2Sugzz. Haiku 5.5 on v3.4 19–3 by model (12–0 on v3.4), Sonnet 5.5
+  12–8, Muse 21–21, Luna 10–30; v3.4 beat every v4 version. Judges (v1 on round 8, v2 on round 9) agreed with his
+  picks no better than chance (26–47% of decided pairs), so taste is decided by human rankings; judges only check
+  facts. Reasoning models need room: Muse (8k cap) and Luna on v4 (12k) returned empty replies, so eval caps are 32k.
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.
