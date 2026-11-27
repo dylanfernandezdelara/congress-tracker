@@ -19,6 +19,10 @@ function fakeDb(requests: Array<Record<string, unknown>>) {
       const stmt = {
         bind: (...a: unknown[]) => ((args = a), stmt),
         async first() {
+          if (/FROM eval_outputs/.test(sql)) {
+            const o = outputs.get(`${args[0]}|${args[1]}`);
+            return o ? { summary_json: o.summary_json ?? null } : null;
+          }
           if (/FROM eval_requests/.test(sql)) {
             const [now] = args as [string];
             return requests.find((r) => ["queued", "running"].includes(r.state as string) && (!r.lease_until || (r.lease_until as string) < now)) ?? null;
@@ -45,7 +49,7 @@ function fakeDb(requests: Array<Record<string, unknown>>) {
             requests.find((x) => x.id === args[0])!.lease_until = null;
           } else if (/INSERT OR REPLACE INTO eval_outputs/.test(sql)) {
             const [request_id, item_key, bill_id, candidate, run, model, state] = args;
-            outputs.set(`${request_id}|${item_key}`, { request_id, item_key, bill_id, candidate, run, model, state, blocking_json: args[9], cost: args[11], error: args[15] });
+            outputs.set(`${request_id}|${item_key}`, { request_id, item_key, bill_id, candidate, run, model, state, summary_json: args[8], blocking_json: args[9], cost: args[11], error: args[15] });
           }
           return { meta: { changes: 1 } };
         },
@@ -161,5 +165,61 @@ describe("runEvalTick", () => {
     expect(result.state).toBe("done");
     const states = [...db.outputs.values()].map((o) => `${o.candidate}:${o.state}`).sort();
     expect(states).toEqual(["haiku:rejected", "luna:failed"]);
+  });
+
+  it("writes with the candidate's prompt version, which keeps the same reply format", async () => {
+    mockChat.mockImplementationOnce(async () => ({
+      content: JSON.stringify({ reader_questions: { main_subject: "diesel grants" }, ...JSON.parse(reply) }),
+      usage: { cost: 0.0004, promptTokens: 900, completionTokens: 300 }, generationId: null, gatewayLogId: null,
+    }));
+    const v = { ...spec, candidates: [{ ...spec.candidates[0]!, key: "luna-plan", prompt: "v4-plan" }, spec.candidates[0]!] };
+    const db = fakeDb([{ id: "r1", spec_json: JSON.stringify(v), cap_usd: 1, state: "queued", spent_usd: 0, lease_until: null }]);
+    await runEvalTick({ DB: db } as never);
+    const prompts = mockChat.mock.calls.map((c) => c[2].user as string);
+    expect(prompts[0]).toContain("READER FOCUS");
+    expect(prompts[0]).toContain('"reader_questions"');
+    expect(prompts[1]).not.toContain("READER FOCUS");
+    expect([...db.outputs.values()].map((o) => `${o.candidate}:${o.state}`)).toEqual(["luna-plan:ok", "luna:ok"]);
+  });
+
+  it("fails a request that names an unknown prompt version", async () => {
+    const v = { ...spec, candidates: [{ ...spec.candidates[0]!, prompt: "v9" }] };
+    const db = fakeDb([{ id: "r1", spec_json: JSON.stringify(v), cap_usd: 1, state: "queued", spent_usd: 0, lease_until: null }]);
+    expect((await runEvalTick({ DB: db } as never)).state).toBe("failed");
+    expect(db.requests[0]!.error).toMatch(/unknown prompt version/);
+  });
+
+  it("judges a pair: a stored summary against CRS, with CRS kept out of the judge's sources", async () => {
+    mockChat.mockImplementation(async () => ({
+      content: JSON.stringify({ errors_a: [], errors_b: ["none"], comparison: "A names the change.", winner: "a", margin: "clear" }),
+      usage: { cost: 0.002, promptTokens: 2000, completionTokens: 200 }, generationId: null, gatewayLogId: null,
+    }));
+    const judge = {
+      kind: "judge", round: "j",
+      judge: { key: "sonnet", model: "anthropic/claude-sonnet-5.5", price: { input: 2, output: 10 } },
+      pairs: [{ key: "p1", bill: "119-hr-2140", a: { request: "w1", item: "119-hr-2140|luna|1" }, b: { crs: true } }],
+    };
+    const db = fakeDb([{ id: "j1", spec_json: JSON.stringify(judge), cap_usd: 1, state: "queued", spent_usd: 0, lease_until: null }]);
+    db.outputs.set("w1|119-hr-2140|luna|1", { request_id: "w1", item_key: "119-hr-2140|luna|1", summary_json: JSON.stringify({ headline: "Bill would extend diesel grants", what_it_does: "Extends it.", key_points: [] }) });
+    expect(await runEvalTick({ DB: db } as never)).toMatchObject({ written: 1, state: "done" });
+    const user = mockChat.mock.calls[0]![2].user as string;
+    expect(user).toContain("Title: Bill would extend diesel grants");
+    expect(user.split("reauthorizes through FY2029").length - 1).toBe(1); // as summary B only
+    expect(user.indexOf("reauthorizes through FY2029")).toBeGreaterThan(user.indexOf("SUMMARY B:"));
+    const out = db.outputs.get("j1|p1")!;
+    expect(out.state).toBe("ok");
+    expect(JSON.parse(out.summary_json as string)).toMatchObject({ winner: "A", margin: "clear", errors_b: [] });
+  });
+
+  it("records a judge pair whose summary is missing as failed", async () => {
+    const judge = {
+      kind: "judge", round: "j",
+      judge: { key: "sonnet", model: "anthropic/claude-sonnet-5.5", price: { input: 2, output: 10 } },
+      pairs: [{ key: "p1", bill: "119-hr-2140", a: { request: "w1", item: "nope" }, b: { crs: true } }],
+    };
+    const db = fakeDb([{ id: "j1", spec_json: JSON.stringify(judge), cap_usd: 1, state: "queued", spent_usd: 0, lease_until: null }]);
+    await runEvalTick({ DB: db } as never);
+    expect(db.outputs.get("j1|p1")).toMatchObject({ state: "failed" });
+    expect(mockChat).not.toHaveBeenCalled();
   });
 });

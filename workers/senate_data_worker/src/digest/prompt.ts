@@ -53,7 +53,7 @@ export interface DigestMessages {
   user: string;
 }
 
-const ROLE = `You explain U.S. legislation to everyday readers (grade 7–8 reading level) so they can decide whether they would support it. You are accurate, concrete, and strictly neutral. You return only JSON.`;
+export const ROLE = `You explain U.S. legislation to everyday readers (grade 7–8 reading level) so they can decide whether they would support it. You are accurate, concrete, and strictly neutral. You return only JSON.`;
 
 /** Shared rules; the same wording in every pass so single-pass and combined summaries read alike. */
 export const RULES = `WHAT TO SAY
@@ -97,7 +97,7 @@ STYLE
   For a bill that changes many things, name the two or three biggest changes for people: "Law extends tax cuts, adds Medicaid work rules, funds border detention", not "Taxes and benefit rules change for families".
 - Aim for grade 7–8: short sentences, common words, one idea per sentence. Explain any necessary term in the same sentence. No acronyms unless explained.`;
 
-const OUTPUT = `Return ONLY this JSON:
+export const OUTPUT = `Return ONLY this JSON:
 {
   "headline": "6–12 words",
   "what_it_does": "one sentence, at most 25 words",
@@ -177,14 +177,21 @@ function crsBlock(bill: DigestBillInput): string {
     : "CRS SUMMARY: not yet published";
 }
 
+/** Prompt parts an eval round may swap (src/eval/variants.ts); production always uses the defaults. */
+export interface PromptParts {
+  task?: string;
+  rules?: string;
+  output?: string;
+}
+
 /** A bill that fits in one pass (or has no text yet). */
-export function singlePassMessages(bill: DigestBillInput): DigestMessages {
+export function singlePassMessages(bill: DigestBillInput, parts: PromptParts = {}): DigestMessages {
   const body = bill.text && bill.textVersion
     ? `BILL TEXT (${bill.textVersion.type}):\n${bill.text}`
     : "BILL TEXT: not yet published — only the title is available";
   return {
     system: ROLE,
-    user: `Summarize this bill for everyday readers.\n\n${metadata(bill)}\n\nSOURCES\n${crsBlock(bill)}\n\n${body}\n\n${RULES}\n\n${OUTPUT}`,
+    user: `${parts.task ?? "Summarize this bill for everyday readers."}\n\n${metadata(bill)}\n\nSOURCES\n${crsBlock(bill)}\n\n${body}\n\n${parts.rules ?? RULES}\n\n${parts.output ?? OUTPUT}`,
   };
 }
 

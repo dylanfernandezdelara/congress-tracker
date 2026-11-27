@@ -260,6 +260,12 @@ way they would, so summaries lead with concrete effects on people and stay stric
   `eval_outputs`; `status` and `fetch <id>` bring them back to `artifacts/digest-eval/out/<round>/`. Single-pass bills
   only. It writes no digest and does not count against `DIGEST_DAILY_BUDGET_USD`. Bill sets: `bills-2026-11.json`
   (`tuning` for rounds, `heldout` only for the final pick).
+  A candidate's `prompt` picks a prompt version from `eval/variants.ts` (`v3.4` production; `v4` adds a reader-focus
+  block from Dylan's round-8 notes: outcome-first titles, the how and the when, fewer points; `v4-plan` and `v4-facts`
+  add a thinking field the parser ignores). Judge rounds (`kind: "judge"`) compare two stored summaries, or one and the
+  CRS summary, with the pairwise judge in `eval/judge.ts` (bill text only, never CRS, as its source).
+  `scripts/digest-eval/judge-pairs.mjs` builds them (`calibrate` from a rating page's answers, `tournament` over a
+  round) and scores them: both orders of every pair, a win only when both agree, Bradley–Terry with bootstrap intervals.
   Rating pages: `node scripts/digest-eval/build-rating-page.mjs <round.json> questions-2026-11.json <out.html>` builds a
   blind page (read one summary and answer the bill's question, then pick a favorite among CRS plus 3 rotated models;
   only summaries that passed the checks) to publish as an Artifact with the `db` capability; answers land in its

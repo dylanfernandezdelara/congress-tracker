@@ -43,12 +43,32 @@ function d1(sql) {
 
 function loadSpec(file) {
   const spec = JSON.parse(readFileSync(file, 'utf8'))
+  if (spec.kind === 'judge') {
+    if (!spec.round || !spec.judge?.model || !spec.judge?.price || !Array.isArray(spec.pairs)) throw new Error('judge file needs round, judge, pairs')
+    return spec
+  }
   if (!spec.round || !Array.isArray(spec.bills) || !Array.isArray(spec.candidates)) throw new Error('round file needs round, bills, candidates')
   for (const c of spec.candidates) if (!c.key || !c.model || !c.price) throw new Error(`candidate needs key, model, price: ${JSON.stringify(c)}`)
   return spec
 }
 
+/** Judge calls: the bill text plus two summaries and the rubric (~1.5k tokens), and a short verdict. */
+function estimateJudge(spec) {
+  const c = spec.judge
+  let w = 0
+  let l = 0
+  for (const pair of spec.pairs) {
+    const bill = JSON.parse(readFileSync(join(billsDir, `${pair.bill}.json`), 'utf8'))
+    const input = 1_500 + (bill.tokens ?? 0)
+    w += (input * c.price.input + (c.maxTokens ?? 12_000) * c.price.output) / 1e6
+    l += (input * c.price.input + 700 * c.price.output) / 1e6
+  }
+  const rows = [{ candidate: c.key, model: c.model, calls: spec.pairs.length, likely_usd: +l.toFixed(4), worst_usd: +w.toFixed(4) }]
+  return { rows, likely: +l.toFixed(4), worst: +w.toFixed(4), calls: spec.pairs.length }
+}
+
 function estimate(spec) {
+  if (spec.kind === 'judge') return estimateJudge(spec)
   const missing = spec.bills.filter((b) => !existsSync(join(billsDir, `${b}.json`)))
   if (missing.length) {
     execFileSync(process.execPath, [join(here, 'fetch-bills.mjs'), ...missing], { stdio: 'inherit' })
@@ -75,7 +95,8 @@ function estimate(spec) {
 }
 
 function printEstimate(spec, e) {
-  console.log(`round ${spec.round}: ${spec.bills.length} bills × ${spec.candidates.length} candidates × ${spec.runs ?? 1} run(s) = ${e.calls} calls, CRS ${spec.crs ?? 'hidden'}`)
+  if (spec.kind === 'judge') console.log(`judge round ${spec.round}: ${e.calls} pairs judged by ${spec.judge.model}`)
+  else console.log(`round ${spec.round}: ${spec.bills.length} bills × ${spec.candidates.length} candidates × ${spec.runs ?? 1} run(s) = ${e.calls} calls, CRS ${spec.crs ?? 'hidden'}`)
   console.table(e.rows)
   console.log(`likely ~$${e.likely}, at most ~$${e.worst} (each call's full output allowance, which the worker's cap check also assumes)`)
 }
@@ -117,6 +138,23 @@ if (cmd === 'estimate') {
   if (!req) throw new Error(`no request ${arg}`)
   const spec = JSON.parse(req.spec_json)
   const rows = d1(`SELECT * FROM eval_outputs WHERE request_id = ${sqlString(arg)} ORDER BY bill_id, candidate, run`)
+  if (spec.kind === 'judge') {
+    const dir = join(root, 'artifacts', 'digest-eval', 'judge', spec.round)
+    mkdirSync(dir, { recursive: true })
+    const pairs = new Map(spec.pairs.map((p) => [p.key, p]))
+    const verdicts = rows.map((r) => ({
+      ...pairs.get(r.item_key),
+      judge: r.candidate,
+      model: r.model,
+      state: r.state,
+      verdict: r.summary_json ? JSON.parse(r.summary_json) : null,
+      error: r.error,
+      cost: r.cost,
+    }))
+    writeFileSync(join(dir, `${spec.judge.key}.json`), JSON.stringify({ round: spec.round, request: arg, verdicts }, null, 2))
+    console.log(`saved ${rows.length} verdicts to artifacts/digest-eval/judge/${spec.round}/${spec.judge.key}.json`)
+    process.exit(0)
+  }
   for (const r of rows) {
     const dir = join(root, 'artifacts', 'digest-eval', 'out', spec.round, r.candidate)
     mkdirSync(dir, { recursive: true })
