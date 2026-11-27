@@ -1,5 +1,5 @@
 /** Bump when adding DDL or one-shot migrations. */
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 const SCHEMA_VERSION_KEY = "schema_version";
 
@@ -326,6 +326,40 @@ export const SCHEMA_DDL = [
   collected_at TEXT,
   cost REAL
 )`,
+  // Eval rounds run by the worker on demand (eval/run-eval.ts): a request names bills and candidate models; each
+  // finished generation is one output row. Never read by the site.
+  `CREATE TABLE IF NOT EXISTS eval_requests (
+  id TEXT PRIMARY KEY,
+  spec_json TEXT NOT NULL,
+  cap_usd REAL NOT NULL,
+  state TEXT NOT NULL,
+  spent_usd REAL NOT NULL DEFAULT 0,
+  lease_until TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT
+)`,
+  `CREATE TABLE IF NOT EXISTS eval_outputs (
+  request_id TEXT NOT NULL,
+  item_key TEXT NOT NULL,
+  bill_id TEXT NOT NULL,
+  candidate TEXT NOT NULL,
+  run INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  state TEXT NOT NULL,
+  content TEXT,
+  summary_json TEXT,
+  blocking_json TEXT,
+  warnings_json TEXT,
+  cost REAL NOT NULL DEFAULT 0,
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  inputs_json TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (request_id, item_key)
+)`,
 ];
 
 /**
@@ -391,6 +425,11 @@ export const SCHEMA_MIGRATIONS: ReadonlyArray<{ toVersion: number; statements: s
     // The committees leaderboard (#223) was its only query; the remaining readers filter by bill.
     toVersion: 16,
     statements: [`DROP INDEX IF EXISTS idx_bill_committee_events_committee`],
+  },
+  {
+    // eval_requests / eval_outputs (SCHEMA_DDL): on-demand eval rounds.
+    toVersion: 17,
+    statements: [],
   },
 ];
 

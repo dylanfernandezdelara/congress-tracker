@@ -10,9 +10,11 @@ import { handleFetch } from "./http/router";
 import { runExecutivePostsPipeline } from "./pipeline/run-executive-posts";
 import { runFeedWithMemberVotes } from "./pipeline/run-feed-with-member-votes";
 import { runSummarySweep } from "./pipeline/run-summary-sweep";
+import { runEvalTick } from "./eval/run-eval";
 import {
   EXECUTIVE_POSTS_CRON_UTC,
   FEED_PIPELINE_CRON_UTC,
+  EVAL_CRON_UTC,
   SUMMARY_SWEEP_CRON_UTC,
   SUMMARY_SWEEP_LEASE_TTL_MS,
 } from "./constants";
@@ -79,6 +81,20 @@ export default {
             console[busy ? "log" : "error"](
               JSON.stringify({ event: busy ? "summary_sweep_skipped_busy" : "summary_sweep_failed", scheduledTime: controller.scheduledTime, error: message }),
             );
+          }),
+      );
+      return;
+    }
+
+    if (cron === EVAL_CRON_UTC) {
+      // Writes only eval tables, so it skips the write lease the site's jobs share.
+      ctx.waitUntil(
+        runEvalTick(env)
+          .then((result) => {
+            if (result.request) console.log(JSON.stringify({ event: "eval_tick", ...result }));
+          })
+          .catch((err: unknown) => {
+            console.error(JSON.stringify({ event: "eval_tick_failed", error: err instanceof Error ? err.message : String(err) }));
           }),
       );
       return;

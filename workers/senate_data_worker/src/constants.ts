@@ -204,6 +204,8 @@ export const EXECUTIVE_POSTS_CRON_UTC = "20 * * * *";
  * frees the write lease before the 10:00 feed.
  */
 export const SUMMARY_SWEEP_CRON_UTC = "35 * * * *";
+/** Eval rounds (eval/run-eval.ts): checks for a queued request every minute; idle ticks are one D1 read. */
+export const EVAL_CRON_UTC = "* * * * *";
 
 /** Alert if no successful scheduled ingest within this many hours after cron. */
 export { FEED_PIPELINE_STALE_HOURS } from "../../../shared/ingest-monitor-status";
