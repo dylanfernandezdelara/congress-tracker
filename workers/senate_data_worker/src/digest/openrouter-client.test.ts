@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../config";
-import { chatCompletion, getBatch, submitBatch } from "./openrouter-client";
+import { chatCompletion, getBatch, requestBody, submitBatch } from "./openrouter-client";
 
 const env = { OPENROUTER_API_KEY: "k" } as Env;
 const model = { id: "openai/gpt-6-luna", maxTokens: 100 };
@@ -138,5 +138,13 @@ describe("openrouter client", () => {
       await expect(chatCompletion(env, model, messages, spend)).rejects.toThrow("D1 down");
       expect(fetch).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("requestBody", () => {
+  it("asks for a JSON object only when the model says so", () => {
+    const m = { system: "s", user: "u" };
+    expect(requestBody({ id: "x", maxTokens: 10, json: true }, m).response_format).toEqual({ type: "json_object" });
+    expect(requestBody({ id: "x", maxTokens: 10 }, m)).not.toHaveProperty("response_format");
   });
 });

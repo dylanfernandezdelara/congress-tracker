@@ -10,7 +10,7 @@ import { prepareBill, type PreparedBill } from "../digest/prepare";
 import { PROMPT_VERSION, singlePassMessages, type DigestMessages } from "../digest/prompt";
 import { inputsRecord } from "../digest/write";
 import type { BillRef } from "../types";
-import { judgeMessages, parseVerdict, type JudgedSummary } from "./judge";
+import { judgeMessages, parseVerdict, type JudgedSummary, type JudgeRubric } from "./judge";
 import { promptParts } from "./variants";
 
 /*
@@ -30,6 +30,8 @@ export interface EvalCandidate {
   maxTokens?: number;
   /** Normal-API price per million tokens, for the cap check before each call. */
   price: { input: number; output: number };
+  /** Ask for a JSON object reply (judges). */
+  json?: boolean;
   /** Prompt version from variants.ts; production's prompt when absent. */
   prompt?: string;
 }
@@ -39,6 +41,8 @@ export interface EvalSpec {
   /** "119-hr-2140" style ids. */
   bills: string[];
   runs?: number;
+  /** Run only these item keys ("119-hr-618|luna-v4|1"): a retry of a round's failed items. */
+  only?: string[];
   /** "hidden" (default): the model gets no CRS summary, as an eval of writing from the bill itself. */
   crs?: "hidden" | "given";
   candidates: EvalCandidate[];
@@ -52,6 +56,8 @@ export interface JudgeSpec {
   kind: "judge";
   round: string;
   judge: EvalCandidate;
+  /** judge.ts rubric; v1 when absent. */
+  rubric?: JudgeRubric;
   pairs: Array<{ key: string; bill: string; a: SummaryRef; b: SummaryRef }>;
 }
 
@@ -99,6 +105,10 @@ export function itemsOf(spec: EvalSpec): Array<{ key: string; bill: string; cand
       for (let run = 1; run <= runs; run += 1) out.push({ key: `${bill}|${candidate.key}|${run}`, bill, candidate, run });
     }
   }
+  if (spec.only?.length) {
+    const only = new Set(spec.only);
+    return out.filter((i) => only.has(i.key));
+  }
   return out;
 }
 
@@ -109,6 +119,7 @@ export function modelOf(c: EvalCandidate): DigestModel {
     price: c.price,
     ...(c.reasoning ? { reasoning: c.reasoning } : {}),
     ...(c.temperature !== undefined ? { temperature: c.temperature } : {}),
+    ...(c.json ? { json: true } : {}),
   };
 }
 
@@ -185,7 +196,7 @@ function judgeTasks(db: D1Database, spec: JudgeSpec): Task[] {
     run: 1,
     model,
     // The judge reads the bill text without CRS (CRS can be a contestant); the CRS contestant comes from the full bill.
-    messages: async (p) => judgeMessages(asSeen(p, "hidden").input, await load(pair.a, p), await load(pair.b, p)),
+    messages: async (p) => judgeMessages(asSeen(p, "hidden").input, await load(pair.a, p), await load(pair.b, p), spec.rubric),
     read: (_p, content) => {
       const verdict = parseVerdict(content);
       return verdict
@@ -351,7 +362,7 @@ export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickR
 }
 
 function promptVersionOf(spec: AnySpec, task: Task): string {
-  if (spec.kind === "judge") return "judge-v1";
+  if (spec.kind === "judge") return `judge-${spec.rubric ?? "v1"}`;
   const c = spec.candidates.find((x) => x.key === task.candidate);
   return c?.prompt ? `eval:${c.prompt}` : PROMPT_VERSION;
 }

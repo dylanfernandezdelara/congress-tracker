@@ -3,6 +3,9 @@ const DATA = PAGE.bills;
 const QUESTIONS = PAGE.questions;
 const app = document.getElementById("app");
 const LETTERS = "ABCDEFGH";
+/** "rank": no read-first question; the rater orders every summary shown, best first. */
+const RANK = PAGE.mode === "rank";
+let ranking = [];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function rng(seed) { return () => ((seed = (Math.imul(seed ^ (seed >>> 15), 1 | seed) + 0x6d2b79f5) >>> 0) / 4294967296); }
@@ -43,9 +46,18 @@ function summaryHTML(s) {
     (pts ? `<div class="label">Key points</div><ul>${pts}</ul>` : "");
 }
 
+function rankHTML(b, order) {
+  const n = order.length;
+  return `<div class="grid">${order.map((ei, k) => {
+    const r = ranking.indexOf(ei);
+    return `<div class="card rankable${r >= 0 ? " ranked" : ""}" data-ei="${ei}" role="button" tabindex="0" aria-pressed="${r >= 0}"><span class="tag">Summary ${LETTERS[k]}</span>${r >= 0 ? `<span class="rankno">${r + 1}</span>` : ""}${summaryHTML(b.entries[ei].summary)}</div>`;
+  }).join("")}</div>
+  <div class="row"><span class="muted">${ranking.length < n ? `Tap the summary you'd rank #${ranking.length + 1} of ${n}` : "All ranked"}</span><button class="ghost" id="clear" ${ranking.length ? "" : "disabled"}>Start over</button></div>`;
+}
+
 function rail() {
   const n = DATA.length;
-  return `<div class="rail" aria-label="Progress">${Array.from({ length: n }, (_, i) => `<span class="${i < step.bill || (i === step.bill && step.phase === "compare") ? "on" : ""}"></span>`).join("")}</div>`;
+  return `<div class="rail" aria-label="Progress">${Array.from({ length: n }, (_, i) => `<span class="${i < step.bill || (i === step.bill && step.phase === "compare" && !RANK) ? "on" : ""}"></span>`).join("")}</div>`;
 }
 function head(i) {
   const b = DATA[i];
@@ -59,17 +71,21 @@ function render() {
     const done = Object.keys(state.answers).length;
     app.innerHTML = `<div class="eyebrow">trackcongress · summary rating · pilot</div>
       <h1>Which summary helps you understand the bill?</h1>
-      <p>You'll go through ${DATA.length} real bills. For each one:</p>
+      ${RANK
+        ? `<p>You'll go through ${DATA.length} real bills. For each one, read ${DATA[0]?.compare?.length ?? 4} summaries of the same bill and <b>rank them</b>: tap the one you'd most want to read on the site, then the next, and so on. A line on why helps a lot.</p>
+      <p class="muted">Summaries are labeled by letter and shuffled; you won't see who wrote them until the end. About ${Math.round(DATA.length * 3)} minutes.</p>`
+        : `<p>You'll go through ${DATA.length} real bills. For each one:</p>
       <ul><li><b>Read one summary</b> and answer a quick question about the bill. Answer from what the summary told you; "Not sure" is a fine answer.</li>
       <li><b>Compare ${DATA[0]?.compare?.length ?? 4} summaries</b> of the same bill and pick the one you'd want to read on the site.</li></ul>
-      <p class="muted">Summaries are labeled by letter and shuffled; you won't see who wrote them until the end. About ${Math.round(DATA.length * 1.6)} minutes.</p>
+      <p class="muted">Summaries are labeled by letter and shuffled; you won't see who wrote them until the end. About ${Math.round(DATA.length * 1.6)} minutes.</p>`}
       ${banner}
       <div class="row"><span class="muted">${done ? `${done} of ${DATA.length} done` : ""}</span>
       <button id="go">${done && done < DATA.length ? "Continue" : done === DATA.length ? "See results" : "Start"}</button></div>`;
     document.getElementById("go").onclick = () => {
       const next = DATA.findIndex((b) => !state.answers[b.id]?.favorite);
       if (next < 0) { step = { bill: -1, phase: "results" }; }
-      else { step = { bill: next, phase: state.answers[DATA[next].id]?.choice !== undefined ? "compare" : "read" }; }
+      else { step = { bill: next, phase: RANK || state.answers[DATA[next].id]?.choice !== undefined ? "compare" : "read" }; }
+      ranking = [];
       render(); scrollTo(0, 0);
     };
     return;
@@ -94,6 +110,45 @@ function render() {
     };
     return;
   }
+  if (step.phase === "compare" && RANK) {
+    const { b, order } = plan(step.bill);
+    const prev = state.answers[b.id] || {};
+    if (!ranking.length && prev.ranking?.length === order.length) ranking = prev.ranking.map((src) => b.entries.findIndex((e) => e.src === src));
+    app.innerHTML = `${head(step.bill)}
+      <div class="label">Rank these from the one you'd most want to read on the site</div>
+      ${rankHTML(b, order)}
+      <label for="why"><b>Why?</b> <span class="muted">Optional, one line is plenty</span></label>
+      <textarea id="why" placeholder="e.g. B said who pays; C was clearer but left out the deadline">${esc(prev.why || "")}</textarea>
+      <p class="note" id="savenote" hidden>Couldn't save to the shared results just now. Your answers are kept in this browser; keep going.</p>
+      <div class="row"><button class="ghost" id="back">Back</button><button id="next" ${ranking.length === order.length ? "" : "disabled"}>${step.bill === DATA.length - 1 ? "Finish" : "Save and next bill"}</button></div>`;
+    const keepWhy = () => (state.answers[b.id] = { ...(state.answers[b.id] || {}), why: document.getElementById("why").value });
+    app.querySelectorAll(".rankable").forEach((card) => {
+      const pick = () => {
+        const ei = Number(card.dataset.ei);
+        if (ranking.includes(ei)) return;
+        keepWhy();
+        ranking.push(ei);
+        // The last one left takes the last place.
+        if (ranking.length === order.length - 1) ranking.push(order.find((x) => !ranking.includes(x)));
+        const y = scrollY; render(); scrollTo(0, y);
+      };
+      card.onclick = pick;
+      card.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+    });
+    document.getElementById("clear").onclick = () => { keepWhy(); ranking = []; const y = scrollY; render(); scrollTo(0, y); };
+    document.getElementById("back").onclick = () => { ranking = []; step = step.bill > 0 ? { bill: step.bill - 1, phase: "compare" } : { bill: -1, phase: "intro" }; render(); scrollTo(0, 0); };
+    document.getElementById("next").onclick = () => {
+      const letters = Object.fromEntries(order.map((e, k) => [LETTERS[k], b.entries[e].src]));
+      const srcs = ranking.map((ei) => b.entries[ei].src);
+      state.answers[b.id] = { ...state.answers[b.id], ranking: srcs, favorite: srcs[0], why: document.getElementById("why").value.trim(), letters, picked_at: new Date().toISOString() };
+      save();
+      ranking = [];
+      const next = DATA.findIndex((x) => !state.answers[x.id]?.favorite);
+      step = next < 0 ? { bill: -1, phase: "results" } : { bill: next, phase: "compare" };
+      render(); scrollTo(0, 0);
+    };
+    return;
+  }
   if (step.phase === "compare") {
     const { b, order } = plan(step.bill);
     const prev = state.answers[b.id] || {};
@@ -115,6 +170,20 @@ function render() {
       step = next < 0 ? { bill: -1, phase: "results" } : { bill: next, phase: "read" };
       render(); scrollTo(0, 0);
     };
+    return;
+  }
+  if (step.phase === "results" && RANK) {
+    const NAMES = PAGE.names;
+    const rows = DATA.map((b) => {
+      const a = state.answers[b.id] || {};
+      const list = (a.ranking || []).map((src, k) => `${k + 1}. ${esc(NAMES[src] || src)}`).join("<br>");
+      return `<tr><td><span class="billno">${esc(b.label)}</span></td><td>${list || "—"}${a.why ? `<div class="muted" style="font-size:.85rem">“${esc(a.why)}”</div>` : ""}</td></tr>`;
+    }).join("");
+    app.innerHTML = `${rail()}<h1>Done. Thank you.</h1>
+      <p>${db ? "Your answers are saved to the shared results." : "Your answers are saved in this browser only."} Here's who wrote what.</p>
+      <div class="tablewrap"><table><thead><tr><th>Bill</th><th>Your ranking</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="row"><button class="ghost" id="redo">Change an answer</button></div>`;
+    document.getElementById("redo").onclick = () => { ranking = []; step = { bill: 0, phase: "compare" }; render(); scrollTo(0, 0); };
     return;
   }
   if (step.phase === "results") {

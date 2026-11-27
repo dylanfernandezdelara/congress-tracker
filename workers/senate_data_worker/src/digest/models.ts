@@ -9,6 +9,8 @@ export interface DigestModel {
   /** Reasoning settings passed through to the provider (Luna: high effort). */
   reasoning?: { effort: "low" | "medium" | "high" };
   temperature?: number;
+  /** Ask the provider for a JSON object reply (eval judges; summaries parse their JSON leniently). */
+  json?: boolean;
   /** Output budget; reasoning models spend part of it thinking before the JSON answer. */
   maxTokens: number;
   /** Batch API price per million tokens, for estimating a batch before it is charged. */

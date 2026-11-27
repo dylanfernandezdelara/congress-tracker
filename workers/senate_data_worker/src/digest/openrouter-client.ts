@@ -53,6 +53,7 @@ export function requestBody(model: DigestModel, messages: DigestMessages): Recor
   };
   if (model.temperature !== undefined) body.temperature = model.temperature;
   if (model.reasoning) body.reasoning = model.reasoning;
+  if (model.json) body.response_format = { type: "json_object" };
   return body;
 }
 

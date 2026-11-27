@@ -5,6 +5,11 @@
  * them). Output is one HTML file to publish as an Artifact (it stores answers with the db capability).
  *
  *   node scripts/digest-eval/build-rating-page.mjs <round.json> <questions.json> <out.html> [--compare 3] [--title "..."]
+ *   node scripts/digest-eval/build-rating-page.mjs <round.json> - <out.html> --rank [--compare 4] [--no-crs]
+ *
+ * --rank: no read-first question; the rater ranks every summary shown, best first (each ranking of 4 is 6 pairwise
+ * results, twice a favorite's 3). --no-crs leaves the CRS summary out of the comparison. With `runs` > 1 in the
+ * round, bill i shows run (i mod runs) + 1, so both runs get rated.
  *
  * Reads artifacts/digest-eval/out/<round>/<candidate>/<bill>-r1.json (remote.mjs fetch) and the bill files.
  * Only summaries that passed the checks are shown: a blocked one would never reach the site.
@@ -28,8 +33,11 @@ if (!roundFile || !questionsFile || !outFile) {
 }
 
 const spec = JSON.parse(readFileSync(roundFile, 'utf8'))
-const questions = JSON.parse(readFileSync(questionsFile, 'utf8'))
-const perBill = Number(opt('--compare', '3'))
+const questions = questionsFile === '-' ? {} : JSON.parse(readFileSync(questionsFile, 'utf8'))
+const rank = rest.includes('--rank')
+const withCrs = !rest.includes('--no-crs')
+const perBill = Number(opt('--compare', rank ? (withCrs ? '3' : '4') : '3'))
+const runs = Math.max(1, spec.runs ?? 1)
 const title = opt('--title', 'Summary Rating')
 
 /** Reader-facing names, revealed only on the results screen. */
@@ -42,6 +50,13 @@ const NAMES = {
   'gemini-4-hydrogen': 'Gemini 4 Hydrogen',
   'deepseek-v4-1-flash': 'DeepSeek V4.1 Flash',
 }
+// Round 9 style keys: <model>-<prompt version>.
+const PROMPTS = { v34: 'current prompt', v4: 'v4: reader focus', 'v4-plan': 'v4 + answer reader questions first', 'v4-facts': 'v4 + list facts first' }
+for (const c of spec.candidates) {
+  if (NAMES[c.key]) continue
+  const m = /^(luna|muse-ember)-(v34|v4|v4-plan|v4-facts)$/.exec(c.key)
+  if (m) NAMES[c.key] = `${m[1] === 'luna' ? 'GPT-6 Luna' : 'Meta Muse Ember'}, ${PROMPTS[m[2]]}`
+}
 
 const label = (b) =>
   `${b.type.replace('HCONRES', 'H.Con.Res.').replace('SCONRES', 'S.Con.Res.').replace('HJRES', 'H.J.Res.').replace('SJRES', 'S.J.Res.').replace('HRES', 'H.Res.').replace('SRES', 'S.Res.').replace(/^HR$/, 'H.R.').replace(/^S$/, 'S.')} ${b.number}`
@@ -49,11 +64,12 @@ const label = (b) =>
 const models = spec.candidates.map((c) => c.key)
 const skipped = []
 const bills = spec.bills.map((id, i) => {
-  if (!questions[id]) throw new Error(`no question for ${id}`)
+  if (!rank && !questions[id]) throw new Error(`no question for ${id}`)
+  const run = (i % runs) + 1
   const bill = JSON.parse(readFileSync(join(root, 'artifacts/digest-eval/bills', `${id}.json`), 'utf8'))
   const entries = []
   for (const key of models) {
-    const f = join(root, 'artifacts/digest-eval/out', spec.round, key, `${id}-r1.json`)
+    const f = join(root, 'artifacts/digest-eval/out', spec.round, key, `${id}-r${run}.json`)
     if (!existsSync(f)) {
       skipped.push(`${id} ${key}: no output`)
       continue
@@ -65,8 +81,10 @@ const bills = spec.bills.map((id, i) => {
     }
     entries.push({ src: key, summary: out.summary })
   }
-  if (!bill.crs?.text) throw new Error(`${id} has no CRS summary`)
-  entries.push({ src: 'crs', summary: { crs: bill.crs.text } })
+  if (withCrs) {
+    if (!bill.crs?.text) throw new Error(`${id} has no CRS summary`)
+    entries.push({ src: 'crs', summary: { crs: bill.crs.text } })
+  }
   // Models for this bill's comparison: a window that slides one model per bill, skipping ones without a summary.
   const has = (m) => entries.some((e) => e.src === m)
   // Windows over every model step by `perBill` (each model equally often) and shift one place every second bill
@@ -77,11 +95,11 @@ const bills = spec.bills.map((id, i) => {
     const m = models[(start + k) % models.length]
     if (has(m)) picked.push(m)
   }
-  const compare = [...picked, 'crs'].map((src) => entries.findIndex((e) => e.src === src))
-  return { id, label: label(bill), title: bill.title, entries, compare }
+  const compare = [...picked, ...(withCrs ? ['crs'] : [])].map((src) => entries.findIndex((e) => e.src === src))
+  return { id, label: label(bill), title: bill.title, run, entries, compare }
 })
 
-const page = { bills, questions, names: NAMES, storageKey: `rating:${spec.round}` }
+const page = { bills, questions, names: NAMES, mode: rank ? 'rank' : 'pick', storageKey: `rating:${spec.round}` }
 const b64 = Buffer.from(JSON.stringify(page)).toString('base64')
 const head = readFileSync(join(here, 'rating-page/head.html'), 'utf8').replace('__TITLE__', title).replace('__ROUND__', spec.round)
 const app = readFileSync(join(here, 'rating-page/app.js'), 'utf8')

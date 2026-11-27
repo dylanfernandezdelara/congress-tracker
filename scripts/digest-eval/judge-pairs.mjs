@@ -9,6 +9,7 @@
  *   node scripts/digest-eval/judge-pairs.mjs score-calibration <ratings.json> <verdicts.json>
  *   node scripts/digest-eval/judge-pairs.mjs score <verdicts.json>
  *
+ * calibrate and tournament take --rubric v1|v2 (eval/judge.ts; v1 by default).
  * <judge.json> is an EvalCandidate: { key, model, price: {input, output}, maxTokens?, reasoning?, temperature? }.
  * Verdicts come from `remote.mjs fetch <judge-request-id>` (artifacts/digest-eval/judge/<round>/<judge>.json).
  *
@@ -31,8 +32,14 @@ function bothOrders(bill, x, y, request, run, tag) {
   ]
 }
 
+const rubricFlag = (() => {
+  const i = args.indexOf('--rubric')
+  return i >= 0 ? args.splice(i, 2)[1] : undefined
+})()
+
 function writeSpec(round, judge, pairs, out) {
-  writeFileSync(out, JSON.stringify({ kind: 'judge', round, judge, pairs }, null, 2))
+  const rubric = rubricFlag ?? 'v1'
+  writeFileSync(out, JSON.stringify({ kind: 'judge', round: rubric === 'v1' ? round : `${round}-${rubric}`, rubric, judge, pairs }, null, 2))
   console.log(`wrote ${out}: ${pairs.length} judge calls`)
 }
 

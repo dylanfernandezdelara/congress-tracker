@@ -16,7 +16,9 @@ export type JudgedSummary = { kind: "summary"; summary: CheckableSummary } | { k
 
 const SYSTEM = `You compare two plain-language summaries of the same U.S. bill and decide which would help an everyday reader more. You check every claim against the bill text. You are neutral about politics. You return only JSON.`;
 
-const RUBRIC = `Decide which summary a typical reader (grade 7–8 reading level, a minute to spare) would come away from understanding the bill better, and more correctly. In order of importance:
+/** v1: accuracy, then outcome, mechanism, main subject, plainness. Agreed with Dylan on 26–33% of round-8 pairs:
+ * it rewarded covering every section and number, where he picked the clear gist. */
+const RUBRIC_V1 = `Decide which summary a typical reader (grade 7–8 reading level, a minute to spare) would come away from understanding the bill better, and more correctly. In order of importance:
 1. Correct: every claim matches the BILL TEXT, with the same strength ("would allow" is not "requires"; "authorizes" is not "funds"). A wrong or invented claim outweighs any amount of clarity. A plain definition of a term is fine.
 2. Outcome: the headline and first sentence say what changes for people and for whom, with concrete words, not vague ones ("places", "efforts", "measures").
 3. How and when: the reader learns the mechanism (a grant, a tax credit, a ban, a right to sue) and the conditions under which it applies, so they never wonder "why would that happen?" or "when does this apply?".
@@ -24,6 +26,22 @@ const RUBRIC = `Decide which summary a typical reader (grade 7–8 reading level
 5. Plain and short: plain words, no repeated points, nothing a reader would skip. More text is not better.
 Layout differs between summaries (bulleted or one paragraph); judge what the reader understands, and count layout only when it makes the summary harder to read.
 If they are about equally good, say "tie".`;
+
+/**
+ * v2: written from Dylan's round-8 notes as general principles (no examples from those bills, which round 9 reuses,
+ * so his round-9 rankings stay a fair test). The reader wants the gist; covering more is not better.
+ */
+const RUBRIC_V2 = `Decide which summary a typical reader would rather find on the site. The reader has under a minute, reads at a grade 7–8 level, and wants the gist: what changes, for whom, and how. In order of importance:
+1. No real errors: a claim that gets wrong what the bill does, or states it more strongly than the text ("requires" for "may"), is a serious flaw. Small imprecision that would not mislead a reader is not.
+2. The gist, fast: from the title and first sentence alone, the reader knows the outcome for people (what becomes possible, required, funded, or banned, and for whom) in concrete words. Vague words ("places", "efforts", "measures", "programs" left unexplained) fail this.
+3. It makes sense: the reader learns the one mechanism or condition that explains the outcome (who pays and how, what triggers it, when it applies), so they never wonder "why would that happen?". A list of facts without that link is worse than fewer facts with it.
+4. Short beats complete: covering every section, number, or technical change is NOT a strength. Each extra point should tell the reader something new and important; secondary sections, conforming changes, and points that repeat the first sentence make a summary worse. Never prefer a summary because it is longer, has more points, or mentions more sections.
+5. Plain English: everyday words; a legal or technical term is replaced or explained.
+Layout differs between summaries (bulleted or one paragraph); judge what the reader understands, and count layout only when it makes the summary harder to read.
+If they are about equally good, say "tie".`;
+
+export const JUDGE_RUBRICS = { v1: RUBRIC_V1, v2: RUBRIC_V2 } as const;
+export type JudgeRubric = keyof typeof JUDGE_RUBRICS;
 
 function render(s: JudgedSummary): string {
   if (s.kind === "crs") return s.text.trim();
@@ -38,7 +56,9 @@ function render(s: JudgedSummary): string {
     .join("\n");
 }
 
-export function judgeMessages(bill: DigestBillInput, a: JudgedSummary, b: JudgedSummary): DigestMessages {
+export function judgeMessages(bill: DigestBillInput, a: JudgedSummary, b: JudgedSummary, rubric: JudgeRubric = "v1"): DigestMessages {
+  const RUBRIC = JUDGE_RUBRICS[rubric];
+  if (!RUBRIC) throw new Error(`unknown judge rubric: ${rubric}`);
   const text = bill.text && bill.textVersion ? `BILL TEXT (${bill.textVersion.type}):\n${bill.text}` : "BILL TEXT: not published; judge from the title only";
   return {
     system: SYSTEM,
