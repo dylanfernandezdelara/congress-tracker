@@ -129,6 +129,10 @@ describe("eval spec helpers", () => {
     ]);
   });
 
+  it("runs only the named items when the round lists them", () => {
+    expect(itemsOf({ ...spec, runs: 2, only: ["119-hr-2140|haiku|2"] }).map((i) => i.key)).toEqual(["119-hr-2140|haiku|2"]);
+  });
+
   it("hides CRS from the model and from the checks unless the round gives it", () => {
     const p = prepared() as never;
     const hidden = asSeen(p, undefined);

@@ -80,18 +80,23 @@ function estimate(spec) {
   for (const c of spec.candidates) {
     let w = 0
     let l = 0
+    let calls = 0
     for (const id of spec.bills) {
       const bill = JSON.parse(readFileSync(join(billsDir, `${id}.json`), 'utf8'))
       if (bill.parts?.length) throw new Error(`${id} is a long bill (split into parts); eval rounds take single-pass bills only`)
+      // A retry (`only`) runs just the listed items.
+      const n = spec.only ? spec.only.filter((k) => k.startsWith(`${id}|${c.key}|`)).length : runs
       const input = PROMPT_TOKENS + (bill.tokens ?? 0)
-      w += (input * c.price.input + (c.maxTokens ?? 12_000) * c.price.output) / 1e6
-      l += (input * c.price.input + LIKELY_OUTPUT_TOKENS * c.price.output) / 1e6
+      w += (n * (input * c.price.input + (c.maxTokens ?? 12_000) * c.price.output)) / 1e6
+      l += (n * (input * c.price.input + LIKELY_OUTPUT_TOKENS * c.price.output)) / 1e6
+      calls += n
     }
-    rows.push({ candidate: c.key, model: c.model, calls: spec.bills.length * runs, likely_usd: +(l * runs).toFixed(4), worst_usd: +(w * runs).toFixed(4) })
-    worst += w * runs
-    likely += l * runs
+    if (!calls) continue
+    rows.push({ candidate: c.key, model: c.model, calls, likely_usd: +l.toFixed(4), worst_usd: +w.toFixed(4) })
+    worst += w
+    likely += l
   }
-  return { rows, likely: +likely.toFixed(4), worst: +worst.toFixed(4), calls: spec.bills.length * spec.candidates.length * runs }
+  return { rows, likely: +likely.toFixed(4), worst: +worst.toFixed(4), calls: rows.reduce((n, r) => n + r.calls, 0) }
 }
 
 function printEstimate(spec, e) {

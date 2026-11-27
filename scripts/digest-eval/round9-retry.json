@@ -1,0 +1,122 @@
+{
+  "round": "round9-prompts",
+  "bills": [
+    "119-hr-618",
+    "119-s-1884",
+    "119-s-2398",
+    "119-s-5568",
+    "119-hr-1041",
+    "119-hres-1335",
+    "119-hr-5625",
+    "119-hconres-86"
+  ],
+  "runs": 2,
+  "crs": "hidden",
+  "candidates": [
+    {
+      "key": "luna-v34",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v3.4"
+    },
+    {
+      "key": "luna-v4",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4"
+    },
+    {
+      "key": "luna-v4-plan",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4-plan"
+    },
+    {
+      "key": "luna-v4-facts",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4-facts"
+    },
+    {
+      "key": "muse-ember-v34",
+      "model": "meta/muse-ember",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v3.4"
+    },
+    {
+      "key": "muse-ember-v4",
+      "model": "meta/muse-ember",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4"
+    },
+    {
+      "key": "muse-ember-v4-plan",
+      "model": "meta/muse-ember",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4-plan"
+    },
+    {
+      "key": "muse-ember-v4-facts",
+      "model": "meta/muse-ember",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4-facts"
+    }
+  ],
+  "only": [
+    "119-hr-1041|luna-v4-facts|1",
+    "119-hr-1041|luna-v4|1",
+    "119-hr-1041|muse-ember-v4-facts|1",
+    "119-hr-1041|muse-ember-v4-plan|1",
+    "119-hr-1041|muse-ember-v4-plan|2",
+    "119-hr-1041|muse-ember-v4|1",
+    "119-hr-618|muse-ember-v4-facts|1",
+    "119-s-1884|muse-ember-v34|2",
+    "119-s-1884|muse-ember-v4-facts|1",
+    "119-s-5568|luna-v4-facts|2",
+    "119-s-5568|luna-v4|2"
+  ]
+}

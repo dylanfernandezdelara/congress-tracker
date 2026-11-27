@@ -30,6 +30,8 @@ export interface EvalCandidate {
   maxTokens?: number;
   /** Normal-API price per million tokens, for the cap check before each call. */
   price: { input: number; output: number };
+  /** Ask for a JSON object reply (judges). */
+  json?: boolean;
   /** Prompt version from variants.ts; production's prompt when absent. */
   prompt?: string;
 }
@@ -39,6 +41,8 @@ export interface EvalSpec {
   /** "119-hr-2140" style ids. */
   bills: string[];
   runs?: number;
+  /** Run only these item keys ("119-hr-618|luna-v4|1"): a retry of a round's failed items. */
+  only?: string[];
   /** "hidden" (default): the model gets no CRS summary, as an eval of writing from the bill itself. */
   crs?: "hidden" | "given";
   candidates: EvalCandidate[];
@@ -101,6 +105,10 @@ export function itemsOf(spec: EvalSpec): Array<{ key: string; bill: string; cand
       for (let run = 1; run <= runs; run += 1) out.push({ key: `${bill}|${candidate.key}|${run}`, bill, candidate, run });
     }
   }
+  if (spec.only?.length) {
+    const only = new Set(spec.only);
+    return out.filter((i) => only.has(i.key));
+  }
   return out;
 }
 
@@ -111,6 +119,7 @@ export function modelOf(c: EvalCandidate): DigestModel {
     price: c.price,
     ...(c.reasoning ? { reasoning: c.reasoning } : {}),
     ...(c.temperature !== undefined ? { temperature: c.temperature } : {}),
+    ...(c.json ? { json: true } : {}),
   };
 }
 
