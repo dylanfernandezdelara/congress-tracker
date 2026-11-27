@@ -1,0 +1,63 @@
+{
+  "round": "round9-prompts",
+  "bills": [
+    "119-hr-618",
+    "119-s-1884",
+    "119-s-2398",
+    "119-s-5568",
+    "119-hr-1041",
+    "119-hres-1335",
+    "119-hr-5625",
+    "119-hconres-86"
+  ],
+  "runs": 2,
+  "crs": "hidden",
+  "candidates": [
+    {
+      "key": "sonnet-5-5-v34",
+      "model": "anthropic/claude-sonnet-5.5",
+      "maxTokens": 16000,
+      "price": {
+        "input": 2,
+        "output": 10
+      },
+      "prompt": "v3.4",
+      "reasoning": {
+        "effort": "medium"
+      }
+    },
+    {
+      "key": "sonnet-5-5-v4",
+      "model": "anthropic/claude-sonnet-5.5",
+      "maxTokens": 16000,
+      "price": {
+        "input": 2,
+        "output": 10
+      },
+      "prompt": "v4",
+      "reasoning": {
+        "effort": "medium"
+      }
+    },
+    {
+      "key": "haiku-5-5-v34",
+      "model": "anthropic/claude-haiku-5.5",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v3.4"
+    },
+    {
+      "key": "haiku-5-5-v4",
+      "model": "anthropic/claude-haiku-5.5",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4"
+    }
+  ]
+}
