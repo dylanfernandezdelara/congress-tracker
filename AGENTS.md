@@ -141,7 +141,10 @@ last is the eval-round check, which takes no lease and writes only eval tables).
 All three share one write lease, so they fire on distinct minutes; a :35 sweep that runs its
 full 15 minutes still frees the lease before the 10:00 feed.
 `wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
-`workers/senate_data_worker` only after `wrangler versions upload` previews. The feed pipeline
+`workers/senate_data_worker` only after `wrangler versions upload` previews. A new or changed cron can take
+several minutes to start firing after a deploy (Cloudflare propagates schedules separately): wait before
+concluding a deploy skipped it, and expect production versions to show `version_upload` in `wrangler versions list`
+even from `wrangler deploy` (Wrangler 4 deploys through the versions API). The feed pipeline
 only upserts **new** passage votes (skips known roll-call keys). For digests it only stores sponsors,
 gives a bill with no summary a deterministic title fallback (`synthesis/title-fallback-digest.ts`,
 worker-only `source: "title_fallback"` marker, stripped from the public feed) so the feed never shows
