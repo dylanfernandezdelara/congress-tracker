@@ -1,0 +1,63 @@
+{
+  "round": "round10-final-heldout",
+  "bills": [
+    "119-hr-2808",
+    "119-s-98",
+    "119-sjres-31",
+    "119-hr-3978",
+    "119-hr-7401",
+    "119-hr-8884",
+    "119-hr-2071",
+    "119-hr-8483"
+  ],
+  "runs": 1,
+  "crs": "hidden",
+  "candidates": [
+    {
+      "key": "haiku-5-5-v34",
+      "model": "anthropic/claude-haiku-5.5",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v3.4"
+    },
+    {
+      "key": "sonnet-5-5-v34",
+      "model": "anthropic/claude-sonnet-5.5",
+      "maxTokens": 16000,
+      "price": {
+        "input": 2,
+        "output": 10
+      },
+      "prompt": "v3.4",
+      "reasoning": {
+        "effort": "medium"
+      }
+    },
+    {
+      "key": "luna-v34",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v3.4"
+    },
+    {
+      "key": "muse-ember-v4-facts",
+      "model": "meta/muse-ember",
+      "maxTokens": 32000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "prompt": "v4-facts"
+    }
+  ]
+}
