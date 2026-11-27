@@ -24,9 +24,9 @@ const root = join(here, '..', '..')
 const workerDir = join(root, 'workers/senate_data_worker')
 const billsDir = join(root, 'artifacts', 'digest-eval', 'bills')
 
-/** Prompt and rules ahead of the bill (v3.4 runs ~3k tokens), and the worker's per-call output assumption. */
+/** Prompt and rules ahead of the bill (v3.4 runs ~3k tokens). The worst case assumes each candidate's full output
+ * allowance, as the worker's cap check does. */
 const PROMPT_TOKENS = 3_500
-const WORST_OUTPUT_TOKENS = 4_000
 const LIKELY_OUTPUT_TOKENS = 1_800
 
 const sqlString = (s) => `'${String(s).replace(/'/g, "''")}'`
@@ -64,7 +64,7 @@ function estimate(spec) {
       const bill = JSON.parse(readFileSync(join(billsDir, `${id}.json`), 'utf8'))
       if (bill.parts?.length) throw new Error(`${id} is a long bill (split into parts); eval rounds take single-pass bills only`)
       const input = PROMPT_TOKENS + (bill.tokens ?? 0)
-      w += (input * c.price.input + Math.min(WORST_OUTPUT_TOKENS, c.maxTokens ?? 12_000) * c.price.output) / 1e6
+      w += (input * c.price.input + (c.maxTokens ?? 12_000) * c.price.output) / 1e6
       l += (input * c.price.input + LIKELY_OUTPUT_TOKENS * c.price.output) / 1e6
     }
     rows.push({ candidate: c.key, model: c.model, calls: spec.bills.length * runs, likely_usd: +(l * runs).toFixed(4), worst_usd: +(w * runs).toFixed(4) })
@@ -77,7 +77,7 @@ function estimate(spec) {
 function printEstimate(spec, e) {
   console.log(`round ${spec.round}: ${spec.bills.length} bills × ${spec.candidates.length} candidates × ${spec.runs ?? 1} run(s) = ${e.calls} calls, CRS ${spec.crs ?? 'hidden'}`)
   console.table(e.rows)
-  console.log(`likely ~$${e.likely}, at most ~$${e.worst} (the worker's own pre-call estimate)`)
+  console.log(`likely ~$${e.likely}, at most ~$${e.worst} (each call's full output allowance, which the worker's cap check also assumes)`)
 }
 
 const [cmd, arg, ...rest] = process.argv.slice(2)

@@ -260,6 +260,10 @@ way they would, so summaries lead with concrete effects on people and stay stric
   `eval_outputs`; `status` and `fetch <id>` bring them back to `artifacts/digest-eval/out/<round>/`. Single-pass bills
   only. It writes no digest and does not count against `DIGEST_DAILY_BUDGET_USD`. Bill sets: `bills-2026-11.json`
   (`tuning` for rounds, `heldout` only for the final pick).
+  Rating pages: `node scripts/digest-eval/build-rating-page.mjs <round.json> questions-2026-11.json <out.html>` builds a
+  blind page (read one summary and answer the bill's question, then pick a favorite among CRS plus 3 rotated models;
+  only summaries that passed the checks) to publish as an Artifact with the `db` capability; answers land in its
+  `ratings` collection. Round 8 (6-model screen, $0.48): https://claude.ai/artifact/PmLURJ2y3SjUXu6FvRA3hB
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.

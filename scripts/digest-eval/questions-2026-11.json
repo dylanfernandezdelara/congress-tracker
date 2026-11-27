@@ -1,0 +1,83 @@
+{
+  "note": "One comprehension question per bill, answered from the bill's own text on Congress.gov. `a` is the index of the correct option. Written 2026-11-27 before any round-8 output was read.",
+  "119-hr-618": {
+    "q": "Who gets permission to connect utilities, roads and rail to the Apex industrial park on federal land?",
+    "o": [
+      "Clark County, the City of North Las Vegas, and the park's owners association",
+      "Only the federal government",
+      "A private energy company picked by Congress",
+      "The State of Nevada alone"
+    ],
+    "a": 0
+  },
+  "119-s-1884": {
+    "q": "What does this law tell courts about lawsuits to recover art lost to Nazi persecution?",
+    "o": [
+      "They can't throw out a claim just because a lot of time has passed",
+      "They must return all such art to Germany",
+      "They can only hear claims filed before 1945",
+      "They must send every claim to an international court"
+    ],
+    "a": 0
+  },
+  "119-s-2398": {
+    "q": "Through what year does this law extend the CDC's tick- and mosquito-borne disease programs?",
+    "o": [
+      "2030",
+      "2025",
+      "2028",
+      "Permanently, with no end year"
+    ],
+    "a": 0
+  },
+  "119-s-5568": {
+    "q": "Which grades would the class-size grants focus on?",
+    "o": [
+      "Kindergarten through 3rd grade",
+      "All grades, K through 12",
+      "Middle school",
+      "High school"
+    ],
+    "a": 0
+  },
+  "119-hr-1041": {
+    "q": "If someone manages a veteran's VA benefits for them, when could the VA still send the veteran's name to the gun background-check system?",
+    "o": [
+      "Only if a judge or similar authority finds the veteran is a danger to themselves or others",
+      "Whenever the VA decides someone should manage the veteran's benefits",
+      "Never, under any circumstances",
+      "Whenever the veteran's family asks"
+    ],
+    "a": 0
+  },
+  "119-hres-1335": {
+    "q": "What does this resolution do?",
+    "o": [
+      "States the House's views on government fraud; it doesn't change any law",
+      "Creates a new federal anti-fraud office",
+      "Cuts funding for programs with improper payments",
+      "Requires refunds to taxpayers"
+    ],
+    "a": 0
+  },
+  "119-hr-5625": {
+    "q": "What would the Justice Department have to do every year?",
+    "o": [
+      "Publish a list of places that release people charged with certain crimes without cash bail",
+      "Ban cashless bail nationwide",
+      "Cut grants to cities that allow cashless bail",
+      "Set bail amounts for federal crimes"
+    ],
+    "a": 0
+  },
+  "119-hconres-86": {
+    "q": "Which U.S. forces would NOT have to be removed from hostilities with Iran?",
+    "o": [
+      "Forces needed to defend the U.S. or an ally or partner from an imminent attack",
+      "Navy ships only",
+      "None; every force must leave the region",
+      "All forces, until the end of 2026"
+    ],
+    "a": 0
+  }
+}
