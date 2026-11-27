@@ -8,50 +8,81 @@ vi.mock("../d1/schema", () => ({ ensureSchema: async () => undefined }));
 vi.mock("../digest/prepare", () => ({ prepareBill: (...a: unknown[]) => mockPrepare(...a) }));
 vi.mock("../digest/openrouter-client", () => ({ chatCompletion: (...a: unknown[]) => mockChat(...a) }));
 
-/** Just enough of D1 for the eval runner's statements. */
+/** Just enough of D1 for the eval runner's statements (one table each, statements matched by their SQL). */
 function fakeDb(requests: Array<Record<string, unknown>>) {
   const outputs = new Map<string, Record<string, unknown>>();
+  const open = () => requests.filter((r) => ["queued", "running"].includes(r.state as string));
   const db = {
     requests,
     outputs,
     prepare(sql: string) {
+      const q = sql.replace(/\s+/g, " ").trim();
       let args: unknown[] = [];
       const stmt = {
         bind: (...a: unknown[]) => ((args = a), stmt),
         async first() {
-          if (/FROM eval_outputs/.test(sql)) {
+          if (/^SELECT summary_json FROM eval_outputs/.test(q)) {
             const o = outputs.get(`${args[0]}|${args[1]}`);
             return o ? { summary_json: o.summary_json ?? null } : null;
           }
-          if (/FROM eval_requests/.test(sql)) {
-            const [now] = args as [string];
-            return requests.find((r) => ["queued", "running"].includes(r.state as string) && (!r.lease_until || (r.lease_until as string) < now)) ?? null;
+          if (/^SELECT COUNT\(\*\)/.test(q)) {
+            const rows = [...outputs.values()].filter((o) => o.request_id === args[0]);
+            return { rows: rows.length, running: rows.filter((o) => o.state === "running").length };
           }
-          return null;
+          if (/^SELECT spent_usd FROM eval_requests/.test(q)) return requests.find((r) => r.id === args[0]) ?? null;
+          throw new Error(`fake D1: no first() for ${q}`);
         },
         async all() {
-          return { results: [...outputs.values()].filter((o) => o.request_id === args[0]).map((o) => ({ item_key: o.item_key })) };
+          if (/FROM eval_requests WHERE state IN/.test(q)) return { results: open() };
+          if (/^SELECT item_key FROM eval_outputs/.test(q)) {
+            return { results: [...outputs.values()].filter((o) => o.request_id === args[0]).map((o) => ({ item_key: o.item_key })) };
+          }
+          throw new Error(`fake D1: no all() for ${q}`);
         },
         async run() {
-          if (/^UPDATE eval_requests SET state = 'running'/.test(sql.trim())) {
-            const [lease, , id, now] = args as string[];
-            const r = requests.find((x) => x.id === id && (!x.lease_until || (x.lease_until as string) < now));
-            if (!r) return { meta: { changes: 0 } };
-            Object.assign(r, { state: "running", lease_until: lease });
-            return { meta: { changes: 1 } };
+          const changed = (n: number) => ({ meta: { changes: n } });
+          if (/^INSERT OR IGNORE INTO eval_outputs/.test(q)) {
+            const [request_id, item_key, bill_id, candidate, run, model, created_at] = args;
+            const k = `${request_id}|${item_key}`;
+            if (outputs.has(k)) return changed(0);
+            outputs.set(k, { request_id, item_key, bill_id, candidate, run, model, state: "running", created_at });
+            return changed(1);
           }
-          if (/^UPDATE eval_requests SET state = \?/.test(sql.trim())) {
-            const [state, error, , id] = args;
-            Object.assign(requests.find((x) => x.id === id)!, { state, error, lease_until: null });
-          } else if (/SET spent_usd/.test(sql)) {
-            requests.find((x) => x.id === args[1])!.spent_usd = args[0];
-          } else if (/SET lease_until = NULL/.test(sql)) {
-            requests.find((x) => x.id === args[0])!.lease_until = null;
-          } else if (/INSERT OR REPLACE INTO eval_outputs/.test(sql)) {
+          if (/^INSERT OR REPLACE INTO eval_outputs/.test(q)) {
             const [request_id, item_key, bill_id, candidate, run, model, state] = args;
-            outputs.set(`${request_id}|${item_key}`, { request_id, item_key, bill_id, candidate, run, model, state, summary_json: args[8], blocking_json: args[9], cost: args[11], error: args[15] });
+            outputs.set(`${request_id}|${item_key}`, {
+              request_id, item_key, bill_id, candidate, run, model, state,
+              summary_json: args[8], blocking_json: args[9], cost: args[11], error: args[15], created_at: args[16],
+            });
+            return changed(1);
           }
-          return { meta: { changes: 1 } };
+          if (/^DELETE FROM eval_outputs WHERE request_id = \? AND state = 'running' AND created_at < \?/.test(q)) {
+            for (const [k, o] of outputs) if (o.request_id === args[0] && o.state === "running" && (o.created_at as string) < (args[1] as string)) outputs.delete(k);
+            return changed(1);
+          }
+          if (/^DELETE FROM eval_outputs WHERE request_id = \? AND item_key = \?/.test(q)) {
+            const k = `${args[0]}|${args[1]}`;
+            if (outputs.get(k)?.state === "running") outputs.delete(k);
+            return changed(1);
+          }
+          if (/^UPDATE eval_requests SET spent_usd = spent_usd \+ \?, state = 'running'/.test(q)) {
+            const [est, , id] = args as [number, string, string];
+            const r = open().find((x) => x.id === id);
+            if (!r || (r.spent_usd as number) + est > (r.cap_usd as number)) return changed(0);
+            Object.assign(r, { spent_usd: (r.spent_usd as number) + est, state: "running" });
+            return changed(1);
+          }
+          if (/^UPDATE eval_requests SET spent_usd = spent_usd \+ \? WHERE id = \?/.test(q)) {
+            const r = requests.find((x) => x.id === args[1])!;
+            r.spent_usd = Math.round(((r.spent_usd as number) + (args[0] as number)) * 1e6) / 1e6;
+            return changed(1);
+          }
+          if (/^UPDATE eval_requests SET state = \?, error = \?/.test(q)) {
+            const [state, error, , id] = args;
+            Object.assign(requests.find((x) => x.id === id)!, { state, error });
+            return changed(1);
+          }
+          throw new Error(`fake D1: no run() for ${q}`);
         },
       };
       return stmt;
@@ -150,10 +181,42 @@ describe("runEvalTick", () => {
     expect(db.requests[0]!.state).toBe("capped");
   });
 
-  it("leaves a leased request alone", async () => {
-    const future = new Date(Date.now() + 60_000).toISOString();
-    const db = fakeDb([{ id: "r1", spec_json: JSON.stringify(spec), cap_usd: 1, state: "running", spent_usd: 0, lease_until: future }]);
-    expect((await runEvalTick({ DB: db } as never)).request).toBeNull();
+  it("lets ticks that overlap share a request without running a call twice", async () => {
+    const db = fakeDb([{ id: "r1", spec_json: JSON.stringify({ ...spec, runs: 3 }), cap_usd: 1, state: "queued", spent_usd: 0 }]);
+    await Promise.all([runEvalTick({ DB: db } as never), runEvalTick({ DB: db } as never), runEvalTick({ DB: db } as never)]);
+    expect(mockChat).toHaveBeenCalledTimes(6);
+    expect([...db.outputs.values()].every((o) => o.state === "ok")).toBe(true);
+    expect(db.requests[0]).toMatchObject({ state: "done", spent_usd: 0.0024 });
+  });
+
+  it("reserves each call's estimate against the cap, so overlapping ticks cannot pass it together", async () => {
+    const probe = fakeDb([{ id: "p", spec_json: JSON.stringify({ ...spec, candidates: [spec.candidates[0]] }), cap_usd: 1, state: "queued", spent_usd: 0 }]);
+    await runEvalTick({ DB: probe } as never);
+    const estimate = mockChat.mock.calls[0]![3].estimate as number;
+    mockChat.mockClear();
+    // Room for one call's estimate, not two: the second claim waits for nothing and is refused.
+    const db = fakeDb([{ id: "r1", spec_json: JSON.stringify(spec), cap_usd: estimate * 1.5, state: "queued", spent_usd: 0 }]);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    mockChat.mockImplementation(async (_env, _model, _messages, spend) => {
+      await gate;
+      await spend.record(0.0004);
+      return { content: reply, usage: { cost: 0.0004, promptTokens: 900, completionTokens: 300 }, generationId: null, gatewayLogId: null };
+    });
+    const ticks = Promise.all([runEvalTick({ DB: db } as never), runEvalTick({ DB: db } as never)]);
+    await new Promise((r) => setTimeout(r, 0));
+    release();
+    await ticks;
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect([...db.outputs.values()].map((o) => o.state)).toEqual(["ok"]);
+  });
+
+  it("reclaims a call whose tick died", async () => {
+    const db = fakeDb([{ id: "r1", spec_json: JSON.stringify(spec), cap_usd: 1, state: "running", spent_usd: 0 }]);
+    db.outputs.set("r1|119-hr-2140|luna|1", { request_id: "r1", item_key: "119-hr-2140|luna|1", state: "running", created_at: "2026-01-01T00:00:00.000Z" });
+    await runEvalTick({ DB: db } as never);
+    expect(mockChat).toHaveBeenCalledTimes(2);
+    expect(db.requests[0]!.state).toBe("done");
   });
 
   it("records a failed call and a rejected reply without stopping the round", async () => {
@@ -185,7 +248,8 @@ describe("runEvalTick", () => {
   it("fails a request that names an unknown prompt version", async () => {
     const v = { ...spec, candidates: [{ ...spec.candidates[0]!, prompt: "v9" }] };
     const db = fakeDb([{ id: "r1", spec_json: JSON.stringify(v), cap_usd: 1, state: "queued", spent_usd: 0, lease_until: null }]);
-    expect((await runEvalTick({ DB: db } as never)).state).toBe("failed");
+    await runEvalTick({ DB: db } as never);
+    expect(db.requests[0]!.state).toBe("failed");
     expect(db.requests[0]!.error).toMatch(/unknown prompt version/);
   });
 

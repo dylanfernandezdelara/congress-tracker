@@ -76,10 +76,13 @@ export interface EvalTickResult {
   state?: string;
 }
 
-/** A tick stops starting calls after this long, so one minute's run never overlaps the next for long. */
-const START_CALLS_FOR_MS = 120_000;
-/** Longer than the last call a tick can start plus its timeout (180 s), so two ticks never run one request. */
-const LEASE_MS = 6 * 60_000;
+/**
+ * A tick starts calls for this long. Ticks overlap (one starts every minute), and each claims calls one at a time, so
+ * about four run side by side; a Worker invocation keeps at most 6 connections open, so overlap is what adds speed.
+ */
+const START_CALLS_FOR_MS = 240_000;
+/** A claim older than this belongs to a tick that died: the last call a tick starts plus its timeout (180 s). */
+const CLAIM_STALE_MS = 10 * 60_000;
 const CONCURRENCY = 6;
 
 export function parseBillId(id: string): BillRef {
@@ -123,24 +126,15 @@ interface RequestRow {
   spent_usd: number;
 }
 
-async function claim(db: D1Database, nowIso: string, leaseIso: string): Promise<RequestRow | null> {
-  const row = await db
-    .prepare(
-      `SELECT id, spec_json, cap_usd, state, spent_usd FROM eval_requests
-       WHERE state IN ('queued', 'running') AND (lease_until IS NULL OR lease_until < ?)
-       ORDER BY created_at ASC LIMIT 1`
-    )
-    .bind(nowIso)
-    .first<RequestRow>();
-  if (!row) return null;
-  const res = await db
-    .prepare(
-      `UPDATE eval_requests SET state = 'running', lease_until = ?, started_at = COALESCE(started_at, ?)
-       WHERE id = ? AND state IN ('queued', 'running') AND (lease_until IS NULL OR lease_until < ?)`
-    )
-    .bind(leaseIso, nowIso, row.id, nowIso)
-    .run();
-  return (res.meta?.changes ?? 0) === 1 ? row : null;
+/** An open request as one tick sees it. */
+interface OpenRequest {
+  row: RequestRow;
+  spec: AnySpec;
+  tasks: Task[];
+  crs: EvalSpec["crs"];
+  /** The cap refused a call this tick: start no more for this request. */
+  capped: boolean;
+  prepared: Map<string, Promise<PreparedBill>>;
 }
 
 async function finish(db: D1Database, id: string, state: string, error: string | null): Promise<void> {
@@ -201,81 +195,105 @@ function judgeTasks(db: D1Database, spec: JudgeSpec): Task[] {
   }));
 }
 
-/** One minute's work: continue the oldest open request until its time slice, its cap, or its items run out. */
+/** One minute's work: start calls for every open request, oldest first, until the time slice or the work runs out. */
 export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickResult> {
   await ensureSchema(env.DB);
-  const claimed = await claim(env.DB, new Date(now).toISOString(), new Date(now + LEASE_MS).toISOString());
-  if (!claimed) return { request: null, written: 0, remaining: 0, spent_usd: 0 };
+  const db = env.DB;
+  const nowIso = new Date(now).toISOString();
+  const { results: open } = await db
+    .prepare(`SELECT id, spec_json, cap_usd, state, spent_usd FROM eval_requests WHERE state IN ('queued', 'running') ORDER BY created_at ASC LIMIT 10`)
+    .all<RequestRow>();
+  if (!open?.length) return { request: null, written: 0, remaining: 0, spent_usd: 0 };
 
-  const req = claimed;
-  let spec: AnySpec;
-  let tasks: Task[];
-  try {
-    spec = JSON.parse(req.spec_json) as AnySpec;
-    if (spec.kind === "judge") {
-      if (!Array.isArray(spec.pairs) || !spec.judge) throw new Error("judge spec needs judge and pairs");
-      tasks = judgeTasks(env.DB, spec);
-    } else {
-      if (!Array.isArray(spec.bills) || !Array.isArray(spec.candidates) || !spec.candidates.length) throw new Error("spec needs bills and candidates");
-      tasks = writeTasks(spec);
+  // A claim left by a tick that died (its calls cannot still be running) goes back to the pool.
+  const staleBefore = new Date(now - CLAIM_STALE_MS).toISOString();
+  const work: Array<{ req: OpenRequest; task: Task }> = [];
+  const requests: OpenRequest[] = [];
+  for (const row of open) {
+    let spec: AnySpec;
+    let tasks: Task[];
+    try {
+      spec = JSON.parse(row.spec_json) as AnySpec;
+      if (spec.kind === "judge") {
+        if (!Array.isArray(spec.pairs) || !spec.judge) throw new Error("judge spec needs judge and pairs");
+        tasks = judgeTasks(db, spec);
+      } else {
+        if (!Array.isArray(spec.bills) || !Array.isArray(spec.candidates) || !spec.candidates.length) throw new Error("spec needs bills and candidates");
+        tasks = writeTasks(spec);
+      }
+    } catch (err: unknown) {
+      await finish(db, row.id, "failed", messageOf(err));
+      continue;
     }
-  } catch (err: unknown) {
-    await finish(env.DB, req.id, "failed", messageOf(err));
-    return { request: req.id, written: 0, remaining: 0, spent_usd: req.spent_usd, state: "failed" };
+    await db.prepare(`DELETE FROM eval_outputs WHERE request_id = ? AND state = 'running' AND created_at < ?`).bind(row.id, staleBefore).run();
+    const { results } = await db.prepare(`SELECT item_key FROM eval_outputs WHERE request_id = ?`).bind(row.id).all<{ item_key: string }>();
+    const taken = new Set((results ?? []).map((r) => r.item_key));
+    const req: OpenRequest = {
+      row,
+      spec,
+      tasks,
+      // A judge needs the CRS text to show the CRS contestant; it hides CRS from its own sources (judgeTasks).
+      crs: spec.kind === "judge" ? "given" : spec.crs,
+      capped: false,
+      prepared: new Map(),
+    };
+    requests.push(req);
+    for (const task of tasks) if (!taken.has(task.key)) work.push({ req, task });
   }
-  const theSpec = spec;
-  // A judge needs the CRS text to show the CRS contestant; it hides CRS from its own sources (judgeTasks).
-  const crs = theSpec.kind === "judge" ? "given" : theSpec.crs;
 
-  const { results } = await env.DB.prepare(`SELECT item_key FROM eval_outputs WHERE request_id = ?`).bind(req.id).all<{ item_key: string }>();
-  const done = new Set((results ?? []).map((r) => r.item_key));
-  const pending = tasks.filter((t) => !done.has(t.key));
-
-  const prepared = new Map<string, Promise<PreparedBill>>();
-  const prepare = (bill: string) => {
-    if (!prepared.has(bill)) prepared.set(bill, prepareBill(env, parseBillId(bill)).then((p) => asSeen(p, crs)));
-    return prepared.get(bill)!;
-  };
-
-  // Spend: what the request had before this tick, plus each call's estimate while it runs, settled to its charge.
-  let committed = req.spent_usd;
-  let reserved = 0;
-  let capped = false;
   let written = 0;
   const startedBy = now + START_CALLS_FOR_MS;
-  const queue = [...pending];
+  const queue = [...work];
 
   async function worker(): Promise<void> {
     for (;;) {
-      if (capped || Date.now() > startedBy) return;
-      const task = queue.shift();
-      if (!task) return;
-      const row = await runTask(task);
-      if (row === "capped") {
-        capped = true;
-        queue.unshift(task);
-        return;
-      }
-      written += 1;
+      if (Date.now() > startedBy) return;
+      const next = queue.shift();
+      if (!next) return;
+      if (next.req.capped) continue;
+      if (await runTask(next.req, next.task)) written += 1;
     }
   }
 
-  async function runTask(task: Task): Promise<"ok" | "capped"> {
+  async function runTask(req: OpenRequest, task: Task): Promise<boolean> {
+    // Claim the call: another tick may have taken it since this one read the list.
+    const claimed = await db
+      .prepare(
+        `INSERT OR IGNORE INTO eval_outputs (request_id, item_key, bill_id, candidate, run, model, state, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'running', ?)`
+      )
+      .bind(req.row.id, task.key, task.bill, task.candidate, task.run, task.model.id, new Date().toISOString())
+      .run();
+    if ((claimed.meta?.changes ?? 0) !== 1) return false;
+
     let p: PreparedBill;
     let messages: DigestMessages;
     try {
-      p = await prepare(task.bill);
+      if (!req.prepared.has(task.bill)) req.prepared.set(task.bill, prepareBill(env, parseBillId(task.bill)).then((x) => asSeen(x, req.crs)));
+      p = await req.prepared.get(task.bill)!;
       if (p.parts.length > 0) throw new Error("long bill (split into parts): not supported in eval rounds");
       messages = await task.messages(p);
     } catch (err: unknown) {
-      await saveOutput(env.DB, req.id, task, { state: "failed", model: task.model.id, error: `prepare: ${messageOf(err)}` });
-      return "ok";
+      await saveOutput(db, req.row.id, task, { state: "failed", model: task.model.id, error: `prepare: ${messageOf(err)}` });
+      return true;
     }
     // The cap assumes the full output allowance (estimateCost does so for "anthropic" models): reasoning models run
     // well past the summary writer's 4k guess (Gemini 4 Hydrogen cost ~1.6x that estimate in round 8).
-    const estimate = estimateCost({ ...task.model, provider: "anthropic" }, [messages], "direct");
-    if (committed + reserved + estimate > req.cap_usd) return "capped";
-    reserved += estimate;
+    const estimate = round6(estimateCost({ ...task.model, provider: "anthropic" }, [messages], "direct"));
+    // Reserve the estimate in one statement, so ticks running side by side never pass the cap together. spent_usd
+    // holds settled charges plus the estimates of calls still out.
+    const reserved = await db
+      .prepare(
+        `UPDATE eval_requests SET spent_usd = spent_usd + ?, state = 'running', started_at = COALESCE(started_at, ?)
+         WHERE id = ? AND state IN ('queued', 'running') AND spent_usd + ? <= cap_usd`
+      )
+      .bind(estimate, new Date().toISOString(), req.row.id, estimate)
+      .run();
+    if ((reserved.meta?.changes ?? 0) !== 1) {
+      req.capped = true;
+      await db.prepare(`DELETE FROM eval_outputs WHERE request_id = ? AND item_key = ? AND state = 'running'`).bind(req.row.id, task.key).run();
+      return false;
+    }
     let cost = 0;
     try {
       const reply = await chatCompletion(env, task.model, messages, {
@@ -285,40 +303,51 @@ export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickR
         },
       });
       const out = task.read(p, reply.content);
-      await saveOutput(env.DB, req.id, task, {
+      await saveOutput(db, req.row.id, task, {
         ...out,
         model: task.model.id,
         content: reply.content,
         cost,
         promptTokens: reply.usage.promptTokens,
         completionTokens: reply.usage.completionTokens,
-        inputs: { ...inputsRecord(p), crs_given: crs === "given", fingerprint: p.fingerprint, prompt_version: promptVersionOf(theSpec, task) },
+        inputs: { ...inputsRecord(p), crs_given: req.crs === "given", fingerprint: p.fingerprint, prompt_version: promptVersionOf(req.spec, task) },
       });
     } catch (err: unknown) {
-      await saveOutput(env.DB, req.id, task, { state: "failed", model: task.model.id, cost, error: messageOf(err) });
+      await saveOutput(db, req.row.id, task, { state: "failed", model: task.model.id, cost, error: messageOf(err) });
     } finally {
-      reserved -= estimate;
-      committed += cost;
-      await env.DB.prepare(`UPDATE eval_requests SET spent_usd = ? WHERE id = ?`).bind(round6(committed), req.id).run();
+      // Settle the reservation to the charge.
+      await db.prepare(`UPDATE eval_requests SET spent_usd = spent_usd + ? WHERE id = ?`).bind(round6(cost - estimate), req.row.id).run();
     }
-    return "ok";
+    return true;
   }
 
   await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
-  const remaining = queue.length;
-  let state = "running";
-  if (remaining === 0) {
-    state = "done";
-    await finish(env.DB, req.id, "done", null);
-  } else if (capped) {
-    state = "capped";
-    await finish(env.DB, req.id, "capped", `spend cap $${req.cap_usd} reached with ${remaining} left`);
-  } else {
-    // More to do: free the lease so the next minute continues.
-    await env.DB.prepare(`UPDATE eval_requests SET lease_until = NULL WHERE id = ?`).bind(req.id).run();
+  // Close each request whose calls have all finished (in this tick or another).
+  let remaining = 0;
+  let last: { id: string; state: string; spent: number } | null = null;
+  for (const req of requests) {
+    const counts = await db
+      .prepare(
+        `SELECT COUNT(*) AS rows, SUM(CASE WHEN state = 'running' THEN 1 ELSE 0 END) AS running FROM eval_outputs WHERE request_id = ?`
+      )
+      .bind(req.row.id)
+      .first<{ rows: number; running: number | null }>();
+    const left = req.tasks.length - (counts?.rows ?? 0);
+    const running = counts?.running ?? 0;
+    remaining += left + running;
+    const after = await db.prepare(`SELECT spent_usd FROM eval_requests WHERE id = ?`).bind(req.row.id).first<{ spent_usd: number }>();
+    let state = "running";
+    if (running === 0 && left === 0) {
+      state = "done";
+      await finish(db, req.row.id, "done", null);
+    } else if (running === 0 && req.capped) {
+      state = "capped";
+      await finish(db, req.row.id, "capped", `spend cap $${req.row.cap_usd} reached with ${left} left`);
+    }
+    last = { id: req.row.id, state, spent: round6(after?.spent_usd ?? 0) };
   }
-  return { request: req.id, written, remaining, spent_usd: round6(committed), state };
+  return { request: last?.id ?? null, written, remaining, spent_usd: last?.spent ?? 0, ...(last ? { state: last.state } : {}) };
 }
 
 function promptVersionOf(spec: AnySpec, task: Task): string {
