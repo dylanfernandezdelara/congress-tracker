@@ -10,7 +10,7 @@ import { prepareBill, type PreparedBill } from "../digest/prepare";
 import { PROMPT_VERSION, singlePassMessages, type DigestMessages } from "../digest/prompt";
 import { inputsRecord } from "../digest/write";
 import type { BillRef } from "../types";
-import { judgeMessages, parseVerdict, type JudgedSummary } from "./judge";
+import { judgeMessages, parseVerdict, type JudgedSummary, type JudgeRubric } from "./judge";
 import { promptParts } from "./variants";
 
 /*
@@ -52,6 +52,8 @@ export interface JudgeSpec {
   kind: "judge";
   round: string;
   judge: EvalCandidate;
+  /** judge.ts rubric; v1 when absent. */
+  rubric?: JudgeRubric;
   pairs: Array<{ key: string; bill: string; a: SummaryRef; b: SummaryRef }>;
 }
 
@@ -185,7 +187,7 @@ function judgeTasks(db: D1Database, spec: JudgeSpec): Task[] {
     run: 1,
     model,
     // The judge reads the bill text without CRS (CRS can be a contestant); the CRS contestant comes from the full bill.
-    messages: async (p) => judgeMessages(asSeen(p, "hidden").input, await load(pair.a, p), await load(pair.b, p)),
+    messages: async (p) => judgeMessages(asSeen(p, "hidden").input, await load(pair.a, p), await load(pair.b, p), spec.rubric),
     read: (_p, content) => {
       const verdict = parseVerdict(content);
       return verdict
@@ -351,7 +353,7 @@ export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickR
 }
 
 function promptVersionOf(spec: AnySpec, task: Task): string {
-  if (spec.kind === "judge") return "judge-v1";
+  if (spec.kind === "judge") return `judge-${spec.rubric ?? "v1"}`;
   const c = spec.candidates.find((x) => x.key === task.candidate);
   return c?.prompt ? `eval:${c.prompt}` : PROMPT_VERSION;
 }

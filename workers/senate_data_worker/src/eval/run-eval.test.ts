@@ -275,6 +275,21 @@ describe("runEvalTick", () => {
     expect(JSON.parse(out.summary_json as string)).toMatchObject({ winner: "A", margin: "clear", errors_b: [] });
   });
 
+  it("judges with the round's rubric, and fails an unknown one", async () => {
+    mockChat.mockResolvedValue({ content: JSON.stringify({ winner: "tie" }), usage: { cost: 0.001, promptTokens: 1, completionTokens: 1 }, generationId: null, gatewayLogId: null });
+    const judge = (rubric: string) => ({
+      kind: "judge", round: "j", rubric,
+      judge: { key: "sonnet", model: "anthropic/claude-sonnet-5.5", price: { input: 2, output: 10 } },
+      pairs: [{ key: "p1", bill: "119-hr-2140", a: { crs: true }, b: { crs: true } }],
+    });
+    const db = fakeDb([{ id: "j1", spec_json: JSON.stringify(judge("v2")), cap_usd: 1, state: "queued", spent_usd: 0 }]);
+    await runEvalTick({ DB: db } as never);
+    expect(mockChat.mock.calls[0]![2].user).toContain("Short beats complete");
+    const bad = fakeDb([{ id: "j2", spec_json: JSON.stringify(judge("v9")), cap_usd: 1, state: "queued", spent_usd: 0 }]);
+    await runEvalTick({ DB: bad } as never);
+    expect(bad.outputs.get("j2|p1")).toMatchObject({ state: "failed" });
+  });
+
   it("records a judge pair whose summary is missing as failed", async () => {
     const judge = {
       kind: "judge", round: "j",
