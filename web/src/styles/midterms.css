@@ -1,0 +1,219 @@
+@layer components {
+  .midterms {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-24);
+    width: 100%;
+    max-width: 44rem;
+    margin-inline: auto;
+    padding: var(--space-24) 0 var(--space-48);
+  }
+
+  .midterms-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+  }
+
+  .midterms-title {
+    margin: 0;
+    font-size: var(--type-display-size);
+    line-height: var(--type-display-leading);
+    font-weight: 500;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .midterms-lede,
+  .midterms-status,
+  .midterms-footnote {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .midterms-footnote {
+    font-size: var(--type-caption-size);
+    color: hsl(var(--twc-faint));
+  }
+
+  .midterms-status a,
+  .midterms-footnote a,
+  .midterms-official a {
+    color: hsl(var(--twc-foreground));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .midterms-picker-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-8) var(--space-16);
+  }
+
+  .midterms-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  .midterms-picker-label,
+  .midterms-picker-hint {
+    font-size: var(--type-caption-size);
+    color: hsl(var(--twc-faint));
+  }
+
+  .midterms-picker-select {
+    min-height: 2.25rem;
+    min-width: 12rem;
+    padding: 0 var(--space-8);
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: var(--radius-nav);
+    background: hsl(var(--twc-card));
+    color: hsl(var(--twc-foreground));
+    font: inherit;
+    font-size: var(--type-ui-size);
+  }
+
+  .midterms-official {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-8) var(--space-16);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8125rem;
+  }
+
+  .midterms-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12, 0.75rem);
+  }
+
+  .midterms-section-title {
+    margin: 0;
+    font-size: var(--type-ui-size);
+    font-weight: 500;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .midterms-section-count {
+    font-weight: 400;
+    color: hsl(var(--twc-faint));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .midterms-race-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12, 0.75rem);
+  }
+
+  .election-race {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    padding: var(--space-16);
+    border: 1px solid hsl(var(--twc-border));
+    border-radius: var(--radius-card);
+    background: hsl(var(--twc-card));
+  }
+
+  .election-race-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4) var(--space-12, 0.75rem);
+  }
+
+  .election-race-title {
+    margin: 0;
+    font-size: var(--type-ui-size);
+    font-weight: 500;
+    color: hsl(var(--twc-foreground));
+  }
+
+  .election-race-tags,
+  .election-rating,
+  .election-race-note,
+  .election-candidate-facts {
+    margin: 0;
+    font-size: var(--type-caption-size);
+    line-height: 1.4;
+    color: hsl(var(--twc-secondary));
+  }
+
+  .election-rating--competitive {
+    color: hsl(var(--twc-foreground));
+    font-weight: 500;
+  }
+
+  .election-rating-source {
+    font-weight: 400;
+    color: hsl(var(--twc-faint));
+  }
+
+  .election-rating-source a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .election-candidates {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .election-candidate {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding-block: var(--space-8);
+    border-top: 1px solid hsl(var(--twc-border));
+  }
+
+  .election-candidate-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-4) var(--space-8);
+  }
+
+  .election-candidate-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: hsl(var(--twc-foreground));
+  }
+
+  /* Same neutral color for every party: no candidate is visually louder than another. */
+  .election-party {
+    font-size: var(--type-caption-size);
+    color: hsl(var(--twc-secondary));
+  }
+
+  .election-candidate-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-12, 0.75rem);
+  }
+
+  .election-candidate-links:empty {
+    display: none;
+  }
+
+  .election-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.75rem;
+    font-size: var(--type-caption-size);
+    color: hsl(var(--twc-secondary));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}

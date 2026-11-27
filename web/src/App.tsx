@@ -5,6 +5,7 @@ import { AppLayout } from './layouts/AppLayout'
 import Home from './routes/Home'
 
 const DebugPage = lazy(() => import('./routes/DebugPage'))
+const Midterms = lazy(() => import('./routes/Midterms'))
 
 const routerFuture = {
   v7_startTransition: true,
@@ -17,6 +18,14 @@ function App() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Home />} />
+          <Route
+            path="/midterms/:state?"
+            element={
+              <Suspense fallback={<p className="text-ui font-normal text-faint">Loading…</p>}>
+                <Midterms />
+              </Suspense>
+            }
+          />
           <Route
             path="/debug"
             element={
