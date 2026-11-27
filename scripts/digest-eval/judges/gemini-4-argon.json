@@ -1,0 +1,1 @@
+{ "key": "gemini-4-argon", "model": "google/gemini-4-argon", "price": { "input": 2, "output": 10 }, "maxTokens": 8000, "reasoning": { "effort": "low" } }

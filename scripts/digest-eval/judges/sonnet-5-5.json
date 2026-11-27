@@ -1,0 +1,1 @@
+{ "key": "sonnet-5-5", "model": "anthropic/claude-sonnet-5.5", "price": { "input": 2, "output": 10 }, "maxTokens": 3000, "temperature": 0 }

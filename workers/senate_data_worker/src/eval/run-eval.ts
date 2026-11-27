@@ -3,12 +3,15 @@ import { ensureSchema } from "../d1/schema";
 import { checkSummary } from "../digest/checks";
 import { estimateCost } from "../digest/cost";
 import type { DigestModel } from "../digest/models";
+import type { CheckableSummary } from "../digest/checks";
 import { chatCompletion } from "../digest/openrouter-client";
 import { parseSummaryReply } from "../digest/parse";
 import { prepareBill, type PreparedBill } from "../digest/prepare";
-import { PROMPT_VERSION, singlePassMessages } from "../digest/prompt";
+import { PROMPT_VERSION, singlePassMessages, type DigestMessages } from "../digest/prompt";
 import { inputsRecord } from "../digest/write";
 import type { BillRef } from "../types";
+import { judgeMessages, parseVerdict, type JudgedSummary } from "./judge";
+import { promptParts } from "./variants";
 
 /*
  * Eval rounds, run by the production worker on demand. A request (a row in eval_requests, written by
@@ -27,6 +30,8 @@ export interface EvalCandidate {
   maxTokens?: number;
   /** Normal-API price per million tokens, for the cap check before each call. */
   price: { input: number; output: number };
+  /** Prompt version from variants.ts; production's prompt when absent. */
+  prompt?: string;
 }
 
 export interface EvalSpec {
@@ -37,6 +42,30 @@ export interface EvalSpec {
   /** "hidden" (default): the model gets no CRS summary, as an eval of writing from the bill itself. */
   crs?: "hidden" | "given";
   candidates: EvalCandidate[];
+}
+
+/** A summary to judge: one the worker wrote in an earlier request, or the bill's official CRS summary. */
+export type SummaryRef = { request: string; item: string } | { crs: true };
+
+/** A judge round: each pair is one call, A and B in the order given (rounds list both orders). */
+export interface JudgeSpec {
+  kind: "judge";
+  round: string;
+  judge: EvalCandidate;
+  pairs: Array<{ key: string; bill: string; a: SummaryRef; b: SummaryRef }>;
+}
+
+type AnySpec = (EvalSpec & { kind?: "write" }) | JudgeSpec;
+
+/** One call of a round: what it is about, and how to build its messages and read its reply. */
+interface Task {
+  key: string;
+  bill: string;
+  candidate: string;
+  run: number;
+  model: DigestModel;
+  messages(p: PreparedBill): Promise<DigestMessages>;
+  read(p: PreparedBill, content: string | null): { state: "ok" | "rejected"; summary: unknown; blocking: string[]; warnings: string[] };
 }
 
 export interface EvalTickResult {
@@ -121,6 +150,57 @@ async function finish(db: D1Database, id: string, state: string, error: string |
     .run();
 }
 
+function writeTasks(spec: EvalSpec): Task[] {
+  return itemsOf(spec).map((item) => {
+    const parts = promptParts(item.candidate.prompt);
+    return {
+      key: item.key,
+      bill: item.bill,
+      candidate: item.candidate.key,
+      run: item.run,
+      model: modelOf(item.candidate),
+      messages: async (p) => singlePassMessages(p.input, parts),
+      read: (p, content) => {
+        const parsed = parseSummaryReply(content, { basis: p.basis, parts: p.parts, totalTokens: p.totalTokens });
+        if (!parsed) return { state: "rejected", summary: null, blocking: ["reply did not parse"], warnings: [] };
+        const check = checkSummary(parsed.checkable, p.checkSources, { long: false });
+        return { state: check.blocking.length ? "rejected" : "ok", summary: parsed.checkable, blocking: check.blocking, warnings: check.warnings };
+      },
+    };
+  });
+}
+
+function judgeTasks(db: D1Database, spec: JudgeSpec): Task[] {
+  const model = modelOf(spec.judge);
+  const load = async (ref: SummaryRef, p: PreparedBill): Promise<JudgedSummary> => {
+    if ("crs" in ref) {
+      if (!p.input.crs?.text) throw new Error("bill has no CRS summary");
+      return { kind: "crs", text: p.input.crs.text };
+    }
+    const row = await db
+      .prepare(`SELECT summary_json FROM eval_outputs WHERE request_id = ? AND item_key = ?`)
+      .bind(ref.request, ref.item)
+      .first<{ summary_json: string | null }>();
+    if (!row?.summary_json) throw new Error(`no summary for ${ref.request} ${ref.item}`);
+    return { kind: "summary", summary: JSON.parse(row.summary_json) as CheckableSummary };
+  };
+  return spec.pairs.map((pair) => ({
+    key: pair.key,
+    bill: pair.bill,
+    candidate: spec.judge.key,
+    run: 1,
+    model,
+    // The judge reads the bill text without CRS (CRS can be a contestant); the CRS contestant comes from the full bill.
+    messages: async (p) => judgeMessages(asSeen(p, "hidden").input, await load(pair.a, p), await load(pair.b, p)),
+    read: (_p, content) => {
+      const verdict = parseVerdict(content);
+      return verdict
+        ? { state: "ok", summary: verdict, blocking: [], warnings: [] }
+        : { state: "rejected", summary: null, blocking: ["verdict did not parse"], warnings: [] };
+    },
+  }));
+}
+
 /** One minute's work: continue the oldest open request until its time slice, its cap, or its items run out. */
 export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickResult> {
   await ensureSchema(env.DB);
@@ -128,22 +208,32 @@ export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickR
   if (!claimed) return { request: null, written: 0, remaining: 0, spent_usd: 0 };
 
   const req = claimed;
-  let spec: EvalSpec;
+  let spec: AnySpec;
+  let tasks: Task[];
   try {
-    spec = JSON.parse(req.spec_json) as EvalSpec;
-    if (!Array.isArray(spec.bills) || !Array.isArray(spec.candidates) || !spec.candidates.length) throw new Error("spec needs bills and candidates");
+    spec = JSON.parse(req.spec_json) as AnySpec;
+    if (spec.kind === "judge") {
+      if (!Array.isArray(spec.pairs) || !spec.judge) throw new Error("judge spec needs judge and pairs");
+      tasks = judgeTasks(env.DB, spec);
+    } else {
+      if (!Array.isArray(spec.bills) || !Array.isArray(spec.candidates) || !spec.candidates.length) throw new Error("spec needs bills and candidates");
+      tasks = writeTasks(spec);
+    }
   } catch (err: unknown) {
-    await finish(env.DB, req.id, "failed", err instanceof Error ? err.message : String(err));
+    await finish(env.DB, req.id, "failed", messageOf(err));
     return { request: req.id, written: 0, remaining: 0, spent_usd: req.spent_usd, state: "failed" };
   }
+  const theSpec = spec;
+  // A judge needs the CRS text to show the CRS contestant; it hides CRS from its own sources (judgeTasks).
+  const crs = theSpec.kind === "judge" ? "given" : theSpec.crs;
 
   const { results } = await env.DB.prepare(`SELECT item_key FROM eval_outputs WHERE request_id = ?`).bind(req.id).all<{ item_key: string }>();
   const done = new Set((results ?? []).map((r) => r.item_key));
-  const pending = itemsOf(spec).filter((i) => !done.has(i.key));
+  const pending = tasks.filter((t) => !done.has(t.key));
 
   const prepared = new Map<string, Promise<PreparedBill>>();
   const prepare = (bill: string) => {
-    if (!prepared.has(bill)) prepared.set(bill, prepareBill(env, parseBillId(bill)).then((p) => asSeen(p, spec.crs)));
+    if (!prepared.has(bill)) prepared.set(bill, prepareBill(env, parseBillId(bill)).then((p) => asSeen(p, crs)));
     return prepared.get(bill)!;
   };
 
@@ -158,61 +248,54 @@ export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickR
   async function worker(): Promise<void> {
     for (;;) {
       if (capped || Date.now() > startedBy) return;
-      const item = queue.shift();
-      if (!item) return;
-      const row = await runItem(item);
+      const task = queue.shift();
+      if (!task) return;
+      const row = await runTask(task);
       if (row === "capped") {
         capped = true;
-        queue.unshift(item);
+        queue.unshift(task);
         return;
       }
       written += 1;
     }
   }
 
-  async function runItem(item: (typeof pending)[number]): Promise<"ok" | "capped"> {
+  async function runTask(task: Task): Promise<"ok" | "capped"> {
     let p: PreparedBill;
+    let messages: DigestMessages;
     try {
-      p = await prepare(item.bill);
+      p = await prepare(task.bill);
+      if (p.parts.length > 0) throw new Error("long bill (split into parts): not supported in eval rounds");
+      messages = await task.messages(p);
     } catch (err: unknown) {
-      await saveOutput(env.DB, req.id, item, { state: "failed", model: item.candidate.model, error: `prepare: ${messageOf(err)}` });
+      await saveOutput(env.DB, req.id, task, { state: "failed", model: task.model.id, error: `prepare: ${messageOf(err)}` });
       return "ok";
     }
-    if (p.parts.length > 0) {
-      await saveOutput(env.DB, req.id, item, { state: "failed", model: item.candidate.model, error: "long bill (split into parts): not supported in eval rounds" });
-      return "ok";
-    }
-    const model = modelOf(item.candidate);
-    const messages = singlePassMessages(p.input);
     // The cap assumes the full output allowance (estimateCost does so for "anthropic" models): reasoning models run
     // well past the summary writer's 4k guess (Gemini 4 Hydrogen cost ~1.6x that estimate in round 8).
-    const estimate = estimateCost({ ...model, provider: "anthropic" }, [messages], "direct");
+    const estimate = estimateCost({ ...task.model, provider: "anthropic" }, [messages], "direct");
     if (committed + reserved + estimate > req.cap_usd) return "capped";
     reserved += estimate;
     let cost = 0;
     try {
-      const reply = await chatCompletion(env, model, messages, {
+      const reply = await chatCompletion(env, task.model, messages, {
         estimate,
         record: async (usd) => {
           cost += usd;
         },
       });
-      const parsed = parseSummaryReply(reply.content, { basis: p.basis, parts: p.parts, totalTokens: p.totalTokens });
-      const check = parsed ? checkSummary(parsed.checkable, p.checkSources, { long: false }) : null;
-      await saveOutput(env.DB, req.id, item, {
-        state: !parsed ? "rejected" : check!.blocking.length ? "rejected" : "ok",
-        model: model.id,
+      const out = task.read(p, reply.content);
+      await saveOutput(env.DB, req.id, task, {
+        ...out,
+        model: task.model.id,
         content: reply.content,
-        summary: parsed?.checkable ?? null,
-        blocking: parsed ? check!.blocking : ["reply did not parse"],
-        warnings: check?.warnings ?? [],
         cost,
         promptTokens: reply.usage.promptTokens,
         completionTokens: reply.usage.completionTokens,
-        inputs: { ...inputsRecord(p), crs_given: spec.crs === "given", fingerprint: p.fingerprint, prompt_version: PROMPT_VERSION },
+        inputs: { ...inputsRecord(p), crs_given: crs === "given", fingerprint: p.fingerprint, prompt_version: promptVersionOf(theSpec, task) },
       });
     } catch (err: unknown) {
-      await saveOutput(env.DB, req.id, item, { state: "failed", model: model.id, cost, error: messageOf(err) });
+      await saveOutput(env.DB, req.id, task, { state: "failed", model: task.model.id, cost, error: messageOf(err) });
     } finally {
       reserved -= estimate;
       committed += cost;
@@ -238,13 +321,19 @@ export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickR
   return { request: req.id, written, remaining, spent_usd: round6(committed), state };
 }
 
+function promptVersionOf(spec: AnySpec, task: Task): string {
+  if (spec.kind === "judge") return "judge-v1";
+  const c = spec.candidates.find((x) => x.key === task.candidate);
+  return c?.prompt ? `eval:${c.prompt}` : PROMPT_VERSION;
+}
+
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err)).slice(0, 500);
 
 async function saveOutput(
   db: D1Database,
   requestId: string,
-  item: { key: string; bill: string; candidate: EvalCandidate; run: number },
+  item: { key: string; bill: string; candidate: string; run: number },
   o: {
     state: "ok" | "rejected" | "failed";
     model: string;
@@ -270,7 +359,7 @@ async function saveOutput(
       requestId,
       item.key,
       item.bill,
-      item.candidate.key,
+      item.candidate,
       item.run,
       o.model,
       o.state,
