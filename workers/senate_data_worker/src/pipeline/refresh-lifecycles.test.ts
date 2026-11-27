@@ -4,6 +4,7 @@ import { resetSchemaFlag } from "../d1/schema";
 import {
   lifecycleRefreshPriority,
   mergeLifecycleRefreshCandidates,
+  recheckStoredLaws,
   refreshBillLifecycles,
 } from "./refresh-lifecycles";
 
@@ -13,6 +14,7 @@ const mockUpsertLifecycle = vi.fn();
 const mockSelectLawsUpdatedBefore = vi.fn();
 const mockClearLifecycleEnactment = vi.fn();
 const mockFetchBillLifecycleSource = vi.fn();
+const mockCountLawsUpdatedBefore = vi.fn();
 
 vi.mock("../d1/lifecycle", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../d1/lifecycle")>();
@@ -24,6 +26,7 @@ vi.mock("../d1/lifecycle", async (importOriginal) => {
     clearLifecycleEnactment: (...args: unknown[]) => mockClearLifecycleEnactment(...args),
     getLifecyclesForBills: (...args: unknown[]) => mockGetLifecyclesForBills(...args),
     upsertLifecycle: (...args: unknown[]) => mockUpsertLifecycle(...args),
+    countLawsUpdatedBefore: (...args: unknown[]) => mockCountLawsUpdatedBefore(...args),
   };
 });
 
@@ -333,5 +336,83 @@ describe("refreshBillLifecycles", () => {
     await refreshBillLifecycles({ DB: {} as D1Database, CONGRESS: "119", SESSION: "2" } as never, [], "test");
 
     expect(mockClearLifecycleEnactment).not.toHaveBeenCalled();
+  });
+});
+
+describe("recheckStoredLaws", () => {
+  const env = { DB: {} as D1Database, CONGRESS: "119", SESSION: "2" } as never;
+  const milestones = (m: Record<string, unknown>) => ({
+    presented_date: null,
+    signed_date: null,
+    vetoed_date: null,
+    became_law_date: null,
+    law_kind: null,
+    public_law: null,
+    latest_action_date: null,
+    latest_action_text: null,
+    unrecognized: [],
+    ...m,
+  });
+
+  beforeEach(() => {
+    resetSchemaFlag();
+    vi.clearAllMocks();
+    mockSelectLawsUpdatedBefore.mockResolvedValue([
+      { bill_congress: 119, bill_type: "HR", bill_number: 766 },
+      { bill_congress: 119, bill_type: "S", bill_number: 629 },
+      { bill_congress: 119, bill_type: "S", bill_number: 2 },
+    ]);
+    mockGetLifecyclesForBills.mockResolvedValue(
+      new Map([
+        ["119:HR:766", row({ bill_number: 766, became_law_date: "2025-01-28", public_law: "119-120", updated_at: "2026-10-09T00:00:00.000Z" })],
+        ["119:S:629", row({ bill_type: "S", bill_number: 629, became_law_date: "2026-07-12", law_kind: "law_unsigned", public_law: "119-102", updated_at: "2026-07-18T00:00:00.000Z" })],
+        ["119:S:2", row({ bill_type: "S", bill_number: 2, became_law_date: "2026-07-01", law_kind: "signed", public_law: "119-90", updated_at: "2026-07-14T00:00:00.000Z" })],
+      ])
+    );
+    mockFetchBillLifecycleSource.mockImplementation(async (_env: unknown, ref: { number: number }) => ({
+      introducedDate: null,
+      milestones:
+        ref.number === 766
+          ? milestones({ latest_action_text: "Referred to the House Committee on Energy and Commerce." })
+          : ref.number === 629
+            ? milestones({ became_law_date: "2026-07-12", signed_date: "2026-07-12", law_kind: "signed", public_law: "119-102" })
+            : milestones({ became_law_date: "2026-07-01", signed_date: "2026-07-01", law_kind: "signed", public_law: "119-90" }),
+    }));
+    mockUpsertLifecycle.mockResolvedValue(undefined);
+    mockClearLifecycleEnactment.mockResolvedValue(undefined);
+    mockCountLawsUpdatedBefore.mockResolvedValue(0);
+  });
+
+  it("dry run reports every change and writes nothing", async () => {
+    const result = await recheckStoredLaws(env, { limit: 40, apply: false, trigger: "test" });
+    expect(result).toMatchObject({ applied: false, checked: 3, unchanged: 1, warnings: [] });
+    expect(result.changes).toEqual([
+      {
+        bill: expect.stringContaining("766"),
+        before: { became_law_date: "2025-01-28", law_kind: null, public_law: "119-120" },
+        after: { became_law_date: null, law_kind: null, public_law: null },
+      },
+      {
+        bill: expect.stringContaining("629"),
+        before: { became_law_date: "2026-07-12", law_kind: "law_unsigned", public_law: "119-102" },
+        after: { became_law_date: "2026-07-12", law_kind: "signed", public_law: "119-102" },
+      },
+    ]);
+    expect(mockUpsertLifecycle).not.toHaveBeenCalled();
+    expect(mockClearLifecycleEnactment).not.toHaveBeenCalled();
+  });
+
+  it("apply writes each law and clears the one Congress.gov does not show", async () => {
+    const result = await recheckStoredLaws(env, { limit: 40, apply: true, trigger: "test" });
+    expect(result.changes).toHaveLength(2);
+    expect(mockUpsertLifecycle).toHaveBeenCalledTimes(3);
+    expect(mockClearLifecycleEnactment).toHaveBeenCalledWith({}, { congress: 119, billType: "HR", billNumber: 766 });
+  });
+
+  it("keeps going past a bill Congress.gov fails on", async () => {
+    mockFetchBillLifecycleSource.mockRejectedValueOnce(new Error("congress.gov 503"));
+    const result = await recheckStoredLaws(env, { limit: 40, apply: true, trigger: "test" });
+    expect(result.checked).toBe(2);
+    expect(result.warnings).toEqual([expect.stringContaining("congress.gov 503")]);
   });
 });

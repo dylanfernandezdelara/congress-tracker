@@ -125,9 +125,11 @@ export const LIFECYCLE_MAX_REFRESHES_PER_RUN = FEED_MAX_BILLS;
 
 /**
  * Laws stored before the status parser read Congress.gov's wording (instead of action codes) are re-checked once,
- * a few per run. A re-check rewrites `updated_at`, so each law leaves the queue after one pass.
+ * a few per daily feed run. A re-check rewrites `updated_at`, so each law leaves the queue after one pass. All 150 were
+ * re-checked on 2026-11-27 with `npm run prod-data -- lifecycle-recheck --apply`; move this cutoff to now (and run that)
+ * after the next parser change.
  */
-export const LIFECYCLE_RECHECK_LAWS_UPDATED_BEFORE = "2026-11-28T00:00:00.000Z";
+export const LIFECYCLE_RECHECK_LAWS_UPDATED_BEFORE = "2026-11-27T02:00:00.000Z";
 export const LIFECYCLE_RECHECKS_PER_RUN = 20;
 
 /**

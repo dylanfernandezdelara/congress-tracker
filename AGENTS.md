@@ -120,6 +120,7 @@ npm run preview   # builds web/dist + `wrangler versions upload`; prints a Previ
 - `POST /__pipeline/run/process-refresh` — hydrate pending `process_refresh_queue` bills only (admin; daily feed also force-refreshes a capped slice of feed bills)
 - `POST /__pipeline/run/executive-posts` — Truth Social executive ingest (admin; also hourly cron)
 - `POST /__pipeline/run/summary-sweep?limit=` — the hourly summary sweep, on demand (admin; `limit` caps both rewrites and batch bills, max `DIGEST_SWEEP_ADMIN_MAX_BILLS`). See **Plain-language summaries** below
+- `POST /__pipeline/run/lifecycle-recheck?limit=&apply=1` — re-read stored laws from Congress.gov and report each status change (admin; **dry run unless `apply=1`**; one-time repair after a parser change, see `LIFECYCLE_RECHECK_LAWS_UPDATED_BEFORE`)
 - `POST /__pipeline/run/disclosures` — local-dev sample disclosures only (`ENABLE_SAMPLE_DISCLOSURES=1` and `ALLOWED_ORIGIN=*` in `.dev.vars`; never in production)
 
 **Sidebar data backfill (production):** Daily cron already chains feed then `member-votes`. After
@@ -154,6 +155,23 @@ web ops UI at `/debug`. See `docs/MONITORING.md`. Manual production ingestion is
 
 Shared stats/feed JSON types live in `shared/stats-api-types.ts` and `shared/feed-api-types.ts`
 (imported by worker + web).
+
+## One-time repairs and backfills (run on demand)
+
+A repair of stored data runs once, on demand, not as a slow drip on a cron. Add the task to
+`workers/senate_data_worker/scripts/prod-tasks.ts` (it calls the worker's own pipeline code), then:
+
+```bash
+cd workers/senate_data_worker
+npm run prod-data -- <task>            # dry run: reads production D1, prints what would change, writes nothing
+npm run prod-data -- <task> --apply    # writes
+```
+
+`scripts/prod-data.mjs` runs the task in Node against production D1 through `wrangler d1 execute --remote` (this
+machine's `wrangler login`; no admin token, no `wrangler dev`). Reads run as they come; writes are held and sent in
+one `--file` before the next read, so 150 bills take ~30 s. Congress.gov calls use `CONGRESS_API_KEY` from `.dev.vars`.
+Check a dry run's changes against Congress.gov before `--apply`. Expose the same task as a `/__pipeline/run/*` route
+when the deployed worker should be able to run it too.
 
 ## Plain-language summaries
 

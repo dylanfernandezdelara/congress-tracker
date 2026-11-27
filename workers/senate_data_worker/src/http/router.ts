@@ -65,6 +65,7 @@ import { buildRecentConfirmations } from "../storage/recent-confirmations";
 import { buildRecentLaws } from "../storage/recent-laws";
 import { runProcessBackfillPipeline } from "../pipeline/run-process-backfill";
 import { refreshBillProcessQueue } from "../pipeline/refresh-bill-process";
+import { recheckStoredLaws } from "../pipeline/refresh-lifecycles";
 import { buildSessionStats } from "../storage/session-stats";
 import type {
   Chamber,
@@ -469,6 +470,12 @@ const PIPELINE_ROUTES: Record<string, (ctx: RouteContext) => Promise<object>> = 
     runExecutivePostsPipeline(env, { trigger: "admin" }),
   "/__pipeline/run/process-backfill": ({ env }) => runProcessBackfillPipeline(env),
   "/__pipeline/run/process-refresh": ({ env }) => refreshBillProcessQueue(env),
+  // One-time repair of laws stored by an earlier parser. Dry run unless ?apply=1; ?limit= per call (default 40, max 200).
+  "/__pipeline/run/lifecycle-recheck": ({ env, url }) => {
+    const requested = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+    const limit = Number.isFinite(requested) && requested > 0 ? Math.min(requested, 200) : 40;
+    return recheckStoredLaws(env, { limit, apply: url.searchParams.get("apply") === "1", trigger: "admin" });
+  },
   // Summaries for older bills. Dry run unless ?apply=1: ?scope=site (bills on the site, queued now) or
   // ?scope=congress (every bill of the Congress, walked by the hourly sweep). Returns counts and estimated cost.
   "/__pipeline/run/summary-backfill": ({ env, url }) => {

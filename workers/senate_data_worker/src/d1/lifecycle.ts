@@ -372,6 +372,16 @@ export async function selectLawsUpdatedBefore(
   return results ?? [];
 }
 
+/** How many enacted rows were last written before `beforeIso`. */
+export async function countLawsUpdatedBefore(db: D1Database, congress: number, beforeIso: string): Promise<number> {
+  await ensureSchema(db);
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM bill_lifecycle WHERE congress = ? AND became_law_date IS NOT NULL AND updated_at < ?`)
+    .bind(congress, beforeIso)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
 export async function selectPresentedPendingLifecycleBills(
   db: D1Database,
   congress: number,
