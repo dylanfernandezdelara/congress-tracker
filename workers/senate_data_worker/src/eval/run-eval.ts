@@ -184,7 +184,9 @@ export async function runEvalTick(env: Env, now = Date.now()): Promise<EvalTickR
     }
     const model = modelOf(item.candidate);
     const messages = singlePassMessages(p.input);
-    const estimate = estimateCost(model, [messages], "direct");
+    // The cap assumes the full output allowance (estimateCost does so for "anthropic" models): reasoning models run
+    // well past the summary writer's 4k guess (Gemini 4 Hydrogen cost ~1.6x that estimate in round 8).
+    const estimate = estimateCost({ ...model, provider: "anthropic" }, [messages], "direct");
     if (committed + reserved + estimate > req.cap_usd) return "capped";
     reserved += estimate;
     let cost = 0;
