@@ -1,0 +1,77 @@
+{
+  "round": "round8-model-screen",
+  "bills": [
+    "119-hr-618",
+    "119-s-1884",
+    "119-s-2398",
+    "119-s-5568",
+    "119-hr-1041",
+    "119-hres-1335",
+    "119-hr-5625",
+    "119-hconres-86"
+  ],
+  "runs": 1,
+  "crs": "hidden",
+  "candidates": [
+    {
+      "key": "luna",
+      "model": "openai/gpt-6-luna",
+      "reasoning": {
+        "effort": "high"
+      },
+      "maxTokens": 12000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      }
+    },
+    {
+      "key": "luna-pro",
+      "model": "openai/gpt-6-luna-pro",
+      "reasoning": {
+        "effort": "high"
+      },
+      "maxTokens": 12000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      }
+    },
+    {
+      "key": "haiku-5-5",
+      "model": "anthropic/claude-haiku-5.5",
+      "maxTokens": 8000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      }
+    },
+    {
+      "key": "muse-ember",
+      "model": "meta/muse-ember",
+      "maxTokens": 8000,
+      "price": {
+        "input": 0.1,
+        "output": 0.5
+      }
+    },
+    {
+      "key": "gemini-4-hydrogen",
+      "model": "google/gemini-4-hydrogen",
+      "maxTokens": 8000,
+      "price": {
+        "input": 1.5,
+        "output": 7.5
+      }
+    },
+    {
+      "key": "deepseek-v4-1-flash",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "maxTokens": 8000,
+      "price": {
+        "input": 0.14,
+        "output": 0.42
+      }
+    }
+  ]
+}

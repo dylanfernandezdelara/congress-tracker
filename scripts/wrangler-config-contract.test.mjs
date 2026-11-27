@@ -131,8 +131,12 @@ test('cron triggers keep the daily feed, hourly executive and hourly summary swe
   // Here we only assert the lease-safety invariant: all pipelines share one
   // D1 write lease, so crons must not fire on the same minute.
   const root = parseWranglerConfig(rootConfigPath)
-  assert.equal(root.crons.length, 3, 'expected exactly three cron triggers')
-  const minutes = root.crons.map((cron) => {
+  // The every-minute eval-round check (eval/run-eval.ts) takes no lease and writes only eval tables.
+  const EVAL_CRON = '* * * * *'
+  assert.ok(root.crons.includes(EVAL_CRON), 'expected the eval-round cron')
+  const leased = root.crons.filter((cron) => cron !== EVAL_CRON)
+  assert.equal(leased.length, 3, 'expected exactly three lease-taking cron triggers')
+  const minutes = leased.map((cron) => {
     const minuteField = cron.split(' ')[0]
     assert.match(minuteField, /^\d+$/, `cron minute must be numeric: ${cron}`)
     return Number(minuteField)

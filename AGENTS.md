@@ -136,7 +136,8 @@ re-run `npm run seed` if the House/Senate left rail goes empty during UI work.
 **Daily ingest (production):** Cloudflare cron runs `runFeedWithMemberVotes` (feed then
 best-effort `member-votes`) at **10:00 UTC**, `runExecutivePostsPipeline` hourly at **:20**
 (`20 * * * *`), and the summary sweep hourly at **:35** (`35 * * * *`) — see `[triggers]` in
-`workers/senate_data_worker/wrangler.toml` (`crons = ["0 10 * * *", "20 * * * *", "35 * * * *"]`).
+`workers/senate_data_worker/wrangler.toml` (`crons = ["0 10 * * *", "20 * * * *", "35 * * * *", "* * * * *"]`; the
+last is the eval-round check, which takes no lease and writes only eval tables).
 All three share one write lease, so they fire on distinct minutes; a :35 sweep that runs its
 full 15 minutes still frees the lease before the 10:00 feed.
 `wrangler deploy` applies that schedule; use `npm run deploy:triggers` in
@@ -251,6 +252,14 @@ way they would, so summaries lead with concrete effects on people and stay stric
   strength errors, but passed only 3 of Dylan's 5 round-2 picks on the run he reviewed (1 of 5 across all three
   runs; Gemini 5 of 5 either way): stricter on inferred wording ("stricter rules", "who it affects"). Use it as a
   second opinion on factual support. A stricter groups rule (fail a group unless the sources name it or it is the direct subject of a provision) was tried on round 6 (2026-10-04; `judge/round6-v3.4-judge-strict-groups.json`) and not adopted: it fails "California regulators", a group in Dylan's round-2 pick.
+- **Remote eval rounds** (since 2026-11-27): the production worker writes eval outputs with its own OpenRouter key, so
+  rounds need no key on the dev machine. `node scripts/digest-eval/remote.mjs estimate <round.json>` (free), then
+  `request <round.json> --cap <usd>` writes a row to `eval_requests`; the one-minute cron (`* * * * *`,
+  `eval/run-eval.ts`) writes each candidate's summary with the worker's `prepareBill`, v3.4 prompt and checks (CRS hidden
+  from the model and the checks unless the round sets `crs: "given"`), stops at the cap, and stores replies in
+  `eval_outputs`; `status` and `fetch <id>` bring them back to `artifacts/digest-eval/out/<round>/`. Single-pass bills
+  only. It writes no digest and does not count against `DIGEST_DAILY_BUDGET_USD`. Bill sets: `bills-2026-11.json`
+  (`tuning` for rounds, `heldout` only for the final pick).
 - **Evals** `scripts/digest-eval/` imports the worker's prompt and checks. `npm run digest:regress`
   (free) runs the checks over saved eval outputs and fails if a reviewer-picked summary would be
   blocked. Model rounds and the calibrated judge are in the same folder.

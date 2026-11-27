@@ -1,0 +1,23 @@
+{
+  "note": "Picked 2026-11-27 from production bills with a CRS summary, single-pass, unused in rounds 1-7. Tune prompts and models on `tuning` only; judge the final pick on `heldout` only (never look at held-out outputs while tuning).",
+  "tuning": [
+    "119-hr-618",
+    "119-s-1884",
+    "119-s-2398",
+    "119-s-5568",
+    "119-hr-1041",
+    "119-hres-1335",
+    "119-hr-5625",
+    "119-hconres-86"
+  ],
+  "heldout": [
+    "119-hr-2808",
+    "119-s-98",
+    "119-sjres-31",
+    "119-hr-3978",
+    "119-hr-7401",
+    "119-hr-8884",
+    "119-hr-2071",
+    "119-hr-8483"
+  ]
+}
